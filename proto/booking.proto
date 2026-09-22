@@ -1,0 +1,79 @@
+// İç servis sözleşmesi — protobuf v3
+// Next.js uygulaması ile bağımsız backend servis modülleri arasındaki
+// gRPC/Protobuf arayüzü. Dinamik yükleme (@grpc/proto-loader) kullanılır.
+syntax = "proto3";
+
+package booking.v1;
+
+// YYYY-MM-DD; aralık [start, end) yarı-açıktır (checkIn <= d < checkOut).
+message DateRange {
+  string start = 1;
+  string end = 2;
+}
+
+// --- InventoryService ----------------------------------------------------
+
+message RoomAvailabilityRequest {
+  string room_id = 1;
+  DateRange range = 2;
+}
+
+message PricePoint {
+  string date = 1;
+  double price = 2;
+  bool available = 3;
+}
+
+message RoomAvailabilityResponse {
+  bool available = 1;
+  repeated PricePoint prices = 2;
+  double estimated_total = 3;
+  string currency = 4;
+  int32 available_rooms = 5;
+}
+
+// --- BookingService ------------------------------------------------------
+
+message ReserveRoomRequest {
+  string room_id = 1;
+  string property_id = 2;
+  DateRange range = 3;
+  int32 guest_count = 4;
+  // Yazar (caller) kullanıcı — BOLA denetimleri için servis tarafında da doğrulanır.
+  string requester_id = 5;
+  string idempotency_key = 6;
+}
+
+message ReserveRoomResponse {
+  string booking_id = 1;
+  string status = 2;
+  double total_price = 3;
+  string currency = 4;
+}
+
+// --- PaymentService ------------------------------------------------------
+
+message ChargeRequest {
+  string booking_id = 1;
+  double amount = 2;
+  string currency = 3;
+  string requester_id = 4;
+}
+
+message ChargeResponse {
+  string payment_id = 1;
+  string status = 2;
+  double charged_amount = 3;
+}
+
+service InventoryService {
+  rpc GetRoomAvailability(RoomAvailabilityRequest) returns (RoomAvailabilityResponse);
+}
+
+service BookingService {
+  rpc ReserveRoom(ReserveRoomRequest) returns (ReserveRoomResponse);
+}
+
+service PaymentService {
+  rpc Charge(ChargeRequest) returns (ChargeResponse);
+}

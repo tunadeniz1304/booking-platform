@@ -205,3 +205,29 @@ model Favorite {
   @@unique([userId, propertyId])
   @@index([propertyId])
 }
+
+enum OutboxStatus {
+  PENDING
+  PROCESSING
+  DONE
+  FAILED
+}
+
+model OutboxMessage {
+  id             String       @id @default(cuid())
+  eventType      String
+  aggregateId    String
+  aggregateType  String
+  payload        Json
+  correlationId  String?
+  status         OutboxStatus @default(PENDING)
+  attempts       Int          @default(0)
+  availableAfter DateTime     @default(now())
+  createdAt      DateTime     @default(now())
+  processedAt    DateTime?
+  lastError      String?
+
+  @@index([status, availableAfter])
+  @@index([aggregateType, aggregateId])
+  @@index([correlationId])
+}

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 import { Redis } from "@upstash/redis";
+import { resolveClientIp } from "@/lib/security/ip";
 
 const JWT_SECRET = process.env.JWT_SECRET || "";
 const REDIS_URL = process.env.REDIS_URL || "redis://localhost:6379";
@@ -19,6 +20,7 @@ const PUBLIC_PATHS = [
   "/api/properties",
   "/api/search",
   "/api/locations",
+  "/api/rooms",
 ];
 
 const AUTH_PATHS = ["/api/auth/login", "/api/auth/register"];
@@ -50,11 +52,8 @@ function getUpstash(): Redis | null {
 const memoryStore = new Map<string, number[]>();
 
 function getClientIp(req: NextRequest): string {
-  const forwarded = req.headers.get("x-forwarded-for");
-  if (forwarded) {
-    return forwarded.split(",")[0].trim();
-  }
-  return req.ip || "unknown";
+  // IP-spoof korumalı çözüm (güvenilir proxy zinciri + enjeksiyon trim)
+  return resolveClientIp(req);
 }
 
 function getRateLimitKey(req: NextRequest): string {

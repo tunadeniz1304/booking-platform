@@ -9,7 +9,7 @@
  */
 
 /** Dünyada atomik olarak gerçekleştirilen bir niyetli işlem (yazma). */
-export interface Command<TPayload = unknown, TResult = unknown> {
+export interface Command<TPayload = unknown> {
   /** Eşsiz komut tipi, örn. "booking.create". */
   readonly type: string;
   readonly payload: TPayload;
@@ -23,7 +23,7 @@ export interface Command<TPayload = unknown, TResult = unknown> {
 }
 
 /** Yan etkisiz, sadece okuma niyetli işlem. */
-export interface Query<TPayload = unknown, TResult = unknown> {
+export interface Query<TPayload = unknown> {
   readonly type: string;
   readonly payload: TPayload;
   readonly correlationId?: string;

@@ -32,7 +32,6 @@ export class EventBus {
     }
     r.onMessage((channel, message) => {
       if (!channel.startsWith("event:")) return;
-      const type = channel.slice("event:".length);
       try {
         const event = JSON.parse(message) as DomainEvent;
         void this.deliverLocal(event);

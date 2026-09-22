@@ -1,5 +1,4 @@
 import { Query, QueryHandler } from "./types";
-import { randomUUID } from "crypto";
 
 /** Query Bus: salt-okuma read-model sorgularını dağıtır. Yan etkisiz. */
 

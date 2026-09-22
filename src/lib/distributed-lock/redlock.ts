@@ -70,7 +70,6 @@ export class Redlock {
     const retryDelayMs = this.defaults.retryDelayMs ?? 100;
 
     const token = randomUUID();
-    let lastError: unknown = null;
 
     for (let attempt = 0; attempt <= retryCount; attempt++) {
       try {
@@ -79,8 +78,8 @@ export class Redlock {
           const fencingToken = await this.nextFencingToken(resource);
           return { resource, token, fencingToken, ttlMs: ttl };
         }
-      } catch (error) {
-        lastError = error;
+      } catch {
+        // deneme başarısız → jitter'lı bekle ve yeniden dene
       }
       // jitter'lı bekleme → thundering herd azalt
       const jitter = Math.floor(Math.random() * retryDelayMs);

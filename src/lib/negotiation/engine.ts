@@ -55,7 +55,7 @@ function clamp(value: number, min: number, max: number): number {
  */
 export function computeFloorRatio(input: Pick<NegotiationInput, "demandSignal" | "isFlexibleDates" | "leadDays">): number {
   return clamp(
-    0.88 - input.demandSignal * 0.12 - (input.isFlexibleDates ? 0.04 : 0) - (input.leadDays > 45 ? 0.03 : 0),
+    0.88 + input.demandSignal * 0.12 - (input.isFlexibleDates ? 0.04 : 0) - (input.leadDays > 45 ? 0.03 : 0),
     0.68,
     0.92
   );
@@ -64,7 +64,7 @@ export function computeFloorRatio(input: Pick<NegotiationInput, "demandSignal" |
 export function negotiate(input: NegotiationInput): NegotiationResult {
   const rulesFired: string[] = [];
   const reason: string[] = [];
-  const { requestedPrice, dynamicPrice, basePrice, round, maxRounds } = input;
+  const { requestedPrice, dynamicPrice, round, maxRounds } = input;
   const floorRatio = computeFloorRatio(input);
   const floorPrice = dynamicPrice * floorRatio;
 

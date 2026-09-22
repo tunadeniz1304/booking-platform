@@ -138,7 +138,16 @@ güncellemeleri bu olayı dinler).
 
 ## 11. Veri Tabanı
 
-- PostgreSQL 16, `transaction` + `pg_trgm` (fuzzy) eklentileri.
+- PostgreSQL 16 + pgvector, `transaction`, `pg_trgm` (fuzzy) eklentileri.
 - Outbox tablosu üretimde sırt çıkarılmaz; biriktirme SAGA/outbox ile beslenir.
-- Bölümlendirme (partitioning) önerisi: `Booking` ve `OutboxMessage` zaman dilimli
-  bölümlerle ölçeklendirilebilir — varsayılan kurulumda emekleme aşaması yok, olgunlaştıkça eklenir.
+- **Partitioning:** `Availability` tablosu (en yüksek hacim) için aylık RANGE
+  partition migration'ı hazır ve doğrulanmış durumda:
+  `migrations/manual/availability-monthly-partitions.sql`. PK `(id, date)`'e
+  taşınır, `(roomId, date)` unique'i partition anahtarını içerdiğinden Prisma
+  upsert ve booking FOR UPDATE akışları aynen çalışır; taşma için DEFAULT bölüm
+  bulunur. Varsayılan kurulumda UYGULANMAZ (ölçek geçişinde tek komutla):
+  ```
+  docker exec -i booking-db-1 psql -U booking -d booking -f - < migrations/manual/availability-monthly-partitions.sql
+  ```
+  Doğrulama: geçici şema üzerinde routing (`2027-03-20` → `Availability_2027_03`,
+  ufuk ötesi → DEFAULT), veri taşıma ve partition-level unique kısıtı test edildi.

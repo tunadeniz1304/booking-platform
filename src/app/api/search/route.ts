@@ -25,6 +25,8 @@ export async function GET(req: NextRequest) {
         | "price_desc"
         | "rating"
         | "recommended",
+      semantic: searchParams.get("semantic") === "1" || searchParams.get("semantic") === "true",
+      userId: req.headers.get("x-user-id") ?? undefined,
     };
 
     const response = await searchProperties(params);

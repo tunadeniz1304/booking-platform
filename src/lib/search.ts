@@ -1,6 +1,14 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { redis } from "@/lib/redis";
+import {
+  findSemanticCandidates,
+  computeAffinity,
+  affinityBoostFor,
+  blendScore,
+  isVectorEnabled,
+} from "@/lib/search/vector";
+import { findFuzzyCandidates } from "@/lib/search/fuzzy";
 
 const SEARCH_CACHE_TTL = 60 * 5; // 5 dakika
 const SEARCH_CACHE_PREFIX = "search:";
@@ -21,6 +29,10 @@ export interface SearchParams {
   page?: number;
   pageSize?: number;
   sort?: "price_asc" | "price_desc" | "rating" | "recommended";
+  /** pgvector semantik aramayı etkinleştirir (query zorunlu). */
+  semantic?: boolean;
+  /** Kişiselleştirme için oturum kullanıcısı (favori/rezervasyon geçmişi). */
+  userId?: string;
 }
 
 export interface SearchResult {
@@ -49,14 +61,19 @@ export interface SearchResponse {
   pageSize: number;
   totalPages: number;
   cached: boolean;
+  /** Bu yanıt pgvector semantik motorla üretildi. */
+  semantic?: boolean;
 }
 
-function buildWhere(params: SearchParams): Prisma.PropertyWhereInput {
+function buildWhere(
+  params: SearchParams,
+  includeQuery = true
+): Prisma.PropertyWhereInput {
   const where: Prisma.PropertyWhereInput = {
     isActive: true,
   };
 
-  if (params.query) {
+  if (includeQuery && params.query) {
     where.OR = [
       { title: { contains: params.query, mode: "insensitive" } },
       { description: { contains: params.query, mode: "insensitive" } },
@@ -166,15 +183,166 @@ function buildCacheKey(params: SearchParams): string {
     page: params.page || 1,
     pageSize: params.pageSize || 20,
     sort: params.sort || "recommended",
+    semantic: params.semantic ? 1 : 0,
+    userId: params.userId || "",
   };
 
   return `${SEARCH_CACHE_PREFIX}${JSON.stringify(normalized)}`;
+}
+
+/** Sorgu kelimesi metin alanlarında geçiyor mu (semantik skordaki keyword bileşeni). */
+function matchesKeyword(property: {
+  title: string;
+  description: string;
+  city: string;
+  country: string;
+  amenities: Array<{ name: string }>;
+}, query: string): boolean {
+  const q = query.toLocaleLowerCase("tr-TR");
+  const haystack = [
+    property.title,
+    property.description,
+    property.city,
+    property.country,
+    ...property.amenities.map((a) => a.name),
+  ]
+    .join(" ")
+    .toLocaleLowerCase("tr-TR");
+  return haystack.includes(q);
+}
+
+/**
+ * pgvector + kişiselleştirme eşzamanlı sıralamalı semantik arama.
+ * Aday havuzu vektör benzerliğiyle kurulur; filtreler bu havuz üzerinde
+ * uygulanır; nihai sıralama harmanlanmış skorla yapılır.
+ */
+async function semanticSearchProperties(
+  params: SearchParams
+): Promise<SearchResponse | null> {
+  if (!params.query || !(await isVectorEnabled())) return null;
+
+  const candidates = await findSemanticCandidates(params.query, 100);
+  const fuzzy = await findFuzzyCandidates(params.query, 30);
+
+  // Vektör + trigram aday havuzu birleştirilir (imla hatasına dayanıklılık).
+  const pool = new Map<string, number>(candidates.map((c) => [c.id, c.similarity]));
+  for (const f of fuzzy) {
+    if (!pool.has(f.id)) pool.set(f.id, f.similarity * 0.8);
+  }
+
+  if (pool.size === 0) {
+    return {
+      results: [],
+      total: 0,
+      page: 1,
+      pageSize: Math.min(50, Math.max(1, params.pageSize || 20)),
+      totalPages: 0,
+      cached: false,
+      semantic: true,
+    };
+  }
+
+  const scoreByCandidate = pool;
+  const affinity = params.userId
+    ? await computeAffinity(params.userId)
+    : { cityWeights: new Map<string, number>(), typeWeights: new Map<string, number>() };
+
+  const where: Prisma.PropertyWhereInput = {
+    ...buildWhere(params, false),
+    id: { in: [...pool.keys()] },
+  };
+
+  const properties = await prisma.property.findMany({
+    where,
+    take: 500,
+    select: {
+      id: true,
+      title: true,
+      description: true,
+      propertyType: true,
+      basePrice: true,
+      currency: true,
+      ratingAvg: true,
+      ratingCount: true,
+      images: true,
+      location: { select: { id: true, city: true, country: true } },
+      amenities: { select: { name: true } },
+      rooms: {
+        where: { available: true },
+        select: { id: true },
+      },
+    },
+  });
+
+  const scored = properties
+    .map((property) => {
+      const similarity = scoreByCandidate.get(property.id) ?? 0;
+      const keywordHit = matchesKeyword(
+        {
+          title: property.title,
+          description: property.description,
+          city: property.location.city,
+          country: property.location.country,
+          amenities: property.amenities,
+        },
+        params.query ?? ""
+      );
+      const affinityBoost = property.location.id
+        ? affinityBoostFor(affinity, property.location.id, property.propertyType)
+        : 0;
+      const score = blendScore(similarity, keywordHit, property.ratingAvg, affinityBoost);
+      return { property, score };
+    })
+    .sort((a, b) => b.score - a.score);
+
+  const total = scored.length;
+  const page = Math.max(1, params.page || 1);
+  const pageSize = Math.min(50, Math.max(1, params.pageSize || 20));
+  const slice = scored.slice((page - 1) * pageSize, page * pageSize);
+
+  const results: SearchResult[] = slice.map(({ property }) => ({
+    id: property.id,
+    title: property.title,
+    description: property.description,
+    propertyType: property.propertyType,
+    basePrice: Number(property.basePrice),
+    currency: property.currency,
+    ratingAvg: property.ratingAvg,
+    ratingCount: property.ratingCount,
+    location: { city: property.location.city, country: property.location.country },
+    amenities: property.amenities.map((a) => a.name),
+    images: property.images,
+    availableRooms: property.rooms.length,
+  }));
+
+  return {
+    results,
+    total,
+    page,
+    pageSize,
+    totalPages: Math.ceil(total / pageSize),
+    cached: false,
+    semantic: true,
+  };
 }
 
 export async function searchProperties(params: SearchParams): Promise<SearchResponse> {
   const page = Math.max(1, params.page || 1);
   const pageSize = Math.min(50, Math.max(1, params.pageSize || 20));
   const cacheKey = buildCacheKey({ ...params, page, pageSize });
+
+  // pgvector semantik arama yolu (sorgu varsa)
+  if (params.semantic && params.query?.trim()) {
+    const semanticResult = await semanticSearchProperties(params);
+    if (semanticResult) {
+      try {
+        await redis.set(cacheKey, JSON.stringify(semanticResult), { ex: SEARCH_CACHE_TTL });
+      } catch (error) {
+        console.error("Semantic search cache write failed:", error);
+      }
+      return semanticResult;
+    }
+  }
 
   try {
     const cached = await redis.get(cacheKey);

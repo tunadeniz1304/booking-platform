@@ -42,9 +42,30 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-booking}:${POSTGRES_PASSWORD:-booking}@db:5432/${POSTGRES_DB:-booking}
       REDIS_URL: redis://redis:6379
       JWT_SECRET: ${JWT_SECRET:-change-me}
+      INTERNAL_API_SECRET: ${INTERNAL_API_SECRET:-change-me-internal-secret}
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-change-me}
       NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3000}
+      NODE_ENV: production
+      ELASTICSEARCH_URL: ${ELASTICSEARCH_URL:-}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # Arka plan işçisi: outbox relay + pricing kuyruğu (bağımsız süreç)
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    command: ["npm", "run", "worker"]
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-booking}:${POSTGRES_PASSWORD:-booking}@db:5432/${POSTGRES_DB:-booking}
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-change-me}
+      INTERNAL_API_SECRET: ${INTERNAL_API_SECRET:-change-me-internal-secret}
       NODE_ENV: production
     depends_on:
       db:
@@ -52,6 +73,22 @@ services:
       redis:
         condition: service_healthy
 
+  # Opsiyonel: semantik/fuzzy aramayı Elasticsearch üzerinden yapmak isterseniz
+  # kullanın: docker compose --profile es up -d (ve ELASTICSEARCH_URL ayarlayın)
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
+    profiles: ["es"]
+    restart: unless-stopped
+    environment:
+      discovery.type: single-node
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+      xpack.security.enabled: "false"
+    ports:
+      - "9200:9200"
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+
 volumes:
   postgres_data:
   redis_data:
+  es_data:

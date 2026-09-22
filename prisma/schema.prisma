@@ -1,0 +1,207 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  passwordHash  String
+  firstName     String
+  lastName      String
+  avatarUrl     String?
+  role          UserRole  @default(USER)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  bookings      Booking[]
+  reviews       Review[]
+  favorites     Favorite[]
+  payments      Payment[]
+  properties    Property[]
+}
+
+enum UserRole {
+  USER
+  HOST
+  ADMIN
+}
+
+model Property {
+  id            String     @id @default(cuid())
+  hostId        String
+  host          User       @relation(fields: [hostId], references: [id])
+  title         String
+  description   String
+  propertyType  PropertyType
+  locationId    String
+  location      Location   @relation(fields: [locationId], references: [id])
+  amenities     Amenity[]  @relation("PropertyAmenities")
+  rooms         Room[]
+  bookings      Booking[]
+  reviews       Review[]
+  favorites     Favorite[]
+  basePrice     Decimal    @db.Decimal(10, 2)
+  currency      String     @default("TRY")
+  ratingAvg     Float      @default(0)
+  ratingCount   Int        @default(0)
+  isActive      Boolean     @default(true)
+  images        String[]    @default([])
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  @@index([locationId, isActive])
+  @@index([hostId])
+  @@index([propertyType, isActive])
+  @@index([ratingAvg])
+}
+
+enum PropertyType {
+  HOTEL
+  APARTMENT
+  VILLA
+  HOSTEL
+  BED_AND_BREAKFAST
+}
+
+model Location {
+  id         String     @id @default(cuid())
+  city       String
+  country    String
+  latitude   Float?
+  longitude  Float?
+  properties Property[]
+
+  @@unique([city, country])
+  @@index([city])
+  @@index([country])
+}
+
+model Amenity {
+  id         String     @id @default(cuid())
+  name       String     @unique
+  icon       String?
+  properties Property[] @relation("PropertyAmenities")
+}
+
+model Room {
+  id            String         @id @default(cuid())
+  propertyId    String
+  property      Property       @relation(fields: [propertyId], references: [id])
+  name          String
+  description   String?
+  capacity      Int
+  bedType       String
+  priceModifier Decimal        @default(0) @db.Decimal(10, 2)
+  available     Boolean        @default(true)
+  availabilities Availability[]
+  bookings      Booking[]
+
+  @@index([propertyId])
+  @@index([available])
+}
+
+model Availability {
+  id          String   @id @default(cuid())
+  roomId      String
+  room        Room     @relation(fields: [roomId], references: [id])
+  date        DateTime @db.Date
+  isAvailable Boolean  @default(true)
+  price       Decimal  @db.Decimal(10, 2)
+  lockedBy    String?
+
+  @@unique([roomId, date])
+  @@index([date])
+  @@index([roomId, isAvailable, date])
+}
+
+model Booking {
+  id         String        @id @default(cuid())
+  userId     String
+  user       User          @relation(fields: [userId], references: [id])
+  propertyId String
+  property   Property      @relation(fields: [propertyId], references: [id])
+  roomId     String
+  room       Room          @relation(fields: [roomId], references: [id])
+  checkIn    DateTime      @db.Date
+  checkOut   DateTime      @db.Date
+  guestCount Int
+  totalPrice Decimal       @db.Decimal(10, 2)
+  currency   String        @default("TRY")
+  status     BookingStatus @default(PENDING)
+  idempotencyKey String?
+  payment    Payment?
+  reviews    Review[]
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  @@index([propertyId, checkIn, checkOut])
+  @@index([userId])
+  @@index([roomId, checkIn, checkOut])
+  @@index([status, checkIn])
+  @@unique([userId, idempotencyKey])
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+model Payment {
+  id        String        @id @default(cuid())
+  bookingId String        @unique
+  booking   Booking       @relation(fields: [bookingId], references: [id])
+  userId    String
+  user      User          @relation(fields: [userId], references: [id])
+  amount    Decimal       @db.Decimal(10, 2)
+  currency  String        @default("TRY")
+  provider  String
+  status    PaymentStatus @default(PENDING)
+  paidAt    DateTime?
+  createdAt DateTime      @default(now())
+
+  @@index([userId])
+  @@index([status])
+  @@index([provider, status])
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+model Review {
+  id         String   @id @default(cuid())
+  bookingId  String   @unique
+  booking    Booking  @relation(fields: [bookingId], references: [id])
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id])
+  rating     Int
+  comment    String?
+  createdAt  DateTime @default(now())
+
+  @@index([propertyId])
+  @@index([userId])
+  @@index([propertyId, rating])
+}
+
+model Favorite {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id])
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, propertyId])
+  @@index([propertyId])
+}

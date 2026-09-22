@@ -1,0 +1,49 @@
+{
+  "name": "booking-platform",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Booking.com ölçeğinde, yüksek eşzamanlılık kaldırabilen konaklama ve rezervasyon platformu",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "test": "vitest run",
+    "postinstall": "prisma generate",
+    "db:up": "docker compose up -d db redis",
+    "db:migrate": "prisma migrate deploy",
+    "db:seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.17.0",
+    "@upstash/redis": "^1.34.0",
+    "bcryptjs": "^2.4.3",
+    "bullmq": "^5.8.0",
+    "ioredis": "^5.4.1",
+    "jose": "^5.6.3",
+    "jsonwebtoken": "^9.0.2",
+    "next": "^14.2.5",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/jsonwebtoken": "^9.0.6",
+    "@types/node": "^20.14.9",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "autoprefixer": "^10.4.19",
+    "eslint": "^8.57.0",
+    "eslint-config-next": "^14.2.5",
+    "postcss": "^8.4.39",
+    "prisma": "^5.17.0",
+    "tailwindcss": "^3.4.6",
+    "tsx": "^4.16.2",
+    "typescript": "^5.5.3",
+    "vitest": "^2.0.3"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  }
+}

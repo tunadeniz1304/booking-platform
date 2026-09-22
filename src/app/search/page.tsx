@@ -62,7 +62,12 @@ function SearchPageContent() {
     setError(null);
     try {
       const params = new URLSearchParams();
-      if (destination) params.set("destination", destination);
+      if (destination) {
+        params.set("destination", destination);
+        // pgvector semantik arama: sorgu-odaklı olduğunda daha iyi sıralar;
+        // vektör katmanı yoksa servis otomatik olarak keyword yoluna döner.
+        params.set("semantic", "1");
+      }
       if (checkIn) params.set("checkIn", checkIn);
       if (checkOut) params.set("checkOut", checkOut);
       if (guests) params.set("guests", String(guests));

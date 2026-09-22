@@ -21,6 +21,7 @@ const PUBLIC_PATHS = [
   "/api/search",
   "/api/locations",
   "/api/rooms",
+  "/api/internal",
 ];
 
 const AUTH_PATHS = ["/api/auth/login", "/api/auth/register"];

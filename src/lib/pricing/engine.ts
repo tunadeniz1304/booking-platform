@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { PricingResult } from "@/lib/pricing-service";
+import { breakers } from "@/lib/resilience/circuit-breaker";
 
 /**
  * Türevsel (predictive) fiyatlandırma motoru.
@@ -195,7 +196,10 @@ export async function calculateDynamicPrice(
 
   let demand = { eventFactor: 1, demandSignal: 0 };
   if (locationId) {
-    demand = await loadDemandImpact(locationId, new Date(input.date));
+    demand = await breakers.pricing.call(
+      () => loadDemandImpact(locationId, new Date(input.date)),
+      async () => ({ eventFactor: 1, demandSignal: 0 })
+    );
   }
 
   return computeDynamicPrice(input, demand);

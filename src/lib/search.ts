@@ -7,8 +7,10 @@ import {
   affinityBoostFor,
   blendScore,
   isVectorEnabled,
+  SemanticCandidate,
 } from "@/lib/search/vector";
-import { findFuzzyCandidates } from "@/lib/search/fuzzy";
+import { findFuzzyCandidates, FuzzyCandidate } from "@/lib/search/fuzzy";
+import { breakers, BreakerOpenError } from "@/lib/resilience/circuit-breaker";
 
 const SEARCH_CACHE_TTL = 60 * 5; // 5 dakika
 const SEARCH_CACHE_PREFIX = "search:";
@@ -220,9 +222,26 @@ async function semanticSearchProperties(
   params: SearchParams
 ): Promise<SearchResponse | null> {
   if (!params.query || !(await isVectorEnabled())) return null;
+  const query = params.query;
 
-  const candidates = await findSemanticCandidates(params.query, 100);
-  const fuzzy = await findFuzzyCandidates(params.query, 30);
+  let candidates: SemanticCandidate[];
+  try {
+    candidates = await breakers.search.call(
+      () => findSemanticCandidates(query, 100),
+      async (): Promise<SemanticCandidate[]> => {
+        throw new BreakerOpenError("search-pgvector");
+      }
+    );
+  } catch {
+    // breaker açık veya vektör araması başarısız → keyword yolu devreye girer
+    return null;
+  }
+  let fuzzy: FuzzyCandidate[];
+  try {
+    fuzzy = await findFuzzyCandidates(query, 30);
+  } catch {
+    fuzzy = [];
+  }
 
   // Vektör + trigram aday havuzu birleştirilir (imla hatasına dayanıklılık).
   const pool = new Map<string, number>(candidates.map((c) => [c.id, c.similarity]));

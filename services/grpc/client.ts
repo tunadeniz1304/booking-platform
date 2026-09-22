@@ -5,6 +5,7 @@
 import * as grpc from "@grpc/grpc-js";
 import * as protoLoader from "@grpc/proto-loader";
 import path from "path";
+import { breakers, BreakerOpenError } from "@/lib/resilience/circuit-breaker";
 
 const PROTO_PATH = path.join(__dirname, "../../proto/booking.proto");
 const GRPC_HOST = process.env.GRPC_HOST ?? "localhost";
@@ -139,13 +140,28 @@ export const grpcClients = {
 };
 
 export function getRoomAvailability(req: RoomAvailabilityRequest, timeoutMs?: number): Promise<RoomAvailabilityResponse> {
-  return promisify(inventoryClient.getRoomAvailability.bind(inventoryClient), req, timeoutMs);
+  return breakers.grpc.call(
+    () => promisify(inventoryClient.getRoomAvailability.bind(inventoryClient), req, timeoutMs),
+    async () => {
+      throw new BreakerOpenError("grpc-internal");
+    }
+  );
 }
 
 export function reserveRoom(req: ReserveRoomRequest, timeoutMs?: number): Promise<ReserveRoomResponse> {
-  return promisify(bookingClient.reserveRoom.bind(bookingClient), req, timeoutMs);
+  return breakers.grpc.call(
+    () => promisify(bookingClient.reserveRoom.bind(bookingClient), req, timeoutMs),
+    async () => {
+      throw new BreakerOpenError("grpc-internal");
+    }
+  );
 }
 
 export function charge(req: ChargeRequest, timeoutMs?: number): Promise<ChargeResponse> {
-  return promisify(paymentClient.charge.bind(paymentClient), req, timeoutMs);
+  return breakers.grpc.call(
+    () => promisify(paymentClient.charge.bind(paymentClient), req, timeoutMs),
+    async () => {
+      throw new BreakerOpenError("grpc-internal");
+    }
+  );
 }

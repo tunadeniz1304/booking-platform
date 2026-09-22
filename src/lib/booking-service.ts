@@ -10,6 +10,7 @@ import {
   BookingCancelledPayload,
   makeEvent,
 } from "@/lib/events/events";
+import { requireOwnership } from "@/lib/security/ownership";
 
 const BOOKING_CACHE_PREFIX = "booking:";
 const BOOKING_CACHE_TTL = 60 * 10; // 10 dakika
@@ -476,9 +477,10 @@ export async function getBooking(bookingId: string, userId: string) {
     throw new BookingNotFoundError("Rezervasyon bulunamadı");
   }
 
-  if (booking.userId !== userId) {
-    throw new BookingUnauthorizedError("Bu rezervasyona erişim yetkiniz yok");
-  }
+  // BOLA: kaynağa yalnız sahibi erişebilir (IDOR koruması)
+  requireOwnership(booking.userId, userId, () =>
+    new BookingUnauthorizedError("Bu rezervasyona erişim yetkiniz yok")
+  );
 
   try {
     await redis.set(cacheKey, JSON.stringify(booking), { ex: BOOKING_CACHE_TTL });

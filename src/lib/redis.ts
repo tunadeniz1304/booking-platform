@@ -27,6 +27,10 @@ export interface RedisClient {
   lpush(key: string, ...values: string[]): Promise<number>;
   rpush(key: string, ...values: string[]): Promise<number>;
   lpop(key: string): Promise<string | null>;
+  /** Atomik Lua betiği (ioredis). Upstash: tanımsız → Redlock non-atomic fallback kullanır. */
+  eval?(script: string, keys: string[], args: string[]): Promise<unknown>;
+  /** Monoton sayaç (fencing token kaynağı). */
+  incr?(key: string): Promise<number>;
 }
 
 export function buildRedisClient(): RedisClient {
@@ -48,6 +52,8 @@ export function buildRedisClient(): RedisClient {
       lpush: (key, ...values) => c.lpush(key, ...values),
       rpush: (key, ...values) => c.rpush(key, ...values),
       lpop: (key) => c.lpop(key),
+      eval: (script, keys, args) => c.eval(script, keys.length, ...keys, ...args),
+      incr: (key) => c.incr(key),
     };
   }
 

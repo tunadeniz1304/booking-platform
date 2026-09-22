@@ -12,7 +12,8 @@
     "postinstall": "prisma generate",
     "db:up": "docker compose up -d db redis",
     "db:migrate": "prisma migrate deploy",
-    "db:seed": "tsx prisma/seed.ts"
+    "db:seed": "tsx prisma/seed.ts",
+    "worker": "tsx src/worker/index.ts"
   },
   "dependencies": {
     "@grpc/grpc-js": "^1.14.5",

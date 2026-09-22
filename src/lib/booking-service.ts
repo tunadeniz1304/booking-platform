@@ -2,11 +2,20 @@ import { Prisma, BookingStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { redis } from "@/lib/redis";
 import { invalidatePropertySearchCache } from "@/lib/search";
+import { createRedlock, LockError } from "@/lib/distributed-lock/redlock";
+import { appendOutbox } from "@/lib/cqrs";
+import {
+  EventTypes,
+  BookingCreatedPayload,
+  BookingCancelledPayload,
+  makeEvent,
+} from "@/lib/events/events";
 
-const BOOKING_LOCK_TTL = 30; // saniye
-const BOOKING_LOCK_PREFIX = "booking:lock:";
 const BOOKING_CACHE_PREFIX = "booking:";
 const BOOKING_CACHE_TTL = 60 * 10; // 10 dakika
+
+/** Uygulama-çapı Redlock örneği (kilit yenileme + fencing token desteği). */
+const redlock = createRedlock(redis);
 
 /** Rezervasyon çakışması (oda başka biri tarafından kilitli, iptal edilemez durum) → 409 */
 export class BookingConflictError extends Error {
@@ -115,37 +124,6 @@ function getDatesBetween(checkIn: Date, checkOut: Date): Date[] {
   return dates;
 }
 
-async function acquireBookingLock(roomId: string, checkIn: Date, checkOut: Date): Promise<string> {
-  const lockKey = `${BOOKING_LOCK_PREFIX}${roomId}:${checkIn.toISOString().slice(0, 10)}:${checkOut
-    .toISOString()
-    .slice(0, 10)}`;
-  const lockToken = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-
-  const acquired = await redis.set(lockKey, lockToken, {
-    nx: true,
-    ex: BOOKING_LOCK_TTL,
-  });
-
-  if (!acquired) {
-    throw new BookingConflictError(
-      "Oda şu anda başka bir misafir tarafından rezerve ediliyor. Lütfen tekrar deneyin."
-    );
-  }
-
-  return lockKey;
-}
-
-async function releaseBookingLock(lockKey: string, lockToken: string): Promise<void> {
-  try {
-    const currentToken = await redis.get(lockKey);
-    if (currentToken === lockToken) {
-      await redis.del(lockKey);
-    }
-  } catch (error) {
-    console.error("Failed to release booking lock:", error);
-  }
-}
-
 export async function createBooking(input: CreateBookingInput): Promise<BookingResult> {
   const checkIn = parseDate(input.checkIn);
   const checkOut = parseDate(input.checkOut);
@@ -185,115 +163,145 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingR
     }
   }
 
-  const lockKey = await acquireBookingLock(input.roomId, checkIn, checkOut);
-  const lockToken = (await redis.get(lockKey)) as string;
+  const lockResource = `booking:lock:${input.roomId}:${checkIn.toISOString().slice(0, 10)}:${checkOut
+    .toISOString()
+    .slice(0, 10)}`;
 
   try {
-    const result = await prisma.$transaction(
-      async (tx) => {
-        const property = await tx.property.findFirst({
-          where: {
-            id: input.propertyId,
-            isActive: true,
+    const result = await redlock.withLock(
+      lockResource,
+      async () => {
+        const result = await prisma.$transaction(
+          async (tx) => {
+            const property = await tx.property.findFirst({
+              where: {
+                id: input.propertyId,
+                isActive: true,
+              },
+              select: {
+                id: true,
+                currency: true,
+              },
+            });
+
+            if (!property) {
+              throw new BookingNotFoundError("Property bulunamadı veya aktif değil");
+            }
+
+            const room = await tx.room.findFirst({
+              where: {
+                id: input.roomId,
+                propertyId: input.propertyId,
+                available: true,
+                capacity: { gte: input.guestCount },
+              },
+              select: {
+                id: true,
+                priceModifier: true,
+              },
+            });
+
+            if (!room) {
+              throw new BookingValidationError(
+                "Oda bulunamadı, uygun değil veya kapasite aşıldı"
+              );
+            }
+
+            const availabilityRows = await tx.$queryRaw<
+              Array<{ id: string; price: Prisma.Decimal }>
+            >`
+              SELECT id, price
+              FROM "Availability"
+              WHERE "roomId" = ${room.id}
+                AND date >= ${checkIn}
+                AND date < ${checkOut}
+                AND "isAvailable" = true
+              ORDER BY date
+              FOR UPDATE
+            `;
+
+            if (availabilityRows.length !== dates.length) {
+              throw new BookingConflictError(
+                "Oda seçilen tarihler için uygun değil"
+              );
+            }
+
+            const totalPrice =
+              availabilityRows.reduce((sum, row) => sum + Number(row.price), 0) +
+              Number(room.priceModifier) * dates.length;
+
+            const booking = await tx.booking.create({
+              data: {
+                userId: input.userId,
+                propertyId: input.propertyId,
+                roomId: room.id,
+                checkIn,
+                checkOut,
+                guestCount: input.guestCount,
+                totalPrice: new Prisma.Decimal(totalPrice.toFixed(2)),
+                currency: input.currency || property.currency,
+                status: BookingStatus.PENDING,
+                idempotencyKey: input.idempotencyKey ?? null,
+              },
+              select: {
+                id: true,
+                propertyId: true,
+                roomId: true,
+                checkIn: true,
+                checkOut: true,
+                guestCount: true,
+                totalPrice: true,
+                currency: true,
+                status: true,
+              },
+            });
+
+            await tx.availability.updateMany({
+              where: {
+                id: { in: availabilityRows.map((row) => row.id) },
+              },
+              data: {
+                isAvailable: false,
+                lockedBy: booking.id,
+              },
+            });
+
+            // Transactional Outbox: booking.created olayı iş ile atomik
+            await appendOutbox(
+              tx,
+              makeEvent<BookingCreatedPayload>(
+                EventTypes.BookingCreated,
+                booking.id,
+                "booking",
+                {
+                  bookingId: booking.id,
+                  propertyId: input.propertyId,
+                  roomId: room.id,
+                  checkIn: checkIn.toISOString().slice(0, 10),
+                  checkOut: checkOut.toISOString().slice(0, 10),
+                  guestCount: input.guestCount,
+                  totalPrice: Number(totalPrice.toFixed(2)),
+                  currency: input.currency || property.currency,
+                  userId: input.userId,
+                },
+                input.idempotencyKey
+              )
+            );
+
+            return {
+              booking,
+              paymentRequired: true,
+            };
           },
-          select: {
-            id: true,
-            currency: true,
-          },
-        });
-
-        if (!property) {
-          throw new BookingNotFoundError("Property bulunamadı veya aktif değil");
-        }
-
-        const room = await tx.room.findFirst({
-          where: {
-            id: input.roomId,
-            propertyId: input.propertyId,
-            available: true,
-            capacity: { gte: input.guestCount },
-          },
-          select: {
-            id: true,
-            priceModifier: true,
-          },
-        });
-
-        if (!room) {
-          throw new BookingValidationError(
-            "Oda bulunamadı, uygun değil veya kapasite aşıldı"
-          );
-        }
-
-        const availabilityRows = await tx.$queryRaw<
-          Array<{ id: string; price: Prisma.Decimal }>
-        >`
-          SELECT id, price
-          FROM "Availability"
-          WHERE "roomId" = ${room.id}
-            AND date >= ${checkIn}
-            AND date < ${checkOut}
-            AND "isAvailable" = true
-          ORDER BY date
-          FOR UPDATE
-        `;
-
-        if (availabilityRows.length !== dates.length) {
-          throw new BookingConflictError(
-            "Oda seçilen tarihler için uygun değil"
-          );
-        }
-
-        const totalPrice =
-          availabilityRows.reduce((sum, row) => sum + Number(row.price), 0) +
-          Number(room.priceModifier) * dates.length;
-
-        const booking = await tx.booking.create({
-          data: {
-            userId: input.userId,
-            propertyId: input.propertyId,
-            roomId: room.id,
-            checkIn,
-            checkOut,
-            guestCount: input.guestCount,
-            totalPrice: new Prisma.Decimal(totalPrice.toFixed(2)),
-            currency: input.currency || property.currency,
-            status: BookingStatus.PENDING,
-            idempotencyKey: input.idempotencyKey ?? null,
-          },
-          select: {
-            id: true,
-            propertyId: true,
-            roomId: true,
-            checkIn: true,
-            checkOut: true,
-            guestCount: true,
-            totalPrice: true,
-            currency: true,
-            status: true,
-          },
-        });
-
-        await tx.availability.updateMany({
-          where: {
-            id: { in: availabilityRows.map((row) => row.id) },
-          },
-          data: {
-            isAvailable: false,
-            lockedBy: booking.id,
-          },
-        });
-
-        return {
-          booking,
-          paymentRequired: true,
-        };
+          {
+            isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+            maxWait: 5000,
+            timeout: 10000,
+          }
+        );
+        return result;
       },
-      {
-        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
-        maxWait: 5000,
-        timeout: 10000,
-      }
+      { ttlMs: 30000 }
     );
 
     await invalidatePropertySearchCache(input.propertyId);
@@ -315,6 +323,11 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingR
 
     return { booking: normalizedBooking, paymentRequired: result.paymentRequired };
   } catch (error) {
+    if (error instanceof LockError) {
+      throw new BookingConflictError(
+        "Oda şu anda başka bir misafir tarafından rezerve ediliyor. Lütfen tekrar deneyin."
+      );
+    }
     // Idempotency yarışı: aynı userId+key eşzamanlı iki istekte unique ihlali (P2002)
     // → diğer isteğin oluşturduğu rezervasyonu döndür
     if (
@@ -349,8 +362,6 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingR
       }
     }
     throw error;
-  } finally {
-    await releaseBookingLock(lockKey, lockToken);
   }
 }
 
@@ -397,6 +408,23 @@ export async function cancelBooking(bookingId: string, userId: string): Promise<
           lockedBy: null,
         },
       });
+
+      // Transactional Outbox: iptal olayı stok serbest bırakma ile atomik
+      await appendOutbox(
+        tx,
+        makeEvent<BookingCancelledPayload>(
+          EventTypes.BookingCancelled,
+          bookingId,
+          "booking",
+          {
+            bookingId,
+            propertyId: booking.propertyId,
+            roomId: booking.roomId,
+            checkIn: booking.checkIn.toISOString().slice(0, 10),
+            checkOut: booking.checkOut.toISOString().slice(0, 10),
+          }
+        )
+      );
 
       return booking.propertyId;
     },

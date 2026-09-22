@@ -35,7 +35,10 @@ const BACKOFF_BASE_MS = 1000;
  * Aynı işlem (tx) içinde mesajı kuyruğa ekler. TransactionClient veya prisma
  * singleton geçilebilir; her ikisinde de `.outboxMessage.create` bulunur.
  */
-export async function appendOutbox(tx: OutboxWriter, event: DomainEvent): Promise<void> {
+export async function appendOutbox(
+  tx: OutboxWriter,
+  event: DomainEvent<unknown>
+): Promise<void> {
   await tx.outboxMessage.create({
     data: {
       eventType: event.type,

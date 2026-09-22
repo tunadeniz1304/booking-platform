@@ -50,6 +50,7 @@ model Property {
   ratingCount   Int        @default(0)
   isActive      Boolean     @default(true)
   images        String[]    @default([])
+  embedding     Unsupported("vector(128)")?
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 
@@ -68,16 +69,32 @@ enum PropertyType {
 }
 
 model Location {
-  id         String     @id @default(cuid())
+  id         String        @id @default(cuid())
   city       String
   country    String
   latitude   Float?
   longitude  Float?
   properties Property[]
+  demandEvents DemandEvent[]
 
   @@unique([city, country])
   @@index([city])
   @@index([country])
+}
+
+model DemandEvent {
+  id         String   @id @default(cuid())
+  locationId String
+  location   Location @relation(fields: [locationId], references: [id])
+  title      String
+  startsAt   DateTime @db.Date
+  endsAt     DateTime @db.Date
+  // Talep etkisi 1-10; fiyat motoru yakınlıkla ağırlıklar.
+  impact     Int      @default(5)
+  createdAt  DateTime @default(now())
+
+  @@index([locationId, startsAt])
+  @@index([startsAt, endsAt])
 }
 
 model Amenity {

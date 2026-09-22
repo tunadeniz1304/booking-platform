@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { redis } from "@/lib/redis";
+import { calculateDynamicPrice } from "@/lib/pricing/engine";
 
 const PRICE_CACHE_PREFIX = "price:";
 const PRICE_CACHE_TTL = 60 * 30; // 30 dakika
@@ -28,76 +29,37 @@ export interface PricingResult {
     occupancyRate: number;
     seasonalFactor: number;
     lastMinuteFactor: number;
+    /** Etkinlik yakınlığı çarpanı (predictive motor). */
+    eventFactor?: number;
+    leadTimeFactor?: number;
+    weekdayFactor?: number;
+    occupancyMultiplier?: number;
+    /** Birleşik talep sinyali 0..1 (SSE ısı haritası besler). */
+    demandSignal?: number;
   };
 }
 
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
-}
-
-function getSeasonalFactor(date: Date): number {
-  const month = date.getMonth();
-
-  // Haziran-Eylül arası yüksek sezon
-  if (month >= 5 && month <= 8) {
-    return 1.3;
-  }
-
-  // Aralık-Ocak yılbaşı dönemi
-  if (month === 11 || month === 0) {
-    return 1.15;
-  }
-
-  return 1.0;
-}
-
-function getLastMinuteFactor(date: Date): number {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const target = new Date(date);
-  target.setHours(0, 0, 0, 0);
-
-  const daysUntil = Math.round(
-    (target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
-  );
-
-  if (daysUntil <= 3) {
-    return 1.2;
-  }
-
-  if (daysUntil <= 7) {
-    return 1.1;
-  }
-
-  return 1.0;
-}
-
-function calculatePrice(input: PricingInput): PricingResult {
-  const date = new Date(input.date);
-  const occupancyRate = clamp(input.occupancyRate ?? 0.5, 0, 1);
-  const seasonalFactor = input.seasonalFactor ?? getSeasonalFactor(date);
-  const lastMinuteFactor = input.lastMinuteFactor ?? getLastMinuteFactor(date);
-
-  const occupancyMultiplier = 1 + (occupancyRate - 0.5) * 0.4;
-  const price =
-    input.basePrice * seasonalFactor * lastMinuteFactor * occupancyMultiplier;
-
-  return {
+/**
+ * Fiyat hesabı → predictif motor (src/lib/pricing/engine.ts).
+ * Mevsimsellik, lead-time, hafta içi gün, occupancy ve lokasyon etkinlik
+ * korelasyonu tek akışta birleşir.
+ */
+async function calculatePrice(input: PricingInput): Promise<PricingResult> {
+  const result = await calculateDynamicPrice({
+    propertyId: input.propertyId,
     roomId: input.roomId,
     date: input.date,
-    price: Math.round(price * 100) / 100,
-    currency: input.currency || "TRY",
-    factors: {
-      occupancyRate,
-      seasonalFactor,
-      lastMinuteFactor,
-    },
-  };
+    basePrice: input.basePrice,
+    occupancyRate: input.occupancyRate,
+    seasonalFactor: input.seasonalFactor,
+    lastMinuteFactor: input.lastMinuteFactor,
+    currency: input.currency,
+  });
+  return result;
 }
 
 export async function calculateAndCachePrice(input: PricingInput): Promise<PricingResult> {
-  const result = calculatePrice(input);
+  const result = await calculatePrice(input);
   const cacheKey = `${PRICE_CACHE_PREFIX}${input.roomId}:${input.date}`;
 
   try {
@@ -130,11 +92,17 @@ export async function updateAvailabilityPrices(
   basePrice: number,
   currency: string
 ): Promise<PricingResult[]> {
+  const room = await prisma.room.findUnique({
+    where: { id: roomId },
+    select: { propertyId: true },
+  });
+  const propertyId = room?.propertyId ?? "";
+
   const results: PricingResult[] = [];
 
   for (const date of dates) {
     const result = await calculateAndCachePrice({
-      propertyId: "",
+      propertyId,
       roomId,
       date,
       basePrice,

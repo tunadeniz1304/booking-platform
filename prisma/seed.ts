@@ -72,6 +72,33 @@ const AMENITIES = [
   { name: "Oda Servisi", icon: "service" },
 ];
 
+// Talep sinyali için gerçekçi lokal etkinlikler (predictive pricing motoru).
+// lokasyon indeksi + bugünden itibaren gün ofsetleri (180 gün ufku içinde).
+const DEMAND_EVENTS: Array<{
+  loc: number;
+  title: string;
+  startOff: number;
+  endOff: number;
+  impact: number;
+}> = [
+  { loc: 0, title: "İstanbul Caz Festivali", startOff: 18, endOff: 24, impact: 8 },
+  { loc: 0, title: "İstanbul Maratonu", startOff: 45, endOff: 46, impact: 6 },
+  { loc: 1, title: "Antalya Film Festivali", startOff: 28, endOff: 35, impact: 7 },
+  { loc: 1, title: "Antalya Expo Fuarı", startOff: 80, endOff: 88, impact: 6 },
+  { loc: 2, title: "Bodrum Yat & Caz Festivali", startOff: 24, endOff: 30, impact: 8 },
+  { loc: 2, title: "Bodrum Vintage Rallisi", startOff: 70, endOff: 73, impact: 4 },
+  { loc: 5, title: "Kapadokya Balon Şenliği", startOff: 34, endOff: 40, impact: 9 },
+  { loc: 7, title: "Muğla Rock Müzik Festivali", startOff: 52, endOff: 56, impact: 6 },
+  { loc: 9, title: "Çeşme Müzik Günleri", startOff: 40, endOff: 44, impact: 5 },
+  { loc: 12, title: "Barselona Primavera Fest", startOff: 55, endOff: 62, impact: 7 },
+  { loc: 12, title: "Barselona Formula E", startOff: 95, endOff: 97, impact: 5 },
+  { loc: 16, title: "Dubai Shopping Festival", startOff: 22, endOff: 31, impact: 8 },
+  { loc: 18, title: "New York Fashion Week", startOff: 33, endOff: 42, impact: 8 },
+  { loc: 18, title: "NYC Maratonu", startOff: 78, endOff: 80, impact: 7 },
+  { loc: 19, title: "Tokyo Anime Expo", startOff: 48, endOff: 54, impact: 7 },
+  { loc: 19, title: "Sakura Başı Sezonu", startOff: 105, endOff: 130, impact: 6 },
+];
+
 type PropSeed = {
   title: string;
   description: string;
@@ -346,10 +373,10 @@ async function main() {
 
   const existing = await prisma.property.findMany({ select: { id: true } });
   if (existing.length > 0) {
+    await prisma.payment.deleteMany();
+    await prisma.review.deleteMany();
     await prisma.booking.deleteMany();
     await prisma.favorite.deleteMany();
-    await prisma.review.deleteMany();
-    await prisma.payment.deleteMany();
     await prisma.availability.deleteMany();
     await prisma.room.deleteMany();
     await prisma.property.deleteMany();
@@ -359,6 +386,21 @@ async function main() {
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
   const horizon = 180;
+
+  // Talep etkinlikleri (prediktif fiyat motorunun dinamik girdisi)
+  await prisma.demandEvent.deleteMany({});
+  const demandEvents = DEMAND_EVENTS.map((ev) => ({
+    locationId: locations[ev.loc],
+    title: ev.title,
+    startsAt: addDays(today, ev.startOff),
+    endsAt: addDays(today, ev.endOff),
+    impact: ev.impact,
+  })).filter((ev) => ev.locationId);
+  if (demandEvents.length > 0) {
+    await prisma.demandEvent.createMany({ data: demandEvents });
+  }
+  console.log("Talep etkinlikleri:", demandEvents.length);
+
   let propertyCount = 0;
   let roomIds: { propertyId: string; roomId: string; title: string }[] = [];
 

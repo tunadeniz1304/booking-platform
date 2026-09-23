@@ -6,6 +6,7 @@ import { createBooking } from "@/lib/booking-service";
 import { relayOutbox } from "@/lib/cqrs";
 import { eventBus } from "@/lib/cqrs";
 import { EventTypes, BookingCreatedPayload } from "@/lib/events/events";
+import { DomainEvent } from "@/lib/cqrs/types";
 
 const prisma = new PrismaClient();
 
@@ -89,8 +90,8 @@ describe("Transactional Outbox — booking.created", () => {
     const received: BookingCreatedPayload[] = [];
     const subscriber = {
       listens: EventTypes.BookingCreated,
-      handle: async (event: { payload: BookingCreatedPayload }) => {
-        received.push(event.payload);
+      handle: async (event: DomainEvent<unknown>) => {
+        received.push(event.payload as BookingCreatedPayload);
       },
     };
     eventBus.on(subscriber);

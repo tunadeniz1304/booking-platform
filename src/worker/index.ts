@@ -10,7 +10,7 @@
  * Docker Compose'ta ayrı bir replika olarak ölçeklenebilir; Next.js
  * sunucusuna bağımlı değildir.
  */
-import { pricingWorker } from "@/lib/queue";
+import { pricingWorker, eventSignalWorker } from "@/lib/queue";
 import { runOutboxRelay } from "@/lib/cqrs";
 import { registerEventHandlers } from "@/lib/events/register";
 
@@ -54,12 +54,16 @@ async function main(): Promise<void> {
 process.on("SIGINT", () => {
   shuttingDown = true;
   clearInterval(relayTimer);
-  void pricingWorker.close().finally(() => process.exit(0));
+  void Promise.all([pricingWorker.close(), eventSignalWorker.close()]).finally(() =>
+    process.exit(0)
+  );
 });
 process.on("SIGTERM", () => {
   shuttingDown = true;
   clearInterval(relayTimer);
-  void pricingWorker.close().finally(() => process.exit(0));
+  void Promise.all([pricingWorker.close(), eventSignalWorker.close()]).finally(() =>
+    process.exit(0)
+  );
 });
 
 main().catch((error) => {

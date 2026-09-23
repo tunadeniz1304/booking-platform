@@ -472,6 +472,41 @@ async function main() {
   }
   console.log("Lokasyonlar:", Object.keys(locations).length);
 
+  // Veri hijyeni: Unicode/trail-space varyantı kopya lokasyonları tekilleştir.
+  // Aynı (city, country) grubunda id'si en küçük olan kanonik kalır; mülkler ve
+  // talep etkinlikleri ona taşınır, kopyalar silinir.
+  const allLocations = await prisma.location.findMany({
+    include: { _count: { select: { properties: true, demandEvents: true } } },
+  });
+  const grouped = new Map<string, typeof allLocations>();
+  for (const l of allLocations) {
+    const key = `${l.city.trim().toLocaleLowerCase("tr-TR")}|${l.country.trim().toLocaleLowerCase("tr-TR")}`;
+    const arr = grouped.get(key) ?? [];
+    arr.push(l);
+    grouped.set(key, arr);
+  }
+  let deduped = 0;
+  for (const arr of grouped.values()) {
+    if (arr.length < 2) continue;
+    arr.sort((a, b) => (a.id < b.id ? -1 : 1));
+    const keeper = arr[0];
+    for (const dup of arr.slice(1)) {
+      if (dup._count.properties > 0) {
+        await prisma.property.updateMany({ where: { locationId: dup.id }, data: { locationId: keeper.id } });
+      }
+      if (dup._count.demandEvents > 0) {
+        await prisma.demandEvent.updateMany({ where: { locationId: dup.id }, data: { locationId: keeper.id } });
+      }
+      await prisma.location.delete({ where: { id: dup.id } });
+      deduped += 1;
+      // seed'in locations[i] haritası silinen kopyayı gösteriyorsa kanoniğe çevir
+      for (const [k, v] of Object.entries(locations)) {
+        if (v === dup.id) locations[Number(k)] = keeper.id;
+      }
+    }
+  }
+  if (deduped > 0) console.log(`Tekilleştirilen lokasyon: ${deduped}`);
+
   const amenityIds: Record<number, string> = {};
   for (let i = 0; i < AMENITIES.length; i++) {
     const a = AMENITIES[i];
@@ -491,6 +526,7 @@ async function main() {
     await prisma.favorite.deleteMany();
     await prisma.availability.deleteMany();
     await prisma.room.deleteMany();
+    await prisma.priceHistory.deleteMany();
     await prisma.property.deleteMany();
     console.log(`Eski veriler temizlendi (${existing.length} property).`);
   }

@@ -30,7 +30,7 @@ export interface Query<TPayload = unknown> {
 }
 
 /** Gerçekleşmiş değişmez olay (outbox / event bus üzerinden yayınlanır). */
-export interface DomainEvent<TPayload = never> {
+export interface DomainEvent<TPayload = unknown> {
   readonly type: string;
   readonly payload: TPayload;
   readonly aggregateId: string;

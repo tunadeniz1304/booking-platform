@@ -1,6 +1,7 @@
 import { Queue, Worker, Job } from "bullmq";
 import Redis from "ioredis";
 import { updateAvailabilityPrices } from "./pricing-service";
+import { ingestExternalSignal, ExternalSignalInput } from "./sentiment/trigger";
 
 const connection = new Redis(process.env.REDIS_URL || "redis://localhost:6379", {
   maxRetriesPerRequest: null,
@@ -69,4 +70,33 @@ export async function setupPricingCron(): Promise<void> {
       }
     );
   }
+}
+
+// --- Global Sentiment & Event Trigger (asenkron sinyal kuyruğu) ---------------
+
+export const eventSignalQueue = new Queue("event-signal", { connection });
+
+export const eventSignalWorker = new Worker(
+  "event-signal",
+  async (job: Job) => {
+    const signal = job.data as ExternalSignalInput;
+    if (!signal?.title || !signal.startsOn || !signal.endsOn) {
+      throw new Error("Invalid event-signal payload");
+    }
+    await ingestExternalSignal(signal);
+  },
+  { connection }
+);
+
+export async function addEventSignalJob(signal: ExternalSignalInput): Promise<Job> {
+  return eventSignalQueue.add(
+    "apply-event-signal",
+    signal,
+    {
+      attempts: 3,
+      backoff: { type: "exponential", delay: 2000 },
+      removeOnComplete: true,
+      removeOnFail: false,
+    }
+  );
 }

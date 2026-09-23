@@ -22,6 +22,8 @@ model User {
   favorites     Favorite[]
   payments      Payment[]
   properties    Property[]
+  listedTransfers  BookingTransfer[] @relation("transferSeller")
+  claimedTransfers BookingTransfer[] @relation("transferBuyer")
 }
 
 enum UserRole {
@@ -151,9 +153,10 @@ model Booking {
   currency   String        @default("TRY")
   status     BookingStatus @default(PENDING)
   idempotencyKey String?
-  payment    Payment?
-  reviews    Review[]
-  createdAt  DateTime      @default(now())
+  payment      Payment?
+  reviews      Review[]
+  transfers    BookingTransfer[]
+  createdAt    DateTime      @default(now())
   updatedAt  DateTime      @updatedAt
 
   @@index([propertyId, checkIn, checkOut])
@@ -261,4 +264,33 @@ model PriceHistory {
 
   @@unique([propertyId, month])
   @@index([propertyId, month])
+}
+
+enum TransferStatus {
+  LISTED
+  CLAIMED
+  COMPLETED
+  CANCELLED
+}
+
+model BookingTransfer {
+  id            String         @id @default(cuid())
+  bookingId     String
+  booking       Booking        @relation(fields: [bookingId], references: [id])
+  sellerId      String
+  seller        User           @relation("transferSeller", fields: [sellerId], references: [id])
+  status        TransferStatus @default(LISTED)
+  askPrice      Decimal        @db.Decimal(10, 2)
+  currency      String         @default("TRY")
+  // HMAC imzalı devir jetonu — delegasyonu doğrulanabilir kılar (denetlenebilir).
+  transferToken String         @unique
+  listedAt      DateTime       @default(now())
+  claimedById   String?
+  claimedBy     User?          @relation("transferBuyer", fields: [claimedById], references: [id])
+  claimedAt     DateTime?
+  completedAt   DateTime?
+
+  @@index([status, bookingId])
+  @@index([sellerId])
+  @@index([claimedById])
 }

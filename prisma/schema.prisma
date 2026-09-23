@@ -51,6 +51,7 @@ model Property {
   isActive      Boolean     @default(true)
   images        String[]    @default([])
   embedding     Unsupported("vector(128)")?
+  priceHistory  PriceHistory[]
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 
@@ -247,4 +248,17 @@ model OutboxMessage {
   @@index([status, availableAfter])
   @@index([aggregateType, aggregateId])
   @@index([correlationId])
+}
+
+model PriceHistory {
+  id              String        @id @default(cuid())
+  propertyId      String
+  property        Property      @relation(fields: [propertyId], references: [id])
+  month           DateTime      @db.Date
+  avgNightlyPrice Decimal       @db.Decimal(10, 2)
+  demandIndex     Float         @default(50)
+  createdAt       DateTime      @default(now())
+
+  @@unique([propertyId, month])
+  @@index([propertyId, month])
 }

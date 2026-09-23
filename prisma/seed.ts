@@ -1,4 +1,4 @@
-import { PrismaClient, Prisma, PropertyType, UserRole } from "@prisma/client";
+import { PrismaClient, Prisma, PropertyType, UserRole, BookingStatus } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
@@ -98,6 +98,118 @@ const DEMAND_EVENTS: Array<{
   { loc: 19, title: "Tokyo Anime Expo", startOff: 48, endOff: 54, impact: 7 },
   { loc: 19, title: "Sakura Başı Sezonu", startOff: 105, endOff: 130, impact: 6 },
 ];
+
+// Kişilikleştirilmiş misafir profilleri + bağlamsal yorum planları
+const PERSONAS = [
+  { index: 1, key: "business", label: "İş Seyahati · Vegan" },
+  { index: 2, key: "backpacker", label: "Bütçe Dostu Sırt Çantalı" },
+  { index: 3, key: "honeymoon", label: "Lüks Balayı Çifti" },
+  { index: 0, key: "family", label: "Genç Aile" },
+];
+
+const REVIEW_PLANS: Array<{ g: number; title: string; off: number; nights: number; persona: string }> = [
+  { g: 1, title: "Grand Deluxe Hotel", off: -45, nights: 3, persona: "business" },
+  { g: 2, title: "Cave Suite Cappadocia", off: -60, nights: 2, persona: "backpacker" },
+  { g: 3, title: "Luxury Bosphorus Suite", off: -30, nights: 4, persona: "honeymoon" },
+  { g: 0, title: "Marmaris Bliss Resort", off: -20, nights: 3, persona: "family" },
+  { g: 1, title: "Villa Amara", off: -90, nights: 5, persona: "business" },
+  { g: 2, title: "Ankara Residence Hotel", off: -15, nights: 2, persona: "backpacker" },
+  { g: 3, title: "New York Central Park View", off: -50, nights: 3, persona: "honeymoon" },
+  { g: 0, title: "İzmir Alsancak Apart Hotel", off: -25, nights: 4, persona: "family" },
+];
+
+/** Mevsimsellik çarpanı (ay indeksi 0-11) — fiyat geçmişi ve yorum sezon notu için. */
+function seasonFactor(month: number): number {
+  if (month >= 5 && month <= 8) return 1.3;
+  if (month === 11 || month === 0) return 1.15;
+  return 1.0;
+}
+
+/** Determinist sözde-RNG (mulberry32) — seed stabil, her çalıştırmada aynı. */
+function mulberry32(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+const PERSONA_REVIEWS: Record<string, { praise: string[]; nitpick: string[] }> = {
+  business: {
+    praise: [
+      "İş toplantılarım için ideal; konum ve sessizlik mükemmeldi.",
+      "WiFi gerçekten hızlıydı, video konferanslarım hiç kesilmedi.",
+      "7/24 resepsiyon yoğun programımda çok işime yaradı.",
+    ],
+    nitpick: ["Erken kahvaltı seçenekleri kısıtlıydı.", "Oda servisi biraz yavaş kaldı."],
+  },
+  backpacker: {
+    praise: [
+      "Bütçem için mükemmel değer; temiz ve konumu harika.",
+      "Her yere yürüyerek ulaştım, fiyata göre paha biçilmez.",
+      "Basit ama işlevsel; fazlasını istemezseniz birebir.",
+    ],
+    nitpick: ["Dekor biraz eski ama fiyata göre gayet değer."],
+  },
+  honeymoon: {
+    praise: [
+      "Manzara inanılmazdı, gün batımını odadan izledik.",
+      "Romantik akşam yemeği ve özel dokunuşlar unutulmazdı.",
+      "Yıldönümümüzü kutladıkları için çok memnunuz.",
+    ],
+    nitpick: ["Spa için önceden rezervasyon gerek, yoğun oluyor."],
+  },
+  family: {
+    praise: [
+      "Çocuklarla gelmek için çok uygun; geniş oda ve güvenli alan.",
+      "Havuz temiz ve bakımlıydı, çocuklar bayıldı.",
+      "Kahvaltı çeşitliliği ailecek bizi mutlu etti.",
+    ],
+    nitpick: ["Asansör yoğun saatlerde bekletiyor."],
+  },
+  vegan: {
+    praise: [
+      "Bitkisel kahvaltı seçenekleri düşünülmüş; yulaf sütü ve meyve boldu.",
+      "Tercihimi önceden not almışlardı, kendimi özel hissettim.",
+    ],
+    nitpick: ["Akşam menüsünde vegan ana yemek çeşidi azdı."],
+  },
+};
+
+const REVIEW_NOISE = [
+  "Resepsiyon ilgili ve güler yüzlüydü.",
+  "Oda temizdi, yatak rahattı.",
+  "Çevrede ulaşım kolaydı.",
+  "Fiyat/performans dengesi iyiydi.",
+];
+
+type ReviewCtx = {
+  title: string;
+  propertyType: string;
+  city: string;
+  amenities: string[];
+  basePrice: number;
+};
+
+/** Kişilik + mevsim + olanaklarla bağlamsal (NLP-tarzı) Türkçe yorum üretir. */
+function composeReview(ctx: ReviewCtx, persona: string, month: number, rng: () => number): { rating: number; comment: string } {
+  const bank = PERSONA_REVIEWS[persona] ?? PERSONA_REVIEWS.backpacker;
+  const praise = bank.praise[Math.floor(rng() * bank.praise.length)];
+  const nitpick = bank.nitpick[Math.floor(rng() * bank.nitpick.length)];
+
+  let seasonNote = "Yaz döneminde yoğundu ama konaklama keyifliydi.";
+  if (month >= 11 || month <= 1) seasonNote = "Kış döneminde geldik, sakin ve huzurluydu.";
+  else if (month >= 2 && month <= 4) seasonNote = "Ara sezonda geldik; fiyatlar daha uygundu.";
+
+  const amenity = ctx.amenities.length > 0 ? `Olanaklardan ${ctx.amenities[0]} özellikle işimize yaradı. ` : "";
+  const noise = REVIEW_NOISE[Math.floor(rng() * REVIEW_NOISE.length)];
+  const comment = `${praise} ${seasonNote} ${noise} ${amenity}${nitpick}`;
+  const rating = Math.min(10, 8 + Math.floor(rng() * 2.6));
+  return { rating, comment };
+}
 
 type PropSeed = {
   title: string;
@@ -503,6 +615,95 @@ async function main() {
     }
   }
   console.log(`Favoriler: ${already.size}`);
+
+  // Geçmiş tamamlanmış konaklamalar → kişilik + mevsim + olanak bağlamlı yorumlar
+  const propByTitleForReviews = new Map(roomIds.map((r) => [r.title, r]));
+  let reviewCount = 0;
+  for (const plan of REVIEW_PLANS) {
+    const target = propByTitleForReviews.get(plan.title);
+    if (!target) continue;
+    const reviewer = allGuests[plan.g];
+    const checkIn = addDays(today, plan.off);
+    const nights = plan.nights;
+    const prop = await prisma.property.findUnique({
+      where: { id: target.propertyId },
+      include: { location: true, amenities: { select: { name: true } } },
+    });
+    if (!prop) continue;
+    const total = Number(prop.basePrice) * seasonFactor(checkIn.getUTCMonth()) * nights;
+    const booking = await prisma.booking.create({
+      data: {
+        userId: reviewer.id,
+        propertyId: prop.id,
+        roomId: target.roomId,
+        checkIn,
+        checkOut: addDays(checkIn, nights),
+        guestCount: 1 + (plan.g % 2),
+        totalPrice: new Prisma.Decimal(Math.round(total * 100) / 100),
+        currency: "TRY",
+        status: BookingStatus.COMPLETED,
+        createdAt: addDays(checkIn, -10),
+      },
+    });
+    await prisma.payment.create({
+      data: {
+        bookingId: booking.id,
+        userId: reviewer.id,
+        amount: booking.totalPrice,
+        currency: "TRY",
+        provider: "mock-gateway",
+        status: "PAID",
+        paidAt: new Date(checkIn.getTime() - 86400000 * 3),
+      },
+    });
+    const rng = mulberry32(plan.g * 7919 + checkIn.getTime() / 86400000);
+    const { rating, comment } = composeReview(
+      {
+        title: prop.title,
+        propertyType: prop.propertyType,
+        city: prop.location.city,
+        amenities: prop.amenities.map((a) => a.name),
+        basePrice: Number(prop.basePrice),
+      },
+      plan.persona,
+      checkIn.getUTCMonth(),
+      rng
+    );
+    await prisma.review.create({
+      data: { bookingId: booking.id, userId: reviewer.id, propertyId: prop.id, rating, comment },
+    });
+    reviewCount += 1;
+  }
+  console.log(`Bağlamsal yorumlar: ${reviewCount}`);
+
+  // Mevsimsel fiyat geçmişi — önceki 12 ay, yaz-zirve / kış-dip dalgalanması
+  await prisma.priceHistory.deleteMany({});
+  const historyStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - 12, 1));
+  const historyRows: Array<{
+    propertyId: string;
+    month: Date;
+    avgNightlyPrice: Prisma.Decimal;
+    demandIndex: number;
+  }> = [];
+  for (const prop of await prisma.property.findMany({ select: { id: true, basePrice: true } })) {
+    const rng = mulberry32([...prop.id].reduce((a, c) => a + c.charCodeAt(0), 7));
+    for (let m = 0; m < 12; m++) {
+      const monthDate = new Date(Date.UTC(historyStart.getUTCFullYear(), historyStart.getUTCMonth() + m, 1));
+      const sf = seasonFactor(monthDate.getUTCMonth());
+      const noise = 0.92 + rng() * 0.16;
+      const avg = Number(prop.basePrice) * sf * noise;
+      const demandIndex = Math.round(Math.min(98, Math.max(12, (sf - 0.9) * 220 + noise * 10)));
+      historyRows.push({
+        propertyId: prop.id,
+        month: monthDate,
+        avgNightlyPrice: new Prisma.Decimal(Math.round(avg * 100) / 100),
+        demandIndex,
+      });
+    }
+  }
+  if (historyRows.length > 0) await prisma.priceHistory.createMany({ data: historyRows });
+  console.log(`Fiyat geçmişi satırları: ${historyRows.length}`);
+
   console.log("Seeding tamamlandı ✅");
 }
 

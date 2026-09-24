@@ -212,13 +212,16 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingR
   }
 
   // Hızlı yol: kilit almadan önce dolu olduğu kesin olan istekleri erken reddet.
-  const occupied = await prisma.availability.count({
-    where: {
-      roomId: input.roomId,
-      date: { gte: toDbDate(stay.checkIn), lt: toDbDate(stay.checkOut) },
-      isAvailable: false,
-    },
-  });
+  // Yalnızca optimizasyondur; sorgu hata verirse atlanır (kilitli yol yetkili kaynaktır).
+  const occupied = await prisma.availability
+    .count({
+      where: {
+        roomId: input.roomId,
+        date: { gte: toDbDate(stay.checkIn), lt: toDbDate(stay.checkOut) },
+        isAvailable: false,
+      },
+    })
+    .catch(() => 0);
   if (occupied > 0) {
     bookingsCreated.inc({ outcome: "sold_out" });
     throw new SoldOutError();

@@ -99,3 +99,50 @@ export function demoReviewSummary(reviews: ReviewInput[]): ReviewSummary {
     citations: [...new Set([...pros, ...cons].map((x) => x.id))],
   };
 }
+
+export interface EventExtraction {
+  city: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  category: "konser" | "festival" | "spor" | "fuar" | "kongre" | "tatil" | "diğer";
+  expectedImpact: number;
+  rationale: string;
+}
+
+const EVENT_CATEGORIES: Array<[RegExp, EventExtraction["category"], number]> = [
+  [/konser|sahne|turne/, "konser", 7],
+  [/festival|şenlik/, "festival", 6],
+  [/maç|final|turnuva|maraton|formula|derbi/, "spor", 8],
+  [/fuar|expo/, "fuar", 5],
+  [/kongre|zirve|konferans/, "kongre", 5],
+  [/bayram|tatil|yılbaşı/, "tatil", 6],
+];
+
+/** Olay çıkarımı demo'su: tarih (ISO veya "12 temmuz"), şehir sözlüğü, kategori sözlüğü. */
+export function demoEventExtraction(
+  text: string,
+  cities: string[],
+  today = new Date()
+): EventExtraction {
+  const t = text.toLocaleLowerCase("tr-TR");
+  const city = cities.find((c) => t.includes(c.toLocaleLowerCase("tr-TR"))) ?? null;
+  const iso = [...t.matchAll(/\b(\d{4}-\d{2}-\d{2})\b/g)].map((m) => m[1]);
+  let startDate: string | null = iso[0] ?? null;
+  let endDate: string | null = iso[1] ?? iso[0] ?? null;
+  if (!startDate) {
+    const f = parseSmartQuery(text, { cities: [], amenities: [] }, today);
+    startDate = f.checkIn ?? null;
+    endDate = f.checkIn ?? null;
+  }
+  const hit = EVENT_CATEGORIES.find(([re]) => re.test(t));
+  return {
+    city,
+    startDate,
+    endDate,
+    category: hit?.[1] ?? "diğer",
+    expectedImpact: hit?.[2] ?? 3,
+    rationale: hit
+      ? `Metinde "${hit[1]}" türü bir etkinlik geçiyor.`
+      : "Belirgin bir etkinlik türü bulunamadı.",
+  };
+}

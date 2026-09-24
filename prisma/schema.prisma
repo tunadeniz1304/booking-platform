@@ -98,10 +98,26 @@ model DemandEvent {
   endsAt     DateTime @db.Date
   // Talep etkisi 1-10; fiyat motoru yakınlıkla ağırlıklar.
   impact     Int      @default(5)
+  /// Öneri → onay akışı: yalnızca APPROVED olaylar fiyata yansır.
+  status     DemandEventStatus @default(APPROVED)
+  category   String?
+  rationale  String?
+  source     String?
+  proposedBy String?
+  approvedBy String?
+  approvedAt DateTime?
   createdAt  DateTime @default(now())
 
   @@index([locationId, startsAt])
   @@index([startsAt, endsAt])
+  @@index([status, locationId])
+}
+
+enum DemandEventStatus {
+  PROPOSED
+  APPROVED
+  REJECTED
+  ROLLED_BACK
 }
 
 model Amenity {
@@ -136,6 +152,8 @@ model Availability {
   isAvailable Boolean  @default(true)
   price       Decimal  @db.Decimal(10, 2)
   lockedBy    String?
+  /// "Bu fiyat neden?": taban, faktör-başı katkılar ve tavan/taban kırpması.
+  priceExplanation Json?
 
   @@unique([roomId, date])
   @@index([date])
@@ -412,4 +430,18 @@ model BookingTransfer {
   @@index([status, expiresAt])
   @@index([sellerId])
   @@index([claimedById])
+}
+
+/// Yönetici eylemleri denetim kaydı (değiştirilemez; yalnızca ekleme).
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String
+  action    String
+  entity    String
+  entityId  String?
+  meta      Json?
+  createdAt DateTime @default(now())
+
+  @@index([actorId, createdAt])
+  @@index([entity, entityId])
 }

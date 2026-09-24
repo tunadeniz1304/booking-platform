@@ -5,9 +5,12 @@ vi.mock("@/lib/redis", async () => {
   const { FakeRedis } = await import("../../helpers/fake-redis");
   return { redis: new FakeRedis() };
 });
-vi.mock("@/lib/sentiment/trigger", () => ({
-  ingestExternalSignal: vi.fn(async () => {
-    throw new Error("Lokasyon bulunamadı: GIZLI-IC-DETAY");
+vi.mock("@/lib/prisma", () => ({
+  prisma: { location: { findFirst: vi.fn(async () => ({ id: "loc1" })) } },
+}));
+vi.mock("@/lib/pricing/event-signals", () => ({
+  proposeEvent: vi.fn(async () => {
+    throw new Error("Veritabanı iç ayrıntısı: GIZLI-IC-DETAY");
   }),
 }));
 
@@ -110,7 +113,7 @@ describe("regression: #2 iç uçlar varsayılan sırla korunuyor", () => {
         }
       )
     );
-    expect(res.status).toBe(422);
+    expect(res.status).toBe(500);
     const text = await res.text();
     expect(text).not.toContain("GIZLI-IC-DETAY");
   });

@@ -101,6 +101,8 @@ export async function loadDemandImpact(
   const events = await prisma.demandEvent.findMany({
     where: {
       locationId,
+      // Yalnızca onaylı olaylar fiyata yansır (öneriler etkisizdir).
+      status: "APPROVED",
       endsAt: { gte: windowStart },
       startsAt: { lte: windowEnd },
     },

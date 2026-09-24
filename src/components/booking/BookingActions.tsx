@@ -169,7 +169,7 @@ export default function BookingActions({ bookingId, status, holdExpiresAt, onCha
           </p>
           <button
             disabled={busy}
-            className="w-full rounded-lg bg-[#003580] px-4 py-3 text-sm font-semibold text-white disabled:bg-gray-300"
+            className="w-full rounded-lg bg-[#003580] px-4 py-3 text-sm font-semibold text-white disabled:bg-gray-300 disabled:text-gray-700"
           >
             {busy ? "İşleniyor..." : "Öde ve onayla"}
           </button>
@@ -190,7 +190,7 @@ export default function BookingActions({ bookingId, status, holdExpiresAt, onCha
           />
           <button
             disabled={busy}
-            className="w-full rounded-lg bg-[#003580] px-4 py-3 text-sm font-semibold text-white disabled:bg-gray-300"
+            className="w-full rounded-lg bg-[#003580] px-4 py-3 text-sm font-semibold text-white disabled:bg-gray-300 disabled:text-gray-700"
           >
             Doğrula
           </button>

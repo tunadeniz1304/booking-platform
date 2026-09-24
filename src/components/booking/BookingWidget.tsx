@@ -152,7 +152,7 @@ export default function BookingWidget({ propertyId, rooms }: BookingWidgetProps)
       <button
         type="submit"
         disabled={!selectedRoom || !quote}
-        className="mt-5 w-full rounded-lg bg-[#003580] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#002b66] disabled:cursor-not-allowed disabled:bg-gray-300"
+        className="mt-5 w-full rounded-lg bg-[#003580] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#002b66] disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-700"
       >
         Rezervasyonu Onayla
       </button>

@@ -76,7 +76,7 @@ export default function SearchBar() {
       <div className="flex flex-col gap-2 lg:flex-row lg:items-stretch">
         {/* Nereye? */}
         <div className="lg:flex-1 lg:border-r lg:border-gray-200 lg:pr-3">
-          <label htmlFor="destination" className="mb-1 block text-xs font-bold text-gray-400">
+          <label htmlFor="destination" className="mb-1 block text-xs font-bold text-gray-600">
             Nereye?
           </label>
           <DestinationAutocomplete value={destination} onChange={setDestination} />
@@ -84,7 +84,7 @@ export default function SearchBar() {
 
         {/* Giriş - Çıkış */}
         <div ref={dateRef} className="relative lg:w-80">
-          <span className="mb-1 block text-xs font-bold text-gray-400">Giriş - Çıkış</span>
+          <span className="mb-1 block text-xs font-bold text-gray-600">Giriş - Çıkış</span>
           <button
             type="button"
             onClick={() => toggleOpen("date", !dateOpen)}
@@ -120,7 +120,7 @@ export default function SearchBar() {
 
         {/* Misafirler */}
         <div ref={guestsRef} className="relative lg:w-60">
-          <span className="mb-1 block text-xs font-bold text-gray-400">Misafirler</span>
+          <span className="mb-1 block text-xs font-bold text-gray-600">Misafirler</span>
           <button
             type="button"
             onClick={() => toggleOpen("guests", !guestsOpen)}

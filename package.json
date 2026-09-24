@@ -17,6 +17,7 @@
     "test:unit": "vitest run --project unit",
     "test:int": "vitest run --project integration",
     "test:coverage": "vitest run --project unit --coverage",
+    "test:e2e": "playwright test",
     "check": "npm run lint && npm run typecheck && npm run format:check && npm run test:unit",
     "postinstall": "prisma generate",
     "db:up": "docker compose -f docker-compose.dev.yml up -d",
@@ -61,6 +62,8 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "@playwright/test": "^1.63.0",
     "@testcontainers/postgresql": "^12.1.0",
     "@testcontainers/redis": "^12.1.0",
     "@types/bcryptjs": "^2.4.6",

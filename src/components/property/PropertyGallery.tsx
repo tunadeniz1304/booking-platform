@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import { unsplashLoader } from "@/lib/ui/image-loader";
 
 interface PropertyGalleryProps {
   images: string[];
@@ -27,9 +28,9 @@ export default function PropertyGallery({ images, title }: PropertyGalleryProps)
           src={activeImage}
           alt={`${title} - görsel ${activeIndex + 1}`}
           fill
-          unoptimized
+          loader={unsplashLoader}
           priority
-          sizes="(max-width: 768px) 100vw, 50vw"
+          sizes="(max-width: 1024px) 100vw, 60vw"
           className="object-cover"
         />
       </div>
@@ -48,8 +49,10 @@ export default function PropertyGallery({ images, title }: PropertyGalleryProps)
                 src={image}
                 alt={`${title} - küçük görsel ${index + 1}`}
                 fill
-                unoptimized
-                sizes="(max-width: 768px) 25vw, 12vw"
+                loader={unsplashLoader}
+                // Küçük resimler LCP görseliyle bant genişliği için yarışmasın.
+                fetchPriority="low"
+                sizes="(max-width: 1024px) 25vw, 15vw"
                 className="object-cover"
               />
             </button>

@@ -20,6 +20,7 @@
     "db:up": "docker compose -f docker-compose.dev.yml up -d",
     "db:migrate": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
+    "demo:reset": "tsx scripts/demo-reset.ts",
     "worker": "tsx --conditions=react-server src/worker/index.ts",
     "grpc:server": "tsx --conditions=react-server services/grpc/main.ts",
     "embeddings:backfill": "tsx scripts/backfill-embeddings.ts",

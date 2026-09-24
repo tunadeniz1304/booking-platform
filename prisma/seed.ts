@@ -816,6 +816,15 @@ const PROPERTIES: PropSeed[] = [
   },
 ];
 
+const DEMO_POLICIES = ["policy_flexible_v1", "policy_moderate_v1", "policy_strict_v1"] as const;
+const DEMO_PROVINCES = ["34", "06", "35", "07", "48", "50", "16", "01", "81", "61"] as const;
+
+/** `/^(0[1-9]|[1-7]\d|8[01])-\d{3,6}(-\d{4})?$/` ile uyumlu demo izin belgesi numarası. */
+function demoLicenseNumber(index: number): string {
+  const province = DEMO_PROVINCES[index % DEMO_PROVINCES.length];
+  return `${province}-${10001 + index}`;
+}
+
 async function main() {
   assertSeedAllowed();
   console.log("Seeding başlıyor...");
@@ -956,7 +965,8 @@ async function main() {
 
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
-  const horizon = 180;
+  // Envanter ufku: ileri 365 gece (rollover işiyle aynı ufuk)
+  const horizon = 365;
 
   // Talep etkinlikleri (prediktif fiyat motorunun dinamik girdisi)
   await prisma.demandEvent.deleteMany({});
@@ -988,6 +998,9 @@ async function main() {
         ratingAvg: prop.ratingAvg,
         ratingCount: prop.ratingCount,
         isActive: true,
+        // Geçerli izin belgesi no (il plaka kodu 01-81 + sıra no) ve deterministik iptal politikası
+        licenseNumber: demoLicenseNumber(propertyCount),
+        cancellationPolicyId: DEMO_POLICIES[propertyCount % DEMO_POLICIES.length],
         images: [
           IMAGE_POOL[propertyCount % IMAGE_POOL.length],
           IMAGE_POOL[(propertyCount + 1) % IMAGE_POOL.length],

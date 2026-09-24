@@ -15,6 +15,8 @@ import { HttpError } from "@/lib/http/errors";
 import { logger, errorFields } from "@/lib/observability/logger";
 import type { AccessClaims } from "@/lib/auth/tokens";
 import { loadBookingV1 } from "./proto";
+import { applyAriMessage } from "@/lib/channel/channel";
+import { assertRoomAccess } from "@/lib/host/host-service";
 import { GrpcAuthError, authenticateMetadata, resolveRequester } from "./auth";
 
 interface DateRange {
@@ -159,6 +161,39 @@ const handlers = {
   }),
 };
 
+interface PushAvailabilityRequest {
+  room_id: string;
+  sequence: string | number;
+  idempotency_key: string;
+  updates: Array<{
+    date: string;
+    price: number;
+    has_price: boolean;
+    available: boolean;
+    has_available: boolean;
+  }>;
+}
+
+const PushAvailability = authed(async (req: PushAvailabilityRequest, claims) => {
+  if (claims.role !== "HOST" && claims.role !== "ADMIN") {
+    throw new GrpcAuthError(grpc.status.PERMISSION_DENIED, "Yalnızca host/admin");
+  }
+  await assertRoomAccess(claims, req.room_id);
+  if (!req.idempotency_key)
+    throw new GrpcAuthError(grpc.status.INVALID_ARGUMENT, "idempotency_key gerekli");
+  const res = await applyAriMessage({
+    roomId: req.room_id,
+    sequence: Number(req.sequence),
+    idempotencyKey: req.idempotency_key,
+    updates: (req.updates ?? []).map((u) => ({
+      date: u.date,
+      ...(u.has_price ? { price: u.price } : {}),
+      ...(u.has_available ? { available: u.available } : {}),
+    })),
+  });
+  return { status: res.status, applied: res.applied };
+});
+
 /** Yan etkisiz sunucu oluşturucu (testler kendi portunda başlatır). */
 export function createGrpcServer(): grpc.Server {
   const pkg = loadBookingV1();
@@ -168,6 +203,7 @@ export function createGrpcServer(): grpc.Server {
   });
   server.addService(pkg.BookingService.service, { ReserveRoom: handlers.ReserveRoom });
   server.addService(pkg.PaymentService.service, { Charge: handlers.Charge });
+  server.addService(pkg.AriService.service, { PushAvailability });
   return server;
 }
 

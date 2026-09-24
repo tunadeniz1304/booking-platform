@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth";
 import { toErrorResponse } from "@/lib/http/errors";
 import { httpsUrl } from "@/lib/security/url";
+import { licenseSchema } from "@/lib/host/host-service";
 import { searchProperties, getPopularProperties } from "@/lib/search";
 import { logger, errorFields } from "@/lib/observability/logger";
 import { appendOutbox } from "@/lib/cqrs";
@@ -28,6 +29,7 @@ const createPropertySchema = z.object({
   amenities: z.array(z.string().trim().min(1)).default([]),
   images: z.array(httpsUrl).max(20).default([]),
   rooms: z.array(roomSchema).min(1),
+  licenseNumber: licenseSchema.optional(),
 });
 
 export async function GET(req: NextRequest) {
@@ -96,6 +98,7 @@ export async function POST(req: NextRequest) {
       amenities,
       images,
       rooms,
+      licenseNumber,
     } = parsed.data;
 
     const property = await prisma.$transaction(async (tx) => {
@@ -124,7 +127,9 @@ export async function POST(req: NextRequest) {
           locationId: location.id,
           basePrice: new Prisma.Decimal(basePrice),
           currency,
-          isActive: true,
+          // Belge numarası yoksa ilan yayınlanmaz (7464 / 2634).
+          isActive: Boolean(licenseNumber),
+          licenseNumber,
           images,
           amenities: { connect: amenityRecords.map((a) => ({ id: a.id })) },
           rooms: {

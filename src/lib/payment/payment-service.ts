@@ -21,6 +21,7 @@ import { logger, errorFields } from "@/lib/observability/logger";
 import { counter } from "@/lib/observability/metrics";
 import { getPaymentProvider, type AuthorizeResult } from "./index";
 import type { WebhookEvent } from "./webhook";
+import { assessPayment } from "@/lib/risk/fraud";
 
 /**
  * Ödeme orkestrasyonu (P0-5).
@@ -272,6 +273,8 @@ export async function payForBooking(input: {
   userId: string;
   cardToken: string;
   idempotencyKey: string;
+  /** Risk sinyalleri (route'tan): güvenilir IP ve ülke bilgisi. */
+  context?: { ip?: string; ipCountry?: string | null; billingCountry?: string | null };
 }): Promise<PayOutcome> {
   const booking = await loadPayable(input.bookingId, input.userId);
   if (booking.status === "CONFIRMED" && booking.payment?.status === PaymentStatus.PAID) {
@@ -286,11 +289,48 @@ export async function payForBooking(input: {
   }
   assertPayable(booking);
 
+  // P1-10: kural tabanlı risk skoru → allow / review (3DS zorunlu) / block.
+  const [account, recentFailed] = await Promise.all([
+    prisma.user.findUnique({ where: { id: input.userId }, select: { createdAt: true } }),
+    prisma.payment.count({
+      where: {
+        userId: input.userId,
+        status: PaymentStatus.FAILED,
+        updatedAt: { gte: new Date(Date.now() - 86_400_000) },
+      },
+    }),
+  ]);
+  const risk = await assessPayment(redis, {
+    userId: input.userId,
+    ip: input.context?.ip ?? "unknown",
+    cardToken: input.cardToken,
+    amountMinor: amountOf(booking).amount,
+    accountCreatedAt: account?.createdAt ?? new Date(),
+    recentFailedPayments: recentFailed,
+    ipCountry: input.context?.ipCountry,
+    billingCountry: input.context?.billingCountry,
+  });
+  await prisma.fraudCheck.create({
+    data: {
+      bookingId: booking.id,
+      userId: input.userId,
+      score: risk.score,
+      decision: risk.decision,
+      reasons: risk.hits as unknown as Prisma.InputJsonValue,
+    },
+  });
+  if (risk.decision === "block") {
+    paymentsTotal.inc({ outcome: "fraud_blocked" });
+    throw new HttpError(403, "FRAUD_BLOCKED", "Ödeme güvenlik kontrolünden geçemedi", {
+      score: risk.score,
+    });
+  }
+
   const result: AuthorizeResult = await getPaymentProvider().authorize({
     amount: amountOf(booking),
     cardToken: input.cardToken,
     idempotencyKey: `auth:${booking.id}:${input.idempotencyKey}`,
-    metadata: { bookingId: booking.id },
+    metadata: { bookingId: booking.id, ...(risk.decision === "review" ? { force3ds: "1" } : {}) },
   });
 
   if (result.status === "declined") {

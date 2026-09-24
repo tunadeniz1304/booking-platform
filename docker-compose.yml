@@ -23,6 +23,7 @@ x-app-env: &app-env
     TRANSFER_SIGNING_SECRET: ""
     PSP_WEBHOOK_SECRET: ""
     METRICS_TOKEN: ""
+    CHANNEL_FEED_SECRET: ""
     GRPC_HOST: grpc
     COOKIE_SECURE: ${COOKIE_SECURE:-false}
   volumes:

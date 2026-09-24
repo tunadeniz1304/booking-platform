@@ -19,6 +19,7 @@ export class MockPsp implements PaymentProvider {
     amount: Money;
     cardToken: string;
     idempotencyKey: string;
+    metadata?: Record<string, string>;
   }): Promise<AuthorizeResult> {
     const parsed = parseMockToken(input.cardToken);
     if (!parsed) throw new PaymentProviderError("invalid_token", "Geçersiz kart token'ı");
@@ -28,7 +29,8 @@ export class MockPsp implements PaymentProvider {
     if (parsed.scenario === "decline") {
       return { status: "declined", providerRef, declineCode: "card_declined" };
     }
-    if (parsed.scenario === "3ds") {
+    // Risk motoru "review" dediyse onaylanacak kartta da 3DS zorunlu.
+    if (parsed.scenario === "3ds" || input.metadata?.force3ds === "1") {
       return {
         status: "requires_action",
         providerRef: `${providerRef}_3ds`,

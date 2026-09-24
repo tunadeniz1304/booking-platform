@@ -20,6 +20,7 @@ setDefault("JWT_SECRET", "t".repeat(48));
 setDefault("INTERNAL_API_SECRET", "i".repeat(48));
 setDefault("TRANSFER_SIGNING_SECRET", "s".repeat(48));
 setDefault("PSP_WEBHOOK_SECRET", "w".repeat(48));
+setDefault("CHANNEL_FEED_SECRET", "c".repeat(48));
 setDefault("DATABASE_URL", "postgresql://unit:unit@127.0.0.1:1/unit");
 setDefault("REDIS_URL", "redis://127.0.0.1:1");
 

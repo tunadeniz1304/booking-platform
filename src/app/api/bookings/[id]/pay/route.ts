@@ -3,6 +3,8 @@ import { z } from "zod";
 import { requireAuth } from "@/lib/auth";
 import { toErrorResponse, ValidationError } from "@/lib/http/errors";
 import { payForBooking } from "@/lib/payment/payment-service";
+import { getConfig } from "@/lib/config/app-config";
+import { resolveClientIp } from "@/lib/security/ip";
 import { observed } from "@/lib/http/observed";
 
 const bodySchema = z.object({
@@ -20,7 +22,18 @@ export const POST = observed(
       const { cardToken } = bodySchema.parse(await req.json());
       const idempotencyKey = req.headers.get("idempotency-key")?.slice(0, 128);
       if (!idempotencyKey) throw new ValidationError("Idempotency-Key başlığı zorunludur");
-      const outcome = await payForBooking({ bookingId: id, userId, cardToken, idempotencyKey });
+      const hops = getConfig().TRUSTED_PROXY_HOPS;
+      const outcome = await payForBooking({
+        bookingId: id,
+        userId,
+        cardToken,
+        idempotencyKey,
+        context: {
+          ip: resolveClientIp(req.headers, hops),
+          // Ülke başlığı yalnızca güvenilir bir CDN/proxy arkasında dikkate alınır.
+          ipCountry: hops > 0 ? req.headers.get("cf-ipcountry") : null,
+        },
+      });
       return NextResponse.json(outcome, { status: outcome.status === "confirmed" ? 200 : 202 });
     } catch (error) {
       return toErrorResponse(error, "bookings.pay");

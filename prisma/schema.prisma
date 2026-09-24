@@ -56,6 +56,8 @@ model Property {
   embedding            Unsupported("vector(128)")?
   priceHistory         PriceHistory[]
   /// İptal politikası (yoksa varsayılan MODERATE); rezervasyonda snapshot'ı alınır.
+  /// Turizm İşletme Belgesi / 7464 izin belgesi no (ör. 34-12345); boşsa ilan yayınlanmaz.
+  licenseNumber String?
   cancellationPolicyId String?
   cancellationPolicy   CancellationPolicy?         @relation(fields: [cancellationPolicyId], references: [id])
   createdAt            DateTime                    @default(now())
@@ -444,4 +446,28 @@ model AuditLog {
 
   @@index([actorId, createdAt])
   @@index([entity, entityId])
+}
+
+/// Ödeme öncesi kural tabanlı risk değerlendirmesi (P1-10); admin inceleme kuyruğu.
+model FraudCheck {
+  id        String   @id @default(cuid())
+  bookingId String
+  userId    String
+  score     Int
+  decision  String
+  reasons   Json
+  reviewedBy String?
+  reviewedAt DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([decision, createdAt])
+  @@index([bookingId])
+}
+
+/// Kanal (ARI) mesaj sırası: oda başına son uygulanan sıra numarası (P1-9).
+model ChannelSequence {
+  roomId       String   @id
+  lastSequence Int
+  lastKey      String?
+  updatedAt    DateTime @updatedAt
 }

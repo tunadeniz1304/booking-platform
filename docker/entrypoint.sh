@@ -9,7 +9,7 @@ set -eu
 KEYFILE_DIR="${KEYFILE_DIR:-/run/booking-secrets}"
 
 # Uygulama sırları: ortam değişkeni öncelikli, yoksa üretilmiş dosya.
-for name in JWT_SECRET INTERNAL_API_SECRET TRANSFER_SIGNING_SECRET PSP_WEBHOOK_SECRET METRICS_TOKEN; do
+for name in JWT_SECRET INTERNAL_API_SECRET TRANSFER_SIGNING_SECRET PSP_WEBHOOK_SECRET METRICS_TOKEN CHANNEL_FEED_SECRET; do
   eval "current=\${$name:-}"
   if [ -z "$current" ] && [ -f "$KEYFILE_DIR/$name" ]; then
     export "$name=$(cat "$KEYFILE_DIR/$name")"

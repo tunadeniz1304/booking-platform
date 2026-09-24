@@ -1,4 +1,7 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { requireRole } from "@/lib/auth";
+import { toErrorResponse } from "@/lib/http/errors";
+import { propertyPatchSchema, updateProperty } from "@/lib/host/host-service";
 import { prisma } from "@/lib/prisma";
 import { logger, errorFields } from "@/lib/observability/logger";
 
@@ -50,6 +53,19 @@ export async function GET(_req: Request, { params }: Props) {
   } catch (error) {
     logger.error(errorFields(error), "Property detail error");
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
+}
+
+/** Mülk güncelleme (sahip HOST veya ADMIN; başkasınınki 404). */
+export async function PATCH(req: NextRequest, { params }: Props) {
+  try {
+    const { id } = await params;
+    const actor = await requireRole(req, ["HOST", "ADMIN"]);
+    return NextResponse.json(
+      await updateProperty(actor, id, propertyPatchSchema.parse(await req.json()))
+    );
+  } catch (error) {
+    return toErrorResponse(error, "properties.update");
   }
 }
 

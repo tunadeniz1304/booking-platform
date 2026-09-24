@@ -146,3 +146,26 @@ export function demoEventExtraction(
       : "Belirgin bir etkinlik türü bulunamadı.",
   };
 }
+
+export interface ListingFacts {
+  title: string;
+  city: string;
+  propertyType: string;
+  amenities: string[];
+  rooms: Array<{ name: string; capacity: number; bedType: string }>;
+}
+
+/** İlan metni demo'su: yalnızca verilen özelliklerden TR/EN taslak (uydurma yok). */
+export function demoListingCopy(f: ListingFacts): { tr: string; en: string } {
+  const maxCap = Math.max(1, ...f.rooms.map((r) => r.capacity));
+  const am = f.amenities.slice(0, 5);
+  return {
+    tr:
+      `${f.city}'da ${f.title}: ${f.rooms.length} oda seçeneği ve ${maxCap} kişiye kadar konaklama.` +
+      (am.length ? ` Olanaklar: ${am.join(", ")}.` : "") +
+      ` Odalar: ${f.rooms.map((r) => `${r.name} (${r.bedType})`).join(", ")}.`,
+    en:
+      `${f.title} in ${f.city}: ${f.rooms.length} room option(s), sleeping up to ${maxCap} guests.` +
+      (am.length ? ` Amenities: ${am.join(", ")}.` : ""),
+  };
+}

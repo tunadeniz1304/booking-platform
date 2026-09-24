@@ -82,3 +82,31 @@ service BookingService {
 service PaymentService {
   rpc Charge(ChargeRequest) returns (ChargeResponse);
 }
+
+// --- AriService (kanal yöneticisi simülatörü) ------------------------------
+
+message AriUpdate {
+  string date = 1;
+  double price = 2;
+  bool has_price = 3;
+  bool available = 4;
+  bool has_available = 5;
+}
+
+message PushAvailabilityRequest {
+  string room_id = 1;
+  // Oda başına monoton artan sıra numarası; eski/eşit numara reddedilir.
+  int64 sequence = 2;
+  // Aynı anahtarla tekrar gönderim tek etki yapar.
+  string idempotency_key = 3;
+  repeated AriUpdate updates = 4;
+}
+
+message PushAvailabilityResponse {
+  string status = 1;
+  int32 applied = 2;
+}
+
+service AriService {
+  rpc PushAvailability(PushAvailabilityRequest) returns (PushAvailabilityResponse);
+}

@@ -9,7 +9,7 @@ export interface BookingV1Package {
   InventoryService: grpc.ServiceClientConstructor;
   BookingService: grpc.ServiceClientConstructor;
   PaymentService: grpc.ServiceClientConstructor;
-  AriService?: grpc.ServiceClientConstructor;
+  AriService: grpc.ServiceClientConstructor;
 }
 
 let cached: BookingV1Package | null = null;

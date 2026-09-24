@@ -53,7 +53,7 @@ Her faz sonunda kalite kapısı: `npm run lint`, `npm run typecheck`, `npm run f
 
 ## F7 — Host/Admin
 
-- [ ] P1-7 extranet, P1-9 kanal simülatörü, P1-10 fraud, P2-4 admin, P2-5 KVKK
+- [x] P1-7 extranet API, P1-9 kanal simülatörü, P1-10 fraud, P2-4 admin API, P2-5 KVKK API (UI sayfaları F8)
 
 ## F8 — Portföy
 

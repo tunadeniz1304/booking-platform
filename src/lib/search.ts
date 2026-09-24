@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { redis } from "@/lib/redis";
+import { logger, errorFields } from "@/lib/observability/logger";
 import {
   findSemanticCandidates,
   computeAffinity,
@@ -14,6 +15,8 @@ import { breakers, BreakerOpenError } from "@/lib/resilience/circuit-breaker";
 
 const SEARCH_CACHE_TTL = 60 * 5; // 5 dakika
 const SEARCH_CACHE_PREFIX = "search:";
+/** Sürüm anahtarı: her geçersiz kılmada INCR → eski anahtarlar TTL ile kendiliğinden düşer. */
+const SEARCH_VERSION_KEY = "search:version";
 const POPULAR_CACHE_TTL = 60 * 15; // 15 dakika
 const POPULAR_CACHE_KEY = "search:popular";
 
@@ -167,7 +170,15 @@ function buildOrderBy(sort: SearchParams["sort"]): Prisma.PropertyOrderByWithRel
   }
 }
 
-function buildCacheKey(params: SearchParams): string {
+async function currentCacheVersion(): Promise<string> {
+  try {
+    return (await redis.get(SEARCH_VERSION_KEY)) ?? "0";
+  } catch {
+    return "0";
+  }
+}
+
+function buildCacheKey(params: SearchParams, version: string): string {
   const normalized = {
     query: params.query?.trim().toLowerCase() || "",
     city: params.city?.trim().toLowerCase() || "",
@@ -186,7 +197,7 @@ function buildCacheKey(params: SearchParams): string {
     userId: params.userId || "",
   };
 
-  return `${SEARCH_CACHE_PREFIX}${JSON.stringify(normalized)}`;
+  return `${SEARCH_CACHE_PREFIX}v${version}:${JSON.stringify(normalized)}`;
 }
 
 /** Sorgu kelimesi metin alanlarında geçiyor mu (semantik skordaki keyword bileşeni). */
@@ -346,7 +357,7 @@ async function semanticSearchProperties(params: SearchParams): Promise<SearchRes
 export async function searchProperties(params: SearchParams): Promise<SearchResponse> {
   const page = Math.max(1, params.page || 1);
   const pageSize = Math.min(50, Math.max(1, params.pageSize || 20));
-  const cacheKey = buildCacheKey({ ...params, page, pageSize });
+  const cacheKey = buildCacheKey({ ...params, page, pageSize }, await currentCacheVersion());
 
   // pgvector semantik arama yolu (sorgu varsa)
   if (params.semantic && params.query?.trim()) {
@@ -556,27 +567,24 @@ export async function getPopularProperties(limit = 10): Promise<SearchResult[]> 
   return results;
 }
 
+/**
+ * Arama önbelleğini O(1) geçersiz kılar: `KEYS search:*` (bloklayıcı O(N)) yerine
+ * sürüm sayacı artırılır; eski sürüm anahtarları TTL dolunca silinir.
+ */
 export async function invalidateSearchCache(): Promise<void> {
   try {
-    const keys = await redis.keys(`${SEARCH_CACHE_PREFIX}*`);
-    if (keys.length > 0) {
-      await redis.del(...keys);
-    }
+    await redis.incr(SEARCH_VERSION_KEY);
     await redis.del(POPULAR_CACHE_KEY);
   } catch (error) {
-    console.error("Search cache invalidation failed:", error);
+    logger.warn(errorFields(error), "search cache invalidation failed");
   }
 }
 
 export async function invalidatePropertySearchCache(propertyId: string): Promise<void> {
+  await invalidateSearchCache();
   try {
-    const keys = await redis.keys(`${SEARCH_CACHE_PREFIX}*`);
-    if (keys.length > 0) {
-      await redis.del(...keys);
-    }
-    await redis.del(POPULAR_CACHE_KEY);
     await redis.del(`property:${propertyId}`);
   } catch (error) {
-    console.error("Property search cache invalidation failed:", error);
+    logger.warn(errorFields(error), "property cache invalidation failed");
   }
 }

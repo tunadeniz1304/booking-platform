@@ -315,6 +315,9 @@ model Review {
   property   Property @relation(fields: [propertyId], references: [id])
   rating     Int
   comment    String?
+  /// Ev sahibinin herkese açık yanıtı.
+  hostReply  String?
+  hostRepliedAt DateTime?
   createdAt  DateTime @default(now())
 
   @@index([propertyId])

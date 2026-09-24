@@ -1,0 +1,7 @@
+apiVersion: 1
+providers:
+  - name: booking
+    folder: booking-platform
+    type: file
+    options:
+      path: /var/lib/grafana/dashboards

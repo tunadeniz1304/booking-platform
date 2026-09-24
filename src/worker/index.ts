@@ -9,12 +9,22 @@
 import { Worker, type Job } from "bullmq";
 import { loadEnv } from "@/lib/config/load-env";
 import { QUEUE_NAMES, getQueue, getQueueConnection, type PricingJobData } from "@/lib/queue";
-import { EXPIRE_HOLDS_JOB, runExpireHolds, scheduleExpireHolds } from "./jobs/expire-holds";
+import {
+  EXPIRE_HOLDS_JOB,
+  ROLLOVER_JOB,
+  runExpireHolds,
+  runRollover,
+  scheduleExpireHolds,
+} from "./jobs/expire-holds";
 import { runOutboxRelay } from "@/lib/cqrs";
 import { registerEventHandlers } from "@/lib/events/register";
 import { updateAvailabilityPrices } from "@/lib/pricing-service";
 import { logger, errorFields } from "@/lib/observability/logger";
 import { logLlmStartup } from "@/lib/llm/startup";
+import { registerTracing } from "@/lib/observability/tracing";
+import { createServer } from "http";
+import { registry } from "@/lib/observability/metrics";
+import { metricsAuthorized } from "@/lib/observability/metrics-auth";
 
 loadEnv();
 
@@ -44,6 +54,7 @@ async function processPricing(job: Job<PricingJobData>): Promise<void> {
 }
 
 async function main(): Promise<void> {
+  await registerTracing("booking-worker");
   logLlmStartup("worker");
   registerEventHandlers();
 
@@ -58,6 +69,7 @@ async function main(): Promise<void> {
     QUEUE_NAMES.maintenance,
     async (job: Job) => {
       if (job.name === EXPIRE_HOLDS_JOB) return runExpireHolds();
+      if (job.name === ROLLOVER_JOB) return runRollover();
       throw new Error(`Bilinmeyen bakım işi: ${job.name}`);
     },
     { connection }
@@ -70,6 +82,17 @@ async function main(): Promise<void> {
   );
   workers.push(maintenance);
   await scheduleExpireHolds(getQueue(QUEUE_NAMES.maintenance));
+
+  // Prometheus için işçi metrikleri (outbox, expire, bildirim sayaçları).
+  const metricsPort = Number(process.env.WORKER_METRICS_PORT ?? 9464);
+  createServer(async (req, res) => {
+    const auth = metricsAuthorized(req.headers.authorization ?? null);
+    if (req.url !== "/metrics" || auth !== "ok") {
+      res.writeHead(auth === "disabled" ? 503 : req.url === "/metrics" ? 401 : 404).end();
+      return;
+    }
+    res.writeHead(200, { "content-type": registry.contentType }).end(await registry.metrics());
+  }).listen(metricsPort);
 
   await drainOutbox();
   relayTimer = setInterval(drainOutbox, OUTBOX_RELAY_INTERVAL_MS);

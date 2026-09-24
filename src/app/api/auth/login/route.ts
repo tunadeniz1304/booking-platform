@@ -5,13 +5,14 @@ import { verifyPasswordConstantTime } from "@/lib/auth";
 import { issueSession } from "@/lib/auth/session";
 import { setSessionCookies } from "@/lib/auth/cookies";
 import { UnauthorizedError, toErrorResponse } from "@/lib/http/errors";
+import { observed } from "@/lib/http/observed";
 
 const loginSchema = z.object({
   email: z.string().trim().email("Geçerli bir e-posta girin").max(254),
   password: z.string().min(1, "Parola boş olamaz").max(200),
 });
 
-export async function POST(req: NextRequest) {
+export const POST = observed("auth.login", async function postHandler(req: NextRequest) {
   try {
     const { email, password } = loginSchema.parse(await req.json());
 
@@ -49,6 +50,6 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     return toErrorResponse(error, "auth.login");
   }
-}
+});
 
 export const dynamic = "force-dynamic";

@@ -1,7 +1,9 @@
 import type { Queue } from "bullmq";
 import { expireHolds } from "@/lib/booking-service";
+import { rollAvailabilityForward } from "@/lib/booking/availability-rollover";
 
 export const EXPIRE_HOLDS_JOB = "expire-holds";
+export const ROLLOVER_JOB = "availability-rollover";
 
 /** Her dakika çalışan tekrarlı iş (idempotent scheduler — birden çok worker güvenli). */
 export async function scheduleExpireHolds(queue: Queue): Promise<void> {
@@ -10,6 +12,16 @@ export async function scheduleExpireHolds(queue: Queue): Promise<void> {
     { every: 60_000 },
     { name: EXPIRE_HOLDS_JOB, data: {}, opts: { removeOnComplete: true, removeOnFail: 100 } }
   );
+  // Her gece 02:30 UTC: ileri 365 gecelik envanteri tamamla.
+  await queue.upsertJobScheduler(
+    ROLLOVER_JOB,
+    { pattern: "30 2 * * *", tz: "UTC" },
+    { name: ROLLOVER_JOB, data: {}, opts: { removeOnComplete: true, removeOnFail: 100 } }
+  );
+}
+
+export async function runRollover(): Promise<number> {
+  return rollAvailabilityForward(365);
 }
 
 /** Süresi dolan tutmaları EXPIRED yapar ve envanteri iade eder. */

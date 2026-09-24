@@ -156,6 +156,36 @@ services:
     volumes:
       - es_data:/usr/share/elasticsearch/data
 
+  # --- Gözlemlenebilirlik (opsiyonel): docker compose --profile observability up ---
+  # İz göndermek için .env: OTEL_EXPORTER_OTLP_ENDPOINT=http://tempo:4318
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    profiles: ["observability"]
+    volumes:
+      - ./docker/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - booking_secrets:/run/booking-secrets:ro
+    ports:
+      - "127.0.0.1:9090:9090"
+
+  tempo:
+    image: grafana/tempo:2.5.0
+    profiles: ["observability"]
+    command: ["-config.file=/etc/tempo.yml"]
+    volumes:
+      - ./docker/observability/tempo.yml:/etc/tempo.yml:ro
+
+  grafana:
+    image: grafana/grafana:11.1.0
+    profiles: ["observability"]
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+    volumes:
+      - ./docker/observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./docs/observability:/var/lib/grafana/dashboards:ro
+    ports:
+      - "127.0.0.1:3001:3000"
+
 volumes:
   postgres_data:
   redis_data:

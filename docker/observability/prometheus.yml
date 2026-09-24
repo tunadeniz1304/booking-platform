@@ -1,0 +1,15 @@
+global:
+  scrape_interval: 15s
+scrape_configs:
+  - job_name: booking-web
+    metrics_path: /api/metrics
+    authorization:
+      credentials_file: /run/booking-secrets/METRICS_TOKEN
+    static_configs:
+      - targets: ["app:3000"]
+  - job_name: booking-worker
+    metrics_path: /metrics
+    authorization:
+      credentials_file: /run/booking-secrets/METRICS_TOKEN
+    static_configs:
+      - targets: ["worker:9464"]

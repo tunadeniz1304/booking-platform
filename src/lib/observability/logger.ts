@@ -1,4 +1,5 @@
 import pino from "pino";
+import { trace } from "@opentelemetry/api";
 
 /**
  * Uygulama geneli yapılandırılmış logger (pino).
@@ -17,6 +18,11 @@ export const logger = pino({
   level: defaultLevel(),
   base: { service: process.env.SERVICE_NAME ?? "booking-web" },
   timestamp: pino.stdTimeFunctions.isoTime,
+  // İz korelasyonu: aktif span varsa her log satırına traceId/spanId eklenir.
+  mixin() {
+    const ctx = trace.getActiveSpan()?.spanContext();
+    return ctx ? { traceId: ctx.traceId, spanId: ctx.spanId } : {};
+  },
   redact: {
     paths: [
       "authorization",

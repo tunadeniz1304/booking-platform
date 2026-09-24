@@ -3,6 +3,7 @@ import { z } from "zod";
 import { createBooking, listUserBookings } from "@/lib/booking-service";
 import { requireAuth } from "@/lib/auth";
 import { toErrorResponse } from "@/lib/http/errors";
+import { observed } from "@/lib/http/observed";
 
 const createBookingSchema = z.object({
   propertyId: z.string().min(1).max(64),
@@ -14,7 +15,7 @@ const createBookingSchema = z.object({
   quoteId: z.string().uuid().optional(),
 });
 
-export async function POST(req: NextRequest) {
+export const POST = observed("bookings", async function postHandler(req: NextRequest) {
   try {
     const { userId } = await requireAuth(req);
     const parsed = createBookingSchema.parse(await req.json());
@@ -25,15 +26,15 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     return toErrorResponse(error, "bookings.create");
   }
-}
+});
 
-export async function GET(req: NextRequest) {
+export const GET = observed("bookings", async function getHandler(req: NextRequest) {
   try {
     const { userId } = await requireAuth(req);
     return NextResponse.json(await listUserBookings(userId));
   } catch (error) {
     return toErrorResponse(error, "bookings.list");
   }
-}
+});
 
 export const dynamic = "force-dynamic";

@@ -1,142 +1,190 @@
 # booking-platform
 
-Booking.com ölçeğinde, yüksek eşzamanlılık kaldırabilen ve veri tutarlılığını koruyan bir konaklama & rezervasyon platformu.
+**Çift rezervasyonu kanıtlanabilir biçimde imkânsız kılan, parayı kuruşu kuruşuna tamsayı olarak hesaplayan ve GenAI'ı yalnızca açıklama/özetleme için — anahtar ve internet olmadan da çalışacak şekilde — kullanan bir konaklama rezervasyon (OTA) platformu.**
 
-## Teknoloji Yığını
+> **Portföy/demo projesidir; gerçek ödeme alınmaz, gerçek konaklama satılmaz.**
 
-| Katman                 | Teknoloji                                                 |
-| ---------------------- | --------------------------------------------------------- |
-| Frontend               | Next.js 14 (App Router), React 18, Tailwind CSS           |
-| Backend                | Next.js Route Handlers, TypeScript `src/lib/*` servisleri |
-| Veritabanı             | PostgreSQL 16 + Prisma ORM                                |
-| Cache / Kilit / Kuyruk | Redis 7, BullMQ                                           |
-| Auth                   | JWT (HS256) + bcryptjs, httpOnly cookie + Bearer          |
-| Infra                  | Docker Compose, GitHub Actions                            |
+Next.js 16 (App Router) · React 19 · TypeScript strict · PostgreSQL 16 + pgvector · Prisma 5 · Redis 7 · BullMQ · gRPC · jose · pino · OpenTelemetry · Prometheus · Vitest + testcontainers + fast-check
+
+---
 
 ## Mimari
 
-Modüler monolit: DDD bounded context'ler (`src/lib/` içinde ayrı servisler) — Catalog, Inventory, Booking, Pricing, Identity, Search. Ayrıntılar: [`docs/architecture.md`](docs/architecture.md). API sözleşmesi: [`docs/api-contract.md`](docs/api-contract.md).
+```mermaid
+flowchart LR
+  subgraph Client["Tarayıcı"]
+    UI["Next.js sayfaları<br/>(search, property, checkout, booking, account, ranking, dev/mailbox)"]
+    HF["Mock hosted fields<br/>(kart → token, tarayıcıda)"]
+  end
 
-Öne çıkan yönler:
+  subgraph App["app (Next.js 16)"]
+    PX["src/proxy.ts<br/>JWT doğrulama · x-user-* başlık temizliği<br/>CSRF Origin · rate-limit · CSP nonce"]
+    API["Route handler'lar<br/>src/app/api/**"]
+    LIB["Bounded context'ler<br/>src/lib/*"]
+    LLM["LLM katmanı src/lib/llm<br/>live · demo · fallback<br/>redaksiyon + guard'lar"]
+    PSP["PaymentProvider<br/>MockPsp (varsayılan) · Stripe (ops.)"]
+  end
 
-- **Double-booking engelleme:** Redis dağıtık kilit (`booking:lock:`) + SERIALIZABLE transaction + `SELECT ... FOR UPDATE` çift katmanı.
-- **Idempotency:** `POST /api/bookings` isteğinde `Idempotency-Key` başlığı; `userId+idempotencyKey` unique'i ile tekrarlanan istek aynı rezervasyonu döndürür.
-- **Rate limiting:** Next.js middleware içinde Redis sliding-window; uç başına farklı limit (auth 20, arama 60, rezervasyon 30, varsayılan 100/dk).
-- **Cache:** arama `search:`, popüler `search:popular`, rezervasyon `booking:`, fiyat `price:` anahtarları; rezervasyon değişiminde ilgili cache'ler geçersiz kılınır.
-- **Dinamik fiyatlandırma:** mevsim + son dakika + doluluk faktörleriyle gecelik fiyat; BullMQ kuyruğu ve günlük cron ile ön ısıtma.
+  subgraph Worker["worker (BullMQ)"]
+    W1["expire-holds (dakikalık)"]
+    W2["availability rollover (gecelik)"]
+    W3["outbox relay → bildirim, embedding"]
+  end
 
-## Başlangıç
+  GRPC["grpc servisi<br/>BookingService + AriService<br/>JWT metadata zorunlu"]
+  PG[("PostgreSQL 16 + pgvector<br/>Availability FOR UPDATE<br/>OutboxMessage")]
+  RD[("Redis 7<br/>Redlock · quote · cache<br/>rate-limit · jti denylist")]
+  EXT["OpenAI-uyumlu LLM API<br/>(yalnızca anahtar varsa)"]
+  MAIL["SMTP veya dev mailbox"]
 
-Gereksinimler: Node 20+, Docker Desktop.
-
-```bash
-# 1) Bağımlılıklar
-npm install
-
-# 2) Ortam değişkenleri
-cp .env.example .env
-
-# 3) PostgreSQL + Redis + Uygulama
-docker compose up -d db redis
-
-# 4) Veritabanı göçü + örnek veri
-npm run db:migrate
-npm run db:seed
-
-# 5) Geliştirme sunucusu
-npm run dev
+  UI --> PX --> API --> LIB
+  HF -. token .-> API
+  LIB --> PG
+  LIB --> RD
+  LIB --> LLM -. canlı mod .-> EXT
+  LIB --> PSP
+  Worker --> PG
+  Worker --> RD
+  W3 --> MAIL
+  GRPC --> LIB
 ```
 
-Uygulama: http://localhost:3000
+Ayrıntılar: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · kararlar: [docs/adr/](docs/adr/)
 
-### Örnek hesaplar (seed)
+## Sektör kıyası
 
-| Rol       | E-posta            | Parola         |
-| --------- | ------------------ | -------------- |
-| Admin     | admin@booking.test | `Password123!` |
-| Host      | host@booking.test  | `Password123!` |
-| Kullanıcı | guest@booking.test | `Password123!` |
+| Yetkinlik          | Sektör liderleri                                        | Bu repoda (v2.0.0)                                                                                                                                      |
+| ------------------ | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Çift rezervasyon   | Gecelik envanter + kilit/constraint + hold              | Redlock + `SELECT … FOR UPDATE` + SERIALIZABLE, `HELD` + TTL, `expire-holds` job'ı; 100 paralel istek → 1 başarı / 99 `SOLD_OUT` (ADR 0002)             |
+| Ödeme              | 3DS2/SCA, auth → capture, iade                          | `PaymentProvider` + `MockPsp` (authorize/capture/refund, 3DS simülasyonu, HMAC imzalı idempotent webhook), opsiyonel `StripeProvider`                   |
+| İptal & iade       | Sürümlü politika, rezervasyona snapshot                 | `CancellationPolicy` (NON_REFUNDABLE/FLEXIBLE/MODERATE/STRICT) + `Booking.policySnapshot` + `computeRefund()`                                           |
+| Fiyat şeffaflığı   | All-in fiyat (FTC 16 CFR 464, Omnibus)                  | Tek `computeTotal()` (kart = PDP = checkout = tahsilat), minor-unit tamsayı, konaklama vergisi `ACCOMMODATION_TAX_RATE` (%1), fast-check                |
+| Arama & sıralama   | Facet, açıklanabilir sıralama (DSA)                     | Ağırlıklı ve `explain` alanlı skor, `/ranking` şeffaflık sayfası; harita görünümü henüz yok (F8)                                                        |
+| GenAI arama        | Booking Smart Filter, Expedia Romie, Trip.com TripGenie | Smart Filter (NL → izinli facet'ler), araçlı ve grounded trip-planner (`POST /api/ai/trip-plan`)                                                        |
+| Yorumlar           | Doğrulanmış konaklama, AI özeti                         | Yalnızca tamamlanmış konaklama sahibi yorum yazar, host yanıtı, atıflı özet (`[r:<id>]` guard'lı)                                                       |
+| Partner extranet   | Oda/fiyat/ARI takvimi                                   | Host API'leri (mülk, oda, toplu ARI, rezervasyonlar, ilan copilot'u); `/host` arayüzü F8'de                                                             |
+| Kanal yönetimi     | OTA XML / iCal                                          | iCal export/import + gRPC `AriService.PushAvailability` (sıra numaralı, idempotent)                                                                     |
+| Dinamik fiyat      | Açıklanabilir yield, olay sinyalleri                    | Faktör kırılımı `Availability.priceExplanation`, olay sinyali önerisi → admin onayı → [floor, ceiling] sınırlı, idempotent yeniden fiyatlama            |
+| Güvenlik           | RBAC, fraud skoru, ATO koruması                         | jose JWT 15 dk + rotating refresh, CSRF Origin kontrolü, kimliğe bağlı rate-limit, iç uç koruması, gRPC JWT, kural tabanlı fraud skoru                  |
+| Gözlemlenebilirlik | Trace + metrik + SLO                                    | pino, OpenTelemetry (Prisma/ioredis), `/api/metrics` (Prometheus), Grafana dashboard JSON, `observability` compose profili                              |
+| Uyum               | KVKK/GDPR, WCAG, STR kayıt no                           | Veri dışa aktarım/silme API'si (`/api/account`), `Property.licenseNumber`, LLM'e giden metinde KVKK redaksiyonu — bkz. [COMPLIANCE](docs/COMPLIANCE.md) |
+| Test & CI          | Yüksek kapsam, e2e, yük                                 | Vitest unit + testcontainers entegrasyon, GitHub Actions CI; Playwright e2e ve k6 yük testi F8'de                                                       |
 
-## Scriptler
+## 30 saniyede çalıştır
 
-| Komut                         | Açıklama                                  |
-| ----------------------------- | ----------------------------------------- |
-| `npm run dev`                 | Geliştirme sunucusu                       |
-| `npm run build`               | Üretim build'i                            |
-| `npm run start`               | Üretim sunucusu                           |
-| `npm run lint`                | ESLint                                    |
-| `npm test`                    | Vitest (concurrency/idempotency)          |
-| `npm run db:migrate`          | Prisma migrate deploy                     |
-| `npm run db:seed`             | Örnek veri                                |
-| `npm run db:up`               | Docker ile db+redis ayağa kaldır          |
-| `npm run worker`              | Arka plan işçisi (outbox relay + pricing) |
-| `npm run grpc:server`         | Bağımsız gRPC sunucusu                    |
-| `npm run grpc:client`         | gRPC istemci bağlantı testi               |
-| `npm run embeddings:backfill` | pgvector gömme (yeniden) hesaplama        |
+Gereksinim: Docker (Compose v2).
 
-> `npm test` için PostgreSQL ve Redis'in çalışıyor olması gerekir (bkz. adım 3).
+```bash
+cp .env.example .env && docker compose up --build
+```
 
-## Phase-2 — Next-Generation Altyapı
+→ <http://localhost:3000>
 
-Booking.com'un limitlerini aşan dağıtık + yapay zeka destekli katmanlar. Mimari: [`docs/architecture-phase2.md`](docs/architecture-phase2.md).
+- **Sırlar otomatik üretilir.** `secrets-init` servisi ilk açılışta JWT, iç API, transfer imza, webhook, metrik, Postgres ve Redis sırlarını rastgele üretip `booking_secrets` volume'una yazar. İmajlarda sır yoktur; build argümanı olarak da geçilmez.
+- **Demo verisi:** `migrate` servisi `prisma migrate deploy` çalıştırır, ardından `DEMO_SEED` açıksa (compose varsayılanı `true`) ve veritabanı boşsa seed yükler. Production'da `DEMO_SEED` açıkça verilmedikçe seed çalışmaz (`src/lib/config/seed-guard.ts`).
+- **Eski volume uyarısı:** v2 öncesi compose ile oluşturulmuş bir `postgres_data` volume'unuz varsa veritabanı parolası artık üretilmiş sırdan geldiği için bağlantı başarısız olur. Bir kez `docker compose down -v` çalıştırın (demo verisi yeniden yüklenir).
+- Postgres ve Redis host'a açılmaz. Yerel geliştirme için: `npm run db:up` (dev compose) → `npm run db:migrate && npm run db:seed` → `npm run dev` ve ayrı terminalde `npm run worker`.
 
-| Modül                | Klasör                                           | Açıklama                                         |
-| -------------------- | ------------------------------------------------ | ------------------------------------------------ |
-| CQRS + Event Bus     | `src/lib/cqrs/`                                  | CommandBus/QueryBus/EventBus + trace             |
-| Transactional Outbox | `src/lib/cqrs/outbox.ts`                         | iş ile atomik olay yayını, at-least-once         |
-| Saga                 | `src/lib/saga/`                                  | booking→payment orkestrasyonu + telafi           |
-| Redlock              | `src/lib/distributed-lock/`                      | fencing token'lı dağıtık kilit                   |
-| gRPC/Protobuf        | `proto/`, `services/grpc/`                       | iç servis sözleşmesi (inventory/booking/payment) |
-| pgvector             | `src/lib/embedding/`, `src/lib/search/vector.ts` | semantik arama + kişiselleştirme                 |
-| Talep Motoru         | `src/lib/pricing/engine.ts`                      | etkinlik korelasyonlu dinamik fiyat              |
-| Fuzzy Arama          | `src/lib/search/fuzzy.ts` (`pg_trgm`)            | imla hatası toleransı                            |
-| Elasticsearch        | `src/lib/search/elastic.ts`                      | opsiyonel ES adaptörü                            |
-| Pazarlık             | `src/lib/negotiation/`                           | çok-etmenli rule-engine (`POST /api/negotiate`)  |
-| Canlı Talep (SSE)    | `src/lib/live/`, `/api/rooms/[id]/live`          | gerçek zamanlı ısı haritası akışı                |
-| Circuit Breaker      | `src/lib/resilience/`                            | CLOSED/OPEN/HALF_OPEN + fallback                 |
-| Güvenlik             | `src/lib/security/`                              | IP-spoof koruması + BOLA denetimi                |
+### Demo kullanıcılar
 
-### Phase-2 scriptleri
+> **UYARI — YALNIZCA DEMO.** Bu hesaplar seed ile oluşturulur ve herkes tarafından bilinen bir parola kullanır. Production'da seed devre dışıdır.
 
-| Komut                         | Açıklama                                         |
-| ----------------------------- | ------------------------------------------------ |
-| `npm run worker`              | Arka plan işçisi: outbox relay + pricing kuyruğu |
-| `npm run grpc:server`         | Bağımsız gRPC sunucusu (port 50051)              |
-| `npm run grpc:client`         | gRPC istemci bağlantı testi                      |
-| `npm run embeddings:backfill` | pgvector gömme vektörlerini (yeniden) hesaplar   |
+| Rol     | E-posta              | Parola         |
+| ------- | -------------------- | -------------- |
+| Misafir | `guest@booking.test` | `Password123!` |
+| Host    | `host@booking.test`  | `Password123!` |
+| Admin   | `admin@booking.test` | `Password123!` |
 
-Semantik aramayı açmak için: `GET /api/search?destination=...&semantic=1`.
-Elasticsearch'i aktifleştirmek için `docker compose --profile es up -d` + `ELASTICSEARCH_URL=http://localhost:9200`.
+Test kartları (mock hosted fields, tarayıcıda token'a çevrilir): `4242 4242 4242 4242` onay, `4000 0000 0000 0002` ret, `4000 0000 0000 3220` 3DS (doğrulama kodu `123456`). Onay e-postaları SMTP yapılandırılmamışsa <http://localhost:3000/dev/mailbox> sayfasına düşer.
 
-## API
+3 dakikalık demo akışı: [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md)
 
-Tam sözleşme: [`docs/api-contract.md`](docs/api-contract.md). Özet:
+## LLM modu
 
-- `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/user/me`, `POST /api/auth/logout`
-- `GET /api/search`, `GET /api/properties`, `POST /api/properties` (HOST), `GET /api/properties/:id`, `GET /api/locations`
-- `POST /api/bookings` (Idempotency-Key destekli), `GET /api/bookings`, `GET/DELETE /api/bookings/:id`
-- `GET/POST/DELETE /api/favorites`
-- `POST/GET /api/pricing`
+Tüm LLM erişimi `src/lib/llm/` sözleşmesinden geçer ([ADR 0005](docs/adr/0005-llm-contract.md), [MODEL_CARD](docs/MODEL_CARD.md)).
+
+| Mod                  | Ne zaman                                                  | Davranış                                                                                          |
+| -------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| **DEMO**             | Anahtar yok veya `LLM_MODE` = `demo`                      | Ağa hiç çıkmaz; görev başına deterministik üreticiler gerçek verilerden Türkçe çıktı üretir       |
+| **CANLI**            | `.env` içinde `LLM_API_KEY` tanımlı (`LLM_MODE` = `auto`) | OpenAI-uyumlu Chat Completions (varsayılan model `deepseek-v4-flash`, `LLM_BASE_URL` ile değişir) |
+| **fallback** (çağrı) | Canlı çağrıda timeout / 429 / 5xx / geçersiz JSON / guard | O çağrı için demo çıktısı, `llmMode: "fallback"` + kısa `reason` kodu; API yine 200 döner         |
+
+- Başlangıç logu: `LLM: DEMO modu` veya `LLM: CANLI (<model> @ <host>)`.
+- `GET /api/llm/status` (giriş gerekli): `mode`, `effectiveMode`, `model`, `baseUrlHost`, `hasKey`, `jsonModeSupported`, `lastError`. Anahtarın kendisi hiçbir yanıtta, logda veya telemetride görünmez.
+- `npm run llm:smoke`: 1 JSON + 1 metin çağrısı; anahtar yoksa "DEMO — smoke atlandı" ile 0 çıkış kodu, anahtar varken canlı başarısızlıkta 1.
+- LLM **asla** fiyat, uygunluk, iade veya sıralama kararı vermez; LLM'e giden her metin KVKK redaksiyonundan geçer (TCKN, IBAN, telefon, e-posta, kart, kişi adı).
+
+## Mühendislik öne çıkanları
+
+- **Çift rezervasyon yok, kanıtlı:** `tests/integration/booking-core.test.ts` aynı son oda için 100 paralel `createBooking` çalıştırır → tam 1 başarı, 99 `SOLD_OUT`; ardından SQL ile gece başına en fazla bir aktif rezervasyon olduğu doğrulanır (overbooking = 0). Katmanlar: Redlock (fencing token) → SERIALIZABLE işlem → `SELECT … FOR UPDATE` gecelik `Availability` satırları → sürüm koşullu durum geçişi.
+- **Para tamsayıdır:** `src/lib/money/money.ts` minor-unit `number` + `allocate` (kalan kuruş dağıtımı); tek `computeTotal()` (`src/lib/pricing/quote.ts`) arama kartı, PDP, checkout ve `Payment.amount` için aynı sonucu verir — `fast-check` property testleriyle (`tests/unit/money`, `tests/unit/pricing`). Quote Redis'te 15 dk saklanır; fiyat değiştiyse `409 PRICE_CHANGED`.
+- **Durum makinesi:** `PENDING → HELD → CONFIRMED → COMPLETED | CANCELLED | EXPIRED` saf geçiş tablosu (`src/lib/booking/state-machine.ts`); ödenmeyen hold'lar `expire-holds` job'ı ile envantere geri döner.
+- **Refresh-token rotasyonu:** jose HS256 access token 15 dk, rotating refresh token 7 gün (aile/`jti` Redis'te), logout `jti` denylist'e yazar; sabit zamanlı login.
+- **Transactional outbox:** olaylar iş verisiyle aynı transaction'da yazılır; relay `UPDATE … WHERE id IN (SELECT … FOR UPDATE SKIP LOCKED) RETURNING *` ile atomik kiralar, lease süresi dolan mesajlar geri alınır, `OUTBOX_MAX_ATTEMPTS` sonrası `DEAD` (ADR 0003).
+- **CSP nonce:** her istekte yeni nonce, `script-src 'nonce-…' 'strict-dynamic'`, HSTS, `Referrer-Policy`, `Permissions-Policy` (`src/lib/security/headers.ts`).
+- **Eksiksiz yetki matrisi:** her route × her rol × anonim beklenen durum kodu (`tests/unit/security/role-matrix.test.ts`); başkasının kaynağına erişim (IDOR) 404 döner (entegrasyon testleri).
+
+### Algoritmaların gerçek adları
+
+| Özellik          | Algoritma                                                                                                                                     |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Çok şehirli rota | n ≤ 10: **Held-Karp** dinamik programlama O(n²·2ⁿ); n > 10: en yakın komşu + **2-opt** ve **or-opt** yerel arama (asimetrik maliyete güvenli) |
+| "Semantik" arama | Varsayılan: 128 boyutlu **feature hashing** (FNV-1a bag-of-words) + pgvector kosinüs; opsiyonel gerçek embedding modeli (ADR 0008)            |
+| Olay sinyalleri  | Onaylı olay etkisi → sınırlı çarpan formülü; duygu analizi (sentiment) yapan bir model **yoktur**                                             |
+| Sıralama         | Ağırlıklı doğrusal skor + Bayes düzeltilmiş puan                                                                                              |
+| Fraud            | Kural tabanlı puanlama (Redis hız sayaçları)                                                                                                  |
+
+Rota optimizasyonu klasik kombinatorik optimizasyondur; neden bu şekilde adlandırıldığı: [METHODOLOGY — Neden "quantum" değil](docs/METHODOLOGY.md#neden-quantum-değil).
 
 ## Testler
 
-`tests/booking-concurrency.test.ts` eşzamanlı çift rezervasyonu (yalnız bir kayıt) ve idempotency anahtarının tekrarını (aynı rezervasyon) doğrular.
-
-## Docker / CI
-
-- `docker-compose.yml`: postgres, redis, Next.js standalone.
-- `Dockerfile`: multi-stage, prisma migrate deploy + server.js.
-- `.github/workflows/deploy.yml`: CI (lint, test, build) + ghcr.io görüntüsü + SSH dağıtımı.
-
-## Proje Yapısı
-
+```bash
+npm run check        # lint + typecheck + prettier --check + unit testler (altyapısız)
+npm run test:unit    # tests/unit/** — Docker gerekmez
+npm run test:int     # tests/integration/** — Docker gerekir (testcontainers: pgvector/pgvector:pg16 + redis:7-alpine)
+npm run test:coverage
 ```
-prisma/            # Şema, migration, seed
-src/
-  app/             # Sayfalar + API route'ları (App Router)
-  components/      # UI bileşenleri
-  lib/             # Servisler: booking, search, pricing, queue, auth, redis, prisma
-  middleware.ts    # Auth + rate-limit + token kara liste
-tests/             # Vitest
-docs/              # Mimari ve API sözleşmesi
+
+Entegrasyon testleri hiçbir zaman `DATABASE_URL`'e yazmaz; container'ın URL'ini kullanır. Docker yoksa suite açık bir mesajla atlanır. Testler ağa çıkmaz (`tests/setup.ts` global `fetch`'i engeller).
+
+CI (`.github/workflows/ci.yml`): lint → typecheck → format → unit + coverage → integration → `next build` → `docker compose build` → `npm audit --audit-level=high`. Eski `deploy.yml` kaldırıldı: gerçek bir deploy hedefi yoktu ve sırları build argümanı olarak imaja geçiriyordu (ADR 0001).
+
+## Gözlemlenebilirlik
+
+```bash
+docker compose --profile observability up --build
 ```
+
+Prometheus <http://127.0.0.1:9090>, Grafana <http://127.0.0.1:3001> (dashboard: `docs/observability/grafana-dashboard.json`), Tempo (OTLP). İz göndermek için `.env` içinde `OTEL_EXPORTER_OTLP_ENDPOINT` değişkenini `http://tempo:4318` yapın. `/api/metrics` `METRICS_TOKEN` ile korunur; `/api/health` (liveness) ve `/api/ready` (DB + Redis) açıktır.
+
+## Dokümantasyon
+
+| Doküman                              | İçerik                                                              |
+| ------------------------------------ | ------------------------------------------------------------------- |
+| [ARCHITECTURE](docs/ARCHITECTURE.md) | Bounded context'ler, sekans/durum/ER diyagramları, güvenlik modeli  |
+| [adr/](docs/adr/)                    | Mimari karar kayıtları 0001–0009                                    |
+| [METHODOLOGY](docs/METHODOLOGY.md)   | Fiyat, olay sinyali, sıralama, fraud, rota, Smart Filter golden set |
+| [MODEL_CARD](docs/MODEL_CARD.md)     | LLM görevleri, şemalar, guard'lar, sınırlamalar                     |
+| [COMPLIANCE](docs/COMPLIANCE.md)     | KVKK/GDPR/DSA/FTC/PCI eşleme tablosu (hukuki görüş değildir)        |
+| [DEMO_SCRIPT](docs/DEMO_SCRIPT.md)   | 3 dakikalık demo akışı                                              |
+| [CHANGELOG](CHANGELOG.md)            | Sürüm notları                                                       |
+
+## Yasal uyarı ve atıflar
+
+**Portföy/demo projesidir; gerçek ödeme alınmaz, gerçek konaklama satılmaz.** Uyum dokümanı hukuki görüş değildir.
+
+- Harita/konum verisi: © OpenStreetMap katkıda bulunanları, [ODbL](https://opendatacommons.org/licenses/odbl/) lisansıyla.
+- Görseller: [Unsplash](https://unsplash.com) (Unsplash License); fotoğraflar sahiplerine aittir.
+- Seed verisi (kullanıcılar, yorumlar, fiyat geçmişi) deterministik olarak üretilmiş kurgusal veridir.
+
+Lisans: [MIT](LICENSE)
+
+---
+
+## English summary
+
+**booking-platform** is a portfolio-grade online travel agency (OTA) backend and web app built with Next.js 16, PostgreSQL + pgvector, Redis and BullMQ. Double booking is provably impossible (Redlock + `SELECT … FOR UPDATE` + SERIALIZABLE; 100 parallel requests for the last room yield exactly 1 success and 99 `SOLD_OUT`, verified in SQL). Money is integer minor units priced by a single `computeTotal()` checked with fast-check property tests. Bookings follow a `PENDING → HELD → CONFIRMED → COMPLETED | CANCELLED | EXPIRED` state machine with automatic hold expiry, a mock PSP with 3DS/capture/refund and signed webhooks, versioned cancellation policies, and a transactional outbox (SKIP LOCKED leases, DEAD letter state).
+
+The LLM layer is used only for explanation, summarisation and natural-language-to-filter translation (Smart Filter, cited review summaries, grounded trip planner, listing copy, event extraction). Without an API key it runs a deterministic demo mode; on errors it falls back per call. It never decides prices or availability, and all outbound text is PII-redacted. Route optimisation is classic Held-Karp / 2-opt / or-opt; "semantic" search defaults to feature hashing.
+
+Run it: `cp .env.example .env && docker compose up --build`, then open <http://localhost:3000>. Demo accounts (`guest@`, `host@`, `admin@booking.test`, password `Password123!`) are **demo only**. This is a demo project: no real payments are taken and no real stays are sold.

@@ -59,7 +59,7 @@ Booking.com ölçeğinde, yüksek trafik kaldırabilen ve eşzamanlı rezervasyo
 
 Detaylı mimari ve API sözleşmesi güncel kaynaklardır:
 
-- [Mimari Dokümanı](architecture.md)
+- [Mimari Dokümanı](ARCHITECTURE.md)
 - [API Sözleşmesi](api-contract.md)
 
 ## 7. Açık Sorular (Gelecek)

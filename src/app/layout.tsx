@@ -1,14 +1,18 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import { headers } from "next/headers";
 import "../styles/globals.css";
 
 export const metadata: Metadata = {
-  title: "Booking.com | Oteller, Evler ve Çok Daha Fazlası",
+  title: "booking-platform — konaklama arama ve rezervasyon (demo)",
   description:
-    "Konaklama arayın, karşılaştırın ve rezervasyon yapın. Oteller, daireler, villalar ve daha fazlası.",
+    "Portföy/demo projesi: konaklama arayın, karşılaştırın ve rezervasyon yapın. Gerçek ödeme alınmaz.",
 };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  // İstek başına CSP nonce'u (proxy üretir) — Next betiklerine otomatik uygulanır;
+  // başlığın okunması sayfaları dinamik render'a zorlar (nonce statik HTML'e gömülemez).
+  await headers();
   return (
     <html lang="tr">
       <body>{children}</body>

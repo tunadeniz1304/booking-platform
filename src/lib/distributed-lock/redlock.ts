@@ -89,49 +89,26 @@ export class Redlock {
     throw new LockError(`Lock "${resource}" acquired after ${retryCount + 1} attempts`);
   }
 
-  /**
-   * Monoton fencing token üretir. Sayaç Redis'te; yoksa güvenli epsilon ile
-   * oluşturulur (iki rakip aynı anda sayaçsız kalırsa HighWater type kullanılır).
-   */
+  /** Monoton fencing token üretir (Redis INCR — atomik). */
   private async nextFencingToken(resource: string): Promise<number> {
-    const counterKey = `${resource}:fence`;
-    if (this.redis.incr) {
-      return this.redis.incr(counterKey);
-    }
-    // ioredis yok (Upstash REST): sayacı atomik olmayan şekilde büyüt
-    const current = Number((await this.redis.get(counterKey)) ?? "0");
-    const next = current + 1;
-    await this.redis.set(counterKey, String(next));
-    return next;
+    return this.redis.incr(`${resource}:fence`);
   }
 
-  /** Kilidi yalnızca token sahibiyse serbest bırakır. */
+  /** Kilidi yalnızca token sahibiyse serbest bırakır (Lua ile atomik). */
   async release(handle: LockHandle): Promise<boolean> {
-    if (this.redis.eval) {
-      const result = await this.redis.eval(RELEASE_SCRIPT, [handle.resource], [handle.token]);
-      return Number(result) === 1;
-    }
-    // Atomic-eval yok: get+del (yarışta nadir, belgelenmiş sınırlama)
-    const current = await this.redis.get(handle.resource);
-    if (current === handle.token) {
-      await this.redis.del(handle.resource);
-      return true;
-    }
-    return false;
+    const result = await this.redis.eval(RELEASE_SCRIPT, [handle.resource], [handle.token]);
+    return Number(result) === 1;
   }
 
   /** Sahibiyse kilidin ömrünü uzatır. */
   async renew(handle: LockHandle, ttlMs?: number): Promise<boolean> {
     const ttl = ttlMs ?? handle.ttlMs;
-    if (this.redis.eval) {
-      const result = await this.redis.eval(
-        TOUCH_SCRIPT,
-        [handle.resource],
-        [handle.token, String(ttl)]
-      );
-      return Number(result) === 1;
-    }
-    return false;
+    const result = await this.redis.eval(
+      TOUCH_SCRIPT,
+      [handle.resource],
+      [handle.token, String(ttl)]
+    );
+    return Number(result) === 1;
   }
 
   /**

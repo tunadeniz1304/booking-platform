@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { searchProperties } from "@/lib/search";
+import { getAuth } from "@/lib/auth";
 
 export async function GET(req: NextRequest) {
   try {
@@ -23,7 +24,8 @@ export async function GET(req: NextRequest) {
       sort: (searchParams.get("sort") ?? "recommended") as
         "price_asc" | "price_desc" | "rating" | "recommended",
       semantic: searchParams.get("semantic") === "1" || searchParams.get("semantic") === "true",
-      userId: req.headers.get("x-user-id") ?? undefined,
+      // Kişiselleştirme yalnızca doğrulanmış token'dan (istemci başlığına güvenilmez).
+      userId: (await getAuth(req))?.userId,
     };
 
     const response = await searchProperties(params);

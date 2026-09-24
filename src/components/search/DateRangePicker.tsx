@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 
 /**
- * Booking.com tarzı çift aylık takvim bileşeni.
+ * Çift aylık tarih aralığı seçici (OTA'larda yaygın desen).
  * Kullanıcı giriş tarihine tıklar → seçim başlar; çıkış tarihine tıklar → aralık tamamlanır.
  * Girişten önceki bir tarihe tıklanırsa giriş yeniden ayarlanır (Booking davranışı).
  */

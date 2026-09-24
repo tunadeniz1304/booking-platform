@@ -1,85 +1,94 @@
 import { Redis as IORedis } from "ioredis";
-import { Redis as UpstashRedis } from "@upstash/redis";
-
-const redisUrl = process.env.REDIS_URL || "redis://localhost:6379";
-const useIoRedis = redisUrl.startsWith("redis://");
-
-const ioredisClient = useIoRedis ? new IORedis(redisUrl, { maxRetriesPerRequest: null }) : null;
-const upstashClient = !useIoRedis
-  ? new UpstashRedis({ url: redisUrl, token: process.env.REDIS_TOKEN || "" })
-  : null;
 
 /**
- * İki istemciyi (ioredis / Upstash) tek bir tip-uyumlu arayüz altında birleştirir.
- * Servisler yalnızca bu arayüzü kullanır; hangi istemcinin aktif olduğunu
- * arayüz uygular. Böylece ioredis+Upstash API farkları servis koduna sızmaz.
+ * Uygulama-çapı Redis istemcisi (ioredis, tembel bağlantı).
+ *
+ * - Bağlantı modül import edildiğinde değil, ilk komutta açılır (testler ve
+ *   build sırasında gereksiz bağlantı denemesi olmaz).
+ * - Redis erişilemezse komutlar sınırlı denemeden sonra hata fırlatır; asılı
+ *   kalmaz. Çağıranlar fail-open / fail-closed kararını kendisi verir.
+ * - BullMQ kendi bağlantısını kullanır (`maxRetriesPerRequest: null` gerektirir).
+ *
+ * Servisler yalnızca `RedisClient` arayüzünü kullanır; testlerde sahte
+ * uygulamayla değiştirilebilir.
  */
 export interface RedisClient {
   get(key: string): Promise<string | null>;
   set(key: string, value: string, opts?: { ex?: number; nx?: boolean }): Promise<string | null>;
+  /** Değeri okuyup atomik olarak siler (Redis ≥ 6.2 GETDEL). */
+  getdel(key: string): Promise<string | null>;
   del(...keys: string[]): Promise<number>;
-  keys(pattern: string): Promise<string[]>;
   ttl(key: string): Promise<number>;
   exists(key: string): Promise<number>;
-  llen(key: string): Promise<number>;
+  incr(key: string): Promise<number>;
+  expire(key: string, seconds: number): Promise<number>;
+  /** Tek komutta INCR + (yeni anahtarsa) EXPIRE — sabit pencere sayacı. */
+  incrWithTtl(key: string, seconds: number): Promise<number>;
+  eval(script: string, keys: string[], args: string[]): Promise<unknown>;
+  sadd(key: string, ...members: string[]): Promise<number>;
+  srem(key: string, ...members: string[]): Promise<number>;
+  smembers(key: string): Promise<string[]>;
+  scard(key: string): Promise<number>;
   lpush(key: string, ...values: string[]): Promise<number>;
-  rpush(key: string, ...values: string[]): Promise<number>;
-  lpop(key: string): Promise<string | null>;
-  /** Atomik Lua betiği (ioredis). Upstash: tanımsız → Redlock non-atomic fallback kullanır. */
-  eval?(script: string, keys: string[], args: string[]): Promise<unknown>;
-  /** Monoton sayaç (fencing token kaynağı). */
-  incr?(key: string): Promise<number>;
+  ltrim(key: string, start: number, stop: number): Promise<string>;
+  lrange(key: string, start: number, stop: number): Promise<string[]>;
+  publish(channel: string, message: string): Promise<number>;
+  ping(): Promise<string>;
 }
 
-export function buildRedisClient(): RedisClient {
-  if (useIoRedis && ioredisClient) {
-    const c = ioredisClient;
-    return {
-      get: (key) => c.get(key),
-      set: (key, value, opts) => {
-        if (!opts) return c.set(key, value);
-        if (opts.nx && opts.ex) return c.set(key, value, "EX", opts.ex, "NX");
-        if (opts.ex) return c.set(key, value, "EX", opts.ex);
-        return c.set(key, value);
-      },
-      del: (...keys) => c.del(...keys),
-      keys: (pattern) => c.keys(pattern),
-      ttl: (key) => c.ttl(key),
-      exists: (key) => c.exists(key),
-      llen: (key) => c.llen(key),
-      lpush: (key, ...values) => c.lpush(key, ...values),
-      rpush: (key, ...values) => c.rpush(key, ...values),
-      lpop: (key) => c.lpop(key),
-      eval: (script, keys, args) => c.eval(script, keys.length, ...keys, ...args),
-      incr: (key) => c.incr(key),
-    };
-  }
+const INCR_WITH_TTL = `
+local v = redis.call('INCR', KEYS[1])
+if v == 1 then redis.call('EXPIRE', KEYS[1], ARGV[1]) end
+return v`;
 
-  if (upstashClient) {
-    const c = upstashClient;
-    return {
-      get: (key) => c.get<string>(key),
-      set: (key, value, opts) => {
-        if (opts?.nx) {
-          return c.set(key, value, { ex: opts.ex ?? 0, nx: true });
-        }
-        if (opts?.ex !== undefined) {
-          return c.set(key, value, { ex: opts.ex });
-        }
-        return c.set(key, value);
-      },
-      del: (...keys) => c.del(...keys),
-      keys: (pattern) => c.keys(pattern),
-      ttl: (key) => c.ttl(key),
-      exists: (key) => c.exists(key).then((v) => (typeof v === "number" ? v : v ? 1 : 0)),
-      llen: (key) => c.llen(key),
-      lpush: (key, ...values) => c.lpush(key, ...values),
-      rpush: (key, ...values) => c.rpush(key, ...values),
-      lpop: (key) => c.lpop(key),
-    };
-  }
+const globalForRedis = globalThis as unknown as { __bookingRedis?: IORedis };
 
-  throw new Error("Redis client could not be initialized");
+/** Ham ioredis bağlantısı (pub/sub veya pipeline gerekiyorsa). */
+export function getRedisConnection(): IORedis {
+  if (!globalForRedis.__bookingRedis) {
+    const url = process.env.REDIS_URL || "redis://localhost:6379";
+    globalForRedis.__bookingRedis = new IORedis(url, {
+      lazyConnect: true,
+      maxRetriesPerRequest: 2,
+      connectTimeout: 2000,
+      enableOfflineQueue: true,
+    });
+    // Bağlantı hataları komut düzeyinde ele alınır; burada yalnızca yutulur ki
+    // "Unhandled error event" süreçleri düşürmesin.
+    globalForRedis.__bookingRedis.on("error", () => {});
+  }
+  return globalForRedis.__bookingRedis;
+}
+
+export function buildRedisClient(connection: () => IORedis = getRedisConnection): RedisClient {
+  return {
+    get: (key) => connection().get(key),
+    set: (key, value, opts) => {
+      const c = connection();
+      if (opts?.nx && opts.ex) return c.set(key, value, "EX", opts.ex, "NX");
+      if (opts?.nx) return c.set(key, value, "NX");
+      if (opts?.ex) return c.set(key, value, "EX", opts.ex);
+      return c.set(key, value);
+    },
+    getdel: (key) => connection().getdel(key),
+    del: (...keys) => (keys.length === 0 ? Promise.resolve(0) : connection().del(...keys)),
+    ttl: (key) => connection().ttl(key),
+    exists: (key) => connection().exists(key),
+    incr: (key) => connection().incr(key),
+    expire: (key, seconds) => connection().expire(key, seconds),
+    incrWithTtl: async (key, seconds) =>
+      Number(await connection().eval(INCR_WITH_TTL, 1, key, String(seconds))),
+    eval: (script, keys, args) => connection().eval(script, keys.length, ...keys, ...args),
+    sadd: (key, ...members) => connection().sadd(key, ...members),
+    srem: (key, ...members) => connection().srem(key, ...members),
+    smembers: (key) => connection().smembers(key),
+    scard: (key) => connection().scard(key),
+    lpush: (key, ...values) => connection().lpush(key, ...values),
+    ltrim: (key, start, stop) => connection().ltrim(key, start, stop),
+    lrange: (key, start, stop) => connection().lrange(key, start, stop),
+    publish: (channel, message) => connection().publish(channel, message),
+    ping: () => connection().ping(),
+  };
 }
 
 export const redis: RedisClient = buildRedisClient();

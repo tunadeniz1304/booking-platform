@@ -72,7 +72,8 @@ export default function Footer() {
 
         <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-gray-200 pt-8 sm:flex-row">
           <p className="text-xs text-gray-500">
-            © {new Date().getFullYear()} Booking.com. Tüm hakları saklıdır.
+            © {new Date().getFullYear()} booking-platform · Portföy/demo projesidir; gerçek ödeme
+            alınmaz, gerçek konaklama satılmaz.
           </p>
           <div className="flex items-center gap-4">
             <button className="text-xs text-gray-500 transition hover:text-[#003580] hover:underline">

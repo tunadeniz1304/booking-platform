@@ -18,11 +18,12 @@ Her faz sonunda kalite kapısı: `npm run lint`, `npm run typecheck`, `npm run f
 
 ## F1 — LLM sözleşmesi + güvenlik temeli
 
-- [ ] §3 LLM katmanı (`src/lib/llm/*`), `/api/llm/status`, `npm run llm:smoke`
-- [ ] Hata #1 gRPC auth, #2 iç uçlar, #5 rate-limit, #6 header spoof
-- [ ] Hata #14 Dockerfile, #15 compose/CI, #16 auth, #17 pricing yetki
-- [ ] Hata #19 sorgu profil'leyici (ayrı commit), #21 `.env.example`
-- [ ] `jose` tekilleştirme, güvenlik başlıkları
+- [x] §3 LLM katmanı (`src/lib/llm/*`), `/api/llm/status`, `npm run llm:smoke` (canlı doğrulandı)
+- [x] Hata #1 gRPC auth, #2 iç uçlar, #5 rate-limit, #6 header spoof
+- [x] Hata #14 Dockerfile, #15 compose/CI, #16 auth, #17 pricing yetki
+- [x] Hata #19 sorgu profil'leyici (ayrı commit), #21 `.env.example`
+- [x] `jose` tekilleştirme (jsonwebtoken kaldırıldı), güvenlik başlıkları + nonce'lu CSP
+- [x] Ek: #10 kuyruk/worker ayrımı, #18 sürüm anahtarlı arama önbelleği (F2'den öne alındı)
 
 ## F2 — Rezervasyon çekirdeği
 

@@ -1,34 +1,68 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { CityNode, optimizeRoute } from "@/lib/routing/optimizer";
+import { optimizeRoute, type CityNode } from "@/lib/routing/optimizer";
+import { getConfig } from "@/lib/config/app-config";
+import { toErrorResponse, ValidationError } from "@/lib/http/errors";
+import { monthOf, todayUtc } from "@/lib/time/nights";
 
+const norm = (s: string) => s.trim().toLocaleLowerCase("tr-TR");
+
+/**
+ * Çok şehirli rota optimizasyonu. Hata #12 düzeltmeleri: şehir adları büyük/küçük
+ * harf ve Türkçe karakter duyarsız eşleşir, liste tekilleştirilir ve
+ * ROUTING_MAX_CITIES ile sınırlanır (DoS yok), ay 1–12.
+ */
 export async function GET(req: NextRequest) {
-  const sp = new URL(req.url).searchParams;
-  const origin = sp.get("origin") ?? "";
-  const cities = (sp.get("cities") ?? "")
-    .split(",")
-    .map((c) => c.trim())
-    .filter(Boolean);
-  if (!origin || cities.length === 0) {
-    return NextResponse.json({ error: "origin ve cities gerekli" }, { status: 400 });
-  }
-  const names = [origin, ...cities];
-  const locations = await prisma.location.findMany({
-    where: { city: { in: names, mode: "insensitive" } },
-    select: { city: true, latitude: true, longitude: true },
-  });
-  const byCity = new Map(locations.map((l) => [l.city, l]));
-  const nodes: CityNode[] = [];
-  for (const name of names) {
-    const hit = byCity.get(name);
-    if (hit?.latitude == null || hit.longitude == null) {
-      return NextResponse.json({ error: `Koordinat bulunamadı: ${name}` }, { status: 422 });
+  try {
+    const max = getConfig().ROUTING_MAX_CITIES;
+    const schema = z.object({
+      origin: z.string().trim().min(1).max(80),
+      cities: z
+        .string()
+        .max(1000)
+        .transform((v) =>
+          v
+            .split(",")
+            .map((c) => c.trim())
+            .filter(Boolean)
+        )
+        .pipe(z.array(z.string().max(80)).min(1).max(max)),
+      month: z.coerce.number().int().min(1).max(12).optional(),
+      returnToOrigin: z.enum(["true", "false"]).optional(),
+    });
+    const q = schema.parse(Object.fromEntries(req.nextUrl.searchParams));
+
+    const names = [q.origin, ...q.cities];
+    const unique = [...new Map(names.map((n) => [norm(n), n])).values()];
+    if (unique.length !== names.length) throw new ValidationError("Şehir listesi tekrar içeremez");
+
+    const locations = await prisma.location.findMany({
+      where: { OR: unique.map((n) => ({ city: { equals: n, mode: "insensitive" as const } })) },
+      select: { city: true, latitude: true, longitude: true },
+    });
+    const byKey = new Map(locations.map((l) => [norm(l.city), l]));
+    const nodes: CityNode[] = [];
+    for (const name of unique) {
+      const hit = byKey.get(norm(name));
+      if (hit?.latitude == null || hit.longitude == null) {
+        return NextResponse.json({ error: `Koordinat bulunamadı: ${name}` }, { status: 422 });
+      }
+      nodes.push({ id: hit.city, name: hit.city, lat: hit.latitude, lng: hit.longitude });
     }
-    nodes.push({ id: name, name, lat: hit.latitude, lng: hit.longitude });
+    const month = q.month ?? monthOf(todayUtc());
+    const plan = optimizeRoute(nodes.slice(1), nodes[0], month, {
+      returnToOrigin: q.returnToOrigin === "true",
+    });
+    return NextResponse.json({
+      origin: nodes[0].name,
+      cities: nodes.slice(1).map((n) => n.name),
+      month,
+      plan,
+    });
+  } catch (error) {
+    return toErrorResponse(error, "routing.optimize");
   }
-  const month = new Date().getMonth();
-  const plan = optimizeRoute(nodes.slice(1), nodes[0], month);
-  return NextResponse.json({ origin, cities, month, plan });
 }
 
 export const dynamic = "force-dynamic";

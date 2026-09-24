@@ -1,9 +1,20 @@
 /**
- * Quantum-Inspired Routing — çok şehirli seyahat için kombinatorik rota motoru.
- * TSP: şehirleri hangi sırayla ziyaret etmek toplam seyahat maliyetini
- * (mesafe + tahmini uçuş + hava-konfor cezası) en düşüğe indirir?
- * n <= 8 -> tam çözüm (Held-Karp DP); n > 8 -> NN + 2-opt iyileştirme.
+ * Çok şehirli seyahat rotası optimizasyonu (klasik kombinatorik optimizasyon;
+ * kuantum esinli bir yöntem değildir; bkz. docs/METHODOLOGY.md).
+ *
+ * Problem: başlangıç şehri sabit, diğer şehirleri hangi sırayla gezmeli ki toplam
+ * yolculuk maliyeti en düşük olsun? Varsayılan AÇIK YOL (dönüş bacağı yok);
+ * `returnToOrigin: true` ile kapalı tur.
+ *
+ *  - n ≤ EXACT_LIMIT: Held-Karp dinamik programlama, O(n²·2ⁿ) — kesin optimum.
+ *  - n > EXACT_LIMIT: en yakın komşu + yerel arama (2-opt ters çevirme ve or-opt
+ *    taşıma). Her hamle TÜM yol maliyeti yeniden hesaplanarak değerlendirilir; bu
+ *    yüzden asimetrik maliyetlerde de doğrudur (klasik 2-opt delta formülü değil).
+ *
+ * Bacak maliyeti = mesafe + 0.4 × uçuş tahmini, varış şehrinin mevsim konforuna göre
+ * düzeltilmiş (asimetrik: A→B ≠ B→A).
  */
+import { getConfig } from "@/lib/config/app-config";
 
 export interface CityNode {
   id: string;
@@ -13,14 +24,25 @@ export interface CityNode {
   nights?: number;
 }
 
+export interface RouteLeg {
+  from: string;
+  to: string;
+  km: number;
+  cost: number;
+}
+
 export interface RoutePlan {
   order: string[];
   totalKm: number;
   flightCostEstimate: number;
   weatherIndex: number;
-  algorithm: "held-karp" | "nearest-neighbor+2opt";
-  legs: Array<{ from: string; to: string; km: number; cost: number }>;
+  algorithm: "held-karp" | "nearest-neighbor+local-search";
+  returnToOrigin: boolean;
+  totalCost: number;
+  legs: RouteLeg[];
 }
+
+export const EXACT_LIMIT = 10;
 
 export function haversineKm(aLat: number, aLng: number, bLat: number, bLng: number): number {
   const R = 6371;
@@ -33,156 +55,178 @@ export function haversineKm(aLat: number, aLng: number, bLat: number, bLng: numb
   return 2 * R * Math.asin(Math.sqrt(h));
 }
 
+/** Tahmini uçuş maliyeti (config: ROUTING_FLIGHT_COST_PER_KM × km + ROUTING_FLIGHT_COST_BASE). */
 export function flightCostEstimate(km: number): number {
-  return Math.round(km * 0.09 + 40);
+  const c = getConfig();
+  return Math.round(km * c.ROUTING_FLIGHT_COST_PER_KM + c.ROUTING_FLIGHT_COST_BASE);
 }
 
+/** Enlem ve AY (1–12) için 0–10 konfor puanı (basit iklim kuşağı modeli). */
 export function climateComfort(lat: number, month: number): number {
+  if (!Number.isInteger(month) || month < 1 || month > 12) {
+    throw new RangeError("Ay 1–12 aralığında olmalı");
+  }
   const abs = Math.abs(lat);
   if (abs < 23) return month >= 6 && month <= 8 ? 6 : 8;
   if (abs <= 45) {
     if (month >= 4 && month <= 6) return 9;
     if (month >= 7 && month <= 8) return 7;
-    if (month === 12 || month === 1 || month === 2) return 4;
+    if (month === 12 || month <= 2) return 4;
     return 8;
   }
   return month >= 6 && month <= 8 ? 9 : month === 12 || month <= 2 ? 2 : 6;
 }
 
-function leg(a: CityNode, b: CityNode, month: number): { km: number; cost: number } {
+/** A→B bacak maliyeti (asimetrik: varış şehrinin konforu uygulanır). */
+export function legCost(a: CityNode, b: CityNode, month: number): { km: number; cost: number } {
   const km = haversineKm(a.lat, a.lng, b.lat, b.lng);
-  const weatherPenalty = (climateComfort(a.lat, month) - 5) * 0.02;
-  const cost = km * (1 + weatherPenalty) + flightCostEstimate(km) * 0.4;
-  return { km, cost };
+  const comfortPenalty = (5 - climateComfort(b.lat, month)) * 0.02;
+  return { km, cost: km * (1 + comfortPenalty) + flightCostEstimate(km) * 0.4 };
 }
-function heldKarp(cities: CityNode[], month: number) {
-  const n = cities.length;
+
+type Matrix = number[][];
+
+function costMatrix(nodes: CityNode[], month: number): Matrix {
+  return nodes.map((a, i) => nodes.map((b, j) => (i === j ? 0 : legCost(a, b, month).cost)));
+}
+
+export function pathCost(order: number[], m: Matrix, closed: boolean): number {
+  let total = 0;
+  for (let i = 0; i < order.length - 1; i++) total += m[order[i]][order[i + 1]];
+  if (closed && order.length > 1) total += m[order[order.length - 1]][order[0]];
+  return total;
+}
+
+/** Held-Karp: 0 sabit başlangıç, açık yol veya kapalı tur. */
+function heldKarp(m: Matrix, closed: boolean): number[] {
+  const n = m.length;
+  if (n === 1) return [0];
   const full = 1 << n;
-  const C = Array.from({ length: full }, () => new Array(n).fill(Infinity));
-  const P = Array.from({ length: full }, () => new Array(n).fill(-1));
-  for (let i = 1; i < n; i++) C[1 << i][i] = leg(cities[0], cities[i], month).cost;
-  for (let mask = 1; mask < full; mask++) {
+  const C = Array.from({ length: full }, () => new Float64Array(n).fill(Infinity));
+  const P = Array.from({ length: full }, () => new Int8Array(n).fill(-1));
+  C[1][0] = 0;
+  for (let mask = 1; mask < full; mask += 2) {
     for (let i = 0; i < n; i++) {
-      if (!(mask & (1 << i)) || C[mask][i] === Infinity) continue;
-      for (let j = 0; j < n; j++) {
+      const base = C[mask][i];
+      if (base === Infinity) continue;
+      for (let j = 1; j < n; j++) {
         if (mask & (1 << j)) continue;
-        if (j === 0) continue; // başlangıç tur boyunca yalnız başta
-        const nc = C[mask][i] + leg(cities[i], cities[j], month).cost;
-        if (nc < C[mask | (1 << j)][j]) {
-          C[mask | (1 << j)][j] = nc;
-          P[mask | (1 << j)][j] = i;
+        const next = mask | (1 << j);
+        const c = base + m[i][j];
+        if (c < C[next][j]) {
+          C[next][j] = c;
+          P[next][j] = i;
         }
       }
     }
   }
-  let last = -1;
+  const last = full - 1;
   let best = Infinity;
-  const finalMask = full - 2; // 0 başlangıç dışındaki tüm düğümler
+  let end = 1;
   for (let j = 1; j < n; j++) {
-    const cand = C[finalMask][j] + leg(cities[j], cities[0], month).cost;
-    if (cand < best) {
-      best = cand;
-      last = j;
+    const c = C[last][j] + (closed ? m[j][0] : 0);
+    if (c < best) {
+      best = c;
+      end = j;
     }
   }
-  if (last === -1) return [0];
   const path: number[] = [];
-  let mask = finalMask;
-  let cur = last;
+  let mask = last;
+  let cur = end;
   while (cur !== -1) {
     path.push(cur);
     const prev = P[mask][cur];
     mask ^= 1 << cur;
     cur = prev;
   }
-  return [0, ...path.reverse()];
+  return path.reverse();
 }
-function nnTwoOpt(cities: CityNode[], month: number) {
-  const n = cities.length;
-  const dist = Array.from({ length: n }, (_, i) =>
-    Array.from({ length: n }, (_, j) => leg(cities[i], cities[j], month).cost)
-  );
-  const order: number[] = [0];
-  const used = new Set<number>([0]);
-  for (let k = 1; k < n; k++) {
+
+/** En yakın komşu + (2-opt ters çevirme, or-opt taşıma) yerel arama; tam maliyet değerlendirmesi. */
+function heuristic(m: Matrix, closed: boolean): number[] {
+  const n = m.length;
+  const order = [0];
+  const used = new Set([0]);
+  while (order.length < n) {
     const last = order[order.length - 1];
     let next = -1;
-    let best = Infinity;
-    for (let j = 0; j < n; j++) {
-      if (used.has(j)) continue;
-      if (dist[last][j] < best) {
-        best = dist[last][j];
-        next = j;
-      }
-    }
-    if (next === -1) break;
+    for (let j = 0; j < n; j++)
+      if (!used.has(j) && (next === -1 || m[last][j] < m[last][next])) next = j;
     order.push(next);
     used.add(next);
   }
+  let best = pathCost(order, m, closed);
   let improved = true;
   while (improved) {
     improved = false;
-    for (let i = 1; i < n - 1; i++) {
-      for (let j = i + 1; j < n; j++) {
-        const a = order[i - 1],
-          b = order[i],
-          c = order[j],
-          d = order[(j + 1) % n];
-        const before = dist[a][b] + dist[c][d];
-        const after = dist[a][c] + dist[b][d];
-        if (after + 1e-9 < before) {
-          order.splice(i, j - i + 1, ...order.slice(i, j + 1).reverse());
+    for (let i = 1; i < n - 1 && !improved; i++) {
+      for (let j = i + 1; j < n && !improved; j++) {
+        const reversed = [
+          ...order.slice(0, i),
+          ...order.slice(i, j + 1).reverse(),
+          ...order.slice(j + 1),
+        ];
+        const c = pathCost(reversed, m, closed);
+        if (c + 1e-9 < best) {
+          order.splice(0, n, ...reversed);
+          best = c;
           improved = true;
+        }
+      }
+    }
+    for (let len = 1; len <= 3 && !improved; len++) {
+      for (let i = 1; i + len <= n && !improved; i++) {
+        const segment = order.slice(i, i + len);
+        const rest = [...order.slice(0, i), ...order.slice(i + len)];
+        for (let k = 1; k <= rest.length && !improved; k++) {
+          if (k === i) continue;
+          const candidate = [...rest.slice(0, k), ...segment, ...rest.slice(k)];
+          const c = pathCost(candidate, m, closed);
+          if (c + 1e-9 < best) {
+            order.splice(0, n, ...candidate);
+            best = c;
+            improved = true;
+          }
         }
       }
     }
   }
   return order;
 }
-function solveExact(c: CityNode[], m: number): number[] {
-  return heldKarp(c, m);
-}
-function solveHeuristic(c: CityNode[], m: number): number[] {
-  return nnTwoOpt(c, m);
-}
-function buildPlanPart(
-  sorted: CityNode[],
-  month: number,
-  algorithm: RoutePlan["algorithm"]
-): RoutePlan {
-  let km = 0;
-  const legs = [];
-  for (let i = 0; i < sorted.length - 1; i++) {
-    const d = haversineKm(sorted[i].lat, sorted[i].lng, sorted[i + 1].lat, sorted[i + 1].lng);
-    km += d;
-    legs.push({
-      from: sorted[i].name,
-      to: sorted[i + 1].name,
-      km: Math.round(d),
-      cost: flightCostEstimate(d),
-    });
-  }
-  const wi = Math.round(
-    sorted.reduce((s, c) => s + climateComfort(c.lat, month), 0) / sorted.length
-  );
-  return {
-    order: sorted.map((c) => c.name),
-    totalKm: Math.round(km),
-    flightCostEstimate: legs.reduce((s, l) => s + l.cost, 0),
-    weatherIndex: wi,
-    algorithm,
-    legs,
-  };
-}
+
 export function optimizeRoute(
   cities: CityNode[],
   origin: CityNode | null,
-  month: number
+  month: number,
+  opts: { returnToOrigin?: boolean } = {}
 ): RoutePlan {
   const nodes = origin ? [origin, ...cities] : [...cities];
-  const n = nodes.length;
-  if (n === 0) throw new Error("Şehir listesi boş");
-  const order = n <= 8 ? solveExact(nodes, month) : solveHeuristic(nodes, month);
-  const sorted = order.map((idx) => nodes[idx]);
-  return buildPlanPart(sorted, month, n <= 8 ? "held-karp" : "nearest-neighbor+2opt");
+  if (nodes.length === 0) throw new Error("Şehir listesi boş");
+  climateComfort(0, month); // ay doğrulaması
+  const closed = opts.returnToOrigin ?? false;
+  const m = costMatrix(nodes, month);
+  const exact = nodes.length <= EXACT_LIMIT;
+  const idx = exact ? heldKarp(m, closed) : heuristic(m, closed);
+  const sequence = closed && idx.length > 1 ? [...idx, idx[0]] : idx;
+
+  const legs: RouteLeg[] = [];
+  for (let i = 0; i < sequence.length - 1; i++) {
+    const a = nodes[sequence[i]];
+    const b = nodes[sequence[i + 1]];
+    const { km, cost } = legCost(a, b, month);
+    legs.push({ from: a.name, to: b.name, km: Math.round(km), cost: Math.round(cost) });
+  }
+  const visited = idx.map((i) => nodes[i]);
+  return {
+    order: visited.map((c) => c.name),
+    totalKm: legs.reduce((s, l) => s + l.km, 0),
+    flightCostEstimate: legs.reduce((s, l) => s + flightCostEstimate(l.km), 0),
+    weatherIndex: Math.round(
+      visited.reduce((s, c) => s + climateComfort(c.lat, month), 0) / visited.length
+    ),
+    algorithm: exact ? "held-karp" : "nearest-neighbor+local-search",
+    returnToOrigin: closed,
+    totalCost: Math.round(pathCost(idx, m, closed)),
+    legs,
+  };
 }

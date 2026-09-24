@@ -30,9 +30,15 @@ describe("çok-etmenli pazarlık rule-engine", () => {
   });
 
   it("taban altı + esnek tarih karşı-teklife düşer ve tabanın üstünde kalır", () => {
-    const floorRatio = computeFloorRatio({ demandSignal: 0.3, isFlexibleDates: true, leadDays: 60 });
+    const floorRatio = computeFloorRatio({
+      demandSignal: 0.3,
+      isFlexibleDates: true,
+      leadDays: 60,
+    });
     const floor = 140 * floorRatio;
-    const r = negotiate(base({ requestedPrice: 80, isFlexibleDates: true, leadDays: 60, demandSignal: 0.3 }));
+    const r = negotiate(
+      base({ requestedPrice: 80, isFlexibleDates: true, leadDays: 60, demandSignal: 0.3 })
+    );
     expect(r.decision).toBe("counter");
     expect(r.counterPrice).not.toBeNull();
     if (r.counterPrice !== null) {

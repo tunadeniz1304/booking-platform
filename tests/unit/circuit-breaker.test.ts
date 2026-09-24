@@ -53,9 +53,11 @@ describe("Circuit Breaker", () => {
   it("ara sıra tek arıza pencere içinde eşiğe ulaşmazsa CLOSED kalır", async () => {
     const cb = new CircuitBreaker("t3", { failureThreshold: 5, windowMs: 5000, cooldownMs: 1000 });
     await cb.call(async () => "ok").catch(() => {});
-    await cb.call(async () => {
-      throw new Error("boom");
-    }).catch(() => {});
+    await cb
+      .call(async () => {
+        throw new Error("boom");
+      })
+      .catch(() => {});
     await cb.call(async () => "ok");
     expect(cb.getState()).toBe("CLOSED");
     const stats = cb.getStats();

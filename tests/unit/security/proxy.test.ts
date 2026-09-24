@@ -130,6 +130,32 @@ describe("proxy yetki ve CSRF", () => {
     expect(bearer.status).toBe(200);
   });
 
+  it("hedef origin Host başlığından türetilir (0.0.0.0'da dinleyen standalone sunucu)", async () => {
+    const { token } = await signAccessToken("u5", "USER", 900);
+    const res = await proxy(
+      new NextRequest("http://0.0.0.0:3000/api/bookings", {
+        method: "POST",
+        headers: {
+          cookie: `token=${token}`,
+          origin: "http://localhost:3000",
+          host: "localhost:3000",
+        },
+      })
+    );
+    expect(res.status).toBe(200);
+    const evil = await proxy(
+      new NextRequest("http://0.0.0.0:3000/api/bookings", {
+        method: "POST",
+        headers: {
+          cookie: `token=${token}`,
+          origin: "https://evil.example",
+          host: "localhost:3000",
+        },
+      })
+    );
+    expect(evil.status).toBe(403);
+  });
+
   it("regression: #16 logout çerezli GET/cross-site POST ile tetiklenemez", async () => {
     const { token } = await signAccessToken("u4", "USER", 900);
     const res = await proxy(

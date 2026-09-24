@@ -7,7 +7,7 @@ import { redis } from "@/lib/redis";
 import { getConfig } from "@/lib/config/app-config";
 import { resolveClientIp } from "@/lib/security/ip";
 import { categorize, checkRateLimit } from "@/lib/security/rate-limit";
-import { allowedOriginsFromEnv, isCsrfViolation } from "@/lib/security/csrf";
+import { allowedOriginsFromEnv, isCsrfViolation, requestOrigin } from "@/lib/security/csrf";
 import { buildCsp } from "@/lib/security/headers";
 import { CSRF_EXEMPT_PREFIXES, isPublicApi } from "@/lib/security/public-routes";
 
@@ -82,7 +82,7 @@ async function handleApi(req: NextRequest, requestHeaders: Headers, requestId: s
     const violation = isCsrfViolation({
       method,
       headers: req.headers,
-      selfOrigin: req.nextUrl.origin,
+      selfOrigin: requestOrigin(req.nextUrl, req.headers),
       hasCookieAuth: Boolean(req.cookies.get(ACCESS_COOKIE) || req.cookies.get(REFRESH_COOKIE)),
       hasBearer: Boolean(req.headers.get("authorization")?.startsWith("Bearer ")),
       allowedOrigins: allowedOriginsFromEnv(),

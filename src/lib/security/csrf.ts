@@ -30,6 +30,18 @@ function originOf(value: string | null): string | null {
   }
 }
 
+/**
+ * İsteğin hedef origin'i. Standalone sunucu `HOSTNAME=0.0.0.0` ile dinlerken
+ * `req.nextUrl.origin` `http://0.0.0.0:3000` olur ve tarayıcının `Origin`'iyle hiç
+ * eşleşmez; bu yüzden hedef, tarayıcının gönderdiği `Host` başlığından türetilir
+ * (OWASP: "target origin" = Host). Host yoksa URL'deki origin kullanılır.
+ */
+export function requestOrigin(url: URL, headers: Headers): string {
+  const host = headers.get("host");
+  if (!host) return url.origin;
+  return originOf(`${url.protocol}//${host}`) ?? url.origin;
+}
+
 /** `APP_ORIGINS` (virgülle ayrık) ortam değişkeninden izinli origin listesi. */
 export function allowedOriginsFromEnv(): string[] {
   return (process.env.APP_ORIGINS ?? process.env.NEXT_PUBLIC_APP_URL ?? "")

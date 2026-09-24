@@ -138,7 +138,7 @@ export const config = {
     "/api/:path*",
     {
       source:
-        "/((?!_next/static|_next/image|favicon.ico|demo/|.*\\.(?:png|jpg|jpeg|svg|webp|ico)$).*)",
+        "/((?!_next/static|_next/image|favicon.ico|demo/|vendor/|.*\\.(?:png|jpg|jpeg|svg|webp|ico)$).*)",
       missing: [
         { type: "header", key: "next-router-prefetch" },
         { type: "header", key: "purpose", value: "prefetch" },

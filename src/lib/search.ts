@@ -66,6 +66,9 @@ export interface SearchResult {
   location: {
     city: string;
     country: string;
+    /** Harita görünümü için (lokasyon koordinatı; yoksa null). */
+    latitude?: number | null;
+    longitude?: number | null;
   };
   amenities: string[];
   images?: string[];
@@ -313,7 +316,9 @@ async function semanticSearchProperties(params: SearchParams): Promise<SearchRes
       ratingAvg: true,
       ratingCount: true,
       images: true,
-      location: { select: { id: true, city: true, country: true } },
+      location: {
+        select: { id: true, city: true, country: true, latitude: true, longitude: true },
+      },
       amenities: { select: { name: true } },
       rooms: {
         where: { available: true },
@@ -357,7 +362,12 @@ async function semanticSearchProperties(params: SearchParams): Promise<SearchRes
     currency: property.currency,
     ratingAvg: property.ratingAvg,
     ratingCount: property.ratingCount,
-    location: { city: property.location.city, country: property.location.country },
+    location: {
+      city: property.location.city,
+      country: property.location.country,
+      latitude: property.location.latitude,
+      longitude: property.location.longitude,
+    },
     amenities: property.amenities.map((a) => a.name),
     images: property.images,
     availableRooms: property.rooms.length,
@@ -427,6 +437,8 @@ export async function searchProperties(params: SearchParams): Promise<SearchResp
           select: {
             city: true,
             country: true,
+            latitude: true,
+            longitude: true,
           },
         },
         amenities: {

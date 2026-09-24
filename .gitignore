@@ -51,3 +51,6 @@ blob-report/
 
 # Yerel araç önbellekleri
 .code-review-graph/
+
+# MapLibre worker (scripts/copy-maplibre-worker.mjs üretir)
+/public/vendor/

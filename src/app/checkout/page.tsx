@@ -137,7 +137,10 @@ function CheckoutContent() {
 
   if (!propertyId || !roomId || !checkIn || !checkOut || loadError) {
     return (
-      <main className="mx-auto flex min-h-[60vh] max-w-3xl items-center justify-center px-4">
+      <main
+        id="main"
+        className="mx-auto flex min-h-[60vh] max-w-3xl items-center justify-center px-4"
+      >
         <div className="text-center">
           <h1 className="text-2xl font-bold text-gray-900">Rezervasyon bilgileri eksik</h1>
           <p className="mt-2 text-gray-600">{loadError ?? "Lütfen tekrar arama yapın."}</p>
@@ -150,7 +153,7 @@ function CheckoutContent() {
   }
 
   return (
-    <main className="mx-auto max-w-3xl px-4 py-8">
+    <main id="main" className="mx-auto max-w-3xl px-4 py-8">
       <h1 className="text-2xl font-bold text-gray-900">Rezervasyonu Tamamla</h1>
 
       <form onSubmit={handleSubmit} className="mt-6 space-y-6">
@@ -227,7 +230,10 @@ export default function CheckoutPage() {
   return (
     <Suspense
       fallback={
-        <main className="mx-auto flex min-h-[60vh] max-w-3xl items-center justify-center px-4">
+        <main
+          id="main"
+          className="mx-auto flex min-h-[60vh] max-w-3xl items-center justify-center px-4"
+        >
           <p className="text-gray-500">Yükleniyor...</p>
         </main>
       }

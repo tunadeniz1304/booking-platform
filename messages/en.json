@@ -6,7 +6,15 @@
     "register": "Sign up",
     "logout": "Sign out",
     "transfers": "Transfer market",
-    "plan": "Plan a trip"
+    "plan": "Plan a trip",
+    "stays": "Stays",
+    "host": "Host dashboard",
+    "admin": "Admin",
+    "mailbox": "Mailbox (demo)",
+    "primary": "Main menu",
+    "mobile": "Mobile menu",
+    "toggleMenu": "Toggle menu",
+    "privacy": "Privacy"
   },
   "quote": {
     "nights": "{count} nights",
@@ -20,5 +28,9 @@
     "ranking": "How ranking works",
     "privacy": "Privacy"
   },
-  "locale": { "label": "Language", "tr": "Türkçe", "en": "English" }
+  "locale": {
+    "label": "Language",
+    "tr": "Türkçe",
+    "en": "English"
+  }
 }

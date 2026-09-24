@@ -3,26 +3,32 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { logout } from "@/lib/api-client";
+import { useTranslations } from "next-intl";
+import { fetchCurrentUser, logout, type SessionUser } from "@/lib/api-client";
 import LocaleSwitcher from "./LocaleSwitcher";
 
-const navItems = [
-  { label: "Konaklama", href: "/" },
-  { label: "Uçuş", href: "/", disabled: true },
-  { label: "Araç Kiralama", href: "/", disabled: true },
-  { label: "Turistik Yerler", href: "/", disabled: true },
-  { label: "Havalimanı Taksi", href: "/", disabled: true },
-];
+type NavKey = "stays" | "plan" | "transfers" | "host" | "admin" | "mailbox";
 
-interface SessionUser {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  role: string;
+interface NavItem {
+  key: NavKey;
+  href: string;
+  roles?: ReadonlyArray<SessionUser["role"]>;
 }
 
+const NAV_ITEMS: readonly NavItem[] = [
+  { key: "stays", href: "/" },
+  { key: "plan", href: "/plan" },
+  { key: "transfers", href: "/transfers" },
+  { key: "host", href: "/host", roles: ["HOST", "ADMIN"] },
+  { key: "admin", href: "/admin", roles: ["ADMIN"] },
+  { key: "mailbox", href: "/dev/mailbox" },
+];
+
+const focusRing =
+  "focus:outline-none focus-visible:ring-2 focus-visible:ring-[#febb02] focus-visible:ring-offset-2 focus-visible:ring-offset-[#003580]";
+
 export default function Header() {
+  const t = useTranslations("nav");
   const router = useRouter();
   const pathname = usePathname();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -30,14 +36,9 @@ export default function Header() {
 
   useEffect(() => {
     let active = true;
-    fetch("/api/user/me")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data: SessionUser | null) => {
-        if (active) setUser(data);
-      })
-      .catch(() => {
-        if (active) setUser(null);
-      });
+    fetchCurrentUser().then((u) => {
+      if (active) setUser(u);
+    });
     return () => {
       active = false;
     };
@@ -54,26 +55,32 @@ export default function Header() {
     ? `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`.toUpperCase()
     : "";
 
+  const items = NAV_ITEMS.filter((item) => !item.roles || (user && item.roles.includes(user.role)));
+  const isCurrent = (href: string) =>
+    href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
+
   return (
     <header className="bg-[#003580] text-white">
+      <a
+        href="#main"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded focus:bg-white focus:px-3 focus:py-2 focus:text-[#003580]"
+      >
+        İçeriğe geç
+      </a>
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         <div className="flex items-center gap-6">
-          <Link href="/" className="text-2xl font-bold tracking-tight">
+          <Link href="/" className={`rounded-sm text-2xl font-bold tracking-tight ${focusRing}`}>
             booking<span className="text-[#febb02]">.com</span>
           </Link>
-          <nav className="hidden items-center gap-1 lg:flex" aria-label="Ana menü">
-            {navItems.map((item) => (
+          <nav className="hidden items-center gap-1 lg:flex" aria-label={t("primary")}>
+            {items.map((item) => (
               <Link
-                key={item.label}
+                key={item.key}
                 href={item.href}
-                aria-disabled={item.disabled}
-                className={`rounded-sm px-3 py-2 text-sm font-medium transition hover:bg-white/10 hover:text-white ${
-                  item.disabled
-                    ? "cursor-not-allowed text-white/50 hover:bg-transparent"
-                    : "text-white/90"
-                }`}
+                aria-current={isCurrent(item.href) ? "page" : undefined}
+                className={`rounded-sm px-3 py-2 text-sm font-medium text-white transition hover:bg-white/10 aria-[current=page]:bg-white/15 ${focusRing}`}
               >
-                {item.label}
+                {t(item.key)}
               </Link>
             ))}
           </nav>
@@ -85,8 +92,8 @@ export default function Header() {
             <div className="flex items-center gap-2">
               <Link
                 href="/account"
-                className="flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm font-medium text-white/90 transition hover:bg-white/10"
-                aria-label="Hesabım"
+                className={`flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm font-medium text-white transition hover:bg-white/10 ${focusRing}`}
+                aria-label={t("account")}
               >
                 <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-xs font-bold text-[#003580]">
                   {initials}
@@ -94,33 +101,36 @@ export default function Header() {
                 <span className="hidden sm:inline">{user.firstName}</span>
               </Link>
               <button
+                type="button"
                 onClick={handleLogout}
-                className="hidden rounded-sm border border-white/30 px-3 py-1.5 text-sm font-medium text-white/90 transition hover:bg-white/10 sm:block"
+                className={`hidden rounded-sm border border-white/60 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-white/10 sm:block ${focusRing}`}
               >
-                Çıkış
+                {t("logout")}
               </button>
             </div>
           ) : (
             <div className="flex items-center gap-2">
               <Link
                 href="/register"
-                className="hidden rounded-sm bg-white px-4 py-2 text-sm font-semibold text-[#003580] transition hover:bg-blue-50 sm:block"
+                className={`hidden rounded-sm bg-white px-4 py-2 text-sm font-semibold text-[#003580] transition hover:bg-blue-50 sm:block ${focusRing}`}
               >
-                Kayıt Ol
+                {t("register")}
               </Link>
               <Link
                 href="/login"
-                className="hidden rounded-sm bg-white px-4 py-2 text-sm font-semibold text-[#003580] transition hover:bg-blue-50 sm:block"
+                className={`hidden rounded-sm bg-white px-4 py-2 text-sm font-semibold text-[#003580] transition hover:bg-blue-50 sm:block ${focusRing}`}
               >
-                Giriş Yap
+                {t("login")}
               </Link>
             </div>
           )}
           <button
+            type="button"
             onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className="rounded-sm p-2 text-white transition hover:bg-white/10 lg:hidden"
-            aria-label="Menüyü aç/kapat"
+            className={`rounded-sm p-2 text-white transition hover:bg-white/10 lg:hidden ${focusRing}`}
+            aria-label={t("toggleMenu")}
             aria-expanded={isMenuOpen}
+            aria-controls="mobile-menu"
           >
             <svg
               className="h-6 w-6"
@@ -150,41 +160,43 @@ export default function Header() {
       </div>
 
       {isMenuOpen && (
-        <div className="border-t border-white/10 bg-[#003580] px-4 pb-4 pt-2 lg:hidden">
-          <nav className="flex flex-col gap-1" aria-label="Mobil menü">
-            {navItems.map((item) => (
+        <div
+          id="mobile-menu"
+          className="border-t border-white/20 bg-[#003580] px-4 pb-4 pt-2 lg:hidden"
+        >
+          <nav className="flex flex-col gap-1" aria-label={t("mobile")}>
+            {items.map((item) => (
               <Link
-                key={item.label}
+                key={item.key}
                 href={item.href}
-                aria-disabled={item.disabled}
-                className={`rounded-sm px-3 py-2 text-sm font-medium transition hover:bg-white/10 ${
-                  item.disabled ? "text-white/50" : "text-white/90 hover:text-white"
-                }`}
+                aria-current={isCurrent(item.href) ? "page" : undefined}
+                className={`rounded-sm px-3 py-2 text-sm font-medium text-white transition hover:bg-white/10 ${focusRing}`}
               >
-                {item.label}
+                {t(item.key)}
               </Link>
             ))}
-            <div className="mt-2 flex flex-col gap-2 border-t border-white/10 pt-2">
+            <div className="mt-2 flex flex-col gap-2 border-t border-white/20 pt-2">
               {user ? (
                 <button
+                  type="button"
                   onClick={handleLogout}
-                  className="rounded-sm bg-white px-4 py-2 text-center text-sm font-semibold text-[#003580]"
+                  className={`rounded-sm bg-white px-4 py-2 text-center text-sm font-semibold text-[#003580] ${focusRing}`}
                 >
-                  Çıkış Yap
+                  {t("logout")}
                 </button>
               ) : (
                 <>
                   <Link
                     href="/register"
-                    className="rounded-sm bg-white px-4 py-2 text-center text-sm font-semibold text-[#003580]"
+                    className={`rounded-sm bg-white px-4 py-2 text-center text-sm font-semibold text-[#003580] ${focusRing}`}
                   >
-                    Kayıt Ol
+                    {t("register")}
                   </Link>
                   <Link
                     href="/login"
-                    className="rounded-sm bg-white px-4 py-2 text-center text-sm font-semibold text-[#003580]"
+                    className={`rounded-sm bg-white px-4 py-2 text-center text-sm font-semibold text-[#003580] ${focusRing}`}
                   >
-                    Giriş Yap
+                    {t("login")}
                   </Link>
                 </>
               )}

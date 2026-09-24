@@ -45,7 +45,10 @@ export default function RegisterPage() {
   return (
     <div className="flex min-h-screen flex-col bg-gray-50">
       <Header />
-      <main className="mx-auto flex w-full max-w-md flex-1 items-center justify-center px-4 py-16">
+      <main
+        id="main"
+        className="mx-auto flex w-full max-w-md flex-1 items-center justify-center px-4 py-16"
+      >
         <div className="w-full rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
           <h1 className="text-2xl font-bold text-gray-900">Kayıt Ol</h1>
           <p className="mt-1 text-sm text-gray-600">

@@ -5,6 +5,7 @@ import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import PropertyGallery from "@/components/property/PropertyGallery";
 import BookingWidget, { BookingWidgetRoom } from "@/components/booking/BookingWidget";
+import ReviewsSection from "@/components/property/ReviewsSection";
 
 interface PropertyPageProps {
   params: Promise<{ id: string }>;
@@ -85,7 +86,7 @@ export default async function PropertyPage({ params }: PropertyPageProps) {
   return (
     <div className="min-h-screen bg-white">
       <Header />
-      <main className="mx-auto max-w-7xl px-4 py-8">
+      <main id="main" className="mx-auto max-w-7xl px-4 py-8">
         <div className="mb-6">
           <p className="text-sm text-gray-500">
             {property.location.city}, {property.location.country}
@@ -123,6 +124,8 @@ export default async function PropertyPage({ params }: PropertyPageProps) {
                 </ul>
               </div>
             )}
+
+            <ReviewsSection propertyId={property.id} />
           </div>
 
           <div className="lg:col-span-1">

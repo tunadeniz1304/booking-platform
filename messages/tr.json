@@ -6,7 +6,15 @@
     "register": "Kayıt ol",
     "logout": "Çıkış yap",
     "transfers": "Devir pazarı",
-    "plan": "Gezi planla"
+    "plan": "Gezi planla",
+    "stays": "Konaklama",
+    "host": "Ev sahibi paneli",
+    "admin": "Yönetim",
+    "mailbox": "Posta kutusu (demo)",
+    "primary": "Ana menü",
+    "mobile": "Mobil menü",
+    "toggleMenu": "Menüyü aç/kapat",
+    "privacy": "Gizlilik"
   },
   "quote": {
     "nights": "{count} gece",
@@ -20,5 +28,9 @@
     "ranking": "Sıralama nasıl çalışır?",
     "privacy": "Gizlilik ve KVKK"
   },
-  "locale": { "label": "Dil", "tr": "Türkçe", "en": "English" }
+  "locale": {
+    "label": "Dil",
+    "tr": "Türkçe",
+    "en": "English"
+  }
 }

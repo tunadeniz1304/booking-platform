@@ -63,7 +63,7 @@ export default function BookingConfirmationPage() {
     return (
       <div className="flex min-h-screen flex-col bg-gray-50">
         <Header />
-        <main className="mx-auto flex max-w-3xl flex-1 items-center justify-center px-4">
+        <main id="main" className="mx-auto flex max-w-3xl flex-1 items-center justify-center px-4">
           <div className="text-center">
             <h1 className="text-2xl font-bold text-gray-900">Giriş gerekli</h1>
             <p className="mt-2 text-gray-600">Rezervasyonunuzu görüntülemek için giriş yapın.</p>
@@ -88,7 +88,7 @@ export default function BookingConfirmationPage() {
   return (
     <div className="flex min-h-screen flex-col bg-gray-50">
       <Header />
-      <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-10">
+      <main id="main" className="mx-auto w-full max-w-3xl flex-1 px-4 py-10">
         {loading ? (
           <p className="text-center text-gray-500">Yükleniyor...</p>
         ) : error ? (

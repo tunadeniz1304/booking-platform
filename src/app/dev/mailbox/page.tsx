@@ -33,7 +33,7 @@ export default function MailboxPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
-      <main className="mx-auto max-w-3xl px-4 py-8">
+      <main id="main" className="mx-auto max-w-3xl px-4 py-8">
         <h1 className="text-2xl font-bold text-gray-900">Posta kutusu (demo)</h1>
         <p className="mt-1 text-sm text-gray-600">
           SMTP yapılandırılmadığında e-postalar burada görünür.

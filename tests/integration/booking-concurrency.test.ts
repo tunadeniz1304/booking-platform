@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { PrismaClient, Prisma } from "@prisma/client";
-import { createBooking, BookingConflictError } from "@/lib/booking-service";
+import { createBooking } from "@/lib/booking-service";
 import { describeInt } from "./helpers";
 
 describeInt("booking-concurrency (integration)", () => {
@@ -128,7 +128,7 @@ describeInt("booking-concurrency (integration)", () => {
 
       const fulfilled = results.filter((r) => r.status === "fulfilled");
       const conflict = results.filter(
-        (r) => r.status === "rejected" && r.reason instanceof BookingConflictError
+        (r) => r.status === "rejected" && (r.reason as { status?: number }).status === 409
       );
 
       // En az biri başarılı; reddedilenler yalnız çakışma sebebiyle olabilir

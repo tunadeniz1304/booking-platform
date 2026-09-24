@@ -64,10 +64,14 @@ export class Redlock {
   /**
    * Kaynağı kilitler. `waitMs` dolmadan edinilemezse LockError fırlatır.
    */
-  async acquire(resource: string, ttlMs?: number): Promise<LockHandle> {
+  async acquire(
+    resource: string,
+    ttlMs?: number,
+    opts: { retryCount?: number; retryDelayMs?: number } = {}
+  ): Promise<LockHandle> {
     const ttl = ttlMs ?? this.defaults.ttlMs ?? 30000;
-    const retryCount = this.defaults.retryCount ?? 5;
-    const retryDelayMs = this.defaults.retryDelayMs ?? 100;
+    const retryCount = opts.retryCount ?? this.defaults.retryCount ?? 5;
+    const retryDelayMs = opts.retryDelayMs ?? this.defaults.retryDelayMs ?? 100;
 
     const token = randomUUID();
 
@@ -118,9 +122,12 @@ export class Redlock {
   async withLock<T>(
     resource: string,
     fn: (handle: LockHandle) => Promise<T>,
-    opts?: { ttlMs?: number; retryCount?: number; renewEveryMs?: number }
+    opts?: { ttlMs?: number; retryCount?: number; retryDelayMs?: number; renewEveryMs?: number }
   ): Promise<T> {
-    const handle = await this.acquire(resource, opts?.ttlMs);
+    const handle = await this.acquire(resource, opts?.ttlMs, {
+      retryCount: opts?.retryCount,
+      retryDelayMs: opts?.retryDelayMs,
+    });
     return this.runGuarded(handle, fn, opts?.renewEveryMs);
   }
 

@@ -152,6 +152,16 @@ model Booking {
   totalPrice Decimal       @db.Decimal(10, 2)
   currency   String        @default("TRY")
   status     BookingStatus @default(PENDING)
+  /// HELD durumundaki geçici tutma süresi; dolunca expire-holds işi envanteri iade eder.
+  holdExpiresAt DateTime?
+  /// İyimser eşzamanlılık sürümü: her durum geçişinde +1 (koşullu güncelleme).
+  version    Int           @default(0)
+  /// computeTotal() kırılımının anlık görüntüsü (geceler, ara toplam, vergiler, toplam; minor-unit).
+  priceBreakdown Json?
+  quoteId    String?
+  confirmedAt DateTime?
+  cancelledAt DateTime?
+  expiredAt  DateTime?
   idempotencyKey String?
   payment      Payment?
   reviews      Review[]
@@ -163,14 +173,18 @@ model Booking {
   @@index([userId])
   @@index([roomId, checkIn, checkOut])
   @@index([status, checkIn])
+  @@index([status, holdExpiresAt])
   @@unique([userId, idempotencyKey])
 }
 
+/// PENDING → HELD → CONFIRMED → COMPLETED | CANCELLED | EXPIRED (src/lib/booking/state-machine.ts)
 enum BookingStatus {
   PENDING
+  HELD
   CONFIRMED
   CANCELLED
   COMPLETED
+  EXPIRED
 }
 
 model Payment {
@@ -232,6 +246,8 @@ enum OutboxStatus {
   PROCESSING
   DONE
   FAILED
+  /// Azami deneme aşıldı; admin panelinden yeniden kuyruğa alınabilir.
+  DEAD
 }
 
 model OutboxMessage {
@@ -244,11 +260,14 @@ model OutboxMessage {
   status         OutboxStatus @default(PENDING)
   attempts       Int          @default(0)
   availableAfter DateTime     @default(now())
+  /// PROCESSING kiralamasının bitişi; dolarsa mesaj başka bir işçi tarafından yeniden alınır.
+  lockedUntil    DateTime?
   createdAt      DateTime     @default(now())
   processedAt    DateTime?
   lastError      String?
 
   @@index([status, availableAfter])
+  @@index([status, lockedUntil])
   @@index([aggregateType, aggregateId])
   @@index([correlationId])
 }

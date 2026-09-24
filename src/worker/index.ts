@@ -8,7 +8,8 @@
  */
 import { Worker, type Job } from "bullmq";
 import { loadEnv } from "@/lib/config/load-env";
-import { QUEUE_NAMES, getQueueConnection, type PricingJobData } from "@/lib/queue";
+import { QUEUE_NAMES, getQueue, getQueueConnection, type PricingJobData } from "@/lib/queue";
+import { EXPIRE_HOLDS_JOB, runExpireHolds, scheduleExpireHolds } from "./jobs/expire-holds";
 import { runOutboxRelay } from "@/lib/cqrs";
 import { registerEventHandlers } from "@/lib/events/register";
 import { updateAvailabilityPrices } from "@/lib/pricing-service";
@@ -52,6 +53,23 @@ async function main(): Promise<void> {
     logger.error({ jobId: job?.id, queue: QUEUE_NAMES.pricing, ...errorFields(err) }, "job failed")
   );
   workers.push(pricing);
+
+  const maintenance = new Worker(
+    QUEUE_NAMES.maintenance,
+    async (job: Job) => {
+      if (job.name === EXPIRE_HOLDS_JOB) return runExpireHolds();
+      throw new Error(`Bilinmeyen bakım işi: ${job.name}`);
+    },
+    { connection }
+  );
+  maintenance.on("failed", (job, err) =>
+    logger.error(
+      { jobId: job?.id, queue: QUEUE_NAMES.maintenance, ...errorFields(err) },
+      "job failed"
+    )
+  );
+  workers.push(maintenance);
+  await scheduleExpireHolds(getQueue(QUEUE_NAMES.maintenance));
 
   await drainOutbox();
   relayTimer = setInterval(drainOutbox, OUTBOX_RELAY_INTERVAL_MS);

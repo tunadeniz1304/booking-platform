@@ -1,30 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { runOutboxRelay } from "@/lib/cqrs";
 import { registerEventHandlers } from "@/lib/events/register";
+import { authorizeInternalRequest } from "@/lib/security/internal-auth";
+import { toErrorResponse } from "@/lib/http/errors";
 
 /**
- * İç servis: Outbox mesajlarını anında boşaltır (on-demand drain).
- *
- * Bağımsız worker süreci (npm run worker) periyodik boşaltmayı yapar; bu
- * uç, test/operasyon ekibine eşzamanlı flush imkânı verir. Bir paylaşılan
- * sır başlığı ile korunur (INTERNAL_API_SECRET). Middleware rate-limit'ine
- * dahildir.
+ * İç servis: Outbox mesajlarını anında boşaltır (operasyon/test için on-demand).
+ * Periyodik boşaltmayı worker süreci yapar. `x-internal-secret` veya ADMIN JWT.
  */
-const INTERNAL_SECRET = process.env.INTERNAL_API_SECRET || "";
-
 export async function POST(req: NextRequest) {
-  const provided = req.headers.get("x-internal-secret");
-  if (!INTERNAL_SECRET || provided !== INTERNAL_SECRET) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
   try {
+    await authorizeInternalRequest(req);
     registerEventHandlers();
-    const published = await runOutboxRelay();
-    return NextResponse.json({ published });
+    return NextResponse.json({ published: await runOutboxRelay() });
   } catch (error) {
-    console.error("Outbox relay endpoint failed:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return toErrorResponse(error, "internal.outbox.relay");
   }
 }
 

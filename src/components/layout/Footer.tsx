@@ -34,7 +34,7 @@ export default function Footer() {
         <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4">
           {footerColumns.map((column) => (
             <div key={column.title}>
-              <h3 className="text-sm font-semibold text-gray-900">{column.title}</h3>
+              <h2 className="text-sm font-semibold text-gray-900">{column.title}</h2>
               <ul className="mt-4 space-y-3">
                 {column.links.map((link) => (
                   <li key={link}>
@@ -50,7 +50,7 @@ export default function Footer() {
             </div>
           ))}
           <div>
-            <h3 className="text-sm font-semibold text-gray-900">Bültenimize abone olun</h3>
+            <h2 className="text-sm font-semibold text-gray-900">Bültenimize abone olun</h2>
             <p className="mt-4 text-sm text-gray-600">
               Size özel fırsatları ve indirimleri kaçırmayın.
             </p>

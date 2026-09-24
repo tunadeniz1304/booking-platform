@@ -1,6 +1,7 @@
 import { Prisma, PaymentStatus, BookingStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { redis } from "@/lib/redis";
+import { HttpError } from "@/lib/http/errors";
 
 /**
  * Ödeme servisi — oda rezervasyonunu onaylayan (CONFIRMED) ödeme akışı.
@@ -13,9 +14,9 @@ import { redis } from "@/lib/redis";
 const PAYMENT_CACHE_PREFIX = "payment:";
 const PAYMENT_CACHE_TTL = 60 * 30;
 
-export class PaymentValidationError extends Error {
-  constructor(message: string) {
-    super(message);
+export class PaymentValidationError extends HttpError {
+  constructor(message: string, status = 400) {
+    super(status, "PAYMENT_INVALID", message);
     this.name = "PaymentValidationError";
   }
 }
@@ -33,20 +34,14 @@ export interface ChargedPayment {
 export interface ChargeInput {
   bookingId: string;
   amount: number;
-  currency: string;
   requesterId: string;
   /** Ödeme sağlayıcısı adı; varsayılan dahili "mock-provider". */
   provider?: string;
 }
 
 export async function chargeBooking(input: ChargeInput): Promise<ChargedPayment> {
+  // Not (hata #1): önbellek okuması YOK — sahiplik kontrolü her zaman ilk adımdır.
   const cacheKey = `${PAYMENT_CACHE_PREFIX}${input.bookingId}`;
-  try {
-    const cached = await redis.get(cacheKey);
-    if (cached) return JSON.parse(cached) as ChargedPayment;
-  } catch {
-    // cache başarısız → DB'den
-  }
 
   const payment = await prisma.$transaction(
     async (tx) => {
@@ -62,11 +57,9 @@ export async function chargeBooking(input: ChargeInput): Promise<ChargedPayment>
         },
       });
 
-      if (!booking) {
-        throw new PaymentValidationError("Rezervasyon bulunamadı");
-      }
-      if (booking.userId !== input.requesterId) {
-        throw new PaymentValidationError("Bu rezervasyonun sahibi değilsiniz");
+      // Sahiplik: başkasının rezervasyonu "bulunamadı" olarak görünür (IDOR).
+      if (!booking || booking.userId !== input.requesterId) {
+        throw new PaymentValidationError("Rezervasyon bulunamadı", 404);
       }
       if (booking.status === BookingStatus.CANCELLED) {
         throw new PaymentValidationError("İptal edilmiş rezervasyon için ödeme yapılamaz");
@@ -98,7 +91,7 @@ export async function chargeBooking(input: ChargeInput): Promise<ChargedPayment>
           bookingId: booking.id,
           userId: booking.userId,
           amount: new Prisma.Decimal(input.amount.toFixed(2)),
-          currency: input.currency || booking.currency,
+          currency: booking.currency,
           provider: input.provider ?? "internal-grpc",
           status: PaymentStatus.PAID,
           paidAt: new Date(),

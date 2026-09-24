@@ -1,25 +1,21 @@
-// Bu dosya bağımsız bir Node sürecinde çalışır (npm run grpc:server).
-// Next.js uygulamasının bundle'ına dahil DEĞİLDİR; iç servis-arası iletişim
-// protokolünün gerçek uygulamasıdır.
-
+/**
+ * İç gRPC servisi (web uygulamasından bağımsız süreç; başlatma: `services/grpc/main.ts`).
+ *
+ * Güvenlik (hata #1):
+ *  - Her RPC `authorization: Bearer <JWT>` metadata'sı ister (UNAUTHENTICATED).
+ *  - İşlemi yapan kullanıcı token'dan türetilir; `requester_id` yalnızca eşleşirse kabul.
+ *  - Ödemede sahiplik kontrolü her şeyden (önbellek dahil) ÖNCE yapılır.
+ *  - Varsayılan bind adresi `127.0.0.1`; Compose'da yalnızca iç ağda açıktır.
+ */
 import * as grpc from "@grpc/grpc-js";
-import * as protoLoader from "@grpc/proto-loader";
-import path from "path";
 import { prisma } from "@/lib/prisma";
 import { createBooking } from "@/lib/booking-service";
 import { chargeBooking } from "@/lib/payment/payment-service";
-
-const PROTO_PATH = path.join(__dirname, "../../proto/booking.proto");
-const GRPC_PORT = Number(process.env.GRPC_PORT ?? "50051");
-
-const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
-  keepCase: true,
-  longs: String,
-  enums: String,
-  defaults: true,
-  oneofs: true,
-});
-const proto = grpc.loadPackageDefinition(packageDefinition);
+import { HttpError } from "@/lib/http/errors";
+import { logger, errorFields } from "@/lib/observability/logger";
+import type { AccessClaims } from "@/lib/auth/tokens";
+import { loadBookingV1 } from "./proto";
+import { GrpcAuthError, authenticateMetadata, resolveRequester } from "./auth";
 
 interface DateRange {
   start?: string;
@@ -31,234 +27,152 @@ interface RoomAvailabilityRequest {
   range?: DateRange;
 }
 
-interface PricePoint {
-  date: string;
-  price: number;
-  available: boolean;
-}
-
-interface RoomAvailabilityResponse {
-  available: boolean;
-  prices: PricePoint[];
-  estimated_total: number;
-  currency: string;
-  available_rooms: number;
-}
-
 interface ReserveRoomRequest {
   room_id: string;
   property_id: string;
   range?: DateRange;
   guest_count?: number;
-  requester_id: string;
+  requester_id?: string;
   idempotency_key?: string;
-}
-
-interface ReserveRoomResponse {
-  booking_id: string;
-  status: string;
-  total_price: number;
-  currency: string;
 }
 
 interface ChargeRequest {
   booking_id: string;
   amount?: number;
   currency?: string;
-  requester_id: string;
+  requester_id?: string;
 }
 
-interface ChargeResponse {
-  payment_id: string;
-  status: string;
-  charged_amount: number;
+type Callback<T> = (err: grpc.ServiceError | null, value?: T) => void;
+
+function serviceError(code: grpc.status, message: string): grpc.ServiceError {
+  const error = new Error(message) as grpc.ServiceError;
+  error.code = code;
+  error.details = message;
+  error.metadata = new grpc.Metadata();
+  return error;
 }
 
-interface BookingV1Root {
-  InventoryService: {
-    service: grpc.ServiceDefinition;
-  };
-  BookingService: {
-    service: grpc.ServiceDefinition;
-  };
-  PaymentService: {
-    service: grpc.ServiceDefinition;
-  };
-}
-
-type GrpcCallback<T> = (err: grpc.ServiceError | null, value?: T) => void;
-
-/** Paket ağacında [booking, v1] yolunu güvenle gezer (proto-loader yuvalı döner). */
-function findInRoot(root: unknown, parts: string[]): unknown {
-  let node: unknown = root;
-  for (const part of parts) {
-    if (node && typeof node === "object" && part in (node as Record<string, unknown>)) {
-      node = (node as Record<string, unknown>)[part];
-    } else {
-      return undefined;
-    }
+/** Alan hatalarını gRPC durum kodlarına çevirir; iç hata ayrıntısı sızdırılmaz. */
+export function toGrpcError(error: unknown): grpc.ServiceError {
+  if (error instanceof GrpcAuthError) return serviceError(error.code, error.message);
+  if (error instanceof HttpError) {
+    const code =
+      error.status === 400
+        ? grpc.status.INVALID_ARGUMENT
+        : error.status === 401
+          ? grpc.status.UNAUTHENTICATED
+          : error.status === 403
+            ? grpc.status.PERMISSION_DENIED
+            : error.status === 404
+              ? grpc.status.NOT_FOUND
+              : error.status === 409
+                ? grpc.status.ABORTED
+                : grpc.status.INTERNAL;
+    return serviceError(code, code === grpc.status.INTERNAL ? "İç hata" : error.message);
   }
-  return node;
+  logger.error(errorFields(error), "grpc handler error");
+  return serviceError(grpc.status.INTERNAL, "İç hata");
 }
 
-const bookingV1: BookingV1Root = findInRoot(proto, ["booking", "v1"]) as unknown as BookingV1Root;
-if (!bookingV1?.InventoryService?.service) {
-  throw new Error(
-    "proto/booking.proto 'booking.v1' paketi yüklenemedi — proto dosyasını kontrol edin"
-  );
+/** RPC işleyicisini kimlik doğrulamasıyla sarar (sunucu tarafı interceptor). */
+function authed<Req, Res>(
+  handler: (request: Req, claims: AccessClaims) => Promise<Res>
+): grpc.handleUnaryCall<Req, Res> {
+  return (call: grpc.ServerUnaryCall<Req, Res>, callback: Callback<Res>) => {
+    authenticateMetadata(call.metadata)
+      .then((claims) => handler(call.request, claims))
+      .then((result) => callback(null, result))
+      .catch((error: unknown) => callback(toGrpcError(error)));
+  };
 }
 
-/** Tarih aralığını [start, end) UTC gece yarısı Date'lerine çevirir. */
 function parseRange(range?: DateRange): { start: Date; end: Date } {
-  if (!range?.start || !range?.end) {
-    throw new Error("Geçersiz tarih aralığı");
-  }
-  const start = new Date(`${range.start}T00:00:00.000Z`);
-  const end = new Date(`${range.end}T00:00:00.000Z`);
+  const start = new Date(`${range?.start ?? ""}T00:00:00.000Z`);
+  const end = new Date(`${range?.end ?? ""}T00:00:00.000Z`);
   if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start >= end) {
-    throw new Error("Geçersiz tarih aralığı");
+    throw new GrpcAuthError(grpc.status.INVALID_ARGUMENT, "Geçersiz tarih aralığı");
   }
   return { start, end };
 }
 
-function toGrpcError(error: unknown): grpc.ServiceError {
-  const message = (error as Error)?.message ?? "Internal error";
-  const typeName = (error as Error)?.constructor?.name;
-  let code = grpc.status.INTERNAL;
-  if (typeName === "BookingConflictError") code = grpc.status.ABORTED;
-  else if (typeName === "BookingValidationError") code = grpc.status.INVALID_ARGUMENT;
-  else if (typeName === "BookingNotFoundError") code = grpc.status.NOT_FOUND;
-  else if (typeName === "PaymentValidationError") code = grpc.status.INVALID_ARGUMENT;
-  const serviceError = new Error(message) as grpc.ServiceError;
-  serviceError.code = code;
-  serviceError.details = message;
-  serviceError.metadata = new grpc.Metadata();
-  return serviceError;
-}
-
-// --- InventoryService ------------------------------------------------------
-
-async function GetRoomAvailability(
-  call: grpc.ServerUnaryCall<RoomAvailabilityRequest, RoomAvailabilityResponse>,
-  callback: GrpcCallback<RoomAvailabilityResponse>
-): Promise<void> {
-  try {
-    const req = call.request;
+const handlers = {
+  GetRoomAvailability: authed(async (req: RoomAvailabilityRequest) => {
     const { start, end } = parseRange(req.range);
-
     const room = await prisma.room.findUnique({
       where: { id: req.room_id },
-      include: { availabilities: { where: { date: { gte: start, lt: end } } } },
+      select: {
+        property: { select: { currency: true } },
+        availabilities: { where: { date: { gte: start, lt: end } }, orderBy: { date: "asc" } },
+      },
     });
-    if (!room) {
-      return callback(toGrpcError(new Error("Oda bulunamadı")));
-    }
-
-    const prices: PricePoint[] = room.availabilities
-      .sort((a, b) => a.date.getTime() - b.date.getTime())
-      .map((a) => ({
-        date: a.date.toISOString().slice(0, 10),
-        price: Number(a.price),
-        available: a.isAvailable,
-      }));
-
+    if (!room) throw new GrpcAuthError(grpc.status.NOT_FOUND, "Oda bulunamadı");
+    const prices = room.availabilities.map((a) => ({
+      date: a.date.toISOString().slice(0, 10),
+      price: Number(a.price),
+      available: a.isAvailable,
+    }));
     const available = prices.length > 0 && prices.every((p) => p.available);
-    const estimatedTotal = available
-      ? Math.round(prices.reduce((s, p) => s + p.price, 0) * 100) / 100
-      : 0;
-
-    const property = await prisma.room
-      .findUnique({ where: { id: req.room_id }, select: { propertyId: true } })
-      .then((r) =>
-        r
-          ? prisma.property.findUnique({ where: { id: r.propertyId }, select: { currency: true } })
-          : null
-      );
-
-    callback(null, {
+    return {
       available,
       prices,
-      estimated_total: estimatedTotal,
-      currency: property?.currency ?? "TRY",
+      estimated_total: available
+        ? Math.round(prices.reduce((s, p) => s + p.price * 100, 0)) / 100
+        : 0,
+      currency: room.property.currency,
       available_rooms: available ? 1 : 0,
-    });
-  } catch (error) {
-    callback(toGrpcError(error));
-  }
-}
+    };
+  }),
 
-// --- BookingService --------------------------------------------------------
-
-async function ReserveRoom(
-  call: grpc.ServerUnaryCall<ReserveRoomRequest, ReserveRoomResponse>,
-  callback: GrpcCallback<ReserveRoomResponse>
-): Promise<void> {
-  try {
-    const req = call.request;
+  ReserveRoom: authed(async (req: ReserveRoomRequest, claims) => {
+    const userId = resolveRequester(claims, req.requester_id);
     const result = await createBooking({
-      userId: req.requester_id,
+      userId,
       propertyId: req.property_id,
       roomId: req.room_id,
       checkIn: req.range?.start ?? "",
       checkOut: req.range?.end ?? "",
-      guestCount: req.guest_count ?? 1,
+      guestCount: req.guest_count || 1,
       idempotencyKey: req.idempotency_key || undefined,
     });
-    callback(null, {
+    return {
       booking_id: result.booking.id,
       status: result.booking.status,
       total_price: result.booking.totalPrice,
       currency: result.booking.currency,
-    });
-  } catch (error) {
-    callback(toGrpcError(error));
-  }
-}
+    };
+  }),
 
-// --- PaymentService ---------------------------------------------------------
-
-async function Charge(
-  call: grpc.ServerUnaryCall<ChargeRequest, ChargeResponse>,
-  callback: GrpcCallback<ChargeResponse>
-): Promise<void> {
-  try {
-    const req = call.request;
+  Charge: authed(async (req: ChargeRequest, claims) => {
+    const requesterId = resolveRequester(claims, req.requester_id);
     const payment = await chargeBooking({
       bookingId: req.booking_id,
       amount: req.amount ?? 0,
-      currency: req.currency ?? "TRY",
-      requesterId: req.requester_id,
+      requesterId,
       provider: "grpc-internal",
     });
-    callback(null, {
-      payment_id: payment.id,
-      status: payment.status,
-      charged_amount: payment.amount,
-    });
-  } catch (error) {
-    callback(toGrpcError(error));
-  }
+    return { payment_id: payment.id, status: payment.status, charged_amount: payment.amount };
+  }),
+};
+
+/** Yan etkisiz sunucu oluşturucu (testler kendi portunda başlatır). */
+export function createGrpcServer(): grpc.Server {
+  const pkg = loadBookingV1();
+  const server = new grpc.Server();
+  server.addService(pkg.InventoryService.service, {
+    GetRoomAvailability: handlers.GetRoomAvailability,
+  });
+  server.addService(pkg.BookingService.service, { ReserveRoom: handlers.ReserveRoom });
+  server.addService(pkg.PaymentService.service, { Charge: handlers.Charge });
+  return server;
 }
 
-// --- Başlatma ---------------------------------------------------------------
-
-const server = new grpc.Server();
-server.addService(bookingV1.InventoryService.service, { GetRoomAvailability });
-server.addService(bookingV1.BookingService.service, { ReserveRoom });
-server.addService(bookingV1.PaymentService.service, { Charge });
-
-server.bindAsync(`0.0.0.0:${GRPC_PORT}`, grpc.ServerCredentials.createInsecure(), (err, port) => {
-  if (err) {
-    console.error("[grpc] bind hatası:", err);
-    process.exit(1);
-  }
-  console.log(`[grpc] Booking gRPC servisi ${port} portunda hazır`);
-  void port;
-});
-
-process.on("SIGINT", () => {
-  server.tryShutdown(() => process.exit(0));
-});
-process.on("SIGTERM", () => {
-  server.tryShutdown(() => process.exit(0));
-});
+/** Sunucuyu verilen adreste başlatır; bağlanılan portu döndürür. */
+export function startGrpcServer(server: grpc.Server, host: string, port: number): Promise<number> {
+  return new Promise((resolve, reject) => {
+    server.bindAsync(`${host}:${port}`, grpc.ServerCredentials.createInsecure(), (err, bound) => {
+      if (err) reject(err);
+      else resolve(bound);
+    });
+  });
+}

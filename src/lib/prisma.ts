@@ -1,27 +1,44 @@
 import { PrismaClient } from "@prisma/client";
+import { installQueryStats, isQueryStatsEnabled } from "@/lib/observability/stats";
 
-const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
+const globalForPrisma = globalThis as unknown as { __bookingPrisma?: PrismaClient };
 
 /**
- * Bağlantı havuzu yapılandırması:
- * - Next.js Route Handlers'ları aynı anda birden çok çalışabilir; Prisma'ya tek
- *   singleton istemci ve sınırlı bağlantı havuzu vererek "too many connections"
- *   riskini önleriz.
- * - pool_timeout: havuz doluysa bekleme süresi (saniye).
+ * Tekil Prisma istemcisi — TEMBEL oluşturulur: modül import edildiğinde değil,
+ * ilk sorguda `DATABASE_URL` okunur. Böylece `next build` (ve Docker build) sırasında
+ * veritabanı adresi/sırrı gerekmez ve imaja gömülmez.
+ *
+ * Bağlantı havuzu `DATABASE_URL`'deki `connection_limit` / `pool_timeout` ile sınırlanır.
+ * Sorgu profil'leyicisi yalnızca `ENABLE_QUERY_STATS=true` iken kurulur.
  */
-const prismaClientSingleton = () => {
+export function getPrismaClient(): PrismaClient {
+  if (globalForPrisma.__bookingPrisma) return globalForPrisma.__bookingPrisma;
   const url = process.env.DATABASE_URL;
   if (!url) {
     throw new Error("DATABASE_URL environment variable is required");
   }
-  return new PrismaClient({
+  const statsEnabled = isQueryStatsEnabled();
+  const client = new PrismaClient({
     datasources: { db: { url } },
-    log: process.env.NODE_ENV === "development" ? ["warn", "error"] : ["error"],
+    log: statsEnabled
+      ? [
+          { emit: "event", level: "query" },
+          { emit: "stdout", level: "warn" },
+          { emit: "stdout", level: "error" },
+        ]
+      : [{ emit: "stdout", level: "error" }],
   });
-};
-
-export const prisma = globalForPrisma.prisma ?? prismaClientSingleton();
-
-if (process.env.NODE_ENV !== "production") {
-  globalForPrisma.prisma = prisma;
+  if (statsEnabled) {
+    installQueryStats(client as unknown as Parameters<typeof installQueryStats>[0]);
+  }
+  globalForPrisma.__bookingPrisma = client;
+  return client;
 }
+
+export const prisma: PrismaClient = new Proxy({} as PrismaClient, {
+  get(_target, property) {
+    const client = getPrismaClient();
+    const value = Reflect.get(client, property, client);
+    return typeof value === "function" ? value.bind(client) : value;
+  },
+});

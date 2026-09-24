@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { redis } from "@/lib/redis";
+import { getConfig } from "@/lib/config/app-config";
 import { calculateDynamicPrice } from "@/lib/pricing/engine";
 
 /**
@@ -37,14 +38,22 @@ function parseDate(value: string): Date {
   return new Date(`${value}T00:00:00.000Z`);
 }
 
-/** Odanın bir görüntülenmesini kaydet (sayfa yüklendiğinde / SSE bağlanınca). */
-export async function recordRoomView(roomId: string): Promise<void> {
+/**
+ * Görüntülenme kaydı — atomik (`INCR` + TTL) ve IP başına tekil: aynı IP'nin
+ * tekrar bağlanması LIVE_VIEW_DEDUPE_SECONDS boyunca sayacı şişiremez.
+ */
+export async function recordRoomView(roomId: string, ip: string): Promise<boolean> {
   try {
-    const key = `${VIEWS_PREFIX}${roomId}:views`;
-    const current = Number((await redis.get(key)) ?? "0");
-    await redis.set(key, String(current + 1), { ex: VIEW_WINDOW_TTL });
+    const dedupe = getConfig().LIVE_VIEW_DEDUPE_SECONDS;
+    const first = await redis.set(`${VIEWS_PREFIX}${roomId}:seen:${ip}`, "1", {
+      nx: true,
+      ex: dedupe,
+    });
+    if (!first) return false;
+    await redis.incrWithTtl(`${VIEWS_PREFIX}${roomId}:views`, VIEW_WINDOW_TTL);
+    return true;
   } catch {
-    // sayaç arızası zararsız
+    return false; // sayaç arızası zararsız
   }
 }
 

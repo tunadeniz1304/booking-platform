@@ -1,149 +1,165 @@
-// P2P Booking Transfer: listeleme (BOLA + adil fiyat), imzalı jetonla atomik
-// devir (race-güvenli), çift-talep reddi ve sahiplik değişimini DB'de doğrular.
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { PrismaClient, Prisma, BookingStatus, UserRole } from "@prisma/client";
+// P1-8 / hata #3: imzalı claim linki, escrow ödemesi, tek kullanımlık token, yarış güvenliği.
+import { beforeAll, afterAll, it, expect } from "vitest";
+import { PrismaClient, Prisma, BookingStatus } from "@prisma/client";
+import { describeInt, utcDay } from "./helpers";
 import {
-  listBookingForTransfer,
   claimTransfer,
-  verifyTransferToken,
-  TransferError,
+  discoverTransfers,
+  listBookingForTransfer,
+  listMyTransfers,
 } from "@/lib/transfer/transfer-service";
-import { describeInt } from "./helpers";
 
-describeInt("transfer (integration)", () => {
+describeInt("regression: #3 P2P devir (integration)", () => {
   const prisma = new PrismaClient();
+  const stamp = Date.now();
+  let seller = "";
+  let buyer = "";
+  let buyer2 = "";
+  let propertyId = "";
+  let roomId = "";
 
-  let seller: { id: string };
-  let buyer: { id: string };
-  let property: { id: string };
-  let bookingId = "";
-  let bookingId2 = "";
-
-  async function makeBooking(userId: string): Promise<{ id: string }> {
-    const today = new Date();
-    today.setUTCHours(0, 0, 0, 0);
-    const checkIn = new Date(today);
-    checkIn.setUTCDate(checkIn.getUTCDate() + 25);
-    const checkOut = new Date(checkIn);
-    checkOut.setUTCDate(checkOut.getUTCDate() + 2);
-    return prisma.booking.create({
+  async function confirmedBooking(daysAhead = 25) {
+    const b = await prisma.booking.create({
       data: {
-        userId,
-        propertyId: property.id,
-        roomId: (await prisma.room.findFirstOrThrow({ where: { propertyId: property.id } })).id,
-        checkIn,
-        checkOut,
+        userId: seller,
+        propertyId,
+        roomId,
+        checkIn: utcDay(daysAhead),
+        checkOut: utcDay(daysAhead + 2),
         guestCount: 1,
         totalPrice: new Prisma.Decimal(2000),
-        currency: "TRY",
         status: BookingStatus.CONFIRMED,
       },
     });
+    await prisma.payment.create({
+      data: {
+        bookingId: b.id,
+        userId: seller,
+        amount: new Prisma.Decimal(2000),
+        provider: "mock",
+        status: "PAID",
+      },
+    });
+    return b.id;
   }
 
   beforeAll(async () => {
-    seller = await prisma.user.create({
-      data: {
-        email: `tr-seller-${Date.now()}@t.test`,
-        passwordHash: "x",
-        firstName: "S",
-        lastName: "T",
-      },
-    });
-    buyer = await prisma.user.create({
-      data: {
-        email: `tr-buyer-${Date.now()}@t.test`,
-        passwordHash: "x",
-        firstName: "B",
-        lastName: "T",
-      },
-    });
-    const host = await prisma.user.create({
-      data: {
-        email: `tr-host-${Date.now()}@t.test`,
-        passwordHash: "x",
-        firstName: "H",
-        lastName: "T",
-        role: UserRole.HOST,
-      },
-    });
+    const mk = (n: string) =>
+      prisma.user.create({
+        data: {
+          email: `tr-${n}-${stamp}@t.test`,
+          passwordHash: "x",
+          firstName: n,
+          lastName: "Test",
+        },
+      });
+    seller = (await mk("satici")).id;
+    buyer = (await mk("alici")).id;
+    buyer2 = (await mk("alici2")).id;
     const location = await prisma.location.create({
-      data: { city: `TransCity-${Date.now()}`, country: "TEST" },
+      data: { city: `TransCity-${stamp}`, country: "TEST" },
     });
-    property = await prisma.property.create({
+    const property = await prisma.property.create({
       data: {
-        hostId: host.id,
-        title: "Transfer Test Oteli",
-        description: "transfer",
+        hostId: seller,
+        title: "Devir Oteli",
+        description: "t",
         propertyType: "HOTEL",
         locationId: location.id,
         basePrice: new Prisma.Decimal(1000),
-        currency: "TRY",
-        isActive: true,
       },
     });
-    await prisma.room.create({
-      data: {
-        propertyId: property.id,
-        name: "Devir Odası",
-        capacity: 2,
-        bedType: "Çift",
-        priceModifier: new Prisma.Decimal(0),
-        available: true,
-      },
-    });
-    bookingId = (await makeBooking(seller.id)).id;
-    bookingId2 = (await makeBooking(seller.id)).id;
+    propertyId = property.id;
+    roomId = (
+      await prisma.room.create({ data: { propertyId, name: "Oda", capacity: 2, bedType: "Çift" } })
+    ).id;
   });
 
   afterAll(async () => {
-    await prisma.bookingTransfer.deleteMany({
-      where: { bookingId: { in: [bookingId, bookingId2] } },
-    });
-    await prisma.booking.deleteMany({ where: { id: { in: [bookingId, bookingId2] } } });
-    const propHost = await prisma.property.findUnique({
-      where: { id: property.id },
-      select: { hostId: true },
-    });
-    await prisma.room.deleteMany({ where: { propertyId: property.id } });
-    await prisma.property.deleteMany({ where: { id: property.id } });
-    await prisma.location.deleteMany({ where: { city: { startsWith: "TransCity-" } } });
-    await prisma.user.deleteMany({
-      where: { id: { in: [seller.id, buyer.id, propHost?.hostId ?? "x"] } },
-    });
     await prisma.$disconnect();
   });
 
-  describe("P2P Booking Transfer", () => {
-    it("listeleme jeton üretir; alıcı devralır; çift talep reddedilir", async () => {
-      const listed = await listBookingForTransfer(bookingId, seller.id, 2200);
-      expect(listed.id).toBeTruthy();
-      expect(listed.transferToken).toBeTruthy();
-      // jeton imzası + süre doğrulanabilir
-      const parsed = verifyTransferToken(listed.transferToken);
-      expect(parsed?.bookingId).toBe(bookingId);
-      expect(parsed?.sellerId).toBe(seller.id);
+  it("token yalnızca özetiyle saklanır; listeler token sızdırmaz", async () => {
+    const bookingId = await confirmedBooking();
+    const listed = await listBookingForTransfer(bookingId, seller, 200_000);
+    const row = await prisma.bookingTransfer.findUniqueOrThrow({ where: { id: listed.id } });
+    expect(JSON.stringify(row)).not.toContain(listed.claimToken);
+    expect(JSON.stringify(await listMyTransfers(seller))).not.toContain("tokenHash");
+    const discovered = await discoverTransfers();
+    const mine = discovered.find((d) => d.id === listed.id);
+    expect(mine?.seller).toBe("s*** T.");
+  });
 
-      const claimed = await claimTransfer(listed.id, buyer.id);
-      expect(claimed.status).toBe("COMPLETED");
+  it("token'sız / sahte token ile claim 403", async () => {
+    await expect(
+      claimTransfer({ token: "sahte.token", buyerId: buyer, cardToken: "tok_mock_ok_4242" })
+    ).rejects.toMatchObject({ status: 403 });
+  });
 
-      // sahiplik devri: booking artık alıcıya ait
-      const b = await prisma.booking.findUnique({ where: { id: bookingId } });
-      expect(b?.userId).toBe(buyer.id);
+  it("claim: ödeme alınır, sahiplik + ödeme kaydı alıcıya geçer; aynı token ikinci kez 409", async () => {
+    const bookingId = await confirmedBooking();
+    const listed = await listBookingForTransfer(bookingId, seller, 200_000);
+    const res = await claimTransfer({
+      token: listed.claimToken,
+      buyerId: buyer,
+      cardToken: "tok_mock_ok_4242",
+    });
+    expect(res.status).toBe("COMPLETED");
+    const b = await prisma.booking.findUniqueOrThrow({
+      where: { id: bookingId },
+      include: { payment: true },
+    });
+    expect(b.userId).toBe(buyer);
+    expect(b.payment?.userId).toBe(buyer);
+    const ledger = await prisma.ledgerEntry.findMany({
+      where: { bookingId },
+      orderBy: { kind: "asc" },
+    });
+    expect(ledger.map((l) => l.kind).sort()).toEqual(["TRANSFER_PAYMENT", "TRANSFER_PAYOUT"]);
+    await expect(
+      claimTransfer({ token: listed.claimToken, buyerId: buyer2, cardToken: "tok_mock_ok_4242" })
+    ).rejects.toMatchObject({ status: 409 });
+  });
 
-      // aynı transferi tekrar talep etmek çift-talep değil → 409/404
-      await expect(claimTransfer(listed.id, seller.id)).rejects.toThrow();
-    }, 30000);
+  it("eşzamanlı 2 claim → tam 1 başarı", async () => {
+    const bookingId = await confirmedBooking(40);
+    const listed = await listBookingForTransfer(bookingId, seller, 150_000);
+    const results = await Promise.allSettled([
+      claimTransfer({ token: listed.claimToken, buyerId: buyer, cardToken: "tok_mock_ok_4242" }),
+      claimTransfer({ token: listed.claimToken, buyerId: buyer2, cardToken: "tok_mock_ok_4242" }),
+    ]);
+    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+  });
 
-    it("satıcı olmayan listeleme yapamaz + adil fiyat üst sınırı uygulanır", async () => {
-      // satıcı olmayan biri listelerse BOLA → 404
-      await expect(listBookingForTransfer(bookingId2, buyer.id, 1000)).rejects.toThrow(
-        TransferError
-      );
-      // adil üst sınır aşımı (2000 * 1.35 = 2700 üstü)
-      await expect(listBookingForTransfer(bookingId2, seller.id, 3000)).rejects.toThrow(
-        TransferError
-      );
+  it("ödeme reddi → sahiplik değişmez", async () => {
+    const bookingId = await confirmedBooking(50);
+    const listed = await listBookingForTransfer(bookingId, seller, 100_000);
+    await expect(
+      claimTransfer({
+        token: listed.claimToken,
+        buyerId: buyer,
+        cardToken: "tok_mock_decline_0002",
+      })
+    ).rejects.toMatchObject({ status: 402 });
+    expect((await prisma.booking.findUniqueOrThrow({ where: { id: bookingId } })).userId).toBe(
+      seller
+    );
+    expect(
+      (await prisma.bookingTransfer.findUniqueOrThrow({ where: { id: listed.id } })).status
+    ).toBe("LISTED");
+  });
+
+  it("kurallar: satıcı olmayan 404, fiyat sınırı (oran 1.0), girişe yakın rezervasyon reddedilir", async () => {
+    const bookingId = await confirmedBooking(60);
+    await expect(listBookingForTransfer(bookingId, buyer, 100_000)).rejects.toMatchObject({
+      status: 404,
+    });
+    await expect(listBookingForTransfer(bookingId, seller, 200_001)).rejects.toMatchObject({
+      code: "ASK_TOO_HIGH",
+    });
+    const soon = await confirmedBooking(1);
+    await expect(listBookingForTransfer(soon, seller, 100_000)).rejects.toMatchObject({
+      code: "TOO_LATE",
     });
   });
 });

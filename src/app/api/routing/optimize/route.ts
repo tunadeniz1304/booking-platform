@@ -5,7 +5,10 @@ import { CityNode, optimizeRoute } from "@/lib/routing/optimizer";
 export async function GET(req: NextRequest) {
   const sp = new URL(req.url).searchParams;
   const origin = sp.get("origin") ?? "";
-  const cities = (sp.get("cities") ?? "").split(",").map((c) => c.trim()).filter(Boolean);
+  const cities = (sp.get("cities") ?? "")
+    .split(",")
+    .map((c) => c.trim())
+    .filter(Boolean);
   if (!origin || cities.length === 0) {
     return NextResponse.json({ error: "origin ve cities gerekli" }, { status: 400 });
   }

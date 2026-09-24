@@ -4,9 +4,7 @@ import { Redis as UpstashRedis } from "@upstash/redis";
 const redisUrl = process.env.REDIS_URL || "redis://localhost:6379";
 const useIoRedis = redisUrl.startsWith("redis://");
 
-const ioredisClient = useIoRedis
-  ? new IORedis(redisUrl, { maxRetriesPerRequest: null })
-  : null;
+const ioredisClient = useIoRedis ? new IORedis(redisUrl, { maxRetriesPerRequest: null }) : null;
 const upstashClient = !useIoRedis
   ? new UpstashRedis({ url: redisUrl, token: process.env.REDIS_TOKEN || "" })
   : null;
@@ -73,8 +71,7 @@ export function buildRedisClient(): RedisClient {
       del: (...keys) => c.del(...keys),
       keys: (pattern) => c.keys(pattern),
       ttl: (key) => c.ttl(key),
-      exists: (key) =>
-        c.exists(key).then((v) => (typeof v === "number" ? v : v ? 1 : 0)),
+      exists: (key) => c.exists(key).then((v) => (typeof v === "number" ? v : v ? 1 : 0)),
       llen: (key) => c.llen(key),
       lpush: (key, ...values) => c.lpush(key, ...values),
       rpush: (key, ...values) => c.rpush(key, ...values),

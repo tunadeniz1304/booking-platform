@@ -21,10 +21,7 @@ export async function GET(req: NextRequest) {
       page: Number.isFinite(page) && page > 0 ? page : 1,
       pageSize: Number.isFinite(pageSize) && pageSize > 0 ? Math.min(pageSize, 50) : 12,
       sort: (searchParams.get("sort") ?? "recommended") as
-        | "price_asc"
-        | "price_desc"
-        | "rating"
-        | "recommended",
+        "price_asc" | "price_desc" | "rating" | "recommended",
       semantic: searchParams.get("semantic") === "1" || searchParams.get("semantic") === "true",
       userId: req.headers.get("x-user-id") ?? undefined,
     };

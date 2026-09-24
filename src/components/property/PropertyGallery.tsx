@@ -41,9 +41,7 @@ export default function PropertyGallery({ images, title }: PropertyGalleryProps)
               type="button"
               onClick={() => setActiveIndex(index)}
               className={`relative aspect-[4/3] overflow-hidden rounded-lg transition ${
-                index === activeIndex
-                  ? "ring-2 ring-primary-600"
-                  : "opacity-70 hover:opacity-100"
+                index === activeIndex ? "ring-2 ring-primary-600" : "opacity-70 hover:opacity-100"
               }`}
             >
               <Image

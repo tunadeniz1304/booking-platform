@@ -8,18 +8,19 @@ Booking.com ölçeğinde, yüksek trafik kaldırabilen ve eşzamanlı rezervasyo
 
 ## 2. Teknoloji Yığını
 
-| Katman | Teknoloji |
-|--------|-----------|
-| Frontend | Next.js 14 (App Router), React 18, Tailwind CSS |
-| Backend | Next.js Route Handlers + `src/lib/*` servisleri |
-| Veritabanı | PostgreSQL 16 + Prisma ORM |
-| Cache/Kilit/Kuyruk | Redis 7 (ioredis/Upstash), BullMQ |
-| Auth | JWT (HS256) + bcryptjs, httpOnly cookie + Bearer |
-| Infra | Docker Compose, GitHub Actions |
+| Katman             | Teknoloji                                        |
+| ------------------ | ------------------------------------------------ |
+| Frontend           | Next.js 14 (App Router), React 18, Tailwind CSS  |
+| Backend            | Next.js Route Handlers + `src/lib/*` servisleri  |
+| Veritabanı         | PostgreSQL 16 + Prisma ORM                       |
+| Cache/Kilit/Kuyruk | Redis 7 (ioredis/Upstash), BullMQ                |
+| Auth               | JWT (HS256) + bcryptjs, httpOnly cookie + Bearer |
+| Infra              | Docker Compose, GitHub Actions                   |
 
 ## 3. Kullanıcı Hikayeleri
 
 ### 3.1 Misafir (Kullanıcı)
+
 - Şehir/tarih/misafir sayısına göre konaklama aramak.
 - Konaklama detaylarını (fotoğraf, olanaklar, oda seçenekleri) görüntülemek.
 - Uygun odayı seçip rezervasyon oluşturmak.
@@ -27,10 +28,12 @@ Booking.com ölçeğinde, yüksek trafik kaldırabilen ve eşzamanlı rezervasyo
 - Konaklamaları favorilerine eklemek.
 
 ### 3.2 Ev Sahibi (Host)
+
 - Konaklama ilanı oluşturmak.
 - Oda ve fiyat bilgilerini yönetmek.
 
 ### 3.3 Yönetici (Admin)
+
 - Kullanıcıları ve ilanları yönetmek.
 
 ## 4. Fonksiyonel Gereksinimler (MVP)
@@ -55,6 +58,7 @@ Booking.com ölçeğinde, yüksek trafik kaldırabilen ve eşzamanlı rezervasyo
 ## 6. Mimariden Bağımsız Kararlar
 
 Detaylı mimari ve API sözleşmesi güncel kaynaklardır:
+
 - [Mimari Dokümanı](architecture.md)
 - [API Sözleşmesi](api-contract.md)
 

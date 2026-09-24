@@ -147,8 +147,24 @@ export class CircuitBreaker {
 
 /** Yaygın dış bağımlılıklar için uygulama-çapı breaker'lar. */
 export const breakers = {
-  search: new CircuitBreaker("search-pgvector", { failureThreshold: 3, windowMs: 20_000, cooldownMs: 10_000 }),
-  pricing: new CircuitBreaker("pricing-engine", { failureThreshold: 5, windowMs: 20_000, cooldownMs: 10_000 }),
-  grpc: new CircuitBreaker("grpc-internal", { failureThreshold: 3, windowMs: 15_000, cooldownMs: 10_000 }),
-  redisCache: new CircuitBreaker("redis-cache", { failureThreshold: 8, windowMs: 30_000, cooldownMs: 15_000 }),
+  search: new CircuitBreaker("search-pgvector", {
+    failureThreshold: 3,
+    windowMs: 20_000,
+    cooldownMs: 10_000,
+  }),
+  pricing: new CircuitBreaker("pricing-engine", {
+    failureThreshold: 5,
+    windowMs: 20_000,
+    cooldownMs: 10_000,
+  }),
+  grpc: new CircuitBreaker("grpc-internal", {
+    failureThreshold: 3,
+    windowMs: 15_000,
+    cooldownMs: 10_000,
+  }),
+  redisCache: new CircuitBreaker("redis-cache", {
+    failureThreshold: 8,
+    windowMs: 30_000,
+    cooldownMs: 15_000,
+  }),
 };

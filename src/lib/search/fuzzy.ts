@@ -16,10 +16,7 @@ export interface FuzzyCandidate {
 const SIMILARITY_THRESHOLD = 0.2;
 const MAX_WORDS = 4;
 
-export async function findFuzzyCandidates(
-  query: string,
-  limit = 30
-): Promise<FuzzyCandidate[]> {
+export async function findFuzzyCandidates(query: string, limit = 30): Promise<FuzzyCandidate[]> {
   const words = query
     .toLocaleLowerCase("tr-TR")
     .split(/\s+/)
@@ -28,7 +25,10 @@ export async function findFuzzyCandidates(
   if (words.length === 0) return [];
 
   // mülkId -> en iyi (skor, alan) haritası
-  const best = new Map<string, { similarity: number; matchedField: FuzzyCandidate["matchedField"] }>();
+  const best = new Map<
+    string,
+    { similarity: number; matchedField: FuzzyCandidate["matchedField"] }
+  >();
 
   for (const word of words) {
     const rows = await prisma.$queryRaw<

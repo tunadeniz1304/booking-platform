@@ -11,8 +11,27 @@
 export const EMBEDDING_DIM = 128;
 
 const stopWords = new Set([
-  "ve", "bir", "ile", "için", "bu", "da", "de", "en", "çok", "olan",
-  "the", "a", "an", "of", "for", "in", "on", "to", "and", "is", "at",
+  "ve",
+  "bir",
+  "ile",
+  "için",
+  "bu",
+  "da",
+  "de",
+  "en",
+  "çok",
+  "olan",
+  "the",
+  "a",
+  "an",
+  "of",
+  "for",
+  "in",
+  "on",
+  "to",
+  "and",
+  "is",
+  "at",
 ]);
 
 function tokenize(text: string): string[] {

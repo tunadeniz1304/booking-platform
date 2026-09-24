@@ -86,9 +86,7 @@ export class Redlock {
       await sleep(retryDelayMs + jitter);
     }
 
-    throw new LockError(
-      `Lock "${resource}" acquired after ${retryCount + 1} attempts`
-    );
+    throw new LockError(`Lock "${resource}" acquired after ${retryCount + 1} attempts`);
   }
 
   /**
@@ -126,10 +124,11 @@ export class Redlock {
   async renew(handle: LockHandle, ttlMs?: number): Promise<boolean> {
     const ttl = ttlMs ?? handle.ttlMs;
     if (this.redis.eval) {
-      const result = await this.redis.eval(TOUCH_SCRIPT, [handle.resource], [
-        handle.token,
-        String(ttl),
-      ]);
+      const result = await this.redis.eval(
+        TOUCH_SCRIPT,
+        [handle.resource],
+        [handle.token, String(ttl)]
+      );
       return Number(result) === 1;
     }
     return false;
@@ -157,11 +156,14 @@ export class Redlock {
     const renewInterval = renewEveryMs ?? handle.ttlMs / 3;
 
     try {
-      renewTimer = setInterval(() => {
-        this.renew(handle).catch(() => {
-          // Yenilenemezse işlem TTL'de kendiliğinden çözülür; yarış yeniden başlar.
-        });
-      }, Math.min(renewInterval, handle.ttlMs / 2));
+      renewTimer = setInterval(
+        () => {
+          this.renew(handle).catch(() => {
+            // Yenilenemezse işlem TTL'de kendiliğinden çözülür; yarış yeniden başlar.
+          });
+        },
+        Math.min(renewInterval, handle.ttlMs / 2)
+      );
 
       return await fn(handle);
     } finally {

@@ -8,11 +8,7 @@ export const metadata: Metadata = {
     "Konaklama arayın, karşılaştırın ve rezervasyon yapın. Oteller, daireler, villalar ve daha fazlası.",
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: ReactNode;
-}) {
+export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="tr">
       <body>{children}</body>

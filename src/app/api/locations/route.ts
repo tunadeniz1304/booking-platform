@@ -8,14 +8,15 @@ export async function GET(req: NextRequest) {
     const q = (searchParams.get("q") ?? "").trim();
 
     const results = await prisma.location.findMany({
-      where: q.length >= 2
-        ? {
-            OR: [
-              { city: { contains: q, mode: "insensitive" as Prisma.QueryMode } },
-              { country: { contains: q, mode: "insensitive" as Prisma.QueryMode } },
-            ],
-          }
-        : undefined,
+      where:
+        q.length >= 2
+          ? {
+              OR: [
+                { city: { contains: q, mode: "insensitive" as Prisma.QueryMode } },
+                { country: { contains: q, mode: "insensitive" as Prisma.QueryMode } },
+              ],
+            }
+          : undefined,
       select: { city: true, country: true },
       orderBy: { city: "asc" },
       take: 20,

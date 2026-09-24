@@ -17,10 +17,7 @@ export async function POST(req: NextRequest) {
   try {
     // Zaten giriş yapmış kullanıcı tekrar kayıt olamaz
     if (getUserFromRequest(req)) {
-      return NextResponse.json(
-        { error: "Zaten giriş yapmış durumdasınız" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Zaten giriş yapmış durumdasınız" }, { status: 400 });
     }
 
     const body = await req.json();
@@ -36,10 +33,7 @@ export async function POST(req: NextRequest) {
 
     const existing = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
     if (existing) {
-      return NextResponse.json(
-        { error: "Bu e-posta adresi zaten kayıtlı" },
-        { status: 409 }
-      );
+      return NextResponse.json({ error: "Bu e-posta adresi zaten kayıtlı" }, { status: 409 });
     }
 
     const passwordHash = await hashPassword(password);

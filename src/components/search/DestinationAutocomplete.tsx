@@ -29,10 +29,7 @@ interface DestinationAutocompleteProps {
   onChange: (value: string) => void;
 }
 
-export default function DestinationAutocomplete({
-  value,
-  onChange,
-}: DestinationAutocompleteProps) {
+export default function DestinationAutocomplete({ value, onChange }: DestinationAutocompleteProps) {
   const [options, setOptions] = useState<LocationOption[]>([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -73,9 +70,15 @@ export default function DestinationAutocomplete({
         });
         if (cancelled || !res.ok) return;
         const data = (await res.json()) as LocationOption[];
-        setOptions(data.length > 0 ? data.slice(0, 8) : POPULAR_FALLBACK.filter((p) =>
-          p.city.toLowerCase().includes(query.toLowerCase()) || p.country.toLowerCase().includes(query.toLowerCase())
-        ));
+        setOptions(
+          data.length > 0
+            ? data.slice(0, 8)
+            : POPULAR_FALLBACK.filter(
+                (p) =>
+                  p.city.toLowerCase().includes(query.toLowerCase()) ||
+                  p.country.toLowerCase().includes(query.toLowerCase())
+              )
+        );
       } catch (err) {
         if ((err as Error).name === "AbortError") return;
         setOptions([]);
@@ -112,7 +115,12 @@ export default function DestinationAutocomplete({
             strokeWidth={2}
             d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
           />
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+          />
         </svg>
         <input
           id="destination"
@@ -140,7 +148,11 @@ export default function DestinationAutocomplete({
           className="absolute left-0 right-0 z-20 mt-1 max-h-72 overflow-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
         >
           <li className="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
-            {value.trim().length === 0 ? "Popüler destinasyonlar" : loading ? "Aranıyor..." : "Öneriler"}
+            {value.trim().length === 0
+              ? "Popüler destinasyonlar"
+              : loading
+                ? "Aranıyor..."
+                : "Öneriler"}
           </li>
           {options.length === 0 && !loading && (
             <li className="px-4 py-3 text-sm text-gray-500">Sonuç bulunamadı</li>
@@ -154,9 +166,25 @@ export default function DestinationAutocomplete({
                 onClick={() => selectOption(opt)}
                 className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-gray-800 transition hover:bg-blue-50"
               >
-                <svg className="h-4 w-4 shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                <svg
+                  className="h-4 w-4 shrink-0 text-gray-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                  />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+                  />
                 </svg>
                 <span className="font-medium">{opt.city}</span>
                 <span className="text-gray-500">{opt.country}</span>

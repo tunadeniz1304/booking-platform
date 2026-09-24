@@ -104,9 +104,7 @@ function validateDateRange(checkIn: Date, checkOut: Date): void {
   }
 
   const maxStayDays = 30;
-  const stayDays = Math.round(
-    (checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24)
-  );
+  const stayDays = Math.round((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
   if (stayDays > maxStayDays) {
     throw new BookingValidationError(`Konaklama ${maxStayDays} günü aşamaz`);
   }
@@ -203,9 +201,7 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingR
             });
 
             if (!room) {
-              throw new BookingValidationError(
-                "Oda bulunamadı, uygun değil veya kapasite aşıldı"
-              );
+              throw new BookingValidationError("Oda bulunamadı, uygun değil veya kapasite aşıldı");
             }
 
             const availabilityRows = await tx.$queryRaw<
@@ -222,9 +218,7 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingR
             `;
 
             if (availabilityRows.length !== dates.length) {
-              throw new BookingConflictError(
-                "Oda seçilen tarihler için uygun değil"
-              );
+              throw new BookingConflictError("Oda seçilen tarihler için uygun değil");
             }
 
             const totalPrice =
@@ -413,18 +407,13 @@ export async function cancelBooking(bookingId: string, userId: string): Promise<
       // Transactional Outbox: iptal olayı stok serbest bırakma ile atomik
       await appendOutbox(
         tx,
-        makeEvent<BookingCancelledPayload>(
-          EventTypes.BookingCancelled,
+        makeEvent<BookingCancelledPayload>(EventTypes.BookingCancelled, bookingId, "booking", {
           bookingId,
-          "booking",
-          {
-            bookingId,
-            propertyId: booking.propertyId,
-            roomId: booking.roomId,
-            checkIn: booking.checkIn.toISOString().slice(0, 10),
-            checkOut: booking.checkOut.toISOString().slice(0, 10),
-          }
-        )
+          propertyId: booking.propertyId,
+          roomId: booking.roomId,
+          checkIn: booking.checkIn.toISOString().slice(0, 10),
+          checkOut: booking.checkOut.toISOString().slice(0, 10),
+        })
       );
 
       return booking.propertyId;
@@ -478,8 +467,10 @@ export async function getBooking(bookingId: string, userId: string) {
   }
 
   // BOLA: kaynağa yalnız sahibi erişebilir (IDOR koruması)
-  requireOwnership(booking.userId, userId, () =>
-    new BookingUnauthorizedError("Bu rezervasyona erişim yetkiniz yok")
+  requireOwnership(
+    booking.userId,
+    userId,
+    () => new BookingUnauthorizedError("Bu rezervasyona erişim yetkiniz yok")
   );
 
   try {

@@ -8,10 +8,7 @@ import {
 } from "@/lib/booking-service";
 import { getUserIdFromRequest } from "@/lib/auth";
 
-export async function GET(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
     const userId = getUserIdFromRequest(req);
@@ -22,10 +19,7 @@ export async function GET(
   }
 }
 
-export async function DELETE(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
     const userId = getUserIdFromRequest(req);

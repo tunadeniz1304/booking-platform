@@ -91,14 +91,29 @@ export default function SearchBar() {
             aria-expanded={dateOpen}
             className="flex w-full items-center gap-2 rounded-sm border border-gray-300 bg-white px-3 py-2.5 text-left text-sm text-gray-900 hover:border-[#003580]"
           >
-            <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            <svg
+              className="h-5 w-5 text-gray-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+              />
             </svg>
             <span>{dateSummary}</span>
           </button>
           {dateOpen && (
             <div className="absolute left-0 right-0 z-30 mt-1 lg:right-auto lg:w-[560px]">
-              <DateRangePicker value={{ checkIn, checkOut }} onChange={handleDateChange} monthCount={2} />
+              <DateRangePicker
+                value={{ checkIn, checkOut }}
+                onChange={handleDateChange}
+                monthCount={2}
+              />
             </div>
           )}
         </div>
@@ -112,8 +127,19 @@ export default function SearchBar() {
             aria-expanded={guestsOpen}
             className="flex w-full items-center gap-2 rounded-sm border border-gray-300 bg-white px-3 py-2.5 text-left text-sm text-gray-900 hover:border-[#003580]"
           >
-            <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            <svg
+              className="h-5 w-5 text-gray-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+              />
             </svg>
             <span>
               {totalGuests} misafir · {roomsCount} oda
@@ -127,9 +153,23 @@ export default function SearchBar() {
                   <p className="text-xs text-gray-500">13 yaş ve üzeri</p>
                 </div>
                 <div className="flex items-center gap-3">
-                  <button type="button" onClick={() => setAdults(Math.max(1, adults - 1))} aria-label="Azalt" className="h-8 w-8 rounded-full border border-gray-300 text-gray-700 hover:bg-gray-50">−</button>
+                  <button
+                    type="button"
+                    onClick={() => setAdults(Math.max(1, adults - 1))}
+                    aria-label="Azalt"
+                    className="h-8 w-8 rounded-full border border-gray-300 text-gray-700 hover:bg-gray-50"
+                  >
+                    −
+                  </button>
                   <span className="w-6 text-center text-sm font-semibold">{adults}</span>
-                  <button type="button" onClick={() => setAdults(Math.min(30, adults + 1))} aria-label="Artır" className="h-8 w-8 rounded-full border border-gray-300 text-gray-700 hover:bg-gray-50">+</button>
+                  <button
+                    type="button"
+                    onClick={() => setAdults(Math.min(30, adults + 1))}
+                    aria-label="Artır"
+                    className="h-8 w-8 rounded-full border border-gray-300 text-gray-700 hover:bg-gray-50"
+                  >
+                    +
+                  </button>
                 </div>
               </div>
               <div className="flex items-center justify-between border-t border-gray-100 py-2">
@@ -138,17 +178,45 @@ export default function SearchBar() {
                   <p className="text-xs text-gray-500">0-12 yaş</p>
                 </div>
                 <div className="flex items-center gap-3">
-                  <button type="button" onClick={() => setChildren(Math.max(0, children - 1))} aria-label="Azalt" className="h-8 w-8 rounded-full border border-gray-300 text-gray-700 hover:bg-gray-50">−</button>
+                  <button
+                    type="button"
+                    onClick={() => setChildren(Math.max(0, children - 1))}
+                    aria-label="Azalt"
+                    className="h-8 w-8 rounded-full border border-gray-300 text-gray-700 hover:bg-gray-50"
+                  >
+                    −
+                  </button>
                   <span className="w-6 text-center text-sm font-semibold">{children}</span>
-                  <button type="button" onClick={() => setChildren(Math.min(10, children + 1))} aria-label="Artır" className="h-8 w-8 rounded-full border border-gray-300 text-gray-700 hover:bg-gray-50">+</button>
+                  <button
+                    type="button"
+                    onClick={() => setChildren(Math.min(10, children + 1))}
+                    aria-label="Artır"
+                    className="h-8 w-8 rounded-full border border-gray-300 text-gray-700 hover:bg-gray-50"
+                  >
+                    +
+                  </button>
                 </div>
               </div>
               <div className="flex items-center justify-between border-t border-gray-100 py-2">
                 <p className="text-sm font-medium text-gray-900">Odalar</p>
                 <div className="flex items-center gap-3">
-                  <button type="button" onClick={() => setRoomsCount(Math.max(1, roomsCount - 1))} aria-label="Azalt" className="h-8 w-8 rounded-full border border-gray-300 text-gray-700 hover:bg-gray-50">−</button>
+                  <button
+                    type="button"
+                    onClick={() => setRoomsCount(Math.max(1, roomsCount - 1))}
+                    aria-label="Azalt"
+                    className="h-8 w-8 rounded-full border border-gray-300 text-gray-700 hover:bg-gray-50"
+                  >
+                    −
+                  </button>
                   <span className="w-6 text-center text-sm font-semibold">{roomsCount}</span>
-                  <button type="button" onClick={() => setRoomsCount(Math.min(30, roomsCount + 1))} aria-label="Artır" className="h-8 w-8 rounded-full border border-gray-300 text-gray-700 hover:bg-gray-50">+</button>
+                  <button
+                    type="button"
+                    onClick={() => setRoomsCount(Math.min(30, roomsCount + 1))}
+                    aria-label="Artır"
+                    className="h-8 w-8 rounded-full border border-gray-300 text-gray-700 hover:bg-gray-50"
+                  >
+                    +
+                  </button>
                 </div>
               </div>
             </div>

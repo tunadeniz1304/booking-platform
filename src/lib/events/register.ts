@@ -1,9 +1,5 @@
 import { eventBus } from "@/lib/cqrs";
-import {
-  EventTypes,
-  BookingCreatedPayload,
-  BookingCancelledPayload,
-} from "./events";
+import { EventTypes, BookingCreatedPayload, BookingCancelledPayload } from "./events";
 import { invalidatePropertySearchCache } from "@/lib/search";
 import { invalidatePriceCache } from "@/lib/pricing-service";
 import { redis } from "@/lib/redis";

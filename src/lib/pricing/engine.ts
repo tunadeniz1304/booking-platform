@@ -119,8 +119,7 @@ export async function loadDemandImpact(
     const end = new Date(event.endsAt);
     // Etkinlik penceresinin hedef günle kesişimi
     const inWindow =
-      date.getTime() >= start.getTime() - 2 * dayMs &&
-      date.getTime() <= end.getTime() + 1 * dayMs;
+      date.getTime() >= start.getTime() - 2 * dayMs && date.getTime() <= end.getTime() + 1 * dayMs;
     const daysBefore = Math.round((start.getTime() - date.getTime()) / dayMs);
     // 10 gün önceden doğrusal sönüm
     const decay = inWindow ? 1 : Math.max(0, 1 - Math.max(0, daysBefore) / 10);
@@ -158,11 +157,7 @@ export function computeDynamicPrice(
   );
 
   // Birleşik talep sinyali (0..1): etc. payı baskın, ama occupancy da sinyale karışır
-  const demandSignal = clamp(
-    0.5 * demand.demandSignal + 0.5 * occupancyRate,
-    0,
-    1
-  );
+  const demandSignal = clamp(0.5 * demand.demandSignal + 0.5 * occupancyRate, 0, 1);
 
   return {
     roomId: input.roomId,
@@ -182,9 +177,7 @@ export function computeDynamicPrice(
   };
 }
 
-export async function calculateDynamicPrice(
-  input: DynamicPricingInput
-): Promise<PricingResult> {
+export async function calculateDynamicPrice(input: DynamicPricingInput): Promise<PricingResult> {
   let locationId = input.locationId;
   if (!locationId) {
     const property = await prisma.property.findUnique({

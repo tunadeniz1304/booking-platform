@@ -47,9 +47,7 @@ function verifyJwt(token: string): VerifiedClaims | null {
  * İsteği doğrula: Bearer başlığı veya `token` çerezi.
  * Geçersizse null döner (route kendi 401'ini üretir).
  */
-export function getUserFromRequest(
-  req: NextRequest
-): { userId: string; role: string } | null {
+export function getUserFromRequest(req: NextRequest): { userId: string; role: string } | null {
   const authHeader = req.headers.get("authorization");
   const bearer = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
   const cookieToken = req.cookies.get("token")?.value ?? null;
@@ -74,10 +72,7 @@ export function getUserIdFromRequest(req: NextRequest): string {
   return user.userId;
 }
 
-export function requireRole(
-  req: NextRequest,
-  roles: string[]
-): { userId: string; role: string } {
+export function requireRole(req: NextRequest, roles: string[]): { userId: string; role: string } {
   const user = getUserFromRequest(req);
   if (!user?.userId) {
     throw new Error("Missing or invalid token");

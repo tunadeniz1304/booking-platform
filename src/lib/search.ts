@@ -67,10 +67,7 @@ export interface SearchResponse {
   semantic?: boolean;
 }
 
-function buildWhere(
-  params: SearchParams,
-  includeQuery = true
-): Prisma.PropertyWhereInput {
+function buildWhere(params: SearchParams, includeQuery = true): Prisma.PropertyWhereInput {
   const where: Prisma.PropertyWhereInput = {
     isActive: true,
   };
@@ -193,13 +190,16 @@ function buildCacheKey(params: SearchParams): string {
 }
 
 /** Sorgu kelimesi metin alanlarında geçiyor mu (semantik skordaki keyword bileşeni). */
-function matchesKeyword(property: {
-  title: string;
-  description: string;
-  city: string;
-  country: string;
-  amenities: Array<{ name: string }>;
-}, query: string): boolean {
+function matchesKeyword(
+  property: {
+    title: string;
+    description: string;
+    city: string;
+    country: string;
+    amenities: Array<{ name: string }>;
+  },
+  query: string
+): boolean {
   const q = query.toLocaleLowerCase("tr-TR");
   const haystack = [
     property.title,
@@ -218,9 +218,7 @@ function matchesKeyword(property: {
  * Aday havuzu vektör benzerliğiyle kurulur; filtreler bu havuz üzerinde
  * uygulanır; nihai sıralama harmanlanmış skorla yapılır.
  */
-async function semanticSearchProperties(
-  params: SearchParams
-): Promise<SearchResponse | null> {
+async function semanticSearchProperties(params: SearchParams): Promise<SearchResponse | null> {
   if (!params.query || !(await isVectorEnabled())) return null;
   const query = params.query;
 
@@ -412,15 +410,16 @@ export async function searchProperties(params: SearchParams): Promise<SearchResp
             id: true,
             priceModifier: true,
             availabilities: {
-              where: params.checkIn && params.checkOut
-                ? {
-                    date: {
-                      gte: new Date(params.checkIn),
-                      lt: new Date(params.checkOut),
-                    },
-                    isAvailable: true,
-                  }
-                : undefined,
+              where:
+                params.checkIn && params.checkOut
+                  ? {
+                      date: {
+                        gte: new Date(params.checkIn),
+                        lt: new Date(params.checkOut),
+                      },
+                      isAvailable: true,
+                    }
+                  : undefined,
               select: {
                 price: true,
               },

@@ -54,9 +54,10 @@ export async function indexProperty(propertyId: string): Promise<boolean> {
     city: property.location.city,
     country: property.location.country,
     amenities: property.amenities.map((a) => a.name),
-    location: property.location.latitude && property.location.longitude
-      ? { lat: property.location.latitude, lon: property.location.longitude }
-      : null,
+    location:
+      property.location.latitude && property.location.longitude
+        ? { lat: property.location.latitude, lon: property.location.longitude }
+        : null,
   };
 
   const res = await esFetch(`_index/${INDEX}/_doc/${property.id}`, {
@@ -72,10 +73,7 @@ export interface EsSearchHit {
 }
 
 /** Fuzzy (fuzziness=AUTO) + skor sıralamalı metin araması. */
-export async function esFuzzySearch(
-  query: string,
-  size = 30
-): Promise<EsSearchHit[] | null> {
+export async function esFuzzySearch(query: string, size = 30): Promise<EsSearchHit[] | null> {
   if (!elasticEnabled) return null;
   const body = {
     query: {

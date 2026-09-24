@@ -4,14 +4,14 @@ Booking.com ölçeğinde, yüksek eşzamanlılık kaldırabilen ve veri tutarlı
 
 ## Teknoloji Yığını
 
-| Katman | Teknoloji |
-|--------|-----------|
-| Frontend | Next.js 14 (App Router), React 18, Tailwind CSS |
-| Backend | Next.js Route Handlers, TypeScript `src/lib/*` servisleri |
-| Veritabanı | PostgreSQL 16 + Prisma ORM |
-| Cache / Kilit / Kuyruk | Redis 7, BullMQ |
-| Auth | JWT (HS256) + bcryptjs, httpOnly cookie + Bearer |
-| Infra | Docker Compose, GitHub Actions |
+| Katman                 | Teknoloji                                                 |
+| ---------------------- | --------------------------------------------------------- |
+| Frontend               | Next.js 14 (App Router), React 18, Tailwind CSS           |
+| Backend                | Next.js Route Handlers, TypeScript `src/lib/*` servisleri |
+| Veritabanı             | PostgreSQL 16 + Prisma ORM                                |
+| Cache / Kilit / Kuyruk | Redis 7, BullMQ                                           |
+| Auth                   | JWT (HS256) + bcryptjs, httpOnly cookie + Bearer          |
+| Infra                  | Docker Compose, GitHub Actions                            |
 
 ## Mimari
 
@@ -51,28 +51,28 @@ Uygulama: http://localhost:3000
 
 ### Örnek hesaplar (seed)
 
-| Rol | E-posta | Parola |
-|-----|---------|--------|
-| Admin | admin@booking.test | `Password123!` |
-| Host | host@booking.test | `Password123!` |
+| Rol       | E-posta            | Parola         |
+| --------- | ------------------ | -------------- |
+| Admin     | admin@booking.test | `Password123!` |
+| Host      | host@booking.test  | `Password123!` |
 | Kullanıcı | guest@booking.test | `Password123!` |
 
 ## Scriptler
 
-| Komut | Açıklama |
-|-------|----------|
-| `npm run dev` | Geliştirme sunucusu |
-| `npm run build` | Üretim build'i |
-| `npm run start` | Üretim sunucusu |
-| `npm run lint` | ESLint |
-| `npm test` | Vitest (concurrency/idempotency) |
-| `npm run db:migrate` | Prisma migrate deploy |
-| `npm run db:seed` | Örnek veri |
-| `npm run db:up` | Docker ile db+redis ayağa kaldır |
-| `npm run worker` | Arka plan işçisi (outbox relay + pricing) |
-| `npm run grpc:server` | Bağımsız gRPC sunucusu |
-| `npm run grpc:client` | gRPC istemci bağlantı testi |
-| `npm run embeddings:backfill` | pgvector gömme (yeniden) hesaplama |
+| Komut                         | Açıklama                                  |
+| ----------------------------- | ----------------------------------------- |
+| `npm run dev`                 | Geliştirme sunucusu                       |
+| `npm run build`               | Üretim build'i                            |
+| `npm run start`               | Üretim sunucusu                           |
+| `npm run lint`                | ESLint                                    |
+| `npm test`                    | Vitest (concurrency/idempotency)          |
+| `npm run db:migrate`          | Prisma migrate deploy                     |
+| `npm run db:seed`             | Örnek veri                                |
+| `npm run db:up`               | Docker ile db+redis ayağa kaldır          |
+| `npm run worker`              | Arka plan işçisi (outbox relay + pricing) |
+| `npm run grpc:server`         | Bağımsız gRPC sunucusu                    |
+| `npm run grpc:client`         | gRPC istemci bağlantı testi               |
+| `npm run embeddings:backfill` | pgvector gömme (yeniden) hesaplama        |
 
 > `npm test` için PostgreSQL ve Redis'in çalışıyor olması gerekir (bkz. adım 3).
 
@@ -80,30 +80,30 @@ Uygulama: http://localhost:3000
 
 Booking.com'un limitlerini aşan dağıtık + yapay zeka destekli katmanlar. Mimari: [`docs/architecture-phase2.md`](docs/architecture-phase2.md).
 
-| Modül | Klasör | Açıklama |
-|-------|--------|----------|
-| CQRS + Event Bus | `src/lib/cqrs/` | CommandBus/QueryBus/EventBus + trace |
-| Transactional Outbox | `src/lib/cqrs/outbox.ts` | iş ile atomik olay yayını, at-least-once |
-| Saga | `src/lib/saga/` | booking→payment orkestrasyonu + telafi |
-| Redlock | `src/lib/distributed-lock/` | fencing token'lı dağıtık kilit |
-| gRPC/Protobuf | `proto/`, `services/grpc/` | iç servis sözleşmesi (inventory/booking/payment) |
-| pgvector | `src/lib/embedding/`, `src/lib/search/vector.ts` | semantik arama + kişiselleştirme |
-| Talep Motoru | `src/lib/pricing/engine.ts` | etkinlik korelasyonlu dinamik fiyat |
-| Fuzzy Arama | `src/lib/search/fuzzy.ts` (`pg_trgm`) | imla hatası toleransı |
-| Elasticsearch | `src/lib/search/elastic.ts` | opsiyonel ES adaptörü |
-| Pazarlık | `src/lib/negotiation/` | çok-etmenli rule-engine (`POST /api/negotiate`) |
-| Canlı Talep (SSE) | `src/lib/live/`, `/api/rooms/[id]/live` | gerçek zamanlı ısı haritası akışı |
-| Circuit Breaker | `src/lib/resilience/` | CLOSED/OPEN/HALF_OPEN + fallback |
-| Güvenlik | `src/lib/security/` | IP-spoof koruması + BOLA denetimi |
+| Modül                | Klasör                                           | Açıklama                                         |
+| -------------------- | ------------------------------------------------ | ------------------------------------------------ |
+| CQRS + Event Bus     | `src/lib/cqrs/`                                  | CommandBus/QueryBus/EventBus + trace             |
+| Transactional Outbox | `src/lib/cqrs/outbox.ts`                         | iş ile atomik olay yayını, at-least-once         |
+| Saga                 | `src/lib/saga/`                                  | booking→payment orkestrasyonu + telafi           |
+| Redlock              | `src/lib/distributed-lock/`                      | fencing token'lı dağıtık kilit                   |
+| gRPC/Protobuf        | `proto/`, `services/grpc/`                       | iç servis sözleşmesi (inventory/booking/payment) |
+| pgvector             | `src/lib/embedding/`, `src/lib/search/vector.ts` | semantik arama + kişiselleştirme                 |
+| Talep Motoru         | `src/lib/pricing/engine.ts`                      | etkinlik korelasyonlu dinamik fiyat              |
+| Fuzzy Arama          | `src/lib/search/fuzzy.ts` (`pg_trgm`)            | imla hatası toleransı                            |
+| Elasticsearch        | `src/lib/search/elastic.ts`                      | opsiyonel ES adaptörü                            |
+| Pazarlık             | `src/lib/negotiation/`                           | çok-etmenli rule-engine (`POST /api/negotiate`)  |
+| Canlı Talep (SSE)    | `src/lib/live/`, `/api/rooms/[id]/live`          | gerçek zamanlı ısı haritası akışı                |
+| Circuit Breaker      | `src/lib/resilience/`                            | CLOSED/OPEN/HALF_OPEN + fallback                 |
+| Güvenlik             | `src/lib/security/`                              | IP-spoof koruması + BOLA denetimi                |
 
 ### Phase-2 scriptleri
 
-| Komut | Açıklama |
-|-------|----------|
-| `npm run worker` | Arka plan işçisi: outbox relay + pricing kuyruğu |
-| `npm run grpc:server` | Bağımsız gRPC sunucusu (port 50051) |
-| `npm run grpc:client` | gRPC istemci bağlantı testi |
-| `npm run embeddings:backfill` | pgvector gömme vektörlerini (yeniden) hesaplar |
+| Komut                         | Açıklama                                         |
+| ----------------------------- | ------------------------------------------------ |
+| `npm run worker`              | Arka plan işçisi: outbox relay + pricing kuyruğu |
+| `npm run grpc:server`         | Bağımsız gRPC sunucusu (port 50051)              |
+| `npm run grpc:client`         | gRPC istemci bağlantı testi                      |
+| `npm run embeddings:backfill` | pgvector gömme vektörlerini (yeniden) hesaplar   |
 
 Semantik aramayı açmak için: `GET /api/search?destination=...&semantic=1`.
 Elasticsearch'i aktifleştirmek için `docker compose --profile es up -d` + `ELASTICSEARCH_URL=http://localhost:9200`.

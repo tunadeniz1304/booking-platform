@@ -41,9 +41,7 @@ export async function findSemanticCandidates(
   const vector = encode(query);
   const literal = toVectorLiteral(vector);
 
-  const rows = await prisma.$queryRaw<
-    Array<{ id: string; similarity: number }>
-  >`
+  const rows = await prisma.$queryRaw<Array<{ id: string; similarity: number }>>`
     SELECT id,
            1 - (embedding <=> ${literal}::vector) AS similarity
     FROM "Property"

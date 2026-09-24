@@ -98,9 +98,14 @@ function findInRoot(root: unknown, parts: string[]): unknown {
 }
 
 /** Dinamik protobuf tiplerini tek noktada daraltıyoruz (bkz. BookingV1Root). */
-const bookingV1: ClientConstructors = findInRoot(proto, ["booking", "v1"]) as unknown as ClientConstructors;
+const bookingV1: ClientConstructors = findInRoot(proto, [
+  "booking",
+  "v1",
+]) as unknown as ClientConstructors;
 if (!bookingV1?.InventoryService) {
-  throw new Error("proto/booking.proto 'booking.v1' paketi yüklenemedi — proto dosyasını kontrol edin");
+  throw new Error(
+    "proto/booking.proto 'booking.v1' paketi yüklenemedi — proto dosyasını kontrol edin"
+  );
 }
 
 const address = `${GRPC_HOST}:${GRPC_PORT}`;
@@ -139,7 +144,10 @@ export const grpcClients = {
   payment: paymentClient,
 };
 
-export function getRoomAvailability(req: RoomAvailabilityRequest, timeoutMs?: number): Promise<RoomAvailabilityResponse> {
+export function getRoomAvailability(
+  req: RoomAvailabilityRequest,
+  timeoutMs?: number
+): Promise<RoomAvailabilityResponse> {
   return breakers.grpc.call(
     () => promisify(inventoryClient.getRoomAvailability.bind(inventoryClient), req, timeoutMs),
     async () => {
@@ -148,7 +156,10 @@ export function getRoomAvailability(req: RoomAvailabilityRequest, timeoutMs?: nu
   );
 }
 
-export function reserveRoom(req: ReserveRoomRequest, timeoutMs?: number): Promise<ReserveRoomResponse> {
+export function reserveRoom(
+  req: ReserveRoomRequest,
+  timeoutMs?: number
+): Promise<ReserveRoomResponse> {
   return breakers.grpc.call(
     () => promisify(bookingClient.reserveRoom.bind(bookingClient), req, timeoutMs),
     async () => {

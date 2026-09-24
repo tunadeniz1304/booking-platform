@@ -3,11 +3,23 @@ import Link from "next/link";
 const footerColumns = [
   {
     title: "Destek",
-    links: ["Yardım Merkezi", "COVID-19 ile ilgili bilgiler", "İade politikası", "Para iadesi", "Erişilebilirlik"],
+    links: [
+      "Yardım Merkezi",
+      "COVID-19 ile ilgili bilgiler",
+      "İade politikası",
+      "Para iadesi",
+      "Erişilebilirlik",
+    ],
   },
   {
     title: "Keşfet",
-    links: ["Tüm konaklama seçenekleri", "Tatil kiralık evleri", "Tatil paketleri", "Şehir merkezindeki oteller", "Uygun oteller"],
+    links: [
+      "Tüm konaklama seçenekleri",
+      "Tatil kiralık evleri",
+      "Tatil paketleri",
+      "Şehir merkezindeki oteller",
+      "Uygun oteller",
+    ],
   },
   {
     title: "Bizimle iletişime geçin",
@@ -26,7 +38,10 @@ export default function Footer() {
               <ul className="mt-4 space-y-3">
                 {column.links.map((link) => (
                   <li key={link}>
-                    <Link href="/" className="text-sm text-gray-600 transition hover:text-[#003580] hover:underline">
+                    <Link
+                      href="/"
+                      className="text-sm text-gray-600 transition hover:text-[#003580] hover:underline"
+                    >
                       {link}
                     </Link>
                   </li>

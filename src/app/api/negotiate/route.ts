@@ -38,12 +38,11 @@ export async function POST(req: NextRequest) {
     if (checkIn >= checkOut) {
       return NextResponse.json({ error: "Geçersiz tarih aralığı" }, { status: 400 });
     }
-    const nights = Math.round(
-      (checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24)
+    const nights = Math.round((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
+    const leadDays = Math.max(
+      0,
+      Math.round((checkIn.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
     );
-    const leadDays = Math.max(0, Math.round(
-      (checkIn.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
-    ));
 
     const room = await prisma.room.findFirst({
       where: { id: parsed.roomId, propertyId: parsed.propertyId, available: true },
@@ -112,11 +111,16 @@ export async function POST(req: NextRequest) {
       checkIn: parsed.checkIn,
       checkOut: parsed.checkOut,
       currency: result.currency,
-      estimatedTotal: Math.round(result.counterPrice !== null ? result.counterPrice * nights : result.currentPrice * nights),
+      estimatedTotal: Math.round(
+        result.counterPrice !== null ? result.counterPrice * nights : result.currentPrice * nights
+      ),
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: "Validation error", details: error.errors }, { status: 400 });
+      return NextResponse.json(
+        { error: "Validation error", details: error.errors },
+        { status: 400 }
+      );
     }
     if (error instanceof Error && error.message === "Missing or invalid token") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

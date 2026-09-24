@@ -78,20 +78,19 @@ export async function ingestExternalSignal(input: ExternalSignalInput): Promise<
 
   // Çözümle: aday lokasyonları sırala — hangisinde AKTİF mülk varsa o kazanır
   // (Unicode varyantı/trail-space kopya satırlara karşı dayanıklılık).
-  const candidates = city || country
-    ? await prisma.location.findMany({
-        where: {
-          OR: [
-            ...(city ? [{ city: { equals: city, mode: "insensitive" as const } }] : []),
-            ...(country
-              ? [{ country: { equals: country, mode: "insensitive" as const } }]
-              : []),
-          ],
-        },
-        orderBy: { properties: { _count: "desc" } },
-        include: { _count: { select: { properties: { where: { isActive: true } } } } },
-      })
-    : [];
+  const candidates =
+    city || country
+      ? await prisma.location.findMany({
+          where: {
+            OR: [
+              ...(city ? [{ city: { equals: city, mode: "insensitive" as const } }] : []),
+              ...(country ? [{ country: { equals: country, mode: "insensitive" as const } }] : []),
+            ],
+          },
+          orderBy: { properties: { _count: "desc" } },
+          include: { _count: { select: { properties: { where: { isActive: true } } } } },
+        })
+      : [];
   const location = candidates.find((c) => c._count.properties > 0) ?? candidates[0] ?? null;
   if (!location) {
     throw new Error(`Lokasyon bulunamadı: ${city ?? country ?? "(boş)"}`);
@@ -139,7 +138,10 @@ export async function ingestExternalSignal(input: ExternalSignalInput): Promise<
   let repricedRooms = 0;
   for (const room of rooms) {
     const firstNight = await prisma.availability.findFirst({
-      where: { roomId: room.id, date: { in: windowDates.map((d) => new Date(`${d}T00:00:00.000Z`)) } },
+      where: {
+        roomId: room.id,
+        date: { in: windowDates.map((d) => new Date(`${d}T00:00:00.000Z`)) },
+      },
       orderBy: { date: "asc" },
       select: { price: true },
     });
@@ -187,7 +189,13 @@ export async function ingestExternalSignal(input: ExternalSignalInput): Promise<
     signal: impact / 10,
   };
   await eventBus.publish(
-    makeEvent(EventTypes.DemandSignalChanged, event.id, "demand_event", signal, `signal:${event.id}`)
+    makeEvent(
+      EventTypes.DemandSignalChanged,
+      event.id,
+      "demand_event",
+      signal,
+      `signal:${event.id}`
+    )
   );
   await redis
     .lpush(

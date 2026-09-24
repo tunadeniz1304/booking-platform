@@ -103,7 +103,9 @@ function findInRoot(root: unknown, parts: string[]): unknown {
 
 const bookingV1: BookingV1Root = findInRoot(proto, ["booking", "v1"]) as unknown as BookingV1Root;
 if (!bookingV1?.InventoryService?.service) {
-  throw new Error("proto/booking.proto 'booking.v1' paketi yüklenemedi — proto dosyasını kontrol edin");
+  throw new Error(
+    "proto/booking.proto 'booking.v1' paketi yüklenemedi — proto dosyasını kontrol edin"
+  );
 }
 
 /** Tarih aralığını [start, end) UTC gece yarısı Date'lerine çevirir. */
@@ -168,7 +170,9 @@ async function GetRoomAvailability(
     const property = await prisma.room
       .findUnique({ where: { id: req.room_id }, select: { propertyId: true } })
       .then((r) =>
-        r ? prisma.property.findUnique({ where: { id: r.propertyId }, select: { currency: true } }) : null
+        r
+          ? prisma.property.findUnique({ where: { id: r.propertyId }, select: { currency: true } })
+          : null
       );
 
     callback(null, {
@@ -243,18 +247,14 @@ server.addService(bookingV1.InventoryService.service, { GetRoomAvailability });
 server.addService(bookingV1.BookingService.service, { ReserveRoom });
 server.addService(bookingV1.PaymentService.service, { Charge });
 
-server.bindAsync(
-  `0.0.0.0:${GRPC_PORT}`,
-  grpc.ServerCredentials.createInsecure(),
-  (err, port) => {
-    if (err) {
-      console.error("[grpc] bind hatası:", err);
-      process.exit(1);
-    }
-    console.log(`[grpc] Booking gRPC servisi ${port} portunda hazır`);
-    void port;
+server.bindAsync(`0.0.0.0:${GRPC_PORT}`, grpc.ServerCredentials.createInsecure(), (err, port) => {
+  if (err) {
+    console.error("[grpc] bind hatası:", err);
+    process.exit(1);
   }
-);
+  console.log(`[grpc] Booking gRPC servisi ${port} portunda hazır`);
+  void port;
+});
 
 process.on("SIGINT", () => {
   server.tryShutdown(() => process.exit(0));

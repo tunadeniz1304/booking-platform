@@ -35,10 +35,7 @@ const BACKOFF_BASE_MS = 1000;
  * Aynı işlem (tx) içinde mesajı kuyruğa ekler. TransactionClient veya prisma
  * singleton geçilebilir; her ikisinde de `.outboxMessage.create` bulunur.
  */
-export async function appendOutbox(
-  tx: OutboxWriter,
-  event: DomainEvent<unknown>
-): Promise<void> {
+export async function appendOutbox(tx: OutboxWriter, event: DomainEvent<unknown>): Promise<void> {
   await tx.outboxMessage.create({
     data: {
       eventType: event.type,
@@ -131,10 +128,7 @@ export async function relayOutbox(batchSize = 100): Promise<number> {
           lastError: (error as Error)?.message ?? String(error),
         },
       });
-      console.error(
-        `Outbox relay failed for ${row.eventType} (attempt ${attempts}):`,
-        error
-      );
+      console.error(`Outbox relay failed for ${row.eventType} (attempt ${attempts}):`, error);
     }
   }
 

@@ -11,10 +11,7 @@ const loginSchema = z.object({
 export async function POST(req: NextRequest) {
   try {
     if (getUserFromRequest(req)) {
-      return NextResponse.json(
-        { error: "Zaten giriş yapmış durumdasınız" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Zaten giriş yapmış durumdasınız" }, { status: 400 });
     }
 
     const body = await req.json();
@@ -32,14 +29,10 @@ export async function POST(req: NextRequest) {
       where: { email: email.toLowerCase() },
     });
 
-    const valid =
-      user && (await verifyPassword(password, user.passwordHash));
+    const valid = user && (await verifyPassword(password, user.passwordHash));
 
     if (!user || !valid) {
-      return NextResponse.json(
-        { error: "E-posta veya parola hatalı" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "E-posta veya parola hatalı" }, { status: 401 });
     }
 
     const token = signToken(user.id, user.role);

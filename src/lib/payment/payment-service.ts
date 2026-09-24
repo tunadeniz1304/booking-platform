@@ -90,9 +90,7 @@ export async function chargeBooking(input: ChargeInput): Promise<ChargedPayment>
 
       const expectedAmount = Number(booking.totalPrice);
       if (Math.abs(expectedAmount - input.amount) > 0.01) {
-        throw new PaymentValidationError(
-          `Tutar eşleşmiyor: beklenen ${expectedAmount.toFixed(2)}`
-        );
+        throw new PaymentValidationError(`Tutar eşleşmiyor: beklenen ${expectedAmount.toFixed(2)}`);
       }
 
       const created = await tx.payment.create({

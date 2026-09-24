@@ -47,10 +47,7 @@ export async function GET(req: NextRequest) {
 
 function handleBookingError(error: unknown): NextResponse {
   if (error instanceof z.ZodError) {
-    return NextResponse.json(
-      { error: "Validation error", details: error.errors },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "Validation error", details: error.errors }, { status: 400 });
   }
   if (error instanceof Error && error.message === "Missing or invalid token") {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

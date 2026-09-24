@@ -26,7 +26,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(
       favorites.map((f) => ({
         ...f,
-        property: f.property ? { ...f.property, basePrice: Number(f.property.basePrice) } : f.property,
+        property: f.property
+          ? { ...f.property, basePrice: Number(f.property.basePrice) }
+          : f.property,
       }))
     );
   } catch (error) {
@@ -64,7 +66,12 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json(
-      { ...favorite, property: favorite.property ? { ...favorite.property, basePrice: Number(favorite.property.basePrice) } : favorite.property },
+      {
+        ...favorite,
+        property: favorite.property
+          ? { ...favorite.property, basePrice: Number(favorite.property.basePrice) }
+          : favorite.property,
+      },
       { status: 201 }
     );
   } catch (error) {

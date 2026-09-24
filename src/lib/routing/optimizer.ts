@@ -80,7 +80,10 @@ function heldKarp(cities: CityNode[], month: number) {
   const finalMask = full - 2; // 0 başlangıç dışındaki tüm düğümler
   for (let j = 1; j < n; j++) {
     const cand = C[finalMask][j] + leg(cities[j], cities[0], month).cost;
-    if (cand < best) { best = cand; last = j; }
+    if (cand < best) {
+      best = cand;
+      last = j;
+    }
   }
   if (last === -1) return [0];
   const path: number[] = [];
@@ -107,7 +110,10 @@ function nnTwoOpt(cities: CityNode[], month: number) {
     let best = Infinity;
     for (let j = 0; j < n; j++) {
       if (used.has(j)) continue;
-      if (dist[last][j] < best) { best = dist[last][j]; next = j; }
+      if (dist[last][j] < best) {
+        best = dist[last][j];
+        next = j;
+      }
     }
     if (next === -1) break;
     order.push(next);
@@ -118,7 +124,10 @@ function nnTwoOpt(cities: CityNode[], month: number) {
     improved = false;
     for (let i = 1; i < n - 1; i++) {
       for (let j = i + 1; j < n; j++) {
-        const a = order[i - 1], b = order[i], c = order[j], d = order[(j + 1) % n];
+        const a = order[i - 1],
+          b = order[i],
+          c = order[j],
+          d = order[(j + 1) % n];
         const before = dist[a][b] + dist[c][d];
         const after = dist[a][c] + dist[b][d];
         if (after + 1e-9 < before) {
@@ -130,8 +139,12 @@ function nnTwoOpt(cities: CityNode[], month: number) {
   }
   return order;
 }
-function solveExact(c: CityNode[], m: number): number[] { return heldKarp(c, m); }
-function solveHeuristic(c: CityNode[], m: number): number[] { return nnTwoOpt(c, m); }
+function solveExact(c: CityNode[], m: number): number[] {
+  return heldKarp(c, m);
+}
+function solveHeuristic(c: CityNode[], m: number): number[] {
+  return nnTwoOpt(c, m);
+}
 function buildPlanPart(
   sorted: CityNode[],
   month: number,
@@ -142,9 +155,16 @@ function buildPlanPart(
   for (let i = 0; i < sorted.length - 1; i++) {
     const d = haversineKm(sorted[i].lat, sorted[i].lng, sorted[i + 1].lat, sorted[i + 1].lng);
     km += d;
-    legs.push({ from: sorted[i].name, to: sorted[i + 1].name, km: Math.round(d), cost: flightCostEstimate(d) });
+    legs.push({
+      from: sorted[i].name,
+      to: sorted[i + 1].name,
+      km: Math.round(d),
+      cost: flightCostEstimate(d),
+    });
   }
-  const wi = Math.round(sorted.reduce((s, c) => s + climateComfort(c.lat, month), 0) / sorted.length);
+  const wi = Math.round(
+    sorted.reduce((s, c) => s + climateComfort(c.lat, month), 0) / sorted.length
+  );
   return {
     order: sorted.map((c) => c.name),
     totalKm: Math.round(km),

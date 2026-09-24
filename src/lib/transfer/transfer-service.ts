@@ -20,10 +20,13 @@ import { prisma } from "@/lib/prisma";
  */
 
 const TRANSFER_SECRET = process.env.JWT_SECRET || "insecure-transfer-secret";
-const TRANSFER_TOKEN_TTL_MS = 1000 * 60 * 60 * 24 * 7; // 7 gün
+const TRANSFER_LINK_TTL_MS = 1000 * 60 * 60 * 24 * 7; // 7 gün
 
 export class TransferError extends Error {
-  constructor(message: string, readonly status = 422) {
+  constructor(
+    message: string,
+    readonly status = 422
+  ) {
     super(message);
     this.name = "TransferError";
   }
@@ -42,7 +45,7 @@ export interface ListedTransfer {
 
 /** HMAC imzalı, süreli transfer jetonu üret. */
 function signTransferToken(bookingId: string, sellerId: string, nonce: string): string {
-  const exp = Date.now() + TRANSFER_TOKEN_TTL_MS;
+  const exp = Date.now() + TRANSFER_LINK_TTL_MS;
   const payload = `${bookingId}.${sellerId}.${nonce}.${exp}`;
   const sig = createHmac("sha256", TRANSFER_SECRET).update(payload).digest("hex");
   return `${payload}.${sig}`;
@@ -200,7 +203,11 @@ export async function claimTransfer(transferId: string, buyerId: string): Promis
 /** Satıcı listeyi iptal edebilir. */
 export async function cancelTransferListing(transferId: string, sellerId: string): Promise<void> {
   await prisma.bookingTransfer.updateMany({
-    where: { id: transferId, sellerId, status: { in: [TransferStatus.LISTED, TransferStatus.CLAIMED] } },
+    where: {
+      id: transferId,
+      sellerId,
+      status: { in: [TransferStatus.LISTED, TransferStatus.CLAIMED] },
+    },
     data: { status: TransferStatus.CANCELLED },
   });
 }

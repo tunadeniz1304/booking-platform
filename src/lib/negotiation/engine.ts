@@ -53,9 +53,14 @@ function clamp(value: number, min: number, max: number): number {
  * Yüksek talep tabanı yükseltir (daha az indirim); esnek tarih ve uzun
  * vade tabanı düşürür (daha fazla indirim).
  */
-export function computeFloorRatio(input: Pick<NegotiationInput, "demandSignal" | "isFlexibleDates" | "leadDays">): number {
+export function computeFloorRatio(
+  input: Pick<NegotiationInput, "demandSignal" | "isFlexibleDates" | "leadDays">
+): number {
   return clamp(
-    0.88 + input.demandSignal * 0.12 - (input.isFlexibleDates ? 0.04 : 0) - (input.leadDays > 45 ? 0.03 : 0),
+    0.88 +
+      input.demandSignal * 0.12 -
+      (input.isFlexibleDates ? 0.04 : 0) -
+      (input.leadDays > 45 ? 0.03 : 0),
     0.68,
     0.92
   );
@@ -128,9 +133,13 @@ export function negotiate(input: NegotiationInput): NegotiationResult {
   }
 
   // Kural 4: Karşı-teklif — istek ile dinamik fiyat arası, taban korunarak
-  const counter = Math.round(Math.max(requestedPrice + (dynamicPrice - requestedPrice) * 0.4, floorPrice) * 100) / 100;
+  const counter =
+    Math.round(Math.max(requestedPrice + (dynamicPrice - requestedPrice) * 0.4, floorPrice) * 100) /
+    100;
   rulesFired.push("rule.counter_between_ask_and_dynamic");
-  reason.push(`Karşı-teklif: ${counter.toFixed(2)} (taban ${floorPrice.toFixed(2)}, tavan ${dynamicPrice.toFixed(2)})`);
+  reason.push(
+    `Karşı-teklif: ${counter.toFixed(2)} (taban ${floorPrice.toFixed(2)}, tavan ${dynamicPrice.toFixed(2)})`
+  );
 
   const discountPercent =
     dynamicPrice > 0 ? Math.round((1 - counter / dynamicPrice) * 10000) / 100 : 0;

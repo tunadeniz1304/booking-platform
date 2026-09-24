@@ -9,8 +9,18 @@ import { useMemo, useState } from "react";
  */
 
 const MONTHS_TR = [
-  "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran",
-  "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık",
+  "Ocak",
+  "Şubat",
+  "Mart",
+  "Nisan",
+  "Mayıs",
+  "Haziran",
+  "Temmuz",
+  "Ağustos",
+  "Eylül",
+  "Ekim",
+  "Kasım",
+  "Aralık",
 ];
 const DOW_TR = ["Pt", "Sa", "Ça", "Pe", "Cu", "Ct", "Pz"];
 
@@ -79,7 +89,11 @@ export default function DateRangePicker({
     for (let i = 0; i < monthCount; i++) {
       const m = activeMonth + i;
       const y = activeYear + Math.floor(m / 12);
-      arr.push({ year: y, month: ((m % 12) + 12) % 12, days: monthMatrix(y, ((m % 12) + 12) % 12) });
+      arr.push({
+        year: y,
+        month: ((m % 12) + 12) % 12,
+        days: monthMatrix(y, ((m % 12) + 12) % 12),
+      });
     }
     return arr;
   }, [activeYear, activeMonth, monthCount]);
@@ -117,7 +131,10 @@ export default function DateRangePicker({
   };
 
   const isSameDay = (a: Date | null, b: Date) =>
-    !!a && a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+    !!a &&
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate();
 
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-lg">
@@ -129,8 +146,19 @@ export default function DateRangePicker({
           aria-label="Önceki ay"
           className="rounded p-1.5 text-gray-600 hover:bg-gray-100 disabled:opacity-30"
         >
-          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          <svg
+            className="h-5 w-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M15 19l-7-7 7-7"
+            />
           </svg>
         </button>
         <div className="flex gap-6 text-sm font-semibold text-gray-800">
@@ -146,7 +174,13 @@ export default function DateRangePicker({
           aria-label="Sonraki ay"
           className="rounded p-1.5 text-gray-600 hover:bg-gray-100"
         >
-          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <svg
+            className="h-5 w-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>
         </button>
@@ -157,7 +191,9 @@ export default function DateRangePicker({
           <div key={`${m.year}-${m.month}`}>
             <div className="grid grid-cols-7 gap-1 text-center text-xs text-gray-500">
               {DOW_TR.map((d) => (
-                <div key={d} className="py-1">{d}</div>
+                <div key={d} className="py-1">
+                  {d}
+                </div>
               ))}
             </div>
             <div className="mt-1 grid grid-cols-7 gap-1">
@@ -166,7 +202,10 @@ export default function DateRangePicker({
                 const isIn = isSameDay(checkIn, d);
                 const isOut = isSameDay(checkOut, d);
                 const range = inRange(d);
-                const todayCell = d.getFullYear() === today.getFullYear() && d.getMonth() === today.getMonth() && d.getDate() === today.getDate();
+                const todayCell =
+                  d.getFullYear() === today.getFullYear() &&
+                  d.getMonth() === today.getMonth() &&
+                  d.getDate() === today.getDate();
                 return (
                   <button
                     key={idx}
@@ -178,10 +217,10 @@ export default function DateRangePicker({
                       disabled
                         ? "cursor-not-allowed text-gray-300"
                         : isIn || isOut
-                        ? "bg-[#003580] font-semibold text-white hover:bg-[#002b66]"
-                        : range
-                        ? "bg-blue-100 text-[#003580]"
-                        : "text-gray-800 hover:bg-blue-50"
+                          ? "bg-[#003580] font-semibold text-white hover:bg-[#002b66]"
+                          : range
+                            ? "bg-blue-100 text-[#003580]"
+                            : "text-gray-800 hover:bg-blue-50"
                     } ${todayCell && !(isIn || isOut) ? "ring-1 ring-inset ring-[#003580]" : ""}`}
                   >
                     {d.getDate()}

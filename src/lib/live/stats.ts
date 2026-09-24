@@ -73,9 +73,7 @@ export async function getRoomHeat(
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
   const start = startDate ? parseDate(startDate) : today;
-  const end = endDate
-    ? parseDate(endDate)
-    : new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+  const end = endDate ? parseDate(endDate) : new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
   if (end <= start) {
     throw new Error("Geçersiz tarih aralığı");
   }

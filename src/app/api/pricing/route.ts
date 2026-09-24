@@ -40,10 +40,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Pricing API error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 

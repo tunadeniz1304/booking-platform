@@ -33,7 +33,14 @@ export async function GET(req: NextRequest) {
     if (popular) {
       const limit = Number(searchParams.get("limit") ?? "10");
       const results = await getPopularProperties(Number.isFinite(limit) ? Math.min(limit, 50) : 10);
-      return NextResponse.json({ results, total: results.length, page: 1, pageSize: results.length, totalPages: 1, cached: false });
+      return NextResponse.json({
+        results,
+        total: results.length,
+        page: 1,
+        pageSize: results.length,
+        totalPages: 1,
+        cached: false,
+      });
     }
 
     const page = Number(searchParams.get("page") ?? "1");
@@ -51,7 +58,8 @@ export async function GET(req: NextRequest) {
       amenities: searchParams.get("amenities")?.split(",").filter(Boolean),
       page: Number.isFinite(page) && page > 0 ? page : 1,
       pageSize: Number.isFinite(pageSize) && pageSize > 0 ? Math.min(pageSize, 50) : 12,
-      sort: (searchParams.get("sort") ?? "recommended") as "price_asc" | "price_desc" | "rating" | "recommended",
+      sort: (searchParams.get("sort") ?? "recommended") as
+        "price_asc" | "price_desc" | "rating" | "recommended",
     });
     return NextResponse.json(response);
   } catch (error) {
@@ -72,7 +80,18 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
-    const { title, description, propertyType, city, country, basePrice, currency, amenities, images, rooms } = parsed.data;
+    const {
+      title,
+      description,
+      propertyType,
+      city,
+      country,
+      basePrice,
+      currency,
+      amenities,
+      images,
+      rooms,
+    } = parsed.data;
 
     const property = await prisma.$transaction(async (tx) => {
       const location = await tx.location.upsert({

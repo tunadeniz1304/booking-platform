@@ -89,14 +89,10 @@ export const eventSignalWorker = new Worker(
 );
 
 export async function addEventSignalJob(signal: ExternalSignalInput): Promise<Job> {
-  return eventSignalQueue.add(
-    "apply-event-signal",
-    signal,
-    {
-      attempts: 3,
-      backoff: { type: "exponential", delay: 2000 },
-      removeOnComplete: true,
-      removeOnFail: false,
-    }
-  );
+  return eventSignalQueue.add("apply-event-signal", signal, {
+    attempts: 3,
+    backoff: { type: "exponential", delay: 2000 },
+    removeOnComplete: true,
+    removeOnFail: false,
+  });
 }

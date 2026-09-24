@@ -44,7 +44,8 @@ Her faz sonunda kalite kapısı: `npm run lint`, `npm run typecheck`, `npm run f
 
 ## F5 — Arama & GenAI I
 
-- [ ] P1-1 Smart Filter, P1-2 sıralama + harita, P1-11 embedding (#22), P1-3 i18n/FX
+- [x] P1-1 Smart Filter (golden set ≥ 18/20), P1-2 açıklanabilir sıralama, P1-11 embedding (#22), P1-3 i18n/FX
+- [ ] Harita görünümü (MapLibre) → F8 UI ile
 
 ## F6 — Yorumlar + GenAI II
 

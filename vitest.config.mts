@@ -1,7 +1,11 @@
 import { defineConfig } from "vitest/config";
 import path from "path";
 
-const alias = { "@": path.resolve(import.meta.dirname, "src") };
+const alias = {
+  "@": path.resolve(import.meta.dirname, "src"),
+  // `server-only` testlerde (Node) boş modüle çözülür; Next'te react-server koşulu kullanılır.
+  "server-only": path.resolve(import.meta.dirname, "node_modules/server-only/empty.js"),
+};
 
 /**
  * İki test projesi (P0-10):

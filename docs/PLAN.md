@@ -59,13 +59,13 @@ Her faz sonunda kalite kapısı: `npm run lint`, `npm run typecheck`, `npm run f
 
 - [x] P2-1 UI: `/host`, `/admin`, `/plan`, `/transfers`, `/account/privacy`, çerez bandı, harita, a11y düzeltmeleri
 - [x] P2-2 seed/demo (`demo:reset`, lisans no, politikalar, 365 gün envanter)
-- [x] P2-3 Playwright e2e (10/10) + axe (6 sayfa, 0 serious/critical), k6 (1 başarı / 199 SOLD_OUT, SQL overbooking 0)
-- [x] Lighthouse mobil raporu (`docs/perf/lighthouse.md`; a11y 100, PDP performansı 79–90 — hedef tutarlı değil)
+- [x] P2-3 Playwright e2e (11/11, harita senkronu dahil) + axe (6 sayfa, 0 serious/critical), k6 (1 başarı / 199 SOLD_OUT, SQL overbooking 0)
+- [x] Lighthouse mobil raporu (`docs/perf/lighthouse.md`; a11y 100, PDP 5 koşumda 89–95)
 - [x] (ops.) P1-12 MCP sunucusu (`services/mcp`, `npm run mcp:server`, `npm run mcp:smoke`)
 
 ## F9 — Docs + CI + cila
 
 - [x] README, ARCHITECTURE, ADR'ler, METHODOLOGY, MODEL_CARD, COMPLIANCE, DEMO_SCRIPT
 - [x] `ci.yml` (e2e job'ı dahil), CHANGELOG, LICENSE, `docs/FINAL_REPORT.md`, `package.json` 2.0.0
-- [ ] README ekran görüntüleri (`docs/img/`)
-- [ ] `v2.0.0` tag + push, CI'nın GitHub'da yeşil olduğunun doğrulanması
+- [x] README ekran görüntüleri (`docs/img/`, `npm run docs:screenshots`)
+- [x] `v2.0.0` tag + push, CI'nın GitHub'da yeşil olduğunun doğrulanması

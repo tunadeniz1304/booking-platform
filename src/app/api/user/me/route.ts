@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuth } from "@/lib/auth";
+import { logger, errorFields } from "@/lib/observability/logger";
 
 export async function GET(req: NextRequest) {
   const user = await getAuth(req);
@@ -28,7 +29,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json(record);
   } catch (error) {
-    console.error("Failed to fetch user:", error);
+    logger.error(errorFields(error), "Failed to fetch user");
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }

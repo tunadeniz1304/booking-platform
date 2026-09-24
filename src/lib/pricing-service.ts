@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { redis } from "@/lib/redis";
 import { calculateDynamicPrice } from "@/lib/pricing/engine";
+import { logger, errorFields } from "@/lib/observability/logger";
 
 const PRICE_CACHE_PREFIX = "price:";
 const PRICE_CACHE_TTL = 60 * 30; // 30 dakika
@@ -62,7 +63,7 @@ export async function calculateAndCachePrice(input: PricingInput): Promise<Prici
   try {
     await redis.set(cacheKey, JSON.stringify(result), { ex: PRICE_CACHE_TTL });
   } catch (error) {
-    console.error("Price cache write failed:", error);
+    logger.error(errorFields(error), "Price cache write failed");
   }
 
   return result;
@@ -129,6 +130,6 @@ export async function invalidatePriceCache(roomId: string, date: string): Promis
   try {
     await redis.del(`${PRICE_CACHE_PREFIX}${roomId}:${date}`);
   } catch (error) {
-    console.error("Price cache invalidation failed:", error);
+    logger.error(errorFields(error), "Price cache invalidation failed");
   }
 }

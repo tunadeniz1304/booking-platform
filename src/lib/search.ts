@@ -380,7 +380,7 @@ export async function searchProperties(params: SearchParams): Promise<SearchResp
       try {
         await redis.set(cacheKey, JSON.stringify(semanticResult), { ex: SEARCH_CACHE_TTL });
       } catch (error) {
-        console.error("Semantic search cache write failed:", error);
+        logger.error(errorFields(error), "Semantic search cache write failed");
       }
       return semanticResult;
     }
@@ -392,7 +392,7 @@ export async function searchProperties(params: SearchParams): Promise<SearchResp
       return { ...(JSON.parse(cached) as SearchResponse), cached: true };
     }
   } catch (error) {
-    console.error("Search cache read failed:", error);
+    logger.error(errorFields(error), "Search cache read failed");
   }
 
   const where = buildWhere(params);
@@ -517,7 +517,7 @@ export async function searchProperties(params: SearchParams): Promise<SearchResp
   try {
     await redis.set(cacheKey, JSON.stringify(response), { ex: SEARCH_CACHE_TTL });
   } catch (error) {
-    console.error("Search cache write failed:", error);
+    logger.error(errorFields(error), "Search cache write failed");
   }
 
   return response;
@@ -530,7 +530,7 @@ export async function getPopularProperties(limit = 10): Promise<SearchResult[]> 
       return JSON.parse(cached) as SearchResult[];
     }
   } catch (error) {
-    console.error("Popular cache read failed:", error);
+    logger.error(errorFields(error), "Popular cache read failed");
   }
 
   const properties = await prisma.property.findMany({
@@ -585,7 +585,7 @@ export async function getPopularProperties(limit = 10): Promise<SearchResult[]> 
   try {
     await redis.set(POPULAR_CACHE_KEY, JSON.stringify(results), { ex: POPULAR_CACHE_TTL });
   } catch (error) {
-    console.error("Popular cache write failed:", error);
+    logger.error(errorFields(error), "Popular cache write failed");
   }
 
   return results;

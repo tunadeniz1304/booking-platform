@@ -6,6 +6,7 @@ import { requireRole } from "@/lib/auth";
 import { toErrorResponse } from "@/lib/http/errors";
 import { httpsUrl } from "@/lib/security/url";
 import { searchProperties, getPopularProperties } from "@/lib/search";
+import { logger, errorFields } from "@/lib/observability/logger";
 
 const roomSchema = z.object({
   name: z.string().trim().min(1),
@@ -65,7 +66,7 @@ export async function GET(req: NextRequest) {
     });
     return NextResponse.json(response);
   } catch (error) {
-    console.error("Properties list error:", error);
+    logger.error(errorFields(error), "Properties list error");
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

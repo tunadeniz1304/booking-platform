@@ -1,4 +1,5 @@
 import { DomainEvent, EventHandler } from "./types";
+import { logger, errorFields } from "@/lib/observability/logger";
 
 /**
  * Event Bus: aggregate'ten fışkıran değişmez olayları subscriber'lara dağıtır.
@@ -71,7 +72,7 @@ export class EventBus {
       try {
         await this.redis.publish(`event:${normalized.type}`, JSON.stringify(normalized));
       } catch (error) {
-        console.error("Event bus redis publish failed:", error);
+        logger.error(errorFields(error), "Event bus redis publish failed");
       }
     }
   }
@@ -88,7 +89,7 @@ export class EventBus {
     await Promise.allSettled(
       [...set].map((handler) =>
         handler.handle(event).catch((error) => {
-          console.error(`Event handler ${handler.listens} failed:`, error);
+          logger.error(errorFields(error), `Event handler ${handler.listens} failed`);
         })
       )
     );

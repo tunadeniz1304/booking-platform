@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { searchProperties } from "@/lib/search";
 import { getAuth } from "@/lib/auth";
+import { logger, errorFields } from "@/lib/observability/logger";
+import { observed } from "@/lib/http/observed";
 
-export async function GET(req: NextRequest) {
+export const GET = observed("search", async function getHandler(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const page = Number(searchParams.get("page") ?? "1");
@@ -31,9 +33,9 @@ export async function GET(req: NextRequest) {
     const response = await searchProperties(params);
     return NextResponse.json(response);
   } catch (error) {
-    console.error("Search API error:", error);
+    logger.error(errorFields(error), "Search API error");
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
-}
+});
 
 export const dynamic = "force-dynamic";

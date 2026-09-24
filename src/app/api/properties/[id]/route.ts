@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { logger, errorFields } from "@/lib/observability/logger";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -47,7 +48,7 @@ export async function GET(_req: Request, { params }: Props) {
       rooms: property.rooms.map((r) => ({ ...r, priceModifier: Number(r.priceModifier) })),
     });
   } catch (error) {
-    console.error("Property detail error:", error);
+    logger.error(errorFields(error), "Property detail error");
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

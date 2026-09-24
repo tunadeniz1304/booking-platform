@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAuth } from "@/lib/auth";
+import { logger, errorFields } from "@/lib/observability/logger";
 
 function unauthorized() {
   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -32,7 +33,7 @@ export async function GET(req: NextRequest) {
       }))
     );
   } catch (error) {
-    console.error("Failed to fetch favorites:", error);
+    logger.error(errorFields(error), "Failed to fetch favorites");
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }
@@ -75,7 +76,7 @@ export async function POST(req: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
-    console.error("Failed to add favorite:", error);
+    logger.error(errorFields(error), "Failed to add favorite");
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }
@@ -98,7 +99,7 @@ export async function DELETE(req: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Failed to remove favorite:", error);
+    logger.error(errorFields(error), "Failed to remove favorite");
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }

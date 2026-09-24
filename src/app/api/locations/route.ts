@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { logger, errorFields } from "@/lib/observability/logger";
 
 export async function GET(req: NextRequest) {
   try {
@@ -24,7 +25,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json(results);
   } catch (error) {
-    console.error("Locations error:", error);
+    logger.error(errorFields(error), "Locations error");
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

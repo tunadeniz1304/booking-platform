@@ -32,13 +32,7 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run format:check
-      - run: npx vitest run --project unit --coverage
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: coverage
-          path: coverage/
-          retention-days: 7
+      - run: npm run test:unit
 
   integration:
     name: Integration (testcontainers · pgvector + redis)
@@ -50,8 +44,16 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      # Container imajları: pgvector/pgvector:pg16 ve redis:7-alpine (testcontainers ile)
-      - run: npx vitest run --project integration
+      # Container imajları: pgvector/pgvector:pg16 ve redis:7-alpine (testcontainers ile).
+      # Docker burada mevcut → unit + integration birlikte koşar ve %80 satır
+      # kapsam eşiği (vitest.config.mts) burada zorlanır.
+      - run: npm run test:coverage
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage
+          path: coverage/
+          retention-days: 7
 
   build:
     name: Next build · Docker images

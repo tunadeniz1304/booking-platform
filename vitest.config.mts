@@ -25,6 +25,9 @@ export default defineConfig({
       reportsDirectory: "coverage",
       include: ["src/lib/**/*.ts"],
       exclude: ["**/*.d.ts", "**/*.test.ts"],
+      // booking.md §5: unit + integration birlikte (`npm run test:coverage`) en az %80 satır.
+      // Yalnız unit koşusu DB/Redis yollarını içermez → eşik birleşik koşu içindir.
+      thresholds: { lines: 80 },
     },
     projects: [
       {

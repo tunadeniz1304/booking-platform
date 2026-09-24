@@ -142,12 +142,12 @@ Rota optimizasyonu klasik kombinatorik optimizasyondur; neden bu şekilde adland
 npm run check        # lint + typecheck + prettier --check + unit testler (altyapısız)
 npm run test:unit    # tests/unit/** — Docker gerekmez
 npm run test:int     # tests/integration/** — Docker gerekir (testcontainers: pgvector/pgvector:pg16 + redis:7-alpine)
-npm run test:coverage
+npm run test:coverage # unit + integration birlikte, src/lib için ≥ %80 satır eşiği (Docker gerekir)
 ```
 
 Entegrasyon testleri hiçbir zaman `DATABASE_URL`'e yazmaz; container'ın URL'ini kullanır. Docker yoksa suite açık bir mesajla atlanır. Testler ağa çıkmaz (`tests/setup.ts` global `fetch`'i engeller).
 
-CI (`.github/workflows/ci.yml`): lint → typecheck → format → unit + coverage → integration → `next build` → `docker compose build` → `npm audit --audit-level=high` → Playwright e2e (compose demo yığınına karşı, `npm run test:e2e`). Eski `deploy.yml` kaldırıldı: gerçek bir deploy hedefi yoktu ve sırları build argümanı olarak imaja geçiriyordu (ADR 0001).
+CI (`.github/workflows/ci.yml`): lint → typecheck → format → unit → unit + integration + coverage eşiği (≥ %80 satır) → `next build` → `docker compose build` → `npm audit --audit-level=high` → Playwright e2e (compose demo yığınına karşı, `npm run test:e2e`). Eski `deploy.yml` kaldırıldı: gerçek bir deploy hedefi yoktu ve sırları build argümanı olarak imaja geçiriyordu (ADR 0001).
 
 ## Gözlemlenebilirlik
 

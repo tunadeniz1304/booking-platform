@@ -42,20 +42,20 @@ const ALL: Role[] = ["USER", "HOST", "ADMIN"];
 const HOST_ADMIN: Role[] = ["HOST", "ADMIN"];
 
 const MATRIX: Array<[string, string, Handler, Role[]]> = [
-  ["POST /api/pricing", "POST", pricing.POST as Handler, HOST_ADMIN],
-  ["PATCH /api/properties/[id]", "PATCH", property.PATCH as Handler, HOST_ADMIN],
-  ["POST /api/properties/[id]/rooms", "POST", rooms.POST as Handler, HOST_ADMIN],
-  ["PUT /api/rooms/[roomId]/availability", "PUT", ari.PUT as Handler, HOST_ADMIN],
-  ["GET /api/host/properties", "GET", hostProps.GET as Handler, HOST_ADMIN],
-  ["GET /api/host/bookings", "GET", hostBookings.GET as Handler, HOST_ADMIN],
-  ["POST /api/ai/listing-copy", "POST", listingCopy.POST as Handler, HOST_ADMIN],
-  ["GET /api/admin/events", "GET", adminEvents.GET as Handler, ["ADMIN"]],
-  ["GET /api/admin/outbox", "GET", adminOutbox.GET as Handler, ["ADMIN"]],
-  ["GET /api/admin/fraud", "GET", adminFraud.GET as Handler, ["ADMIN"]],
-  ["PATCH /api/admin/users/[id]/role", "PATCH", adminRole.PATCH as Handler, ["ADMIN"]],
-  ["GET /api/bookings", "GET", bookings.GET as Handler, ALL],
-  ["GET /api/account", "GET", account.GET as Handler, ALL],
-  ["GET /api/dev/mailbox", "GET", mailbox.GET as Handler, ALL],
+  ["POST /api/pricing", "POST", pricing.POST as unknown as Handler, HOST_ADMIN],
+  ["PATCH /api/properties/[id]", "PATCH", property.PATCH as unknown as Handler, HOST_ADMIN],
+  ["POST /api/properties/[id]/rooms", "POST", rooms.POST as unknown as Handler, HOST_ADMIN],
+  ["PUT /api/rooms/[roomId]/availability", "PUT", ari.PUT as unknown as Handler, HOST_ADMIN],
+  ["GET /api/host/properties", "GET", hostProps.GET as unknown as Handler, HOST_ADMIN],
+  ["GET /api/host/bookings", "GET", hostBookings.GET as unknown as Handler, HOST_ADMIN],
+  ["POST /api/ai/listing-copy", "POST", listingCopy.POST as unknown as Handler, HOST_ADMIN],
+  ["GET /api/admin/events", "GET", adminEvents.GET as unknown as Handler, ["ADMIN"]],
+  ["GET /api/admin/outbox", "GET", adminOutbox.GET as unknown as Handler, ["ADMIN"]],
+  ["GET /api/admin/fraud", "GET", adminFraud.GET as unknown as Handler, ["ADMIN"]],
+  ["PATCH /api/admin/users/[id]/role", "PATCH", adminRole.PATCH as unknown as Handler, ["ADMIN"]],
+  ["GET /api/bookings", "GET", bookings.GET as unknown as Handler, ALL],
+  ["GET /api/account", "GET", account.GET as unknown as Handler, ALL],
+  ["GET /api/dev/mailbox", "GET", mailbox.GET as unknown as Handler, ALL],
 ];
 
 async function call(h: Handler, method: string, role: Role | null): Promise<number> {

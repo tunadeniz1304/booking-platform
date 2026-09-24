@@ -32,6 +32,7 @@ flowchart LR
   end
 
   GRPC["grpc servisi<br/>BookingService + AriService<br/>JWT metadata zorunlu"]
+  MCP["MCP sunucusu (stdio)<br/>search_stays · get_quote · create_hold"]
   PG[("PostgreSQL 16 + pgvector<br/>Availability FOR UPDATE<br/>OutboxMessage")]
   RD[("Redis 7<br/>Redlock · quote · cache<br/>rate-limit · jti denylist")]
   EXT["OpenAI-uyumlu LLM API<br/>(yalnızca anahtar varsa)"]
@@ -47,6 +48,7 @@ flowchart LR
   Worker --> RD
   W3 --> MAIL
   GRPC --> LIB
+  MCP --> LIB
 ```
 
 Ayrıntılar: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · kararlar: [docs/adr/](docs/adr/)
@@ -60,7 +62,7 @@ Ayrıntılar: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · kararlar: [docs/ad
 | İptal & iade       | Sürümlü politika, rezervasyona snapshot                 | `CancellationPolicy` (NON_REFUNDABLE/FLEXIBLE/MODERATE/STRICT) + `Booking.policySnapshot` + `computeRefund()`                                           |
 | Fiyat şeffaflığı   | All-in fiyat (FTC 16 CFR 464, Omnibus)                  | Tek `computeTotal()` (kart = PDP = checkout = tahsilat), minor-unit tamsayı, konaklama vergisi `ACCOMMODATION_TAX_RATE` (%1), fast-check                |
 | Arama & sıralama   | Facet, açıklanabilir sıralama (DSA)                     | Ağırlıklı ve `explain` alanlı skor, `/ranking` şeffaflık sayfası, MapLibre harita görünümü (kümeleme yok)                                               |
-| GenAI arama        | Booking Smart Filter, Expedia Romie, Trip.com TripGenie | Smart Filter (NL → izinli facet'ler), araçlı ve grounded trip-planner (`POST /api/ai/trip-plan`)                                                        |
+| GenAI arama        | Booking Smart Filter, Expedia Romie, Trip.com TripGenie | Smart Filter (NL → izinli facet'ler), araçlı ve grounded trip-planner (`POST /api/ai/trip-plan`), MCP sunucusu                                          |
 | Yorumlar           | Doğrulanmış konaklama, AI özeti                         | Yalnızca tamamlanmış konaklama sahibi yorum yazar, host yanıtı, atıflı özet (`[r:<id>]` guard'lı)                                                       |
 | Partner extranet   | Oda/fiyat/ARI takvimi                                   | Host API'leri (mülk, oda, toplu ARI, rezervasyonlar, ilan copilot'u) ve `/host` paneli                                                                  |
 | Kanal yönetimi     | OTA XML / iCal                                          | iCal export/import + gRPC `AriService.PushAvailability` (sıra numaralı, idempotent)                                                                     |
@@ -99,6 +101,18 @@ Test kartları (mock hosted fields, tarayıcıda token'a çevrilir): `4242 4242 
 
 3 dakikalık demo akışı: [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md)
 
+### Ekran görüntüleri
+
+| Akıllı filtre (doğal dil → filtre çipleri)        | Mülk sayfası (galeri, fiyat, atıflı yorum özeti) |
+| ------------------------------------------------- | ------------------------------------------------ |
+| ![Smart Filter](docs/img/search-smart-filter.png) | ![PDP](docs/img/property.png)                    |
+| **Çok şehirli trip-planner (araçlı, grounded)**   | **Host extranet**                                |
+| ![Trip planner](docs/img/trip-planner.png)        | ![Host](docs/img/host-extranet.png)              |
+| **Ana sayfa**                                     | **Admin paneli (outbox, olay sinyali, fraud)**   |
+| ![Ana sayfa](docs/img/home.png)                   | ![Admin](docs/img/admin.png)                     |
+
+Görüntüler compose demo yığınından (LLM demo modu) `npm run docs:screenshots` ile üretilir (`scripts/screenshots.ts`).
+
 ## LLM modu
 
 Tüm LLM erişimi `src/lib/llm/` sözleşmesinden geçer ([ADR 0005](docs/adr/0005-llm-contract.md), [MODEL_CARD](docs/MODEL_CARD.md)).
@@ -113,6 +127,18 @@ Tüm LLM erişimi `src/lib/llm/` sözleşmesinden geçer ([ADR 0005](docs/adr/00
 - `GET /api/llm/status` (giriş gerekli): `mode`, `effectiveMode`, `model`, `baseUrlHost`, `hasKey`, `jsonModeSupported`, `lastError`. Anahtarın kendisi hiçbir yanıtta, logda veya telemetride görünmez.
 - `npm run llm:smoke`: 1 JSON + 1 metin çağrısı; anahtar yoksa "DEMO — smoke atlandı" ile 0 çıkış kodu, anahtar varken canlı başarısızlıkta 1.
 - LLM **asla** fiyat, uygunluk, iade veya sıralama kararı vermez; LLM'e giden her metin KVKK redaksiyonundan geçer (TCKN, IBAN, telefon, e-posta, kart, kişi adı).
+
+### MCP sunucusu
+
+`npm run mcp:server` platformu [Model Context Protocol](https://modelcontextprotocol.io) üzerinden (stdio) LLM istemcilerine açar (`services/mcp/`):
+
+| Araç           | Yetki                         | Ne yapar                                                                           |
+| -------------- | ----------------------------- | ---------------------------------------------------------------------------------- |
+| `search_stays` | anonim                        | Deterministik arama; tarih verilirse en ucuz odanın vergi dahil teklifi            |
+| `get_quote`    | anonim                        | `computeTotal()` teklifi (`quoteId`, gece gece fiyat, vergi, toplam)               |
+| `create_hold`  | kullanıcı access token'ı şart | Odayı `HELD` olarak tutar; **ödeme almaz** — ödenmezse süre dolunca `EXPIRED` olur |
+
+Token `accessToken` argümanıyla veya `MCP_ACCESS_TOKEN` ortam değişkeniyle verilir; yoksa `create_hold` `UNAUTHORIZED` ile reddedilir ve kullanıcı yalnızca token'dan türetilir. Loglar stderr'e gider (stdout JSON-RPC'ye ayrılmıştır). İnceleme: `npx @modelcontextprotocol/inspector npm run mcp:server`; duman testi: `npm run mcp:smoke`.
 
 ## Mühendislik öne çıkanları
 
@@ -185,6 +211,6 @@ Lisans: [MIT](LICENSE)
 
 **booking-platform** is a portfolio-grade online travel agency (OTA) backend and web app built with Next.js 16, PostgreSQL + pgvector, Redis and BullMQ. Double booking is provably impossible (Redlock + `SELECT … FOR UPDATE` + SERIALIZABLE; 100 parallel requests for the last room yield exactly 1 success and 99 `SOLD_OUT`, verified in SQL). Money is integer minor units priced by a single `computeTotal()` checked with fast-check property tests. Bookings follow a `PENDING → HELD → CONFIRMED → COMPLETED | CANCELLED | EXPIRED` state machine with automatic hold expiry, a mock PSP with 3DS/capture/refund and signed webhooks, versioned cancellation policies, and a transactional outbox (SKIP LOCKED leases, DEAD letter state).
 
-The LLM layer is used only for explanation, summarisation and natural-language-to-filter translation (Smart Filter, cited review summaries, grounded trip planner, listing copy, event extraction). Without an API key it runs a deterministic demo mode; on errors it falls back per call. It never decides prices or availability, and all outbound text is PII-redacted. Route optimisation is classic Held-Karp / 2-opt / or-opt; "semantic" search defaults to feature hashing.
+The LLM layer is used only for explanation, summarisation and natural-language-to-filter translation (Smart Filter, cited review summaries, grounded trip planner, listing copy, event extraction). Without an API key it runs a deterministic demo mode; on errors it falls back per call. It never decides prices or availability, and all outbound text is PII-redacted. An MCP server (`npm run mcp:server`) exposes search, quote and token-gated hold tools to LLM clients. Route optimisation is classic Held-Karp / 2-opt / or-opt; "semantic" search defaults to feature hashing.
 
 Run it: `cp .env.example .env && docker compose up --build`, then open <http://localhost:3000>. Demo accounts (`guest@`, `host@`, `admin@booking.test`, password `Password123!`) are **demo only**. This is a demo project: no real payments are taken and no real stays are sold.

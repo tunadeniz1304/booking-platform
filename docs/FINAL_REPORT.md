@@ -1,7 +1,7 @@
 # booking-platform v2.0.0 — Final raporu
 
 > Portföy/demo projesidir; gerçek ödeme alınmaz, gerçek konaklama satılmaz.
-> Bu rapordaki tüm sayılar 2026-09-24 tarihinde gerçekten çalıştırılan komutların çıktısıdır; çalıştırılmayan ölçümler açıkça "koşulmadı" diye belirtilmiştir.
+> Bu rapordaki tüm sayılar 2026-09-24/25 tarihlerinde gerçekten çalıştırılan komutların çıktısıdır; çalıştırılmayan ölçümler açıkça "koşulmadı" diye belirtilmiştir.
 
 ## 1. Özet
 
@@ -26,7 +26,7 @@ v1'deki prototip (Next.js 14, PENDING'de takılan rezervasyonlar, float para, ö
 | **F6** — Yorumlar + GenAI II              | Doğrulanmış yorum + atıflı özet, grounded trip-planner, onaylı olay sinyalleri (#13)                                                                                                                                                                                                                                          | `4c30709`, `0b6dfda`, `ab283a2`                                                                                                    |
 | **F7** — Host/Admin                       | Extranet API, iCal + gRPC ARI, fraud skoru, admin kuyrukları + audit log, KVKK API                                                                                                                                                                                                                                            | `7636dd5`, `8e10147`                                                                                                               |
 | **F8** — Portföy                          | Seed genişletme + `demo:reset`; `/host`, `/admin`, `/plan`, `/transfers`, `/account/privacy`, çerez bandı; Smart Filter çipleri, "neden bu sırada", MapLibre harita; PDP yorum özeti, rol farkında menü, atlama bağlantısı; Playwright e2e + axe, k6, Lighthouse; a11y düzeltmeleri; compose'da CSRF origin hatası düzeltmesi | `f451c1b`, `c271e8e`, `c579512`, `43e9af7`, `9c9afad`, `50ab4ba`, `44e446d`, `31d6365`, `ed94724`, `f623a61`, `da45ad8`, `859efad` |
-| **F9** — Docs + CI + cila                 | README, ARCHITECTURE, ADR 0001–0009, METHODOLOGY, MODEL_CARD, COMPLIANCE, DEMO_SCRIPT, CHANGELOG, LICENSE; CI'ya e2e job'ı; bu rapor; sürüm 2.0.0                                                                                                                                                                             | `99e81fe`, `69d5933` ve bu rapor commit'i                                                                                          |
+| **F9** — Docs + CI + cila                 | README (+ ekran görüntüleri), ARCHITECTURE, ADR 0001–0009, METHODOLOGY, MODEL_CARD, COMPLIANCE, DEMO_SCRIPT, CHANGELOG, LICENSE; CI'ya e2e job'ı ve %80 kapsam eşiği; MCP sunucusu (P1-12); harita kümelemesi + liste senkronu; PDP görsel optimizasyonu; bu rapor; sürüm 2.0.0                                               | `99e81fe`, `69d5933` ve bu rapor commit'i                                                                                          |
 
 ## 3. Hata → regresyon testi eşlemesi (§1 "Bilinen hatalar")
 
@@ -61,21 +61,22 @@ Adanmış testi olmayan hata: **yok**. Not: #3, #4, #7, #9, #13, #22 yalnızca e
 
 ## 4. Metrikler
 
-| Ölçüm                            | Değer                                                                                  | Komut                                                     |
-| -------------------------------- | -------------------------------------------------------------------------------------- | --------------------------------------------------------- |
-| Unit testler                     | **224 / 224** geçti (27 dosya)                                                         | `npm run test:unit`                                       |
-| Entegrasyon testleri             | **38 / 38** geçti (14 dosya; gerçek Postgres 16 + pgvector ve Redis 7, testcontainers) | `npm run test:int`                                        |
-| E2E testleri                     | **10 / 10** geçti (3 dosya; ardışık 3 koşumda yeşil)                                   | `npm run test:e2e` (compose demo yığınına karşı)          |
-| Toplam                           | **272** test (hedef ≥ 150)                                                             | —                                                         |
-| Unit kapsamı (`src/lib/**/*.ts`) | satır **%43.53**, ifade %43.47, dal %38.12, fonksiyon %40.57                           | `npx vitest run --project unit --coverage` (json-summary) |
-| axe (wcag2a/aa, wcag21a/aa)      | 6 ana sayfada **0** serious/critical                                                   | `tests/e2e/a11y.spec.ts`                                  |
-| k6 — yarış                       | 200 VU aynı oda-gecesi → **1 × 201, 199 × 409 SOLD_OUT**; SQL overbooking **0**        | [docs/perf/k6-results.md](perf/k6-results.md)             |
-| k6 — `/api/search` p95           | **16.62 ms** (compose ağı içinden); host NAT üzerinden ilk koşumda 1.39 s (eşik ✗)     | aynı dosya                                                |
-| Lighthouse (mobil)               | Accessibility 6/6 sayfada **100**; Performance 91–97, PDP 79–90 (medyan 83)            | [docs/perf/lighthouse.md](perf/lighthouse.md)             |
-| Smart Filter golden set          | 20/20 (demo modu)                                                                      | `tests/unit/ai/smart-filter-golden.test.ts`               |
-| `npm audit --audit-level=high`   | 0 high/critical (4 moderate: `@opentelemetry/*`, `@prisma/instrumentation`)            | `npm audit`                                               |
+| Ölçüm                                          | Değer                                                                                            | Komut                                            |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------ |
+| Unit testler                                   | **252 / 252** geçti (32 dosya)                                                                   | `npm run test:unit`                              |
+| Entegrasyon testleri                           | **50 / 50** geçti (16 dosya; gerçek Postgres 16 + pgvector ve Redis 7, testcontainers)           | `npm run test:int`                               |
+| E2E testleri                                   | **11 / 11** geçti (3 dosya; harita kümeleme + liste senkronu dahil)                              | `npm run test:e2e` (compose demo yığınına karşı) |
+| Toplam                                         | **313** test (hedef ≥ 150)                                                                       | —                                                |
+| Kapsam (`src/lib/**/*.ts`, unit + entegrasyon) | satır **%83.31**, ifade %81.18, dal %71.15, fonksiyon %79.14 (eşik: satır ≥ %80, CI'da zorlanır) | `npm run test:coverage`                          |
+| axe (wcag2a/aa, wcag21a/aa)                    | 6 ana sayfada **0** serious/critical                                                             | `tests/e2e/a11y.spec.ts`                         |
+| k6 — yarış                                     | 200 VU aynı oda-gecesi → **1 × 201, 199 × 409 SOLD_OUT**; SQL overbooking **0**                  | [docs/perf/k6-results.md](perf/k6-results.md)    |
+| k6 — `/api/search` p95                         | **16.62 ms** (compose ağı içinden); host NAT üzerinden ilk koşumda 1.39 s (eşik ✗)               | aynı dosya                                       |
+| Lighthouse (mobil)                             | Accessibility 6/6 sayfada **100**; Performance 92–96, PDP 5 koşumda 89–95 (medyan 90)            | [docs/perf/lighthouse.md](perf/lighthouse.md)    |
+| MCP duman testi                                | 3 araç listelendi; token'sız `create_hold` → `UNAUTHORIZED`                                      | `npm run mcp:smoke`                              |
+| Smart Filter golden set                        | 20/20 (demo modu)                                                                                | `tests/unit/ai/smart-filter-golden.test.ts`      |
+| `npm audit --audit-level=high`                 | 0 high/critical (4 moderate: `@opentelemetry/*`, `@prisma/instrumentation`)                      | `npm audit`                                      |
 
-Kapsam notu: §8'deki "yeni kodda ≥ %80" ölçütü **global olarak karşılanmıyor**. Vitest'te kapsam eşiği (`coverage.thresholds`) tanımlı değil; `src/lib` altındaki DB/Redis'e dokunan servislerin çoğu yalnızca entegrasyon testleriyle kapsanıyor ve bu testler kapsam raporuna dahil değil.
+Kapsam notu: §8'deki "yeni kodda ≥ %80" ölçütü `vitest.config.mts` içinde `coverage.thresholds.lines = 80` olarak tanımlıdır ve CI'nın entegrasyon job'ında (`npm run test:coverage`: unit + entegrasyon birlikte) zorlanır. Yalnız unit koşusu DB/Redis yollarını içermediği için eşik birleşik koşuya uygulanır.
 
 ## 5. Öncesi / sonrası (§2 "Hedef" sütunu)
 
@@ -85,8 +86,8 @@ Kapsam notu: §8'deki "yeni kodda ≥ %80" ölçütü **global olarak karşılan
 | Ödeme              | Yok                            | `PaymentProvider` + `MockPsp` (auth/capture/refund/webhook), ops. Stripe | ✅ 3DS simülasyonu dahil; Stripe sağlayıcısı SDK'sız REST (`fetch`) ile opsiyonel (`PAYMENT_PROVIDER=stripe`) |
 | İptal & iade       | Yok                            | Sürümlü politika + snapshot + `computeRefund()`                          | ✅ e2e'de iade tutarı UI'da doğrulanıyor                                                                      |
 | Fiyat şeffaflığı   | Float, ekran ≠ tahsilat        | `computeTotal()` minor-unit, vergi config, fast-check                    | ✅                                                                                                            |
-| Arama & sıralama   | Prisma filtre                  | Facet, harita, açıklanabilir skor                                        | ✅ `explain` + `/ranking` + MapLibre harita; ⚠️ harita kümelemesi (supercluster) yok                          |
-| GenAI arama        | Yok                            | Smart Filter, trip-planner copilot                                       | ✅ Çipli Smart Filter, `/plan` sayfası                                                                        |
+| Arama & sıralama   | Prisma filtre                  | Facet, harita, açıklanabilir skor                                        | ✅ `explain` + `/ranking` + MapLibre harita, `supercluster` kümelemesi, harita ↔ liste senkronu (e2e)         |
+| GenAI arama        | Yok                            | Smart Filter, trip-planner copilot                                       | ✅ Çipli Smart Filter, `/plan` sayfası, MCP sunucusu (`search_stays`, `get_quote`, `create_hold`)             |
 | Yorumlar           | Model var, API yok             | Doğrulanmış yorum, host yanıtı, atıflı özet                              | ✅                                                                                                            |
 | Partner extranet   | Yok                            | `/host`: oda, takvim, fiyat, rezervasyonlar, ilan copilot'u              | ✅ (takvim e2e ile doğrulandı)                                                                                |
 | Kanal yönetimi     | Yok                            | iCal + ARI gRPC                                                          | ✅                                                                                                            |
@@ -94,30 +95,28 @@ Kapsam notu: §8'deki "yeni kodda ≥ %80" ölçütü **global olarak karşılan
 | Güvenlik           | Çok sayıda açık                | Açıklar kapalı, refresh rotation, CSRF, fraud skoru                      | ✅ + F8'de compose'daki CSRF origin hatası düzeltildi                                                         |
 | Gözlemlenebilirlik | `console.*`                    | pino, OTel, `/api/metrics`, Grafana                                      | ✅                                                                                                            |
 | Uyum               | Yok                            | Aydınlatma + çerez onayı, dışa aktarım/silme, belge no, axe              | ✅ (hukuki görüş değildir)                                                                                    |
-| Test & CI          | 22 test, CI kırmızı            | ≥ 150 test, testcontainers, Playwright, k6, yeşil CI                     | ✅ 272 test, CI'da e2e job'ı; ⚠️ CI'nın GitHub'daki son durumu bu raporda doğrulanmadı (push yapılmadı)       |
+| Test & CI          | 22 test, CI kırmızı            | ≥ 150 test, testcontainers, Playwright, k6, yeşil CI                     | ✅ 313 test, %83 satır kapsamı (eşikli), CI'da e2e job'ı; GitHub Actions yeşil                                |
 
 ## 6. Bilinen sınırlamalar
 
-- **Harita kümelemesi yok:** MapLibre görünümü işaretçileri kümelemeden çizer (`supercluster` eklenmedi); çok sonuçta işaretçiler üst üste biner.
-- **MCP sunucusu (P1-12, opsiyonel) uygulanmadı:** `services/mcp` yok.
-- **Kapsam %43.5** (unit, `src/lib`); §8'in "yeni kodda ≥ %80" ölçütü sağlanmıyor (bkz. §4).
-- **Lighthouse PDP performansı** 79–90 arasında dalgalanıyor (LCP = uzak galeri görseli); ≥ 85 hedefi tutarlı değil.
+- **Harita karoları OSM'den gelir:** karo sunucusuna erişim yoksa harita görünümü tasarım gereği listeye döner; harita e2e testi bu durumda gerekçesiyle atlanır.
+- **MCP sunucusu yalnızca stdio:** uzak (HTTP/SSE) taşıma yok; `create_hold` ödeme almaz, ödeme web arayüzünde tamamlanır.
+- **Kapsam eşiği birleşik koşu içindir:** %80 satır eşiği unit + entegrasyon birlikte (`npm run test:coverage`, Docker gerekir) ölçülür; yalnız unit koşusunda DB/Redis yolları kapsanmaz.
+- **Lighthouse ölçüm ortamı:** PDP `chrome-headless-shell` ile 5/5 koşumda ≥ 85 (89–95); tam Chrome `--headless=new` bu makinede çoğunlukla `NO_NAVSTART` verdi, tamamlanan tek koşumu 82 idi. LCP uzak (Unsplash) görsele bağlıdır.
 - **k6 tek makinede** koşuldu (Windows + Docker Desktop); host NAT üzerinden arama p95 eşiği ilk koşumda aşıldı, compose ağı içinden 13–17 ms.
 - **Secret taraması yanlış pozitifleri:** §9'daki regex `git diff` üzerinde kaldırılan (`-`) placeholder satırlarını da yakalayabilir; commit öncesi tarama yalnızca eklenen (`+`) satırlarda yapıldı ve hepsinde 0'dır.
 - **Eski Docker volume'ları:** v2 öncesi `postgres_data` volume'u ile parola uyuşmaz; bir kez `docker compose down -v` gerekir (README'de belirtildi).
 - **SMTP:** `.env`'de SMTP tanımlı ama sunucuya ulaşılamıyorsa e-posta yine `/dev/mailbox`'ta görünür, ancak `smtp/FAILED` durumuyla.
 - **Anonim ziyaretçide konsol 401'leri:** oturum yoklaması beklenen `401` döndürdüğü için Lighthouse Best Practices 96.
-- **README ekran görüntüleri/GIF** (`docs/img/`) henüz eklenmedi.
 - **Availability partitioning** opt-in ve Prisma şemasıyla drift'li (ADR 0006).
 - **`npm audit`:** 4 moderate açık (OpenTelemetry / `@prisma/instrumentation` transitif), high/critical yok.
 
 ## 7. Gelecek iş
 
-1. Harita kümelemesi (`supercluster`) ve harita ↔ liste vurgulama senkronu.
-2. MCP sunucusu (`search_stays`, `get_quote`, `create_hold`; token'sız `create_hold` reddi).
-3. Vitest `coverage.thresholds` + entegrasyon kapsamının birleştirilmesi; servis katmanı için ek unit testleri.
-4. PDP LCP: galeri görsellerini yerel/optimize kaynağa (`public/demo/`) almak, `sizes` ayarı.
-5. k6'yı CI'da (nightly) compose ağı içinde koşup eşikleri kalıcı izlemek; çoklu makine yük testi.
-6. Gerçek PSP (Stripe test mode) ile uçtan uca test, 3DS2 akışının gerçek SDK ile doğrulanması.
-7. README için ekran görüntüleri/GIF, erişilebilirlik için manuel ekran okuyucu testi.
-8. Availability partitioning'in Prisma şemasıyla uyumlu hâle getirilmesi.
+1. MCP için uzak taşıma (Streamable HTTP) ve OAuth tabanlı kullanıcı yetkilendirmesi.
+2. Dal (branch) kapsamının %71'den yukarı çekilmesi; servis katmanı için ek unit testleri.
+3. Görselleri yerel/CDN'de barındırmak (`public/demo/`), harita için çevrimdışı vektör karo (Protomaps).
+4. k6'yı CI'da (nightly) compose ağı içinde koşup eşikleri kalıcı izlemek; çoklu makine yük testi.
+5. Gerçek PSP (Stripe test mode) ile uçtan uca test, 3DS2 akışının gerçek SDK ile doğrulanması.
+6. Erişilebilirlik için manuel ekran okuyucu testi.
+7. Availability partitioning'in Prisma şemasıyla uyumlu hâle getirilmesi.

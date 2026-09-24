@@ -45,7 +45,7 @@ Her faz sonunda kalite kapısı: `npm run lint`, `npm run typecheck`, `npm run f
 ## F5 — Arama & GenAI I
 
 - [x] P1-1 Smart Filter (golden set ≥ 18/20), P1-2 açıklanabilir sıralama, P1-11 embedding (#22), P1-3 i18n/FX
-- [x] Harita görünümü (MapLibre) → F8'de eklendi (kümeleme yok)
+- [x] Harita görünümü (MapLibre) + `supercluster` kümelemesi, harita ↔ liste seçim senkronu (e2e)
 
 ## F6 — Yorumlar + GenAI II
 
@@ -61,7 +61,7 @@ Her faz sonunda kalite kapısı: `npm run lint`, `npm run typecheck`, `npm run f
 - [x] P2-2 seed/demo (`demo:reset`, lisans no, politikalar, 365 gün envanter)
 - [x] P2-3 Playwright e2e (10/10) + axe (6 sayfa, 0 serious/critical), k6 (1 başarı / 199 SOLD_OUT, SQL overbooking 0)
 - [x] Lighthouse mobil raporu (`docs/perf/lighthouse.md`; a11y 100, PDP performansı 79–90 — hedef tutarlı değil)
-- [ ] (ops.) P1-12 MCP sunucusu — uygulanmadı
+- [x] (ops.) P1-12 MCP sunucusu (`services/mcp`, `npm run mcp:server`, `npm run mcp:smoke`)
 
 ## F9 — Docs + CI + cila
 

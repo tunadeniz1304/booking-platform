@@ -11,6 +11,7 @@ booking-platform bir **modüler monolittir** ([ADR 0001](adr/0001-modular-monoli
 | `app`          | Next.js (`src/proxy.ts` + `src/app`) | Sayfalar ve REST API                                                                           |
 | `worker`       | `src/worker/index.ts`                | `expire-holds` (dakikalık), availability rollover (gecelik), outbox relay, bildirim, embedding |
 | `grpc`         | `services/grpc/main.ts`              | `BookingService` + `AriService` (kanal ARI push); yalnızca compose iç ağında                   |
+| `mcp`          | `services/mcp/main.ts`               | MCP sunucusu (stdio): `search_stays`, `get_quote`, token'lı `create_hold`; isteğe bağlı, yerel |
 | `migrate`      | `scripts/migrate-and-seed.ts`        | `prisma migrate deploy` + (`DEMO_SEED` ve boş DB ise) seed                                     |
 | `secrets-init` | `scripts/gen-secrets.mjs`            | Eksik sırları rastgele üretip `booking_secrets` volume'una yazar                               |
 
@@ -18,23 +19,23 @@ Altyapı: PostgreSQL 16 + pgvector (`pgvector/pgvector:pg16`), Redis 7 (`require
 
 ## 2. Bounded context'ler
 
-| Context            | Klasör / dosyalar                                                                              | Sorumluluk                                                                                                 |
-| ------------------ | ---------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| Identity & Access  | `src/lib/auth/*`, `src/lib/security/*`, `src/proxy.ts`                                         | JWT, refresh rotasyonu, RBAC (`USER`/`HOST`/`ADMIN`), CSRF, rate-limit, güvenlik başlıkları                |
-| Catalog            | `src/app/api/properties/**`, `src/lib/host/host-service.ts`                                    | Mülk, oda, olanak, `licenseNumber`; host'un kendi mülkleri                                                 |
-| Inventory          | `Availability`, `src/lib/booking/availability-rollover.ts`, `src/lib/channel/channel.ts`       | Gecelik envanter/fiyat satırları, 365 gün rollover, iCal import/export, ARI sıra numaraları                |
-| Booking            | `src/lib/booking-service.ts`, `src/lib/booking/{state-machine,cancellation}.ts`                | Hold, durum makinesi, iptal politikası snapshot'ı, iade hesabı                                             |
-| Pricing            | `src/lib/pricing/{quote,engine,event-signals}.ts`, `src/lib/money/*`                           | `computeTotal()`, minor-unit para, dinamik fiyat faktörleri, olay sinyalleri, FX görüntüleme               |
-| Payment            | `src/lib/payment/*`                                                                            | `PaymentProvider`, `MockPsp`, opsiyonel Stripe, webhook doğrulama, ledger                                  |
-| Transfer           | `src/lib/transfer/transfer-service.ts`                                                         | İmzalı claim linki + escrow ödemeli rezervasyon devri ([ADR 0007](adr/0007-transfer-claim-link-escrow.md)) |
-| Search & Discovery | `src/lib/search.ts`, `src/lib/search/{ranking,vector,fuzzy,elastic}.ts`, `src/lib/embedding/*` | Filtre, sürüm anahtarlı cache, açıklanabilir sıralama, pgvector benzerlik                                  |
-| Reviews            | `src/lib/reviews/review-service.ts`                                                            | Doğrulanmış konaklama yorumu, host yanıtı, özet cache sürümü                                               |
-| AI (LLM kullanan)  | `src/lib/ai/*` → `src/lib/llm/*`                                                               | Smart Filter, yorum özeti, trip-planner, ilan metni, olay çıkarımı ([ADR 0005](adr/0005-llm-contract.md))  |
-| Risk               | `src/lib/risk/fraud.ts`                                                                        | Kural tabanlı fraud skoru                                                                                  |
-| Notifications      | `src/lib/notifications/*`                                                                      | Türkçe e-posta şablonları; SMTP veya dev mailbox (`/dev/mailbox`)                                          |
-| Messaging          | `src/lib/cqrs/{outbox,event-bus}.ts`, `src/lib/queue.ts`                                       | Transactional outbox, olay yayını, BullMQ kuyruk tanımları (producer ≠ worker)                             |
-| Admin & Privacy    | `src/lib/admin/audit.ts`, `src/lib/privacy/privacy-service.ts`                                 | Audit log, outbox/fraud/olay kuyrukları, KVKK veri dışa aktarım ve anonimleştirme                          |
-| Observability      | `src/lib/observability/*`, `src/instrumentation.ts`                                            | pino, OpenTelemetry, Prometheus metrikleri, readiness                                                      |
+| Context            | Klasör / dosyalar                                                                                          | Sorumluluk                                                                                                  |
+| ------------------ | ---------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Identity & Access  | `src/lib/auth/*`, `src/lib/security/*`, `src/proxy.ts`                                                     | JWT, refresh rotasyonu, RBAC (`USER`/`HOST`/`ADMIN`), CSRF, rate-limit, güvenlik başlıkları                 |
+| Catalog            | `src/app/api/properties/**`, `src/lib/host/host-service.ts`                                                | Mülk, oda, olanak, `licenseNumber`; host'un kendi mülkleri                                                  |
+| Inventory          | `Availability`, `src/lib/booking/availability-rollover.ts`, `src/lib/channel/channel.ts`                   | Gecelik envanter/fiyat satırları, 365 gün rollover, iCal import/export, ARI sıra numaraları                 |
+| Booking            | `src/lib/booking-service.ts`, `src/lib/booking/{state-machine,cancellation}.ts`                            | Hold, durum makinesi, iptal politikası snapshot'ı, iade hesabı                                              |
+| Pricing            | `src/lib/pricing/{quote,engine,event-signals}.ts`, `src/lib/money/*`                                       | `computeTotal()`, minor-unit para, dinamik fiyat faktörleri, olay sinyalleri, FX görüntüleme                |
+| Payment            | `src/lib/payment/*`                                                                                        | `PaymentProvider`, `MockPsp`, opsiyonel Stripe, webhook doğrulama, ledger                                   |
+| Transfer           | `src/lib/transfer/transfer-service.ts`                                                                     | İmzalı claim linki + escrow ödemeli rezervasyon devri ([ADR 0007](adr/0007-transfer-claim-link-escrow.md))  |
+| Search & Discovery | `src/lib/search.ts`, `src/lib/search/{ranking,vector,fuzzy,elastic,map-cluster}.ts`, `src/lib/embedding/*` | Filtre, sürüm anahtarlı cache, açıklanabilir sıralama, pgvector benzerlik, harita kümelemesi (supercluster) |
+| Reviews            | `src/lib/reviews/review-service.ts`                                                                        | Doğrulanmış konaklama yorumu, host yanıtı, özet cache sürümü                                                |
+| AI (LLM kullanan)  | `src/lib/ai/*` → `src/lib/llm/*`                                                                           | Smart Filter, yorum özeti, trip-planner, ilan metni, olay çıkarımı ([ADR 0005](adr/0005-llm-contract.md))   |
+| Risk               | `src/lib/risk/fraud.ts`                                                                                    | Kural tabanlı fraud skoru                                                                                   |
+| Notifications      | `src/lib/notifications/*`                                                                                  | Türkçe e-posta şablonları; SMTP veya dev mailbox (`/dev/mailbox`)                                           |
+| Messaging          | `src/lib/cqrs/{outbox,event-bus}.ts`, `src/lib/queue.ts`                                                   | Transactional outbox, olay yayını, BullMQ kuyruk tanımları (producer ≠ worker)                              |
+| Admin & Privacy    | `src/lib/admin/audit.ts`, `src/lib/privacy/privacy-service.ts`                                             | Audit log, outbox/fraud/olay kuyrukları, KVKK veri dışa aktarım ve anonimleştirme                           |
+| Observability      | `src/lib/observability/*`, `src/instrumentation.ts`                                                        | pino, OpenTelemetry, Prometheus metrikleri, readiness                                                       |
 
 Diğer: `negotiation/engine.ts` (kural tabanlı pazarlık), `resilience/circuit-breaker.ts`, `routing/optimizer.ts` (çok şehirli rota), `live/hub.ts` (tek paylaşılan poller + Redis pub/sub ile SSE).
 
@@ -194,5 +195,4 @@ Diğer modeller: `Amenity`, `Favorite`, `Notification`, `OutboxMessage` (`PENDIN
 
 ## 9. Bilinen sınırlamalar
 
-- Harita görünümü (MapLibre) nokta kümelemesi (supercluster) içermez; çok sayıda sonuçta işaretçiler üst üste binebilir.
 - k6 yük testi tek makinede (Docker Desktop) koşuldu; sonuçlar [docs/perf/k6-results.md](perf/k6-results.md).

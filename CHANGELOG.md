@@ -4,7 +4,7 @@ Bu dosyadaki tüm önemli değişiklikler burada belgelenir. Biçim [Keep a Chan
 
 ## [Unreleased]
 
-## [2.0.0] - 2026-09-24
+## [2.0.0] - 2026-09-25
 
 v1'in prototip çekirdeği üretim kalitesinde bir rezervasyon platformuna dönüştürüldü. 22 bilinen hatanın her biri düzeltildi ve regresyon testiyle korunuyor.
 
@@ -21,6 +21,10 @@ v1'in prototip çekirdeği üretim kalitesinde bir rezervasyon platformuna dön�
 - **F7 — Host ve admin:** host extranet API'leri (mülk, oda, toplu ARI, rezervasyonlar), ilan metni copilot'u, `Property.licenseNumber` zorunluluğu; iCal export/import ve gRPC `AriService` kanal simülatörü; kural tabanlı fraud skoru; admin kuyrukları (outbox, olaylar, fraud, kullanıcı rolleri) ve audit log; KVKK veri dışa aktarım ve hesap silme API'si.
 - **F8 — Portföy arayüzü:** `/host` extranet paneli (mülk düzenleme, oda ekleme, toplu takvim, rezervasyonlar, ilan metni önerisi), `/admin` paneli, `/plan` trip-planner, `/transfers` + claim sayfası, `/account/privacy` KVKK self-servis, aydınlatma metni ve çerez onay bandı; Smart Filter çipleri, "neden bu sırada" açıklaması ve MapLibre harita görünümü; PDP'de atıflı yorum özeti, rol farkında menü, atlama bağlantısı; `npm run demo:reset`, lisans numaraları ve 365 günlük demo envanteri.
 - **F8 — Test ve performans:** Playwright e2e (`npm run test:e2e`: arama → PDP → checkout → 3DS → onay e-postası → iptal → iade; ret kartı; host takvimi; Smart Filter) ve `@axe-core/playwright` ile 6 ana sayfada WCAG A/AA taraması; k6 yük testi `load/booking-spike.js` ve raporları `docs/perf/k6-results.md`, `docs/perf/lighthouse.md`; CI'da compose demo yığınına karşı e2e job'ı.
+- **P1-12 — MCP sunucusu:** `npm run mcp:server` (stdio, `@modelcontextprotocol/sdk`) ile `search_stays`, `get_quote` ve access token'lı `create_hold` araçları; `npm run mcp:smoke` duman testi.
+- Harita görünümünde `supercluster` ile işaretçi kümelemesi ve harita ↔ liste iki yönlü seçim senkronu (`src/lib/search/map-cluster.ts`).
+- README ekran görüntüleri (`docs/img/`, `npm run docs:screenshots`).
+- `npm run test:coverage` unit + entegrasyon testlerini birlikte koşar; `src/lib` için %80 satır kapsam eşiği CI'da zorlanır.
 - `docs/FINAL_REPORT.md`: faz faz yapılanlar, hata → test eşlemesi, metrikler, sınırlamalar.
 - Dokümantasyon: README, `docs/ARCHITECTURE.md`, ADR 0001–0009, `docs/METHODOLOGY.md`, `docs/MODEL_CARD.md`, `docs/COMPLIANCE.md`, `docs/DEMO_SCRIPT.md`, MIT lisansı.
 
@@ -33,6 +37,8 @@ v1'in prototip çekirdeği üretim kalitesinde bir rezervasyon platformuna dön�
 - Eski "sentiment trigger" modülü, admin onaylı ve tavanlı olay sinyali motoruyla değiştirildi.
 - Docker imajları sırsız; compose sırları `secrets-init` ile üretir, Postgres/Redis host'a açılmaz, Redis parolalı; gRPC servisi compose'a eklendi.
 - `.env.example` tüm ortam değişkenlerini belgeler.
+- PDP galerisi Unsplash CDN'inde boyutlandırılmış `srcset` kullanır (önceden optimize edilmemiş 1200 px görseller); küçük resimler düşük öncelikli yüklenir.
+- `LOG_TO_STDERR=true` ile loglar stderr'e yazılabilir (stdio protokollü süreçler için).
 
 ### Fixed
 

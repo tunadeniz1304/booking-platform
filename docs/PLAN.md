@@ -39,8 +39,8 @@ Her faz sonunda kalite kapısı: `npm run lint`, `npm run typecheck`, `npm run f
 
 ## F4 — Gözlemlenebilirlik + migration disiplini
 
-- [ ] P0-8 (pino, OTel, `/api/metrics`, health/ready), P0-9
-- [ ] SSE (#11), routing (#12)
+- [x] P0-8 (pino, OTel, `/api/metrics`, health/ready, Grafana dashboard), P0-9 (rollover, partisyon betiği)
+- [x] SSE (#11), routing (#12)
 
 ## F5 — Arama & GenAI I
 

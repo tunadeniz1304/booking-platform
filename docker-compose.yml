@@ -1,90 +1,158 @@
-version: "3.9"
+# Tek komutla tam demo: `cp .env.example .env && docker compose up --build`
+#
+# - Postgres ve Redis host'a AÇILMAZ (yalnızca iç ağ). Yerel geliştirme için
+#   `docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d db redis`.
+# - Sırlar imajda yok; `.env`'de verilmezse `secrets-init` rastgele üretir.
+# - Opsiyonel profiller: `search` (Elasticsearch), `observability` (Prometheus/Grafana/Tempo).
+
+x-app-env: &app-env
+  env_file:
+    - path: .env
+      required: false
+  environment:
+    NODE_ENV: production
+    POSTGRES_HOST: db
+    POSTGRES_USER: ${POSTGRES_USER:-booking}
+    POSTGRES_DB: ${POSTGRES_DB:-booking}
+    REDIS_HOST: redis
+    DATABASE_URL: ""
+    REDIS_URL: ""
+    # Demo ortamında sırlar daima `secrets-init` üretimidir (.env'deki değerler ezilir).
+    JWT_SECRET: ""
+    INTERNAL_API_SECRET: ""
+    TRANSFER_SIGNING_SECRET: ""
+    PSP_WEBHOOK_SECRET: ""
+    METRICS_TOKEN: ""
+    GRPC_HOST: grpc
+    COOKIE_SECURE: ${COOKIE_SECURE:-false}
+  volumes:
+    - booking_secrets:/run/booking-secrets:ro
 
 services:
+  secrets-init:
+    build: { context: ., target: worker }
+    image: booking-platform-worker
+    user: "0:0"
+    entrypoint: ["node", "scripts/gen-secrets.mjs"]
+    command: []
+    volumes:
+      - booking_secrets:/run/booking-secrets
+    restart: "no"
+
   db:
     image: pgvector/pgvector:pg16
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-booking}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-booking}
       POSTGRES_DB: ${POSTGRES_DB:-booking}
-    ports:
-      - "5432:5432"
+      POSTGRES_PASSWORD_FILE: /run/booking-secrets/POSTGRES_PASSWORD
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - booking_secrets:/run/booking-secrets:ro
+    depends_on:
+      secrets-init: { condition: service_completed_successfully }
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-booking}"]
-      interval: 10s
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-booking} -d ${POSTGRES_DB:-booking}"]
+      interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 20
 
   redis:
     image: redis:7-alpine
     restart: unless-stopped
-    ports:
-      - "6379:6379"
+    command:
+      - sh
+      - -c
+      - exec redis-server --appendonly yes --requirepass "$$(cat /run/booking-secrets/REDIS_PASSWORD)"
     volumes:
       - redis_data:/data
+      - booking_secrets:/run/booking-secrets:ro
+    depends_on:
+      secrets-init: { condition: service_completed_successfully }
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
+      test:
+        - CMD-SHELL
+        - redis-cli -a "$$(cat /run/booking-secrets/REDIS_PASSWORD)" --no-auth-warning ping | grep -q PONG
+      interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 20
+
+  # Tek seferlik: migration + (DEMO_SEED=true ise ve veritabanı boşsa) demo verisi.
+  migrate:
+    image: booking-platform-worker
+    <<: *app-env
+    environment:
+      NODE_ENV: production
+      POSTGRES_HOST: db
+      POSTGRES_USER: ${POSTGRES_USER:-booking}
+      POSTGRES_DB: ${POSTGRES_DB:-booking}
+      REDIS_HOST: redis
+      DATABASE_URL: ""
+      REDIS_URL: ""
+      DEMO_SEED: ${DEMO_SEED:-true}
+      JWT_SECRET: ""
+      INTERNAL_API_SECRET: ""
+      TRANSFER_SIGNING_SECRET: ""
+      PSP_WEBHOOK_SECRET: ""
+      METRICS_TOKEN: ""
+    command: ["npx", "tsx", "scripts/migrate-and-seed.ts"]
+    depends_on:
+      secrets-init: { condition: service_completed_successfully }
+      db: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    restart: "no"
 
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    build: { context: ., target: web }
+    image: booking-platform-web
+    <<: *app-env
     restart: unless-stopped
     ports:
-      - "3000:3000"
-    environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-booking}:${POSTGRES_PASSWORD:-booking}@db:5432/${POSTGRES_DB:-booking}
-      REDIS_URL: redis://redis:6379
-      JWT_SECRET: ${JWT_SECRET:-change-me}
-      INTERNAL_API_SECRET: ${INTERNAL_API_SECRET:-change-me-internal-secret}
-      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-change-me}
-      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3000}
-      NODE_ENV: production
-      ELASTICSEARCH_URL: ${ELASTICSEARCH_URL:-}
+      - "${APP_PORT:-3000}:3000"
     depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+      migrate: { condition: service_completed_successfully }
 
-  # Arka plan işçisi: outbox relay + pricing kuyruğu (bağımsız süreç)
   worker:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: booking-platform-worker
+    <<: *app-env
     restart: unless-stopped
-    command: ["npm", "run", "worker"]
-    environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-booking}:${POSTGRES_PASSWORD:-booking}@db:5432/${POSTGRES_DB:-booking}
-      REDIS_URL: redis://redis:6379
-      JWT_SECRET: ${JWT_SECRET:-change-me}
-      INTERNAL_API_SECRET: ${INTERNAL_API_SECRET:-change-me-internal-secret}
-      NODE_ENV: production
     depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+      migrate: { condition: service_completed_successfully }
 
-  # Opsiyonel: semantik/fuzzy aramayı Elasticsearch üzerinden yapmak isterseniz
-  # kullanın: docker compose --profile es up -d (ve ELASTICSEARCH_URL ayarlayın)
+  # İç gRPC servisi: yalnızca compose ağında erişilebilir (host'a port açılmaz).
+  grpc:
+    image: booking-platform-worker
+    <<: *app-env
+    environment:
+      NODE_ENV: production
+      POSTGRES_HOST: db
+      POSTGRES_USER: ${POSTGRES_USER:-booking}
+      POSTGRES_DB: ${POSTGRES_DB:-booking}
+      REDIS_HOST: redis
+      DATABASE_URL: ""
+      REDIS_URL: ""
+      GRPC_HOST: 0.0.0.0
+      JWT_SECRET: ""
+      INTERNAL_API_SECRET: ""
+      TRANSFER_SIGNING_SECRET: ""
+      PSP_WEBHOOK_SECRET: ""
+      METRICS_TOKEN: ""
+      GRPC_PORT: "50051"
+    command: ["npx", "tsx", "--conditions=react-server", "services/grpc/main.ts"]
+    expose:
+      - "50051"
+    restart: unless-stopped
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
-    profiles: ["es"]
+    profiles: ["search"]
     restart: unless-stopped
     environment:
       discovery.type: single-node
       ES_JAVA_OPTS: "-Xms512m -Xmx512m"
       xpack.security.enabled: "false"
-    ports:
-      - "9200:9200"
     volumes:
       - es_data:/usr/share/elasticsearch/data
 
@@ -92,3 +160,4 @@ volumes:
   postgres_data:
   redis_data:
   es_data:
+  booking_secrets:

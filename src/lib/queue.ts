@@ -1,98 +1,63 @@
-import { Queue, Worker, Job } from "bullmq";
-import Redis from "ioredis";
-import { updateAvailabilityPrices } from "./pricing-service";
-import { ingestExternalSignal, ExternalSignalInput } from "./sentiment/trigger";
+import { Queue, type JobsOptions } from "bullmq";
+import { Redis } from "ioredis";
 
-const connection = new Redis(process.env.REDIS_URL || "redis://localhost:6379", {
-  maxRetriesPerRequest: null,
-});
+/**
+ * BullMQ kuyruk TANIMLARI (yalnızca producer).
+ *
+ * Bu modül import edildiğinde hiçbir Worker başlamaz ve Redis bağlantısı
+ * açılmaz; kuyruklar ilk kullanımda tembel oluşturulur. İşleyiciler (Worker)
+ * YALNIZCA `src/worker/index.ts` sürecinde çalışır — Next sunucusu iş işlemez.
+ */
 
-export const pricingQueue = new Queue("pricing", { connection });
+export const QUEUE_NAMES = {
+  pricing: "pricing",
+  maintenance: "maintenance",
+  notifications: "notifications",
+  embeddings: "embeddings",
+  channel: "channel",
+} as const;
 
-export const pricingWorker = new Worker(
-  "pricing",
-  async (job: Job) => {
-    // Doğru imza: updateAvailabilityPrices(roomId, dates[], basePrice, currency)
-    const data = job.data as {
-      roomId?: string;
-      dates?: string[];
-      basePrice?: number;
-      currency?: string;
-    };
+export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];
 
-    if (!data.roomId || !data.dates || data.dates.length === 0) {
-      throw new Error("Invalid pricing job payload: roomId and dates are required");
-    }
+export interface PricingJobData {
+  roomId: string;
+  dates: string[];
+  basePrice: number;
+  currency: string;
+}
 
-    await updateAvailabilityPrices(
-      data.roomId,
-      data.dates,
-      data.basePrice ?? 0,
-      data.currency ?? "TRY"
-    );
-  },
-  { connection }
-);
+const globalForQueues = globalThis as unknown as {
+  __bookingQueueConnection?: Redis;
+  __bookingQueues?: Map<QueueName, Queue>;
+};
 
-export async function addPricingUpdateJob(
-  roomId: string,
-  dates: string[],
-  basePrice: number,
-  currency?: string
-): Promise<Job> {
-  return pricingQueue.add(
-    "update-pricing",
-    {
-      roomId,
-      dates,
-      basePrice,
-      currency: currency ?? "TRY",
-    },
-    {
-      attempts: 3,
-      backoff: { type: "exponential", delay: 5000 },
-      removeOnComplete: true,
-      removeOnFail: false,
-    }
+/** BullMQ bağlantısı (`maxRetriesPerRequest: null` BullMQ gereksinimidir). */
+export function getQueueConnection(): Redis {
+  globalForQueues.__bookingQueueConnection ??= new Redis(
+    process.env.REDIS_URL || "redis://localhost:6379",
+    { maxRetriesPerRequest: null, lazyConnect: true }
   );
+  return globalForQueues.__bookingQueueConnection;
 }
 
-export async function setupPricingCron(): Promise<void> {
-  const repeatableJobs = await pricingQueue.getRepeatableJobs();
-  const existing = repeatableJobs.find((job) => job.name === "update-pricing-cron");
-  if (!existing) {
-    await pricingQueue.add(
-      "update-pricing-cron",
-      {},
-      {
-        repeat: { pattern: "0 3 * * *" },
-        jobId: "update-pricing-cron",
-      }
-    );
+export function getQueue(name: QueueName): Queue {
+  globalForQueues.__bookingQueues ??= new Map();
+  let queue = globalForQueues.__bookingQueues.get(name);
+  if (!queue) {
+    queue = new Queue(name, { connection: getQueueConnection() });
+    globalForQueues.__bookingQueues.set(name, queue);
   }
+  return queue;
 }
 
-// --- Global Sentiment & Event Trigger (asenkron sinyal kuyruğu) ---------------
+const DEFAULT_JOB_OPTIONS: JobsOptions = {
+  attempts: 3,
+  backoff: { type: "exponential", delay: 5000 },
+  removeOnComplete: true,
+  removeOnFail: 1000,
+};
 
-export const eventSignalQueue = new Queue("event-signal", { connection });
-
-export const eventSignalWorker = new Worker(
-  "event-signal",
-  async (job: Job) => {
-    const signal = job.data as ExternalSignalInput;
-    if (!signal?.title || !signal.startsOn || !signal.endsOn) {
-      throw new Error("Invalid event-signal payload");
-    }
-    await ingestExternalSignal(signal);
-  },
-  { connection }
-);
-
-export async function addEventSignalJob(signal: ExternalSignalInput): Promise<Job> {
-  return eventSignalQueue.add("apply-event-signal", signal, {
-    attempts: 3,
-    backoff: { type: "exponential", delay: 2000 },
-    removeOnComplete: true,
-    removeOnFail: false,
-  });
+export async function addPricingUpdateJob(data: PricingJobData): Promise<string | undefined> {
+  const job = await getQueue(QUEUE_NAMES.pricing).add("update-pricing", data, DEFAULT_JOB_OPTIONS);
+  return job.id;
 }

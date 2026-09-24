@@ -1,49 +1,49 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { addPricingUpdateJob, setupPricingCron } from "@/lib/queue";
+import { prisma } from "@/lib/prisma";
+import { addPricingUpdateJob } from "@/lib/queue";
 import { requireRole } from "@/lib/auth";
+import { NotFoundError, toErrorResponse } from "@/lib/http/errors";
+import { isOwnedBy } from "@/lib/security/ownership";
 
 const pricingSchema = z.object({
-  roomId: z.string().min(1),
-  dates: z.array(z.string().datetime()).min(1).max(366),
-  basePrice: z.number().positive(),
-  currency: z.string().min(1).default("TRY"),
+  roomId: z.string().min(1).max(64),
+  dates: z
+    .array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/))
+    .min(1)
+    .max(366),
+  basePrice: z.number().positive().max(10_000_000),
 });
 
-export async function POST(request: NextRequest) {
+/**
+ * Oda fiyat güncelleme işi kuyruğa alır.
+ * - Oturum yok → 401, rol HOST/ADMIN değil → 403.
+ * - HOST yalnızca KENDİ mülkünün odası için iş açabilir; başkasınınki → 404
+ *   (kaynağın varlığı sızdırılmaz). ADMIN tüm odalar için.
+ */
+export async function POST(req: NextRequest) {
   try {
-    requireRole(request, ["HOST", "ADMIN"]);
-    const body = await request.json();
-    const parsed = pricingSchema.safeParse(body);
+    const actor = await requireRole(req, ["HOST", "ADMIN"]);
+    const { roomId, dates, basePrice } = pricingSchema.parse(await req.json());
 
-    if (!parsed.success) {
-      return NextResponse.json(
-        { error: "Invalid request body", details: parsed.error.flatten() },
-        { status: 400 }
-      );
+    const room = await prisma.room.findUnique({
+      where: { id: roomId },
+      select: { property: { select: { hostId: true, currency: true } } },
+    });
+    if (!room || (actor.role !== "ADMIN" && !isOwnedBy(room.property.hostId, actor.userId))) {
+      throw new NotFoundError("Oda bulunamadı");
     }
 
-    const { roomId, dates, basePrice, currency } = parsed.data;
-
-    // Cron mekanizmasını başlat (ilk istekte)
-    await setupPricingCron();
-
-    // Kuyruğa iş ekle (async)
-    await addPricingUpdateJob(roomId, dates, basePrice, currency);
-
-    return NextResponse.json({
-      message: "Pricing update job queued successfully",
+    const jobId = await addPricingUpdateJob({
       roomId,
       dates,
       basePrice,
-      currency,
+      currency: room.property.currency,
     });
+    return NextResponse.json({ queued: true, jobId, roomId, dates: dates.length }, { status: 202 });
   } catch (error) {
-    console.error("Pricing API error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return toErrorResponse(error, "pricing");
   }
 }
 
-export async function GET() {
-  return NextResponse.json({ message: "Use POST to trigger pricing update" });
-}
+export const dynamic = "force-dynamic";

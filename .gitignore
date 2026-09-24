@@ -40,3 +40,14 @@ Thumbs.db
 coverage/
 # TypeScript incremental build
 *.tsbuildinfo
+
+# Test/raporlama çıktıları
+playwright-report/
+test-results/
+blob-report/
+
+# Eski projeler (yerel arşiv, repoya girmez)
+/archive/
+
+# Yerel araç önbellekleri
+.code-review-graph/

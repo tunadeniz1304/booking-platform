@@ -27,10 +27,10 @@ Her faz sonunda kalite kapısı: `npm run lint`, `npm run typecheck`, `npm run f
 
 ## F2 — Rezervasyon çekirdeği
 
-- [ ] P0-2 durum makinesi + hold/expiry (#4)
-- [ ] P0-3 para/quote (#7, #8, #20)
-- [ ] Outbox (#9), BullMQ ayrımı (#10), cache (#18)
-- [ ] 100 paralel eşzamanlılık testi
+- [x] P0-2 durum makinesi + hold/expiry (#4)
+- [x] P0-3 para/quote (#7, #8, #20)
+- [x] Outbox (#9), BullMQ ayrımı (#10), cache (#18)
+- [x] 100 paralel eşzamanlılık testi (1 başarı / 99 SOLD_OUT, SQL overbooking 0)
 
 ## F3 — Ödeme + iptal + bildirim
 

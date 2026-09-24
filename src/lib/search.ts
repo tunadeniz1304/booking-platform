@@ -5,6 +5,9 @@ import { logger, errorFields } from "@/lib/observability/logger";
 import { getConfig } from "@/lib/config/app-config";
 import { money, toDecimalString, toMinor } from "@/lib/money/money";
 import { nightsFromRows, priceStay } from "@/lib/pricing/quote";
+import { rankResults } from "@/lib/search/ranking";
+
+const RANK_POOL = 200;
 import { isIsoDate, nightsBetween, type IsoDate } from "@/lib/time/nights";
 
 function stayFor(params: { checkIn?: string; checkOut?: string }): { nights: IsoDate[] } | null {
@@ -71,6 +74,9 @@ export interface SearchResult {
   totalPrice?: number;
   /** Seçilen tarihler için en ucuz odanın vergi dahil toplamı (priceStay ile). */
   quote?: { roomId: string; total: number; currency: string; nights: number };
+  /** Önerilen sıralamada toplam skor ve bileşen katkıları ("Bu sıralama neden?"). */
+  score?: number;
+  explain?: Record<string, number>;
 }
 
 export interface SearchResponse {
@@ -397,14 +403,16 @@ export async function searchProperties(params: SearchParams): Promise<SearchResp
 
   const where = buildWhere(params);
   const orderBy = buildOrderBy(params.sort);
+  const rankInApp = (params.sort ?? "recommended") === "recommended";
 
   const [total, properties] = await Promise.all([
     prisma.property.count({ where }),
     prisma.property.findMany({
       where,
       orderBy,
-      skip: (page - 1) * pageSize,
-      take: pageSize,
+      // "Önerilen" sıralama uygulamada (açıklanabilir skor) yapılır → aday havuzu alınır.
+      skip: rankInApp ? 0 : (page - 1) * pageSize,
+      take: rankInApp ? RANK_POOL : pageSize,
       select: {
         id: true,
         title: true,
@@ -456,7 +464,7 @@ export async function searchProperties(params: SearchParams): Promise<SearchResp
     }),
   ]);
 
-  const results: SearchResult[] = properties.map((property) => {
+  const mapped: SearchResult[] = properties.map((property) => {
     const availableRooms = property.rooms.length;
     let totalPrice: number | undefined;
     let quote: SearchResult["quote"];
@@ -504,6 +512,22 @@ export async function searchProperties(params: SearchParams): Promise<SearchResp
       quote,
     };
   });
+
+  let results = mapped;
+  if (rankInApp) {
+    const ranked = rankResults(
+      mapped.map((r) => ({
+        id: r.id,
+        price: r.quote?.total ?? r.basePrice * 100,
+        ratingAvg: r.ratingAvg,
+        ratingCount: r.ratingCount,
+      }))
+    );
+    const byId = new Map(mapped.map((r) => [r.id, r]));
+    results = ranked
+      .slice((page - 1) * pageSize, page * pageSize)
+      .map((x) => ({ ...byId.get(x.id)!, score: x.score, explain: x.explain }));
+  }
 
   const response: SearchResponse = {
     results,

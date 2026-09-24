@@ -49,7 +49,7 @@ Her faz sonunda kalite kapısı: `npm run lint`, `npm run typecheck`, `npm run f
 
 ## F6 — Yorumlar + GenAI II
 
-- [ ] P1-4 yorumlar + özet, P1-6 trip-planner, P1-5 olay sinyalleri (#13)
+- [x] P1-4 yorumlar + atıflı özet, P1-6 trip-planner (API; `/plan` sayfası F8), P1-5 olay sinyalleri (#13)
 
 ## F7 — Host/Admin
 

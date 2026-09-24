@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { diffDays, fromDate, monthOf, parseIsoDate, toDbDate } from "@/lib/time/nights";
 import { PricingResult } from "@/lib/pricing-service";
 import { breakers } from "@/lib/resilience/circuit-breaker";
 
@@ -42,16 +43,14 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-export function daysUntil(date: Date): number {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const target = new Date(date);
-  target.setHours(0, 0, 0, 0);
-  return Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+/** Bugünden (UTC) hedef geceye kalan gün sayısı — yerel saat dilimi kullanılmaz. */
+export function daysUntil(date: Date, now: Date = new Date()): number {
+  return diffDays(fromDate(now), fromDate(date));
 }
 
 export function getSeasonalFactor(date: Date): number {
-  const month = date.getMonth();
+  // 0 tabanlı UTC ay (yerel getMonth DEĞİL — gece sınırında yanlış ay üretmesin).
+  const month = monthOf(fromDate(date)) - 1;
   // Haziran-Eylül yüksek sezon
   if (month >= 5 && month <= 8) return 1.3;
   // Aralık-Ocak yılbaşı
@@ -136,7 +135,7 @@ export function computeDynamicPrice(
   input: DynamicPricingInput,
   demand: { eventFactor: number; demandSignal: number }
 ): PricingResult {
-  const date = new Date(input.date);
+  const date = toDbDate(parseIsoDate(input.date));
   const occupancyRate = clamp(input.occupancyRate ?? 0.5, 0, 1);
   const seasonalFactor = input.seasonalFactor ?? getSeasonalFactor(date);
   const lastMinuteFactor = input.lastMinuteFactor ?? getLeadTimeFactor(date).lastMinute;

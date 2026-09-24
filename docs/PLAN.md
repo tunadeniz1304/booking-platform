@@ -35,7 +35,7 @@ Her faz sonunda kalite kapısı: `npm run lint`, `npm run typecheck`, `npm run f
 ## F3 — Ödeme + iptal + bildirim
 
 - [x] P0-4 iptal politikası, P0-5 ödeme (MockPsp + 3DS + webhook), P0-7 bildirimler
-- [x] Transfer (#3) + P1-8 servis/API (`/transfers` sayfası F8'de)
+- [x] Transfer (#3) + P1-8 servis/API (`/transfers` sayfası F8'de eklendi)
 
 ## F4 — Gözlemlenebilirlik + migration disiplini
 
@@ -45,7 +45,7 @@ Her faz sonunda kalite kapısı: `npm run lint`, `npm run typecheck`, `npm run f
 ## F5 — Arama & GenAI I
 
 - [x] P1-1 Smart Filter (golden set ≥ 18/20), P1-2 açıklanabilir sıralama, P1-11 embedding (#22), P1-3 i18n/FX
-- [ ] Harita görünümü (MapLibre) → F8 UI ile
+- [x] Harita görünümü (MapLibre) → F8'de eklendi (kümeleme yok)
 
 ## F6 — Yorumlar + GenAI II
 
@@ -57,9 +57,15 @@ Her faz sonunda kalite kapısı: `npm run lint`, `npm run typecheck`, `npm run f
 
 ## F8 — Portföy
 
-- [ ] P2-1 UI, P2-2 seed/demo, P2-3 Playwright + k6, (ops.) P1-12 MCP
+- [x] P2-1 UI: `/host`, `/admin`, `/plan`, `/transfers`, `/account/privacy`, çerez bandı, harita, a11y düzeltmeleri
+- [x] P2-2 seed/demo (`demo:reset`, lisans no, politikalar, 365 gün envanter)
+- [x] P2-3 Playwright e2e (10/10) + axe (6 sayfa, 0 serious/critical), k6 (1 başarı / 199 SOLD_OUT, SQL overbooking 0)
+- [x] Lighthouse mobil raporu (`docs/perf/lighthouse.md`; a11y 100, PDP performansı 79–90 — hedef tutarlı değil)
+- [ ] (ops.) P1-12 MCP sunucusu — uygulanmadı
 
 ## F9 — Docs + CI + cila
 
-- [ ] README, ARCHITECTURE, ADR'ler, METHODOLOGY, MODEL_CARD, COMPLIANCE, DEMO_SCRIPT
-- [ ] `ci.yml`, CHANGELOG, LICENSE, `v2.0.0`
+- [x] README, ARCHITECTURE, ADR'ler, METHODOLOGY, MODEL_CARD, COMPLIANCE, DEMO_SCRIPT
+- [x] `ci.yml` (e2e job'ı dahil), CHANGELOG, LICENSE, `docs/FINAL_REPORT.md`, `package.json` 2.0.0
+- [ ] README ekran görüntüleri (`docs/img/`)
+- [ ] `v2.0.0` tag + push, CI'nın GitHub'da yeşil olduğunun doğrulanması

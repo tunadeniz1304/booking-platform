@@ -17,3 +17,4 @@ booking.md
 .code-review-graph
 data
 *.min.js
+tsconfig.json

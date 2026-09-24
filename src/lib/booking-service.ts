@@ -17,6 +17,7 @@ import { getConfig } from "@/lib/config/app-config";
 import { withSerializableRetry } from "@/lib/db/transactions";
 import { transition, type BookingState } from "@/lib/booking/state-machine";
 import { toSnapshot } from "@/lib/booking/cancellation";
+import { getFxTable } from "@/lib/money/fx";
 import { money, toDecimalString, toMinor, assertCurrency } from "@/lib/money/money";
 import { DateRangeError, fromDate, parseStay, toDbDate, type IsoDate } from "@/lib/time/nights";
 import {
@@ -336,6 +337,7 @@ async function reserveInTransaction(
         policySnapshot: toSnapshot(
           room.property.cancellationPolicy
         ) as unknown as Prisma.InputJsonValue,
+        fxSnapshot: getFxTable() as unknown as Prisma.InputJsonValue,
         idempotencyKey: input.idempotencyKey ?? null,
       },
       select: bookingSelect,

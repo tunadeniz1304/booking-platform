@@ -1,6 +1,8 @@
 "use client";
 
+import { useLocale, useTranslations } from "next-intl";
 import { formatMoney, money } from "@/lib/money/money";
+import { convert } from "@/lib/money/fx";
 import type { QuoteView } from "./useQuote";
 
 function fmt(amount: number, currency: string): string {
@@ -12,6 +14,13 @@ function fmt(amount: number, currency: string): string {
  * birebir kopyasıdır; burada hesaplama yapılmaz.
  */
 export default function QuoteBreakdown({ quote }: { quote: QuoteView }) {
+  const t = useTranslations("quote");
+  const locale = useLocale();
+  // İngilizce arayüzde bilgi amaçlı USD karşılığı (tahsilat mülkün para biriminde).
+  const approx =
+    locale === "en" && quote.currency !== "USD"
+      ? formatMoney(convert(money(quote.total, quote.currency), "USD"), "en-US")
+      : null;
   const n = quote.nights.length;
   const uniform = quote.nights.every((x) => x.amount === quote.nights[0].amount);
   return (
@@ -39,9 +48,14 @@ export default function QuoteBreakdown({ quote }: { quote: QuoteView }) {
         </div>
       ))}
       <div className="flex justify-between border-t border-gray-200 pt-2 text-base font-semibold text-gray-900">
-        <dt>Toplam (vergiler dahil)</dt>
+        <dt>{t("total")}</dt>
         <dd data-testid="quote-total">{fmt(quote.total, quote.currency)}</dd>
       </div>
+      {approx && (
+        <p className="text-xs text-gray-500" data-testid="quote-fx">
+          {t("approx", { amount: approx, currency: quote.currency })}
+        </p>
+      )}
     </dl>
   );
 }

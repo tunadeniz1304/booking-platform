@@ -165,6 +165,8 @@ model Booking {
   quoteId        String?
   /// Rezervasyon anındaki iptal politikası (sonradan değişse de bu geçerlidir).
   policySnapshot Json?
+  /// Rezervasyon anındaki kur tablosu (yalnızca görüntüleme karşılıkları için).
+  fxSnapshot Json?
   ledgerEntries  LedgerEntry[]
   confirmedAt    DateTime?
   cancelledAt    DateTime?

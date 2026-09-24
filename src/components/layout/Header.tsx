@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { logout } from "@/lib/api-client";
+import LocaleSwitcher from "./LocaleSwitcher";
 
 const navItems = [
   { label: "Konaklama", href: "/" },
@@ -79,6 +80,7 @@ export default function Header() {
         </div>
 
         <div className="flex items-center gap-2">
+          <LocaleSwitcher />
           {user ? (
             <div className="flex items-center gap-2">
               <Link

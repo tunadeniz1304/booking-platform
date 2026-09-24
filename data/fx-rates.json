@@ -1,0 +1,6 @@
+{
+  "base": "TRY",
+  "asOf": "2026-09-01",
+  "source": "Statik demo kur tablosu (gerçek kur değildir; ağ erişimi gerektirmez)",
+  "rates": { "TRY": 1, "USD": 0.0243, "EUR": 0.0221, "GBP": 0.0187 }
+}

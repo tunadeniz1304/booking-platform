@@ -1,0 +1,24 @@
+{
+  "nav": {
+    "search": "Search",
+    "account": "My account",
+    "login": "Sign in",
+    "register": "Sign up",
+    "logout": "Sign out",
+    "transfers": "Transfer market",
+    "plan": "Plan a trip"
+  },
+  "quote": {
+    "nights": "{count} nights",
+    "subtotal": "Subtotal",
+    "tax": "Accommodation tax",
+    "total": "Total (taxes included)",
+    "approx": "Approx. {amount} (for information; charged in {currency})"
+  },
+  "footer": {
+    "demo": "Portfolio/demo project; no real payments are taken and no real stays are sold.",
+    "ranking": "How ranking works",
+    "privacy": "Privacy"
+  },
+  "locale": { "label": "Language", "tr": "Türkçe", "en": "English" }
+}

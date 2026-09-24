@@ -1,0 +1,24 @@
+{
+  "nav": {
+    "search": "Ara",
+    "account": "Hesabım",
+    "login": "Giriş yap",
+    "register": "Kayıt ol",
+    "logout": "Çıkış yap",
+    "transfers": "Devir pazarı",
+    "plan": "Gezi planla"
+  },
+  "quote": {
+    "nights": "{count} gece",
+    "subtotal": "Ara toplam",
+    "tax": "Konaklama vergisi",
+    "total": "Toplam (vergiler dahil)",
+    "approx": "Yaklaşık {amount} (bilgi amaçlı; tahsilat {currency} ile)"
+  },
+  "footer": {
+    "demo": "Portföy/demo projesidir; gerçek ödeme alınmaz, gerçek konaklama satılmaz.",
+    "ranking": "Sıralama nasıl çalışır?",
+    "privacy": "Gizlilik ve KVKK"
+  },
+  "locale": { "label": "Dil", "tr": "Türkçe", "en": "English" }
+}

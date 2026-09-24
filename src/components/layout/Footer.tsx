@@ -55,7 +55,11 @@ export default function Footer() {
               Size özel fırsatları ve indirimleri kaçırmayın.
             </p>
             <form className="mt-4 flex flex-col gap-2 sm:flex-row">
+              <label htmlFor="newsletter-email" className="sr-only">
+                E-posta adresiniz
+              </label>
               <input
+                id="newsletter-email"
                 type="email"
                 placeholder="E-posta adresiniz"
                 className="w-full rounded-sm border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-500 focus:border-[#003580] focus:outline-none focus:ring-1 focus:ring-[#003580]"
@@ -71,20 +75,32 @@ export default function Footer() {
         </div>
 
         <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-gray-200 pt-8 sm:flex-row">
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-gray-600">
             © {new Date().getFullYear()} booking-platform · Portföy/demo projesidir; gerçek ödeme
             alınmaz, gerçek konaklama satılmaz.
           </p>
           <div className="flex items-center gap-4">
-            <button className="text-xs text-gray-500 transition hover:text-[#003580] hover:underline">
+            <Link
+              href="/privacy"
+              className="text-xs text-gray-600 transition hover:text-[#003580] hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003580]"
+            >
               Gizlilik Bildirimi
-            </button>
+            </Link>
+            <Link
+              href="/account/privacy"
+              className="text-xs text-gray-600 transition hover:text-[#003580] hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003580]"
+            >
+              Verilerim
+            </Link>
             <button className="text-xs text-gray-500 transition hover:text-[#003580] hover:underline">
               Kullanım Koşulları
             </button>
-            <button className="text-xs text-gray-500 transition hover:text-[#003580] hover:underline">
+            <Link
+              href="/privacy#p-cookies"
+              className="text-xs text-gray-600 transition hover:text-[#003580] hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003580]"
+            >
               Çerez Bildirimi
-            </button>
+            </Link>
           </div>
         </div>
       </div>

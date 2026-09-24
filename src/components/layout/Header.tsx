@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { getToken, logout } from "@/lib/api-client";
+import { logout } from "@/lib/api-client";
 
 const navItems = [
   { label: "Konaklama", href: "/" },
@@ -26,18 +26,20 @@ export default function Header() {
   const pathname = usePathname();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [user, setUser] = useState<SessionUser | null>(null);
-  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    setHydrated(true);
-    if (!getToken()) {
-      setUser(null);
-      return;
-    }
+    let active = true;
     fetch("/api/user/me")
       .then((res) => (res.ok ? res.json() : null))
-      .then((data) => setUser(data))
-      .catch(() => setUser(null));
+      .then((data: SessionUser | null) => {
+        if (active) setUser(data);
+      })
+      .catch(() => {
+        if (active) setUser(null);
+      });
+    return () => {
+      active = false;
+    };
   }, [pathname]);
 
   const handleLogout = async () => {
@@ -65,7 +67,9 @@ export default function Header() {
                 href={item.href}
                 aria-disabled={item.disabled}
                 className={`rounded-sm px-3 py-2 text-sm font-medium transition hover:bg-white/10 hover:text-white ${
-                  item.disabled ? "cursor-not-allowed text-white/50 hover:bg-transparent" : "text-white/90"
+                  item.disabled
+                    ? "cursor-not-allowed text-white/50 hover:bg-transparent"
+                    : "text-white/90"
                 }`}
               >
                 {item.label}
@@ -75,7 +79,7 @@ export default function Header() {
         </div>
 
         <div className="flex items-center gap-2">
-          {hydrated && user ? (
+          {user ? (
             <div className="flex items-center gap-2">
               <Link
                 href="/account"
@@ -116,11 +120,27 @@ export default function Header() {
             aria-label="Menüyü aç/kapat"
             aria-expanded={isMenuOpen}
           >
-            <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <svg
+              className="h-6 w-6"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
               {isMenuOpen ? (
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
               ) : (
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 6h16M4 12h16M4 18h16"
+                />
               )}
             </svg>
           </button>
@@ -143,7 +163,7 @@ export default function Header() {
               </Link>
             ))}
             <div className="mt-2 flex flex-col gap-2 border-t border-white/10 pt-2">
-              {hydrated && user ? (
+              {user ? (
                 <button
                   onClick={handleLogout}
                   className="rounded-sm bg-white px-4 py-2 text-center text-sm font-semibold text-[#003580]"

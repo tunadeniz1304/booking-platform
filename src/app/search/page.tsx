@@ -89,7 +89,8 @@ function SearchPageContent() {
   }, [destination, checkIn, checkOut, guests, sortBy]);
 
   useEffect(() => {
-    load();
+    const timer = setTimeout(() => void load(), 0);
+    return () => clearTimeout(timer);
   }, [load]);
 
   const visibleResults = results.filter((p) => {

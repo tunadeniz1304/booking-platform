@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
+import { useRouter } from "next/navigation";
 
 export interface PropertyCardProps {
   id: string;
@@ -28,6 +30,7 @@ export default function PropertyCard({
   propertyType,
   initialFavorite = false,
 }: PropertyCardProps) {
+  const router = useRouter();
   const [isFavorite, setIsFavorite] = useState(initialFavorite);
   const [busy, setBusy] = useState(false);
 
@@ -51,7 +54,7 @@ export default function PropertyCard({
     } catch (err) {
       // Giriş yapılmamışsa favori eklenemez; kullanıcıyı girişe yönlendir
       if (err instanceof Error && err.message.includes("401")) {
-        window.location.href = "/login";
+        router.push("/login");
       }
     } finally {
       setBusy(false);
@@ -61,10 +64,12 @@ export default function PropertyCard({
   return (
     <div className="group overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm transition hover:shadow-md">
       <div className="relative h-48 overflow-hidden">
-        <img
+        <Image
           src={imageUrl}
           alt={title}
-          className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+          fill
+          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+          className="object-cover transition duration-300 group-hover:scale-105"
         />
         <button
           type="button"
@@ -103,14 +108,25 @@ export default function PropertyCard({
               </Link>
             </h3>
             <p className="mt-1 flex items-center gap-1 text-sm text-gray-500">
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <svg
+                className="h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   strokeWidth={2}
                   d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
                 />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+                />
               </svg>
               {location}
             </p>

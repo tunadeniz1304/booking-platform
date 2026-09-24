@@ -9,11 +9,8 @@ import { getRoomHeat, recordRoomView } from "@/lib/live/stats";
  * yayınlanır; kullanıcı sayfadan ayrılınca bağlantı kapanır. Middleware
  * rate-limit'ine tabidir; genel (auth gerektirmez) bir ısı haritasıdır.
  */
-export async function GET(
-  req: NextRequest,
-  { params }: { params: { roomId: string } }
-) {
-  const { roomId } = params;
+export async function GET(req: NextRequest, { params }: { params: Promise<{ roomId: string }> }) {
+  const { roomId } = await params;
   const { searchParams } = new URL(req.url);
   const start = searchParams.get("start") ?? undefined;
   const end = searchParams.get("end") ?? undefined;
@@ -34,14 +31,10 @@ export async function GET(
             controller.enqueue(encoder.encode(`event: error\ndata: Oda bulunamadı\n\n`));
             return;
           }
-          controller.enqueue(
-            encoder.encode(`event: heat\ndata: ${JSON.stringify(heat)}\n\n`)
-          );
+          controller.enqueue(encoder.encode(`event: heat\ndata: ${JSON.stringify(heat)}\n\n`));
         } catch (error) {
           controller.enqueue(
-            encoder.encode(
-              `event: error\ndata: ${JSON.stringify((error as Error).message)}\n\n`
-            )
+            encoder.encode(`event: error\ndata: ${JSON.stringify((error as Error).message)}\n\n`)
           );
         }
       };

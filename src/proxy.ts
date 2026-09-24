@@ -54,7 +54,7 @@ const memoryStore = new Map<string, number[]>();
 
 function getClientIp(req: NextRequest): string {
   // IP-spoof korumalı çözüm (güvenilir proxy zinciri + enjeksiyon trim)
-  return resolveClientIp(req);
+  return resolveClientIp(req.headers, Number(process.env.TRUSTED_PROXY_HOPS ?? 0));
 }
 
 function getRateLimitKey(req: NextRequest): string {
@@ -154,8 +154,7 @@ async function checkRateLimit(req: NextRequest): Promise<RateLimitResult> {
 
 async function verifyToken(req: NextRequest): Promise<{ userId: string } | null> {
   const token =
-    req.cookies.get("token")?.value ||
-    req.headers.get("authorization")?.replace("Bearer ", "");
+    req.cookies.get("token")?.value || req.headers.get("authorization")?.replace("Bearer ", "");
   if (!token) return null;
 
   // JWT_SECRET boşsa hiçbir token kabul edilmez (fail-closed)
@@ -182,7 +181,7 @@ async function isTokenBlacklisted(token: string): Promise<boolean> {
   }
 }
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   if (
@@ -220,8 +219,7 @@ export async function middleware(req: NextRequest) {
       }
 
       const token =
-        req.cookies.get("token")?.value ||
-        req.headers.get("authorization")?.replace("Bearer ", "");
+        req.cookies.get("token")?.value || req.headers.get("authorization")?.replace("Bearer ", "");
       if (token && (await isTokenBlacklisted(token))) {
         return NextResponse.json(
           { error: "Unauthorized" },
@@ -247,8 +245,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    "/api/:path*",
-    "/((?!_next/static|_next/image|favicon.ico).*)",
-  ],
+  matcher: ["/api/:path*", "/((?!_next/static|_next/image|favicon.ico).*)"],
 };

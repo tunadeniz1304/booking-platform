@@ -37,31 +37,34 @@ function CheckoutContent() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      router.replace("/login");
-      return;
-    }
+    const timer = setTimeout(() => {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        router.replace("/login");
+        return;
+      }
 
-    if (!propertyId || !roomId || !checkIn || !checkOut) {
-      setError("Rezervasyon bilgileri eksik.");
-      setLoading(false);
-      return;
-    }
+      if (!propertyId || !roomId || !checkIn || !checkOut) {
+        setError("Rezervasyon bilgileri eksik.");
+        setLoading(false);
+        return;
+      }
 
-    fetch(`/api/properties/${propertyId}`, { cache: "no-store" })
-      .then((res) => {
-        if (!res.ok) throw new Error("Property yüklenemedi.");
-        return res.json();
-      })
-      .then((data: CheckoutProperty) => {
-        setProperty(data);
-        setLoading(false);
-      })
-      .catch(() => {
-        setError("Property bilgileri alınamadı.");
-        setLoading(false);
-      });
+      fetch(`/api/properties/${propertyId}`, { cache: "no-store" })
+        .then((res) => {
+          if (!res.ok) throw new Error("Property yüklenemedi.");
+          return res.json();
+        })
+        .then((data: CheckoutProperty) => {
+          setProperty(data);
+          setLoading(false);
+        })
+        .catch(() => {
+          setError("Property bilgileri alınamadı.");
+          setLoading(false);
+        });
+    }, 0);
+    return () => clearTimeout(timer);
   }, [propertyId, roomId, checkIn, checkOut, router]);
 
   const room = useMemo(() => {
@@ -145,10 +148,7 @@ function CheckoutContent() {
         <div className="text-center">
           <h1 className="text-2xl font-bold text-gray-900">Hata</h1>
           <p className="mt-2 text-gray-600">{error}</p>
-          <Link
-            href="/"
-            className="mt-4 inline-block text-primary-600 hover:underline"
-          >
+          <Link href="/" className="mt-4 inline-block text-primary-600 hover:underline">
             Ana sayfaya dön
           </Link>
         </div>
@@ -160,14 +160,9 @@ function CheckoutContent() {
     return (
       <main className="mx-auto flex min-h-[60vh] max-w-3xl items-center justify-center px-4">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900">
-            Rezervasyon bilgileri eksik
-          </h1>
+          <h1 className="text-2xl font-bold text-gray-900">Rezervasyon bilgileri eksik</h1>
           <p className="mt-2 text-gray-600">Lütfen tekrar arama yapın.</p>
-          <Link
-            href="/"
-            className="mt-4 inline-block text-primary-600 hover:underline"
-          >
+          <Link href="/" className="mt-4 inline-block text-primary-600 hover:underline">
             Ana sayfaya dön
           </Link>
         </div>
@@ -181,9 +176,7 @@ function CheckoutContent() {
 
       <form onSubmit={handleSubmit} className="mt-6 space-y-6">
         <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-gray-900">
-            Konaklama Bilgileri
-          </h2>
+          <h2 className="text-lg font-semibold text-gray-900">Konaklama Bilgileri</h2>
           <dl className="mt-4 space-y-3 text-sm">
             <div className="flex justify-between">
               <dt className="text-gray-600">Property</dt>
@@ -251,9 +244,7 @@ function CheckoutContent() {
         </div>
 
         {error && (
-          <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
-            {error}
-          </div>
+          <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
         )}
 
         <button

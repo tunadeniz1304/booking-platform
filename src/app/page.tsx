@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import SearchBar from "@/components/search/SearchBar";
@@ -42,9 +43,7 @@ export default async function HomePage() {
             <h1 className="text-3xl font-bold text-white sm:text-4xl">
               Binlerce konaklama yerini keşfedin
             </h1>
-            <p className="mt-2 text-white/80">
-              Dünya genelinde 2.000.000+ konaklama seçeneği
-            </p>
+            <p className="mt-2 text-white/80">Dünya genelinde 2.000.000+ konaklama seçeneği</p>
             <div className="mt-8">
               <SearchBar />
             </div>
@@ -60,11 +59,15 @@ export default async function HomePage() {
                 href={`/search?destination=${encodeURIComponent(dest.city)}`}
                 className="group relative overflow-hidden rounded-lg"
               >
-                <img
-                  src={dest.imageUrl}
-                  alt={dest.city}
-                  className="h-48 w-full object-cover transition duration-300 group-hover:scale-105"
-                />
+                <div className="relative h-48 w-full">
+                  <Image
+                    src={dest.imageUrl}
+                    alt={dest.city}
+                    fill
+                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                    className="object-cover transition duration-300 group-hover:scale-105"
+                  />
+                </div>
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
                 <div className="absolute bottom-0 p-4 text-white">
                   <h3 className="text-lg font-semibold">{dest.city}</h3>

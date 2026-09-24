@@ -52,10 +52,8 @@ export default function BookingWidget({
   const selectedRoom =
     availableRooms.find((room) => room.id === selectedRoomId) ?? availableRooms[0];
 
-  const totalPrice = useMemo(() => {
-    if (!selectedRoom || nights <= 0) return 0;
-    return (basePrice + selectedRoom.priceModifier) * nights;
-  }, [basePrice, selectedRoom, nights]);
+  const totalPrice =
+    !selectedRoom || nights <= 0 ? 0 : (basePrice + selectedRoom.priceModifier) * nights;
 
   const handleDateChange = (v: { checkIn: string; checkOut: string }) => {
     setCheckIn(v.checkIn);
@@ -81,9 +79,7 @@ export default function BookingWidget({
   const dateSummary = (() => {
     const fmt = (s: string) =>
       new Date(s).toLocaleDateString("tr-TR", { day: "numeric", month: "short", year: "numeric" });
-    return checkIn && checkOut
-      ? `${fmt(checkIn)} - ${fmt(checkOut)}`
-      : "Tarih seçin";
+    return checkIn && checkOut ? `${fmt(checkIn)} - ${fmt(checkOut)}` : "Tarih seçin";
   })();
 
   return (

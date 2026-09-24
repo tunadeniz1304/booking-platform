@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import { logout } from "@/lib/api-client";
@@ -49,6 +50,7 @@ interface Favorite {
 }
 
 export default function AccountPage() {
+  const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [favorites, setFavorites] = useState<Favorite[]>([]);
@@ -211,7 +213,7 @@ export default function AccountPage() {
           <button
             onClick={async () => {
               await logout();
-              window.location.href = "/";
+              router.push("/");
             }}
             className="rounded-md border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
           >
@@ -233,7 +235,11 @@ export default function AccountPage() {
                 </h2>
                 <p className="text-sm text-gray-500">{user.email}</p>
                 <span className="mt-1 inline-block rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
-                  {user.role === "HOST" ? "Ev Sahibi" : user.role === "ADMIN" ? "Yönetici" : "Kullanıcı"}
+                  {user.role === "HOST"
+                    ? "Ev Sahibi"
+                    : user.role === "ADMIN"
+                      ? "Yönetici"
+                      : "Kullanıcı"}
                 </span>
               </div>
             </div>
@@ -299,7 +305,9 @@ export default function AccountPage() {
                           disabled={cancellingId === booking.id}
                           className="rounded-md border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                          {cancellingId === booking.id ? "İptal ediliyor..." : "Rezervasyonu İptal Et"}
+                          {cancellingId === booking.id
+                            ? "İptal ediliyor..."
+                            : "Rezervasyonu İptal Et"}
                         </button>
                       )}
                       <button
@@ -314,8 +322,8 @@ export default function AccountPage() {
                         {favoritingId === booking.propertyId
                           ? "İşleniyor..."
                           : favorites.some((f) => f.propertyId === booking.propertyId)
-                          ? "Favorilerden Çıkar"
-                          : "Favorilere Ekle"}
+                            ? "Favorilerden Çıkar"
+                            : "Favorilere Ekle"}
                       </button>
                     </div>
                   </div>

@@ -4,12 +4,10 @@ import { prisma } from "@/lib/prisma";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import PropertyGallery from "@/components/property/PropertyGallery";
-import BookingWidget, {
-  BookingWidgetRoom,
-} from "@/components/booking/BookingWidget";
+import BookingWidget, { BookingWidgetRoom } from "@/components/booking/BookingWidget";
 
 interface PropertyPageProps {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }
 
 interface PropertyDetail {
@@ -68,9 +66,7 @@ async function getProperty(id: string): Promise<PropertyDetail | null> {
   };
 }
 
-export async function generateMetadata({
-  params,
-}: PropertyPageProps): Promise<Metadata> {
+export async function generateMetadata({ params }: PropertyPageProps): Promise<Metadata> {
   const { id } = await params;
   const property = await getProperty(id);
   return {
@@ -99,9 +95,7 @@ export default async function PropertyPage({ params }: PropertyPageProps) {
             <span className="inline-flex items-center rounded-lg bg-[#003580] px-2 py-1 text-sm font-semibold text-white">
               {property.ratingAvg.toFixed(1)}
             </span>
-            <span className="text-sm text-gray-600">
-              {property.ratingCount} değerlendirme
-            </span>
+            <span className="text-sm text-gray-600">{property.ratingCount} değerlendirme</span>
           </div>
         </div>
 
@@ -111,9 +105,7 @@ export default async function PropertyPage({ params }: PropertyPageProps) {
 
             <div className="mt-8">
               <h2 className="text-xl font-semibold text-gray-900">Açıklama</h2>
-              <p className="mt-2 whitespace-pre-line text-gray-700">
-                {property.description}
-              </p>
+              <p className="mt-2 whitespace-pre-line text-gray-700">{property.description}</p>
             </div>
 
             {property.amenities.length > 0 && (

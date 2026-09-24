@@ -42,7 +42,8 @@ export default function BookingConfirmationPage() {
   }, [id]);
 
   useEffect(() => {
-    load();
+    const timer = setTimeout(() => void load(), 0);
+    return () => clearTimeout(timer);
   }, [load]);
 
   if (!getToken()) {
@@ -53,7 +54,10 @@ export default function BookingConfirmationPage() {
           <div className="text-center">
             <h1 className="text-2xl font-bold text-gray-900">Giriş gerekli</h1>
             <p className="mt-2 text-gray-600">Rezervasyonunuzu görüntülemek için giriş yapın.</p>
-            <Link href="/login" className="mt-4 inline-block rounded-lg bg-[#003580] px-6 py-3 text-sm font-semibold text-white">
+            <Link
+              href="/login"
+              className="mt-4 inline-block rounded-lg bg-[#003580] px-6 py-3 text-sm font-semibold text-white"
+            >
               Giriş Yap
             </Link>
           </div>
@@ -78,7 +82,10 @@ export default function BookingConfirmationPage() {
           <div className="rounded-2xl bg-white p-8 text-center shadow-sm">
             <h1 className="text-xl font-bold text-red-600">Hata</h1>
             <p className="mt-2 text-gray-600">{error}</p>
-            <Link href="/" className="mt-4 inline-block text-sm font-semibold text-[#003580] hover:underline">
+            <Link
+              href="/"
+              className="mt-4 inline-block text-sm font-semibold text-[#003580] hover:underline"
+            >
               Ana sayfaya dön
             </Link>
           </div>

@@ -71,7 +71,8 @@ describeInt("regression: #1 gRPC auth (integration)", () => {
         checkOut: utcDay(22),
         guestCount: 1,
         totalPrice: new Prisma.Decimal(2000),
-        status: BookingStatus.PENDING,
+        status: BookingStatus.HELD,
+        holdExpiresAt: new Date(Date.now() + 15 * 60_000),
       },
     });
     bookingId = booking.id;
@@ -111,7 +112,11 @@ describeInt("regression: #1 gRPC auth (integration)", () => {
 
   it("sahibi kendi token'ıyla ödeyebilir", async () => {
     const { token } = await signAccessToken(ownerId, "USER", 900);
-    const { err, res } = await charge(token, { booking_id: bookingId, amount: 2000 });
+    const { err, res } = await charge(token, {
+      booking_id: bookingId,
+      card_token: "tok_mock_ok_4242",
+      idempotency_key: "grpc-test",
+    });
     expect(err).toBeNull();
     expect(res?.status).toBe("PAID");
   });

@@ -1,136 +1,539 @@
-import { Prisma, PaymentStatus, BookingStatus } from "@prisma/client";
+import { Prisma, PaymentStatus, type BookingStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { redis } from "@/lib/redis";
-import { HttpError } from "@/lib/http/errors";
+import { appendOutbox } from "@/lib/cqrs";
+import {
+  EventTypes,
+  makeEvent,
+  type BookingCancelledPayload,
+  type BookingConfirmedPayload,
+} from "@/lib/events/events";
+import { ConflictError, HttpError } from "@/lib/http/errors";
+import { withSerializableRetry } from "@/lib/db/transactions";
+import { transition, type BookingState } from "@/lib/booking/state-machine";
+import { computeRefund, parseSnapshot, type RefundDecision } from "@/lib/booking/cancellation";
+import { releaseInventory, BookingNotFoundError } from "@/lib/booking-service";
+import { invalidatePropertySearchCache } from "@/lib/search";
+import { getConfig } from "@/lib/config/app-config";
+import { money, toDecimalString, toMinor, assertCurrency, type Money } from "@/lib/money/money";
+import { fromDate } from "@/lib/time/nights";
+import { logger, errorFields } from "@/lib/observability/logger";
+import { counter } from "@/lib/observability/metrics";
+import { getPaymentProvider, type AuthorizeResult } from "./index";
+import type { WebhookEvent } from "./webhook";
 
 /**
- * Ödeme servisi — oda rezervasyonunu onaylayan (CONFIRMED) ödeme akışı.
+ * Ödeme orkestrasyonu (P0-5).
  *
- * Idempotent: aynı booking için ikinci kez çağrılırsa mevcut ödemeyi döndürür.
- * BOLA: ödeme yalnızca rezervasyon sahibi (requesterId == booking.userId) tarafından
- * tetiklenebilir.
+ *   checkout → authorize ─┬─ authorized ──→ capture → HELD→CONFIRMED (tek işlem)
+ *                         ├─ requires_action (3DS) → confirmChallenge → …
+ *                         └─ declined → booking HELD kalır (başka kartla denenebilir;
+ *                                        süre dolarsa expire-holds EXPIRED yapar)
+ *
+ * Kart verisi sunucuya gelmez (yalnızca `cardToken`). PSP çağrıları veritabanı
+ * işleminin DIŞINDA yapılır; işlem çakışırsa (ör. tutma bu arada doldu) tahsilat
+ * iade edilir. Tüm tutarlar minor-unit.
  */
 
-const PAYMENT_CACHE_PREFIX = "payment:";
-const PAYMENT_CACHE_TTL = 60 * 30;
+const paymentsTotal = counter("payment_attempts_total", "Ödeme denemeleri", ["outcome"] as const);
 
-export class PaymentValidationError extends HttpError {
-  constructor(message: string, status = 400) {
-    super(status, "PAYMENT_INVALID", message);
-    this.name = "PaymentValidationError";
+export class PaymentDeclinedError extends HttpError {
+  constructor(code: string) {
+    super(402, "PAYMENT_DECLINED", "Ödeme reddedildi. Lütfen başka bir kart deneyin.", {
+      declineCode: code,
+    });
+    this.name = "PaymentDeclinedError";
   }
 }
 
-export interface ChargedPayment {
+export type PayOutcome =
+  | { status: "confirmed"; bookingId: string; paymentId: string; amount: number; currency: string }
+  | { status: "requires_action"; bookingId: string; challenge: { type: string; hint: string } };
+
+interface PayableBooking {
   id: string;
-  bookingId: string;
-  status: PaymentStatus;
-  amount: number;
+  userId: string;
+  status: BookingStatus;
+  version: number;
+  propertyId: string;
+  roomId: string;
+  checkIn: Date;
+  checkOut: Date;
+  holdExpiresAt: Date | null;
+  totalPrice: Prisma.Decimal;
   currency: string;
-  provider: string;
-  paidAt: Date | null;
+  payment: { id: string; status: PaymentStatus; providerRef: string | null } | null;
 }
 
-export interface ChargeInput {
-  bookingId: string;
-  amount: number;
-  requesterId: string;
-  /** Ödeme sağlayıcısı adı; varsayılan dahili "mock-provider". */
-  provider?: string;
-}
-
-export async function chargeBooking(input: ChargeInput): Promise<ChargedPayment> {
-  // Not (hata #1): önbellek okuması YOK — sahiplik kontrolü her zaman ilk adımdır.
-  const cacheKey = `${PAYMENT_CACHE_PREFIX}${input.bookingId}`;
-
-  const payment = await prisma.$transaction(
-    async (tx) => {
-      const booking = await tx.booking.findUnique({
-        where: { id: input.bookingId },
-        select: {
-          id: true,
-          userId: true,
-          totalPrice: true,
-          currency: true,
-          status: true,
-          payment: { select: { id: true, status: true } },
-        },
-      });
-
-      // Sahiplik: başkasının rezervasyonu "bulunamadı" olarak görünür (IDOR).
-      if (!booking || booking.userId !== input.requesterId) {
-        throw new PaymentValidationError("Rezervasyon bulunamadı", 404);
-      }
-      if (booking.status === BookingStatus.CANCELLED) {
-        throw new PaymentValidationError("İptal edilmiş rezervasyon için ödeme yapılamaz");
-      }
-
-      // Idempotent: ödeme daha önce tamamlanmışsa mevcut kaydı döndür
-      if (booking.payment && booking.payment.status === PaymentStatus.PAID) {
-        return tx.payment.findUnique({
-          where: { bookingId: booking.id },
-          select: {
-            id: true,
-            bookingId: true,
-            status: true,
-            amount: true,
-            currency: true,
-            provider: true,
-            paidAt: true,
-          },
-        });
-      }
-
-      const expectedAmount = Number(booking.totalPrice);
-      if (Math.abs(expectedAmount - input.amount) > 0.01) {
-        throw new PaymentValidationError(`Tutar eşleşmiyor: beklenen ${expectedAmount.toFixed(2)}`);
-      }
-
-      const created = await tx.payment.create({
-        data: {
-          bookingId: booking.id,
-          userId: booking.userId,
-          amount: new Prisma.Decimal(input.amount.toFixed(2)),
-          currency: booking.currency,
-          provider: input.provider ?? "internal-grpc",
-          status: PaymentStatus.PAID,
-          paidAt: new Date(),
-        },
-        select: {
-          id: true,
-          bookingId: true,
-          status: true,
-          amount: true,
-          currency: true,
-          provider: true,
-          paidAt: true,
-        },
-      });
-
-      await tx.booking.update({
-        where: { id: booking.id },
-        data: { status: BookingStatus.CONFIRMED },
-      });
-
-      return created;
+async function loadPayable(bookingId: string, userId: string): Promise<PayableBooking> {
+  const booking = await prisma.booking.findUnique({
+    where: { id: bookingId },
+    select: {
+      id: true,
+      userId: true,
+      status: true,
+      version: true,
+      propertyId: true,
+      roomId: true,
+      checkIn: true,
+      checkOut: true,
+      holdExpiresAt: true,
+      totalPrice: true,
+      currency: true,
+      payment: { select: { id: true, status: true, providerRef: true } },
     },
-    { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
-  );
+  });
+  // IDOR: başkasının rezervasyonu "bulunamadı"
+  if (!booking || booking.userId !== userId) throw new BookingNotFoundError();
+  return booking;
+}
 
-  if (!payment) {
-    throw new PaymentValidationError("Ödeme kaydı oluşturulamadı");
+function amountOf(booking: { totalPrice: Prisma.Decimal; currency: string }): Money {
+  const currency = assertCurrency(booking.currency);
+  return money(toMinor(booking.totalPrice.toString(), currency), currency);
+}
+
+async function upsertPayment(
+  booking: PayableBooking,
+  data: {
+    status: PaymentStatus;
+    providerRef?: string;
+    failureCode?: string | null;
+    authorizedAt?: Date;
   }
+): Promise<string> {
+  const amount = amountOf(booking);
+  const payment = await prisma.payment.upsert({
+    where: { bookingId: booking.id },
+    create: {
+      bookingId: booking.id,
+      userId: booking.userId,
+      amount: new Prisma.Decimal(toDecimalString(amount)),
+      currency: amount.currency,
+      provider: getPaymentProvider().name,
+      ...data,
+    },
+    update: { ...data, provider: getPaymentProvider().name },
+    select: { id: true },
+  });
+  return payment.id;
+}
 
-  const normalized: ChargedPayment = {
-    ...payment,
-    amount: Number(payment.amount),
-  };
+/**
+ * Yetkilendirilmiş ödemeyi tahsil eder ve rezervasyonu onaylar. Veritabanı geçişi
+ * başarısız olursa (tutma bu arada doldu/iptal edildi) tahsilat iade edilir.
+ */
+async function captureAndConfirm(
+  booking: PayableBooking,
+  providerRef: string
+): Promise<PayOutcome> {
+  const provider = getPaymentProvider();
+  const amount = amountOf(booking);
+  await upsertPayment(booking, {
+    status: PaymentStatus.AUTHORIZED,
+    providerRef,
+    authorizedAt: new Date(),
+    failureCode: null,
+  });
+  await provider.capture(providerRef, amount);
 
   try {
-    await redis.set(cacheKey, JSON.stringify(normalized), { ex: PAYMENT_CACHE_TTL });
+    const paymentId = await withSerializableRetry((tx) =>
+      confirmInTransaction(tx, booking.id, providerRef)
+    );
+    paymentsTotal.inc({ outcome: "confirmed" });
+    await afterBookingWrite(booking.propertyId, booking.id);
+    return {
+      status: "confirmed",
+      bookingId: booking.id,
+      paymentId,
+      amount: amount.amount,
+      currency: amount.currency,
+    };
+  } catch (error) {
+    // Onaylanamadı → tahsilatı geri ver (para asla askıda kalmaz).
+    await provider
+      .refund(providerRef, amount, `compensate:${booking.id}`)
+      .catch((e) =>
+        logger.error({ bookingId: booking.id, ...errorFields(e) }, "compensating refund failed")
+      );
+    await prisma.payment.update({
+      where: { bookingId: booking.id },
+      data: {
+        status: PaymentStatus.REFUNDED,
+        refundedAmount: new Prisma.Decimal(toDecimalString(amount)),
+        refundedAt: new Date(),
+        failureCode: "BOOKING_NOT_CONFIRMABLE",
+      },
+    });
+    paymentsTotal.inc({ outcome: "compensated" });
+    throw error;
+  }
+}
+
+/** HELD → CONFIRMED + ödeme PAID + defter kaydı + outbox (tek işlem). Idempotent. */
+export async function confirmInTransaction(
+  tx: Prisma.TransactionClient,
+  bookingId: string,
+  providerRef: string
+): Promise<string> {
+  const booking = await tx.booking.findUnique({
+    where: { id: bookingId },
+    select: {
+      id: true,
+      userId: true,
+      status: true,
+      version: true,
+      propertyId: true,
+      roomId: true,
+      checkIn: true,
+      checkOut: true,
+      holdExpiresAt: true,
+      totalPrice: true,
+      currency: true,
+      payment: { select: { id: true, status: true } },
+    },
+  });
+  if (!booking) throw new BookingNotFoundError();
+  if (booking.status === "CONFIRMED" && booking.payment?.status === PaymentStatus.PAID) {
+    return booking.payment.id; // idempotent (webhook + senkron akış yarışı)
+  }
+  let next: BookingState;
+  try {
+    next = transition(booking.status as BookingState, "CONFIRM");
   } catch {
-    // cache yazım arızası zararsız
+    throw new ConflictError("Rezervasyon artık onaylanamaz", "BOOKING_NOT_CONFIRMABLE");
+  }
+  if (booking.holdExpiresAt && booking.holdExpiresAt.getTime() < Date.now()) {
+    throw new ConflictError("Rezervasyon tutma süresi doldu", "HOLD_EXPIRED");
+  }
+  const updated = await tx.booking.updateMany({
+    where: { id: booking.id, status: booking.status, version: booking.version },
+    data: {
+      status: next as BookingStatus,
+      confirmedAt: new Date(),
+      holdExpiresAt: null,
+      version: { increment: 1 },
+    },
+  });
+  if (updated.count !== 1) {
+    throw new ConflictError("Rezervasyon eşzamanlı olarak değişti", "CONCURRENT_UPDATE");
+  }
+  const amount = amountOf(booking);
+  const payment = await tx.payment.update({
+    where: { bookingId: booking.id },
+    data: { status: PaymentStatus.PAID, paidAt: new Date(), providerRef, failureCode: null },
+    select: { id: true },
+  });
+  await tx.ledgerEntry.create({
+    data: {
+      bookingId: booking.id,
+      userId: booking.userId,
+      kind: "CHARGE",
+      amount: new Prisma.Decimal(toDecimalString(amount)),
+      currency: amount.currency,
+      reference: providerRef,
+    },
+  });
+  await appendOutbox(
+    tx,
+    makeEvent<BookingConfirmedPayload>(EventTypes.BookingConfirmed, booking.id, "booking", {
+      bookingId: booking.id,
+      propertyId: booking.propertyId,
+      roomId: booking.roomId,
+      checkIn: fromDate(booking.checkIn),
+      checkOut: fromDate(booking.checkOut),
+      userId: booking.userId,
+      totalMinor: amount.amount,
+      currency: amount.currency,
+      paymentId: payment.id,
+    })
+  );
+  return payment.id;
+}
+
+async function afterBookingWrite(propertyId: string, bookingId: string): Promise<void> {
+  await invalidatePropertySearchCache(propertyId);
+  await redis.del(`booking:${bookingId}`).catch(() => 0);
+}
+
+function assertPayable(booking: PayableBooking): void {
+  if (booking.status !== "HELD") {
+    throw new ConflictError("Bu rezervasyon ödeme beklemiyor", "INVALID_STATE");
+  }
+  if (!booking.holdExpiresAt || booking.holdExpiresAt.getTime() < Date.now()) {
+    throw new ConflictError("Rezervasyon tutma süresi doldu", "HOLD_EXPIRED");
+  }
+}
+
+/** Checkout ödemesi: kart token'ı ile yetkilendir; başarılıysa tahsil et ve onayla. */
+export async function payForBooking(input: {
+  bookingId: string;
+  userId: string;
+  cardToken: string;
+  idempotencyKey: string;
+}): Promise<PayOutcome> {
+  const booking = await loadPayable(input.bookingId, input.userId);
+  if (booking.status === "CONFIRMED" && booking.payment?.status === PaymentStatus.PAID) {
+    const amount = amountOf(booking);
+    return {
+      status: "confirmed",
+      bookingId: booking.id,
+      paymentId: booking.payment.id,
+      amount: amount.amount,
+      currency: amount.currency,
+    };
+  }
+  assertPayable(booking);
+
+  const result: AuthorizeResult = await getPaymentProvider().authorize({
+    amount: amountOf(booking),
+    cardToken: input.cardToken,
+    idempotencyKey: `auth:${booking.id}:${input.idempotencyKey}`,
+    metadata: { bookingId: booking.id },
+  });
+
+  if (result.status === "declined") {
+    await upsertPayment(booking, {
+      status: PaymentStatus.FAILED,
+      providerRef: result.providerRef,
+      failureCode: result.declineCode,
+    });
+    paymentsTotal.inc({ outcome: "declined" });
+    throw new PaymentDeclinedError(result.declineCode);
+  }
+  if (result.status === "requires_action") {
+    await upsertPayment(booking, {
+      status: PaymentStatus.REQUIRES_ACTION,
+      providerRef: result.providerRef,
+      failureCode: null,
+    });
+    paymentsTotal.inc({ outcome: "requires_action" });
+    return { status: "requires_action", bookingId: booking.id, challenge: result.challenge };
+  }
+  return captureAndConfirm(booking, result.providerRef);
+}
+
+/** 3DS doğrulamasını tamamlar. */
+export async function confirmPaymentChallenge(input: {
+  bookingId: string;
+  userId: string;
+  code: string;
+}): Promise<PayOutcome> {
+  const booking = await loadPayable(input.bookingId, input.userId);
+  if (booking.payment?.status !== PaymentStatus.REQUIRES_ACTION || !booking.payment.providerRef) {
+    throw new ConflictError("Doğrulama bekleyen ödeme yok", "NO_PENDING_CHALLENGE");
+  }
+  assertPayable(booking);
+  const result = await getPaymentProvider().confirmChallenge(
+    booking.payment.providerRef,
+    input.code
+  );
+  if (result.status !== "authorized") {
+    const code = result.status === "declined" ? result.declineCode : "authentication_required";
+    await upsertPayment(booking, { status: PaymentStatus.FAILED, failureCode: code });
+    paymentsTotal.inc({ outcome: "declined" });
+    throw new PaymentDeclinedError(code);
+  }
+  return captureAndConfirm(booking, result.providerRef);
+}
+
+/**
+ * PSP webhook olayını uygular. Olay kimliği `PaymentEvent` tablosunda tekildir:
+ * aynı olay ikinci kez gelirse hiçbir etki yapmaz (`duplicate: true`).
+ */
+export async function handleWebhookEvent(event: WebhookEvent): Promise<{ duplicate: boolean }> {
+  try {
+    await prisma.paymentEvent.create({
+      data: { id: event.id, type: event.type, providerRef: event.data.providerRef },
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      return { duplicate: true };
+    }
+    throw error;
   }
 
-  return normalized;
+  const payment = await prisma.payment.findUnique({
+    where: { providerRef: event.data.providerRef },
+    select: { bookingId: true, status: true, booking: { select: { propertyId: true } } },
+  });
+  if (!payment) {
+    logger.warn({ eventId: event.id, type: event.type }, "webhook for unknown payment");
+    return { duplicate: false };
+  }
+
+  if (event.type === "payment.succeeded" && payment.status !== PaymentStatus.PAID) {
+    await withSerializableRetry((tx) =>
+      confirmInTransaction(tx, payment.bookingId, event.data.providerRef)
+    );
+    await afterBookingWrite(payment.booking.propertyId, payment.bookingId);
+  } else if (event.type === "payment.failed" && payment.status !== PaymentStatus.PAID) {
+    await prisma.payment.update({
+      where: { bookingId: payment.bookingId },
+      data: { status: PaymentStatus.FAILED, failureCode: "psp_failed" },
+    });
+  } else if (event.type === "refund.succeeded") {
+    await prisma.payment.updateMany({
+      where: { bookingId: payment.bookingId, refundedAt: null },
+      data: { refundedAt: new Date() },
+    });
+  }
+  return { duplicate: false };
+}
+
+export interface CancellationOutcome {
+  bookingId: string;
+  status: BookingStatus;
+  refund: RefundDecision & { currency: string };
+}
+
+/**
+ * İptal + iade (P0-4): durum makinesi CANCEL, envanter iadesi, rezervasyon anındaki
+ * politika snapshot'ına göre iade tutarı, defter kaydı ve PSP iadesi.
+ * PSP iadesi işlemden sonra yapılır; başarısız olursa `failureCode=REFUND_FAILED`
+ * (yönetici panelinden yeniden denenir) — iptal geri alınmaz.
+ */
+export async function cancelAndRefund(
+  bookingId: string,
+  userId: string,
+  now = new Date()
+): Promise<CancellationOutcome> {
+  const config = getConfig();
+  const result = await withSerializableRetry(async (tx) => {
+    const booking = await tx.booking.findUnique({
+      where: { id: bookingId },
+      select: {
+        id: true,
+        userId: true,
+        status: true,
+        version: true,
+        propertyId: true,
+        roomId: true,
+        checkIn: true,
+        checkOut: true,
+        createdAt: true,
+        currency: true,
+        policySnapshot: true,
+        payment: { select: { status: true, amount: true, providerRef: true } },
+      },
+    });
+    if (!booking || booking.userId !== userId) throw new BookingNotFoundError();
+
+    let next: BookingState;
+    try {
+      next = transition(booking.status as BookingState, "CANCEL");
+    } catch {
+      throw new ConflictError("Bu rezervasyon iptal edilemez", "INVALID_STATE");
+    }
+    const currency = assertCurrency(booking.currency);
+    const paidMinor =
+      booking.payment?.status === PaymentStatus.PAID
+        ? toMinor(booking.payment.amount.toString(), currency)
+        : 0;
+    const decision = computeRefund(
+      parseSnapshot(booking.policySnapshot),
+      { checkIn: fromDate(booking.checkIn), createdAt: booking.createdAt, paidMinor, currency },
+      now,
+      config.CHECKIN_HOUR_UTC
+    );
+
+    const updated = await tx.booking.updateMany({
+      where: { id: booking.id, status: booking.status, version: booking.version },
+      data: {
+        status: next as BookingStatus,
+        cancelledAt: now,
+        holdExpiresAt: null,
+        version: { increment: 1 },
+      },
+    });
+    if (updated.count !== 1) {
+      throw new ConflictError("Rezervasyon eşzamanlı olarak değişti", "CONCURRENT_UPDATE");
+    }
+    await releaseInventory(tx, booking);
+
+    if (booking.payment) {
+      if (booking.payment.status === PaymentStatus.PAID) {
+        await tx.payment.update({
+          where: { bookingId: booking.id },
+          data: {
+            status:
+              decision.refundMinor === paidMinor && paidMinor > 0
+                ? PaymentStatus.REFUNDED
+                : decision.refundMinor > 0
+                  ? PaymentStatus.PARTIALLY_REFUNDED
+                  : PaymentStatus.PAID,
+            refundedAmount: new Prisma.Decimal(
+              toDecimalString(money(decision.refundMinor, currency))
+            ),
+            refundedAt: decision.refundMinor > 0 ? now : null,
+          },
+        });
+        if (decision.refundMinor > 0) {
+          await tx.ledgerEntry.create({
+            data: {
+              bookingId: booking.id,
+              userId: booking.userId,
+              kind: "REFUND",
+              amount: new Prisma.Decimal(toDecimalString(money(decision.refundMinor, currency))),
+              currency,
+              reference: booking.payment.providerRef,
+            },
+          });
+        }
+      } else if (booking.payment.status !== PaymentStatus.FAILED) {
+        await tx.payment.update({
+          where: { bookingId: booking.id },
+          data: { status: PaymentStatus.VOIDED },
+        });
+      }
+    }
+
+    await appendOutbox(
+      tx,
+      makeEvent<BookingCancelledPayload>(EventTypes.BookingCancelled, booking.id, "booking", {
+        bookingId: booking.id,
+        propertyId: booking.propertyId,
+        roomId: booking.roomId,
+        checkIn: fromDate(booking.checkIn),
+        checkOut: fromDate(booking.checkOut),
+        userId: booking.userId,
+        refundMinor: decision.refundMinor,
+        currency,
+        reason: decision.reason,
+      })
+    );
+    return { booking, decision, currency, next };
+  });
+
+  const { booking, decision, currency } = result;
+  const provider = getPaymentProvider();
+  if (booking.payment?.providerRef) {
+    try {
+      if (decision.refundMinor > 0) {
+        await provider.refund(
+          booking.payment.providerRef,
+          money(decision.refundMinor, currency),
+          `refund:${booking.id}`
+        );
+      } else if (
+        booking.payment.status !== PaymentStatus.PAID &&
+        booking.payment.status !== PaymentStatus.FAILED
+      ) {
+        await provider.void(booking.payment.providerRef);
+      }
+    } catch (error) {
+      logger.error({ bookingId: booking.id, ...errorFields(error) }, "psp refund failed");
+      await prisma.payment.update({
+        where: { bookingId: booking.id },
+        data: { failureCode: "REFUND_FAILED" },
+      });
+    }
+  }
+  await afterBookingWrite(booking.propertyId, booking.id);
+  return {
+    bookingId: booking.id,
+    status: result.next as BookingStatus,
+    refund: { ...decision, currency },
+  };
 }

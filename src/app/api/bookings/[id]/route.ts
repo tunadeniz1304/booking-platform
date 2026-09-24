@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { cancelBooking, getBooking } from "@/lib/booking-service";
+import { getBooking } from "@/lib/booking-service";
+import { cancelAndRefund } from "@/lib/payment/payment-service";
 import { requireAuth } from "@/lib/auth";
 import { toErrorResponse } from "@/lib/http/errors";
 
@@ -17,8 +18,8 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   try {
     const { id } = await params;
     const { userId } = await requireAuth(req);
-    await cancelBooking(id, userId);
-    return NextResponse.json({ success: true });
+    // İade tutarı rezervasyon anındaki iptal politikasına göre hesaplanır ve PSP'ye iletilir.
+    return NextResponse.json(await cancelAndRefund(id, userId));
   } catch (error) {
     return toErrorResponse(error, "bookings.cancel");
   }

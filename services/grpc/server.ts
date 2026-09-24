@@ -10,7 +10,7 @@
 import * as grpc from "@grpc/grpc-js";
 import { prisma } from "@/lib/prisma";
 import { createBooking } from "@/lib/booking-service";
-import { chargeBooking } from "@/lib/payment/payment-service";
+import { payForBooking } from "@/lib/payment/payment-service";
 import { HttpError } from "@/lib/http/errors";
 import { logger, errorFields } from "@/lib/observability/logger";
 import type { AccessClaims } from "@/lib/auth/tokens";
@@ -38,9 +38,9 @@ interface ReserveRoomRequest {
 
 interface ChargeRequest {
   booking_id: string;
-  amount?: number;
-  currency?: string;
   requester_id?: string;
+  card_token?: string;
+  idempotency_key?: string;
 }
 
 type Callback<T> = (err: grpc.ServiceError | null, value?: T) => void;
@@ -60,15 +60,17 @@ export function toGrpcError(error: unknown): grpc.ServiceError {
     const code =
       error.status === 400
         ? grpc.status.INVALID_ARGUMENT
-        : error.status === 401
-          ? grpc.status.UNAUTHENTICATED
-          : error.status === 403
-            ? grpc.status.PERMISSION_DENIED
-            : error.status === 404
-              ? grpc.status.NOT_FOUND
-              : error.status === 409
-                ? grpc.status.ABORTED
-                : grpc.status.INTERNAL;
+        : error.status === 402
+          ? grpc.status.FAILED_PRECONDITION
+          : error.status === 401
+            ? grpc.status.UNAUTHENTICATED
+            : error.status === 403
+              ? grpc.status.PERMISSION_DENIED
+              : error.status === 404
+                ? grpc.status.NOT_FOUND
+                : error.status === 409
+                  ? grpc.status.ABORTED
+                  : grpc.status.INTERNAL;
     return serviceError(code, code === grpc.status.INTERNAL ? "İç hata" : error.message);
   }
   logger.error(errorFields(error), "grpc handler error");
@@ -144,14 +146,16 @@ const handlers = {
   }),
 
   Charge: authed(async (req: ChargeRequest, claims) => {
-    const requesterId = resolveRequester(claims, req.requester_id);
-    const payment = await chargeBooking({
+    const userId = resolveRequester(claims, req.requester_id);
+    const outcome = await payForBooking({
       bookingId: req.booking_id,
-      amount: req.amount ?? 0,
-      requesterId,
-      provider: "grpc-internal",
+      userId,
+      cardToken: req.card_token || "",
+      idempotencyKey: req.idempotency_key || "grpc",
     });
-    return { payment_id: payment.id, status: payment.status, charged_amount: payment.amount };
+    return outcome.status === "confirmed"
+      ? { payment_id: outcome.paymentId, status: "PAID", charged_amount: outcome.amount / 100 }
+      : { payment_id: "", status: "REQUIRES_ACTION", charged_amount: 0 };
   }),
 };
 

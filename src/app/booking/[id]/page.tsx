@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import { ApiError, apiFetch } from "@/lib/api-client";
+import BookingActions from "@/components/booking/BookingActions";
 
 interface BookingDetail {
   id: string;
@@ -15,6 +16,7 @@ interface BookingDetail {
   totalPrice: number;
   currency: string;
   status: string;
+  holdExpiresAt?: string | null;
   property: {
     id: string;
     title: string;
@@ -22,6 +24,15 @@ interface BookingDetail {
   };
   room: { name: string };
 }
+
+const STATUS_TITLES: Record<string, string> = {
+  HELD: "Oda sizin için tutuluyor — ödemeyi tamamlayın",
+  PENDING: "Rezervasyon beklemede",
+  CONFIRMED: "Rezervasyonunuz onaylandı",
+  COMPLETED: "Konaklama tamamlandı",
+  CANCELLED: "Rezervasyon iptal edildi",
+  EXPIRED: "Ödeme süresi doldu",
+};
 
 export default function BookingConfirmationPage() {
   const { id } = useParams<{ id: string }>();
@@ -94,7 +105,9 @@ export default function BookingConfirmationPage() {
         ) : booking ? (
           <div className="overflow-hidden rounded-2xl bg-white shadow-sm">
             <div className="bg-green-600 px-8 py-6 text-white">
-              <h1 className="text-2xl font-bold">Rezervasyonunuz Onaylandı</h1>
+              <h1 className="text-2xl font-bold">
+                {STATUS_TITLES[booking.status] ?? booking.status}
+              </h1>
               <p className="mt-1 text-sm text-green-100">
                 Rezervasyon numarası: <span className="font-semibold">{booking.id}</span>
               </p>
@@ -134,6 +147,13 @@ export default function BookingConfirmationPage() {
                   }).format(booking.totalPrice)}
                 </span>
               </div>
+
+              <BookingActions
+                bookingId={booking.id}
+                status={booking.status}
+                holdExpiresAt={booking.holdExpiresAt}
+                onChanged={() => void load()}
+              />
 
               <div className="flex flex-wrap gap-3 border-t border-gray-100 pt-6">
                 <Link

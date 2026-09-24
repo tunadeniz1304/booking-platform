@@ -34,8 +34,8 @@ Her faz sonunda kalite kapısı: `npm run lint`, `npm run typecheck`, `npm run f
 
 ## F3 — Ödeme + iptal + bildirim
 
-- [ ] P0-4 iptal politikası, P0-5 ödeme (MockPsp), P0-7 bildirimler
-- [ ] Transfer (#3) + P1-8
+- [x] P0-4 iptal politikası, P0-5 ödeme (MockPsp + 3DS + webhook), P0-7 bildirimler
+- [x] Transfer (#3) + P1-8 servis/API (`/transfers` sayfası F8'de)
 
 ## F4 — Gözlemlenebilirlik + migration disiplini
 

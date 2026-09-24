@@ -6,7 +6,9 @@ import {
   type BookingConfirmedPayload,
   type BookingCreatedPayload,
   type BookingExpiredPayload,
+  type PropertyCreatedPayload,
 } from "./events";
+import { upsertPropertyEmbedding } from "@/lib/embedding/backfill";
 import { invalidatePropertySearchCache } from "@/lib/search";
 import { invalidatePriceCache } from "@/lib/pricing-service";
 import {
@@ -52,6 +54,9 @@ export function registerEventHandlers(): void {
     await invalidateStay(p);
     await notifyBookingCancelled(p);
   });
+  on<PropertyCreatedPayload>(EventTypes.PropertyCreated, (p) =>
+    upsertPropertyEmbedding(p.propertyId)
+  );
   on<BookingExpiredPayload>(EventTypes.BookingExpired, async (p) => {
     await invalidateStay(p);
     await notifyBookingExpired(p);

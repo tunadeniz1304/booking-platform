@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
-import { encode, toVectorLiteral } from "@/lib/embedding/embedder";
+import { toVectorLiteral } from "@/lib/embedding/embedder";
+import { embedText } from "@/lib/embedding/provider";
 
 /**
  * pgvector semantik arama + kişiselleştirme eşzamanlı sıralama.
@@ -38,7 +39,7 @@ export async function findSemanticCandidates(
   query: string,
   limit = 50
 ): Promise<SemanticCandidate[]> {
-  const vector = encode(query);
+  const vector = await embedText(query);
   const literal = toVectorLiteral(vector);
 
   const rows = await prisma.$queryRaw<Array<{ id: string; similarity: number }>>`

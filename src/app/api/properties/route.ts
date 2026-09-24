@@ -7,6 +7,8 @@ import { toErrorResponse } from "@/lib/http/errors";
 import { httpsUrl } from "@/lib/security/url";
 import { searchProperties, getPopularProperties } from "@/lib/search";
 import { logger, errorFields } from "@/lib/observability/logger";
+import { appendOutbox } from "@/lib/cqrs";
+import { EventTypes, makeEvent, type PropertyCreatedPayload } from "@/lib/events/events";
 
 const roomSchema = z.object({
   name: z.string().trim().min(1),
@@ -144,6 +146,14 @@ export async function POST(req: NextRequest) {
           location: { select: { city: true, country: true } },
         },
       });
+      // #22: yeni mülk için embedding işçide üretilir (outbox ile atomik olay).
+      await appendOutbox(
+        tx,
+        makeEvent<PropertyCreatedPayload>(EventTypes.PropertyCreated, created.id, "property", {
+          propertyId: created.id,
+          hostId: host.userId,
+        })
+      );
       return created;
     });
 

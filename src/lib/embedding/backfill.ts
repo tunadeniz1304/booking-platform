@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
-import { encode, toVectorLiteral } from "@/lib/embedding/embedder";
+import { toVectorLiteral } from "@/lib/embedding/embedder";
+import { embedText } from "@/lib/embedding/provider";
 
 /**
  * Property gömme vektörlerini hesaplar ve pgvector'a yazar.
@@ -24,7 +25,7 @@ export async function upsertPropertyEmbedding(propertyId: string): Promise<void>
     ...property.amenities.map((a) => a.name),
   ].join(" ");
 
-  const vector = encode(text);
+  const vector = await embedText(text);
   const literal = toVectorLiteral(vector);
 
   await prisma.$executeRaw`

@@ -171,6 +171,7 @@ export async function listHostProperties(actor: AccessClaims) {
     select: {
       id: true,
       title: true,
+      description: true,
       isActive: true,
       licenseNumber: true,
       basePrice: true,

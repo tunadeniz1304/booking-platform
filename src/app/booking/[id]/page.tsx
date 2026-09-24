@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
-import { apiFetch, getToken } from "@/lib/api-client";
+import { ApiError, apiFetch } from "@/lib/api-client";
 
 interface BookingDetail {
   id: string;
@@ -28,6 +28,7 @@ export default function BookingConfirmationPage() {
   const [booking, setBooking] = useState<BookingDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [needsLogin, setNeedsLogin] = useState(false);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -35,6 +36,7 @@ export default function BookingConfirmationPage() {
       const data = await apiFetch<{ booking: BookingDetail }>(`/api/bookings/${id}`);
       setBooking(data.booking);
     } catch (err) {
+      if (err instanceof ApiError && err.status === 401) setNeedsLogin(true);
       setError(err instanceof Error ? err.message : "Rezervasyon yüklenemedi");
     } finally {
       setLoading(false);
@@ -46,7 +48,7 @@ export default function BookingConfirmationPage() {
     return () => clearTimeout(timer);
   }, [load]);
 
-  if (!getToken()) {
+  if (needsLogin) {
     return (
       <div className="flex min-h-screen flex-col bg-gray-50">
         <Header />

@@ -11,6 +11,7 @@ import {
   makeEvent,
 } from "@/lib/events/events";
 import { requireOwnership } from "@/lib/security/ownership";
+import { HttpError } from "@/lib/http/errors";
 
 const BOOKING_CACHE_PREFIX = "booking:";
 const BOOKING_CACHE_TTL = 60 * 10; // 10 dakika
@@ -18,35 +19,30 @@ const BOOKING_CACHE_TTL = 60 * 10; // 10 dakika
 /** Uygulama-çapı Redlock örneği (kilit yenileme + fencing token desteği). */
 const redlock = createRedlock(redis);
 
-/** Rezervasyon çakışması (oda başka biri tarafından kilitli, iptal edilemez durum) → 409 */
-export class BookingConflictError extends Error {
-  constructor(message: string) {
-    super(message);
+/** Rezervasyon çakışması (oda başka biri tarafından kilitli/dolu, geçersiz durum) → 409 */
+export class BookingConflictError extends HttpError {
+  constructor(message: string, code = "BOOKING_CONFLICT") {
+    super(409, code, message);
     this.name = "BookingConflictError";
   }
 }
 
 /** Doğrulama hatası (tarih aralığı, kapasite, uygunluk) → 400 */
-export class BookingValidationError extends Error {
+export class BookingValidationError extends HttpError {
   constructor(message: string) {
-    super(message);
+    super(400, "BOOKING_INVALID", message);
     this.name = "BookingValidationError";
   }
 }
 
-/** Kayıt bulunamadı → 404 */
-export class BookingNotFoundError extends Error {
-  constructor(message: string) {
-    super(message);
+/**
+ * Kayıt bulunamadı → 404. Başkasının rezervasyonuna erişim de 404 döner
+ * (IDOR: kaynağın varlığı bile sızdırılmaz).
+ */
+export class BookingNotFoundError extends HttpError {
+  constructor(message = "Rezervasyon bulunamadı") {
+    super(404, "BOOKING_NOT_FOUND", message);
     this.name = "BookingNotFoundError";
-  }
-}
-
-/** Kaynağa erişim yetkisi yok → 403 */
-export class BookingUnauthorizedError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "BookingUnauthorizedError";
   }
 }
 
@@ -467,11 +463,7 @@ export async function getBooking(bookingId: string, userId: string) {
   }
 
   // BOLA: kaynağa yalnız sahibi erişebilir (IDOR koruması)
-  requireOwnership(
-    booking.userId,
-    userId,
-    () => new BookingUnauthorizedError("Bu rezervasyona erişim yetkiniz yok")
-  );
+  requireOwnership(booking.userId, userId, () => new BookingNotFoundError());
 
   try {
     await redis.set(cacheKey, JSON.stringify(booking), { ex: BOOKING_CACHE_TTL });

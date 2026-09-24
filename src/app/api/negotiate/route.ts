@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { getUserIdFromRequest } from "@/lib/auth";
+import { requireAuth } from "@/lib/auth";
+import { toErrorResponse } from "@/lib/http/errors";
 import { negotiate, NegotiationInput } from "@/lib/negotiation/engine";
 import { calculateDynamicPrice } from "@/lib/pricing/engine";
 
@@ -28,7 +29,7 @@ function parseDate(value: string): Date {
  */
 export async function POST(req: NextRequest) {
   try {
-    getUserIdFromRequest(req);
+    await requireAuth(req);
 
     const body = await req.json();
     const parsed = negotiateSchema.parse(body);
@@ -116,17 +117,7 @@ export async function POST(req: NextRequest) {
       ),
     });
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: "Validation error", details: error.errors },
-        { status: 400 }
-      );
-    }
-    if (error instanceof Error && error.message === "Missing or invalid token") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    console.error("Negotiation API error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return toErrorResponse(error, "negotiate");
   }
 }
 

@@ -1,5 +1,6 @@
 import { PrismaClient, Prisma, PropertyType, UserRole, BookingStatus } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { assertSeedAllowed } from "../src/lib/config/seed-guard";
 
 const prisma = new PrismaClient();
 
@@ -816,6 +817,7 @@ const PROPERTIES: PropSeed[] = [
 ];
 
 async function main() {
+  assertSeedAllowed();
   console.log("Seeding başlıyor...");
   const passwordHash = await bcrypt.hash("Password123!", 10);
   await prisma.user.upsert({

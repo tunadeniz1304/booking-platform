@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
-import { setToken } from "@/lib/api-client";
 
 interface LoginResponse {
   user: { id: string; firstName: string; lastName: string; email: string; role: string };
@@ -33,7 +32,6 @@ export default function LoginPage() {
       if (!res.ok) {
         throw new Error(data.error ?? "Giriş yapılamadı");
       }
-      setToken(data.token);
       const redirect = new URLSearchParams(window.location.search).get("redirect") ?? "/";
       router.push(redirect);
       router.refresh();

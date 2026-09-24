@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getUserFromRequest } from "@/lib/auth";
+import { getAuth } from "@/lib/auth";
 import { getLlmStatus } from "@/lib/llm/status";
 
 /**
@@ -7,7 +7,7 @@ import { getLlmStatus } from "@/lib/llm/status";
  * yalnızca `hasKey: boolean`.
  */
 export async function GET(req: NextRequest) {
-  if (!getUserFromRequest(req)) {
+  if (!(await getAuth(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   return NextResponse.json(getLlmStatus());

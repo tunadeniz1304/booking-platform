@@ -1,41 +1,37 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { verifyPassword, signToken, getUserFromRequest } from "@/lib/auth";
+import { verifyPasswordConstantTime } from "@/lib/auth";
+import { issueSession } from "@/lib/auth/session";
+import { setSessionCookies } from "@/lib/auth/cookies";
+import { UnauthorizedError, toErrorResponse } from "@/lib/http/errors";
 
 const loginSchema = z.object({
-  email: z.string().trim().email("Geçerli bir e-posta girin"),
-  password: z.string().min(1, "Parola boş olamaz"),
+  email: z.string().trim().email("Geçerli bir e-posta girin").max(254),
+  password: z.string().min(1, "Parola boş olamaz").max(200),
 });
 
 export async function POST(req: NextRequest) {
   try {
-    if (getUserFromRequest(req)) {
-      return NextResponse.json({ error: "Zaten giriş yapmış durumdasınız" }, { status: 400 });
-    }
-
-    const body = await req.json();
-    const parsed = loginSchema.safeParse(body);
-    if (!parsed.success) {
-      return NextResponse.json(
-        { error: "Validation error", details: parsed.error.flatten() },
-        { status: 400 }
-      );
-    }
-
-    const { email, password } = parsed.data;
+    const { email, password } = loginSchema.parse(await req.json());
 
     const user = await prisma.user.findUnique({
       where: { email: email.toLowerCase() },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        role: true,
+        passwordHash: true,
+      },
     });
 
-    const valid = user && (await verifyPassword(password, user.passwordHash));
+    // Kullanıcı yoksa da bcrypt karşılaştırması yapılır (zamanlama e-posta varlığını ele vermez).
+    const valid = await verifyPasswordConstantTime(password, user?.passwordHash);
+    if (!user || !valid) throw new UnauthorizedError("E-posta veya parola hatalı");
 
-    if (!user || !valid) {
-      return NextResponse.json({ error: "E-posta veya parola hatalı" }, { status: 401 });
-    }
-
-    const token = signToken(user.id, user.role);
+    const session = await issueSession(user);
     const response = NextResponse.json({
       user: {
         id: user.id,
@@ -44,18 +40,15 @@ export async function POST(req: NextRequest) {
         email: user.email,
         role: user.role,
       },
-      token,
+      // Tarayıcı dışı istemciler için (Bearer). Tarayıcı çerezi kullanır, bunu saklamaz.
+      accessToken: session.accessToken,
+      accessExpiresAt: session.accessExpiresAt.toISOString(),
     });
-    response.cookies.set("token", token, {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      maxAge: 60 * 60 * 24 * 7,
-      path: "/",
-    });
+    setSessionCookies(response, session);
     return response;
   } catch (error) {
-    console.error("Login error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return toErrorResponse(error, "auth.login");
   }
 }
+
+export const dynamic = "force-dynamic";

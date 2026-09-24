@@ -1,64 +1,93 @@
 "use client";
 
 /**
- * İstemci tarafı kimlik ve API yardımcıları.
- * Token hem Bearer başlığında (localStorage) hem de httpOnly çerezde tutulur;
- * kayıt/giriş yanıtındaki token buraya yazılır.
+ * İstemci tarafı API yardımcıları.
+ *
+ * Kimlik YALNIZCA httpOnly çerezlerde taşınır (JS token'a erişemez → XSS ile
+ * token sızmaz). Erişim token'ı süresi dolunca (401) bir kez
+ * `POST /api/auth/refresh` denenir ve istek tekrarlanır.
  */
 
-const TOKEN_KEY = "token";
-
-export function getToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return window.localStorage.getItem(TOKEN_KEY);
+export class ApiError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+    readonly code?: string,
+    readonly details?: unknown
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
 }
 
-export function setToken(token: string): void {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(TOKEN_KEY, token);
+let refreshing: Promise<boolean> | null = null;
+
+async function refreshSession(): Promise<boolean> {
+  refreshing ??= fetch("/api/auth/refresh", { method: "POST", credentials: "same-origin" })
+    .then((res) => res.ok)
+    .catch(() => false)
+    .finally(() => {
+      setTimeout(() => {
+        refreshing = null;
+      }, 0);
+    });
+  return refreshing;
 }
 
-export function clearToken(): void {
-  if (typeof window === "undefined") return;
-  window.localStorage.removeItem(TOKEN_KEY);
-}
-
-export function isAuthenticated(): boolean {
-  return Boolean(getToken());
+async function toApiError(res: Response): Promise<ApiError> {
+  let message = `İstek başarısız (${res.status})`;
+  let code: string | undefined;
+  let details: unknown;
+  try {
+    const body = (await res.json()) as { error?: string; code?: string; details?: unknown };
+    if (body.error) message = body.error;
+    code = body.code;
+    details = body.details;
+  } catch {
+    // yanıt JSON değilse varsayılan mesaj
+  }
+  return new ApiError(res.status, message, code, details);
 }
 
 export async function apiFetch<T = unknown>(path: string, options: RequestInit = {}): Promise<T> {
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-    ...(options.headers as Record<string, string> | undefined),
+  const init: RequestInit = {
+    ...options,
+    credentials: "same-origin",
+    headers: {
+      "Content-Type": "application/json",
+      ...(options.headers as Record<string, string> | undefined),
+    },
   };
-  const token = getToken();
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
-  }
 
-  const res = await fetch(path, { ...options, headers });
-  if (!res.ok) {
-    let message = `İstek başarısız (${res.status})`;
-    try {
-      const body = (await res.json()) as { error?: string };
-      if (body.error) message = body.error;
-    } catch {
-      // yanıt JSON değilse varsayılan mesaj
-    }
-    if (res.status === 401) {
-      clearToken();
-    }
-    throw new Error(message);
+  let res = await fetch(path, init);
+  if (res.status === 401 && !path.startsWith("/api/auth/")) {
+    if (await refreshSession()) res = await fetch(path, init);
   }
+  if (!res.ok) throw await toApiError(res);
   return (await res.json()) as T;
+}
+
+export interface SessionUser {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: "USER" | "HOST" | "ADMIN";
+}
+
+/** Oturumdaki kullanıcı (yoksa `null`). */
+export async function fetchCurrentUser(): Promise<SessionUser | null> {
+  try {
+    return await apiFetch<SessionUser>("/api/user/me");
+  } catch {
+    return null;
+  }
 }
 
 export async function logout(): Promise<void> {
   try {
-    await fetch("/api/auth/logout", { method: "POST" });
+    await fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" });
   } catch {
-    // sunucu çerezi temizlenemese bile yerel token düşer
+    // ağ hatasında çerezler sunucu tarafında zaten kısa ömürlü
   }
-  clearToken();
 }

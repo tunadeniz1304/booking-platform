@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual, randomBytes } from "crypto";
 import { Prisma, BookingStatus, TransferStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { HttpError } from "@/lib/http/errors";
 
 /**
  * P2P Booking Transfer (ikincil pazar).
@@ -22,12 +23,9 @@ import { prisma } from "@/lib/prisma";
 const TRANSFER_SECRET = process.env.JWT_SECRET || "insecure-transfer-secret";
 const TRANSFER_LINK_TTL_MS = 1000 * 60 * 60 * 24 * 7; // 7 gün
 
-export class TransferError extends Error {
-  constructor(
-    message: string,
-    readonly status = 422
-  ) {
-    super(message);
+export class TransferError extends HttpError {
+  constructor(message: string, status = 422, code = "TRANSFER_ERROR") {
+    super(status, code, message);
     this.name = "TransferError";
   }
 }

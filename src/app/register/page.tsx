@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
-import { setToken } from "@/lib/api-client";
 
 interface RegisterResponse {
   user: { id: string; firstName: string; lastName: string; email: string; role: string };
@@ -35,7 +34,6 @@ export default function RegisterPage() {
       if (!res.ok) {
         throw new Error(data.error ?? "Kayıt oluşturulamadı");
       }
-      setToken(data.token);
       router.push("/");
       router.refresh();
     } catch (err) {

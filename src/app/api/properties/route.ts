@@ -3,6 +3,8 @@ import { z } from "zod";
 import { Prisma, PropertyType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth";
+import { toErrorResponse } from "@/lib/http/errors";
+import { httpsUrl } from "@/lib/security/url";
 import { searchProperties, getPopularProperties } from "@/lib/search";
 
 const roomSchema = z.object({
@@ -21,7 +23,7 @@ const createPropertySchema = z.object({
   basePrice: z.number().positive(),
   currency: z.string().trim().min(1).default("TRY"),
   amenities: z.array(z.string().trim().min(1)).default([]),
-  images: z.array(z.string().url()).default([]),
+  images: z.array(httpsUrl).max(20).default([]),
   rooms: z.array(roomSchema).min(1),
 });
 
@@ -70,7 +72,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const host = requireRole(req, ["HOST", "ADMIN"]);
+    const host = await requireRole(req, ["HOST", "ADMIN"]);
 
     const body = await req.json();
     const parsed = createPropertySchema.safeParse(body);
@@ -146,14 +148,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(property, { status: 201 });
   } catch (error) {
-    if (error instanceof Error && error.message === "Missing or invalid token") {
-      return NextResponse.json({ error: "Missing or invalid token" }, { status: 401 });
-    }
-    if (error instanceof Error && error.message === "Insufficient permissions") {
-      return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
-    }
-    console.error("Property create error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return toErrorResponse(error, "properties.create");
   }
 }
 

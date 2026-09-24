@@ -1,79 +1,37 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { createBooking } from "@/lib/booking-service";
-import { getUserIdFromRequest } from "@/lib/auth";
-import { listUserBookings } from "@/lib/booking-service";
+import { createBooking, listUserBookings } from "@/lib/booking-service";
+import { requireAuth } from "@/lib/auth";
+import { toErrorResponse } from "@/lib/http/errors";
 
 const createBookingSchema = z.object({
-  propertyId: z.string().min(1),
-  roomId: z.string().min(1),
-  checkIn: z.string().min(1),
-  checkOut: z.string().min(1),
-  guestCount: z.number().int().positive(),
+  propertyId: z.string().min(1).max(64),
+  roomId: z.string().min(1).max(64),
+  checkIn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  checkOut: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  guestCount: z.number().int().positive().max(20),
 });
 
 export async function POST(req: NextRequest) {
   try {
-    const userId = getUserIdFromRequest(req);
-    const body = await req.json();
-    const parsed = createBookingSchema.parse(body);
-    const idempotencyKey = req.headers.get("idempotency-key") ?? undefined;
+    const { userId } = await requireAuth(req);
+    const parsed = createBookingSchema.parse(await req.json());
+    const idempotencyKey = req.headers.get("idempotency-key")?.slice(0, 128) || undefined;
 
-    const booking = await createBooking({
-      userId,
-      propertyId: parsed.propertyId,
-      roomId: parsed.roomId,
-      checkIn: parsed.checkIn,
-      checkOut: parsed.checkOut,
-      guestCount: parsed.guestCount,
-      idempotencyKey,
-    });
-
+    const booking = await createBooking({ userId, ...parsed, idempotencyKey });
     return NextResponse.json(booking, { status: 201 });
   } catch (error) {
-    return handleBookingError(error);
+    return toErrorResponse(error, "bookings.create");
   }
 }
 
 export async function GET(req: NextRequest) {
   try {
-    const userId = getUserIdFromRequest(req);
-    const bookings = await listUserBookings(userId);
-    return NextResponse.json(bookings);
+    const { userId } = await requireAuth(req);
+    return NextResponse.json(await listUserBookings(userId));
   } catch (error) {
-    return handleBookingError(error);
+    return toErrorResponse(error, "bookings.list");
   }
-}
-
-function handleBookingError(error: unknown): NextResponse {
-  if (error instanceof z.ZodError) {
-    return NextResponse.json({ error: "Validation error", details: error.errors }, { status: 400 });
-  }
-  if (error instanceof Error && error.message === "Missing or invalid token") {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-  if (error instanceof Error && error.message === "Invalid token") {
-    return NextResponse.json({ error: error.message }, { status: 401 });
-  }
-  if (error instanceof Error && error.message === "Missing authorization header") {
-    return NextResponse.json({ error: error.message }, { status: 401 });
-  }
-  // Booking-service tip hataları
-  const typeName = (error as Error)?.constructor?.name;
-  if (typeName === "BookingConflictError") {
-    return NextResponse.json({ error: (error as Error).message }, { status: 409 });
-  }
-  if (typeName === "BookingValidationError") {
-    return NextResponse.json({ error: (error as Error).message }, { status: 400 });
-  }
-  if (typeName === "BookingNotFoundError") {
-    return NextResponse.json({ error: (error as Error).message }, { status: 404 });
-  }
-  if (typeName === "BookingUnauthorizedError") {
-    return NextResponse.json({ error: (error as Error).message }, { status: 403 });
-  }
-  console.error("Failed booking operation:", error);
-  return NextResponse.json({ error: "Internal server error" }, { status: 500 });
 }
 
 export const dynamic = "force-dynamic";

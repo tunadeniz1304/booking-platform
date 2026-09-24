@@ -38,12 +38,6 @@ function CheckoutContent() {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      const token = localStorage.getItem("token");
-      if (!token) {
-        router.replace("/login");
-        return;
-      }
-
       if (!propertyId || !roomId || !checkIn || !checkOut) {
         setError("Rezervasyon bilgileri eksik.");
         setLoading(false);
@@ -89,12 +83,6 @@ function CheckoutContent() {
     e.preventDefault();
     if (!property || !room) return;
 
-    const token = localStorage.getItem("token");
-    if (!token) {
-      router.replace("/login");
-      return;
-    }
-
     setSubmitting(true);
     setError(null);
 
@@ -105,7 +93,6 @@ function CheckoutContent() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
           "Idempotency-Key": idempotencyKey,
         },
         body: JSON.stringify({
@@ -117,6 +104,12 @@ function CheckoutContent() {
         }),
       });
 
+      if (res.status === 401) {
+        router.replace(
+          `/login?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`
+        );
+        return;
+      }
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.error ?? "Rezervasyon oluşturulamadı.");

@@ -4,7 +4,7 @@
 
 Demo hesapları (**yalnızca demo**, parola `Password123!`): `guest@booking.test`, `host@booking.test`, `admin@booking.test`.
 
-> Host paneli, admin paneli ve `/plan` arayüzü F8'de ekleniyor. Arayüzü olmayan adımlar aşağıda API çağrısıyla gösterilir; yanıtlar aynı servis katmanından gelir.
+> Adımlar arayüzden (`/search`, `/host`, `/admin`, `/plan`) yapılabilir; tekrarlanabilirlik için aşağıda API çağrılarıyla da gösterilir — yanıtlar aynı servis katmanından gelir. Adım 1, 3 ve host takvimi `tests/e2e/` altında Playwright ile otomatik doğrulanır.
 
 API adımları için oturum (Bearer token, CSRF gerektirmez):
 

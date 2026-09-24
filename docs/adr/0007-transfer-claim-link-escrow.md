@@ -26,4 +26,4 @@ Kurallar: `askPrice ≤ TRANSFER_MAX_ASK_RATIO × ödenen tutar` (varsayılan 1.
 
 - Para gerçekten el değiştirir (mock PSP üzerinden); veritabanı okunsa bile token elde edilemez.
 - Gerçek dünyada bu akış lisanslı bir ödeme kuruluşu veya escrow hizmeti gerektirir (bkz. [COMPLIANCE](../COMPLIANCE.md), 6493 sayılı Kanun).
-- `/transfers` arayüz sayfası F8'e bırakıldı; özellik API üzerinden kullanılabilir.
+- `/transfers` ve `/transfers/claim` arayüz sayfaları API'nin üzerine kuruludur.

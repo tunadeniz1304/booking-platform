@@ -194,6 +194,5 @@ Diğer modeller: `Amenity`, `Favorite`, `Notification`, `OutboxMessage` (`PENDIN
 
 ## 9. Bilinen sınırlamalar
 
-- Host/admin/trip-planner/transfer için API'ler hazır, ayrı arayüz sayfaları (`/host`, `/admin`, `/plan`, `/transfers`, `/account/privacy`) F8'e bırakıldı.
-- Harita görünümü (MapLibre) yok; arama liste görünümüdür.
-- Playwright e2e ve k6 yük testleri henüz yok; eşzamanlılık kanıtı entegrasyon testidir.
+- Harita görünümü (MapLibre) nokta kümelemesi (supercluster) içermez; çok sayıda sonuçta işaretçiler üst üste binebilir.
+- k6 yük testi tek makinede (Docker Desktop) koşuldu; sonuçlar [docs/perf/k6-results.md](perf/k6-results.md).

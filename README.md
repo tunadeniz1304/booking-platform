@@ -59,16 +59,16 @@ Ayrıntılar: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · kararlar: [docs/ad
 | Ödeme              | 3DS2/SCA, auth → capture, iade                          | `PaymentProvider` + `MockPsp` (authorize/capture/refund, 3DS simülasyonu, HMAC imzalı idempotent webhook), opsiyonel `StripeProvider`                   |
 | İptal & iade       | Sürümlü politika, rezervasyona snapshot                 | `CancellationPolicy` (NON_REFUNDABLE/FLEXIBLE/MODERATE/STRICT) + `Booking.policySnapshot` + `computeRefund()`                                           |
 | Fiyat şeffaflığı   | All-in fiyat (FTC 16 CFR 464, Omnibus)                  | Tek `computeTotal()` (kart = PDP = checkout = tahsilat), minor-unit tamsayı, konaklama vergisi `ACCOMMODATION_TAX_RATE` (%1), fast-check                |
-| Arama & sıralama   | Facet, açıklanabilir sıralama (DSA)                     | Ağırlıklı ve `explain` alanlı skor, `/ranking` şeffaflık sayfası; harita görünümü henüz yok (F8)                                                        |
+| Arama & sıralama   | Facet, açıklanabilir sıralama (DSA)                     | Ağırlıklı ve `explain` alanlı skor, `/ranking` şeffaflık sayfası, MapLibre harita görünümü (kümeleme yok)                                               |
 | GenAI arama        | Booking Smart Filter, Expedia Romie, Trip.com TripGenie | Smart Filter (NL → izinli facet'ler), araçlı ve grounded trip-planner (`POST /api/ai/trip-plan`)                                                        |
 | Yorumlar           | Doğrulanmış konaklama, AI özeti                         | Yalnızca tamamlanmış konaklama sahibi yorum yazar, host yanıtı, atıflı özet (`[r:<id>]` guard'lı)                                                       |
-| Partner extranet   | Oda/fiyat/ARI takvimi                                   | Host API'leri (mülk, oda, toplu ARI, rezervasyonlar, ilan copilot'u); `/host` arayüzü F8'de                                                             |
+| Partner extranet   | Oda/fiyat/ARI takvimi                                   | Host API'leri (mülk, oda, toplu ARI, rezervasyonlar, ilan copilot'u) ve `/host` paneli                                                                  |
 | Kanal yönetimi     | OTA XML / iCal                                          | iCal export/import + gRPC `AriService.PushAvailability` (sıra numaralı, idempotent)                                                                     |
 | Dinamik fiyat      | Açıklanabilir yield, olay sinyalleri                    | Faktör kırılımı `Availability.priceExplanation`, olay sinyali önerisi → admin onayı → [floor, ceiling] sınırlı, idempotent yeniden fiyatlama            |
 | Güvenlik           | RBAC, fraud skoru, ATO koruması                         | jose JWT 15 dk + rotating refresh, CSRF Origin kontrolü, kimliğe bağlı rate-limit, iç uç koruması, gRPC JWT, kural tabanlı fraud skoru                  |
 | Gözlemlenebilirlik | Trace + metrik + SLO                                    | pino, OpenTelemetry (Prisma/ioredis), `/api/metrics` (Prometheus), Grafana dashboard JSON, `observability` compose profili                              |
 | Uyum               | KVKK/GDPR, WCAG, STR kayıt no                           | Veri dışa aktarım/silme API'si (`/api/account`), `Property.licenseNumber`, LLM'e giden metinde KVKK redaksiyonu — bkz. [COMPLIANCE](docs/COMPLIANCE.md) |
-| Test & CI          | Yüksek kapsam, e2e, yük                                 | Vitest unit + testcontainers entegrasyon, GitHub Actions CI; Playwright e2e ve k6 yük testi F8'de                                                       |
+| Test & CI          | Yüksek kapsam, e2e, yük                                 | Vitest unit + testcontainers entegrasyon, Playwright e2e + axe, k6 yük testi ([docs/perf](docs/perf/)), GitHub Actions CI                               |
 
 ## 30 saniyede çalıştır
 
@@ -147,7 +147,7 @@ npm run test:coverage
 
 Entegrasyon testleri hiçbir zaman `DATABASE_URL`'e yazmaz; container'ın URL'ini kullanır. Docker yoksa suite açık bir mesajla atlanır. Testler ağa çıkmaz (`tests/setup.ts` global `fetch`'i engeller).
 
-CI (`.github/workflows/ci.yml`): lint → typecheck → format → unit + coverage → integration → `next build` → `docker compose build` → `npm audit --audit-level=high`. Eski `deploy.yml` kaldırıldı: gerçek bir deploy hedefi yoktu ve sırları build argümanı olarak imaja geçiriyordu (ADR 0001).
+CI (`.github/workflows/ci.yml`): lint → typecheck → format → unit + coverage → integration → `next build` → `docker compose build` → `npm audit --audit-level=high` → Playwright e2e (compose demo yığınına karşı, `npm run test:e2e`). Eski `deploy.yml` kaldırıldı: gerçek bir deploy hedefi yoktu ve sırları build argümanı olarak imaja geçiriyordu (ADR 0001).
 
 ## Gözlemlenebilirlik
 

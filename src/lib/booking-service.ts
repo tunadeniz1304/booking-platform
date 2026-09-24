@@ -16,6 +16,7 @@ import { HttpError } from "@/lib/http/errors";
 import { getConfig } from "@/lib/config/app-config";
 import { withSerializableRetry } from "@/lib/db/transactions";
 import { transition, type BookingState } from "@/lib/booking/state-machine";
+import { toSnapshot } from "@/lib/booking/cancellation";
 import { money, toDecimalString, toMinor, assertCurrency } from "@/lib/money/money";
 import { DateRangeError, fromDate, parseStay, toDbDate, type IsoDate } from "@/lib/time/nights";
 import {
@@ -269,7 +270,12 @@ async function reserveInTransaction(
         capacity: true,
         available: true,
         priceModifier: true,
-        property: { select: { currency: true } },
+        property: {
+          select: {
+            currency: true,
+            cancellationPolicy: { select: { kind: true, version: true, rules: true } },
+          },
+        },
       },
     });
     if (!room) throw new BookingNotFoundError("Oda veya mülk bulunamadı");
@@ -327,6 +333,9 @@ async function reserveInTransaction(
         holdExpiresAt,
         priceBreakdown: priced as unknown as Prisma.InputJsonValue,
         quoteId: quote?.quoteId ?? null,
+        policySnapshot: toSnapshot(
+          room.property.cancellationPolicy
+        ) as unknown as Prisma.InputJsonValue,
         idempotencyKey: input.idempotencyKey ?? null,
       },
       select: bookingSelect,

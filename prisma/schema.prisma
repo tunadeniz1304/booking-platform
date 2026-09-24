@@ -8,20 +8,20 @@ datasource db {
 }
 
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
-  passwordHash  String
-  firstName     String
-  lastName      String
-  avatarUrl     String?
-  role          UserRole  @default(USER)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  bookings      Booking[]
-  reviews       Review[]
-  favorites     Favorite[]
-  payments      Payment[]
-  properties    Property[]
+  id               String            @id @default(cuid())
+  email            String            @unique
+  passwordHash     String
+  firstName        String
+  lastName         String
+  avatarUrl        String?
+  role             UserRole          @default(USER)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  bookings         Booking[]
+  reviews          Review[]
+  favorites        Favorite[]
+  payments         Payment[]
+  properties       Property[]
   listedTransfers  BookingTransfer[] @relation("transferSeller")
   claimedTransfers BookingTransfer[] @relation("transferBuyer")
 }
@@ -33,29 +33,32 @@ enum UserRole {
 }
 
 model Property {
-  id            String     @id @default(cuid())
-  hostId        String
-  host          User       @relation(fields: [hostId], references: [id])
-  title         String
-  description   String
-  propertyType  PropertyType
-  locationId    String
-  location      Location   @relation(fields: [locationId], references: [id])
-  amenities     Amenity[]  @relation("PropertyAmenities")
-  rooms         Room[]
-  bookings      Booking[]
-  reviews       Review[]
-  favorites     Favorite[]
-  basePrice     Decimal    @db.Decimal(10, 2)
-  currency      String     @default("TRY")
-  ratingAvg     Float      @default(0)
-  ratingCount   Int        @default(0)
-  isActive      Boolean     @default(true)
-  images        String[]    @default([])
-  embedding     Unsupported("vector(128)")?
-  priceHistory  PriceHistory[]
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+  id                   String                      @id @default(cuid())
+  hostId               String
+  host                 User                        @relation(fields: [hostId], references: [id])
+  title                String
+  description          String
+  propertyType         PropertyType
+  locationId           String
+  location             Location                    @relation(fields: [locationId], references: [id])
+  amenities            Amenity[]                   @relation("PropertyAmenities")
+  rooms                Room[]
+  bookings             Booking[]
+  reviews              Review[]
+  favorites            Favorite[]
+  basePrice            Decimal                     @db.Decimal(10, 2)
+  currency             String                      @default("TRY")
+  ratingAvg            Float                       @default(0)
+  ratingCount          Int                         @default(0)
+  isActive             Boolean                     @default(true)
+  images               String[]                    @default([])
+  embedding            Unsupported("vector(128)")?
+  priceHistory         PriceHistory[]
+  /// İptal politikası (yoksa varsayılan MODERATE); rezervasyonda snapshot'ı alınır.
+  cancellationPolicyId String?
+  cancellationPolicy   CancellationPolicy?         @relation(fields: [cancellationPolicyId], references: [id])
+  createdAt            DateTime                    @default(now())
+  updatedAt            DateTime                    @updatedAt
 
   @@index([locationId, isActive])
   @@index([hostId])
@@ -72,12 +75,12 @@ enum PropertyType {
 }
 
 model Location {
-  id         String        @id @default(cuid())
-  city       String
-  country    String
-  latitude   Float?
-  longitude  Float?
-  properties Property[]
+  id           String        @id @default(cuid())
+  city         String
+  country      String
+  latitude     Float?
+  longitude    Float?
+  properties   Property[]
   demandEvents DemandEvent[]
 
   @@unique([city, country])
@@ -108,17 +111,17 @@ model Amenity {
 }
 
 model Room {
-  id            String         @id @default(cuid())
-  propertyId    String
-  property      Property       @relation(fields: [propertyId], references: [id])
-  name          String
-  description   String?
-  capacity      Int
-  bedType       String
-  priceModifier Decimal        @default(0) @db.Decimal(10, 2)
-  available     Boolean        @default(true)
+  id             String         @id @default(cuid())
+  propertyId     String
+  property       Property       @relation(fields: [propertyId], references: [id])
+  name           String
+  description    String?
+  capacity       Int
+  bedType        String
+  priceModifier  Decimal        @default(0) @db.Decimal(10, 2)
+  available      Boolean        @default(true)
   availabilities Availability[]
-  bookings      Booking[]
+  bookings       Booking[]
 
   @@index([propertyId])
   @@index([available])
@@ -139,42 +142,45 @@ model Availability {
 }
 
 model Booking {
-  id         String        @id @default(cuid())
-  userId     String
-  user       User          @relation(fields: [userId], references: [id])
-  propertyId String
-  property   Property      @relation(fields: [propertyId], references: [id])
-  roomId     String
-  room       Room          @relation(fields: [roomId], references: [id])
-  checkIn    DateTime      @db.Date
-  checkOut   DateTime      @db.Date
-  guestCount Int
-  totalPrice Decimal       @db.Decimal(10, 2)
-  currency   String        @default("TRY")
-  status     BookingStatus @default(PENDING)
+  id             String            @id @default(cuid())
+  userId         String
+  user           User              @relation(fields: [userId], references: [id])
+  propertyId     String
+  property       Property          @relation(fields: [propertyId], references: [id])
+  roomId         String
+  room           Room              @relation(fields: [roomId], references: [id])
+  checkIn        DateTime          @db.Date
+  checkOut       DateTime          @db.Date
+  guestCount     Int
+  totalPrice     Decimal           @db.Decimal(10, 2)
+  currency       String            @default("TRY")
+  status         BookingStatus     @default(PENDING)
   /// HELD durumundaki geçici tutma süresi; dolunca expire-holds işi envanteri iade eder.
-  holdExpiresAt DateTime?
+  holdExpiresAt  DateTime?
   /// İyimser eşzamanlılık sürümü: her durum geçişinde +1 (koşullu güncelleme).
-  version    Int           @default(0)
+  version        Int               @default(0)
   /// computeTotal() kırılımının anlık görüntüsü (geceler, ara toplam, vergiler, toplam; minor-unit).
   priceBreakdown Json?
-  quoteId    String?
-  confirmedAt DateTime?
-  cancelledAt DateTime?
-  expiredAt  DateTime?
+  quoteId        String?
+  /// Rezervasyon anındaki iptal politikası (sonradan değişse de bu geçerlidir).
+  policySnapshot Json?
+  ledgerEntries  LedgerEntry[]
+  confirmedAt    DateTime?
+  cancelledAt    DateTime?
+  expiredAt      DateTime?
   idempotencyKey String?
-  payment      Payment?
-  reviews      Review[]
-  transfers    BookingTransfer[]
-  createdAt    DateTime      @default(now())
-  updatedAt  DateTime      @updatedAt
+  payment        Payment?
+  reviews        Review[]
+  transfers      BookingTransfer[]
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
 
+  @@unique([userId, idempotencyKey])
   @@index([propertyId, checkIn, checkOut])
   @@index([userId])
   @@index([roomId, checkIn, checkOut])
   @@index([status, checkIn])
   @@index([status, holdExpiresAt])
-  @@unique([userId, idempotencyKey])
 }
 
 /// PENDING → HELD → CONFIRMED → COMPLETED | CANCELLED | EXPIRED (src/lib/booking/state-machine.ts)
@@ -188,28 +194,112 @@ enum BookingStatus {
 }
 
 model Payment {
-  id        String        @id @default(cuid())
-  bookingId String        @unique
-  booking   Booking       @relation(fields: [bookingId], references: [id])
-  userId    String
-  user      User          @relation(fields: [userId], references: [id])
-  amount    Decimal       @db.Decimal(10, 2)
-  currency  String        @default("TRY")
-  provider  String
-  status    PaymentStatus @default(PENDING)
-  paidAt    DateTime?
-  createdAt DateTime      @default(now())
+  id             String        @id @default(cuid())
+  bookingId      String        @unique
+  booking        Booking       @relation(fields: [bookingId], references: [id])
+  /// Ödemenin sahibi = rezervasyonun güncel sahibi (devirde alıcıya geçer).
+  userId         String
+  user           User          @relation(fields: [userId], references: [id])
+  amount         Decimal       @db.Decimal(10, 2)
+  currency       String        @default("TRY")
+  provider       String
+  /// PSP tarafındaki ödeme kimliği (mock: pi_mock_…, stripe: pi_…).
+  providerRef    String?       @unique
+  status         PaymentStatus @default(PENDING)
+  refundedAmount Decimal       @default(0) @db.Decimal(10, 2)
+  failureCode    String?
+  authorizedAt   DateTime?
+  paidAt         DateTime?
+  refundedAt     DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @default(now()) @updatedAt
 
   @@index([userId])
   @@index([status])
   @@index([provider, status])
 }
 
+/// PSP webhook olayları — olay kimliği benzersiz: replay ikinci kez etki etmez.
+model PaymentEvent {
+  id          String   @id
+  type        String
+  providerRef String?
+  receivedAt  DateTime @default(now())
+
+  @@index([providerRef])
+}
+
+enum LedgerKind {
+  CHARGE
+  REFUND
+  TRANSFER_PAYMENT
+  TRANSFER_PAYOUT
+}
+
+/// Para hareketleri defteri (escrow/devir izlenebilirliği).
+model LedgerEntry {
+  id        String     @id @default(cuid())
+  bookingId String
+  booking   Booking    @relation(fields: [bookingId], references: [id])
+  userId    String
+  kind      LedgerKind
+  amount    Decimal    @db.Decimal(10, 2)
+  currency  String
+  reference String?
+  createdAt DateTime   @default(now())
+
+  @@index([bookingId])
+  @@index([userId])
+}
+
+enum CancellationPolicyKind {
+  NON_REFUNDABLE
+  FLEXIBLE
+  MODERATE
+  STRICT
+}
+
+/// Sürümlü iptal politikası; kurallar: { tiers: [{ hoursBefore, refundPercent }], graceHours? }.
+model CancellationPolicy {
+  id         String                 @id @default(cuid())
+  kind       CancellationPolicyKind
+  version    Int                    @default(1)
+  rules      Json
+  createdAt  DateTime               @default(now())
+  properties Property[]
+
+  @@unique([kind, version])
+}
+
+/// Bildirim kutusu (SMTP yoksa dev mailbox). dedupeKey: aynı olay iki kez → tek e-posta.
+model Notification {
+  id        String    @id @default(cuid())
+  dedupeKey String    @unique
+  channel   String    @default("email")
+  userId    String?
+  to        String
+  subject   String
+  text      String
+  html      String
+  status    String    @default("PENDING")
+  transport String    @default("mailbox")
+  error     String?
+  createdAt DateTime  @default(now())
+  sentAt    DateTime?
+
+  @@index([userId, createdAt])
+}
+
 enum PaymentStatus {
   PENDING
+  REQUIRES_ACTION
+  AUTHORIZED
+  /// Tahsil edildi (capture)
   PAID
   FAILED
+  PARTIALLY_REFUNDED
   REFUNDED
+  VOIDED
 }
 
 model Review {
@@ -273,13 +363,13 @@ model OutboxMessage {
 }
 
 model PriceHistory {
-  id              String        @id @default(cuid())
+  id              String   @id @default(cuid())
   propertyId      String
-  property        Property      @relation(fields: [propertyId], references: [id])
-  month           DateTime      @db.Date
-  avgNightlyPrice Decimal       @db.Decimal(10, 2)
-  demandIndex     Float         @default(50)
-  createdAt       DateTime      @default(now())
+  property        Property @relation(fields: [propertyId], references: [id])
+  month           DateTime @db.Date
+  avgNightlyPrice Decimal  @db.Decimal(10, 2)
+  demandIndex     Float    @default(50)
+  createdAt       DateTime @default(now())
 
   @@unique([propertyId, month])
   @@index([propertyId, month])
@@ -293,23 +383,27 @@ enum TransferStatus {
 }
 
 model BookingTransfer {
-  id            String         @id @default(cuid())
-  bookingId     String
-  booking       Booking        @relation(fields: [bookingId], references: [id])
-  sellerId      String
-  seller        User           @relation("transferSeller", fields: [sellerId], references: [id])
-  status        TransferStatus @default(LISTED)
-  askPrice      Decimal        @db.Decimal(10, 2)
-  currency      String         @default("TRY")
-  // HMAC imzalı devir jetonu — delegasyonu doğrulanabilir kılar (denetlenebilir).
-  transferToken String         @unique
-  listedAt      DateTime       @default(now())
-  claimedById   String?
-  claimedBy     User?          @relation("transferBuyer", fields: [claimedById], references: [id])
-  claimedAt     DateTime?
-  completedAt   DateTime?
+  id              String         @id @default(cuid())
+  bookingId       String
+  booking         Booking        @relation(fields: [bookingId], references: [id])
+  sellerId        String
+  seller          User           @relation("transferSeller", fields: [sellerId], references: [id])
+  status          TransferStatus @default(LISTED)
+  askPrice        Decimal        @db.Decimal(10, 2)
+  currency        String         @default("TRY")
+  /// İmzalı claim linkinin SHA-256 özeti — token'ın kendisi saklanmaz.
+  tokenHash       String         @unique
+  expiresAt       DateTime
+  listedAt        DateTime       @default(now())
+  claimedById     String?
+  claimedBy       User?          @relation("transferBuyer", fields: [claimedById], references: [id])
+  claimedAt       DateTime?
+  completedAt     DateTime?
+  cancelledAt     DateTime?
+  buyerPaymentRef String?
 
   @@index([status, bookingId])
+  @@index([status, expiresAt])
   @@index([sellerId])
   @@index([claimedById])
 }

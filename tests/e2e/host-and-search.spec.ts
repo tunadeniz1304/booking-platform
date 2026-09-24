@@ -38,3 +38,42 @@ test("Smart Filter (demo): doğal dil sorgusu filtre çiplerine dönüşür", as
   await chips.getByRole("button", { name: /2 misafir filtresini kaldır/ }).click();
   await expect(chips.getByRole("button", { name: /2 misafir/ })).toHaveCount(0);
 });
+
+test("harita görünümü: kümeleme ve liste ↔ işaretçi senkronu", async ({ page }) => {
+  await page.goto("/search");
+  await page
+    .getByRole("group", { name: "Görünüm" })
+    .getByRole("button", { name: "Harita" })
+    .click();
+
+  const list = page.getByRole("list", { name: "Haritadaki sonuçlar" });
+  const fallback = page.getByText(/Harita yüklenemedi/);
+  await expect(list.or(fallback).first()).toBeVisible();
+  test.skip(
+    await fallback.isVisible(),
+    "Harita karoları yüklenemedi (çevrimdışı) → liste görünümü"
+  );
+
+  // Türkiye geneli görünümde aynı şehirdeki mülkler kümelenir.
+  const clusters = page.getByRole("button", { name: /konaklama; yakınlaştırmak için tıklayın/ });
+  await expect(clusters.first()).toBeVisible();
+
+  // Liste → harita: seçim işaretçiyi vurgular ve açılır pencerede mülkü gösterir.
+  const firstItem = list.getByRole("button").first();
+  const title = (await firstItem.locator("span").first().innerText()).trim();
+  await firstItem.click();
+  await expect(firstItem).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("link", { name: title })).toBeVisible();
+  const marker = page.getByRole("button", { name: new RegExp(`^${escapeRegExp(title)}, `) });
+  await expect(marker).toHaveAttribute("aria-pressed", "true");
+
+  // Seçimi kaldır, ardından harita → liste: işaretçiye tıklamak liste öğesini seçer.
+  await firstItem.click();
+  await expect(firstItem).toHaveAttribute("aria-pressed", "false");
+  await marker.click();
+  await expect(firstItem).toHaveAttribute("aria-pressed", "true");
+});
+
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}

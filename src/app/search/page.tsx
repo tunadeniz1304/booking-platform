@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import Header from "@/components/layout/Header";
@@ -104,6 +104,8 @@ function SearchPageContent() {
   const [llmMode, setLlmMode] = useState<string | null>(null);
   const [smartBusy, setSmartBusy] = useState(false);
   const [view, setView] = useState<"list" | "map">("list");
+  /** Harita ↔ liste senkronu: seçili mülk (işaretçi veya liste öğesi). */
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [mapError, setMapError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -359,8 +361,20 @@ function SearchPageContent() {
             )}
 
             {showMap && !error && (
-              <div className="mb-6">
-                <ResultsMap points={mapPoints} onFail={(reason) => setMapError(reason)} />
+              <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
+                <div className="lg:col-span-2">
+                  <ResultsMap
+                    points={mapPoints}
+                    selectedId={selectedId}
+                    onSelect={setSelectedId}
+                    onFail={(reason) => setMapError(reason)}
+                  />
+                </div>
+                <MapResultList
+                  points={mapPoints}
+                  selectedId={selectedId}
+                  onSelect={setSelectedId}
+                />
               </div>
             )}
 
@@ -392,6 +406,58 @@ function SearchPageContent() {
       </main>
       <Footer />
     </div>
+  );
+}
+
+/** Harita görünümünün yan listesi: seçim haritayla iki yönlü senkron. */
+function MapResultList({
+  points,
+  selectedId,
+  onSelect,
+}: {
+  points: MapPoint[];
+  selectedId: string | null;
+  onSelect: (id: string | null) => void;
+}) {
+  const itemRefs = useRef(new Map<string, HTMLLIElement>());
+  useEffect(() => {
+    if (selectedId) itemRefs.current.get(selectedId)?.scrollIntoView({ block: "nearest" });
+  }, [selectedId]);
+
+  return (
+    <ul
+      aria-label="Haritadaki sonuçlar"
+      className="max-h-[480px] space-y-2 overflow-y-auto rounded-lg bg-white p-2 shadow-sm"
+    >
+      {points.map((p) => {
+        const active = p.id === selectedId;
+        return (
+          <li
+            key={p.id}
+            ref={(el) => {
+              if (el) itemRefs.current.set(p.id, el);
+              else itemRefs.current.delete(p.id);
+            }}
+          >
+            <button
+              type="button"
+              aria-pressed={active}
+              onClick={() => onSelect(active ? null : p.id)}
+              className={`w-full rounded-md border px-3 py-2 text-left text-sm ${
+                active
+                  ? "border-[#003580] bg-amber-100 text-gray-900"
+                  : "border-gray-200 bg-white text-gray-900 hover:bg-gray-50"
+              } ${focusRing}`}
+            >
+              <span className="block font-semibold">{p.title}</span>
+              <span className="text-gray-700">
+                {p.city} · {p.priceLabel}
+              </span>
+            </button>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 

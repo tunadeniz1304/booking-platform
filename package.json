@@ -26,6 +26,8 @@
     "demo:reset": "tsx scripts/demo-reset.ts",
     "worker": "tsx --conditions=react-server src/worker/index.ts",
     "grpc:server": "tsx --conditions=react-server services/grpc/main.ts",
+    "mcp:server": "cross-env LOG_TO_STDERR=true SERVICE_NAME=booking-mcp tsx --conditions=react-server services/mcp/main.ts",
+    "mcp:smoke": "tsx scripts/mcp-smoke.ts",
     "embeddings:backfill": "tsx scripts/backfill-embeddings.ts",
     "llm:smoke": "tsx --conditions=react-server scripts/llm-smoke.ts",
     "availability:rollover": "tsx scripts/availability-rollover.ts",
@@ -34,6 +36,7 @@
   "dependencies": {
     "@grpc/grpc-js": "^1.14.5",
     "@grpc/proto-loader": "^0.7.15",
+    "@modelcontextprotocol/sdk": "^1.30.1",
     "@opentelemetry/api": "^1.9.1",
     "@opentelemetry/instrumentation-ioredis": "^0.70.0",
     "@prisma/client": "^5.17.0",

@@ -26,7 +26,8 @@ export function categorize(pathname: string): RateLimitCategory {
   if (
     pathname.startsWith("/api/search") ||
     pathname.startsWith("/api/properties") ||
-    pathname.startsWith("/api/locations")
+    pathname.startsWith("/api/locations") ||
+    pathname.startsWith("/api/quote")
   ) {
     return "search";
   }

@@ -2,6 +2,17 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { redis } from "@/lib/redis";
 import { logger, errorFields } from "@/lib/observability/logger";
+import { getConfig } from "@/lib/config/app-config";
+import { money, toDecimalString, toMinor } from "@/lib/money/money";
+import { nightsFromRows, priceStay } from "@/lib/pricing/quote";
+import { isIsoDate, nightsBetween, type IsoDate } from "@/lib/time/nights";
+
+function stayFor(params: { checkIn?: string; checkOut?: string }): { nights: IsoDate[] } | null {
+  if (!params.checkIn || !params.checkOut) return null;
+  if (!isIsoDate(params.checkIn) || !isIsoDate(params.checkOut)) return null;
+  const nights = nightsBetween(params.checkIn, params.checkOut);
+  return nights.length > 0 ? { nights } : null;
+}
 import {
   findSemanticCandidates,
   computeAffinity,
@@ -56,7 +67,10 @@ export interface SearchResult {
   amenities: string[];
   images?: string[];
   availableRooms: number;
+  /** Görüntüleme (ana birim); tahsilat için `quote.total` (minor-unit) kullanılır. */
   totalPrice?: number;
+  /** Seçilen tarihler için en ucuz odanın vergi dahil toplamı (priceStay ile). */
+  quote?: { roomId: string; total: number; currency: string; nights: number };
 }
 
 export interface SearchResponse {
@@ -425,14 +439,15 @@ export async function searchProperties(params: SearchParams): Promise<SearchResp
                 params.checkIn && params.checkOut
                   ? {
                       date: {
-                        gte: new Date(params.checkIn),
-                        lt: new Date(params.checkOut),
+                        gte: new Date(`${params.checkIn}T00:00:00.000Z`),
+                        lt: new Date(`${params.checkOut}T00:00:00.000Z`),
                       },
-                      isAvailable: true,
                     }
                   : undefined,
               select: {
+                date: true,
                 price: true,
+                isAvailable: true,
               },
             },
           },
@@ -444,24 +459,32 @@ export async function searchProperties(params: SearchParams): Promise<SearchResp
   const results: SearchResult[] = properties.map((property) => {
     const availableRooms = property.rooms.length;
     let totalPrice: number | undefined;
+    let quote: SearchResult["quote"];
 
-    if (params.checkIn && params.checkOut && availableRooms > 0) {
-      const nights = Math.max(
-        1,
-        Math.round(
-          (new Date(params.checkOut).getTime() - new Date(params.checkIn).getTime()) /
-            (1000 * 60 * 60 * 24)
-        )
-      );
-
-      const room = property.rooms[0];
-      const availabilityPrices = room.availabilities.map((a) => Number(a.price));
-      const avgAvailabilityPrice =
-        availabilityPrices.length > 0
-          ? availabilityPrices.reduce((sum, p) => sum + p, 0) / availabilityPrices.length
-          : Number(property.basePrice) + Number(room.priceModifier);
-
-      totalPrice = Math.round(avgAvailabilityPrice * nights * 100) / 100;
+    // Kart fiyatı = PDP = checkout: aynı saf `priceStay` fonksiyonu, en ucuz uygun oda.
+    const stay = stayFor(params);
+    if (stay && availableRooms > 0) {
+      for (const room of property.rooms) {
+        const nights = nightsFromRows(room.availabilities, stay.nights, property.currency);
+        if (!nights) continue;
+        const priced = priceStay({
+          nights,
+          modifierMinor: toMinor(room.priceModifier.toString(), property.currency),
+          currency: property.currency,
+          taxRate: getConfig().ACCOMMODATION_TAX_RATE,
+        });
+        if (!quote || priced.total < quote.total) {
+          quote = {
+            roomId: room.id,
+            total: priced.total,
+            currency: priced.currency,
+            nights: nights.length,
+          };
+        }
+      }
+      if (quote) {
+        totalPrice = Number(toDecimalString(money(quote.total, quote.currency)));
+      }
     }
 
     return {
@@ -478,6 +501,7 @@ export async function searchProperties(params: SearchParams): Promise<SearchResp
       images: property.images,
       availableRooms,
       totalPrice,
+      quote,
     };
   });
 

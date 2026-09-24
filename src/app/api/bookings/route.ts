@@ -10,6 +10,8 @@ const createBookingSchema = z.object({
   checkIn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   checkOut: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   guestCount: z.number().int().positive().max(20),
+  /** Checkout'ta gösterilen teklif; fiyat değiştiyse 409 PRICE_CHANGED. */
+  quoteId: z.string().uuid().optional(),
 });
 
 export async function POST(req: NextRequest) {

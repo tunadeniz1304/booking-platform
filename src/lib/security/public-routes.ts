@@ -18,6 +18,7 @@ const PUBLIC_API: readonly PublicRule[] = [
   { prefix: "/api/search", methods: ["GET", "POST"] },
   { prefix: "/api/properties", methods: ["GET"] },
   { prefix: "/api/locations", methods: ["GET"] },
+  { prefix: "/api/quote", methods: ["GET"] },
   { prefix: "/api/rooms/", methods: ["GET"] },
   { prefix: "/api/routing/optimize", methods: ["GET"] },
   { prefix: "/api/transfers/discover", methods: ["GET"] },

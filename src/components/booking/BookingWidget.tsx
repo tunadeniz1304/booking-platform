@@ -1,8 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import DateRangePicker, { toISODate } from "@/components/search/DateRangePicker";
+import QuoteBreakdown from "./QuoteBreakdown";
+import { useQuote } from "./useQuote";
 
 export interface BookingWidgetRoom {
   id: string;
@@ -16,22 +18,18 @@ export interface BookingWidgetRoom {
 interface BookingWidgetProps {
   propertyId: string;
   rooms: BookingWidgetRoom[];
-  basePrice: number;
+  /** Yalnızca "başlangıç fiyatı" gösterimi için; toplam daima sunucu teklifinden gelir. */
+  basePrice?: number;
   currency?: string;
 }
 
 function addDaysISO(days: number): string {
   const d = new Date();
-  d.setDate(d.getDate() + days);
+  d.setUTCDate(d.getUTCDate() + days);
   return toISODate(d);
 }
 
-export default function BookingWidget({
-  propertyId,
-  rooms,
-  basePrice,
-  currency = "TRY",
-}: BookingWidgetProps) {
+export default function BookingWidget({ propertyId, rooms }: BookingWidgetProps) {
   const router = useRouter();
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [checkIn, setCheckIn] = useState(addDaysISO(1));
@@ -41,19 +39,16 @@ export default function BookingWidget({
 
   const availableRooms = rooms.filter((room) => room.available);
 
-  const nights = useMemo(() => {
-    if (!checkIn || !checkOut) return 0;
-    const start = new Date(checkIn);
-    const end = new Date(checkOut);
-    const diff = end.getTime() - start.getTime();
-    return Math.max(0, Math.round(diff / (1000 * 60 * 60 * 24)));
-  }, [checkIn, checkOut]);
-
   const selectedRoom =
     availableRooms.find((room) => room.id === selectedRoomId) ?? availableRooms[0];
 
-  const totalPrice =
-    !selectedRoom || nights <= 0 ? 0 : (basePrice + selectedRoom.priceModifier) * nights;
+  const { quote, loading, error } = useQuote({
+    roomId: selectedRoom?.id,
+    propertyId,
+    checkIn,
+    checkOut,
+    guests: guestCount,
+  });
 
   const handleDateChange = (v: { checkIn: string; checkOut: string }) => {
     setCheckIn(v.checkIn);
@@ -63,7 +58,7 @@ export default function BookingWidget({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedRoom || nights <= 0) return;
+    if (!selectedRoom || !quote) return;
 
     const params = new URLSearchParams({
       propertyId,
@@ -71,6 +66,7 @@ export default function BookingWidget({
       checkIn,
       checkOut,
       guestCount: String(guestCount),
+      quoteId: quote.quoteId,
     });
 
     router.push(`/checkout?${params.toString()}`);
@@ -147,38 +143,15 @@ export default function BookingWidget({
         </select>
       </div>
 
-      {selectedRoom && nights > 0 && (
-        <div className="mt-5 border-t border-gray-200 pt-4">
-          <div className="flex justify-between text-sm text-gray-600">
-            <span>
-              {new Intl.NumberFormat("tr-TR", {
-                style: "currency",
-                currency,
-              }).format(basePrice + selectedRoom.priceModifier)}{" "}
-              x {nights} gece
-            </span>
-            <span>
-              {new Intl.NumberFormat("tr-TR", {
-                style: "currency",
-                currency,
-              }).format(totalPrice)}
-            </span>
-          </div>
-          <div className="mt-2 flex justify-between text-base font-semibold text-gray-900">
-            <span>Toplam</span>
-            <span>
-              {new Intl.NumberFormat("tr-TR", {
-                style: "currency",
-                currency,
-              }).format(totalPrice)}
-            </span>
-          </div>
-        </div>
-      )}
+      <div className="mt-5 border-t border-gray-200 pt-4" aria-live="polite">
+        {loading && <p className="text-sm text-gray-500">Fiyat hesaplanıyor…</p>}
+        {error && <p className="text-sm text-red-600">{error}</p>}
+        {quote && <QuoteBreakdown quote={quote} />}
+      </div>
 
       <button
         type="submit"
-        disabled={!selectedRoom || nights <= 0}
+        disabled={!selectedRoom || !quote}
         className="mt-5 w-full rounded-lg bg-[#003580] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#002b66] disabled:cursor-not-allowed disabled:bg-gray-300"
       >
         Rezervasyonu Onayla

@@ -57,7 +57,7 @@ Her faz sonunda kalite kapısı: `npm run lint` · `npm run typecheck` · `npm r
 
 ## v3 F8 — i18n, UI, demo, yük
 
-- [ ] P1-12 i18n (#20); P2-1 UI + a11y; P2-2 demo senaryoları; P2-3 yük/kaos; ekran görüntüleri
+- [x] P1-12 i18n (#20); P2-1 UI + a11y; P2-2 demo senaryoları; P2-3 yük/kaos; ekran görüntüleri
 
 ## v3 F9 — Dokümanlar + release
 

@@ -29,6 +29,10 @@ Bu dosyadaki tüm önemli değişiklikler burada belgelenir. Biçim [Keep a Chan
 - **v3 F7 — Kanal yöneticisi (P1-9, #21, ADR 0015):** `ical-poll` tekrarlı işi (ETag / `If-Modified-Since`, SSRF korumalı https, boyut/süre sınırı), ev sahibi abonelik uçları, besleme belirteci döndürme (`ChannelFeed.tokenVersion`), yalnız uyaran fiyat eşitliği kontrolü.
 - **v3 F7 — Gelir paneli (P1-5, ADR 0015):** `/host/revenue` doluluk, ADR, RevPAR ve SVG pickup grafiği; doluluk, varışa kalan süre, TR resmî tatilleri ve onaylı olaylardan katkı tablolu fiyat önerisi her zaman [taban, tavan] içinde (v3#5, fast-check); LLM yalnız Türkçe açıklamayı yazar (demo yedeği). Kabul fiyatı yazıp geceyi sabitler (`priceOverride`, motor ezmez), ret hiçbir şeyi değiştirmez.
 - **v3 F7 — Ölü kod (#17):** knip ile bulunan kullanılmayan dosya ve dışa aktarımlar kaldırıldı.
+- **v3 F8 — i18n (P1-12, #20, ADR 0018):** next-intl ile tr/en (varsayılan tr, `NEXT_LOCALE` çerezi), üst bardaki dil seçici, `Intl` tabanlı tarih/para/sayı biçimleme, anahtar eşitliği betiği (`npm run i18n:check`); bildirim e-postaları `User.locale`'e göre iki dilli.
+- **v3 F8 — UI + erişilebilirlik (P2-1):** Playwright + axe taraması (`tests/e2e/i18n.spec.ts`, ciddi/kritik ihlal 0 hedefi), PDP'de fiyat içgörüsü bileşeni.
+- **v3 F8 — Demo senaryoları (P2-2):** `scripts/demo-scenarios.ts` 7 tohumlu uçtan uca senaryo (100 paralel HOLD, idempotent ödeme, vergi dökümü, saat dilimi, MCP 401, gelir önerisi, belgesiz ilan); `docs/DEMO_SCRIPT.md`, `npm run demo:reset`.
+- **v3 F8 — Yük ve kaos (P2-3):** k6 `search`, `hold-spike`, `payment-race`, `llm-fallback` betikleri; `load/chaos.md` (Redis kesintisi, LLM zaman aşımı) ve `docs/perf/k6-results.md` gerçek ölçümlerle.
 
 ### Changed
 
@@ -40,6 +44,12 @@ Bu dosyadaki tüm önemli değişiklikler burada belgelenir. Biçim [Keep a Chan
 
 ### Fixed
 
+- Eşzamanlı ödeme onayında Postgres serileştirme çakışması (P2034) 3 denemede tükenip 500 dönüyordu (k6 payment-race: 18 onaydan 4'ü). Deneme sayısı ve üstel+rastgele geri çekilme yapılandırılabilir (`DB_SERIALIZABLE_RETRY_ATTEMPTS`, `DB_SERIALIZABLE_RETRY_BASE_MS`); tükenirse 409 `TRANSACTION_CONFLICT` + `Retry-After`.
+- Redis kesintisinde fail-open arama ~33 sn asılı kalıyordu; bağlantı koptuktan sonra komutlar hemen reddedilir ve her komut `REDIS_COMMAND_TIMEOUT_MS` ile sınırlıdır (kesinti altında arama p95 232 ms).
+- Süre dolum işi (`expire-holds`) sayacı tutarsız tek bir tutmada tüm toplu işlemi geri alıyor, hiçbir tutma bir daha düşmüyordu; tutarsız kayıt SAVEPOINT ile iadesiz EXPIRED yapılır ve loglanır (`booking_expire_inventory_drift_total`). Seed'deki PENDING rezervasyonlar artık `held` sayacını artırır.
+- MCP 401 yanıtı JSON-RPC `-32001` hata gövdesi ve `WWW-Authenticate` başlığı döner.
+- Fiyat kırılımında (`QuoteBreakdown`) `<dl>` içinde `<p>` vardı (axe `definition-list`, serious; ürün ve checkout sayfaları); dahil vergi ve kur notları listenin dışına alındı.
+- `demo:scenarios` betiğinin okuduğu `BASE_URL` ve `DAY_OFFSET` `.env.example`'da belgelenmemişti (regression #21 kırmızıydı).
 - Serbest metin araması kök ekleri, yazım hataları ve eş anlamlıları kaçırıyordu; hibrit RRF araması ile düzeltildi (v3#19).
 - Devredilen rezervasyonun iptal iadesi yeni sahibe değil ödemeyi yapan alıcıya gider (v3#4).
 

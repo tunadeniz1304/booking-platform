@@ -15,6 +15,7 @@ export const webhookEventSchema = z.object({
   type: z.enum(["payment.succeeded", "payment.failed", "refund.succeeded"]),
   data: z.object({
     providerRef: z.string().min(1).max(200),
+    /** Minor-unit; verilirse kayıtlı ödemeyle birebir eşleşmelidir (v3#2). */
     amount: z.number().int().optional(),
     currency: z.string().optional(),
   }),

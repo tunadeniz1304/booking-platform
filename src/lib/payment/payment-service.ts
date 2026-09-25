@@ -10,6 +10,7 @@ import {
 } from "@/lib/events/events";
 import { ConflictError, HttpError } from "@/lib/http/errors";
 import { withSerializableRetry } from "@/lib/db/transactions";
+import { createRedlock, LockError } from "@/lib/distributed-lock/redlock";
 import { transition, type BookingState } from "@/lib/booking/state-machine";
 import { computeRefund, parseSnapshot, type RefundDecision } from "@/lib/booking/cancellation";
 import { releaseInventory, BookingNotFoundError } from "@/lib/booking-service";
@@ -19,24 +20,54 @@ import { money, toDecimalString, toMinor, assertCurrency, type Money } from "@/l
 import { fromDate } from "@/lib/time/nights";
 import { logger, errorFields } from "@/lib/observability/logger";
 import { counter } from "@/lib/observability/metrics";
+import { audit } from "@/lib/admin/audit";
 import { getPaymentProvider, type AuthorizeResult } from "./index";
 import type { WebhookEvent } from "./webhook";
 import { assessPayment } from "@/lib/risk/fraud";
 
 /**
- * Ödeme orkestrasyonu (P0-5).
+ * Ödeme orkestrasyonu (P0-5, v3 P0-6).
  *
- *   checkout → authorize ─┬─ authorized ──→ capture → HELD→CONFIRMED (tek işlem)
+ *   checkout → authorize ─┬─ authorized ──→ claim → capture → HELD→CONFIRMED (tek işlem)
  *                         ├─ requires_action (3DS) → confirmChallenge → …
  *                         └─ declined → booking HELD kalır (başka kartla denenebilir;
  *                                        süre dolarsa expire-holds EXPIRED yapar)
  *
- * Kart verisi sunucuya gelmez (yalnızca `cardToken`). PSP çağrıları veritabanı
- * işleminin DIŞINDA yapılır; işlem çakışırsa (ör. tutma bu arada doldu) tahsilat
- * iade edilir. Tüm tutarlar minor-unit.
+ * Çift tahsilat kanıtlı imkânsızdır (v3#1), iki katman:
+ *  1. Booking başına Redis kilidi (`pay:<bookingId>`): iki sekme / farklı Idempotency-Key /
+ *     gRPC `Charge` aynı rezervasyonu SIRAYLA işler; ikinci istek onaylı rezervasyonu görür.
+ *  2. Veritabanında `Payment` üzerinde koşullu durum geçişi: tahsil hakkı yalnızca satırı
+ *     "açık" durumdan (PENDING/REQUIRES_ACTION/FAILED/VOIDED) AUTHORIZED'a çeviren tek
+ *     yetkilendirmeye verilir (`updateMany … where status in (…)`). Kilit kaybolsa bile
+ *     yarışı kaybeden yetkilendirme `void` edilir; kaybeden bir capture (ör. geç gelen PSP
+ *     webhook'u) otomatik iade edilir ve `payment_capture_race_total` artar.
+ *
+ * Kart verisi sunucuya gelmez (yalnızca `cardToken`). PSP çağrıları veritabanı işleminin
+ * DIŞINDA yapılır. Tüm tutarlar minor-unit.
  */
 
 const paymentsTotal = counter("payment_attempts_total", "Ödeme denemeleri", ["outcome"] as const);
+export const captureRaceTotal = counter(
+  "payment_capture_race_total",
+  "Yarışı kaybedip telafi edilen yetkilendirme/tahsilatlar",
+  ["action"] as const
+);
+
+const redlock = createRedlock(redis);
+
+/** Tahsil hakkı alınabilecek (henüz para çekilmemiş) ödeme durumları. */
+const OPEN_STATUSES: PaymentStatus[] = [
+  PaymentStatus.PENDING,
+  PaymentStatus.REQUIRES_ACTION,
+  PaymentStatus.FAILED,
+  PaymentStatus.VOIDED,
+];
+/** Parası çekilmiş (bir daha tahsil edilemez) durumlar. */
+const SETTLED_STATUSES: PaymentStatus[] = [
+  PaymentStatus.PAID,
+  PaymentStatus.PARTIALLY_REFUNDED,
+  PaymentStatus.REFUNDED,
+];
 
 export class PaymentDeclinedError extends HttpError {
   constructor(code: string) {
@@ -44,6 +75,29 @@ export class PaymentDeclinedError extends HttpError {
       declineCode: code,
     });
     this.name = "PaymentDeclinedError";
+  }
+}
+
+export class PaymentInProgressError extends ConflictError {
+  constructor() {
+    super("Bu rezervasyon için başka bir ödeme işleniyor", "PAYMENT_IN_PROGRESS");
+    this.name = "PaymentInProgressError";
+  }
+}
+
+/** Başka bir yetkilendirme tahsil hakkını aldı; bu deneme telafi edilmeli. */
+export class CaptureRaceLostError extends ConflictError {
+  constructor() {
+    super("Bu rezervasyon başka bir ödemeyle zaten tahsil edildi", "ALREADY_PAID");
+    this.name = "CaptureRaceLostError";
+  }
+}
+
+/** Webhook tutarı/para birimi kayıtlı ödemeyle uyuşmuyor (v3#2). */
+export class WebhookMismatchError extends HttpError {
+  constructor() {
+    super(400, "WEBHOOK_MISMATCH", "Olay tutarı veya para birimi ödemeyle uyuşmuyor");
+    this.name = "WebhookMismatchError";
   }
 }
 
@@ -94,49 +148,128 @@ function amountOf(booking: { totalPrice: Prisma.Decimal; currency: string }): Mo
   return money(toMinor(booking.totalPrice.toString(), currency), currency);
 }
 
-async function upsertPayment(
+/**
+ * Ödeme satırını KOŞULLU olarak günceller: yalnızca satır `from` durumlarındaysa
+ * (veya hiç yoksa oluşturarak). Parası çekilmiş bir satır (PAID…) asla ezilmez (v3#1).
+ * @returns güncellendiyse ödeme kimliği, koşul tutmadıysa `null`
+ */
+async function transitionPayment(
   booking: PayableBooking,
+  from: readonly PaymentStatus[],
   data: {
     status: PaymentStatus;
     providerRef?: string;
     failureCode?: string | null;
     authorizedAt?: Date;
-  }
-): Promise<string> {
+  },
+  where: { providerRef?: string } = {}
+): Promise<string | null> {
   const amount = amountOf(booking);
-  const payment = await prisma.payment.upsert({
-    where: { bookingId: booking.id },
-    create: {
-      bookingId: booking.id,
-      userId: booking.userId,
-      amount: new Prisma.Decimal(toDecimalString(amount)),
-      currency: amount.currency,
-      provider: getPaymentProvider().name,
-      ...data,
-    },
-    update: { ...data, provider: getPaymentProvider().name },
-    select: { id: true },
+  const provider = getPaymentProvider().name;
+  const updated = await prisma.payment.updateMany({
+    where: { bookingId: booking.id, status: { in: [...from] }, ...where },
+    data: { ...data, provider },
   });
-  return payment.id;
+  if (updated.count === 1) {
+    const row = await prisma.payment.findUniqueOrThrow({
+      where: { bookingId: booking.id },
+      select: { id: true },
+    });
+    return row.id;
+  }
+  if (where.providerRef) return null;
+  try {
+    const created = await prisma.payment.create({
+      data: {
+        bookingId: booking.id,
+        userId: booking.userId,
+        amount: new Prisma.Decimal(toDecimalString(amount)),
+        currency: amount.currency,
+        provider,
+        ...data,
+      },
+      select: { id: true },
+    });
+    return created.id;
+  } catch (error) {
+    // Satır zaten var ama koşul tutmadı (ör. başka yetkilendirme kazandı).
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      return null;
+    }
+    throw error;
+  }
+}
+
+/** Yarışı kaybeden yetkilendirmeyi bırakır (para çekilmedi). */
+async function voidLoser(bookingId: string, providerRef: string): Promise<void> {
+  captureRaceTotal.inc({ action: "void" });
+  logger.warn({ bookingId, providerRef }, "payment race lost; voiding authorization");
+  await getPaymentProvider()
+    .void(providerRef)
+    .catch((e) => logger.error({ bookingId, ...errorFields(e) }, "loser void failed"));
 }
 
 /**
- * Yetkilendirilmiş ödemeyi tahsil eder ve rezervasyonu onaylar. Veritabanı geçişi
- * başarısız olursa (tutma bu arada doldu/iptal edildi) tahsilat iade edilir.
+ * Yarışı kaybeden (ama PSP'de tahsil edilmiş) ödemeyi iade eder ve denetim izi bırakır.
+ * İade anahtarı providerRef'e bağlıdır → tekrar çağrılırsa PSP tek iade yapar.
+ */
+async function refundLoser(
+  bookingId: string,
+  providerRef: string,
+  amount: Money,
+  reason: string
+): Promise<void> {
+  captureRaceTotal.inc({ action: "refund" });
+  logger.warn({ bookingId, providerRef, reason }, "capture could not be applied; refunding");
+  await getPaymentProvider().refund(providerRef, amount, `compensate:${providerRef}`);
+  await prisma.paymentEvent
+    .create({
+      data: { id: `comp:${providerRef}`, type: `compensation.${reason}`, providerRef },
+    })
+    .catch((error) => {
+      if (!(error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002")) {
+        throw error;
+      }
+    });
+}
+
+/**
+ * Yetkilendirilmiş ödemeyi tahsil eder ve rezervasyonu onaylar.
+ *  1. Tahsil hakkı: ödeme satırı koşullu olarak AUTHORIZED(providerRef) yapılır; tutmazsa
+ *     başka bir ödeme kazanmıştır → bu yetkilendirme void edilir.
+ *  2. PSP capture.
+ *  3. HELD→CONFIRMED + PAID + defter (tek işlem). Başarısızsa (tutma bu arada doldu)
+ *     tahsilat iade edilir — para asla askıda kalmaz.
  */
 async function captureAndConfirm(
   booking: PayableBooking,
-  providerRef: string
+  providerRef: string,
+  claimFrom: readonly PaymentStatus[] = OPEN_STATUSES
 ): Promise<PayOutcome> {
   const provider = getPaymentProvider();
   const amount = amountOf(booking);
-  await upsertPayment(booking, {
+  const claimed = await transitionPayment(booking, claimFrom, {
     status: PaymentStatus.AUTHORIZED,
     providerRef,
     authorizedAt: new Date(),
     failureCode: null,
   });
-  await provider.capture(providerRef, amount);
+  if (!claimed) {
+    await voidLoser(booking.id, providerRef);
+    return alreadyConfirmed(booking.id, booking.userId);
+  }
+
+  try {
+    await provider.capture(providerRef, amount);
+  } catch (error) {
+    await provider.void(providerRef).catch(() => undefined);
+    await prisma.payment.updateMany({
+      where: { bookingId: booking.id, providerRef, status: PaymentStatus.AUTHORIZED },
+      data: { status: PaymentStatus.FAILED, failureCode: "capture_failed" },
+    });
+    paymentsTotal.inc({ outcome: "capture_failed" });
+    throw error;
+  }
 
   try {
     const paymentId = await withSerializableRetry((tx) =>
@@ -154,12 +287,12 @@ async function captureAndConfirm(
   } catch (error) {
     // Onaylanamadı → tahsilatı geri ver (para asla askıda kalmaz).
     await provider
-      .refund(providerRef, amount, `compensate:${booking.id}`)
+      .refund(providerRef, amount, `compensate:${providerRef}`)
       .catch((e) =>
         logger.error({ bookingId: booking.id, ...errorFields(e) }, "compensating refund failed")
       );
-    await prisma.payment.update({
-      where: { bookingId: booking.id },
+    await prisma.payment.updateMany({
+      where: { bookingId: booking.id, providerRef, status: { notIn: SETTLED_STATUSES } },
       data: {
         status: PaymentStatus.REFUNDED,
         refundedAmount: new Prisma.Decimal(toDecimalString(amount)),
@@ -168,11 +301,39 @@ async function captureAndConfirm(
       },
     });
     paymentsTotal.inc({ outcome: "compensated" });
+    if (error instanceof CaptureRaceLostError) {
+      captureRaceTotal.inc({ action: "refund" });
+      return alreadyConfirmed(booking.id, booking.userId);
+    }
     throw error;
   }
 }
 
-/** HELD → CONFIRMED + ödeme PAID + defter kaydı + outbox (tek işlem). Idempotent. */
+/** Rezervasyon başka bir ödemeyle onaylandıysa onu (idempotent sonuç) döner. */
+async function alreadyConfirmed(bookingId: string, userId: string): Promise<PayOutcome> {
+  const fresh = await loadPayable(bookingId, userId);
+  if (
+    fresh.status === "CONFIRMED" &&
+    fresh.payment &&
+    SETTLED_STATUSES.includes(fresh.payment.status)
+  ) {
+    const amount = amountOf(fresh);
+    return {
+      status: "confirmed",
+      bookingId,
+      paymentId: fresh.payment.id,
+      amount: amount.amount,
+      currency: amount.currency,
+    };
+  }
+  throw new PaymentInProgressError();
+}
+
+/**
+ * HELD → CONFIRMED + ödeme PAID + defter kaydı + outbox (tek işlem).
+ * Aynı providerRef ile tekrar çağrılırsa idempotent; FARKLI bir providerRef ile çağrılırsa
+ * (rezervasyon başka ödemeyle onaylanmış) `CaptureRaceLostError` — çağıran iade eder.
+ */
 export async function confirmInTransaction(
   tx: Prisma.TransactionClient,
   bookingId: string,
@@ -192,12 +353,13 @@ export async function confirmInTransaction(
       holdExpiresAt: true,
       totalPrice: true,
       currency: true,
-      payment: { select: { id: true, status: true } },
+      payment: { select: { id: true, status: true, providerRef: true } },
     },
   });
   if (!booking) throw new BookingNotFoundError();
-  if (booking.status === "CONFIRMED" && booking.payment?.status === PaymentStatus.PAID) {
-    return booking.payment.id; // idempotent (webhook + senkron akış yarışı)
+  if (booking.payment && SETTLED_STATUSES.includes(booking.payment.status)) {
+    if (booking.payment.providerRef === providerRef) return booking.payment.id; // idempotent
+    throw new CaptureRaceLostError();
   }
   let next: BookingState;
   try {
@@ -208,6 +370,16 @@ export async function confirmInTransaction(
   if (booking.holdExpiresAt && booking.holdExpiresAt.getTime() < Date.now()) {
     throw new ConflictError("Rezervasyon tutma süresi doldu", "HOLD_EXPIRED");
   }
+  // Tahsil hakkı bu providerRef'te olmalı (başka yetkilendirme satırı almışsa yarış kaybı).
+  const paid = await tx.payment.updateMany({
+    where: {
+      bookingId: booking.id,
+      providerRef,
+      status: { in: [PaymentStatus.AUTHORIZED, PaymentStatus.REQUIRES_ACTION] },
+    },
+    data: { status: PaymentStatus.PAID, paidAt: new Date(), failureCode: null },
+  });
+  if (paid.count !== 1) throw new CaptureRaceLostError();
   const updated = await tx.booking.updateMany({
     where: { id: booking.id, status: booking.status, version: booking.version },
     data: {
@@ -221,9 +393,8 @@ export async function confirmInTransaction(
     throw new ConflictError("Rezervasyon eşzamanlı olarak değişti", "CONCURRENT_UPDATE");
   }
   const amount = amountOf(booking);
-  const payment = await tx.payment.update({
+  const payment = await tx.payment.findUniqueOrThrow({
     where: { bookingId: booking.id },
-    data: { status: PaymentStatus.PAID, paidAt: new Date(), providerRef, failureCode: null },
     select: { id: true },
   });
   await tx.ledgerEntry.create({
@@ -267,25 +438,47 @@ function assertPayable(booking: PayableBooking): void {
   }
 }
 
+/** Rezervasyon başına ödeme kilidi; kilit alınamazsa 409 PAYMENT_IN_PROGRESS. */
+async function withPaymentLock<T>(bookingId: string, fn: () => Promise<T>): Promise<T> {
+  try {
+    return await redlock.withLock(`pay:${bookingId}`, fn, {
+      ttlMs: 30_000,
+      retryCount: 100,
+      retryDelayMs: 50,
+    });
+  } catch (error) {
+    if (error instanceof LockError) throw new PaymentInProgressError();
+    throw error;
+  }
+}
+
 /** Checkout ödemesi: kart token'ı ile yetkilendir; başarılıysa tahsil et ve onayla. */
 export async function payForBooking(input: {
   bookingId: string;
   userId: string;
   cardToken: string;
   idempotencyKey: string;
-  /** Risk sinyalleri (route'tan): güvenilir IP ve ülke bilgisi. */
+  /** Risk sinyalleri (route'tan): istemci anahtarı ve ülke bilgisi. */
   context?: { ip?: string; ipCountry?: string | null; billingCountry?: string | null };
 }): Promise<PayOutcome> {
+  // IDOR kontrolü kilitten önce (başkasının rezervasyonuna kilit bile alınmaz).
+  await loadPayable(input.bookingId, input.userId);
+  try {
+    return await withPaymentLock(input.bookingId, () => payLocked(input));
+  } finally {
+    // Ret / 3DS yolları da ödeme durumunu değiştirir → okuma önbelleği her sonuçta düşer.
+    await redis.del(`booking:${input.bookingId}`).catch(() => 0);
+  }
+}
+
+async function payLocked(input: Parameters<typeof payForBooking>[0]): Promise<PayOutcome> {
   const booking = await loadPayable(input.bookingId, input.userId);
-  if (booking.status === "CONFIRMED" && booking.payment?.status === PaymentStatus.PAID) {
-    const amount = amountOf(booking);
-    return {
-      status: "confirmed",
-      bookingId: booking.id,
-      paymentId: booking.payment.id,
-      amount: amount.amount,
-      currency: amount.currency,
-    };
+  if (
+    booking.status === "CONFIRMED" &&
+    booking.payment &&
+    SETTLED_STATUSES.includes(booking.payment.status)
+  ) {
+    return alreadyConfirmed(booking.id, input.userId);
   }
   assertPayable(booking);
 
@@ -334,7 +527,7 @@ export async function payForBooking(input: {
   });
 
   if (result.status === "declined") {
-    await upsertPayment(booking, {
+    await transitionPayment(booking, OPEN_STATUSES, {
       status: PaymentStatus.FAILED,
       providerRef: result.providerRef,
       failureCode: result.declineCode,
@@ -343,11 +536,15 @@ export async function payForBooking(input: {
     throw new PaymentDeclinedError(result.declineCode);
   }
   if (result.status === "requires_action") {
-    await upsertPayment(booking, {
+    const recorded = await transitionPayment(booking, OPEN_STATUSES, {
       status: PaymentStatus.REQUIRES_ACTION,
       providerRef: result.providerRef,
       failureCode: null,
     });
+    if (!recorded) {
+      await voidLoser(booking.id, result.providerRef);
+      return alreadyConfirmed(booking.id, input.userId);
+    }
     paymentsTotal.inc({ outcome: "requires_action" });
     return { status: "requires_action", bookingId: booking.id, challenge: result.challenge };
   }
@@ -360,66 +557,145 @@ export async function confirmPaymentChallenge(input: {
   userId: string;
   code: string;
 }): Promise<PayOutcome> {
-  const booking = await loadPayable(input.bookingId, input.userId);
-  if (booking.payment?.status !== PaymentStatus.REQUIRES_ACTION || !booking.payment.providerRef) {
-    throw new ConflictError("Doğrulama bekleyen ödeme yok", "NO_PENDING_CHALLENGE");
+  await loadPayable(input.bookingId, input.userId);
+  return withPaymentLock(input.bookingId, async () => {
+    const booking = await loadPayable(input.bookingId, input.userId);
+    if (booking.payment?.status !== PaymentStatus.REQUIRES_ACTION || !booking.payment.providerRef) {
+      throw new ConflictError("Doğrulama bekleyen ödeme yok", "NO_PENDING_CHALLENGE");
+    }
+    assertPayable(booking);
+    const ref = booking.payment.providerRef;
+    const result = await getPaymentProvider().confirmChallenge(ref, input.code);
+    if (result.status !== "authorized") {
+      const code = result.status === "declined" ? result.declineCode : "authentication_required";
+      await transitionPayment(
+        booking,
+        [PaymentStatus.REQUIRES_ACTION],
+        { status: PaymentStatus.FAILED, failureCode: code },
+        { providerRef: ref }
+      );
+      paymentsTotal.inc({ outcome: "declined" });
+      throw new PaymentDeclinedError(code);
+    }
+    return captureAndConfirm(booking, result.providerRef, [PaymentStatus.REQUIRES_ACTION]);
+  }).finally(() => redis.del(`booking:${input.bookingId}`).catch(() => 0));
+}
+
+function sameAmount(
+  event: WebhookEvent,
+  payment: { amount: Prisma.Decimal; currency: string }
+): boolean {
+  const currency = assertCurrency(payment.currency);
+  if (event.data.currency && event.data.currency.toUpperCase() !== currency) return false;
+  if (event.data.amount !== undefined) {
+    return event.data.amount === toMinor(payment.amount.toString(), currency);
   }
-  assertPayable(booking);
-  const result = await getPaymentProvider().confirmChallenge(
-    booking.payment.providerRef,
-    input.code
-  );
-  if (result.status !== "authorized") {
-    const code = result.status === "declined" ? result.declineCode : "authentication_required";
-    await upsertPayment(booking, { status: PaymentStatus.FAILED, failureCode: code });
-    paymentsTotal.inc({ outcome: "declined" });
-    throw new PaymentDeclinedError(code);
-  }
-  return captureAndConfirm(booking, result.providerRef);
+  return true;
+}
+
+function isUniqueViolation(error: unknown): boolean {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
 }
 
 /**
- * PSP webhook olayını uygular. Olay kimliği `PaymentEvent` tablosunda tekildir:
- * aynı olay ikinci kez gelirse hiçbir etki yapmaz (`duplicate: true`).
+ * PSP webhook olayını uygular (v3#2).
+ *
+ *  - Olay kimliği `PaymentEvent`'e İŞLEMEYLE AYNI işlemde yazılır: işleme başarısız olursa
+ *    kayıt da geri alınır ve PSP'nin yeniden denemesi "duplicate" sayılmaz.
+ *  - Tutar/para birimi kayıtlı ödemeyle uyuşmazsa 400 + denetim kaydı (etki yok).
+ *  - `payment.succeeded` onaylanamazsa (tutma süresi doldu, iptal, başka ödeme kazandı):
+ *    yakalanan para otomatik iade edilir, ödeme REFUNDED işaretlenir ve olay kaydedilir.
  */
-export async function handleWebhookEvent(event: WebhookEvent): Promise<{ duplicate: boolean }> {
-  try {
-    await prisma.paymentEvent.create({
-      data: { id: event.id, type: event.type, providerRef: event.data.providerRef },
-    });
-  } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-      return { duplicate: true };
-    }
-    throw error;
+export async function handleWebhookEvent(
+  event: WebhookEvent
+): Promise<{ duplicate: boolean; compensated?: boolean }> {
+  if (await prisma.paymentEvent.findUnique({ where: { id: event.id }, select: { id: true } })) {
+    return { duplicate: true };
   }
-
   const payment = await prisma.payment.findUnique({
     where: { providerRef: event.data.providerRef },
-    select: { bookingId: true, status: true, booking: { select: { propertyId: true } } },
+    select: {
+      bookingId: true,
+      status: true,
+      amount: true,
+      currency: true,
+      booking: { select: { propertyId: true } },
+    },
   });
-  if (!payment) {
-    logger.warn({ eventId: event.id, type: event.type }, "webhook for unknown payment");
-    return { duplicate: false };
-  }
+  const record = (tx: Prisma.TransactionClient) =>
+    tx.paymentEvent.create({
+      data: { id: event.id, type: event.type, providerRef: event.data.providerRef },
+    });
 
-  if (event.type === "payment.succeeded" && payment.status !== PaymentStatus.PAID) {
-    await withSerializableRetry((tx) =>
-      confirmInTransaction(tx, payment.bookingId, event.data.providerRef)
-    );
-    await afterBookingWrite(payment.booking.propertyId, payment.bookingId);
-  } else if (event.type === "payment.failed" && payment.status !== PaymentStatus.PAID) {
-    await prisma.payment.update({
-      where: { bookingId: payment.bookingId },
-      data: { status: PaymentStatus.FAILED, failureCode: "psp_failed" },
+  try {
+    if (!payment) {
+      logger.warn({ eventId: event.id, type: event.type }, "webhook for unknown payment");
+      await prisma.$transaction(async (tx) => record(tx));
+      return { duplicate: false };
+    }
+    if (!sameAmount(event, payment)) {
+      await audit("system:webhook", "payment.webhook_mismatch", "Payment", payment.bookingId, {
+        eventId: event.id,
+        type: event.type,
+        eventAmount: event.data.amount ?? null,
+        eventCurrency: event.data.currency ?? null,
+      });
+      throw new WebhookMismatchError();
+    }
+
+    if (event.type === "payment.succeeded") {
+      try {
+        await withSerializableRetry(async (tx) => {
+          await record(tx);
+          await confirmInTransaction(tx, payment.bookingId, event.data.providerRef);
+        });
+        await afterBookingWrite(payment.booking.propertyId, payment.bookingId);
+        return { duplicate: false };
+      } catch (error) {
+        if (!(error instanceof ConflictError) || isUniqueViolation(error)) throw error;
+        // Tahsil edilmiş para onaylanamıyor → otomatik iade + olay kaydı.
+        const currency = assertCurrency(payment.currency);
+        const amount = money(toMinor(payment.amount.toString(), currency), currency);
+        await refundLoser(payment.bookingId, event.data.providerRef, amount, error.code);
+        await prisma.$transaction(async (tx) => {
+          await record(tx);
+          await tx.payment.updateMany({
+            where: {
+              bookingId: payment.bookingId,
+              providerRef: event.data.providerRef,
+              status: { notIn: SETTLED_STATUSES },
+            },
+            data: {
+              status: PaymentStatus.REFUNDED,
+              refundedAmount: payment.amount,
+              refundedAt: new Date(),
+              failureCode: error.code,
+            },
+          });
+        });
+        return { duplicate: false, compensated: true };
+      }
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await record(tx);
+      if (event.type === "payment.failed") {
+        await tx.payment.updateMany({
+          where: { bookingId: payment.bookingId, status: { in: OPEN_STATUSES } },
+          data: { status: PaymentStatus.FAILED, failureCode: "psp_failed" },
+        });
+      } else if (event.type === "refund.succeeded") {
+        await tx.payment.updateMany({
+          where: { bookingId: payment.bookingId, refundedAt: null },
+          data: { refundedAt: new Date() },
+        });
+      }
     });
-  } else if (event.type === "refund.succeeded") {
-    await prisma.payment.updateMany({
-      where: { bookingId: payment.bookingId, refundedAt: null },
-      data: { refundedAt: new Date() },
-    });
+    return { duplicate: false };
+  } catch (error) {
+    if (isUniqueViolation(error)) return { duplicate: true };
+    throw error;
   }
-  return { duplicate: false };
 }
 
 export interface CancellationOutcome {

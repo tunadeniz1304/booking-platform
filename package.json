@@ -27,7 +27,7 @@
     "worker": "tsx --conditions=react-server src/worker/index.ts",
     "grpc:server": "tsx --conditions=react-server services/grpc/main.ts",
     "mcp:server": "cross-env LOG_TO_STDERR=true SERVICE_NAME=booking-mcp tsx --conditions=react-server services/mcp/main.ts",
-    "mcp:smoke": "tsx scripts/mcp-smoke.ts",
+    "mcp:smoke": "cross-env LOG_TO_STDERR=true tsx --conditions=react-server scripts/mcp-smoke.ts",
     "docs:screenshots": "tsx scripts/screenshots.ts",
     "embeddings:backfill": "tsx scripts/backfill-embeddings.ts",
     "ltr:clicks": "tsx scripts/ltr/generate-clicks.ts",

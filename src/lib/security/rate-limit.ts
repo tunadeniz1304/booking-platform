@@ -8,13 +8,19 @@ import type { AppConfig } from "@/lib/config/app-config";
  * güvenilir proxy zincirinden çözülen IP. İstemcinin gönderdiği `x-user-id`
  * gibi başlıklar asla anahtara girmez (atlatma önlenir).
  *
- * Redis hatasında hassas kategoriler (auth, booking, payment) fail-CLOSED,
+ * Redis hatasında hassas kategoriler (auth, booking, payment, agentic) fail-CLOSED,
  * diğerleri fail-open davranır.
  */
 
-export type RateLimitCategory = "auth" | "booking" | "payment" | "search" | "ai" | "default";
+export type RateLimitCategory =
+  "auth" | "booking" | "payment" | "search" | "ai" | "agentic" | "default";
 
-const SENSITIVE: ReadonlySet<RateLimitCategory> = new Set(["auth", "booking", "payment"]);
+const SENSITIVE: ReadonlySet<RateLimitCategory> = new Set([
+  "auth",
+  "booking",
+  "payment",
+  "agentic",
+]);
 
 export function categorize(pathname: string): RateLimitCategory {
   if (pathname.startsWith("/api/auth")) return "auth";
@@ -22,6 +28,8 @@ export function categorize(pathname: string): RateLimitCategory {
     return "booking";
   }
   if (pathname.startsWith("/api/payments")) return "payment";
+  // Ajan uçları (P1-11): MCP HTTP + ACP checkout — ayrı kova, rezervasyon/ödeme yapabilir.
+  if (pathname.startsWith("/api/mcp") || pathname.startsWith("/api/agentic")) return "agentic";
   // Tüm AI uçları (yorum özeti dahil) `ai` kategorisinde — §3 v3-b.
   if (
     pathname.startsWith("/api/ai") ||
@@ -56,6 +64,8 @@ export function limitFor(category: RateLimitCategory, config: AppConfig): number
       return config.RATE_LIMIT_SEARCH_MAX;
     case "ai":
       return config.RATE_LIMIT_AI_MAX;
+    case "agentic":
+      return config.RATE_LIMIT_AGENTIC_MAX;
     default:
       return config.RATE_LIMIT_DEFAULT_MAX;
   }

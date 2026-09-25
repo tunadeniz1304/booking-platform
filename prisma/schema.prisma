@@ -801,3 +801,32 @@ model ExperimentExposure {
   @@unique([flagKey, subjectId])
   @@index([flagKey, variant])
 }
+
+/// Ajan checkout oturumu (P1-11, ACP benzeri): ajan teklifi alır, kullanıcı onaylar,
+/// tamamlama aynı quote → hold → ödeme saga yolundan geçer. Sahibi dışında görünmez.
+model CheckoutSession {
+  id             String   @id @default(cuid())
+  userId         String
+  /// Oluşturma isteğinin `Idempotency-Key` başlığı (kullanıcı başına tekil).
+  idempotencyKey String   @db.VarChar(128)
+  /// Aynı anahtarla farklı gövde gönderilirse 409 için istek özeti (sha256).
+  requestHash    String   @db.VarChar(64)
+  /// ready_for_payment | in_progress | completed | canceled
+  status         String   @db.VarChar(32)
+  propertyId     String
+  roomId         String
+  checkIn        String   @db.VarChar(10)
+  checkOut       String   @db.VarChar(10)
+  guests         Int
+  quoteId        String?
+  currency       String   @db.VarChar(3)
+  /// Teklif kırılımı (minor-unit): ara toplam, ücret, vergi, toplam.
+  totals         Json
+  bookingId      String?
+  expiresAt      DateTime
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([userId, idempotencyKey])
+  @@index([userId, createdAt])
+}

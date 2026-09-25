@@ -7,7 +7,7 @@
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { loadEnv } from "@/lib/config/load-env";
 import { logger, errorFields } from "@/lib/observability/logger";
-import { createMcpServer } from "./server";
+import { createMcpServer } from "@/lib/mcp/server";
 
 loadEnv();
 

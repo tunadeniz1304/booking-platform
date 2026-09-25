@@ -123,6 +123,8 @@ const schema = z.object({
   ICAL_MAX_BYTES: int(1_000_000, 10_000, 10_000_000),
   /** Parite uyarısı: harici kanal fiyatı bizimkinden bu kadar baz puan farklıysa host uyarılır. */
   CHANNEL_PARITY_TOLERANCE_BPS: int(100, 0, 10_000),
+  /** Ajan checkout oturumu (ACP) geçerlilik süresi (dk); dolunca oturum iptal sayılır. */
+  CHECKOUT_SESSION_TTL_MINUTES: int(30, 5, 1440),
 
   // Güvenlik / ağ
   TRUSTED_PROXY_HOPS: int(0, 0, 10),
@@ -152,6 +154,8 @@ const schema = z.object({
   RATE_LIMIT_SEARCH_MAX: int(60, 1),
   RATE_LIMIT_BOOKING_MAX: int(30, 1),
   RATE_LIMIT_AI_MAX: int(20, 1),
+  /** MCP HTTP ve ajan checkout uçları (`/api/mcp`, `/api/agentic`) — fail-closed. */
+  RATE_LIMIT_AGENTIC_MAX: int(30, 1),
 
   // Canlı ısı haritası (SSE)
   LIVE_MAX_RANGE_DAYS: int(60, 1, 366),

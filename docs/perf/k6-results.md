@@ -57,3 +57,35 @@ docker run --rm -i --network <proje>_default -e BASE_URL=http://app:3000 -e DAY_
 ```
 
 `DAY_OFFSET` her koşumda farklı bir gece seçmek içindir; aynı gece tekrar koşulursa doğru olarak 0 başarı / 200 `SOLD_OUT` görülür.
+
+## F8 — Yük ve kaos koşumları (v3)
+
+Ortam: Docker Desktop (8 çekirdek, 7.6 GiB), compose projesi `booking-e2e`, k6
+`grafana/k6` imajıyla compose ağı içinden (`BASE_URL=http://app:3000`), rate limit
+override'ı yükseltilmiş (`load/chaos.md` bölüm 0). **Uyarı:** aynı makinede başka
+projelere ait konteynerler çalışıyordu (bir API süreci ölçümler sırasında %100–340 CPU);
+`hold-spike` gecikmeleri bundan belirgin biçimde etkilendi.
+
+| Script                        | Koşul                                   | Temel sonuç                                                         | Eşik              |
+| ----------------------------- | --------------------------------------- | ------------------------------------------------------------------- | ----------------- |
+| `search.js`                   | 50 rps, 60 s                            | 3000 istek, hata 0, p95 **29 ms**                                   | ✓                 |
+| `search.js`                   | 20 rps, 30 s, **Redis kapalı**          | 600 istek, hata %0, p95 **232.4 ms**, max 444 ms                    | ✓                 |
+| `hold-spike.js`               | `DAY_OFFSET=250`, sakin ortam, eski im. | 4029 istek, 201 = 1767, 409 = 2237, 5xx = 0, p95 434 ms, p99 792 ms | ✓                 |
+| `hold-spike.js`               | `DAY_OFFSET=320`, yeni imaj, yoğun host | 201 = 931, 409 = 446, 5xx = 0, p95 41.9 s, 2647 düşen iterasyon     | ✗ (p95)           |
+| `payment-race.js` (koşum 1)   | eski imaj                               | 14/18 CONFIRMED, **4 × 500** (serileştirme çatışması)               | ✗                 |
+| `payment-race.js` (koşum 2)   | düzeltme sonrası                        | 20/20 CONFIRMED, `pay_5xx` 0, çift tahsilat 0, p95 1.98 s           | ✓                 |
+| `llm-fallback.js` EXPECT=demo | `LLM_MODE=demo`                         | 151 istek, %100 demo, p95 49 ms, 5xx 0                              | ✓                 |
+| `llm-fallback.js` fallback    | yönlendirilemeyen URL, 1 s zaman aşımı  | 151 istek, %100 fallback (`reason=timeout`), p95 1.13 s, 5xx 0      | ✓                 |
+| `llm-fallback.js` canlı       | gerçek sağlayıcı, `LLM_MODE=auto`       | 129 istek, %71.3 fallback, p95 15.1 s                               | ✗ (p95 < 3000 ms) |
+
+Değişmezler (tüm koşumlardan sonra): overbooking SQL **0**, ledger çift `CHARGE` **0**.
+
+Notlar:
+
+- `payment-race.js` metrik farkı (`/api/metrics` önce/sonra) yalnızca tek `app`
+  replikasında anlamlıdır.
+- `hold-spike` için yeni imajın sakin ortamda ölçümü yapılamadı; eski ayarlarla aynı
+  yoğun ortamda da p95 32.3 s ölçüldüğünden yavaşlık ortama bağlandı, ancak bu bir
+  **açık risktir** — sakin bir makinede tekrar ölçülmeli.
+- Kaos ayrıntıları ve bulunan üç hata (Redis kapalıyken 33 s arama, zehirli süre dolum
+  işi, ödeme yarışında 500): `load/chaos.md`.

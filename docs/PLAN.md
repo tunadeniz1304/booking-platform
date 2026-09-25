@@ -53,7 +53,7 @@ Her faz sonunda kalite kapısı: `npm run lint` · `npm run typecheck` · `npm r
 
 ## v3 F7 — Agentic booking, host gelir paneli, kanal yöneticisi
 
-- [ ] P1-11 MCP HTTP + `ui://` + checkout_sessions; P1-5 gelir paneli; P1-9 kanal (#21); #17 ölü kod
+- [x] P1-11 MCP HTTP + `ui://` + checkout_sessions; P1-5 gelir paneli; P1-9 kanal (#21); #17 ölü kod
 
 ## v3 F8 — i18n, UI, demo, yük
 

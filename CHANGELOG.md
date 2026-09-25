@@ -25,6 +25,10 @@ Bu dosyadaki tüm önemli değişiklikler burada belgelenir. Biçim [Keep a Chan
 - **v3 F6 — Fraud v2 + step-up (P1-8, ADR 0017):** gerekçe kodlu kural puanlama (hız, cihaz parmak izi, BIN/IP ülke uyuşmazlığı) → `allow | challenge_3ds | step_up_passkey | review | deny`; step-up passkey ile (403 `STEP_UP_REQUIRED`, passkey yoksa 3DS).
 - **v3 F6 — Passkey arayüzü:** girişte "Passkey ile giriş", hesap sayfasında passkey listele/ekle/sil, ödemede step-up penceresi (doğrulamadan sonra ödeme yeniden denenir).
 - **v3 F6 — Belge/kayıt no (P1-10):** mock TR (7565) ve AB (2024/1028) kayıt doğrulaması; VERIFIED olmayan ilan yayına alınamaz ve aramada görünmez (v3#25); aylık SDEP CSV dışa aktarımı (`scripts/sdep-export.ts`).
+- **v3 F7 — Ajan rezervasyonu (P1-11, ADR 0015):** `/api/mcp` streamable HTTP MCP (bearer zorunlu, 401 + `WWW-Authenticate`, fail-closed "agentic" hız sınırı), `ui://stay-card` kaynağı, `get_price_insight` / `list_my_bookings` / `cancel_booking` (`confirm: true`) araçları; ACP `checkout_sessions` oluştur/güncelle/tamamla `Idempotency-Key` ister ve insan akışıyla aynı `quote → hold → payment` sagasını çalıştırır.
+- **v3 F7 — Kanal yöneticisi (P1-9, #21, ADR 0015):** `ical-poll` tekrarlı işi (ETag / `If-Modified-Since`, SSRF korumalı https, boyut/süre sınırı), ev sahibi abonelik uçları, besleme belirteci döndürme (`ChannelFeed.tokenVersion`), yalnız uyaran fiyat eşitliği kontrolü.
+- **v3 F7 — Gelir paneli (P1-5, ADR 0015):** `/host/revenue` doluluk, ADR, RevPAR ve SVG pickup grafiği; doluluk, varışa kalan süre, TR resmî tatilleri ve onaylı olaylardan katkı tablolu fiyat önerisi her zaman [taban, tavan] içinde (v3#5, fast-check); LLM yalnız Türkçe açıklamayı yazar (demo yedeği). Kabul fiyatı yazıp geceyi sabitler (`priceOverride`, motor ezmez), ret hiçbir şeyi değiştirmez.
+- **v3 F7 — Ölü kod (#17):** knip ile bulunan kullanılmayan dosya ve dışa aktarımlar kaldırıldı.
 
 ### Changed
 

@@ -3,7 +3,6 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { redis } from "@/lib/redis";
 import { logger, errorFields } from "@/lib/observability/logger";
-import { getConfig } from "@/lib/config/app-config";
 import {
   money,
   toDecimalString,

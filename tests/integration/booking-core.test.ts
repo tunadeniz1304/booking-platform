@@ -225,16 +225,20 @@ describeInt("rezervasyon çekirdeği (integration)", () => {
   }, 60_000);
 
   it("regression: #7 para birimi daima mülkün para birimi", async () => {
-    const { booking } = await createBooking({
+    const base = {
       userId: userIds[6],
       propertyId: usdProperty.id,
       roomId: usdProperty.roomId,
       checkIn: iso(utcDay(15)),
       checkOut: iso(utcDay(16)),
       guestCount: 1,
-      // İstemci para birimi alanı artık yok; ekstra alan gönderilse bile yok sayılır.
-      ...({ currency: "TRY" } as object),
+    };
+    // P0-5: `currency` yalnızca tahsilat para birimidir; izin listesinde olmayan birim 400,
+    // rezervasyonun para birimini hiçbir koşulda değiştiremez.
+    await expect(createBooking({ ...base, currency: "TRY" })).rejects.toMatchObject({
+      status: 400,
     });
+    const { booking } = await createBooking(base);
     expect(booking.currency).toBe("USD");
     const row = await prisma.booking.findUniqueOrThrow({ where: { id: booking.id } });
     expect(row.currency).toBe("USD");

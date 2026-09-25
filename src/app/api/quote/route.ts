@@ -12,6 +12,12 @@ const querySchema = z.object({
   guests: z.coerce.number().int().min(1).max(20).default(1),
   ratePlanId: z.string().min(1).max(64).optional(),
   units: z.coerce.number().int().min(1).max(10).optional(),
+  /** Tahsilat para birimi (P0-5); izinli değilse 400. */
+  currency: z
+    .string()
+    .regex(/^[A-Za-z]{3}$/)
+    .transform((c) => c.toUpperCase())
+    .optional(),
 });
 
 /**

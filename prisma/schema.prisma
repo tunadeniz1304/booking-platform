@@ -273,8 +273,11 @@ model Booking {
   quoteId        String?
   /// Rezervasyon anındaki iptal politikası (sonradan değişse de bu geçerlidir).
   policySnapshot Json?
-  /// Rezervasyon anındaki kur tablosu (yalnızca görüntüleme karşılıkları için).
+  /// Rezervasyon anındaki kur tablosu (görüntüleme ve misafir para biriminde tahsilat).
   fxSnapshot     Json?
+  /// Kullanılan kalıcı kur tablosu (P0-5); statik yedek tablo kullanıldıysa null.
+  fxSnapshotId   String?
+  fxRate         FxRate?           @relation(fields: [fxSnapshotId], references: [id], onDelete: SetNull)
   ledgerEntries  LedgerEntry[]
   confirmedAt    DateTime?
   cancelledAt    DateTime?
@@ -292,6 +295,25 @@ model Booking {
   @@index([roomId, checkIn, checkOut])
   @@index([status, checkIn])
   @@index([status, holdExpiresAt])
+}
+
+/// Kalıcı kur tablosu (P0-5): her `fx-refresh` çalışması bir satır. Oranlar "1 TRY = x".
+/// Teklif `fxSnapshotId` ile bir satıra bağlanır; kur değişse de teklif aynı tutarla tahsil edilir.
+model FxRate {
+  id        String    @id @default(cuid())
+  base      String    @default("TRY")
+  /// { "USD": 0.0243, "EUR": 0.0221, ... }
+  rates     Json
+  /// tcmb | ecb | static
+  source    String
+  /// Kaynağın yayım tarihi
+  asOf      DateTime  @db.Date
+  /// Ağ yoktu → statik yedek tablo yazıldı
+  stale     Boolean   @default(false)
+  fetchedAt DateTime  @default(now())
+  bookings  Booking[]
+
+  @@index([fetchedAt])
 }
 
 /// PENDING → HELD → CONFIRMED → COMPLETED | CANCELLED | EXPIRED (src/lib/booking/state-machine.ts)

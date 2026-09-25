@@ -11,7 +11,8 @@ import {
   assertCurrency,
   type CurrencyCode,
 } from "@/lib/money/money";
-import { convert } from "@/lib/money/fx";
+import { convert, type FxSnapshot } from "@/lib/money/fx";
+import { getCurrentFx } from "@/lib/fx/store";
 import { nightsFromInventory, priceStay } from "@/lib/pricing/quote";
 import { checkRestrictions, type RestrictionRow } from "@/lib/booking/restrictions";
 import { rankResults } from "@/lib/search/ranking";
@@ -405,8 +406,9 @@ async function stayQuotes(
 
 // --- 3) + 4) Filtre, sıralama, sayfalama ---------------------------------------------
 
-function displayAmount(minor: number, from: string, to: CurrencyCode): number {
-  const converted = convert(money(minor, from), to);
+/** Görüntüleme dönüşümü; tablo yoksa (dönüşüm gerekmiyor) statik tabloya düşer. */
+function displayAmount(minor: number, from: string, to: CurrencyCode, table?: FxSnapshot): number {
+  const converted = convert(money(minor, from), to, table);
   return Number(toDecimalString(converted));
 }
 
@@ -453,6 +455,8 @@ export async function searchProperties(input: SearchInput): Promise<SearchRespon
   const stay = stayOf(params);
   const quotes = stay ? await stayQuotes(entries, stay, params.guests ?? 1) : null;
 
+  // P0-5: görüntüleme para birimi istendiyse kalıcı kur tablosu (DB yoksa statik yedek).
+  const fx = displayCurrency ? await getCurrentFx() : undefined;
   const results: SearchResult[] = [];
   for (const e of entries) {
     const quote = quotes ? quotes.get(e.id) : undefined;
@@ -460,8 +464,8 @@ export async function searchProperties(input: SearchInput): Promise<SearchRespon
     const currency = displayCurrency ?? assertCurrency(e.currency);
     const baseMinor = toMinor(e.basePrice, e.currency);
     const amount = quote
-      ? displayAmount(quote.total, quote.currency, currency)
-      : displayAmount(baseMinor, e.currency, currency);
+      ? displayAmount(quote.total, quote.currency, currency, fx)
+      : displayAmount(baseMinor, e.currency, currency, fx);
     if (params.minPrice !== undefined && amount < params.minPrice) continue;
     if (params.maxPrice !== undefined && amount > params.maxPrice) continue;
     results.push({

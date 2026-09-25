@@ -18,6 +18,7 @@ import {
   runRollover,
   scheduleExpireHolds,
 } from "./jobs/expire-holds";
+import { FX_REFRESH_JOB, runFxRefresh, scheduleFxRefresh } from "./jobs/fx-refresh";
 import { runOutboxRelay } from "@/lib/cqrs";
 import { registerEventHandlers } from "@/lib/events/register";
 import { updateAvailabilityPrices } from "@/lib/pricing-service";
@@ -73,6 +74,7 @@ async function main(): Promise<void> {
       if (job.name === EXPIRE_HOLDS_JOB) return runExpireHolds();
       if (job.name === ROLLOVER_JOB) return runRollover();
       if (job.name === COMPLETE_STAYS_JOB) return runCompleteStays();
+      if (job.name === FX_REFRESH_JOB) return runFxRefresh();
       throw new Error(`Bilinmeyen bakım işi: ${job.name}`);
     },
     { connection }
@@ -85,6 +87,7 @@ async function main(): Promise<void> {
   );
   workers.push(maintenance);
   await scheduleExpireHolds(getQueue(QUEUE_NAMES.maintenance));
+  await scheduleFxRefresh(getQueue(QUEUE_NAMES.maintenance));
 
   // Prometheus için işçi metrikleri (outbox, expire, bildirim sayaçları).
   const metricsPort = Number(process.env.WORKER_METRICS_PORT ?? 9464);

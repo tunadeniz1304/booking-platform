@@ -16,6 +16,12 @@ const createBookingSchema = z.object({
   /** Fiyat planı (yoksa varsayılan) ve oda adedi (v3 P0-2). */
   ratePlanId: z.string().min(1).max(64).optional(),
   units: z.number().int().min(1).max(10).optional(),
+  /** Tahsilat para birimi (P0-5); yoksa teklifinki ya da tesisinki. */
+  currency: z
+    .string()
+    .regex(/^[A-Za-z]{3}$/)
+    .transform((c) => c.toUpperCase())
+    .optional(),
 });
 
 export const POST = observed("bookings", async function postHandler(req: NextRequest) {

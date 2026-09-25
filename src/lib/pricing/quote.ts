@@ -23,6 +23,7 @@ import {
   type IsoDate,
 } from "@/lib/time/nights";
 import { checkRestrictions, describeViolation } from "@/lib/booking/restrictions";
+import { chargeAmount, getCurrentFx, resolveChargeCurrency } from "@/lib/fx/store";
 import { computeTaxes, taxRulesFor, type TaxLine, type TaxRule } from "@/lib/pricing/tax";
 
 /**
@@ -81,6 +82,10 @@ export interface Quote extends PricedStay {
   units: number;
   createdAt: string;
   expiresAt: string;
+  /** Teklifin sabitlediği kur tablosu (`FxRate.id`; statik yedekte null) — P0-5. */
+  fxSnapshotId: string | null;
+  /** Tahsil edilecek tutar: tesis para biriminde ya da izin verilen seçili birimde. */
+  charge: { currency: CurrencyCode; total: number };
 }
 
 /** Saf fiyatlama: geceler + oda farkı + plan farkı + vergi → kırılım. Deterministik. */
@@ -173,6 +178,8 @@ export interface QuoteRequest {
   checkOut: string;
   guests: number;
   units?: number;
+  /** Tahsilat para birimi (`FX_CHARGE_CURRENCIES` ile izinli); yoksa tesisinki. */
+  currency?: string;
 }
 
 const ratePlanSelect = {
@@ -291,9 +298,14 @@ export async function computeTotal(req: QuoteRequest, now: Date = new Date()): P
     taxRules: taxRulesFor(room.property.location.country),
     guests: req.guests,
   });
+  const chargeCurrency = resolveChargeCurrency(currency, req.currency);
+  const fx = await getCurrentFx(now);
+  const charge = chargeAmount(money(priced.total, currency), chargeCurrency, fx);
   const expiresAt = new Date(now.getTime() + config.QUOTE_TTL_MINUTES * 60_000);
   return {
     ...priced,
+    fxSnapshotId: fx.id,
+    charge: { currency: charge.currency, total: charge.total },
     quoteId: randomUUID(),
     propertyId: room.propertyId,
     roomId: room.id,

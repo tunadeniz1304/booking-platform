@@ -36,6 +36,24 @@ const schema = z.object({
   /** Geçmiş envanter günleri bu kadar gün sonra budanır (P0-11). */
   INVENTORY_RETENTION_DAYS: int(400, 30, 3650),
 
+  // Kur (P0-5)
+  /** Sırayla denenecek kur kaynakları ("tcmb,ecb"); "none" → ağ yok, yalnızca statik tablo. */
+  FX_SOURCES: z.string().default("tcmb,ecb"),
+  FX_TCMB_URL: z.string().url().default("https://www.tcmb.gov.tr/kurlar/today.xml"),
+  FX_ECB_URL: z
+    .string()
+    .url()
+    .default("https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml"),
+  FX_FETCH_TIMEOUT_MS: int(5000, 100, 60_000),
+  /** Günlük yenileme (cron, UTC). TCMB kurları ~15:30 TR saatinde yayımlanır. */
+  FX_REFRESH_CRON: z.string().min(1).default("45 12 * * *"),
+  /** Bu kadar saatten eski kur tablosu "stale" sayılır. */
+  FX_STALE_HOURS: int(72, 1, 24 * 30),
+  /** Güncel tablo bellekte bu kadar saniye tutulur. */
+  FX_CACHE_SECONDS: int(60, 0, 3600),
+  /** Tesis para birimi dışında tahsilat yapılabilecek para birimleri ("USD,EUR"); boş → yalnızca tesis. */
+  FX_CHARGE_CURRENCIES: z.string().default(""),
+
   // Dinamik fiyat / olay sinyalleri
   PRICE_FLOOR_MULTIPLIER: num(0.6, 0.1, 1),
   PRICE_CEILING_MULTIPLIER: num(2.0, 1, 10),

@@ -17,7 +17,13 @@ import { getConfig } from "@/lib/config/app-config";
 import { withSerializableRetry } from "@/lib/db/transactions";
 import { transition, type BookingState } from "@/lib/booking/state-machine";
 import { DEFAULT_POLICIES, toSnapshot } from "@/lib/booking/cancellation";
-import { getFxTable } from "@/lib/money/fx";
+import {
+  chargeAmount,
+  getCurrentFx,
+  getFxById,
+  resolveChargeCurrency,
+  type FxTable,
+} from "@/lib/fx/store";
 import { taxRulesFor } from "@/lib/pricing/tax";
 import { money, toDecimalString, toMinor, assertCurrency } from "@/lib/money/money";
 import {
@@ -116,6 +122,8 @@ export interface CreateBookingInput {
   idempotencyKey?: string;
   /** Checkout'ta gösterilen teklif; verilirse fiyat birebir eşleşmelidir. */
   quoteId?: string;
+  /** Tahsilat para birimi (yoksa teklifinki, o da yoksa tesisinki; P0-5). */
+  currency?: string;
 }
 
 export interface BookingDTO {
@@ -269,6 +277,11 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingR
     throw new SoldOutError();
   }
 
+  // P0-5: teklif varsa onun sabitlediği kur tablosu → teklif süresince tahsilat tutarı değişmez.
+  const fx =
+    (quote ? await getFxById(quote.fxSnapshotId ?? null).catch(() => null) : null) ??
+    (await getCurrentFx());
+
   try {
     const ratePlanId = input.ratePlanId ?? quote?.ratePlan?.id;
     const row = await redlock.withLock(
@@ -279,7 +292,8 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingR
           stay.checkIn,
           stay.checkOut,
           stay.nights,
-          quote
+          quote,
+          fx
         ),
       { ttlMs: 15_000, retryCount: 200, retryDelayMs: 25 }
     );
@@ -315,7 +329,8 @@ async function reserveInTransaction(
   checkIn: IsoDate,
   checkOut: IsoDate,
   nights: IsoDate[],
-  quote: Quote | null
+  quote: Quote | null,
+  fx: FxTable
 ): Promise<BookingDTO> {
   const config = getConfig();
   return withSerializableRetry(async (tx) => {
@@ -415,6 +430,27 @@ async function reserveInTransaction(
       );
     }
 
+    const chargeCurrency = resolveChargeCurrency(
+      currency,
+      input.currency ?? quote?.charge?.currency
+    );
+    const charge = chargeAmount(money(priced.total, currency), chargeCurrency, fx);
+    if (
+      quote?.charge &&
+      quote.charge.currency === charge.currency &&
+      quote.charge.total !== charge.total
+    ) {
+      throw new BookingConflictError(
+        "Fiyat değişti, lütfen yeni fiyatı onaylayın",
+        "PRICE_CHANGED",
+        {
+          previousTotal: quote.charge.total,
+          currentTotal: charge.total,
+          currency: charge.currency,
+        }
+      );
+    }
+
     const status = transition("PENDING", "HOLD");
     const holdExpiresAt = new Date(Date.now() + config.BOOKING_HOLD_TTL_MINUTES * 60_000);
     const booking = await tx.booking.create({
@@ -427,14 +463,15 @@ async function reserveInTransaction(
         checkIn: toDbDate(checkIn),
         checkOut: toDbDate(checkOut),
         guestCount: input.guestCount,
-        totalPrice: new Prisma.Decimal(toDecimalString(money(priced.total, currency))),
-        currency,
+        totalPrice: new Prisma.Decimal(toDecimalString(money(charge.total, charge.currency))),
+        currency: charge.currency,
         status,
         holdExpiresAt,
         priceBreakdown: priced as unknown as Prisma.InputJsonValue,
         quoteId: quote?.quoteId ?? null,
         policySnapshot: policy as unknown as Prisma.InputJsonValue,
-        fxSnapshot: getFxTable() as unknown as Prisma.InputJsonValue,
+        fxSnapshotId: fx.id,
+        fxSnapshot: fx as unknown as Prisma.InputJsonValue,
         idempotencyKey: input.idempotencyKey ?? null,
       },
       select: bookingSelect,

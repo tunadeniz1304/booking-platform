@@ -1,74 +1,41 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { redis } from "@/lib/redis";
-import { calculateDynamicPrice } from "@/lib/pricing/engine";
+import { priceNights, type PriceExplanation } from "@/lib/pricing/event-signals";
+import { money, toDecimalString, toMinor } from "@/lib/money/money";
 import { logger, errorFields } from "@/lib/observability/logger";
 
 const PRICE_CACHE_PREFIX = "price:";
 const PRICE_CACHE_TTL = 60 * 30; // 30 dakika
 
-export interface PricingInput {
-  propertyId: string;
-  roomId: string;
-  date: string;
-  basePrice: number;
-  occupancyRate?: number;
-  seasonalFactor?: number;
-  lastMinuteFactor?: number;
-  currency?: string;
-}
-
 export interface PricingResult {
   roomId: string;
   date: string;
+  /** Gecelik fiyat, ana birim (DB `Decimal` ile aynı değer). */
   price: number;
   currency: string;
-  factors: {
-    occupancyRate: number;
-    seasonalFactor: number;
-    lastMinuteFactor: number;
-    /** Etkinlik yakınlığı çarpanı (predictive motor). */
-    eventFactor?: number;
-    leadTimeFactor?: number;
-    weekdayFactor?: number;
-    occupancyMultiplier?: number;
-    /** Birleşik talep sinyali 0..1 (SSE ısı haritası besler). */
-    demandSignal?: number;
-  };
+  /** Tek motorun açıklaması (tutarlar minor birim, v3#9). */
+  explanation: PriceExplanation;
+}
+
+async function cachePrice(result: PricingResult): Promise<void> {
+  try {
+    await redis.set(
+      `${PRICE_CACHE_PREFIX}${result.roomId}:${result.date}`,
+      JSON.stringify(result),
+      {
+        ex: PRICE_CACHE_TTL,
+      }
+    );
+  } catch (error) {
+    logger.error(errorFields(error), "Fiyat önbelleği yazılamadı");
+  }
 }
 
 /**
- * Fiyat hesabı → predictif motor (src/lib/pricing/engine.ts).
- * Mevsimsellik, lead-time, hafta içi gün, occupancy ve lokasyon etkinlik
- * korelasyonu tek akışta birleşir.
+ * Worker fiyat işi: geceleri tek motorla (`priceNights`, ADR 0016) fiyatlar, önbelleğe ve
+ * `InventoryDay` satırlarına açıklamasıyla yazar.
  */
-async function calculatePrice(input: PricingInput): Promise<PricingResult> {
-  const result = await calculateDynamicPrice({
-    propertyId: input.propertyId,
-    roomId: input.roomId,
-    date: input.date,
-    basePrice: input.basePrice,
-    occupancyRate: input.occupancyRate,
-    seasonalFactor: input.seasonalFactor,
-    lastMinuteFactor: input.lastMinuteFactor,
-    currency: input.currency,
-  });
-  return result;
-}
-
-export async function calculateAndCachePrice(input: PricingInput): Promise<PricingResult> {
-  const result = await calculatePrice(input);
-  const cacheKey = `${PRICE_CACHE_PREFIX}${input.roomId}:${input.date}`;
-
-  try {
-    await redis.set(cacheKey, JSON.stringify(result), { ex: PRICE_CACHE_TTL });
-  } catch (error) {
-    logger.error(errorFields(error), "Price cache write failed");
-  }
-
-  return result;
-}
-
 export async function updateAvailabilityPrices(
   roomId: string,
   dates: string[],
@@ -77,40 +44,42 @@ export async function updateAvailabilityPrices(
 ): Promise<PricingResult[]> {
   const room = await prisma.roomType.findUnique({
     where: { id: roomId },
-    select: { propertyId: true, units: true },
+    select: { units: true, property: { select: { locationId: true } } },
   });
-  const propertyId = room?.propertyId ?? "";
+  const explained = await priceNights({
+    locationId: room?.property.locationId ?? null,
+    nights: dates,
+    baseMinor: toMinor(basePrice, currency),
+    currency,
+  });
 
-  const results: PricingResult[] = [];
-
-  for (const date of dates) {
-    const result = await calculateAndCachePrice({
-      propertyId,
+  const results: PricingResult[] = dates.map((date) => {
+    const explanation = explained.get(date)!;
+    return {
       roomId,
       date,
-      basePrice,
+      price: Number(toDecimalString(money(explanation.price, currency))),
       currency,
-    });
-    results.push(result);
-  }
+      explanation,
+    };
+  });
+  for (const result of results) await cachePrice(result);
 
   await prisma.$transaction(
     async (tx) => {
       for (const result of results) {
+        const price = new Prisma.Decimal(
+          toDecimalString(money(result.explanation.price, currency))
+        );
+        const priceExplanation = result.explanation as unknown as Prisma.InputJsonValue;
         await tx.inventoryDay.upsert({
-          where: {
-            roomTypeId_date: {
-              roomTypeId: roomId,
-              date: new Date(result.date),
-            },
-          },
-          update: {
-            price: new Prisma.Decimal(result.price),
-          },
+          where: { roomTypeId_date: { roomTypeId: roomId, date: new Date(result.date) } },
+          update: { price, priceExplanation },
           create: {
             roomTypeId: roomId,
             date: new Date(result.date),
-            price: new Prisma.Decimal(result.price),
+            price,
+            priceExplanation,
             total: room?.units ?? 1,
           },
         });
@@ -130,6 +99,6 @@ export async function invalidatePriceCache(roomId: string, date: string): Promis
   try {
     await redis.del(`${PRICE_CACHE_PREFIX}${roomId}:${date}`);
   } catch (error) {
-    logger.error(errorFields(error), "Price cache invalidation failed");
+    logger.error(errorFields(error), "Fiyat önbelleği silinemedi");
   }
 }

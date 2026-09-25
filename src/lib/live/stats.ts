@@ -1,7 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { redis } from "@/lib/redis";
 import { getConfig } from "@/lib/config/app-config";
-import { calculateDynamicPrice } from "@/lib/pricing/engine";
+import { eventSignal, priceNights } from "@/lib/pricing/event-signals";
+import { toMinor } from "@/lib/money/money";
 
 /**
  * Canlı talep ısı haritası istatistikleri.
@@ -10,7 +11,7 @@ import { calculateDynamicPrice } from "@/lib/pricing/engine";
  *  - scarcity: oda için aralıkta dolu gece oranı (stok)
  *  - views: Redis'teki son dakika görüntülenme sayacı (ilgi)
  *  - booked: Redis'teki son 24 saatteki rezervasyon sayacı
- *  - demandSignal: predictif fiyat motorunun talep sinyali
+ *  - demandSignal: olay sinyali (tek fiyat motoru) + doluluk kıtlığı ortalaması
  *
  * SSE akışı bu değerleri 3 sn'de bir yayınlar.
  */
@@ -105,26 +106,25 @@ export async function getRoomHeat(
   const views = Number(viewsRaw ?? "0");
   const bookedRecent = Number(bookedRaw ?? "0");
 
-  // predictif motor: ilk gece için talep sinyali + güncel fiyat
+  // Güncel fiyat = envanterdeki (tek motorla yazılmış) fiyat; çarpan tekrar uygulanmaz (v3#9).
   const nightlyBase =
     availability.find((a) => a.date.getTime() === start.getTime())?.price ??
     room.property.basePrice ??
-    Number(availability[0]?.price ?? 0);
-  let demandSignal = 0;
-  let currentNightlyPrice = Number(nightlyBase) || 0;
+    availability[0]?.price;
+  const currentNightlyPrice = Number(nightlyBase ?? 0) || 0;
+  // Talep sinyali: olay sinyali (ilk gece) ile doluluk kıtlığının ortalaması.
+  let demandSignal = scarcity;
   try {
-    const quote = await calculateDynamicPrice({
-      propertyId: room.propertyId,
-      roomId,
-      date: start.toISOString().slice(0, 10),
-      basePrice: Number(nightlyBase) || Number(room.property.basePrice) || 0,
-      occupancyRate: scarcity,
+    const firstNight = start.toISOString().slice(0, 10);
+    const priced = await priceNights({
       locationId: room.property.locationId,
+      nights: [firstNight],
+      baseMinor: toMinor(room.property.basePrice.toString(), room.property.currency),
+      currency: room.property.currency,
     });
-    demandSignal = quote.factors.demandSignal ?? scarcity;
-    currentNightlyPrice = quote.price;
+    demandSignal = (eventSignal(priced.get(firstNight)!) + scarcity) / 2;
   } catch {
-    // motor yoksa DB fiyatı korunur
+    // motor yoksa yalnız doluluk kıtlığı kullanılır
   }
 
   let status: RoomHeat["status"] = "available";

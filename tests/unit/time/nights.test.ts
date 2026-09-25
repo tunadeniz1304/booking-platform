@@ -9,7 +9,7 @@ import {
   parseStay,
   type IsoDate,
 } from "@/lib/time/nights";
-import { daysUntil, getSeasonalFactor } from "@/lib/pricing/engine";
+import { getSeasonalFactor } from "@/lib/pricing/event-signals";
 
 const d = (s: string) => parseIsoDate(s);
 const originalTz = process.env.TZ;
@@ -52,10 +52,5 @@ describe("regression: #20 UTC gece tipi", () => {
     process.env.TZ = "America/Los_Angeles";
     // Yerel getMonth() burada 31 Mayıs derdi (düşük sezon 1.0); UTC ile Haziran → 1.3
     expect(getSeasonalFactor(new Date("2026-06-01T00:00:00.000Z"))).toBe(1.3);
-  });
-
-  it("daysUntil UTC takvim günü farkıdır", () => {
-    const now = new Date("2026-09-24T23:30:00.000Z");
-    expect(daysUntil(new Date("2026-09-25T00:00:00.000Z"), now)).toBe(1);
   });
 });

@@ -30,7 +30,8 @@ yanıltıcı fiyat gösterimi riski.
   sürüm korunur).
 - **Legacy motor** `event-signals.ts`'e birleştirilir (F3): gecelik taban fiyat yalnızca tek,
   açıklanabilir motorla üretilir; kırpma sınırları `PRICE_FLOOR_MULTIPLIER` /
-  `PRICE_CEILING_MULTIPLIER` config'inden gelir, sabit sayı yoktur.
+  `PRICE_CEILING_MULTIPLIER` config'inden gelir, sabit sayı yoktur. (Uygulandı: `engine.ts`
+  silindi; worker fiyat işi ve canlı ısı haritası `priceNights` kullanır.)
 
 ## Sonuçlar
 

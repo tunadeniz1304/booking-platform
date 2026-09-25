@@ -2,11 +2,13 @@ import { Prisma, type DemandEventStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getConfig } from "@/lib/config/app-config";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/http/errors";
-import { getSeasonalFactor, getWeekdayFactor } from "./engine";
+import { breakers } from "@/lib/resilience/circuit-breaker";
 import { money, multiplyRate, toDecimalString, toMinor, assertCurrency } from "@/lib/money/money";
 import {
   addDays,
+  dayOfWeek,
   fromDate,
+  monthOf,
   nightsBetween,
   parseIsoDate,
   toDbDate,
@@ -29,7 +31,28 @@ import { invalidateSearchCache } from "@/lib/search";
  *  - Tek işlem, tek toplu UPDATE (N+1 yok).
  *  - "Hedge" kaldırıldı; yerine onaylı ve geri alınabilir yield hold (oda payı ≤
  *    YIELD_HOLD_MAX_SHARE).
+ *
+ * Tek gecelik fiyat motoru budur (v3#9, ADR 0016): eski float "prediktif motor"
+ * (`pricing/engine.ts`, sabit 0.6–3.0 kırpma + sabit doluluk 0.5) buraya birleştirildi;
+ * worker fiyat işi ve canlı ısı haritası da `priceNights` kullanır.
  */
+
+/** Mevsim çarpanı: Haziran–Eylül yüksek sezon, Aralık–Ocak yılbaşı (UTC ay, yerel değil). */
+export function getSeasonalFactor(date: Date): number {
+  const month = monthOf(fromDate(date));
+  if (month >= 6 && month <= 9) return 1.3;
+  if (month === 12 || month === 1) return 1.15;
+  return 1.0;
+}
+
+/** Hafta günü çarpanı: Cuma / Cumartesi geceleri yoğun, Pazar hafif yüksek (UTC). */
+export function getWeekdayFactor(date: Date): number {
+  const day = dayOfWeek(fromDate(date));
+  if (day === 5) return 1.15;
+  if (day === 6) return 1.18;
+  if (day === 0) return 1.05;
+  return 1.0;
+}
 
 export interface PriceExplanation {
   base: number;
@@ -78,6 +101,68 @@ export function explainNightPrice(input: {
   };
 }
 
+type SignalEvent = { id: string; title: string; impact: number; startsAt: Date; endsAt: Date };
+
+function activeOn(events: SignalEvent[], date: IsoDate) {
+  return events
+    .filter((e) => windowOf(e).includes(date))
+    .map((e) => ({ id: e.id, title: e.title, impact: e.impact }));
+}
+
+async function approvedEvents(locationId: string, first: Date, last: Date) {
+  return prisma.demandEvent.findMany({
+    where: {
+      locationId,
+      status: "APPROVED",
+      startsAt: { lte: last },
+      endsAt: { gte: addDaysDate(first, -2) },
+    },
+    select: { id: true, title: true, impact: true, startsAt: true, endsAt: true },
+  });
+}
+
+/**
+ * Verilen geceleri konumdaki onaylı olaylarla fiyatlar (salt okunur). Olay sorgusu devre
+ * kesiciden geçer; DB/kesici hatasında olaysız (mevsim × hafta günü) fiyata düşer.
+ */
+export async function priceNights(input: {
+  locationId: string | null;
+  /** YYYY-MM-DD geceler (doğrulanır). */
+  nights: readonly string[];
+  baseMinor: number;
+  currency: string;
+}): Promise<Map<string, PriceExplanation>> {
+  const out = new Map<string, PriceExplanation>();
+  if (input.nights.length === 0) return out;
+  const sorted = input.nights.map((n) => parseIsoDate(n)).sort();
+  const locationId = input.locationId;
+  const events: SignalEvent[] = locationId
+    ? await breakers.pricing.call(
+        () => approvedEvents(locationId, toDbDate(sorted[0]), toDbDate(sorted[sorted.length - 1])),
+        async () => []
+      )
+    : [];
+  for (const date of sorted) {
+    out.set(
+      date,
+      explainNightPrice({
+        date,
+        baseMinor: input.baseMinor,
+        currency: input.currency,
+        events: activeOn(events, date),
+      })
+    );
+  }
+  return out;
+}
+
+/** Olay kaynaklı talep sinyali 0..1: olay çarpanının tavana göre konumu. */
+export function eventSignal(exp: PriceExplanation): number {
+  const headroom = getConfig().PRICE_CEILING_MULTIPLIER - 1;
+  if (headroom <= 0) return 0;
+  return Math.min(1, Math.max(0, (exp.factors.event - 1) / headroom));
+}
+
 function windowOf(event: { startsAt: Date; endsAt: Date }): IsoDate[] {
   // Etki penceresi: olaydan bir gece önce → bittiği geceyi de kapsayacak şekilde
   return nightsBetween(addDays(fromDate(event.startsAt), -1), addDays(fromDate(event.endsAt), 2));
@@ -114,9 +199,7 @@ export async function repriceLocation(locationId: string, nights: IsoDate[]): Pr
     if (rows.length === 0) return 0;
     const values = rows.map((row) => {
       const date = fromDate(row.date);
-      const active = events
-        .filter((e) => windowOf(e).includes(date))
-        .map((e) => ({ id: e.id, title: e.title, impact: e.impact }));
+      const active = activeOn(events, date);
       const currency = row.roomType.property.currency;
       const exp = explainNightPrice({
         date,

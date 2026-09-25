@@ -17,20 +17,15 @@ total    = subtotal + vergi
 
 Arama kartı, PDP, checkout ve tahsilat aynı sonucu kullanır; quote `QUOTE_TTL_MINUTES` (15) boyunca Redis'te saklanır ([ADR 0004](adr/0004-minor-unit-money-quote.md)).
 
-### 1.2 Dinamik fiyat faktörleri (`src/lib/pricing/engine.ts`)
+### 1.2 Dinamik fiyat faktörleri (tek motor)
 
-Host fiyat önerisi (`POST /api/pricing`) için çarpımsal bir model kullanılır; her faktör yanıtta ayrı döner:
+Eski float "prediktif motor" (`src/lib/pricing/engine.ts`: son dakika / erken rezervasyon, sabit doluluk 0.5, sabit [0.60, 3.00] kırpma) kaldırıldı ([ADR 0016](adr/0016-legacy-pricing-and-negotiation.md), v3#9). Gecelik fiyat artık yalnızca `event-signals.ts` motoruyla (§1.3) minor unit olarak üretilir; worker fiyat işi (`updateAvailabilityPrices`) ve canlı ısı haritası aynı `priceNights` fonksiyonunu kullanır. Isı haritasındaki talep sinyali = (olay sinyali + doluluk kıtlığı) / 2; gösterilen gecelik fiyat envanterdeki fiyattır (çarpan ikinci kez uygulanmaz).
 
-| Faktör            | Kural                                                                                  |
-| ----------------- | -------------------------------------------------------------------------------------- |
-| Mevsim            | Haziran–Eylül 1.30; Aralık–Ocak 1.15; diğer 1.00 (UTC ay)                              |
-| Son dakika        | Girişe ≤ 3 gün 1.20; ≤ 7 gün 1.10; diğer 1.00                                          |
-| Erken rezervasyon | Girişe ≥ 90 gün 0.95                                                                   |
-| Hafta günü        | Cuma 1.15, Cumartesi 1.18, Pazar 1.05, diğer 1.00 (UTC)                                |
-| Doluluk           | `1 + (doluluk − 0.5) × 0.4` (doluluk [0, 1] aralığına sıkıştırılır)                    |
-| Olay yakınlığı    | Onaylı olaylar; pencere dışında 10 günlük doğrusal sönüm, `1 + min(1, Σetki/30) × 0.6` |
-
-Sonuç taban fiyatın **[0.60, 3.00]** katı aralığına sıkıştırılır. Yalnızca `APPROVED` olaylar hesaba girer.
+| Faktör     | Kural                                                     |
+| ---------- | --------------------------------------------------------- |
+| Mevsim     | Haziran–Eylül 1.30; Aralık–Ocak 1.15; diğer 1.00 (UTC ay) |
+| Hafta günü | Cuma 1.15, Cumartesi 1.18, Pazar 1.05, diğer 1.00 (UTC)   |
+| Olay       | Onaylı olaylar, bkz. §1.3                                 |
 
 ### 1.3 Olay sinyalleri (`src/lib/pricing/event-signals.ts`)
 

@@ -10,6 +10,7 @@ import {
 } from "@/lib/payment/payment-service";
 import { relayOutbox } from "@/lib/cqrs";
 import { registerEventHandlers } from "@/lib/events/register";
+import { inlineFlow, setFulfilmentFlowForTests } from "@/lib/saga/booking-saga";
 import { MOCK_3DS_CODE } from "@/lib/payment/card-token";
 import { redis } from "@/lib/redis";
 
@@ -43,6 +44,7 @@ describeInt("ödeme, iptal, iade ve bildirim (integration)", () => {
 
   beforeAll(async () => {
     registerEventHandlers();
+    setFulfilmentFlowForTests(inlineFlow);
     const user = await prisma.user.create({
       data: { email: `pay-${stamp}@t.test`, passwordHash: "x", firstName: "Ayşe", lastName: "Ö" },
     });

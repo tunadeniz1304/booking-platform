@@ -685,6 +685,59 @@ export async function expireHolds(now: Date = new Date(), limit = 100): Promise<
   return expired.length;
 }
 
+/**
+ * Saga telafisi (P0-7): ödeme adımları başarısız olunca tutmayı HEMEN serbest bırakır
+ * (HELD → EXPIRED + envanter iadesi + outbox). Koşullu geçiş → idempotent; rezervasyon
+ * bu arada onaylandıysa/düştüyse hiçbir şey yapmaz.
+ * @returns tutma bu çağrıyla serbest bırakıldıysa true
+ */
+export async function releaseHold(bookingId: string): Promise<boolean> {
+  const released = await withSerializableRetry(async (tx) => {
+    const booking = await tx.booking.findUnique({
+      where: { id: bookingId },
+      select: {
+        id: true,
+        userId: true,
+        status: true,
+        roomId: true,
+        propertyId: true,
+        checkIn: true,
+        checkOut: true,
+        units: true,
+      },
+    });
+    if (!booking || booking.status !== BookingStatus.HELD) return null;
+    const updated = await tx.booking.updateMany({
+      where: { id: booking.id, status: BookingStatus.HELD },
+      data: {
+        status: transition("HELD", "EXPIRE") as BookingStatus,
+        expiredAt: new Date(),
+        holdExpiresAt: null,
+        version: { increment: 1 },
+      },
+    });
+    if (updated.count !== 1) return null;
+    await releaseInventory(tx, booking);
+    await appendOutbox(
+      tx,
+      makeEvent<BookingExpiredPayload>(EventTypes.BookingExpired, booking.id, "booking", {
+        bookingId: booking.id,
+        propertyId: booking.propertyId,
+        roomId: booking.roomId,
+        checkIn: fromDate(booking.checkIn),
+        checkOut: fromDate(booking.checkOut),
+        userId: booking.userId,
+        reason: "payment_failed",
+      })
+    );
+    return booking;
+  });
+  if (!released) return false;
+  await afterWrite(released.propertyId, bookingId);
+  bookingsExpired.inc();
+  return true;
+}
+
 export async function getBooking(bookingId: string, userId: string) {
   const cacheKey = `${BOOKING_CACHE_PREFIX}${bookingId}`;
   try {

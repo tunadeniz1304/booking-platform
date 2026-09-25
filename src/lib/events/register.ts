@@ -16,9 +16,9 @@ import { invalidatePropertySearchCache } from "@/lib/search";
 import { invalidatePriceCache } from "@/lib/pricing-service";
 import {
   notifyBookingCancelled,
-  notifyBookingConfirmed,
   notifyBookingExpired,
 } from "@/lib/notifications/booking-notifications";
+import { startBookingFulfilment } from "@/lib/saga/booking-saga";
 
 /**
  * Outbox'tan yayınlanan domain olaylarının tüketicileri (worker sürecinde).
@@ -52,7 +52,8 @@ export function registerEventHandlers(): void {
   registered = true;
 
   on<BookingCreatedPayload>(EventTypes.BookingCreated, invalidateStay);
-  on<BookingConfirmedPayload>(EventTypes.BookingConfirmed, notifyBookingConfirmed);
+  // Saga devamı (P0-7): fatura → bildirim, BullMQ FlowProducer ile.
+  on<BookingConfirmedPayload>(EventTypes.BookingConfirmed, startBookingFulfilment);
   on<BookingCancelledPayload>(EventTypes.BookingCancelled, async (p) => {
     await invalidateStay(p);
     await notifyBookingCancelled(p);

@@ -13,7 +13,9 @@ import { withSerializableRetry } from "@/lib/db/transactions";
 import { createRedlock, LockError } from "@/lib/distributed-lock/redlock";
 import { transition, type BookingState } from "@/lib/booking/state-machine";
 import { computeRefund, parseSnapshot, type RefundDecision } from "@/lib/booking/cancellation";
-import { releaseInventory, BookingNotFoundError } from "@/lib/booking-service";
+import { releaseHold, releaseInventory, BookingNotFoundError } from "@/lib/booking-service";
+import { runSaga, type SagaStep } from "@/lib/saga/saga";
+import { PAYMENT_SAGA, SAGA_STEPS } from "@/lib/saga/booking-saga";
 import { invalidatePropertySearchCache } from "@/lib/search";
 import { money, toDecimalString, toMinor, assertCurrency, type Money } from "@/lib/money/money";
 import { clockOf, fromDate } from "@/lib/time/nights";
@@ -234,75 +236,137 @@ async function refundLoser(
     });
 }
 
+interface PaymentSagaCtx {
+  booking: PayableBooking;
+  providerRef: string;
+  amount: Money;
+  claimFrom: readonly PaymentStatus[];
+  claimed: boolean;
+  captured: boolean;
+}
+
 /**
- * Yetkilendirilmiş ödemeyi tahsil eder ve rezervasyonu onaylar.
- *  1. Tahsil hakkı: ödeme satırı koşullu olarak AUTHORIZED(providerRef) yapılır; tutmazsa
- *     başka bir ödeme kazanmıştır → bu yetkilendirme void edilir.
- *  2. PSP capture.
- *  3. HELD→CONFIRMED + PAID + defter (tek işlem). Başarısızsa (tutma bu arada doldu)
- *     tahsilat iade edilir — para asla askıda kalmaz.
+ * Ödeme sagası (P0-7, ADR 0013): hold → authorize → capture → confirm (pivot).
+ * Onay sonrası fatura → bildirim, outbox `BookingConfirmed` üzerinden BullMQ FlowProducer
+ * ile ileri-kurtarmalı yürür (`booking-saga.ts`). Telafiler: iade → void → tutmayı bırak.
+ * Tahsil, onaydan ÖNCE yapılır: CONFIRMED ⇒ para çekilmiş (v3#1 değişmezi).
  */
+const PAYMENT_SAGA_STEPS: SagaStep<PaymentSagaCtx, PayOutcome>[] = [
+  {
+    name: SAGA_STEPS.hold,
+    // Tutma rezervasyon anında alındı (saga dışı, `from`); adım yalnızca telafiyi taşır.
+    run: async () => undefined,
+    compensate: (ctx) => releaseHold(ctx.booking.id),
+  },
+  {
+    name: SAGA_STEPS.authorize,
+    // Provizyon PSP'de saga öncesi alındı (3DS olabilir); adım yalnızca telafiyi taşır.
+    run: async () => undefined,
+    compensate: async (ctx) => {
+      if (ctx.captured) return false;
+      await getPaymentProvider().void(ctx.providerRef);
+      // Tahsil hakkı alındıysa satır AUTHORIZED(providerRef), alınmadıysa hâlâ açık durumdadır.
+      await prisma.payment.updateMany({
+        where: ctx.claimed
+          ? {
+              bookingId: ctx.booking.id,
+              providerRef: ctx.providerRef,
+              status: PaymentStatus.AUTHORIZED,
+            }
+          : { bookingId: ctx.booking.id, status: { in: [...ctx.claimFrom] } },
+        data: { status: PaymentStatus.VOIDED, failureCode: "saga_aborted" },
+      });
+    },
+  },
+  {
+    name: SAGA_STEPS.capture,
+    run: async (ctx) => {
+      // Tahsil hakkı: ödeme satırı koşullu olarak AUTHORIZED(providerRef) yapılır.
+      const claimed = await transitionPayment(ctx.booking, ctx.claimFrom, {
+        status: PaymentStatus.AUTHORIZED,
+        providerRef: ctx.providerRef,
+        authorizedAt: new Date(),
+        failureCode: null,
+      });
+      if (!claimed) {
+        await voidLoser(ctx.booking.id, ctx.providerRef);
+        return { done: await alreadyConfirmed(ctx.booking.id, ctx.booking.userId) };
+      }
+      ctx.claimed = true;
+      try {
+        await getPaymentProvider().capture(ctx.providerRef, ctx.amount);
+      } catch (error) {
+        paymentsTotal.inc({ outcome: "capture_failed" });
+        throw error;
+      }
+      ctx.captured = true;
+    },
+    compensate: async (ctx) => {
+      if (!ctx.captured) return false;
+      // İade anahtarı providerRef'e bağlı → tekrar çağrılsa da PSP tek iade yapar.
+      await getPaymentProvider().refund(
+        ctx.providerRef,
+        ctx.amount,
+        `compensate:${ctx.providerRef}`
+      );
+      await prisma.payment.updateMany({
+        where: {
+          bookingId: ctx.booking.id,
+          providerRef: ctx.providerRef,
+          status: { notIn: SETTLED_STATUSES },
+        },
+        data: {
+          status: PaymentStatus.REFUNDED,
+          refundedAmount: new Prisma.Decimal(toDecimalString(ctx.amount)),
+          refundedAt: new Date(),
+          failureCode: "BOOKING_NOT_CONFIRMABLE",
+        },
+      });
+      paymentsTotal.inc({ outcome: "compensated" });
+    },
+  },
+  {
+    name: SAGA_STEPS.confirm,
+    pivot: true,
+    run: async (ctx) => {
+      // HELD→CONFIRMED + PAID + defter + outbox (tek işlem).
+      const paymentId = await withSerializableRetry((tx) =>
+        confirmInTransaction(tx, ctx.booking.id, ctx.providerRef)
+      );
+      paymentsTotal.inc({ outcome: "confirmed" });
+      await afterBookingWrite(ctx.booking.propertyId, ctx.booking.id);
+      return {
+        done: {
+          status: "confirmed",
+          bookingId: ctx.booking.id,
+          paymentId,
+          amount: ctx.amount.amount,
+          currency: ctx.amount.currency,
+        },
+      };
+    },
+  },
+];
+
+/** Yetkilendirilmiş ödemeyi saga ile tahsil eder ve rezervasyonu onaylar. */
 async function captureAndConfirm(
   booking: PayableBooking,
   providerRef: string,
   claimFrom: readonly PaymentStatus[] = OPEN_STATUSES
 ): Promise<PayOutcome> {
-  const provider = getPaymentProvider();
-  const amount = amountOf(booking);
-  const claimed = await transitionPayment(booking, claimFrom, {
-    status: PaymentStatus.AUTHORIZED,
+  const ctx: PaymentSagaCtx = {
+    booking,
     providerRef,
-    authorizedAt: new Date(),
-    failureCode: null,
-  });
-  if (!claimed) {
-    await voidLoser(booking.id, providerRef);
-    return alreadyConfirmed(booking.id, booking.userId);
-  }
-
+    amount: amountOf(booking),
+    claimFrom,
+    claimed: false,
+    captured: false,
+  };
   try {
-    await provider.capture(providerRef, amount);
+    return await runSaga(PAYMENT_SAGA, PAYMENT_SAGA_STEPS, ctx, { from: SAGA_STEPS.capture });
   } catch (error) {
-    await provider.void(providerRef).catch(() => undefined);
-    await prisma.payment.updateMany({
-      where: { bookingId: booking.id, providerRef, status: PaymentStatus.AUTHORIZED },
-      data: { status: PaymentStatus.FAILED, failureCode: "capture_failed" },
-    });
-    paymentsTotal.inc({ outcome: "capture_failed" });
-    throw error;
-  }
-
-  try {
-    const paymentId = await withSerializableRetry((tx) =>
-      confirmInTransaction(tx, booking.id, providerRef)
-    );
-    paymentsTotal.inc({ outcome: "confirmed" });
-    await afterBookingWrite(booking.propertyId, booking.id);
-    return {
-      status: "confirmed",
-      bookingId: booking.id,
-      paymentId,
-      amount: amount.amount,
-      currency: amount.currency,
-    };
-  } catch (error) {
-    // Onaylanamadı → tahsilatı geri ver (para asla askıda kalmaz).
-    await provider
-      .refund(providerRef, amount, `compensate:${providerRef}`)
-      .catch((e) =>
-        logger.error({ bookingId: booking.id, ...errorFields(e) }, "compensating refund failed")
-      );
-    await prisma.payment.updateMany({
-      where: { bookingId: booking.id, providerRef, status: { notIn: SETTLED_STATUSES } },
-      data: {
-        status: PaymentStatus.REFUNDED,
-        refundedAmount: new Prisma.Decimal(toDecimalString(amount)),
-        refundedAt: new Date(),
-        failureCode: "BOOKING_NOT_CONFIRMABLE",
-      },
-    });
-    paymentsTotal.inc({ outcome: "compensated" });
     if (error instanceof CaptureRaceLostError) {
+      // Başka bir ödeme bu arada onayladı: bizimki iade edildi → idempotent sonuç.
       captureRaceTotal.inc({ action: "refund" });
       return alreadyConfirmed(booking.id, booking.userId);
     }

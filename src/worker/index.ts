@@ -8,6 +8,7 @@
  */
 import { Worker, type Job } from "bullmq";
 import { loadEnv } from "@/lib/config/load-env";
+import { processFulfilmentJob } from "@/lib/saga/booking-saga";
 import { QUEUE_NAMES, getQueue, getQueueConnection, type PricingJobData } from "@/lib/queue";
 import {
   EXPIRE_HOLDS_JOB,
@@ -90,6 +91,17 @@ async function main(): Promise<void> {
     )
   );
   workers.push(maintenance);
+
+  // P0-7 saga devamı: fatura (çocuk) → bildirim (ebeveyn) akış işleri.
+  const saga = new Worker(
+    QUEUE_NAMES.saga,
+    async (job: Job) => processFulfilmentJob(job.name, job.data),
+    { connection }
+  );
+  saga.on("failed", (job, err) =>
+    logger.error({ jobId: job?.id, queue: QUEUE_NAMES.saga, ...errorFields(err) }, "job failed")
+  );
+  workers.push(saga);
   await scheduleExpireHolds(getQueue(QUEUE_NAMES.maintenance));
   await scheduleFxRefresh(getQueue(QUEUE_NAMES.maintenance));
   await schedulePriceAlerts(getQueue(QUEUE_NAMES.maintenance));

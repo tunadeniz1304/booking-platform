@@ -15,6 +15,7 @@ export const QUEUE_NAMES = {
   notifications: "notifications",
   embeddings: "embeddings",
   channel: "channel",
+  saga: "saga",
 } as const;
 
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];

@@ -1,4 +1,5 @@
 import { Redis as IORedis } from "ioredis";
+import { getConfig } from "@/lib/config/app-config";
 
 /**
  * Uygulama-çapı Redis istemcisi (ioredis, tembel bağlantı).
@@ -7,6 +8,10 @@ import { Redis as IORedis } from "ioredis";
  *   build sırasında gereksiz bağlantı denemesi olmaz).
  * - Redis erişilemezse komutlar sınırlı denemeden sonra hata fırlatır; asılı
  *   kalmaz. Çağıranlar fail-open / fail-closed kararını kendisi verir.
+ * - Bağlantı bir kez hazır olduktan sonra koparsa komutlar yeniden bağlanmayı
+ *   BEKLEMEZ, hemen reddedilir (fail-fast); her komut ayrıca REDIS_COMMAND_TIMEOUT_MS
+ *   ile sınırlıdır. Kaos deneyi: Redis durdurulunca fail-open arama bu olmadan
+ *   ~33 sn sürüyordu (load/chaos.md).
  * - BullMQ kendi bağlantısını kullanır (`maxRetriesPerRequest: null` gerektirir).
  *
  * Servisler yalnızca `RedisClient` arayüzünü kullanır; testlerde sahte
@@ -43,7 +48,26 @@ local v = redis.call('INCR', KEYS[1])
 if v == 1 then redis.call('EXPIRE', KEYS[1], ARGV[1]) end
 return v`;
 
-const globalForRedis = globalThis as unknown as { __bookingRedis?: IORedis };
+const globalForRedis = globalThis as unknown as {
+  __bookingRedis?: IORedis;
+  __bookingRedisEverReady?: boolean;
+};
+
+/** Redis erişilemez (komut gönderilmeden reddedildi). */
+export class RedisUnavailableError extends Error {
+  constructor(status: string) {
+    super(`Redis bağlantısı yok (durum: ${status})`);
+    this.name = "RedisUnavailableError";
+  }
+}
+
+/**
+ * Komut beklemeden reddedilmeli mi? Yalnızca bağlantı daha önce hazır olmuşsa ve şu an
+ * hazır değilse: ilk (tembel) bağlantı sırasında komutlar kuyrukta bekler.
+ */
+export function shouldFailFast(status: string, everReady: boolean): boolean {
+  return everReady && status !== "ready";
+}
 
 /** Ham ioredis bağlantısı (pub/sub veya pipeline gerekiyorsa). */
 export function getRedisConnection(): IORedis {
@@ -53,7 +77,11 @@ export function getRedisConnection(): IORedis {
       lazyConnect: true,
       maxRetriesPerRequest: 2,
       connectTimeout: 2000,
+      commandTimeout: getConfig().REDIS_COMMAND_TIMEOUT_MS,
       enableOfflineQueue: true,
+    });
+    globalForRedis.__bookingRedis.on("ready", () => {
+      globalForRedis.__bookingRedisEverReady = true;
     });
     // Bağlantı hataları komut düzeyinde ele alınır; burada yalnızca yutulur ki
     // "Unhandled error event" süreçleri düşürmesin.
@@ -63,34 +91,41 @@ export function getRedisConnection(): IORedis {
 }
 
 function buildRedisClient(connection: () => IORedis = getRedisConnection): RedisClient {
+  const run = <T>(command: (c: IORedis) => Promise<T>): Promise<T> => {
+    const c = connection();
+    if (shouldFailFast(c.status, globalForRedis.__bookingRedisEverReady === true)) {
+      return Promise.reject(new RedisUnavailableError(c.status));
+    }
+    return command(c);
+  };
   return {
-    get: (key) => connection().get(key),
-    mget: (keys) => (keys.length === 0 ? Promise.resolve([]) : connection().mget(...keys)),
-    set: (key, value, opts) => {
-      const c = connection();
-      if (opts?.nx && opts.ex) return c.set(key, value, "EX", opts.ex, "NX");
-      if (opts?.nx) return c.set(key, value, "NX");
-      if (opts?.ex) return c.set(key, value, "EX", opts.ex);
-      return c.set(key, value);
-    },
-    getdel: (key) => connection().getdel(key),
-    del: (...keys) => (keys.length === 0 ? Promise.resolve(0) : connection().del(...keys)),
-    ttl: (key) => connection().ttl(key),
-    exists: (key) => connection().exists(key),
-    incr: (key) => connection().incr(key),
-    expire: (key, seconds) => connection().expire(key, seconds),
+    get: (key) => run((c) => c.get(key)),
+    mget: (keys) => (keys.length === 0 ? Promise.resolve([]) : run((c) => c.mget(...keys))),
+    set: (key, value, opts) =>
+      run((c) => {
+        if (opts?.nx && opts.ex) return c.set(key, value, "EX", opts.ex, "NX");
+        if (opts?.nx) return c.set(key, value, "NX");
+        if (opts?.ex) return c.set(key, value, "EX", opts.ex);
+        return c.set(key, value);
+      }),
+    getdel: (key) => run((c) => c.getdel(key)),
+    del: (...keys) => (keys.length === 0 ? Promise.resolve(0) : run((c) => c.del(...keys))),
+    ttl: (key) => run((c) => c.ttl(key)),
+    exists: (key) => run((c) => c.exists(key)),
+    incr: (key) => run((c) => c.incr(key)),
+    expire: (key, seconds) => run((c) => c.expire(key, seconds)),
     incrWithTtl: async (key, seconds) =>
-      Number(await connection().eval(INCR_WITH_TTL, 1, key, String(seconds))),
-    eval: (script, keys, args) => connection().eval(script, keys.length, ...keys, ...args),
-    sadd: (key, ...members) => connection().sadd(key, ...members),
-    srem: (key, ...members) => connection().srem(key, ...members),
-    smembers: (key) => connection().smembers(key),
-    scard: (key) => connection().scard(key),
-    lpush: (key, ...values) => connection().lpush(key, ...values),
-    ltrim: (key, start, stop) => connection().ltrim(key, start, stop),
-    lrange: (key, start, stop) => connection().lrange(key, start, stop),
-    publish: (channel, message) => connection().publish(channel, message),
-    ping: () => connection().ping(),
+      Number(await run((c) => c.eval(INCR_WITH_TTL, 1, key, String(seconds)))),
+    eval: (script, keys, args) => run((c) => c.eval(script, keys.length, ...keys, ...args)),
+    sadd: (key, ...members) => run((c) => c.sadd(key, ...members)),
+    srem: (key, ...members) => run((c) => c.srem(key, ...members)),
+    smembers: (key) => run((c) => c.smembers(key)),
+    scard: (key) => run((c) => c.scard(key)),
+    lpush: (key, ...values) => run((c) => c.lpush(key, ...values)),
+    ltrim: (key, start, stop) => run((c) => c.ltrim(key, start, stop)),
+    lrange: (key, start, stop) => run((c) => c.lrange(key, start, stop)),
+    publish: (channel, message) => run((c) => c.publish(channel, message)),
+    ping: () => run((c) => c.ping()),
   };
 }
 

@@ -59,6 +59,19 @@ interface LlmStatus {
   lastError: string | null;
 }
 
+interface ExperimentResult {
+  flagKey: string;
+  enabled: boolean;
+  variants: Array<{
+    variant: string;
+    exposures: number;
+    users: number;
+    conversions: number;
+    rate: number;
+    ci: { low: number; high: number };
+  }>;
+}
+
 type Feedback = { error?: string; message?: string };
 
 const EVENT_STATUS: Record<DemandEvent["status"], string> = {
@@ -75,6 +88,7 @@ export default function AdminDashboard() {
       <OutboxCard />
       <EventsCard />
       <FraudCard />
+      <ExperimentsCard />
       <RoleCard />
     </div>
   );
@@ -338,6 +352,51 @@ function FraudCard() {
           ))}
         </ul>
       )}
+    </Card>
+  );
+}
+
+const pct = (v: number) => `%${(v * 100).toFixed(1)}`;
+
+function ExperimentsCard() {
+  const { data, error } = useLoader(() => apiFetch<ExperimentResult[]>("/api/admin/experiments"));
+  return (
+    <Card title="A/B deneyleri" id="experiments">
+      <Status error={error} />
+      {data?.length === 0 && <p className="text-sm text-gray-700">Tanımlı deney yok.</p>}
+      {data?.map((exp) => (
+        <div key={exp.flagKey} className="overflow-x-auto">
+          <p className="mb-2 text-sm font-medium">
+            {exp.flagKey} · {exp.enabled ? "açık" : "kapalı"}
+          </p>
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="border-b">
+                <th className="py-1 pr-3">Kol</th>
+                <th className="py-1 pr-3">Maruziyet</th>
+                <th className="py-1 pr-3">Kullanıcı</th>
+                <th className="py-1 pr-3">Dönüşüm</th>
+                <th className="py-1 pr-3">Oran</th>
+                <th className="py-1">%95 Wilson</th>
+              </tr>
+            </thead>
+            <tbody>
+              {exp.variants.map((v) => (
+                <tr key={v.variant} className="border-b last:border-0">
+                  <td className="py-1 pr-3">{v.variant}</td>
+                  <td className="py-1 pr-3">{v.exposures}</td>
+                  <td className="py-1 pr-3">{v.users}</td>
+                  <td className="py-1 pr-3">{v.conversions}</td>
+                  <td className="py-1 pr-3">{pct(v.rate)}</td>
+                  <td className="py-1">
+                    {pct(v.ci.low)} – {pct(v.ci.high)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ))}
     </Card>
   );
 }

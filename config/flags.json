@@ -1,0 +1,10 @@
+{
+  "search-ranking": {
+    "enabled": true,
+    "defaultVariant": "ranking.weighted",
+    "variants": {
+      "ranking.weighted": 50,
+      "ranking.ltr": 50
+    }
+  }
+}

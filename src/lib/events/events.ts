@@ -19,6 +19,8 @@ export const EventTypes = {
   AuthEmailRequested: "auth.email_requested",
   /** İzlenen konaklamanın fiyatı Omnibus referansının altına düştü (P1-4). */
   PriceDropped: "price.dropped",
+  /** Kullanıcı/oturum bir deney koluna ilk kez maruz kaldı (P1-3). */
+  ExperimentExposure: "experiment.exposure",
 } as const;
 
 export type EventType = (typeof EventTypes)[keyof typeof EventTypes];

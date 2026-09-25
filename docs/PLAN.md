@@ -24,16 +24,16 @@ Her faz sonunda kalite kapısı: `npm run lint` · `npm run typecheck` · `npm r
 
 ## v3 F2 — Envanter v2 + saat dilimi + arama doğruluğu
 
-- [ ] P0-2 `RoomType` / `RatePlan` / `Restriction` / `InventoryDay` + veri taşıma
-- [ ] P0-3 `Property.timeZone` + Temporal (#6, #18 `complete-stays`)
-- [ ] #7 arama doğruluğu; #15 / P0-11 veri yaşam döngüsü
+- [x] P0-2 `RoomType` / `RatePlan` / `Restriction` / `InventoryDay` + veri taşıma
+- [x] P0-3 `Property.timeZone` + Temporal (#6, #18 `complete-stays`)
+- [x] #7 arama doğruluğu; #15 / P0-11 veri yaşam döngüsü
 
 ## v3 F3 — Vergi, FX, tek fiyat kaynağı, fiyat içgörüsü
 
-- [ ] P0-4 vergi/ücret motoru + toplam fiyat
-- [ ] P0-5 kalıcı FX (`FxRate`, `fx-refresh`)
-- [ ] #9 tek `computeTotal` (legacy engine + negotiate ADR)
-- [ ] P1-4 conformal fiyat içgörüsü + fiyat alarmı
+- [x] P0-4 vergi/ücret motoru + toplam fiyat
+- [x] P0-5 kalıcı FX (`FxRate`, `fx-refresh`)
+- [x] #9 tek `computeTotal` (legacy engine + negotiate ADR)
+- [x] P1-4 conformal fiyat içgörüsü + fiyat alarmı
 
 ## v3 F4 — Ödeme, saga, devir ledger'ı
 

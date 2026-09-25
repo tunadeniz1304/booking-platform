@@ -10,11 +10,15 @@ Bu dosyadaki tüm önemli değişiklikler burada belgelenir. Biçim [Keep a Chan
 - **v3 F2 — Envanter v2 (ADR 0010):** `RoomType{units}`, `RatePlan` (iade edilemez / kahvaltılı), `Restriction` (minStay/maxStay/CTA/CTD/stopSell), `InventoryDay{total, sold, held}` (`CHECK sold+held<=total`), `ExternalBlock`; `Availability` verisi tek migration'da taşındı. units=3 odada 100 paralel istek → tam 3 başarı.
 - **v3 F2 — Tesis saat dilimi (ADR 0011):** `Property.timeZone/checkInTime/checkOutTime`, Temporal yardımcıları; iCal içe aktarma ve `complete-stays` job'ı tesisin yerel gününde çalışır.
 - **v3 F2 — Arama doğruluğu:** tek zod arama şeması (`src/lib/search/params.ts`), geçersiz girdi 400; fiyat filtresi toplam fiyat üzerinden; `pageSize` 50'ye kırpılır.
+- **v3 F3 — Vergi/ücret motoru (ADR 0012):** veri tabanlı kurallar (`data/tax-rules.json` / `TAX_RULES_JSON`), dahil/hariç vergiler, tarih aralıklı kurallar, `SERVICE_FEE_BPS`; arama kartı, PDP, checkout ve tahsilat aynı vergiler dahil toplamı gösterir.
+- **v3 F3 — Kalıcı FX (ADR 0012):** `FxRate` tablosu, günlük `fx-refresh` işi (TCMB → ECB → statik yedek, bayat işareti); teklif kur tablosunu sabitler (`fxSnapshotId`), tahsilat teklifteki tutarla yapılır.
+- **v3 F3 — Fiyat içgörüsü ve alarmı:** split conformal tahmin aralığı (%90, `PRICE_INSIGHT_ALPHA`) ile düşük/tipik/yüksek etiketi (`GET /api/price-insight`); `PriceAlert` ve günlük `price-alerts` işi, toplam Omnibus referansının (son 30 günün en düşüğü, "önceki fiyat") altına inince e-posta gönderir (`/api/price-alerts`).
 
 ### Changed
 
 - Oda API yanıtları `maxOccupancy` döner; `capacity` bir sürüm boyunca takma ad olarak korunur.
 - Pazarlık özelliği kaldırıldı, tek fiyat kaynağı `priceStay` (ADR 0016).
+- Legacy fiyat motoru (`src/lib/pricing/engine.ts`) `event-signals` içine katlandı; `pricing-service` ve canlı ısı haritası tek motoru kullanır (#9).
 
 ### Removed
 

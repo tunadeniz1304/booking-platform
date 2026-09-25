@@ -5,7 +5,7 @@ import { STATIC_SECURITY_HEADERS } from "./src/lib/security/headers";
 const nextConfig: NextConfig = {
   output: "standalone",
   poweredByHeader: false,
-  serverExternalPackages: ["pino", "@prisma/client", "ioredis", "bullmq"],
+  serverExternalPackages: ["pino", "@prisma/client", "ioredis", "bullmq", "pdfkit"],
   images: {
     remotePatterns: [{ protocol: "https", hostname: "images.unsplash.com" }],
   },

@@ -1,0 +1,5 @@
+Geist-Regular.ttf
+Copyright (c) 2023 Vercel, in collaboration with basement.studio
+Licensed under the SIL Open Font License, Version 1.1.
+Full text: https://openfontlicense.org/open-font-license-official-text/
+Source: https://github.com/vercel/geist-font

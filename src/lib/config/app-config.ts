@@ -191,6 +191,16 @@ const schema = z.object({
   OUTBOX_LEASE_SECONDS: int(60, 5, 3600),
   OUTBOX_BACKOFF_BASE_MS: int(1000, 10, 60000),
 
+  // Redis istemcisi
+  /** Tek Redis komutunun üst süresi (ms); aşılırsa komut reddedilir (fail-open/closed çağırana kalır). */
+  REDIS_COMMAND_TIMEOUT_MS: int(1000, 50, 30_000),
+
+  // SERIALIZABLE işlem yeniden denemesi (P2034 / 40001)
+  /** Serileştirme çakışmasında toplam deneme sayısı (ilk deneme dahil). */
+  DB_SERIALIZABLE_RETRY_ATTEMPTS: int(6, 1, 20),
+  /** Üstel geri çekilme tabanı (ms); gecikme = taban·2^(n−1) + aynı büyüklükte rastgele pay. */
+  DB_SERIALIZABLE_RETRY_BASE_MS: int(15, 1, 1000),
+
   // P1-1 hibrit arama (RRF)
   SEARCH_RRF_K: int(60, 1, 1000),
   SEARCH_HYBRID_CANDIDATES: int(200, 10, 5000),

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { Prisma } from "@prisma/client";
 import { logger, errorFields } from "@/lib/observability/logger";
+import { isSerializationFailure } from "@/lib/db/serialization";
 
 /**
  * HTTP'ye eşlenen alan hataları. Route handler'lar ince kalır: iş mantığı bu
@@ -83,6 +84,15 @@ export function toErrorResponse(error: unknown, context = "request"): NextRespon
   // Prisma "kayıt bulunamadı" (ör. var olmayan kimlikle update) → 404, 500 değil.
   if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
     return NextResponse.json({ error: "Kayıt bulunamadı", code: "NOT_FOUND" }, { status: 404 });
+  }
+  // Yeniden denemeler tükendikten sonra kalan serileştirme çakışması geçicidir: 500 değil,
+  // 409 + Retry-After. Aynı Idempotency-Key ile tekrar güvenlidir.
+  if (isSerializationFailure(error)) {
+    logger.warn({ context, ...errorFields(error) }, "serialization conflict after retries");
+    return NextResponse.json(
+      { error: "Eşzamanlı işlem çakışması, lütfen tekrar deneyin", code: "TRANSACTION_CONFLICT" },
+      { status: 409, headers: { "Retry-After": "1" } }
+    );
   }
   if (error instanceof SyntaxError) {
     return NextResponse.json(

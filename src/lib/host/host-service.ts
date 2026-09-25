@@ -61,6 +61,16 @@ export async function updateProperty(
   if (patch.isActive && !license) {
     throw new ValidationError("Belge numarası olmadan ilan yayınlanamaz");
   }
+  // v3#8: var olmayan politika kimliği FK hatasıyla 500 değil, 400 döner.
+  if (
+    patch.cancellationPolicyId &&
+    !(await prisma.cancellationPolicy.findUnique({
+      where: { id: patch.cancellationPolicyId },
+      select: { id: true },
+    }))
+  ) {
+    throw new ValidationError("İptal politikası bulunamadı");
+  }
   const updated = await prisma.property.update({
     where: { id: propertyId },
     data: {

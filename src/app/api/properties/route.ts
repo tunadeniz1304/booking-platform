@@ -3,33 +3,32 @@ import { z } from "zod";
 import { Prisma, PropertyType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth";
-import { toErrorResponse } from "@/lib/http/errors";
+import { ValidationError, toErrorResponse } from "@/lib/http/errors";
 import { httpsUrl } from "@/lib/security/url";
-import { licenseSchema } from "@/lib/host/host-service";
+import { licenseSchema, roomSchema } from "@/lib/host/host-service";
+import { CURRENCIES } from "@/lib/money/money";
 import { searchProperties, getPopularProperties } from "@/lib/search";
 import { logger, errorFields } from "@/lib/observability/logger";
 import { appendOutbox } from "@/lib/cqrs";
 import { EventTypes, makeEvent, type PropertyCreatedPayload } from "@/lib/events/events";
 
-const roomSchema = z.object({
-  name: z.string().trim().min(1),
-  capacity: z.number().int().positive(),
-  bedType: z.string().trim().min(1),
-  priceModifier: z.number().nonnegative().default(0),
-});
-
+/**
+ * v3#8: her alanın üst sınırı var; para birimi desteklenen listeden (aksi halde 400,
+ * sonradan `assertCurrency` → 500 değil); oda şeması host extranet ile ortak.
+ */
 const createPropertySchema = z.object({
-  title: z.string().trim().min(2),
-  description: z.string().trim().min(10),
+  title: z.string().trim().min(2).max(120),
+  description: z.string().trim().min(10).max(5000),
   propertyType: z.enum(["HOTEL", "APARTMENT", "VILLA", "HOSTEL", "BED_AND_BREAKFAST"]),
-  city: z.string().trim().min(1),
-  country: z.string().trim().min(1),
-  basePrice: z.number().positive(),
-  currency: z.string().trim().min(1).default("TRY"),
-  amenities: z.array(z.string().trim().min(1)).default([]),
+  city: z.string().trim().min(1).max(100),
+  country: z.string().trim().min(1).max(100),
+  basePrice: z.number().positive().max(1_000_000),
+  currency: z.enum(CURRENCIES).default("TRY"),
+  amenities: z.array(z.string().trim().min(1).max(60)).max(50).default([]),
   images: z.array(httpsUrl).max(20).default([]),
-  rooms: z.array(roomSchema).min(1),
+  rooms: z.array(roomSchema).min(1).max(50),
   licenseNumber: licenseSchema.optional(),
+  cancellationPolicyId: z.string().trim().min(1).max(64).optional(),
 });
 
 export async function GET(req: NextRequest) {
@@ -99,7 +98,17 @@ export async function POST(req: NextRequest) {
       images,
       rooms,
       licenseNumber,
+      cancellationPolicyId,
     } = parsed.data;
+    if (
+      cancellationPolicyId &&
+      !(await prisma.cancellationPolicy.findUnique({
+        where: { id: cancellationPolicyId },
+        select: { id: true },
+      }))
+    ) {
+      throw new ValidationError("İptal politikası bulunamadı");
+    }
 
     const property = await prisma.$transaction(async (tx) => {
       const location = await tx.location.upsert({
@@ -130,6 +139,7 @@ export async function POST(req: NextRequest) {
           // Belge numarası yoksa ilan yayınlanmaz (7464 / 2634).
           isActive: Boolean(licenseNumber),
           licenseNumber,
+          cancellationPolicyId: cancellationPolicyId ?? null,
           images,
           amenities: { connect: amenityRecords.map((a) => ({ id: a.id })) },
           rooms: {

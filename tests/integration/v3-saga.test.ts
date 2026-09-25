@@ -1,4 +1,4 @@
-import { beforeAll, afterAll, afterEach, it, expect } from "vitest";
+import { beforeAll, beforeEach, afterAll, afterEach, it, expect } from "vitest";
 import { PrismaClient } from "@prisma/client";
 import { describeInt } from "./helpers";
 import { createStayFixture, ledgerNetMinor, type StayFixture } from "./fixtures";
@@ -14,6 +14,7 @@ import {
   setFulfilmentFlowForTests,
   startBookingFulfilment,
 } from "@/lib/saga/booking-saga";
+import { redis } from "@/lib/redis";
 import type { Money } from "@/lib/money/money";
 
 class CountingPsp extends MockPsp {
@@ -47,6 +48,10 @@ describeInt("P0-7 ödeme sagası: hata enjeksiyonu + telafi (integration)", () =
 
   beforeAll(async () => {
     fx = await createStayFixture(prisma, { tag: "saga" });
+  });
+  beforeEach(async () => {
+    // Hız (velocity) sayaçları diğer dosyalardan birikip 3DS'e yönlendirmesin.
+    await redis.del(`fraud:v:user:${fx.userId}`, "fraud:v:card:tok_mock_ok_4242");
   });
   afterEach(() => {
     injectSagaFaultForTests(PAYMENT_SAGA, null);

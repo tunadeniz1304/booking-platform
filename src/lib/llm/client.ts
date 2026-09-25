@@ -41,7 +41,14 @@ import { redis } from "@/lib/redis";
  */
 
 export type LlmTask =
-  "smart_filter" | "review_summary" | "trip_plan" | "listing_copy" | "event_extraction" | "smoke";
+  | "smart_filter"
+  | "review_summary"
+  | "trip_plan"
+  | "listing_copy"
+  | "event_extraction"
+  | "message_draft"
+  | "moderation_explain"
+  | "smoke";
 
 export type LlmMode = "live" | "demo" | "fallback";
 

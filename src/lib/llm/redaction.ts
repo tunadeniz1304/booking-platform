@@ -12,11 +12,12 @@
 
 export type PiiKind = "EPOSTA" | "IBAN" | "KART" | "TCKN" | "TELEFON" | "KISI";
 
-const EMAIL_RE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
-const IBAN_RE = /\bTR\d{2}(?:\s?\d{4}){5}\s?\d{2}\b/gi;
-const CARD_CANDIDATE_RE = /(?<!\d)(?:\d[ -]?){12,18}\d(?!\d)/g;
-const TCKN_CANDIDATE_RE = /(?<!\d)[1-9]\d{10}(?!\d)/g;
-const PHONE_RE = /(?<![\d+])(?:\+90[\s-]?|0)?\(?5\d{2}\)?[\s-]?\d{3}[\s-]?\d{2}[\s-]?\d{2}(?!\d)/g;
+export const EMAIL_RE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
+export const IBAN_RE = /\bTR\d{2}(?:\s?\d{4}){5}\s?\d{2}\b/gi;
+export const CARD_CANDIDATE_RE = /(?<!\d)(?:\d[ -]?){12,18}\d(?!\d)/g;
+export const TCKN_CANDIDATE_RE = /(?<!\d)[1-9]\d{10}(?!\d)/g;
+export const PHONE_RE =
+  /(?<![\d+])(?:\+90[\s-]?|0)?\(?5\d{2}\)?[\s-]?\d{3}[\s-]?\d{2}[\s-]?\d{2}(?!\d)/g;
 
 /** Luhn (mod 10) doğrulaması — kart numaraları için. */
 export function isLuhnValid(digits: string): boolean {

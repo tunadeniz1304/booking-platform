@@ -7,6 +7,7 @@ import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import { ApiError, apiFetch } from "@/lib/api-client";
 import BookingActions from "@/components/booking/BookingActions";
+import BookingMessages from "@/components/booking/BookingMessages";
 import { toMinor } from "@/lib/money/money";
 
 interface BookingDetail {
@@ -157,6 +158,10 @@ export default function BookingConfirmationPage() {
                 currency={booking.currency}
                 onChanged={() => void load()}
               />
+
+              {["CONFIRMED", "COMPLETED"].includes(booking.status) && (
+                <BookingMessages bookingId={booking.id} />
+              )}
 
               <div className="flex flex-wrap gap-3 border-t border-gray-100 pt-6">
                 <Link

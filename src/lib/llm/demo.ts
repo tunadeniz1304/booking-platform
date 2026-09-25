@@ -169,3 +169,21 @@ export function demoListingCopy(f: ListingFacts): { tr: string; en: string } {
       (am.length ? ` Amenities: ${am.join(", ")}.` : ""),
   };
 }
+
+export interface MessageDraftFacts {
+  propertyTitle: string;
+  guestName: string;
+  checkIn: string;
+  checkOut: string;
+  lastGuestMessage: string | null;
+}
+
+/** Deterministik ev sahibi yanıt taslağı (P1-6); ev sahibi onaylamadan gönderilmez. */
+export function demoMessageDraft(f: MessageDraftFacts): { reply: string } {
+  const opener = f.lastGuestMessage
+    ? "Mesajınız için teşekkürler, konuyu not aldım ve en kısa sürede dönüş yapacağım."
+    : "Rezervasyonunuz için teşekkürler!";
+  return {
+    reply: `Merhaba ${f.guestName}, ${opener} ${f.propertyTitle} için ${f.checkIn} – ${f.checkOut} tarihlerinde sizi ağırlamayı dört gözle bekliyoruz. Başka bir sorunuz olursa buradan yazabilirsiniz.`,
+  };
+}

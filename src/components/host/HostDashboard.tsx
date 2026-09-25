@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import Link from "next/link";
 import { apiFetch } from "@/lib/api-client";
 import { formatDate, formatDecimal, isoDay } from "@/lib/ui/format";
 import {
@@ -28,6 +29,7 @@ interface HostProperty {
   description: string;
   isActive: boolean;
   licenseNumber: string | null;
+  licenseStatus: "PENDING" | "VERIFIED" | "REJECTED";
   basePrice: string;
   currency: string;
   ratingAvg: number;
@@ -53,6 +55,13 @@ const STATUS_LABEL: Record<string, string> = {
   CANCELLED: "İptal",
   EXPIRED: "Süresi doldu",
   COMPLETED: "Tamamlandı",
+};
+
+/** P1-10: kayıt doğrulaması yapılmamış ilan yayına alınamaz ve aramada görünmez. */
+const LICENSE_LABEL: Record<HostProperty["licenseStatus"], string> = {
+  PENDING: "Doğrulama bekliyor",
+  VERIFIED: "Doğrulandı",
+  REJECTED: "Kayıtta bulunamadı",
 };
 
 export default function HostDashboard() {
@@ -107,8 +116,11 @@ export default function HostDashboard() {
                   <th scope="col" className="py-2 pr-4">
                     Tutar
                   </th>
-                  <th scope="col" className="py-2">
+                  <th scope="col" className="py-2 pr-4">
                     Durum
+                  </th>
+                  <th scope="col" className="py-2">
+                    <span className="sr-only">Mesajlar</span>
                   </th>
                 </tr>
               </thead>
@@ -120,7 +132,17 @@ export default function HostDashboard() {
                     <td className="py-2 pr-4">{formatDate(b.checkOut)}</td>
                     <td className="py-2 pr-4">{b.guestCount}</td>
                     <td className="py-2 pr-4">{formatDecimal(b.totalPrice, b.currency)}</td>
-                    <td className="py-2">{STATUS_LABEL[b.status] ?? b.status}</td>
+                    <td className="py-2 pr-4">{STATUS_LABEL[b.status] ?? b.status}</td>
+                    <td className="py-2">
+                      {(b.status === "CONFIRMED" || b.status === "COMPLETED") && (
+                        <Link
+                          href={"/host/messages/" + b.id}
+                          className="font-semibold text-[#003580] hover:underline"
+                        >
+                          Mesajlar
+                        </Link>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -171,7 +193,8 @@ function PropertyPanel({ property, onChanged }: { property: HostProperty; onChan
     <Card title={p.title} id={pid}>
       <p className="mb-4 text-sm text-gray-700">
         Taban fiyat: {formatDecimal(p.basePrice, p.currency)} · Puan {p.ratingAvg.toFixed(1)} ·{" "}
-        {p.isActive ? "Yayında" : "Yayında değil"}
+        {p.isActive ? "Yayında" : "Yayında değil"} · Belge:{" "}
+        <span data-testid="license-status">{LICENSE_LABEL[p.licenseStatus]}</span>
       </p>
       <form onSubmit={save} className="grid gap-4 md:grid-cols-2">
         <Field label="Başlık" id={`${pid}-title`}>

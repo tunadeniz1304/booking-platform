@@ -1,0 +1,182 @@
+import "server-only";
+import { z } from "zod";
+import { prisma } from "@/lib/prisma";
+import { getConfig } from "@/lib/config/app-config";
+import { ConflictError, NotFoundError, ValidationError } from "@/lib/http/errors";
+import { getLlmClient } from "@/lib/llm/client";
+import { demoMessageDraft } from "@/lib/llm/demo";
+import { maskMessage } from "./mask";
+import { publishMessage, type MessageEvent } from "./hub";
+
+/**
+ * P1-6 misafir ↔ ev sahibi mesajlaşması. Yetki: yalnızca rezervasyonun misafiri ve
+ * ilanın ev sahibi; diğer herkes (başka misafir/host, ADMIN dahil) 404 alır —
+ * varlık bilgisi sızdırılmaz (IDOR). Gövde kaydedilmeden önce maskelenir.
+ */
+export type ThreadRole = "GUEST" | "HOST";
+
+/** Mesaj gönderilebilen rezervasyon durumları (ödenmemiş/iptal edilmiş rezervasyonda yok). */
+const WRITABLE = new Set(["CONFIRMED", "COMPLETED"]);
+
+export interface ThreadAccess {
+  bookingId: string;
+  role: ThreadRole;
+  status: string;
+  propertyTitle: string;
+  guestName: string;
+  checkIn: Date;
+  checkOut: Date;
+}
+
+export async function resolveThreadAccess(
+  bookingId: string,
+  userId: string
+): Promise<ThreadAccess> {
+  const b = await prisma.booking.findUnique({
+    where: { id: bookingId },
+    select: {
+      id: true,
+      userId: true,
+      status: true,
+      checkIn: true,
+      checkOut: true,
+      user: { select: { firstName: true } },
+      property: { select: { hostId: true, title: true } },
+    },
+  });
+  const role: ThreadRole | null = !b
+    ? null
+    : b.userId === userId
+      ? "GUEST"
+      : b.property.hostId === userId
+        ? "HOST"
+        : null;
+  if (!b || !role) throw new NotFoundError("Rezervasyon bulunamadı");
+  return {
+    bookingId: b.id,
+    role,
+    status: b.status,
+    propertyTitle: b.property.title,
+    guestName: b.user.firstName || "Misafir",
+    checkIn: b.checkIn,
+    checkOut: b.checkOut,
+  };
+}
+
+function toEvent(m: {
+  id: string;
+  senderId: string;
+  senderRole: string;
+  body: string;
+  maskedKinds: string[];
+  fromAiDraft: boolean;
+  createdAt: Date;
+}): MessageEvent {
+  return { ...m, createdAt: m.createdAt.toISOString() };
+}
+
+export async function listMessages(bookingId: string, userId: string) {
+  const access = await resolveThreadAccess(bookingId, userId);
+  const thread = await prisma.messageThread.findUnique({ where: { bookingId } });
+  const messages = thread
+    ? await prisma.message.findMany({
+        where: { threadId: thread.id },
+        orderBy: { createdAt: "desc" },
+        take: getConfig().MESSAGE_PAGE_SIZE,
+      })
+    : [];
+  return {
+    role: access.role,
+    canWrite: WRITABLE.has(access.status),
+    messages: messages.reverse().map(toEvent),
+  };
+}
+
+export const sendMessageSchema = z.object({
+  body: z.string().trim().min(1),
+  /** Ev sahibinin onayladığı (düzenleyebildiği) yapay zekâ taslağından mı gönderiliyor. */
+  fromAiDraft: z.boolean().optional(),
+});
+
+export async function sendMessage(
+  bookingId: string,
+  userId: string,
+  input: z.infer<typeof sendMessageSchema>
+): Promise<MessageEvent> {
+  const access = await resolveThreadAccess(bookingId, userId);
+  if (!WRITABLE.has(access.status)) {
+    throw new ConflictError("Mesajlaşma yalnızca onaylı rezervasyonlarda açıktır");
+  }
+  const max = getConfig().MESSAGE_MAX_LENGTH;
+  if (input.body.length > max) throw new ValidationError(`Mesaj en fazla ${max} karakter olabilir`);
+  if (input.fromAiDraft && access.role !== "HOST") {
+    throw new ValidationError("Yapay zekâ taslağı yalnızca ev sahibi tarafından gönderilebilir");
+  }
+  const masked = maskMessage(input.body);
+  const thread = await prisma.messageThread.upsert({
+    where: { bookingId },
+    create: { bookingId },
+    update: {},
+  });
+  const msg = await prisma.message.create({
+    data: {
+      threadId: thread.id,
+      senderId: userId,
+      senderRole: access.role,
+      body: masked.text,
+      maskedKinds: masked.kinds,
+      fromAiDraft: input.fromAiDraft ?? false,
+    },
+  });
+  await prisma.messageThread.update({ where: { id: thread.id }, data: { updatedAt: new Date() } });
+  const event = toEvent(msg);
+  await publishMessage(bookingId, event);
+  return event;
+}
+
+/**
+ * Ev sahibi için yanıt TASLAĞI: yalnızca öneridir, KAYDEDİLMEZ ve GÖNDERİLMEZ.
+ * Ev sahibi metni düzenleyip `sendMessage(..., fromAiDraft: true)` ile kendisi gönderir.
+ */
+export async function draftHostReply(bookingId: string, userId: string) {
+  const access = await resolveThreadAccess(bookingId, userId);
+  if (access.role !== "HOST") throw new NotFoundError("Rezervasyon bulunamadı");
+  const thread = await prisma.messageThread.findUnique({ where: { bookingId } });
+  const recent = thread
+    ? await prisma.message.findMany({
+        where: { threadId: thread.id },
+        orderBy: { createdAt: "desc" },
+        take: 10,
+        select: { senderRole: true, body: true },
+      })
+    : [];
+  const lastGuest = recent.find((m) => m.senderRole === "GUEST")?.body ?? null;
+  const facts = {
+    propertyTitle: access.propertyTitle,
+    guestName: access.guestName,
+    checkIn: access.checkIn.toISOString().slice(0, 10),
+    checkOut: access.checkOut.toISOString().slice(0, 10),
+    lastGuestMessage: lastGuest,
+  };
+  const res = await getLlmClient().completeJson(
+    "message_draft",
+    z.object({ reply: z.string().min(5).max(getConfig().MESSAGE_MAX_LENGTH) }),
+    [
+      {
+        role: "system",
+        content:
+          "Ev sahibi adına misafire kısa, nazik bir Türkçe yanıt taslağı yaz. Söz verme, fiyat/iade taahhüdü verme, iletişim bilgisi veya harici bağlantı ekleme. JSON: {reply}",
+      },
+      {
+        role: "user",
+        content: JSON.stringify({
+          ...facts,
+          history: recent.reverse().map((m) => `${m.senderRole}: ${m.body}`),
+        }),
+      },
+    ],
+    { demo: () => demoMessageDraft(facts) }
+  );
+  // Taslak da platform dışı iletişim içeremez.
+  return { draft: maskMessage(res.data.reply).text, llmMode: res.llmMode };
+}

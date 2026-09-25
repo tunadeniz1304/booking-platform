@@ -5,9 +5,15 @@
  * Araçlar:
  *  - `search_stays` — deterministik arama (`searchProperties`); anonim.
  *  - `get_quote`    — sunucu tarafı fiyat teklifi (`computeTotal`); anonim.
- *  - `create_hold`  — kullanıcının access token'ı ile HELD rezervasyon oluşturur.
- *    Hold ≠ ödeme: kart çekimi yoktur, süre dolarsa EXPIRED olur. Token yoksa,
- *    geçersizse veya iptal edilmişse reddedilir; kullanıcı YALNIZCA token'dan türetilir.
+ *  - `create_hold`  — kimliği doğrulanmış kullanıcı adına HELD rezervasyon oluşturur.
+ *    Hold ≠ ödeme: kart çekimi yoktur, süre dolarsa EXPIRED olur.
+ *
+ * Kimlik (v3#12): kimlik bilgisi ASLA araç argümanı değildir (argümanlar modelin
+ * bağlamına girer → token modele sızar). Kimlik transport seviyesinden gelir:
+ *  - streamable HTTP: `Authorization: Bearer <token>` → SDK `extra.authInfo.token`;
+ *  - stdio: süreç ortamındaki `MCP_ACCESS_TOKEN`.
+ * Token yoksa, geçersizse veya iptal edilmişse araç UNAUTHORIZED döner; kullanıcı
+ * YALNIZCA token'dan türetilir.
  *
  * Fiyat/uygunluk her zaman deterministik servislerden gelir; MCP katmanı
  * hesaplama yapmaz, yalnızca doğrular ve iletir.
@@ -20,6 +26,7 @@ import { computeTotal, type Quote, type QuoteRequest } from "@/lib/pricing/quote
 import { createBooking, type BookingResult, type CreateBookingInput } from "@/lib/booking-service";
 import { verifyAccessToken, type AccessClaims } from "@/lib/auth/tokens";
 import { isAccessTokenDenied } from "@/lib/auth/denylist";
+import { isTokenVersionCurrent } from "@/lib/auth/token-version";
 import { HttpError } from "@/lib/http/errors";
 import { logger, errorFields } from "@/lib/observability/logger";
 
@@ -33,6 +40,7 @@ export interface McpDeps {
 async function authenticate(token: string): Promise<AccessClaims | null> {
   const claims = await verifyAccessToken(token);
   if (!claims || (await isAccessTokenDenied(claims.jti))) return null;
+  if (!(await isTokenVersionCurrent(claims.userId, claims.tv))) return null;
   return claims;
 }
 
@@ -52,6 +60,11 @@ function ok(data: unknown): CallToolResult {
 
 function fail(code: string, message: string): CallToolResult {
   return { isError: true, content: [{ type: "text", text: JSON.stringify({ code, message }) }] };
+}
+
+/** Transport'tan gelen kimlik (HTTP bearer) yoksa stdio ortam değişkeni. */
+export function transportToken(extra?: { authInfo?: { token?: string } }): string | undefined {
+  return extra?.authInfo?.token?.trim() || process.env.MCP_ACCESS_TOKEN?.trim() || undefined;
 }
 
 async function guarded(tool: string, run: () => Promise<CallToolResult>): Promise<CallToolResult> {
@@ -124,9 +137,8 @@ export function createMcpServer(deps: McpDeps = defaultDeps): McpServer {
     {
       title: "Odayı tut (hold)",
       description:
-        "Kullanıcının access token'ı ile odayı süreli olarak tutar (HELD). Ödeme alınmaz; ödeme web arayüzünden tamamlanır, aksi hâlde hold süresi dolunca EXPIRED olur.",
+        "Oturum açmış kullanıcı adına odayı süreli olarak tutar (HELD). Kimlik bağlantıdan (OAuth bearer / MCP_ACCESS_TOKEN) gelir, argüman olarak verilmez. Ödeme alınmaz; ödeme web arayüzünden tamamlanır, aksi hâlde hold süresi dolunca EXPIRED olur.",
       inputSchema: {
-        accessToken: z.string().max(4096).optional(),
         propertyId: id,
         roomId: id,
         checkIn: isoDate,
@@ -136,10 +148,10 @@ export function createMcpServer(deps: McpDeps = defaultDeps): McpServer {
         idempotencyKey: z.string().min(1).max(128).optional(),
       },
     },
-    ({ accessToken, guests, ...rest }) =>
+    ({ guests, ...rest }, extra) =>
       guarded("create_hold", async () => {
-        const token = accessToken?.trim() || process.env.MCP_ACCESS_TOKEN?.trim();
-        if (!token) return fail("UNAUTHORIZED", "create_hold için access token gerekli");
+        const token = transportToken(extra);
+        if (!token) return fail("UNAUTHORIZED", "create_hold için oturum (bearer token) gerekli");
         const claims = await deps.authenticate(token);
         if (!claims) return fail("UNAUTHORIZED", "Geçersiz veya süresi dolmuş token");
         const { booking, paymentRequired } = await deps.hold({

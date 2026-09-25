@@ -30,6 +30,9 @@ message RoomAvailabilityResponse {
   double estimated_total = 3;
   string currency = 4;
   int32 available_rooms = 5;
+  // v3#9: tek fiyat kaynağı (computeTotal) — oda farkı + vergiler dahil, minor-unit.
+  // `estimated_total` (double) bir sürüm boyunca geriye uyumluluk için korunur.
+  int64 estimated_total_minor = 6;
 }
 
 // --- BookingService ------------------------------------------------------
@@ -62,13 +65,17 @@ message ChargeRequest {
   string requester_id = 4;
   // PSP kart token'ı (kart verisi servise gelmez).
   string card_token = 5;
+  // ZORUNLU (v3#1): boşsa INVALID_ARGUMENT. Çift tahsilatı ayrıca booking kilidi önler.
   string idempotency_key = 6;
 }
 
 message ChargeResponse {
   string payment_id = 1;
   string status = 2;
+  // Kullanımdan kalkıyor: ana birim (ör. 1234.5). Hesaplama için `charged_amount_minor`.
   double charged_amount = 3;
+  int64 charged_amount_minor = 4;
+  string currency = 5;
 }
 
 service InventoryService {

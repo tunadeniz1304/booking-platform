@@ -104,7 +104,11 @@ describeInt("regression: #1 gRPC auth (integration)", () => {
 
   it("başkasının rezervasyonu için ödeme NOT_FOUND (sahiplik önce)", async () => {
     const { token } = await signAccessToken(otherId, "USER", 900);
-    const { err } = await charge(token, { booking_id: bookingId, amount: 2000 });
+    const { err } = await charge(token, {
+      booking_id: bookingId,
+      amount: 2000,
+      idempotency_key: "idor",
+    });
     expect(err?.code).toBe(grpc.status.NOT_FOUND);
     const payment = await prisma.payment.findUnique({ where: { bookingId } });
     expect(payment).toBeNull();

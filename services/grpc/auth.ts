@@ -1,6 +1,7 @@
 import * as grpc from "@grpc/grpc-js";
 import { verifyAccessToken, type AccessClaims } from "@/lib/auth/tokens";
 import { isAccessTokenDenied } from "@/lib/auth/denylist";
+import { isTokenVersionCurrent } from "@/lib/auth/token-version";
 
 /**
  * gRPC kimlik doğrulaması: `authorization: Bearer <JWT>` metadata'sı.
@@ -28,7 +29,11 @@ export async function authenticateMetadata(metadata: grpc.Metadata): Promise<Acc
     throw new GrpcAuthError(grpc.status.UNAUTHENTICATED, "authorization metadata gerekli");
   }
   const claims = await verifyAccessToken(header.slice(7).trim());
-  if (!claims || (await isAccessTokenDenied(claims.jti))) {
+  if (
+    !claims ||
+    (await isAccessTokenDenied(claims.jti)) ||
+    !(await isTokenVersionCurrent(claims.userId, claims.tv))
+  ) {
     throw new GrpcAuthError(grpc.status.UNAUTHENTICATED, "Geçersiz veya süresi dolmuş token");
   }
   return claims;

@@ -7,7 +7,12 @@ vi.mock("@/lib/redis", async () => {
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { createMcpServer, defaultDeps, type McpDeps } from "../../../services/mcp/server";
+import {
+  createMcpServer,
+  defaultDeps,
+  transportToken,
+  type McpDeps,
+} from "../../../services/mcp/server";
 import { signAccessToken } from "@/lib/auth/tokens";
 import { ConflictError } from "@/lib/http/errors";
 import type { SearchResponse } from "@/lib/search";
@@ -156,10 +161,8 @@ describe("MCP sunucusu (P1-12)", () => {
   it("create_hold geçersiz token'ı reddeder", async () => {
     const deps = fakeDeps();
     const client = await connect(deps);
-    const res = await client.callTool({
-      name: "create_hold",
-      arguments: { ...holdArgs, accessToken: "bozuk.token.degeri" },
-    });
+    vi.stubEnv("MCP_ACCESS_TOKEN", "bozuk.token.degeri");
+    const res = await client.callTool({ name: "create_hold", arguments: holdArgs });
     expect(payload(res)).toMatchObject({ code: "UNAUTHORIZED" });
     expect(deps.hold).not.toHaveBeenCalled();
   });
@@ -168,10 +171,8 @@ describe("MCP sunucusu (P1-12)", () => {
     const deps = fakeDeps();
     const client = await connect(deps);
     const { token } = await signAccessToken("u-mcp", "USER", 900);
-    const res = await client.callTool({
-      name: "create_hold",
-      arguments: { ...holdArgs, accessToken: token },
-    });
+    vi.stubEnv("MCP_ACCESS_TOKEN", token);
+    const res = await client.callTool({ name: "create_hold", arguments: holdArgs });
     expect(res.isError).toBeFalsy();
     expect(deps.hold).toHaveBeenCalledWith(
       expect.objectContaining({ userId: "u-mcp", guestCount: 2, roomId: "r1" })
@@ -188,16 +189,43 @@ describe("MCP sunucusu (P1-12)", () => {
     expect(deps.hold).toHaveBeenCalledWith(expect.objectContaining({ userId: "u-env" }));
   });
 
+  it("regression: v3#12 hiçbir araç şemasında kimlik bilgisi argümanı yok", async () => {
+    const client = await connect(fakeDeps());
+    const { tools } = await client.listTools();
+    for (const tool of tools) {
+      const props = Object.keys(
+        (tool.inputSchema as { properties?: Record<string, unknown> }).properties ?? {}
+      );
+      expect(props.filter((p) => /token|secret|password|authorization|jwt/i.test(p))).toEqual([]);
+    }
+  });
+
+  it("regression: v3#12 argümanla gönderilen token yok sayılır (transport kimliği yoksa 401)", async () => {
+    const deps = fakeDeps();
+    const client = await connect(deps);
+    const { token } = await signAccessToken("u-leak", "USER", 900);
+    const res = await client.callTool({
+      name: "create_hold",
+      arguments: { ...holdArgs, accessToken: token },
+    });
+    expect(payload(res)).toMatchObject({ code: "UNAUTHORIZED" });
+    expect(deps.hold).not.toHaveBeenCalled();
+  });
+
+  it("transportToken: HTTP authInfo ortam değişkeninden önce gelir", async () => {
+    vi.stubEnv("MCP_ACCESS_TOKEN", "env-token");
+    expect(transportToken({ authInfo: { token: "http-token" } })).toBe("http-token");
+    expect(transportToken({})).toBe("env-token");
+  });
+
   it("servis hataları (ör. SOLD_OUT) hata koduyla araç hatasına çevrilir", async () => {
     const deps = fakeDeps();
     deps.hold.mockRejectedValueOnce(new ConflictError("Oda dolu", "SOLD_OUT"));
     deps.search.mockRejectedValueOnce(new Error("db down"));
     const client = await connect(deps);
     const { token } = await signAccessToken("u1", "USER", 900);
-    const held = await client.callTool({
-      name: "create_hold",
-      arguments: { ...holdArgs, accessToken: token },
-    });
+    vi.stubEnv("MCP_ACCESS_TOKEN", token);
+    const held = await client.callTool({ name: "create_hold", arguments: holdArgs });
     expect(held.isError).toBe(true);
     expect(payload(held)).toMatchObject({ code: "SOLD_OUT" });
 

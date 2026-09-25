@@ -3,6 +3,7 @@
  * metadata'sı taşır (sunucu token'sız çağrıyı UNAUTHENTICATED ile reddeder).
  * Devre kesici (circuit breaker) ile sarılıdır.
  */
+import { readFileSync } from "fs";
 import * as grpc from "@grpc/grpc-js";
 import { breakers, BreakerOpenError } from "@/lib/resilience/circuit-breaker";
 import { loadBookingV1 } from "./proto";
@@ -16,6 +17,7 @@ export interface RoomAvailabilityResponse {
   available: boolean;
   prices: Array<{ date: string; price: number; available: boolean }>;
   estimated_total: number;
+  estimated_total_minor: string | number;
   currency: string;
   available_rooms: number;
 }
@@ -50,13 +52,26 @@ export interface GrpcClients {
  * @param address `host:port`
  * @param accessToken çağrıyı yapan kullanıcının erişim token'ı (yoksa sunucu reddeder)
  */
+/**
+ * İstemci kimlik bilgileri: `GRPC_TLS_CA` verilirse sunucu sertifikası bu CA ile doğrulanır
+ * (mTLS için `GRPC_TLS_CLIENT_CERT` / `GRPC_TLS_CLIENT_KEY`); yoksa şifresiz (yerel/iç ağ).
+ */
+export function clientCredentials(env: NodeJS.ProcessEnv = process.env): grpc.ChannelCredentials {
+  if (!env.GRPC_TLS_CA) return grpc.credentials.createInsecure();
+  return grpc.credentials.createSsl(
+    readFileSync(env.GRPC_TLS_CA),
+    env.GRPC_TLS_CLIENT_KEY ? readFileSync(env.GRPC_TLS_CLIENT_KEY) : null,
+    env.GRPC_TLS_CLIENT_CERT ? readFileSync(env.GRPC_TLS_CLIENT_CERT) : null
+  );
+}
+
 export function createGrpcClients(
   address: string,
   accessToken?: string,
-  timeoutMs = 5000
+  timeoutMs = 5000,
+  creds: grpc.ChannelCredentials = clientCredentials()
 ): GrpcClients {
   const pkg = loadBookingV1();
-  const creds = grpc.credentials.createInsecure();
   const inventory = new pkg.InventoryService(address, creds);
   const booking = new pkg.BookingService(address, creds);
 

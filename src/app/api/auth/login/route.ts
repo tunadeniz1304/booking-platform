@@ -13,6 +13,7 @@ import {
 } from "@/lib/auth/account";
 import { UnauthorizedError, toErrorResponse } from "@/lib/http/errors";
 import { observed } from "@/lib/http/observed";
+import { LOCALE_COOKIE, resolveLocale } from "@/i18n/config";
 
 const loginSchema = z.object({
   email: z.string().trim().email("Geçerli bir e-posta girin").max(254),
@@ -50,7 +51,8 @@ export const POST = observed("auth.login", async function postHandler(req: NextR
       if (user && !user.deletedAt) await recordFailedLogin(user.id);
       throw new UnauthorizedError("E-posta veya parola hatalı");
     }
-    await recordSuccessfulLogin(user.id);
+    const cookieLocale = req.cookies.get(LOCALE_COOKIE)?.value;
+    await recordSuccessfulLogin(user.id, cookieLocale ? resolveLocale(cookieLocale) : undefined);
 
     const session = await issueSession(user);
     const response = NextResponse.json({

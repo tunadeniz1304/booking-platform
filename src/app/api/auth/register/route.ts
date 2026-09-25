@@ -9,6 +9,7 @@ import { issueEmailToken } from "@/lib/auth/account";
 import { ConflictError, toErrorResponse } from "@/lib/http/errors";
 import { observed } from "@/lib/http/observed";
 import { passwordSchema } from "@/lib/auth/password-policy";
+import { LOCALE_COOKIE, resolveLocale } from "@/i18n/config";
 
 const registerSchema = z.object({
   firstName: z.string().trim().min(2, "Ad en az 2 karakter olmalıdır").max(60),
@@ -26,7 +27,14 @@ export const POST = observed("auth.register", async function postHandler(req: Ne
     let user;
     try {
       user = await prisma.user.create({
-        data: { firstName, lastName, email: email.toLowerCase(), passwordHash, role: "USER" },
+        data: {
+          firstName,
+          lastName,
+          email: email.toLowerCase(),
+          passwordHash,
+          role: "USER",
+          locale: resolveLocale(req.cookies.get(LOCALE_COOKIE)?.value),
+        },
         select: { id: true, firstName: true, lastName: true, email: true, role: true },
       });
     } catch (error) {

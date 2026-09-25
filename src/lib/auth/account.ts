@@ -90,10 +90,11 @@ export async function recordFailedLogin(userId: string, now = new Date()): Promi
   return true;
 }
 
-export async function recordSuccessfulLogin(userId: string): Promise<void> {
+export async function recordSuccessfulLogin(userId: string, locale?: string): Promise<void> {
   await prisma.user.update({
     where: { id: userId },
-    data: { failedLoginCount: 0, lockedUntil: null },
+    // Dil tercihi e-postalar için saklanır (çerez yoksa mevcut değer korunur).
+    data: { failedLoginCount: 0, lockedUntil: null, ...(locale ? { locale } : {}) },
   });
 }
 

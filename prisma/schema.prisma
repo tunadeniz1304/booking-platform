@@ -24,6 +24,8 @@ model User {
   failedLoginCount    Int                  @default(0)
   lockedUntil         DateTime?
   deletedAt           DateTime?
+  /// Arayüz/e-posta dili (tr|en); kayıt ve girişte NEXT_LOCALE çerezinden güncellenir (P1-12).
+  locale              String               @default("tr")
   authTokens          AuthToken[]
   webAuthnCredentials WebAuthnCredential[]
   createdAt           DateTime             @default(now())

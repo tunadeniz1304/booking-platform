@@ -80,7 +80,8 @@ describe("regression: #5 rate-limit atlatma", () => {
       statuses.push(res.status);
     }
     expect(statuses.at(-1)).toBe(429);
-    expect([...fake.store.keys()].every((k) => k.includes("ip:unknown"))).toBe(true);
+    // IP bilinmiyor → sahte XFF'ler aynı parmak izi kovasında toplanır (v3#3).
+    expect([...fake.store.keys()].every((k) => k.includes(":anon:"))).toBe(true);
   });
 
   it("doğrulanmış kullanıcı kendi kotasını alır (anahtar = JWT sub)", async () => {
@@ -95,6 +96,34 @@ describe("regression: #5 rate-limit atlatma", () => {
     expect(auth.status).toBe(503);
     const search = await proxy(req("/api/search"));
     expect(search.status).toBe(200);
+  });
+});
+
+describe("regression: v3#3 anonimler tek global kovaya düşmez", () => {
+  it("farklı istemciler (UA/dil) ayrı kovalar alır; biri kilitlenince diğeri etkilenmez", async () => {
+    const attacker = { "user-agent": "curl/8.0", "accept-language": "en" };
+    for (let i = 0; i < 5; i++) {
+      await proxy(req("/api/auth/login", { method: "POST", headers: attacker }));
+    }
+    const blocked = await proxy(req("/api/auth/login", { method: "POST", headers: attacker }));
+    expect(blocked.status).toBe(429);
+    const victim = await proxy(
+      req("/api/auth/login", {
+        method: "POST",
+        headers: { "user-agent": "Mozilla/5.0 Firefox", "accept-language": "tr-TR" },
+      })
+    );
+    expect(victim.status).not.toBe(429);
+    expect([...fake.store.keys()].some((k) => k.includes("unknown"))).toBe(false);
+  });
+
+  it("TRUST_REAL_IP_HEADER=true iken x-real-ip anahtar olur", async () => {
+    process.env.TRUST_REAL_IP_HEADER = "true";
+    resetConfigForTests();
+    await proxy(req("/api/search", { headers: { "x-real-ip": "203.0.113.7" } }));
+    expect([...fake.store.keys()].some((k) => k.includes("ip:203.0.113.7"))).toBe(true);
+    delete process.env.TRUST_REAL_IP_HEADER;
+    resetConfigForTests();
   });
 });
 

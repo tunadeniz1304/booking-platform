@@ -4,7 +4,7 @@ import { requireAuth } from "@/lib/auth";
 import { toErrorResponse, ValidationError } from "@/lib/http/errors";
 import { payForBooking } from "@/lib/payment/payment-service";
 import { getConfig } from "@/lib/config/app-config";
-import { resolveClientIp } from "@/lib/security/ip";
+import { clientKey } from "@/lib/security/ip";
 import { observed } from "@/lib/http/observed";
 
 const bodySchema = z.object({
@@ -22,14 +22,19 @@ export const POST = observed(
       const { cardToken } = bodySchema.parse(await req.json());
       const idempotencyKey = req.headers.get("idempotency-key")?.slice(0, 128);
       if (!idempotencyKey) throw new ValidationError("Idempotency-Key başlığı zorunludur");
-      const hops = getConfig().TRUSTED_PROXY_HOPS;
+      const config = getConfig();
+      const hops = config.TRUSTED_PROXY_HOPS;
       const outcome = await payForBooking({
         bookingId: id,
         userId,
         cardToken,
         idempotencyKey,
         context: {
-          ip: resolveClientIp(req.headers, hops),
+          // Hız kuralı istemci anahtarıyla sayılır (IP ya da parmak izi; tek "unknown" kovası yok).
+          ip: clientKey(req.headers, {
+            trustedProxyHops: hops,
+            trustRealIpHeader: config.TRUST_REAL_IP_HEADER,
+          }),
           // Ülke başlığı yalnızca güvenilir bir CDN/proxy arkasında dikkate alınır.
           ipCountry: hops > 0 ? req.headers.get("cf-ipcountry") : null,
         },

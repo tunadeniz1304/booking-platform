@@ -53,8 +53,24 @@ const schema = z.object({
 
   // Güvenlik / ağ
   TRUSTED_PROXY_HOPS: int(0, 0, 10),
-  ACCESS_TOKEN_TTL_SECONDS: int(15 * 60, 60, 24 * 60 * 60),
+  /** hops=0 iken önde başlığı ezen tek ters vekil varsa `x-real-ip`'ye güven (v3#3). */
+  TRUST_REAL_IP_HEADER: bool(false),
+  /** Hesap (e-posta) bazlı giriş denemesi limiti — IP'den bağımsız (v3#3). */
+  RATE_LIMIT_LOGIN_PER_ACCOUNT_MAX: int(10, 1),
+  /** v3: 15 → 5 dk (denylist Redis yokken fail-closed; iptal penceresi kısa). */
+  ACCESS_TOKEN_TTL_SECONDS: int(5 * 60, 60, 24 * 60 * 60),
   REFRESH_TOKEN_TTL_SECONDS: int(7 * 24 * 60 * 60, 60 * 60, 90 * 24 * 60 * 60),
+
+  // Hesap güvenliği (P0-8)
+  AUTH_LOCKOUT_THRESHOLD: int(5, 1, 100),
+  AUTH_LOCKOUT_MINUTES: int(15, 1, 24 * 60),
+  AUTH_RESET_TOKEN_TTL_MINUTES: int(30, 5, 24 * 60),
+  AUTH_VERIFY_TOKEN_TTL_HOURS: int(24, 1, 24 * 14),
+  /** WebAuthn: tarayıcıdaki alan adı (RP ID) ve beklenen origin. */
+  WEBAUTHN_RP_ID: z.string().min(1).default("localhost"),
+  WEBAUTHN_RP_NAME: z.string().min(1).default("booking-platform"),
+  WEBAUTHN_ORIGIN: z.string().url().default("http://localhost:3000"),
+  WEBAUTHN_CHALLENGE_TTL_SECONDS: int(300, 30, 3600),
 
   // Rate-limit (pencere başına istek)
   RATE_LIMIT_WINDOW_SECONDS: int(60, 1, 3600),
@@ -79,9 +95,6 @@ const schema = z.object({
   OUTBOX_MAX_ATTEMPTS: int(8, 1, 50),
   OUTBOX_LEASE_SECONDS: int(60, 5, 3600),
   OUTBOX_BACKOFF_BASE_MS: int(1000, 10, 60000),
-
-  // Pazarlık
-  NEGOTIATION_MAX_ROUNDS: int(3, 1, 10),
 });
 
 export type AppConfig = z.infer<typeof schema> & { invalidKeys: string[] };

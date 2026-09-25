@@ -2,12 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import { extractAccessToken, verifyAccessToken, type AccessClaims } from "@/lib/auth/tokens";
 import { isAccessTokenDenied } from "@/lib/auth/denylist";
+import { isTokenVersionCurrent } from "@/lib/auth/token-version";
 import { ACCESS_COOKIE, REFRESH_COOKIE } from "@/lib/auth/cookies";
 import { redis } from "@/lib/redis";
 import { getConfig } from "@/lib/config/app-config";
-import { resolveClientIp } from "@/lib/security/ip";
+import { clientKey } from "@/lib/security/ip";
 import { categorize, checkRateLimit } from "@/lib/security/rate-limit";
-import { allowedOriginsFromEnv, isCsrfViolation, requestOrigin } from "@/lib/security/csrf";
+import {
+  allowedOriginsFromEnv,
+  isCsrfViolation,
+  isLoginCsrfViolation,
+  requestOrigin,
+} from "@/lib/security/csrf";
 import { buildCsp } from "@/lib/security/headers";
 import { CSRF_EXEMPT_PREFIXES, isPublicApi } from "@/lib/security/public-routes";
 
@@ -34,7 +40,8 @@ async function verifiedClaims(req: NextRequest): Promise<AccessClaims | null> {
   if (!token) return null;
   const claims = await verifyAccessToken(token);
   if (!claims) return null;
-  return (await isAccessTokenDenied(claims.jti)) ? null : claims;
+  if (await isAccessTokenDenied(claims.jti)) return null;
+  return (await isTokenVersionCurrent(claims.userId, claims.tv)) ? claims : null;
 }
 
 function json(status: number, body: Record<string, unknown>, headers: Headers): NextResponse {
@@ -50,9 +57,13 @@ async function handleApi(req: NextRequest, requestHeaders: Headers, requestId: s
   const responseHeaders = new Headers({ "x-request-id": requestId });
 
   // 1) Rate-limit — kimlik yalnızca doğrulanmış kaynaklardan.
+  // IP bilinmiyorsa anonimler tek kovaya değil parmak izi kovalarına düşer (v3#3).
   const identity = claims
     ? `u:${claims.userId}`
-    : `ip:${resolveClientIp(req.headers, config.TRUSTED_PROXY_HOPS)}`;
+    : clientKey(req.headers, {
+        trustedProxyHops: config.TRUSTED_PROXY_HOPS,
+        trustRealIpHeader: config.TRUST_REAL_IP_HEADER,
+      });
   const decision = await checkRateLimit(redis, {
     category: categorize(pathname),
     identity,
@@ -79,14 +90,17 @@ async function handleApi(req: NextRequest, requestHeaders: Headers, requestId: s
 
   // 2) CSRF — çerezli, durum değiştiren istekler.
   if (!CSRF_EXEMPT_PREFIXES.some((p) => pathname.startsWith(p))) {
-    const violation = isCsrfViolation({
+    const csrfInput = {
       method,
       headers: req.headers,
       selfOrigin: requestOrigin(req.nextUrl, req.headers),
       hasCookieAuth: Boolean(req.cookies.get(ACCESS_COOKIE) || req.cookies.get(REFRESH_COOKIE)),
       hasBearer: Boolean(req.headers.get("authorization")?.startsWith("Bearer ")),
       allowedOrigins: allowedOriginsFromEnv(),
-    });
+    };
+    const violation =
+      isCsrfViolation(csrfInput) ||
+      (pathname.startsWith("/api/auth/") && isLoginCsrfViolation(csrfInput));
     if (violation) {
       return json(
         403,

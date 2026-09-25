@@ -3,7 +3,7 @@ import { z } from "zod";
 import { getRoomHeat, recordRoomView } from "@/lib/live/stats";
 import { acquireConnectionSlot, subscribeHeat } from "@/lib/live/hub";
 import { getConfig } from "@/lib/config/app-config";
-import { resolveClientIp } from "@/lib/security/ip";
+import { clientKey } from "@/lib/security/ip";
 import { addDays, diffDays, parseIsoDate, todayUtc } from "@/lib/time/nights";
 
 const querySchema = z.object({
@@ -50,7 +50,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ room
   const first = await getRoomHeat(roomId, start, end);
   if (!first) return NextResponse.json({ error: "Oda bulunamadı" }, { status: 404 });
 
-  const ip = resolveClientIp(req.headers, config.TRUSTED_PROXY_HOPS);
+  const ip = clientKey(req.headers, {
+    trustedProxyHops: config.TRUSTED_PROXY_HOPS,
+    trustRealIpHeader: config.TRUST_REAL_IP_HEADER,
+  });
   const release = await acquireConnectionSlot(ip);
   if (!release) {
     return NextResponse.json(

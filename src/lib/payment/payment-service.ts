@@ -23,6 +23,7 @@ import { counter } from "@/lib/observability/metrics";
 import { audit } from "@/lib/admin/audit";
 import { getPaymentProvider, type AuthorizeResult } from "./index";
 import type { WebhookEvent } from "./webhook";
+import type { PaymentChallenge } from "./provider";
 import { assessPayment } from "@/lib/risk/fraud";
 
 /**
@@ -103,7 +104,7 @@ export class WebhookMismatchError extends HttpError {
 
 export type PayOutcome =
   | { status: "confirmed"; bookingId: string; paymentId: string; amount: number; currency: string }
-  | { status: "requires_action"; bookingId: string; challenge: { type: string; hint: string } };
+  | { status: "requires_action"; bookingId: string; challenge: PaymentChallenge };
 
 interface PayableBooking {
   id: string;

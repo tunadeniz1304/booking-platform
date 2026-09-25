@@ -1,22 +1,47 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import { ApiError, apiFetch } from "@/lib/api-client";
 import { CardValidationError, TEST_CARDS, tokenizeCard } from "@/lib/payment/card-token";
 import { formatMoney, money } from "@/lib/money/money";
+import type { PayResponse } from "./StripePaymentForm";
+
+// Stripe.js yalnızca `PAYMENT_PROVIDER=stripe` iken ve istemcide yüklenir.
+const StripePaymentForm = dynamic(() => import("./StripePaymentForm"), { ssr: false });
+
+interface PaymentConfig {
+  provider: "stripe" | "mock";
+  publishableKey: string | null;
+}
 
 interface Props {
   bookingId: string;
   status: string;
   holdExpiresAt?: string | null;
+  /** Tahsil edilecek tutar (Stripe Payment Element'in `amount` seçeneği için). */
+  amountMinor?: number;
+  currency?: string;
   onChanged: () => void;
 }
 
 /**
  * Ödeme (HELD) ve iptal (HELD/CONFIRMED) eylemleri.
  * Kart numarası tarayıcıda token'a çevrilir; sunucuya yalnızca `cardToken` gider.
+ * `PAYMENT_PROVIDER=stripe` iken Stripe Payment Element, aksi hâlde mock hosted fields (#10).
  */
-export default function BookingActions({ bookingId, status, holdExpiresAt, onChanged }: Props) {
+export default function BookingActions({
+  bookingId,
+  status,
+  holdExpiresAt,
+  amountMinor,
+  currency,
+  onChanged,
+}: Props) {
+  const [payConfig, setPayConfig] = useState<PaymentConfig>({
+    provider: "mock",
+    publishableKey: null,
+  });
   const [card, setCard] = useState({ number: "", exp: "12/30", cvc: "" });
   const [challenge, setChallenge] = useState<string | null>(null);
   const [code, setCode] = useState("");
@@ -25,6 +50,55 @@ export default function BookingActions({ bookingId, status, holdExpiresAt, onCha
   const [idemKey] = useState(() =>
     typeof crypto !== "undefined" ? crypto.randomUUID() : String(Date.now())
   );
+
+  useEffect(() => {
+    if (status !== "HELD") return;
+    apiFetch<PaymentConfig>("/api/payments/config")
+      .then(setPayConfig)
+      .catch(() => undefined); // Yapılandırma okunamazsa mock form kalır.
+  }, [status]);
+
+  const useStripeForm =
+    payConfig.provider === "stripe" && !!payConfig.publishableKey && !!amountMinor && !!currency;
+
+  function showError(err: unknown, fallback: string) {
+    setMessage({ kind: "error", text: err instanceof ApiError ? err.message : fallback });
+  }
+
+  function submitToken(cardToken: string) {
+    return apiFetch<PayResponse>(`/api/bookings/${bookingId}/pay`, {
+      method: "POST",
+      headers: { "Idempotency-Key": idemKey },
+      body: JSON.stringify({ cardToken }),
+    });
+  }
+
+  async function stripeSubmit(cardToken: string): Promise<PayResponse> {
+    setMessage(null);
+    setBusy(true);
+    try {
+      const out = await submitToken(cardToken);
+      if (out.status !== "requires_action") onChanged();
+      return out;
+    } catch (err) {
+      showError(err, "Ödeme başarısız");
+      return { status: "failed" };
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function stripeConfirm() {
+    try {
+      await apiFetch(`/api/bookings/${bookingId}/pay/confirm`, {
+        method: "POST",
+        body: JSON.stringify({}),
+      });
+      onChanged();
+    } catch (err) {
+      showError(err, "Doğrulama başarısız");
+    }
+  }
 
   async function pay(e: React.FormEvent) {
     e.preventDefault();
@@ -47,14 +121,7 @@ export default function BookingActions({ bookingId, status, holdExpiresAt, onCha
     }
     setBusy(true);
     try {
-      const out = await apiFetch<{ status: string; challenge?: { hint: string } }>(
-        `/api/bookings/${bookingId}/pay`,
-        {
-          method: "POST",
-          headers: { "Idempotency-Key": idemKey },
-          body: JSON.stringify({ cardToken }),
-        }
-      );
+      const out = await submitToken(cardToken);
       if (out.status === "requires_action")
         setChallenge(out.challenge?.hint ?? "Doğrulama gerekli");
       else onChanged();
@@ -116,7 +183,22 @@ export default function BookingActions({ bookingId, status, holdExpiresAt, onCha
   const input = "mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm";
   return (
     <div className="space-y-4 border-t border-gray-100 pt-6">
-      {status === "HELD" && !challenge && (
+      {status === "HELD" && useStripeForm && (
+        <div className="space-y-3">
+          <h2 className="text-lg font-semibold text-gray-900">Ödeme</h2>
+          <StripePaymentForm
+            publishableKey={payConfig.publishableKey!}
+            amountMinor={amountMinor!}
+            currency={currency!}
+            busy={busy}
+            submit={stripeSubmit}
+            confirm={stripeConfirm}
+            onError={(text) => setMessage({ kind: "error", text })}
+          />
+        </div>
+      )}
+
+      {status === "HELD" && !useStripeForm && !challenge && (
         <form onSubmit={pay} className="space-y-3" aria-label="Ödeme">
           <h2 className="text-lg font-semibold text-gray-900">Ödeme</h2>
           {holdExpiresAt && (

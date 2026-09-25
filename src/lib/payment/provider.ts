@@ -8,13 +8,22 @@ import type { Money } from "@/lib/money/money";
  * (PCI-DSS SAQ A kapsamı).
  */
 
+export interface PaymentChallenge {
+  type: "3ds_otp" | "stripe_next_action";
+  hint: string;
+  clientSecret?: string;
+}
+
 export type AuthorizeResult =
   | { status: "authorized"; providerRef: string }
   | {
       status: "requires_action";
       providerRef: string;
-      /** 3DS doğrulaması için istemciye gösterilecek bilgi (mock: tek kullanımlık kod ipucu). */
-      challenge: { type: "3ds_otp"; hint: string };
+      /**
+       * 3DS doğrulaması için istemciye gösterilecek bilgi. Mock: tek kullanımlık kod ipucu;
+       * Stripe: `clientSecret` ile tarayıcıda `handleNextAction`.
+       */
+      challenge: PaymentChallenge;
     }
   | { status: "declined"; providerRef: string; declineCode: string };
 

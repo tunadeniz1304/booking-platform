@@ -7,6 +7,7 @@ import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import { ApiError, apiFetch } from "@/lib/api-client";
 import BookingActions from "@/components/booking/BookingActions";
+import { toMinor } from "@/lib/money/money";
 
 interface BookingDetail {
   id: string;
@@ -152,6 +153,8 @@ export default function BookingConfirmationPage() {
                 bookingId={booking.id}
                 status={booking.status}
                 holdExpiresAt={booking.holdExpiresAt}
+                amountMinor={toMinor(booking.totalPrice, booking.currency)}
+                currency={booking.currency}
                 onChanged={() => void load()}
               />
 

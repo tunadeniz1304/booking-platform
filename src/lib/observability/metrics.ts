@@ -39,4 +39,3 @@ export function histogram<L extends string>(
   if (existing) return existing as Histogram<L>;
   return new Histogram<L>({ name, help, labelNames, buckets, registers: [registry] });
 }
-

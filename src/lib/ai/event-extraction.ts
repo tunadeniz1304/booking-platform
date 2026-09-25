@@ -25,9 +25,7 @@ const schema = z.object({
   rationale: z.string().max(500),
 });
 
-async function extractEvent(
-  text: string
-): Promise<{ data: EventExtraction; llmMode: string }> {
+async function extractEvent(text: string): Promise<{ data: EventExtraction; llmMode: string }> {
   const cities = (
     await prisma.location.findMany({ select: { city: true }, distinct: ["city"] })
   ).map((l) => l.city);

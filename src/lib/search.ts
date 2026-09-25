@@ -623,4 +623,3 @@ export async function getPopularProperties(limit = 10): Promise<SearchResult[]> 
   }
   return results;
 }
-

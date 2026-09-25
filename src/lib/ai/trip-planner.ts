@@ -109,9 +109,7 @@ async function bestStay(
 }
 
 /** Deterministik plan (demo çıktısı ve canlı anlatımın olgu kaynağı). */
-async function buildTripPlan(
-  req: TripRequest
-): Promise<Omit<TripPlan, "narrative" | "llmMode">> {
+async function buildTripPlan(req: TripRequest): Promise<Omit<TripPlan, "narrative" | "llmMode">> {
   if (req.cities.length < 1 || req.cities.length > 6) throw new ValidationError("1–6 şehir seçin");
   if (req.days < req.cities.length || req.days > 30)
     throw new ValidationError("Gün sayısı şehir sayısı ile 30 arasında olmalı");

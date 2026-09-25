@@ -14,7 +14,7 @@ import { moderateText, type ModerationReason } from "@/lib/reviews/moderation";
  * sürümünü artırır (AI özeti önbelleği sürüm anahtarlıdır).
  */
 
-export function reviewsVersionKey(propertyId: string): string {
+function reviewsVersionKey(propertyId: string): string {
   return `reviews:version:${propertyId}`;
 }
 

@@ -29,7 +29,7 @@ export async function withSerializableRetry<T>(
   throw lastError;
 }
 
-export function isSerializationFailure(error: unknown): boolean {
+function isSerializationFailure(error: unknown): boolean {
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
     if (error.code === "P2034") return true;
     const meta = error.meta as { code?: string } | undefined;

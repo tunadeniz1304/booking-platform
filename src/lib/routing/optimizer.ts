@@ -56,7 +56,7 @@ export function haversineKm(aLat: number, aLng: number, bLat: number, bLng: numb
 }
 
 /** Tahmini uçuş maliyeti (config: ROUTING_FLIGHT_COST_PER_KM × km + ROUTING_FLIGHT_COST_BASE). */
-export function flightCostEstimate(km: number): number {
+function flightCostEstimate(km: number): number {
   const c = getConfig();
   return Math.round(km * c.ROUTING_FLIGHT_COST_PER_KM + c.ROUTING_FLIGHT_COST_BASE);
 }
@@ -90,7 +90,7 @@ function costMatrix(nodes: CityNode[], month: number): Matrix {
   return nodes.map((a, i) => nodes.map((b, j) => (i === j ? 0 : legCost(a, b, month).cost)));
 }
 
-export function pathCost(order: number[], m: Matrix, closed: boolean): number {
+function pathCost(order: number[], m: Matrix, closed: boolean): number {
   let total = 0;
   for (let i = 0; i < order.length - 1; i++) total += m[order[i]][order[i + 1]];
   if (closed && order.length > 1) total += m[order[order.length - 1]][order[0]];

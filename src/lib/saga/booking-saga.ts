@@ -40,7 +40,7 @@ export interface FlowAdder {
   add(flow: FlowJob): Promise<unknown>;
 }
 
-export function fulfilmentFlow(p: BookingConfirmedPayload): FlowJob {
+function fulfilmentFlow(p: BookingConfirmedPayload): FlowJob {
   const opts = (step: string) => ({
     jobId: `${step}:${p.bookingId}`,
     attempts: FLOW_JOB_ATTEMPTS,

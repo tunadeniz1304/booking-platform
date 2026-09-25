@@ -12,9 +12,6 @@ import { Redis } from "ioredis";
 export const QUEUE_NAMES = {
   pricing: "pricing",
   maintenance: "maintenance",
-  notifications: "notifications",
-  embeddings: "embeddings",
-  channel: "channel",
   saga: "saga",
 } as const;
 

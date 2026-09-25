@@ -16,7 +16,7 @@ export const PAYOUT_JOB = "payouts";
 const PAYOUT_BATCH_SIZE = 100;
 const PAYOUT_REF_HEX_LENGTH = 24;
 
-export function mockPayoutReference(payoutId: string): string {
+function mockPayoutReference(payoutId: string): string {
   const digest = createHash("sha256").update(`payout:${payoutId}`).digest("hex");
   return `po_mock_${digest.slice(0, PAYOUT_REF_HEX_LENGTH)}`;
 }

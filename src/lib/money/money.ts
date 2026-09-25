@@ -47,7 +47,7 @@ export function money(amount: number, currency: CurrencyCode | string): Money {
   return { amount, currency: assertCurrency(currency) };
 }
 
-export function zero(currency: CurrencyCode | string): Money {
+function zero(currency: CurrencyCode | string): Money {
   return money(0, currency);
 }
 
@@ -60,11 +60,6 @@ function sameCurrency(a: Money, b: Money): void {
 export function add(a: Money, b: Money): Money {
   sameCurrency(a, b);
   return money(a.amount + b.amount, a.currency);
-}
-
-export function subtract(a: Money, b: Money): Money {
-  sameCurrency(a, b);
-  return money(a.amount - b.amount, a.currency);
 }
 
 export function sum(items: readonly Money[], currency: CurrencyCode | string): Money {

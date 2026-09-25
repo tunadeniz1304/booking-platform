@@ -4,7 +4,7 @@ import { sendEmail } from "./notifier";
 import { authLinkEmail, priceDropEmail } from "./templates";
 
 /** Uygulamanın dışa açık kök adresi (e-posta bağlantıları için). */
-export function appBaseUrl(): string {
+function appBaseUrl(): string {
   return (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000").replace(/\/+$/, "");
 }
 

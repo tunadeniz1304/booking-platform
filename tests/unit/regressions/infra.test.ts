@@ -169,4 +169,10 @@ describe("regression: v3#17 ölü kod/ayar", () => {
     expect(read("docker-compose.yml")).not.toMatch(/elasticsearch/i);
     expect(read(".env.example")).not.toMatch(/ELASTICSEARCH_URL/);
   });
+
+  it("işleyicisi olmayan kuyruklar, kullanılmayan LLM barrel'ı ve sahte bülten formu kaldırıldı", () => {
+    expect(read("src/lib/queue.ts")).not.toMatch(/notifications:|embeddings:|channel:/);
+    expect(() => statSync(path.join(root, "src/lib/llm/index.ts"))).toThrow();
+    expect(read("src/components/layout/Footer.tsx")).not.toMatch(/newsletter-email|Abone Ol/);
+  });
 });

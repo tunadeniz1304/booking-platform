@@ -181,7 +181,7 @@ class ToolLoopExceededError extends Error {
   }
 }
 
-export function classifyLlmError(error: unknown): FallbackReason {
+function classifyLlmError(error: unknown): FallbackReason {
   if (error instanceof APIUserAbortError) return "aborted";
   if (error instanceof APIConnectionTimeoutError) return "timeout";
   if (error instanceof APIConnectionError) return "network";

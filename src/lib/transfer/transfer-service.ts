@@ -50,7 +50,7 @@ function assertEnabled(): void {
   }
 }
 
-export function hashToken(token: string): string {
+function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
 
@@ -61,14 +61,14 @@ interface TokenPayload {
   nonce: string;
 }
 
-export function signClaimToken(payload: TokenPayload): string {
+function signClaimToken(payload: TokenPayload): string {
   const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
   const sig = createHmac("sha256", signingSecret()).update(body).digest("base64url");
   return `${body}.${sig}`;
 }
 
 /** İmza (timing-safe) ve süre doğrulaması; geçersizse `null`. */
-export function verifyClaimToken(token: string, now = Date.now()): TokenPayload | null {
+function verifyClaimToken(token: string, now = Date.now()): TokenPayload | null {
   const [body, sig] = token.split(".");
   if (!body || !sig) return null;
   const expected = createHmac("sha256", signingSecret()).update(body).digest();

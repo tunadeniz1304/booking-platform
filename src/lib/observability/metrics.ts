@@ -1,4 +1,4 @@
-import { Counter, Gauge, Histogram, Registry, collectDefaultMetrics } from "prom-client";
+import { Counter, Histogram, Registry, collectDefaultMetrics } from "prom-client";
 
 /**
  * Prometheus metrik kaydı (tek süreç-içi registry).
@@ -40,12 +40,3 @@ export function histogram<L extends string>(
   return new Histogram<L>({ name, help, labelNames, buckets, registers: [registry] });
 }
 
-export function gauge<L extends string>(
-  name: string,
-  help: string,
-  labelNames: readonly L[] = []
-): Gauge<L> {
-  const existing = registry.getSingleMetric(name);
-  if (existing) return existing as Gauge<L>;
-  return new Gauge<L>({ name, help, labelNames, registers: [registry] });
-}

@@ -25,7 +25,7 @@ const schema = z.object({
   rationale: z.string().max(500),
 });
 
-export async function extractEvent(
+async function extractEvent(
   text: string
 ): Promise<{ data: EventExtraction; llmMode: string }> {
   const cities = (

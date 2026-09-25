@@ -30,7 +30,7 @@ function sourceUrl(name: FxSourceName): string {
   return name === "tcmb" ? config.FX_TCMB_URL : config.FX_ECB_URL;
 }
 
-export function configuredSources(): FxSourceName[] {
+function configuredSources(): FxSourceName[] {
   return getConfig()
     .FX_SOURCES.split(",")
     .map((s) => s.trim().toLowerCase())

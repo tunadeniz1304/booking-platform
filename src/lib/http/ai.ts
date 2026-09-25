@@ -9,7 +9,7 @@ import { runWithLlmSubject } from "@/lib/llm/budget";
  *  - Bütçe öznesi: oturum varsa `u:<id>`, yoksa istemci anahtarı (IP / parmak izi).
  *  - `ai_generated: true` (AI Act Md. 50) — her AI çıktısı API'de işaretlenir.
  */
-export async function aiSubject(req: NextRequest): Promise<string> {
+async function aiSubject(req: NextRequest): Promise<string> {
   const claims = await getAuth(req);
   if (claims) return `u:${claims.userId}`;
   const config = getConfig();

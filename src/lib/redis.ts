@@ -62,7 +62,7 @@ export function getRedisConnection(): IORedis {
   return globalForRedis.__bookingRedis;
 }
 
-export function buildRedisClient(connection: () => IORedis = getRedisConnection): RedisClient {
+function buildRedisClient(connection: () => IORedis = getRedisConnection): RedisClient {
   return {
     get: (key) => connection().get(key),
     mget: (keys) => (keys.length === 0 ? Promise.resolve([]) : connection().mget(...keys)),

@@ -322,7 +322,7 @@ export async function computeTotal(req: QuoteRequest, now: Date = new Date()): P
 const QUOTE_PREFIX = "quote:";
 
 /** Teklifi TTL ile saklar (checkout `quoteId` gönderir). */
-export async function saveQuote(quote: Quote): Promise<void> {
+async function saveQuote(quote: Quote): Promise<void> {
   await redis.set(`${QUOTE_PREFIX}${quote.quoteId}`, JSON.stringify(quote), {
     ex: getConfig().QUOTE_TTL_MINUTES * 60,
   });

@@ -624,7 +624,3 @@ export async function getPopularProperties(limit = 10): Promise<SearchResult[]> 
   return results;
 }
 
-/** Yalnızca testler: bir mülkün teklif önbelleği anahtarı için güncel sürüm. */
-export async function propertyCacheVersion(propertyId: string): Promise<string> {
-  return getVersion(`${PROPERTY_VERSION_PREFIX}${propertyId}`);
-}

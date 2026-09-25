@@ -11,7 +11,7 @@ const globalForPrisma = globalThis as unknown as { __bookingPrisma?: PrismaClien
  * Bağlantı havuzu `DATABASE_URL`'deki `connection_limit` / `pool_timeout` ile sınırlanır.
  * Sorgu profil'leyicisi yalnızca `ENABLE_QUERY_STATS=true` iken kurulur.
  */
-export function getPrismaClient(): PrismaClient {
+function getPrismaClient(): PrismaClient {
   if (globalForPrisma.__bookingPrisma) return globalForPrisma.__bookingPrisma;
   const url = process.env.DATABASE_URL;
   if (!url) {

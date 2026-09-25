@@ -1,16 +1,10 @@
 import { prisma } from "@/lib/prisma";
-import { toVectorLiteral } from "@/lib/embedding/embedder";
-import { embedText } from "@/lib/embedding/provider";
 
 /**
  * pgvector semantik arama + kişiselleştirme eşzamanlı sıralama.
  *
- * - `findSemanticCandidates`: sorgu gömülür, `embedding <=> query` (kosinüs
- *   mesafesi) ile en benzer mülklerin (id -> skor) listesi çekilir.
  * - `computeAffinityBoost`: kullanıcının geçmişiyle (favori + rezervasyon
  *   lokasyonları/mülk tipleri) eşleşen mülklere küçük bir tercih ağırlığı verir.
- * - `blendScore`: metin eşleşmesi + vektör benzerliği + derecelendirme +
- *   kişiselleştirme tek skorda eşzamanlı harmanlanır.
  */
 
 let vectorProbe: boolean | null = null;
@@ -27,30 +21,6 @@ export async function isVectorEnabled(): Promise<boolean> {
     vectorProbe = false;
   }
   return vectorProbe;
-}
-
-export interface SemanticCandidate {
-  id: string;
-  similarity: number;
-}
-
-/** Sorgunun gömme vektörüyle en benzer aktif mülkleri döndürür. */
-export async function findSemanticCandidates(
-  query: string,
-  limit = 50
-): Promise<SemanticCandidate[]> {
-  const vector = await embedText(query);
-  const literal = toVectorLiteral(vector);
-
-  const rows = await prisma.$queryRaw<Array<{ id: string; similarity: number }>>`
-    SELECT id,
-           1 - (embedding <=> ${literal}::vector) AS similarity
-    FROM "Property"
-    WHERE "isActive" = true AND "licenseStatus" = 'VERIFIED' AND embedding IS NOT NULL
-    ORDER BY embedding <=> ${literal}::vector
-    LIMIT ${limit}
-  `;
-  return rows.map((r) => ({ id: r.id, similarity: Number(r.similarity) }));
 }
 
 export interface Affinity {
@@ -90,25 +60,6 @@ export async function computeAffinity(userId: string): Promise<Affinity> {
     bump(typeWeights, b.property.propertyType, 1.0);
   }
   return { cityWeights, typeWeights };
-}
-
-/**
- * Nihai eşzamanlı skor.
- * similarity: vektör benzerliği (0-1). keywordHit: 0/1 (metadata tam eşleşme).
- * rating: 0-1 normalize. affinityBoost: 0-1.
- */
-export function blendScore(
-  similarity: number,
-  keywordHit: boolean,
-  rating: number,
-  affinityBoost: number
-): number {
-  return (
-    0.5 * similarity +
-    0.2 * (keywordHit ? 1 : 0) +
-    0.15 * Math.min(1, rating / 5) +
-    0.15 * affinityBoost
-  );
 }
 
 /** Bir mülk için kullanıcının tercihine göre (0-1) boost üretir. */

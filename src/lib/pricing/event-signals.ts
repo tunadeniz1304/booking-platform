@@ -46,7 +46,7 @@ export function getSeasonalFactor(date: Date): number {
 }
 
 /** Hafta günü çarpanı: Cuma / Cumartesi geceleri yoğun, Pazar hafif yüksek (UTC). */
-export function getWeekdayFactor(date: Date): number {
+function getWeekdayFactor(date: Date): number {
   const day = dayOfWeek(fromDate(date));
   if (day === 5) return 1.15;
   if (day === 6) return 1.18;
@@ -169,7 +169,7 @@ function windowOf(event: { startsAt: Date; endsAt: Date }): IsoDate[] {
 }
 
 /** Konumdaki geceleri onaylı TÜM olaylara göre orijinal tabandan yeniden fiyatlar. */
-export async function repriceLocation(locationId: string, nights: IsoDate[]): Promise<number> {
+async function repriceLocation(locationId: string, nights: IsoDate[]): Promise<number> {
   if (nights.length === 0) return 0;
   const first = toDbDate(nights[0]);
   const last = toDbDate(nights[nights.length - 1]);

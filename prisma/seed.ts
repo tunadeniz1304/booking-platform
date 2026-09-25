@@ -870,6 +870,8 @@ const PROPERTIES: PropSeed[] = [
 ];
 
 const DEMO_POLICIES = ["policy_flexible_v1", "policy_moderate_v1", "policy_strict_v1"] as const;
+/** P2-2 senaryo 7: belgesiz (PENDING) demo ilanı — scripts/demo-scenarios.ts ile aynı başlık. */
+const UNLICENSED_DEMO_TITLE = "Kadıköy Moda Sahil Dairesi (belge bekliyor)";
 const DEMO_PROVINCES = ["34", "06", "35", "07", "48", "50", "16", "01", "81", "61"] as const;
 
 /** `/^(0[1-9]|[1-7]\d|8[01])-\d{3,6}(-\d{4})?$/` ile uyumlu demo izin belgesi numarası. */
@@ -1114,6 +1116,52 @@ async function main() {
     propertyCount++;
   }
   console.log(`Özellikler oluşturuldu: ${propertyCount}, odalar: ${roomIds.length}`);
+
+  // P2-2 demo senaryosu 7: izin belgesi DOĞRULANMAMIŞ tek bir ilan (deterministik başlık).
+  // Aktif ama `licenseStatus: PENDING` → /api/search'te görünmemeli, ev sahibi panelinde
+  // görünmeli (v3#25 regresyon testinin birebir aynası). Demo rezervasyon/favori/yorum
+  // adımlarına girmesin diye `roomIds`'e EKLENMEZ. Başlık scripts/demo-scenarios.ts ile eşleşir.
+  {
+    const unlicensed = await prisma.property.create({
+      data: {
+        hostId: host.id,
+        title: UNLICENSED_DEMO_TITLE,
+        description:
+          "Moda sahiline yürüme mesafesinde iki kişilik daire. İzin belgesi doğrulaması bekleniyor; doğrulanana kadar aramada listelenmez.",
+        propertyType: "APARTMENT" as PropertyType,
+        locationId: locations[0],
+        timeZone: "Europe/Istanbul",
+        basePrice: new Prisma.Decimal(1800),
+        currency: "TRY",
+        isActive: true,
+        licenseNumber: null,
+        licenseStatus: "PENDING",
+        cancellationPolicyId: DEMO_POLICIES[0],
+        images: [IMAGE_POOL[0], IMAGE_POOL[1 % IMAGE_POOL.length]],
+      },
+    });
+    const room = await prisma.roomType.create({
+      data: {
+        propertyId: unlicensed.id,
+        name: "Daire",
+        maxOccupancy: 2,
+        units: 1,
+        bedType: "Çift Kişilik Yatak",
+        priceModifier: new Prisma.Decimal(0),
+        available: true,
+        ratePlans: { create: ratePlansFor("APARTMENT") },
+      },
+    });
+    await prisma.inventoryDay.createMany({
+      data: Array.from({ length: horizon }, (_, day) => ({
+        roomTypeId: room.id,
+        date: addDays(today, day),
+        total: 1,
+        price: new Prisma.Decimal(1800),
+      })),
+    });
+    console.log(`Belgesiz demo ilanı (aramada gizli): ${UNLICENSED_DEMO_TITLE}`);
+  }
 
   // Demo rezervasyonlar: farklı kullanıcılar, tarihler ve durumlar
   const allGuests = [{ id: guest.id }, ...extraGuests];

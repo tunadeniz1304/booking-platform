@@ -90,6 +90,87 @@ curl -s localhost:3000/api/ai/trip-plan -H "authorization: Bearer $GUEST" -H 'co
 
 ---
 
+## Demo senaryoları (P2-2)
+
+`scripts/demo-scenarios.ts`, **çalışan** yığına HTTP ile bağlanır ve aşağıdaki 7 iddiayı uçtan uca doğrular. Her senaryo için bir `[PASS]`/`[FAIL]` satırı ve temel sayılar yazılır. Herhangi bir senaryo başarısız olursa çıkış kodu `1` olur.
+
+```bash
+npm run demo:reset                         # seed (senaryo 7'nin belgesiz ilanı dahil)
+npm run demo:scenarios                     # 7 senaryonun hepsi
+npm run demo:scenarios -- --only=4         # tek senaryo (birden çok: --only=2,5)
+BASE_URL=http://localhost:3000 DAY_OFFSET=200 npm run demo:scenarios
+```
+
+- `BASE_URL`: varsayılanı `http://localhost:3000`.
+- `DAY_OFFSET`: tarihlerin bugünden kaç gün ileride olacağını belirler (1–340). Verilmezse 150–339 arası rastgele seçilir. Böylece tekrar çalıştırmalar birbirinin envanterine çarpmaz.
+- Betik, oluşturduğu HELD kayıtlarını iş bitince iptal eder.
+- Hesaplar seed'dekilerdir (`guest@` ve `host@booking.test`). Her hesapla tek giriş yapılır; belirteç 4 dakikadan eskiyse yenilenir.
+- Tutarlar tamsayı minor-unit (kuruş) olarak yazılır.
+
+### Ön koşul: yükseltilmiş rate limit
+
+Senaryo 1, tek kullanıcıdan 100 eşzamanlı `POST /api/bookings` gönderir. Varsayılan `RATE_LIMIT_BOOKING_MAX=30` (60 sn pencere, JWT `sub` başına) ile bu isteklerin bir kısmı 429 alır ve senaryo **FAIL** olur. Aşağıdaki gibi bir compose override kullanın (`docs/perf/k6-results.md`'deki k6 koşusuyla aynı yöntem):
+
+```yaml
+# docker-compose.demo.yml
+services:
+  app:
+    environment:
+      RATE_LIMIT_BOOKING_MAX: "100000" # senaryo 1 (100 paralel) + ödeme uçları
+      RATE_LIMIT_SEARCH_MAX: "100000" # arama/teklif (senaryo 3, 6, 7)
+      RATE_LIMIT_AGENTIC_MAX: "100000" # /api/mcp (senaryo 5)
+      RATE_LIMIT_DEFAULT_MAX: "100000" # host uçları (senaryo 6, 7)
+      RATE_LIMIT_AUTH_MAX: "100000"
+```
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.demo.yml up -d
+```
+
+- Yalnızca senaryo 1'in geçmesi için `RATE_LIMIT_BOOKING_MAX` ≥ 110 yeterlidir. Diğer değerler, betiğin art arda çalıştırılabilmesi içindir.
+- Hesap başı giriş limiti (`RATE_LIMIT_LOGIN_PER_ACCOUNT_MAX=10`/dk) değiştirilmez; betik zaten az giriş yapar.
+- 429 alınırsa betik sonunda bir uyarı satırı basar.
+
+### Senaryolar
+
+| #   | Senaryo                                  | Nasıl doğrulanır                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| --- | ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | 3 birimlik odaya 100 paralel rezervasyon | Hedef: İstanbul Sultanahmet Pansiyon / "Standart Oda" (3 birim), aynı tarihler. Her istek **ayrı** `idempotency-key` taşır; aynı anahtar (kullanıcı, anahtar) aynı rezervasyonu döndürür ve yarışı ölçmez. Beklenen: tam **3 × 201 HELD** (3 farklı id) ve **97 × 409** (`SOLD_OUT` ön kontrol ya da `ROOM_BUSY` kilit). 429 ve 5xx olmamalı. Kazanan anahtarlardan biri tekrar gönderildiğinde aynı id dönmeli.                                                                             |
+| 2   | İki sekmeden ödeme → tek tahsilat        | Terash Manzaralı odası için HELD kayıt oluşturulur. Ardından iki eşzamanlı `POST /pay` gönderilir (farklı `Idempotency-Key`, mock kart). Kaybeden sekme ya aynı `paymentId` ile `confirmed` ya da 409 `PAYMENT_IN_PROGRESS`/`ALREADY_PAID` almalı. Son durum `CONFIRMED`/`PAID` olmalı ve ödenen tutar rezervasyon toplamına eşit olmalı. Fraud skoru 3DS isterse tek bir `pay/confirm` (`123456`) yapılır.                                                                                  |
+| 3   | İstanbul teklifi                         | `GET /api/quote` yanıtında `KDV` (VAT, fiyata dahil) ve `Konaklama vergisi` (ACCOMMODATION_TAX, hariç) kalemleri bulunmalı. Ayrıca `ara toplam = Σ gece` ve `toplam = ara toplam + Σ hariç kalemler` eşitlikleri tutmalı; tüm tutarlar tamsayı olmalı.                                                                                                                                                                                                                                       |
+| 4   | Tokyo iade penceresi                     | Tokyo Shibuya Capsule+ / "Özel Kabin" tutulur, ödenir ve `DELETE /api/bookings/{id}` ile iptal edilir. **İade API'de hesaplanır** (`refund.hoursBeforeCheckIn`, tesis saati `Asia/Tokyo`). Betik, alan fonksiyonu `computeRefund`'ı yalnızca _kahin_ olarak içe aktarır. Tokyo saatiyle hesaplanan saat, istek öncesi/sonrası aralığında API sonucuyla eşleşmeli; `Europe/Istanbul` saatiyle hesaplanan değer ise ~6 saat sapmalı. İade yüzdesi, tutarı ve gerekçesi de kahinle aynı olmalı. |
+| 5   | MCP → hold                               | `POST /api/mcp` kimliksiz çağrıldığında **401** ve JSON-RPC hata kodu `-32001` dönmeli. Guest belirteciyle `tools/call search_stays` (İstanbul) çağrılır; teklifli ilk uygun sonuç için `create_hold` → `HELD` beklenir. Önceki koşularda dolmuş 1 birimli odalar olabileceği için en çok 5 aday denenir.                                                                                                                                                                                    |
+| 6   | Fiyat önerisi kabulü                     | Host, İstanbul Galata Loft Suites / "Loft" için öneri üretir (`POST /api/host/revenue/suggestions`, yarından itibaren 14 gece). Fiyatı değiştiren ilk öneri seçilir: aynı gecenin teklifi alınır, öneri kabul edilir, teklif yeniden alınır. Gece tutarı değişmeli ve fark `önerilen − mevcut` ile aynı yönde olmalı. Varsayılan planın `priceModifierBps` değeri 0 ise fark birebir eşit olmalı.                                                                                            |
+| 7   | Belgesiz ilan                            | Seed, **Kadıköy Moda Sahil Dairesi (belge bekliyor)** ilanını ekler: `isActive=true`, `licenseStatus=PENDING`, belge no yok (v3#25 regresyonunun aynası). Bu ilan `GET /api/host/properties` içinde görünmeli; `/api/search`'te "Moda", "Kadıköy" (tarihli) ve "İstanbul" sorgularının hiçbirinde görünmemeli.                                                                                                                                                                               |
+
+### Beklenen çıktı biçimi
+
+Burada sayılar gösterilmez; gerçek değerler seed fiyatlarına, sezona ve `DAY_OFFSET`'e bağlıdır. Biçim şöyledir:
+
+```text
+Demo senaryoları — BASE_URL=http://localhost:3000, DAY_OFFSET=<n>, çalıştırma=<id>
+[PASS] Senaryo 1 — 100 paralel rezervasyon, 3 birim → tam 3 HELD (<ms> ms)
+       İstanbul Sultanahmet Pansiyon / Standart Oda (birim=3) …: 100 istek → HELD=3, 409 SOLD_OUT=<a>, 409 ROOM_BUSY=<b>; idempotency tekrarı aynı kaydı döndü=evet
+[PASS] Senaryo 2 — İki sekmeden ödeme → tek tahsilat (<ms> ms)
+       …
+Sonuç: 7/7 senaryo geçti.
+```
+
+- `SOLD_OUT` ile `ROOM_BUSY` arasındaki dağılım zamanlamaya bağlıdır; yalnızca toplamlarının 97 olması beklenir.
+
+### Bilinen sınırlar
+
+- **Senaryo 4:** iade penceresi yalnızca API üzerinden okunur. `computeRefund` karşılaştırma içindir ve API sonucunu üretmez.
+  - Tarih uzak gelecekte olduğundan politika genellikle aynı kademede kalır (STRICT ise cayma süresi, yani `grace_period`).
+  - Tokyo ve İstanbul arasındaki fark, kademe değişimiyle değil, `hoursBeforeCheckIn` değerindeki 6 saatlik farkla gösterilir.
+- **Senaryo 6:** öneriler yalnızca önümüzdeki 14 gece için üretilir, bu yüzden `DAY_OFFSET` kullanılmaz. Kabul edilen öneri o gecenin fiyatını kalıcı olarak değiştirir; sıfırlamak için `npm run demo:reset` gerekir.
+- **Senaryo 7:** `GET /api/properties/{id}` yalnızca `isActive` alanına bakar; bu nedenle belgesiz ilan doğrudan id ile hâlâ okunabilir. Senaryo yalnızca aramadaki gizlenmeyi doğrular.
+- **Docker Desktop (Windows/macOS):** host'tan `localhost:3000`'e 100 eşzamanlı bağlantıda port yönlendiricisi bazı soketleri `ECONNRESET` ile kesebilir (sunucu isteği yine işler). Betik yalnızca tekrarı güvenli istekleri (GET veya `idempotency-key` taşıyan) en çok 2 kez yeniden dener ve bunu sonda bir `Not:` satırıyla bildirir. Alternatif: betiği compose ağı içinden çalıştırın: `docker compose run --rm --no-deps -e BASE_URL=http://app:3000 migrate npx tsx scripts/demo-scenarios.ts`.
+- **Son doğrulama (2026-09-25):** hem host'tan hem compose ağından **7/7 PASS**; senaryo 1: 100 istek → 3 HELD + 97 × 409 `SOLD_OUT`, idempotency tekrarı aynı kaydı döndürdü.
+- **Ödeme:** tekrarlanan koşularda guest hesabının ödeme hızı fraud skorunu yükseltip 3DS isteyebilir. Betik bu durumda mock 3DS koduyla onaylar.
+
+---
+
 ## Sorun giderme
 
 | Belirti                            | Çözüm                                                                                       |

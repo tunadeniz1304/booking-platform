@@ -35,7 +35,8 @@
     "llm:smoke": "tsx --conditions=react-server scripts/llm-smoke.ts",
     "availability:rollover": "tsx scripts/availability-rollover.ts",
     "sdep:export": "tsx scripts/sdep-export.ts",
-    "i18n:check": "tsx scripts/i18n-check.ts"
+    "i18n:check": "tsx scripts/i18n-check.ts",
+    "demo:scenarios": "tsx scripts/demo-scenarios.ts"
   },
   "dependencies": {
     "@grpc/grpc-js": "^1.14.5",

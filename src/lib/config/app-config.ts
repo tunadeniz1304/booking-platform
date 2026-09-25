@@ -78,6 +78,8 @@ const schema = z.object({
 
   // Transfer
   FEATURE_TRANSFER: bool(true),
+  /** Devir sonrası satıcıya (mock) payout işinin cron'u (UTC). */
+  PAYOUT_CRON: z.string().min(1).default("*/15 * * * *"),
   TRANSFER_MAX_ASK_RATIO: num(1.0, 0.1, 2),
   TRANSFER_MIN_HOURS_BEFORE_CHECKIN: int(48, 0, 24 * 60),
   TRANSFER_LINK_TTL_HOURS: int(24 * 7, 1, 24 * 60),

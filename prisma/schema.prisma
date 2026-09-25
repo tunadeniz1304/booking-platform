@@ -288,6 +288,8 @@ model Booking {
   payment        Payment?
   reviews        Review[]
   transfers      BookingTransfer[]
+  payouts        Payout[]
+  invoice        Invoice?
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
 
@@ -570,6 +572,45 @@ model BookingTransfer {
   @@index([status, expiresAt])
   @@index([sellerId])
   @@index([claimedById])
+}
+
+enum PayoutStatus {
+  PENDING
+  PAID
+  FAILED
+}
+
+/// Devir sonrası satıcıya yapılacak ödeme (#4). Talep anında PENDING açılır; mock payout işi
+/// PAID'e çeker (`po_mock_…` referansı). Defterde karşılığı TRANSFER_PAYOUT satırıdır.
+model Payout {
+  id         String       @id @default(cuid())
+  userId     String
+  bookingId  String
+  booking    Booking      @relation(fields: [bookingId], references: [id])
+  transferId String       @unique
+  amount     Decimal      @db.Decimal(10, 2)
+  currency   String
+  status     PayoutStatus @default(PENDING)
+  reference  String?
+  attempts   Int          @default(0)
+  createdAt  DateTime     @default(now())
+  paidAt     DateTime?
+
+  @@index([status, createdAt])
+  @@index([userId])
+}
+
+/// Mock e-Arşiv fatura kaydı (DEMO — mali değeri yoktur). Rezervasyon başına bir fatura.
+model Invoice {
+  id        String   @id @default(cuid())
+  bookingId String   @unique
+  booking   Booking  @relation(fields: [bookingId], references: [id])
+  number    String   @unique
+  amount    Decimal  @db.Decimal(10, 2)
+  taxAmount Decimal  @db.Decimal(10, 2)
+  currency  String
+  buyerName String
+  issuedAt  DateTime @default(now())
 }
 
 /// Yönetici eylemleri denetim kaydı (değiştirilemez; yalnızca ekleme).

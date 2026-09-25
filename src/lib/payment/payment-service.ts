@@ -719,6 +719,37 @@ export interface CancellationOutcome {
  * PSP iadesi işlemden sonra yapılır; başarısız olursa `failureCode=REFUND_FAILED`
  * (yönetici panelinden yeniden denenir) — iptal geri alınmaz.
  */
+/**
+ * İadenin gideceği ödeme (#4): rezervasyon devredildiyse yeni sahibin devir ödemesi
+ * (`buyerPaymentRef`) — satıcı bedelini payout ile zaten almıştır. İade üst sınırı
+ * alıcının ödediği tutardır (asıl tahsilatı aşamaz). Devir yoksa asıl ödeme.
+ */
+function refundTarget(
+  booking: {
+    userId: string;
+    payment: { amount: Prisma.Decimal; providerRef: string | null } | null;
+    transfers: Array<{
+      askPrice: Prisma.Decimal;
+      currency: string;
+      claimedById: string | null;
+      buyerPaymentRef: string | null;
+    }>;
+  },
+  currency: string
+): { providerRef: string | null; refundableMinor: number } {
+  const paid = booking.payment ? toMinor(booking.payment.amount.toString(), currency) : 0;
+  const transfer = booking.transfers[0];
+  if (
+    transfer?.buyerPaymentRef &&
+    transfer.claimedById === booking.userId &&
+    transfer.currency === currency
+  ) {
+    const ask = toMinor(transfer.askPrice.toString(), currency);
+    return { providerRef: transfer.buyerPaymentRef, refundableMinor: Math.min(ask, paid) };
+  }
+  return { providerRef: booking.payment?.providerRef ?? null, refundableMinor: paid };
+}
+
 export async function cancelAndRefund(
   bookingId: string,
   userId: string,
@@ -742,6 +773,12 @@ export async function cancelAndRefund(
         policySnapshot: true,
         property: { select: { timeZone: true, checkInTime: true, checkOutTime: true } },
         payment: { select: { status: true, amount: true, providerRef: true } },
+        transfers: {
+          where: { status: "COMPLETED" },
+          orderBy: { completedAt: "desc" },
+          take: 1,
+          select: { askPrice: true, currency: true, claimedById: true, buyerPaymentRef: true },
+        },
       },
     });
     if (!booking || booking.userId !== userId) throw new BookingNotFoundError();
@@ -753,10 +790,8 @@ export async function cancelAndRefund(
       throw new ConflictError("Bu rezervasyon iptal edilemez", "INVALID_STATE");
     }
     const currency = assertCurrency(booking.currency);
-    const paidMinor =
-      booking.payment?.status === PaymentStatus.PAID
-        ? toMinor(booking.payment.amount.toString(), currency)
-        : 0;
+    const target = refundTarget(booking, currency);
+    const paidMinor = booking.payment?.status === PaymentStatus.PAID ? target.refundableMinor : 0;
     const decision = computeRefund(
       parseSnapshot(booking.policySnapshot),
       { checkIn: fromDate(booking.checkIn), createdAt: booking.createdAt, paidMinor, currency },
@@ -803,7 +838,7 @@ export async function cancelAndRefund(
               kind: "REFUND",
               amount: new Prisma.Decimal(toDecimalString(money(decision.refundMinor, currency))),
               currency,
-              reference: booking.payment.providerRef,
+              reference: target.providerRef,
             },
           });
         }
@@ -829,16 +864,16 @@ export async function cancelAndRefund(
         reason: decision.reason,
       })
     );
-    return { booking, decision, currency, next };
+    return { booking, decision, currency, next, target };
   });
 
-  const { booking, decision, currency } = result;
+  const { booking, decision, currency, target } = result;
   const provider = getPaymentProvider();
   if (booking.payment?.providerRef) {
     try {
-      if (decision.refundMinor > 0) {
+      if (decision.refundMinor > 0 && target.providerRef) {
         await provider.refund(
-          booking.payment.providerRef,
+          target.providerRef,
           money(decision.refundMinor, currency),
           `refund:${booking.id}`
         );

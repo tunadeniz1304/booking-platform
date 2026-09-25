@@ -1005,6 +1005,8 @@ async function main() {
 
   const existing = await prisma.property.findMany({ select: { id: true } });
   if (existing.length > 0) {
+    await prisma.invoice.deleteMany();
+    await prisma.payout.deleteMany();
     await prisma.payment.deleteMany();
     await prisma.review.deleteMany();
     await prisma.booking.deleteMany();

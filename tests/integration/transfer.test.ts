@@ -1,5 +1,5 @@
 // P1-8 / hata #3: imzalı claim linki, escrow ödemesi, tek kullanımlık token, yarış güvenliği.
-import { beforeAll, afterAll, it, expect } from "vitest";
+import { beforeAll, afterAll, afterEach, it, expect } from "vitest";
 import { PrismaClient, Prisma, BookingStatus } from "@prisma/client";
 import { describeInt, utcDay } from "./helpers";
 import {
@@ -8,6 +8,20 @@ import {
   listBookingForTransfer,
   listMyTransfers,
 } from "@/lib/transfer/transfer-service";
+import { cancelAndRefund } from "@/lib/payment/payment-service";
+import { MockPsp } from "@/lib/payment/mock-psp";
+import { setPaymentProviderForTests } from "@/lib/payment";
+import { runPayouts } from "@/worker/jobs/payouts";
+import type { Money } from "@/lib/money/money";
+
+/** İadelerin hangi ödemeye gittiğini kaydeden MockPsp. */
+class RefundSpyPsp extends MockPsp {
+  refunds: Array<{ ref: string; amount: number }> = [];
+  override async refund(ref: string, amount: Money, key: string) {
+    this.refunds.push({ ref, amount: amount.amount });
+    return super.refund(ref, amount, key);
+  }
+}
 
 describeInt("regression: #3 P2P devir (integration)", () => {
   const prisma = new PrismaClient();
@@ -37,6 +51,7 @@ describeInt("regression: #3 P2P devir (integration)", () => {
         userId: seller,
         amount: new Prisma.Decimal(2000),
         provider: "mock",
+        providerRef: `pi_seller_${b.id}`,
         status: "PAID",
       },
     });
@@ -77,6 +92,7 @@ describeInt("regression: #3 P2P devir (integration)", () => {
     ).id;
   });
 
+  afterEach(() => setPaymentProviderForTests(null));
   afterAll(async () => {
     await prisma.$disconnect();
   });
@@ -98,7 +114,7 @@ describeInt("regression: #3 P2P devir (integration)", () => {
     ).rejects.toMatchObject({ status: 403 });
   });
 
-  it("claim: ödeme alınır, sahiplik + ödeme kaydı alıcıya geçer; aynı token ikinci kez 409", async () => {
+  it("claim: ödeme alınır, sahiplik alıcıya geçer, satıcıya payout açılır; aynı token ikinci kez 409", async () => {
     const bookingId = await confirmedBooking();
     const listed = await listBookingForTransfer(bookingId, seller, 200_000);
     const res = await claimTransfer({
@@ -112,7 +128,11 @@ describeInt("regression: #3 P2P devir (integration)", () => {
       include: { payment: true },
     });
     expect(b.userId).toBe(buyer);
-    expect(b.payment?.userId).toBe(buyer);
+    // Asıl ödeme satıcının kartıdır; alıcıya taşınmaz (#4).
+    expect(b.payment?.userId).toBe(seller);
+    const payout = await prisma.payout.findUniqueOrThrow({ where: { transferId: listed.id } });
+    expect(payout).toMatchObject({ userId: seller, status: "PENDING", currency: "TRY" });
+    expect(Number(payout.amount)).toBe(2000);
     const ledger = await prisma.ledgerEntry.findMany({
       where: { bookingId },
       orderBy: { kind: "asc" },
@@ -125,6 +145,16 @@ describeInt("regression: #3 P2P devir (integration)", () => {
 
   it("eşzamanlı 2 claim → tam 1 başarı", async () => {
     const bookingId = await confirmedBooking(40);
+    // İptal satılmış envanteri iade eder → gecelerin sayaç satırları gerekir.
+    await prisma.inventoryDay.createMany({
+      data: [40, 41].map((d) => ({
+        roomTypeId: roomId,
+        date: utcDay(d),
+        total: 1,
+        sold: 1,
+        price: new Prisma.Decimal(1000),
+      })),
+    });
     const listed = await listBookingForTransfer(bookingId, seller, 150_000);
     const results = await Promise.allSettled([
       claimTransfer({ token: listed.claimToken, buyerId: buyer, cardToken: "tok_mock_ok_4242" }),
@@ -163,5 +193,45 @@ describeInt("regression: #3 P2P devir (integration)", () => {
     await expect(listBookingForTransfer(soon, seller, 100_000)).rejects.toMatchObject({
       code: "TOO_LATE",
     });
+  });
+
+  it("regression: v3#4 devir sonrası iptal iadesi alıcının ödemesine gider; payout işi satıcıyı öder", async () => {
+    const psp = new RefundSpyPsp();
+    setPaymentProviderForTests(psp);
+    const bookingId = await confirmedBooking(40);
+    const listed = await listBookingForTransfer(bookingId, seller, 150_000);
+    await claimTransfer({
+      token: listed.claimToken,
+      buyerId: buyer,
+      cardToken: "tok_mock_ok_4242",
+    });
+    const transfer = await prisma.bookingTransfer.findUniqueOrThrow({ where: { id: listed.id } });
+
+    const out = await cancelAndRefund(bookingId, buyer);
+    expect(out.refund.refundMinor).toBeGreaterThan(0);
+    // İade tavanı alıcının ödediği tutar (asıl tahsilat 200.000 olsa da).
+    expect(out.refund.refundMinor).toBeLessThanOrEqual(150_000);
+    expect(psp.refunds).toEqual([
+      { ref: transfer.buyerPaymentRef, amount: out.refund.refundMinor },
+    ]);
+    expect(psp.refunds[0].ref).not.toBe(`pi_seller_${bookingId}`);
+
+    const refund = await prisma.ledgerEntry.findFirstOrThrow({
+      where: { bookingId, kind: "REFUND" },
+    });
+    expect(refund.userId).toBe(buyer);
+    expect(refund.reference).toBe(transfer.buyerPaymentRef);
+
+    await runPayouts();
+    const payout = await prisma.payout.findUniqueOrThrow({ where: { transferId: listed.id } });
+    expect(payout.status).toBe("PAID");
+    expect(payout.reference).toMatch(/^po_mock_[0-9a-f]{24}$/);
+    expect(payout.paidAt).not.toBeNull();
+    // İkinci çalıştırma aynı payout'a dokunmaz.
+    const again = await prisma.payout.findUniqueOrThrow({ where: { transferId: listed.id } });
+    await runPayouts();
+    expect(
+      (await prisma.payout.findUniqueOrThrow({ where: { transferId: listed.id } })).attempts
+    ).toBe(again.attempts);
   });
 });

@@ -1,5 +1,5 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from "crypto";
-import { Prisma, BookingStatus, PaymentStatus, TransferStatus } from "@prisma/client";
+import { Prisma, BookingStatus, TransferStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { redis } from "@/lib/redis";
 import { HttpError } from "@/lib/http/errors";
@@ -278,15 +278,18 @@ export async function claimTransfer(input: {
       if (owned.count !== 1)
         throw new TransferError("Rezervasyon sahipliği değişti", 409, "BOOKING_CHANGED");
 
-      // Asıl ödeme kaydı (ve gelecekteki iade hakkı) yeni sahibe geçer.
-      await tx.payment.updateMany({
-        where: {
-          bookingId: booking.id,
-          status: { in: [PaymentStatus.PAID, PaymentStatus.PARTIALLY_REFUNDED] },
-        },
-        data: { userId: input.buyerId },
-      });
+      // Asıl ödeme (satıcının kartı) satıcıda kalır; satıcı bedelini payout ile alır.
+      // İptal iadesi alıcının devir ödemesine (buyerPaymentRef) yapılır — bkz. cancelAndRefund (#4).
       const amount = new Prisma.Decimal(toDecimalString(ask));
+      await tx.payout.create({
+        data: {
+          userId: transfer.sellerId,
+          bookingId: booking.id,
+          transferId: transfer.id,
+          amount,
+          currency,
+        },
+      });
       await tx.ledgerEntry.createMany({
         data: [
           {

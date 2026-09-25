@@ -36,6 +36,8 @@ model User {
   listedTransfers     BookingTransfer[]    @relation("transferSeller")
   claimedTransfers    BookingTransfer[]    @relation("transferBuyer")
   priceAlerts         PriceAlert[]
+  messages            Message[]
+  reviewReports       ReviewReport[]
 }
 
 enum UserRole {
@@ -78,6 +80,9 @@ model Property {
   /// İptal politikası (yoksa varsayılan MODERATE); rezervasyonda snapshot'ı alınır.
   /// Turizm İşletme Belgesi / 7464 izin belgesi no (ör. 34-12345); boşsa ilan yayınlanmaz.
   licenseNumber        String?
+  /// P1-10: kayıt no doğrulama durumu (TR 7565 / AB 2024/1028 mock kayıtları). Yayın için VERIFIED şart.
+  licenseStatus        LicenseStatus               @default(PENDING)
+  licenseCheckedAt     DateTime?
   cancellationPolicyId String?
   cancellationPolicy   CancellationPolicy?         @relation(fields: [cancellationPolicyId], references: [id])
   createdAt            DateTime                    @default(now())
@@ -293,6 +298,7 @@ model Booking {
   transfers      BookingTransfer[]
   payouts        Payout[]
   invoice        Invoice?
+  messageThread  MessageThread?
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
 
@@ -444,23 +450,89 @@ enum PaymentStatus {
 }
 
 model Review {
-  id            String    @id @default(cuid())
-  bookingId     String    @unique
-  booking       Booking   @relation(fields: [bookingId], references: [id])
-  userId        String
-  user          User      @relation(fields: [userId], references: [id])
-  propertyId    String
-  property      Property  @relation(fields: [propertyId], references: [id])
-  rating        Int
-  comment       String?
+  id                String                 @id @default(cuid())
+  bookingId         String                 @unique
+  booking           Booking                @relation(fields: [bookingId], references: [id])
+  userId            String
+  user              User                   @relation(fields: [userId], references: [id])
+  propertyId        String
+  property          Property               @relation(fields: [propertyId], references: [id])
+  rating            Int
+  comment           String?
   /// Ev sahibinin herkese açık yanıtı.
-  hostReply     String?
-  hostRepliedAt DateTime?
-  createdAt     DateTime  @default(now())
+  hostReply         String?
+  hostRepliedAt     DateTime?
+  /// P1-7 alt puanlar (1–5, isteğe bağlı).
+  cleanliness       Int?
+  location          Int?
+  staff             Int?
+  value             Int?
+  /// P1-7 moderasyon: yalnızca PUBLISHED yorumlar gösterilir ve puana katılır.
+  moderationStatus  ReviewModerationStatus @default(PUBLISHED)
+  /// Deterministik filtrenin/şikâyetlerin gerekçe kodları.
+  moderationReasons Json                   @default("[]")
+  reportCount       Int                    @default(0)
+  reports           ReviewReport[]
+  createdAt         DateTime               @default(now())
 
+  @@index([propertyId, moderationStatus])
   @@index([propertyId])
   @@index([userId])
   @@index([propertyId, rating])
+}
+
+enum ReviewModerationStatus {
+  PUBLISHED
+  PENDING_REVIEW
+  HIDDEN
+  REMOVED
+}
+
+/// P1-7: kullanıcı şikâyeti; kullanıcı başına yorum başına tek.
+model ReviewReport {
+  id         String   @id @default(cuid())
+  reviewId   String
+  review     Review   @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  reporterId String
+  reporter   User     @relation(fields: [reporterId], references: [id])
+  reason     String
+  note       String?
+  createdAt  DateTime @default(now())
+
+  @@unique([reviewId, reporterId])
+}
+
+enum LicenseStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+/// P1-6: rezervasyona bağlı misafir–ev sahibi yazışması.
+model MessageThread {
+  id        String    @id @default(cuid())
+  bookingId String    @unique
+  booking   Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  messages  Message[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+/// Gövde yalnızca maskelenmiş haliyle saklanır (iletişim bilgisi platform dışına taşınmaz).
+model Message {
+  id          String        @id @default(cuid())
+  threadId    String
+  thread      MessageThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  senderId    String
+  sender      User          @relation(fields: [senderId], references: [id])
+  senderRole  String
+  body        String
+  maskedKinds String[]      @default([])
+  /// Ev sahibinin onayladığı yapay zekâ taslağından mı gönderildi.
+  fromAiDraft Boolean       @default(false)
+  createdAt   DateTime      @default(now())
+
+  @@index([threadId, createdAt])
 }
 
 model Favorite {

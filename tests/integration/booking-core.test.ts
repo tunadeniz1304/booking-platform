@@ -182,6 +182,40 @@ describeInt("rezervasyon çekirdeği (integration)", () => {
     );
   });
 
+  it("yük/kaos bulgusu: sayacı tutarsız tek tutma, süre dolum işini zehirlemez", async () => {
+    const mk = (userId: string, from: number, to: number) =>
+      createBooking({
+        userId,
+        propertyId: tryProperty.id,
+        roomId: tryProperty.roomId,
+        checkIn: iso(utcDay(from)),
+        checkOut: iso(utcDay(to)),
+        guestCount: 1,
+      });
+    const { booking: drifted } = await mk(userIds[1], 40, 42);
+    const { booking: normal } = await mk(userIds[2], 50, 51);
+    // Sapma: tutmanın `held` sayacı hiç artırılmamış gibi (eski seed PENDING kaydı).
+    await prisma.inventoryDay.updateMany({
+      where: { roomTypeId: tryProperty.roomId, date: { gte: utcDay(40), lt: utcDay(42) } },
+      data: { held: 0 },
+    });
+    await prisma.booking.updateMany({
+      where: { id: { in: [drifted.id, normal.id] } },
+      data: { holdExpiresAt: new Date(Date.now() - 60_000) },
+    });
+
+    expect(await expireHolds(new Date())).toBeGreaterThanOrEqual(2);
+    for (const id of [drifted.id, normal.id]) {
+      expect((await prisma.booking.findUniqueOrThrow({ where: { id } })).status).toBe("EXPIRED");
+    }
+    // Normal tutma iade edildi; sapmalı olan eksiye düşmedi (kısmi iade geri alındı).
+    expect(await counters(tryProperty.roomId, 50, 51)).toEqual([{ total: 1, sold: 0, held: 0 }]);
+    expect(await counters(tryProperty.roomId, 40, 42)).toEqual([
+      { total: 1, sold: 0, held: 0 },
+      { total: 1, sold: 0, held: 0 },
+    ]);
+  }, 60_000);
+
   it("regression: #8 teklif = rezervasyon toplamı; fiyat değişirse 409 PRICE_CHANGED", async () => {
     const req = {
       roomId: tryProperty.roomId,

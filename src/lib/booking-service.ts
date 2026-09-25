@@ -79,6 +79,10 @@ const bookingsCreated = counter("booking_created_total", "Oluşturulan rezervasy
   "outcome",
 ] as const);
 const bookingsExpired = counter("booking_expired_total", "Süresi dolan tutmalar");
+const inventoryDriftOnExpire = counter(
+  "booking_expire_inventory_drift_total",
+  "Süre dolumunda envanter sayacı tutarsız bulunan tutmalar"
+);
 
 /** Rezervasyon çakışması (dolu, geçersiz durum, eşzamanlı değişiklik) → 409 */
 export class BookingConflictError extends HttpError {
@@ -659,7 +663,7 @@ export async function expireHolds(now: Date = new Date(), limit = 100): Promise<
         },
       });
       if (updated.count !== 1) continue;
-      await releaseInventory(tx, booking);
+      await releaseInventoryOrSkipDrift(tx, booking);
       await appendOutbox(
         tx,
         makeEvent<BookingExpiredPayload>(EventTypes.BookingExpired, booking.id, "booking", {
@@ -683,6 +687,39 @@ export async function expireHolds(now: Date = new Date(), limit = 100): Promise<
     logger.info({ expired: expired.length }, "expired booking holds");
   }
   return expired.length;
+}
+
+/**
+ * Süre dolumu için envanter iadesi; sayaç tutarsızsa (ör. `held` hiç artırılmamış eski/seed
+ * PENDING kaydı) işi DÜŞÜRMEZ. Aksi halde tek bir tutarsız kayıt tüm toplu işlemi geri
+ * alır ve hiçbir tutma bir daha süresi dolmaz (kaos/yük deneyinde görüldü: 4000+ HELD
+ * birikti, envanter kilitli kaldı). SAVEPOINT ile kısmi iade geri alınır; rezervasyon yine
+ * EXPIRED olur (zaten tutulmayan birimi iade etmemek doğrudur) ve durum hata olarak loglanır.
+ */
+async function releaseInventoryOrSkipDrift(
+  tx: Prisma.TransactionClient,
+  booking: {
+    id: string;
+    roomId: string;
+    checkIn: Date;
+    checkOut: Date;
+    units: number;
+    status: string;
+  }
+): Promise<void> {
+  await tx.$executeRawUnsafe("SAVEPOINT expire_release");
+  try {
+    await releaseInventory(tx, booking);
+    await tx.$executeRawUnsafe("RELEASE SAVEPOINT expire_release");
+  } catch (error) {
+    if (!(error instanceof InventoryUnavailableError)) throw error;
+    await tx.$executeRawUnsafe("ROLLBACK TO SAVEPOINT expire_release");
+    inventoryDriftOnExpire.inc();
+    logger.error(
+      { ...errorFields(error), bookingId: booking.id, status: booking.status },
+      "inventory counter drift on expire; hold expired without release"
+    );
+  }
 }
 
 /**

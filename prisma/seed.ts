@@ -1197,6 +1197,14 @@ async function main() {
         status: bp.status as "CONFIRMED" | "PENDING",
       },
     });
+    if (bp.status === "PENDING") {
+      // Sayaçlı envanter: ödeme bekleyen rezervasyon her gecede bir oda TUTAR. Aksi halde
+      // süre dolum işi iade edecek `held` bulamaz (bkz. booking-service expireHolds).
+      await prisma.inventoryDay.updateMany({
+        where: { id: { in: rows.map((r) => r.id) } },
+        data: { held: { increment: 1 } },
+      });
+    }
     if (bp.status === "CONFIRMED") {
       // Sayaçlı envanter: onaylı rezervasyon her gecede bir oda satar.
       await prisma.inventoryDay.updateMany({

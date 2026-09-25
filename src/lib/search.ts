@@ -560,8 +560,10 @@ export async function searchProperties(params: SearchParams): Promise<SearchResp
 }
 
 export async function getPopularProperties(limit = 10): Promise<SearchResult[]> {
+  // Anahtar sürüm + limit içerir: farklı limitler birbirinin önbelleğini döndürmez.
+  const popularKey = `${POPULAR_CACHE_KEY}:v${await currentCacheVersion()}:${limit}`;
   try {
-    const cached = await redis.get(POPULAR_CACHE_KEY);
+    const cached = await redis.get(popularKey);
     if (cached) {
       return JSON.parse(cached) as SearchResult[];
     }
@@ -619,7 +621,7 @@ export async function getPopularProperties(limit = 10): Promise<SearchResult[]> 
   }));
 
   try {
-    await redis.set(POPULAR_CACHE_KEY, JSON.stringify(results), { ex: POPULAR_CACHE_TTL });
+    await redis.set(popularKey, JSON.stringify(results), { ex: POPULAR_CACHE_TTL });
   } catch (error) {
     logger.error(errorFields(error), "Popular cache write failed");
   }

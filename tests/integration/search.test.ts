@@ -225,7 +225,10 @@ describeInt("arama (integration)", () => {
   it("popüler mülkler önbelleklenir; geçersiz kılma sürümü artırır ve önbelleği boşaltır", async () => {
     const popular = await getPopularProperties(5);
     expect(popular.length).toBeGreaterThan(0);
-    expect(await redis.get("search:popular")).not.toBeNull();
+    const version = (await redis.get("search:version")) ?? "0";
+    // Anahtar sürüm + limit içerir (farklı limitler karışmaz).
+    expect(await redis.get(`search:popular:v${version}:5`)).not.toBeNull();
+    expect(await redis.get(`search:popular:v${version}:3`)).toBeNull();
     const again = await getPopularProperties(5);
     expect(again.map((p) => p.id)).toEqual(popular.map((p) => p.id));
 
@@ -233,7 +236,7 @@ describeInt("arama (integration)", () => {
     await redis.set(`property:${cheap.id}`, "x");
     await invalidatePropertySearchCache(cheap.id);
     expect(Number(await redis.get("search:version"))).toBe(before + 1);
-    expect(await redis.get("search:popular")).toBeNull();
+    expect(await redis.get(`search:popular:v${before + 1}:5`)).toBeNull();
     expect(await redis.get(`property:${cheap.id}`)).toBeNull();
 
     // Sürüm değişti → aynı parametreler artık önbellekten gelmez.

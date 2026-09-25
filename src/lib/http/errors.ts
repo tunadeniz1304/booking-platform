@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
+import { Prisma } from "@prisma/client";
 import { logger, errorFields } from "@/lib/observability/logger";
 
 /**
@@ -78,6 +79,10 @@ export function toErrorResponse(error: unknown, context = "request"): NextRespon
       { error: "Doğrulama hatası", code: "VALIDATION_ERROR", details: error.flatten() },
       { status: 400 }
     );
+  }
+  // Prisma "kayıt bulunamadı" (ör. var olmayan kimlikle update) → 404, 500 değil.
+  if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
+    return NextResponse.json({ error: "Kayıt bulunamadı", code: "NOT_FOUND" }, { status: 404 });
   }
   if (error instanceof SyntaxError) {
     return NextResponse.json(

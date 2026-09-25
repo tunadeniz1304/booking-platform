@@ -1,3 +1,4 @@
+import { cityKey } from "@/lib/routing/city-key";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
@@ -6,7 +7,7 @@ import { getConfig } from "@/lib/config/app-config";
 import { toErrorResponse, ValidationError } from "@/lib/http/errors";
 import { monthOf, todayUtc } from "@/lib/time/nights";
 
-const norm = (s: string) => s.trim().toLocaleLowerCase("tr-TR");
+const norm = cityKey;
 
 /**
  * Çok şehirli rota optimizasyonu. Hata #12 düzeltmeleri: şehir adları büyük/küçük
@@ -37,10 +38,12 @@ export async function GET(req: NextRequest) {
     const unique = [...new Map(names.map((n) => [norm(n), n])).values()];
     if (unique.length !== names.length) throw new ValidationError("Şehir listesi tekrar içeremez");
 
-    const locations = await prisma.location.findMany({
-      where: { OR: unique.map((n) => ({ city: { equals: n, mode: "insensitive" as const } })) },
-      select: { city: true, latitude: true, longitude: true },
-    });
+    // Eşleştirme uygulamada `norm` ile (veritabanının `insensitive` karşılaştırması Türkçe
+    // İ/ı'yı katlamaz); lokasyon tablosu küçüktür.
+    const wanted = new Set(unique.map(norm));
+    const locations = (
+      await prisma.location.findMany({ select: { city: true, latitude: true, longitude: true } })
+    ).filter((l) => wanted.has(norm(l.city)));
     const byKey = new Map(locations.map((l) => [norm(l.city), l]));
     const nodes: CityNode[] = [];
     for (const name of unique) {

@@ -78,13 +78,19 @@ export async function createReview(input: {
   return review;
 }
 
-export async function replyToReview(input: { hostId: string; reviewId: string; text: string }) {
+/** Ev sahibi yanıtı: yalnızca mülkün sahibi; ADMIN her mülkün yorumuna yanıt verebilir. */
+export async function replyToReview(input: {
+  hostId: string;
+  reviewId: string;
+  text: string;
+  isAdmin?: boolean;
+}) {
   const review = await prisma.review.findUnique({
     where: { id: input.reviewId },
     select: { id: true, propertyId: true, property: { select: { hostId: true } } },
   });
   // Başka host'un mülkü: kaynağın varlığı sızdırılmaz.
-  if (!review || review.property.hostId !== input.hostId)
+  if (!review || (!input.isAdmin && review.property.hostId !== input.hostId))
     throw new NotFoundError("Yorum bulunamadı");
   const updated = await prisma.review.update({
     where: { id: review.id },

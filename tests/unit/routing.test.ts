@@ -76,3 +76,13 @@ describe("regression: #12 çok şehirli rota optimizasyonu", () => {
     expect(plan.order[0]).toBe("İstanbul");
   });
 });
+
+describe("rota şehir eşleştirme anahtarı (Türkçe İ/ı)", () => {
+  it("PARIS/Paris, ISTANBUL/İstanbul/istanbul aynı anahtar", async () => {
+    const { cityKey: norm } = await import("@/lib/routing/city-key");
+    expect(norm("PARIS")).toBe(norm("Paris"));
+    expect(norm("ISTANBUL")).toBe(norm("İstanbul"));
+    expect(norm("istanbul")).toBe(norm("İSTANBUL"));
+    expect(norm("  Kuşadası ")).toBe(norm("KUŞADASI"));
+  });
+});

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 
 /**
  * "Nereye?" alanı için otomatik tamamlama. Gerçek lokasyon verisini
@@ -30,6 +31,7 @@ interface DestinationAutocompleteProps {
 }
 
 export default function DestinationAutocomplete({ value, onChange }: DestinationAutocompleteProps) {
+  const t = useTranslations("search");
   const [options, setOptions] = useState<LocationOption[]>([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -136,7 +138,7 @@ export default function DestinationAutocomplete({ value, onChange }: Destination
             setOpen(true);
           }}
           onFocus={() => setOpen(true)}
-          placeholder="Şehir, otel veya bölge"
+          placeholder={t("autocomplete.placeholder")}
           className="w-full rounded-sm border border-gray-300 bg-white py-2.5 pl-10 pr-3 text-sm text-gray-900 placeholder-gray-500 focus:border-[#003580] focus:outline-none focus:ring-1 focus:ring-[#003580]"
         />
       </div>
@@ -149,13 +151,13 @@ export default function DestinationAutocomplete({ value, onChange }: Destination
         >
           <li className="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
             {value.trim().length === 0
-              ? "Popüler destinasyonlar"
+              ? t("autocomplete.popular")
               : loading
-                ? "Aranıyor..."
-                : "Öneriler"}
+                ? t("autocomplete.searching")
+                : t("autocomplete.suggestions")}
           </li>
           {options.length === 0 && !loading && (
-            <li className="px-4 py-3 text-sm text-gray-500">Sonuç bulunamadı</li>
+            <li className="px-4 py-3 text-sm text-gray-500">{t("autocomplete.noResults")}</li>
           )}
           {options.map((opt, idx) => (
             <li key={`${opt.city}-${opt.country}-${idx}`}>

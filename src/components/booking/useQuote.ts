@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 
 /** /api/quote yanıtı (tutarlar minor-unit). */
 export interface QuoteView {
@@ -31,6 +32,9 @@ export interface QuoteView {
   expiresAt: string;
 }
 
+/** Ağ/yanıt hatasında yer tutucu; dönüşte etkin dildeki mesaja çevrilir. */
+const FETCH_FAILED = "\u0000quote-fetch-failed";
+
 export interface QuoteState {
   quote: QuoteView | null;
   loading: boolean;
@@ -54,6 +58,7 @@ export function useQuote(params: {
   /** Değiştirildiğinde teklif yeniden alınır (ör. PRICE_CHANGED sonrası). */
   refreshKey?: number;
 }): QuoteState {
+  const t = useTranslations("quote");
   const { roomId, propertyId, checkIn, checkOut, guests, ratePlanId, refreshKey } = params;
   const key =
     roomId && checkIn && checkOut && checkIn < checkOut
@@ -91,7 +96,7 @@ export function useQuote(params: {
               key,
               quote: null,
               loading: false,
-              error: body.error ?? "Fiyat alınamadı",
+              error: body.error ?? FETCH_FAILED,
               code: body.code ?? null,
             });
           } else {
@@ -100,7 +105,7 @@ export function useQuote(params: {
         })
         .catch(() => {
           if (active)
-            setState({ key, quote: null, loading: false, error: "Fiyat alınamadı", code: null });
+            setState({ key, quote: null, loading: false, error: FETCH_FAILED, code: null });
         });
     }, 150);
     return () => {
@@ -112,5 +117,5 @@ export function useQuote(params: {
 
   if (!key) return { quote: null, loading: false, error: null, code: null };
   if (state.key !== key) return { quote: null, loading: true, error: null, code: null };
-  return state;
+  return state.error === FETCH_FAILED ? { ...state, error: t("fetchFailed") } : state;
 }

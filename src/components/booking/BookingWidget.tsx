@@ -2,8 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
+import { useFormat } from "@/i18n/use-format";
 import DateRangePicker, { toISODate } from "@/components/search/DateRangePicker";
 import QuoteBreakdown from "./QuoteBreakdown";
+import PriceInsight from "./PriceInsight";
 import { useQuote } from "./useQuote";
 
 export interface BookingWidgetRatePlan {
@@ -52,6 +55,8 @@ function addDaysISO(days: number): string {
 
 export default function BookingWidget({ propertyId, rooms, initial }: BookingWidgetProps) {
   const router = useRouter();
+  const t = useTranslations("booking");
+  const f = useFormat();
   const validStay =
     initial?.checkIn !== undefined &&
     initial.checkOut !== undefined &&
@@ -110,9 +115,8 @@ export default function BookingWidget({ propertyId, rooms, initial }: BookingWid
   };
 
   const dateSummary = (() => {
-    const fmt = (s: string) =>
-      new Date(s).toLocaleDateString("tr-TR", { day: "numeric", month: "short", year: "numeric" });
-    return checkIn && checkOut ? `${fmt(checkIn)} - ${fmt(checkOut)}` : "Tarih seçin";
+    const fmt = (s: string) => f.date(s, "medium");
+    return checkIn && checkOut ? `${fmt(checkIn)} - ${fmt(checkOut)}` : t("widget.selectDates");
   })();
 
   return (
@@ -120,10 +124,10 @@ export default function BookingWidget({ propertyId, rooms, initial }: BookingWid
       onSubmit={handleSubmit}
       className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm"
     >
-      <h2 className="text-xl font-semibold text-gray-900">Rezervasyon Yap</h2>
+      <h2 className="text-xl font-semibold text-gray-900">{t("widget.title")}</h2>
 
       <div className="relative mt-4">
-        <label className="block text-sm font-medium text-gray-700">Giriş - Çıkış</label>
+        <label className="block text-sm font-medium text-gray-700">{t("widget.dates")}</label>
         <button
           type="button"
           onClick={() => setCalendarOpen(!calendarOpen)}
@@ -145,7 +149,7 @@ export default function BookingWidget({ propertyId, rooms, initial }: BookingWid
 
       <div className="mt-3">
         <label htmlFor="guest-count" className="block text-sm font-medium text-gray-700">
-          Misafir Sayısı
+          {t("widget.guests")}
         </label>
         <select
           id="guest-count"
@@ -155,7 +159,7 @@ export default function BookingWidget({ propertyId, rooms, initial }: BookingWid
         >
           {[1, 2, 3, 4, 5, 6].map((count) => (
             <option key={count} value={count}>
-              {count} misafir
+              {t("widget.guestOption", { count })}
             </option>
           ))}
         </select>
@@ -163,7 +167,7 @@ export default function BookingWidget({ propertyId, rooms, initial }: BookingWid
 
       <div className="mt-3">
         <label htmlFor="room-select" className="block text-sm font-medium text-gray-700">
-          Oda Seçimi
+          {t("widget.room")}
         </label>
         <select
           id="room-select"
@@ -171,10 +175,14 @@ export default function BookingWidget({ propertyId, rooms, initial }: BookingWid
           onChange={(e) => setSelectedRoomId(e.target.value)}
           className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#003580] focus:outline-none focus:ring-1 focus:ring-[#003580]"
         >
-          {availableRooms.length === 0 && <option value="">Uygun oda yok</option>}
+          {availableRooms.length === 0 && <option value="">{t("widget.noRooms")}</option>}
           {availableRooms.map((room) => (
             <option key={room.id} value={room.id}>
-              {room.name} - {room.capacity} kişi - {room.bedType}
+              {t("widget.roomOption", {
+                name: room.name,
+                capacity: room.capacity,
+                bedType: room.bedType,
+              })}
             </option>
           ))}
         </select>
@@ -182,7 +190,9 @@ export default function BookingWidget({ propertyId, rooms, initial }: BookingWid
 
       {plans.length > 1 && (
         <fieldset className="mt-3">
-          <legend className="block text-sm font-medium text-gray-700">Fiyat seçeneği</legend>
+          <legend className="block text-sm font-medium text-gray-700">
+            {t("widget.ratePlan")}
+          </legend>
           <div className="mt-1 space-y-1">
             {plans.map((plan) => (
               <label key={plan.id} className="flex items-start gap-2 text-sm text-gray-800">
@@ -197,8 +207,8 @@ export default function BookingWidget({ propertyId, rooms, initial }: BookingWid
                 <span>
                   {plan.name}
                   <span className="block text-xs text-gray-600">
-                    {plan.refundable ? "İptal politikasına göre iade" : "İade edilemez"}
-                    {plan.mealPlan === "BREAKFAST" ? " · Kahvaltı dahil" : ""}
+                    {plan.refundable ? t("widget.refundable") : t("widget.nonRefundable")}
+                    {plan.mealPlan === "BREAKFAST" ? ` · ${t("widget.breakfastIncluded")}` : ""}
                   </span>
                 </span>
               </label>
@@ -208,17 +218,26 @@ export default function BookingWidget({ propertyId, rooms, initial }: BookingWid
       )}
 
       <div className="mt-5 border-t border-gray-200 pt-4" aria-live="polite">
-        {loading && <p className="text-sm text-gray-500">Fiyat hesaplanıyor…</p>}
+        {loading && <p className="text-sm text-gray-500">{t("widget.calculating")}</p>}
         {error && <p className="text-sm text-red-600">{error}</p>}
         {quote && <QuoteBreakdown quote={quote} />}
       </div>
+
+      {selectedRoom && checkIn && checkOut && checkIn < checkOut && (
+        <PriceInsight
+          roomId={selectedRoom.id}
+          checkIn={checkIn}
+          checkOut={checkOut}
+          guests={guestCount}
+        />
+      )}
 
       <button
         type="submit"
         disabled={!selectedRoom || !quote}
         className="mt-5 w-full rounded-lg bg-[#003580] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#002b66] disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-700"
       >
-        Rezervasyonu Onayla
+        {t("widget.submit")}
       </button>
     </form>
   );

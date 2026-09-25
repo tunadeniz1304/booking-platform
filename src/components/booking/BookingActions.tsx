@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
+import { useTranslations } from "next-intl";
 import { ApiError, apiFetch } from "@/lib/api-client";
 import { CardValidationError, TEST_CARDS, tokenizeCard } from "@/lib/payment/card-token";
-import { formatMoney, money } from "@/lib/money/money";
+import { useFormat } from "@/i18n/use-format";
 import { deviceFingerprint } from "@/lib/risk/device-fingerprint";
 import type { PayResponse } from "./StripePaymentForm";
 import StepUpDialog from "./StepUpDialog";
@@ -40,6 +41,8 @@ export default function BookingActions({
   currency,
   onChanged,
 }: Props) {
+  const t = useTranslations("payment");
+  const f = useFormat();
   const [payConfig, setPayConfig] = useState<PaymentConfig>({
     provider: "mock",
     publishableKey: null,
@@ -87,17 +90,17 @@ export default function BookingActions({
     const pending = stepUp;
     setStepUp(null);
     if (!pending?.cardToken) {
-      setMessage({ kind: "info", text: "Doğrulandı. Ödemeyi yeniden gönderebilirsiniz." });
+      setMessage({ kind: "info", text: t("verifiedRetry") });
       return;
     }
     setBusy(true);
     try {
       const out = await submitToken(pending.cardToken, pending.cardBin);
       if (out.status === "requires_action")
-        setChallenge(out.challenge?.hint ?? "Doğrulama gerekli");
+        setChallenge(out.challenge?.hint ?? t("verificationRequired"));
       else onChanged();
     } catch (err) {
-      showError(err, "Ödeme başarısız");
+      showError(err, t("failed"));
     } finally {
       setBusy(false);
     }
@@ -113,7 +116,7 @@ export default function BookingActions({
     } catch (err) {
       // Stripe akışında token tekrar kullanılamaz: doğrulamadan sonra kullanıcı yeniden gönderir.
       if (isStepUp(err)) setStepUp({ cardToken: "" });
-      else showError(err, "Ödeme başarısız");
+      else showError(err, t("failed"));
       return { status: "failed" };
     } finally {
       setBusy(false);
@@ -128,7 +131,7 @@ export default function BookingActions({
       });
       onChanged();
     } catch (err) {
-      showError(err, "Doğrulama başarısız");
+      showError(err, t("verificationFailed"));
     }
   }
 
@@ -147,7 +150,7 @@ export default function BookingActions({
     } catch (err) {
       setMessage({
         kind: "error",
-        text: err instanceof CardValidationError ? err.message : "Kart bilgisi geçersiz",
+        text: err instanceof CardValidationError ? err.message : t("invalidCard"),
       });
       return;
     }
@@ -157,7 +160,7 @@ export default function BookingActions({
     try {
       const out = await submitToken(cardToken, cardBin);
       if (out.status === "requires_action")
-        setChallenge(out.challenge?.hint ?? "Doğrulama gerekli");
+        setChallenge(out.challenge?.hint ?? t("verificationRequired"));
       else onChanged();
     } catch (err) {
       if (isStepUp(err)) {
@@ -166,7 +169,7 @@ export default function BookingActions({
       }
       setMessage({
         kind: "error",
-        text: err instanceof ApiError ? err.message : "Ödeme başarısız",
+        text: err instanceof ApiError ? err.message : t("failed"),
       });
     } finally {
       setBusy(false);
@@ -186,7 +189,7 @@ export default function BookingActions({
     } catch (err) {
       setMessage({
         kind: "error",
-        text: err instanceof ApiError ? err.message : "Doğrulama başarısız",
+        text: err instanceof ApiError ? err.message : t("verificationFailed"),
       });
     } finally {
       setBusy(false);
@@ -194,7 +197,7 @@ export default function BookingActions({
   }
 
   async function cancel() {
-    if (!window.confirm("Rezervasyonu iptal etmek istediğinize emin misiniz?")) return;
+    if (!window.confirm(t("cancel.confirm"))) return;
     setBusy(true);
     try {
       const res = await apiFetch<{
@@ -204,14 +207,17 @@ export default function BookingActions({
         kind: "info",
         text:
           res.refund.refundMinor > 0
-            ? `İptal edildi. İade: ${formatMoney(money(res.refund.refundMinor, res.refund.currency))} (%${res.refund.refundPercent}).`
-            : "İptal edildi. Politika gereği iade yok.",
+            ? t("cancel.refunded", {
+                amount: f.money(res.refund.refundMinor, res.refund.currency),
+                percent: String(res.refund.refundPercent),
+              })
+            : t("cancel.noRefund"),
       });
       onChanged();
     } catch (err) {
       setMessage({
         kind: "error",
-        text: err instanceof ApiError ? err.message : "İptal edilemedi",
+        text: err instanceof ApiError ? err.message : t("cancel.failed"),
       });
     } finally {
       setBusy(false);
@@ -223,7 +229,7 @@ export default function BookingActions({
     <div className="space-y-4 border-t border-gray-100 pt-6">
       {status === "HELD" && useStripeForm && (
         <div className="space-y-3">
-          <h2 className="text-lg font-semibold text-gray-900">Ödeme</h2>
+          <h2 className="text-lg font-semibold text-gray-900">{t("title")}</h2>
           <StripePaymentForm
             publishableKey={payConfig.publishableKey!}
             amountMinor={amountMinor!}
@@ -237,20 +243,15 @@ export default function BookingActions({
       )}
 
       {status === "HELD" && !useStripeForm && !challenge && (
-        <form onSubmit={pay} className="space-y-3" aria-label="Ödeme">
-          <h2 className="text-lg font-semibold text-gray-900">Ödeme</h2>
+        <form onSubmit={pay} className="space-y-3" aria-label={t("title")}>
+          <h2 className="text-lg font-semibold text-gray-900">{t("title")}</h2>
           {holdExpiresAt && (
             <p className="text-sm text-amber-700">
-              Oda sizin için{" "}
-              {new Date(holdExpiresAt).toLocaleTimeString("tr-TR", {
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
-              &apos;e kadar tutuluyor.
+              {t("holdUntil", { time: f.time(holdExpiresAt) })}
             </p>
           )}
           <label className="block text-sm font-medium text-gray-700">
-            Kart numarası
+            {t("cardNumber")}
             <input
               className={input}
               inputMode="numeric"
@@ -262,7 +263,7 @@ export default function BookingActions({
           </label>
           <div className="grid grid-cols-2 gap-3">
             <label className="block text-sm font-medium text-gray-700">
-              Son kullanma (AA/YY)
+              {t("expiry")}
               <input
                 className={input}
                 autoComplete="cc-exp"
@@ -272,7 +273,7 @@ export default function BookingActions({
               />
             </label>
             <label className="block text-sm font-medium text-gray-700">
-              CVC
+              {t("cvc")}
               <input
                 className={input}
                 inputMode="numeric"
@@ -284,26 +285,29 @@ export default function BookingActions({
             </label>
           </div>
           <p className="text-xs text-gray-500">
-            Demo test kartları: {TEST_CARDS.success} (onay), {TEST_CARDS.decline} (ret),{" "}
-            {TEST_CARDS.threeDs} (3D Secure). Gerçek ödeme alınmaz.
+            {t("testCards", {
+              success: TEST_CARDS.success,
+              decline: TEST_CARDS.decline,
+              threeDs: TEST_CARDS.threeDs,
+            })}
           </p>
           <button
             disabled={busy}
             className="w-full rounded-lg bg-[#003580] px-4 py-3 text-sm font-semibold text-white disabled:bg-gray-300 disabled:text-gray-700"
           >
-            {busy ? "İşleniyor..." : "Öde ve onayla"}
+            {busy ? t("processing") : t("payAndConfirm")}
           </button>
         </form>
       )}
 
       {challenge && (
-        <form onSubmit={confirm3ds} className="space-y-3" aria-label="3D Secure doğrulaması">
-          <h2 className="text-lg font-semibold text-gray-900">3D Secure doğrulaması</h2>
+        <form onSubmit={confirm3ds} className="space-y-3" aria-label={t("threeDsTitle")}>
+          <h2 className="text-lg font-semibold text-gray-900">{t("threeDsTitle")}</h2>
           <p className="text-sm text-gray-600">{challenge}</p>
           <input
             className={input}
             inputMode="numeric"
-            aria-label="Doğrulama kodu"
+            aria-label={t("verificationCode")}
             value={code}
             onChange={(e) => setCode(e.target.value)}
             required
@@ -312,7 +316,7 @@ export default function BookingActions({
             disabled={busy}
             className="w-full rounded-lg bg-[#003580] px-4 py-3 text-sm font-semibold text-white disabled:bg-gray-300 disabled:text-gray-700"
           >
-            Doğrula
+            {t("verify")}
           </button>
         </form>
       )}
@@ -324,7 +328,7 @@ export default function BookingActions({
           disabled={busy}
           className="rounded-lg border border-red-300 px-6 py-3 text-sm font-semibold text-red-700 hover:bg-red-50"
         >
-          Rezervasyonu iptal et
+          {t("cancel.button")}
         </button>
       )}
 

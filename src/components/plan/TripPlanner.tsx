@@ -3,7 +3,9 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api-client";
-import { formatDate, formatMinor, isoDay, newIdempotencyKey } from "@/lib/ui/format";
+import { useTranslations } from "next-intl";
+import { isoDay, newIdempotencyKey } from "@/lib/ui/format";
+import { useFormat } from "@/i18n/use-format";
 import {
   Button,
   Card,
@@ -40,6 +42,9 @@ interface TripPlan {
 
 export default function TripPlanner() {
   const router = useRouter();
+  const t = useTranslations("plan");
+  const tc = useTranslations("common");
+  const f = useFormat();
   const [cities, setCities] = useState("İstanbul, Kapadokya, Antalya");
   const [days, setDays] = useState("6");
   const [guests, setGuests] = useState("2");
@@ -72,7 +77,7 @@ export default function TripPlanner() {
       // Her durak için tek idempotency anahtarı: çift tıklama/yeniden deneme çift rezervasyon üretmez.
       setKeys(res.stops.map(() => newIdempotencyKey()));
     } catch (err) {
-      setError(errorMessage(err));
+      setError(errorMessage(err, tc("unexpectedError")));
     } finally {
       setBusy(false);
     }
@@ -98,17 +103,17 @@ export default function TripPlanner() {
       });
       router.push(`/booking/${booking.id}`);
     } catch (err) {
-      setError(errorMessage(err));
+      setError(errorMessage(err, tc("unexpectedError")));
       setHolding(null);
     }
   }
 
   return (
     <div className="space-y-6">
-      <Card title="Gezi bilgileri" id="trip-form">
+      <Card title={t("form.title")} id="trip-form">
         <form onSubmit={submit} className="grid gap-4 md:grid-cols-4">
           <div className="md:col-span-4">
-            <Field label="Şehirler (virgülle ayırın, en fazla 6)" id="trip-cities">
+            <Field label={t("form.cities")} id="trip-cities">
               <input
                 id="trip-cities"
                 className={inputClass}
@@ -118,7 +123,7 @@ export default function TripPlanner() {
               />
             </Field>
           </div>
-          <Field label="Toplam gün" id="trip-days">
+          <Field label={t("form.days")} id="trip-days">
             <input
               id="trip-days"
               type="number"
@@ -130,7 +135,7 @@ export default function TripPlanner() {
               onChange={(e) => setDays(e.target.value)}
             />
           </Field>
-          <Field label="Misafir sayısı" id="trip-guests">
+          <Field label={t("form.guests")} id="trip-guests">
             <input
               id="trip-guests"
               type="number"
@@ -142,7 +147,7 @@ export default function TripPlanner() {
               onChange={(e) => setGuests(e.target.value)}
             />
           </Field>
-          <Field label="Başlangıç tarihi" id="trip-start">
+          <Field label={t("form.startDate")} id="trip-start">
             <input
               id="trip-start"
               type="date"
@@ -153,7 +158,7 @@ export default function TripPlanner() {
           </Field>
           <div className="flex items-end">
             <Button type="submit" disabled={busy} className="w-full">
-              {busy ? "Planlanıyor…" : "Plan oluştur"}
+              {busy ? t("form.submitting") : t("form.submit")}
             </Button>
           </div>
         </form>
@@ -163,11 +168,14 @@ export default function TripPlanner() {
 
       <div aria-live="polite">
         {plan && (
-          <Card title="Önerilen plan" id="trip-result">
+          <Card title={t("result.title")} id="trip-result">
             <div className="flex flex-wrap items-center gap-2 text-sm text-gray-800">
               <span>
-                Rota: <strong>{plan.route.order.join(" → ")}</strong> · yaklaşık{" "}
-                {Math.round(plan.route.totalKm)} km
+                {t.rich("result.route", {
+                  route: plan.route.order.join(" → "),
+                  km: Math.round(plan.route.totalKm),
+                  b: (chunks) => <strong>{chunks}</strong>,
+                })}
               </span>
               <LlmBadge mode={plan.llmMode} />
             </div>
@@ -176,35 +184,35 @@ export default function TripPlanner() {
               {plan.stops.map((s, i) => (
                 <li key={`${s.city}-${s.checkIn}`} className="rounded-md border p-3 text-sm">
                   <p className="font-semibold text-gray-900">
-                    {i + 1}. {s.city} · {formatDate(s.checkIn)} – {formatDate(s.checkOut)} (
-                    {s.nights} gece)
+                    {i + 1}. {s.city} · {f.date(s.checkIn)} – {f.date(s.checkOut)} (
+                    {t("result.nights", { count: s.nights })})
                   </p>
                   {s.stay ? (
                     <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
                       <span>
-                        {s.stay.title} ·{" "}
-                        <strong>{formatMinor(s.stay.total, s.stay.currency)}</strong>
+                        {s.stay.title} · <strong>{f.money(s.stay.total, s.stay.currency)}</strong>
                       </span>
                       <Button
                         onClick={() => hold(i)}
                         disabled={holding !== null}
-                        aria-label={`${s.city} konaklamasını tut (hold)`}
+                        aria-label={t("result.holdLabel", { city: s.city })}
                       >
-                        {holding === i ? "Tutuluyor…" : "Tut (hold)"}
+                        {holding === i ? t("result.holding") : t("result.hold")}
                       </Button>
                     </div>
                   ) : (
-                    <p className="mt-1 text-gray-700">Bu tarihlerde uygun konaklama bulunamadı.</p>
+                    <p className="mt-1 text-gray-700">{t("result.noStay")}</p>
                   )}
                 </li>
               ))}
             </ol>
             <p className="mt-4 text-sm text-gray-900">
-              Konaklama toplamı: <strong>{formatMinor(plan.total, plan.currency)}</strong>
+              {t.rich("result.total", {
+                amount: f.money(plan.total, plan.currency),
+                b: (chunks) => <strong>{chunks}</strong>,
+              })}
             </p>
-            <p className="mt-1 text-xs text-gray-600">
-              Plan rezervasyon yapmaz; «Tut» ile odayı kısa süre ayırıp ödemeye geçersiniz.
-            </p>
+            <p className="mt-1 text-xs text-gray-600">{t("result.note")}</p>
           </Card>
         )}
       </div>

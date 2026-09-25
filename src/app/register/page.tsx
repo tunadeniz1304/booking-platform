@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 
@@ -12,6 +13,7 @@ interface RegisterResponse {
 }
 
 export default function RegisterPage() {
+  const t = useTranslations("auth");
   const router = useRouter();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -32,12 +34,12 @@ export default function RegisterPage() {
       });
       const data = (await res.json()) as RegisterResponse & { error?: string };
       if (!res.ok) {
-        throw new Error(data.error ?? "Kayıt oluşturulamadı");
+        throw new Error(data.error ?? t("register.failed"));
       }
       router.push("/");
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Kayıt oluşturulamadı");
+      setError(err instanceof Error ? err.message : t("register.failed"));
       setSubmitting(false);
     }
   };
@@ -50,16 +52,14 @@ export default function RegisterPage() {
         className="mx-auto flex w-full max-w-md flex-1 items-center justify-center px-4 py-16"
       >
         <div className="w-full rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
-          <h1 className="text-2xl font-bold text-gray-900">Kayıt Ol</h1>
-          <p className="mt-1 text-sm text-gray-600">
-            Hesap oluşturarak rezervasyon yapmaya başlayın.
-          </p>
+          <h1 className="text-2xl font-bold text-gray-900">{t("register.title")}</h1>
+          <p className="mt-1 text-sm text-gray-600">{t("register.subtitle")}</p>
 
           <form onSubmit={handleSubmit} className="mt-6 space-y-4">
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label htmlFor="firstName" className="block text-sm font-medium text-gray-700">
-                  Ad
+                  {t("register.firstName")}
                 </label>
                 <input
                   id="firstName"
@@ -73,7 +73,7 @@ export default function RegisterPage() {
               </div>
               <div>
                 <label htmlFor="lastName" className="block text-sm font-medium text-gray-700">
-                  Soyad
+                  {t("register.lastName")}
                 </label>
                 <input
                   id="lastName"
@@ -89,7 +89,7 @@ export default function RegisterPage() {
 
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                E-posta
+                {t("email")}
               </label>
               <input
                 id="email"
@@ -104,7 +104,7 @@ export default function RegisterPage() {
 
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                Parola
+                {t("password")}
               </label>
               <input
                 id="password"
@@ -114,13 +114,11 @@ export default function RegisterPage() {
                 minLength={8}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="En az 8 karakter ve bir rakam"
+                placeholder={t("register.passwordPlaceholder")}
                 className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#003580] focus:outline-none focus:ring-1 focus:ring-[#003580]"
               />
               {password.length > 0 && (!/[0-9]/.test(password) || password.length < 8) && (
-                <p className="mt-1 text-xs text-red-600">
-                  Parola en az 8 karakter ve bir rakam içermelidir.
-                </p>
+                <p className="mt-1 text-xs text-red-600">{t("register.passwordHint")}</p>
               )}
             </div>
 
@@ -135,14 +133,14 @@ export default function RegisterPage() {
               disabled={submitting}
               className="w-full rounded-lg bg-[#003580] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#002b66] disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-700"
             >
-              {submitting ? "Kaydediliyor..." : "Kayıt Ol"}
+              {submitting ? t("saving") : t("register.submit")}
             </button>
           </form>
 
           <p className="mt-6 text-center text-sm text-gray-600">
-            Zaten hesabınız var mı?{" "}
+            {t("register.haveAccount")}{" "}
             <Link href="/login" className="font-semibold text-[#003580] hover:underline">
-              Giriş Yap
+              {t("register.loginLink")}
             </Link>
           </p>
         </div>

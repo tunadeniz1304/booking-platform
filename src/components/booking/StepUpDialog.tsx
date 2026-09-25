@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { passkeyErrorMessage, performStepUp } from "@/lib/auth/passkey-client";
 
 /**
@@ -16,6 +17,7 @@ export default function StepUpDialog({
   onVerified: () => void;
   onCancel: () => void;
 }) {
+  const t = useTranslations("payment.stepUp");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const primary = useRef<HTMLButtonElement>(null);
@@ -36,7 +38,7 @@ export default function StepUpDialog({
       await performStepUp();
       onVerified();
     } catch (err) {
-      setError(passkeyErrorMessage(err, "Doğrulama başarısız"));
+      setError(passkeyErrorMessage(err, t("failed")));
       setBusy(false);
     }
   }
@@ -51,17 +53,16 @@ export default function StepUpDialog({
         className="w-full max-w-sm rounded-xl bg-white p-6 shadow-lg"
       >
         <h2 id="stepup-title" className="text-lg font-semibold text-gray-900">
-          Ek doğrulama gerekli
+          {t("title")}
         </h2>
         <p id="stepup-desc" className="mt-2 text-sm text-gray-700">
-          Hesabınızı korumak için bu ödemeyi passkey&apos;inizle onaylamanızı istiyoruz. Onaydan
-          sonra ödeme otomatik olarak yeniden denenir.
+          {t("description")}
         </p>
         {error && (
           <p role="alert" className="mt-3 text-sm text-red-700">
             {error}{" "}
             <Link href="/account" className="font-semibold underline">
-              Passkey&apos;lerimi yönet
+              {t("managePasskeys")}
             </Link>
           </p>
         )}
@@ -73,7 +74,7 @@ export default function StepUpDialog({
             disabled={busy}
             className="flex-1 rounded-lg bg-[#003580] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
           >
-            {busy ? "Bekleniyor..." : "Passkey ile doğrula"}
+            {busy ? t("waiting") : t("verify")}
           </button>
           <button
             type="button"
@@ -81,7 +82,7 @@ export default function StepUpDialog({
             disabled={busy}
             className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700"
           >
-            Vazgeç
+            {t("cancel")}
           </button>
         </div>
       </div>

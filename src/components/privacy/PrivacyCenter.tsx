@@ -3,11 +3,13 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { apiFetch } from "@/lib/api-client";
 import { Button, Card, Status, errorMessage, focusRing } from "@/components/ui/ui";
 
 /** KVKK self-servis (P2-5): veri dışa aktarımı ve hesap silme. */
 export default function PrivacyCenter() {
+  const t = useTranslations("privacy.center");
   const router = useRouter();
   const [feedback, setFeedback] = useState<{ error?: string; message?: string }>({});
   const [confirming, setConfirming] = useState(false);
@@ -22,12 +24,13 @@ export default function PrivacyCenter() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "verilerim.json";
+      const fileName = t("exportFileName");
+      a.download = fileName;
       document.body.appendChild(a);
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
-      setFeedback({ message: "Verileriniz indirildi (verilerim.json)." });
+      setFeedback({ message: t("exported", { file: fileName }) });
     } catch (err) {
       setFeedback({ error: errorMessage(err) });
     }
@@ -38,7 +41,7 @@ export default function PrivacyCenter() {
     setFeedback({});
     try {
       await apiFetch("/api/account", { method: "DELETE" });
-      setFeedback({ message: "Hesabınız silindi. Ana sayfaya yönlendiriliyorsunuz…" });
+      setFeedback({ message: t("deleted") });
       router.push("/");
       router.refresh();
     } catch (err) {
@@ -50,22 +53,16 @@ export default function PrivacyCenter() {
   return (
     <div className="space-y-6">
       <Status error={feedback.error} message={feedback.message} />
-      <Card title="Verilerimi indir" id="export">
-        <p className="mb-3 text-sm text-gray-800">
-          Hesabınıza ait kişisel verilerin (profil, rezervasyonlar, yorumlar, favoriler) bir
-          kopyasını JSON olarak indirin. Parola özeti dışa aktarılmaz.
-        </p>
-        <Button onClick={download}>Verilerimi indir</Button>
+      <Card title={t("exportTitle")} id="export">
+        <p className="mb-3 text-sm text-gray-800">{t("exportBody")}</p>
+        <Button onClick={download}>{t("exportButton")}</Button>
       </Card>
 
-      <Card title="Hesabımı sil" id="delete">
-        <p className="mb-3 text-sm text-gray-800">
-          Kişisel alanlarınız silinir veya takma adla değiştirilir. Rezervasyon ve ödeme kayıtları
-          yasal saklama yükümlülüğü nedeniyle anonimleştirilerek tutulur. Bu işlem geri alınamaz.
-        </p>
+      <Card title={t("deleteTitle")} id="delete">
+        <p className="mb-3 text-sm text-gray-800">{t("deleteBody")}</p>
         {!confirming ? (
           <Button variant="danger" onClick={() => setConfirming(true)}>
-            Hesabımı sil
+            {t("deleteButton")}
           </Button>
         ) : (
           <div
@@ -74,7 +71,7 @@ export default function PrivacyCenter() {
             className="space-y-3 rounded-md border border-red-300 bg-red-50 p-3"
           >
             <p id="delete-confirm-title" className="text-sm font-semibold text-red-900">
-              Hesabınızı kalıcı olarak silmek istediğinize emin misiniz?
+              {t("confirmTitle")}
             </p>
             <div className="flex items-center gap-2">
               <input
@@ -85,12 +82,12 @@ export default function PrivacyCenter() {
                 onChange={(e) => setAcknowledged(e.target.checked)}
               />
               <label htmlFor="delete-ack" className="text-sm text-gray-900">
-                İşlemin geri alınamayacağını anladım.
+                {t("acknowledge")}
               </label>
             </div>
             <div className="flex gap-2">
               <Button variant="danger" disabled={!acknowledged || busy} onClick={remove}>
-                {busy ? "Siliniyor…" : "Evet, hesabımı sil"}
+                {busy ? t("deleting") : t("confirmDelete")}
               </Button>
               <Button
                 variant="secondary"
@@ -99,7 +96,7 @@ export default function PrivacyCenter() {
                   setAcknowledged(false);
                 }}
               >
-                Vazgeç
+                {t("cancel")}
               </Button>
             </div>
           </div>
@@ -107,11 +104,13 @@ export default function PrivacyCenter() {
       </Card>
 
       <p className="text-sm text-gray-800">
-        Verilerinizin nasıl işlendiğini{" "}
-        <Link href="/privacy" className={`font-semibold text-[#003580] underline ${focusRing}`}>
-          aydınlatma metninde
-        </Link>{" "}
-        okuyabilirsiniz.
+        {t.rich("noticeLink", {
+          link: (c) => (
+            <Link href="/privacy" className={`font-semibold text-[#003580] underline ${focusRing}`}>
+              {c}
+            </Link>
+          ),
+        })}
       </p>
     </div>
   );

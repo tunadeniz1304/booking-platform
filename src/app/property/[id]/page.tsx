@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 import { prisma } from "@/lib/prisma";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
@@ -87,8 +88,9 @@ async function getProperty(id: string): Promise<PropertyDetail | null> {
 export async function generateMetadata({ params }: PropertyPageProps): Promise<Metadata> {
   const { id } = await params;
   const property = await getProperty(id);
+  const t = await getTranslations("property");
   return {
-    title: property ? `${property.title} | Booking Platform` : "Property Bulunamadı",
+    title: property ? t("metaTitle", { title: property.title }) : t("notFoundTitle"),
   };
 }
 
@@ -103,6 +105,7 @@ export default async function PropertyPage({ params, searchParams }: PropertyPag
     ratePlanId: one(sp.ratePlanId),
   };
   const property = await getProperty(id);
+  const t = await getTranslations("property");
 
   if (!property) {
     notFound();
@@ -121,7 +124,9 @@ export default async function PropertyPage({ params, searchParams }: PropertyPag
             <span className="inline-flex items-center rounded-lg bg-[#003580] px-2 py-1 text-sm font-semibold text-white">
               {property.ratingAvg.toFixed(1)}
             </span>
-            <span className="text-sm text-gray-600">{property.ratingCount} değerlendirme</span>
+            <span className="text-sm text-gray-600">
+              {t("ratingCount", { count: property.ratingCount })}
+            </span>
           </div>
         </div>
 
@@ -130,13 +135,13 @@ export default async function PropertyPage({ params, searchParams }: PropertyPag
             <PropertyGallery images={property.images} title={property.title} />
 
             <div className="mt-8">
-              <h2 className="text-xl font-semibold text-gray-900">Açıklama</h2>
+              <h2 className="text-xl font-semibold text-gray-900">{t("description")}</h2>
               <p className="mt-2 whitespace-pre-line text-gray-700">{property.description}</p>
             </div>
 
             {property.amenities.length > 0 && (
               <div className="mt-8">
-                <h2 className="text-xl font-semibold text-gray-900">Olanaklar</h2>
+                <h2 className="text-xl font-semibold text-gray-900">{t("amenities")}</h2>
                 <ul className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
                   {property.amenities.map((amenity) => (
                     <li

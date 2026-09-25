@@ -4,6 +4,7 @@ import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import SearchBar from "@/components/search/SearchBar";
 import PropertyCard from "@/components/property/PropertyCard";
+import { getTranslations } from "next-intl/server";
 import { getPopularProperties } from "@/lib/search";
 
 export const dynamic = "force-dynamic";
@@ -33,6 +34,7 @@ const popularDestinations = [
 
 export default async function HomePage() {
   const popular = await getPopularProperties(6);
+  const t = await getTranslations("home");
 
   return (
     <div className="min-h-screen bg-white">
@@ -40,10 +42,8 @@ export default async function HomePage() {
       <main id="main">
         <section className="bg-[#003580] pb-16 pt-8">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <h1 className="text-3xl font-bold text-white sm:text-4xl">
-              Binlerce konaklama yerini keşfedin
-            </h1>
-            <p className="mt-2 text-white/80">Dünya genelinde 2.000.000+ konaklama seçeneği</p>
+            <h1 className="text-3xl font-bold text-white sm:text-4xl">{t("title")}</h1>
+            <p className="mt-2 text-white/80">{t("subtitle")}</p>
             <div className="mt-8">
               <SearchBar />
             </div>
@@ -51,7 +51,7 @@ export default async function HomePage() {
         </section>
 
         <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-          <h2 className="text-2xl font-bold text-gray-900">Popüler destinasyonlar</h2>
+          <h2 className="text-2xl font-bold text-gray-900">{t("popularDestinations")}</h2>
           <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {popularDestinations.map((dest) => (
               <Link
@@ -79,7 +79,7 @@ export default async function HomePage() {
         </section>
 
         <section className="mx-auto max-w-7xl px-4 pb-16 sm:px-6 lg:px-8">
-          <h2 className="text-2xl font-bold text-gray-900">Öne çıkan konaklama yerleri</h2>
+          <h2 className="text-2xl font-bold text-gray-900">{t("featured")}</h2>
           {popular.length > 0 ? (
             <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {popular.map((property) => (
@@ -101,7 +101,7 @@ export default async function HomePage() {
             </div>
           ) : (
             <div className="mt-6 rounded-lg bg-gray-50 p-12 text-center">
-              <p className="text-gray-500">Henüz konaklama ilanı yok.</p>
+              <p className="text-gray-500">{t("empty")}</p>
             </div>
           )}
         </section>

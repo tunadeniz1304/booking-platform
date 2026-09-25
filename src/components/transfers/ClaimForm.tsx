@@ -2,9 +2,10 @@
 
 import { useState, useSyncExternalStore, type FormEvent } from "react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { apiFetch } from "@/lib/api-client";
 import { CardValidationError, TEST_CARDS, tokenizeCard } from "@/lib/payment/card-token";
-import { formatMinor } from "@/lib/ui/format";
+import { useFormat } from "@/i18n/use-format";
 import {
   Button,
   Card,
@@ -27,6 +28,8 @@ function readToken(): string {
 }
 
 export default function ClaimForm() {
+  const t = useTranslations("transfers.claim");
+  const f = useFormat();
   const token = useSyncExternalStore(subscribe, readToken, () => "");
   const [card, setCard] = useState({
     number: "",
@@ -51,7 +54,7 @@ export default function ClaimForm() {
       });
     } catch (err) {
       setFeedback({
-        error: err instanceof CardValidationError ? err.message : "Kart doğrulanamadı",
+        error: err instanceof CardValidationError ? err.message : t("invalidCard"),
       });
       return;
     }
@@ -63,7 +66,7 @@ export default function ClaimForm() {
       );
       setBookingId(res.bookingId);
       setFeedback({
-        message: `Devir tamamlandı. Ödenen: ${formatMinor(res.paidMinor, res.currency)}.`,
+        message: t("done", { amount: f.money(res.paidMinor, res.currency) }),
       });
       // Başarılı devirden sonra token'ı adres çubuğundan kaldır.
       window.history.replaceState(null, "", window.location.pathname);
@@ -77,30 +80,33 @@ export default function ClaimForm() {
   if (!token && !bookingId) {
     return (
       <p role="alert" className="text-sm text-red-700">
-        Geçerli bir devir bağlantısı bulunamadı. Satıcının paylaştığı bağlantının tamamını açın.
+        {t("invalidLink")}
       </p>
     );
   }
 
   return (
-    <Card title="Ödeme bilgileri" id="claim">
+    <Card title={t("paymentTitle")} id="claim">
       {bookingId ? (
         <p className="text-sm text-gray-900">
-          Rezervasyon artık sizin:{" "}
-          <Link
-            href={`/booking/${bookingId}`}
-            className={`font-semibold text-[#003580] underline ${focusRing}`}
-          >
-            rezervasyonu görüntüle
-          </Link>
+          {t.rich("owned", {
+            link: (chunks) => (
+              <Link
+                href={`/booking/${bookingId}`}
+                className={`font-semibold text-[#003580] underline ${focusRing}`}
+              >
+                {chunks}
+              </Link>
+            ),
+          })}
         </p>
       ) : (
         <form onSubmit={submit} className="grid gap-3 md:grid-cols-4">
           <div className="md:col-span-4">
             <Field
-              label="Kart numarası"
+              label={t("cardNumber")}
               id="card-number"
-              hint={`Demo kartları: onay ${TEST_CARDS.success}, ret ${TEST_CARDS.decline}. Kart bilgisi sunucuya gönderilmez; yalnızca token gider.`}
+              hint={t("cardHint", { success: TEST_CARDS.success, decline: TEST_CARDS.decline })}
             >
               <input
                 id="card-number"
@@ -113,7 +119,7 @@ export default function ClaimForm() {
               />
             </Field>
           </div>
-          <Field label="Ay" id="card-month">
+          <Field label={t("month")} id="card-month">
             <input
               id="card-month"
               type="number"
@@ -126,7 +132,7 @@ export default function ClaimForm() {
               onChange={(e) => setCard({ ...card, expMonth: e.target.value })}
             />
           </Field>
-          <Field label="Yıl" id="card-year">
+          <Field label={t("year")} id="card-year">
             <input
               id="card-year"
               type="number"
@@ -139,7 +145,7 @@ export default function ClaimForm() {
               onChange={(e) => setCard({ ...card, expYear: e.target.value })}
             />
           </Field>
-          <Field label="CVC" id="card-cvc">
+          <Field label={t("cvc")} id="card-cvc">
             <input
               id="card-cvc"
               inputMode="numeric"
@@ -153,7 +159,7 @@ export default function ClaimForm() {
           </Field>
           <div className="flex items-end">
             <Button type="submit" disabled={busy} className="w-full">
-              {busy ? "İşleniyor…" : "Öde ve devral"}
+              {busy ? t("processing") : t("submit")}
             </Button>
           </div>
         </form>

@@ -2,10 +2,12 @@
 
 import { FormEvent, useState } from "react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import AuthCard, { Notice } from "@/components/auth/AuthCard";
 
 /** Şifre sıfırlama isteği — yanıt hesabın varlığını ele vermez (daima aynı mesaj). */
 export default function ForgotPasswordPage() {
+  const t = useTranslations("auth");
   const [email, setEmail] = useState("");
   const [state, setState] = useState<"idle" | "sending" | "sent" | "error">("idle");
 
@@ -21,14 +23,11 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <AuthCard
-      title="Şifremi unuttum"
-      subtitle="E-posta adresinize sıfırlama bağlantısı gönderelim."
-    >
+    <AuthCard title={t("forgot.title")} subtitle={t("forgot.subtitle")}>
       <form onSubmit={submit} className="mt-6 space-y-4">
         <div>
           <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-            E-posta
+            {t("email")}
           </label>
           <input
             id="email"
@@ -45,19 +44,14 @@ export default function ForgotPasswordPage() {
           disabled={state === "sending"}
           className="w-full rounded-lg bg-[#003580] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#002b66] disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-700"
         >
-          {state === "sending" ? "Gönderiliyor..." : "Bağlantı gönder"}
+          {state === "sending" ? t("forgot.sending") : t("forgot.submit")}
         </button>
       </form>
-      {state === "sent" && (
-        <Notice kind="success">
-          Hesap varsa şifre sıfırlama bağlantısı e-postayla gönderildi. Bağlantı 30 dakika
-          geçerlidir.
-        </Notice>
-      )}
-      {state === "error" && <Notice kind="error">İstek gönderilemedi, tekrar deneyin.</Notice>}
+      {state === "sent" && <Notice kind="success">{t("forgot.sent")}</Notice>}
+      {state === "error" && <Notice kind="error">{t("forgot.error")}</Notice>}
       <p className="mt-6 text-center text-sm text-gray-600">
         <Link href="/login" className="font-semibold text-[#003580] hover:underline">
-          Girişe dön
+          {t("backToLogin")}
         </Link>
       </p>
     </AuthCard>

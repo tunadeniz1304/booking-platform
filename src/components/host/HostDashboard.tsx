@@ -2,8 +2,10 @@
 
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { apiFetch } from "@/lib/api-client";
-import { formatDate, formatDecimal, isoDay } from "@/lib/ui/format";
+import { isoDay } from "@/lib/ui/format";
+import { useFormat } from "@/i18n/use-format";
 import {
   Button,
   Card,
@@ -48,23 +50,22 @@ interface HostBooking {
   guestCount: number;
 }
 
-const STATUS_LABEL: Record<string, string> = {
-  PENDING: "Beklemede",
-  HELD: "Tutuldu",
-  CONFIRMED: "Onaylandı",
-  CANCELLED: "İptal",
-  EXPIRED: "Süresi doldu",
-  COMPLETED: "Tamamlandı",
-};
-
-/** P1-10: kayıt doğrulaması yapılmamış ilan yayına alınamaz ve aramada görünmez. */
-const LICENSE_LABEL: Record<HostProperty["licenseStatus"], string> = {
-  PENDING: "Doğrulama bekliyor",
-  VERIFIED: "Doğrulandı",
-  REJECTED: "Kayıtta bulunamadı",
-};
+const BOOKING_STATUSES = [
+  "PENDING",
+  "HELD",
+  "CONFIRMED",
+  "CANCELLED",
+  "EXPIRED",
+  "COMPLETED",
+] as const;
 
 export default function HostDashboard() {
+  const t = useTranslations("host");
+  const f = useFormat();
+  const statusLabel = (s: string) =>
+    (BOOKING_STATUSES as readonly string[]).includes(s)
+      ? t(`bookingStatus.${s as (typeof BOOKING_STATUSES)[number]}`)
+      : s;
   const { data, error, reload } = useLoader(() =>
     Promise.all([
       apiFetch<HostProperty[]>("/api/host/properties"),
@@ -84,51 +85,53 @@ export default function HostDashboard() {
           href="/host/revenue"
           className={`text-sm font-semibold text-[#003580] hover:underline ${focusRing}`}
         >
-          Gelir paneli: doluluk, ADR, RevPAR ve fiyat önerileri →
+          {t("dashboard.revenueLink")}
         </Link>
       </p>
       <Status error={error} />
       {properties === null && !error && (
         <p aria-live="polite" className="text-sm text-gray-600">
-          Mülkler yükleniyor…
+          {t("dashboard.loadingProperties")}
         </p>
       )}
-      {properties?.length === 0 && <p className="text-sm text-gray-700">Henüz bir mülkünüz yok.</p>}
+      {properties?.length === 0 && (
+        <p className="text-sm text-gray-700">{t("dashboard.noProperties")}</p>
+      )}
       {properties?.map((p) => (
         <PropertyPanel key={p.id} property={p} onChanged={load} />
       ))}
 
-      <Card title="Rezervasyonlar" id="host-bookings">
+      <Card title={t("bookings.title")} id="host-bookings">
         {bookings === null ? (
-          <p className="text-sm text-gray-600">Yükleniyor…</p>
+          <p className="text-sm text-gray-600">{t("bookings.loading")}</p>
         ) : bookings.length === 0 ? (
-          <p className="text-sm text-gray-700">Rezervasyon yok.</p>
+          <p className="text-sm text-gray-700">{t("bookings.empty")}</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full text-left text-sm">
-              <caption className="sr-only">Mülklerinize ait rezervasyonlar</caption>
+              <caption className="sr-only">{t("bookings.caption")}</caption>
               <thead className="border-b text-gray-700">
                 <tr>
                   <th scope="col" className="py-2 pr-4">
-                    Mülk
+                    {t("bookings.columns.property")}
                   </th>
                   <th scope="col" className="py-2 pr-4">
-                    Giriş
+                    {t("bookings.columns.checkIn")}
                   </th>
                   <th scope="col" className="py-2 pr-4">
-                    Çıkış
+                    {t("bookings.columns.checkOut")}
                   </th>
                   <th scope="col" className="py-2 pr-4">
-                    Misafir
+                    {t("bookings.columns.guests")}
                   </th>
                   <th scope="col" className="py-2 pr-4">
-                    Tutar
+                    {t("bookings.columns.amount")}
                   </th>
                   <th scope="col" className="py-2 pr-4">
-                    Durum
+                    {t("bookings.columns.status")}
                   </th>
                   <th scope="col" className="py-2">
-                    <span className="sr-only">Mesajlar</span>
+                    <span className="sr-only">{t("bookings.columns.messages")}</span>
                   </th>
                 </tr>
               </thead>
@@ -136,18 +139,18 @@ export default function HostDashboard() {
                 {bookings.map((b) => (
                   <tr key={b.id} className="border-b last:border-0">
                     <td className="py-2 pr-4">{titleOf(b.propertyId)}</td>
-                    <td className="py-2 pr-4">{formatDate(b.checkIn)}</td>
-                    <td className="py-2 pr-4">{formatDate(b.checkOut)}</td>
+                    <td className="py-2 pr-4">{f.date(b.checkIn, "short")}</td>
+                    <td className="py-2 pr-4">{f.date(b.checkOut, "short")}</td>
                     <td className="py-2 pr-4">{b.guestCount}</td>
-                    <td className="py-2 pr-4">{formatDecimal(b.totalPrice, b.currency)}</td>
-                    <td className="py-2 pr-4">{STATUS_LABEL[b.status] ?? b.status}</td>
+                    <td className="py-2 pr-4">{f.decimal(b.totalPrice, b.currency)}</td>
+                    <td className="py-2 pr-4">{statusLabel(b.status)}</td>
                     <td className="py-2">
                       {(b.status === "CONFIRMED" || b.status === "COMPLETED") && (
                         <Link
                           href={"/host/messages/" + b.id}
                           className="font-semibold text-[#003580] hover:underline"
                         >
-                          Mesajlar
+                          {t("bookings.messagesLink")}
                         </Link>
                       )}
                     </td>
@@ -163,6 +166,8 @@ export default function HostDashboard() {
 }
 
 function PropertyPanel({ property, onChanged }: { property: HostProperty; onChanged: () => void }) {
+  const t = useTranslations("host");
+  const f = useFormat();
   const p = property;
   const pid = `prop-${p.id}`;
   const [form, setForm] = useState({
@@ -188,7 +193,7 @@ function PropertyPanel({ property, onChanged }: { property: HostProperty; onChan
       };
       if (form.licenseNumber.trim()) body.licenseNumber = form.licenseNumber.trim();
       await apiFetch(`/api/properties/${p.id}`, { method: "PATCH", body: JSON.stringify(body) });
-      setStatus({ message: "Kaydedildi." });
+      setStatus({ message: t("property.saved") });
       onChanged();
     } catch (err) {
       setStatus({ error: errorMessage(err) });
@@ -200,12 +205,14 @@ function PropertyPanel({ property, onChanged }: { property: HostProperty; onChan
   return (
     <Card title={p.title} id={pid}>
       <p className="mb-4 text-sm text-gray-700">
-        Taban fiyat: {formatDecimal(p.basePrice, p.currency)} · Puan {p.ratingAvg.toFixed(1)} ·{" "}
-        {p.isActive ? "Yayında" : "Yayında değil"} · Belge:{" "}
-        <span data-testid="license-status">{LICENSE_LABEL[p.licenseStatus]}</span>
+        {t("property.basePrice", { price: f.decimal(p.basePrice, p.currency) })} ·{" "}
+        {t("property.rating", { rating: p.ratingAvg.toFixed(1) })} ·{" "}
+        {p.isActive ? t("property.published") : t("property.unpublished")} · {t("property.license")}{" "}
+        {/* P1-10: kayıt doğrulaması yapılmamış ilan yayına alınamaz ve aramada görünmez. */}
+        <span data-testid="license-status">{t(`licenseStatus.${p.licenseStatus}`)}</span>
       </p>
       <form onSubmit={save} className="grid gap-4 md:grid-cols-2">
-        <Field label="Başlık" id={`${pid}-title`}>
+        <Field label={t("property.fields.title")} id={`${pid}-title`}>
           <input
             id={`${pid}-title`}
             className={inputClass}
@@ -216,7 +223,7 @@ function PropertyPanel({ property, onChanged }: { property: HostProperty; onChan
             onChange={(e) => setForm({ ...form, title: e.target.value })}
           />
         </Field>
-        <Field label={`Taban gecelik fiyat (${p.currency})`} id={`${pid}-price`}>
+        <Field label={t("property.fields.basePrice", { currency: p.currency })} id={`${pid}-price`}>
           <input
             id={`${pid}-price`}
             type="number"
@@ -229,7 +236,7 @@ function PropertyPanel({ property, onChanged }: { property: HostProperty; onChan
           />
         </Field>
         <div className="md:col-span-2">
-          <Field label="Açıklama" id={`${pid}-desc`}>
+          <Field label={t("property.fields.description")} id={`${pid}-desc`}>
             <textarea
               id={`${pid}-desc`}
               rows={4}
@@ -243,9 +250,9 @@ function PropertyPanel({ property, onChanged }: { property: HostProperty; onChan
           </Field>
         </div>
         <Field
-          label="İzin belgesi no"
+          label={t("property.fields.licenseNumber")}
           id={`${pid}-license`}
-          hint="İl plaka kodu + sıra no, ör. 34-12345. Belgesiz ilan yayınlanamaz."
+          hint={t("property.fields.licenseHint")}
         >
           <input
             id={`${pid}-license`}
@@ -264,23 +271,24 @@ function PropertyPanel({ property, onChanged }: { property: HostProperty; onChan
             onChange={(e) => setForm({ ...form, isActive: e.target.checked })}
           />
           <label htmlFor={`${pid}-active`} className="text-sm text-gray-800">
-            İlan yayında
+            {t("property.fields.isActive")}
           </label>
         </div>
         <div className="flex items-center gap-3 md:col-span-2">
           <Button type="submit" disabled={busy}>
-            {busy ? "Kaydediliyor…" : "Kaydet"}
+            {busy ? t("property.saving") : t("property.save")}
           </Button>
           <Status error={status.error} message={status.message} />
         </div>
       </form>
 
       <div className="mt-6 border-t pt-4">
-        <h3 className="text-base font-semibold text-gray-900">Odalar</h3>
+        <h3 className="text-base font-semibold text-gray-900">{t("rooms.title")}</h3>
         <ul className="mt-2 space-y-1 text-sm text-gray-800">
           {p.rooms.map((r) => (
             <li key={r.id}>
-              {r.name} · {r.capacity} kişi {r.available ? "" : "(kapalı)"}
+              {r.name} · {t("rooms.capacity", { count: r.capacity })}{" "}
+              {r.available ? "" : t("rooms.closed")}
             </li>
           ))}
         </ul>
@@ -294,8 +302,13 @@ function PropertyPanel({ property, onChanged }: { property: HostProperty; onChan
 }
 
 function AddRoomForm({ propertyId, onAdded }: { propertyId: string; onAdded: () => void }) {
+  const t = useTranslations("host");
   const id = `room-${propertyId}`;
-  const [form, setForm] = useState({ name: "", capacity: "2", bedType: "Çift kişilik" });
+  const [form, setForm] = useState(() => ({
+    name: "",
+    capacity: "2",
+    bedType: t("rooms.add.defaultBedType"),
+  }));
   const [priceModifier, setPriceModifier] = useState("0");
   const [status, setStatus] = useState<{ error?: string; message?: string }>({});
 
@@ -312,7 +325,7 @@ function AddRoomForm({ propertyId, onAdded }: { propertyId: string; onAdded: () 
           priceModifier: Number(priceModifier),
         }),
       });
-      setStatus({ message: "Oda eklendi." });
+      setStatus({ message: t("rooms.add.added") });
       setForm({ ...form, name: "" });
       onAdded();
     } catch (err) {
@@ -321,8 +334,12 @@ function AddRoomForm({ propertyId, onAdded }: { propertyId: string; onAdded: () 
   }
 
   return (
-    <form onSubmit={submit} className="mt-4 grid gap-3 md:grid-cols-5" aria-label="Oda ekle">
-      <Field label="Oda adı" id={`${id}-name`}>
+    <form
+      onSubmit={submit}
+      className="mt-4 grid gap-3 md:grid-cols-5"
+      aria-label={t("rooms.add.ariaLabel")}
+    >
+      <Field label={t("rooms.add.name")} id={`${id}-name`}>
         <input
           id={`${id}-name`}
           className={inputClass}
@@ -332,7 +349,7 @@ function AddRoomForm({ propertyId, onAdded }: { propertyId: string; onAdded: () 
           onChange={(e) => setForm({ ...form, name: e.target.value })}
         />
       </Field>
-      <Field label="Kapasite" id={`${id}-cap`}>
+      <Field label={t("rooms.add.capacity")} id={`${id}-cap`}>
         <input
           id={`${id}-cap`}
           type="number"
@@ -344,7 +361,7 @@ function AddRoomForm({ propertyId, onAdded }: { propertyId: string; onAdded: () 
           onChange={(e) => setForm({ ...form, capacity: e.target.value })}
         />
       </Field>
-      <Field label="Yatak tipi" id={`${id}-bed`}>
+      <Field label={t("rooms.add.bedType")} id={`${id}-bed`}>
         <input
           id={`${id}-bed`}
           className={inputClass}
@@ -353,7 +370,7 @@ function AddRoomForm({ propertyId, onAdded }: { propertyId: string; onAdded: () 
           onChange={(e) => setForm({ ...form, bedType: e.target.value })}
         />
       </Field>
-      <Field label="Fiyat farkı" id={`${id}-mod`}>
+      <Field label={t("rooms.add.priceModifier")} id={`${id}-mod`}>
         <input
           id={`${id}-mod`}
           type="number"
@@ -366,7 +383,7 @@ function AddRoomForm({ propertyId, onAdded }: { propertyId: string; onAdded: () 
       </Field>
       <div className="flex items-end">
         <Button type="submit" variant="secondary" className="w-full">
-          Oda ekle
+          {t("rooms.add.submit")}
         </Button>
       </div>
       <div className="md:col-span-5">
@@ -377,6 +394,7 @@ function AddRoomForm({ propertyId, onAdded }: { propertyId: string; onAdded: () 
 }
 
 function CalendarForm({ rooms, propertyId }: { rooms: HostRoom[]; propertyId: string }) {
+  const t = useTranslations("host");
   const id = `cal-${propertyId}`;
   const [roomId, setRoomId] = useState(rooms[0]?.id ?? "");
   const [from, setFrom] = useState(isoDay(1));
@@ -392,7 +410,7 @@ function CalendarForm({ rooms, propertyId }: { rooms: HostRoom[]; propertyId: st
     if (price) body.price = Number(price);
     if (availability !== "keep") body.isAvailable = availability === "open";
     if (body.price === undefined && body.isAvailable === undefined) {
-      setStatus({ error: "Fiyat veya müsaitlik değişikliği girin." });
+      setStatus({ error: t("calendar.noChange") });
       return;
     }
     try {
@@ -401,7 +419,11 @@ function CalendarForm({ rooms, propertyId }: { rooms: HostRoom[]; propertyId: st
         { method: "PUT", body: JSON.stringify(body) }
       );
       setStatus({
-        message: `Güncellenen gece: ${res.updated}, eklenen: ${res.created}, rezervasyonlu olduğu için atlanan: ${res.skippedLocked}.`,
+        message: t("calendar.result", {
+          updated: res.updated,
+          created: res.created,
+          skipped: res.skippedLocked,
+        }),
       });
     } catch (err) {
       setStatus({ error: errorMessage(err) });
@@ -411,10 +433,10 @@ function CalendarForm({ rooms, propertyId }: { rooms: HostRoom[]; propertyId: st
   return (
     <form onSubmit={submit} className="mt-6 border-t pt-4" aria-labelledby={`${id}-title`}>
       <h3 id={`${id}-title`} className="text-base font-semibold text-gray-900">
-        Toplu takvim güncellemesi
+        {t("calendar.title")}
       </h3>
       <div className="mt-2 grid gap-3 md:grid-cols-5">
-        <Field label="Oda" id={`${id}-room`}>
+        <Field label={t("calendar.room")} id={`${id}-room`}>
           <select
             id={`${id}-room`}
             className={inputClass}
@@ -428,7 +450,7 @@ function CalendarForm({ rooms, propertyId }: { rooms: HostRoom[]; propertyId: st
             ))}
           </select>
         </Field>
-        <Field label="Başlangıç" id={`${id}-from`}>
+        <Field label={t("calendar.from")} id={`${id}-from`}>
           <input
             id={`${id}-from`}
             type="date"
@@ -438,7 +460,7 @@ function CalendarForm({ rooms, propertyId }: { rooms: HostRoom[]; propertyId: st
             onChange={(e) => setFrom(e.target.value)}
           />
         </Field>
-        <Field label="Bitiş (dahil)" id={`${id}-to`}>
+        <Field label={t("calendar.to")} id={`${id}-to`}>
           <input
             id={`${id}-to`}
             type="date"
@@ -448,7 +470,7 @@ function CalendarForm({ rooms, propertyId }: { rooms: HostRoom[]; propertyId: st
             onChange={(e) => setTo(e.target.value)}
           />
         </Field>
-        <Field label="Gecelik fiyat (boş = değişmez)" id={`${id}-price`}>
+        <Field label={t("calendar.price")} id={`${id}-price`}>
           <input
             id={`${id}-price`}
             type="number"
@@ -459,22 +481,22 @@ function CalendarForm({ rooms, propertyId }: { rooms: HostRoom[]; propertyId: st
             onChange={(e) => setPrice(e.target.value)}
           />
         </Field>
-        <Field label="Müsaitlik" id={`${id}-avail`}>
+        <Field label={t("calendar.availability")} id={`${id}-avail`}>
           <select
             id={`${id}-avail`}
             className={inputClass}
             value={availability}
             onChange={(e) => setAvailability(e.target.value as typeof availability)}
           >
-            <option value="keep">Değiştirme</option>
-            <option value="open">Satışa aç</option>
-            <option value="close">Satışa kapat</option>
+            <option value="keep">{t("calendar.keep")}</option>
+            <option value="open">{t("calendar.open")}</option>
+            <option value="close">{t("calendar.close")}</option>
           </select>
         </Field>
       </div>
       <div className="mt-3 flex items-center gap-3">
         <Button type="submit" variant="secondary">
-          Takvimi güncelle
+          {t("calendar.submit")}
         </Button>
         <Status error={status.error} message={status.message} />
       </div>
@@ -483,6 +505,7 @@ function CalendarForm({ rooms, propertyId }: { rooms: HostRoom[]; propertyId: st
 }
 
 function ListingCopy({ propertyId }: { propertyId: string }) {
+  const t = useTranslations("host");
   const [draft, setDraft] = useState<{ tr: string; en: string } | null>(null);
   const [mode, setMode] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -508,7 +531,7 @@ function ListingCopy({ propertyId }: { propertyId: string }) {
   return (
     <div className="mt-6 border-t pt-4">
       <Button variant="secondary" onClick={suggest} disabled={busy}>
-        {busy ? "Öneri hazırlanıyor…" : "İlan metni önerisi"}
+        {busy ? t("listingCopy.suggesting") : t("listingCopy.suggest")}
       </Button>
       <div aria-live="polite" className="mt-3 space-y-2">
         {error && (
@@ -519,7 +542,7 @@ function ListingCopy({ propertyId }: { propertyId: string }) {
         {draft && (
           <div className="space-y-2 rounded-md bg-gray-50 p-3 text-sm text-gray-900">
             <p className="flex items-center gap-2 font-medium">
-              Taslak (otomatik yayınlanmaz, düzenleyip onaylayın) <LlmBadge mode={mode} />
+              {t("listingCopy.draft")} <LlmBadge mode={mode} />
             </p>
             <p>
               <span className="font-semibold">TR:</span> {draft.tr}

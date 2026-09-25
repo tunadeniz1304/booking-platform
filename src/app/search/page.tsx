@@ -3,6 +3,7 @@
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import PropertyCard from "@/components/property/PropertyCard";
@@ -10,14 +11,20 @@ import RankingWhy from "@/components/search/RankingWhy";
 import SmartFilter, { type SmartFilters } from "@/components/search/SmartFilter";
 import type { MapPoint } from "@/components/search/ResultsMap";
 import { apiFetch } from "@/lib/api-client";
-import { formatDecimal } from "@/lib/ui/format";
+import { useFormat } from "@/i18n/use-format";
 import { focusRing } from "@/components/ui/ui";
 
 // Harita yalnızca istemcide ve yalnızca istenince yüklenir (maplibre ağır, SSR'siz).
 const ResultsMap = dynamic(() => import("@/components/search/ResultsMap"), {
   ssr: false,
-  loading: () => <p className="text-sm text-gray-600">Harita yükleniyor…</p>,
+  loading: () => <MapLoading />,
 });
+
+/** Harita paketi yüklenirken gösterilen yer tutucu (çeviri için hook kullanır). */
+function MapLoading() {
+  const t = useTranslations("search");
+  return <p className="text-sm text-gray-600">{t("mapLoading")}</p>;
+}
 
 interface SearchResultItem {
   id: string;
@@ -75,17 +82,21 @@ function smartToParams(f: SmartFilters): URLSearchParams {
 
 const PROPERTY_TYPES = ["HOTEL", "APARTMENT", "VILLA", "HOSTEL", "BED_AND_BREAKFAST"];
 
-const TYPE_LABELS: Record<string, string> = {
-  HOTEL: "Otel",
-  APARTMENT: "Apart",
-  VILLA: "Villa",
-  HOSTEL: "Hostel",
-  BED_AND_BREAKFAST: "Pansiyon",
+/** Mülk türü → `search.types.*` çeviri anahtarı. */
+const TYPE_KEYS: Record<string, string> = {
+  HOTEL: "hotel",
+  APARTMENT: "apartment",
+  VILLA: "villa",
+  HOSTEL: "hostel",
+  BED_AND_BREAKFAST: "bedAndBreakfast",
 };
 
 const smallInput = `w-full rounded-sm border border-gray-400 px-2 py-1 text-sm ${focusRing}`;
 
 function SearchPageContent() {
+  const t = useTranslations("search");
+  const f = useFormat();
+  const typeLabel = (type: string) => (TYPE_KEYS[type] ? t(`types.${TYPE_KEYS[type]}`) : type);
   const searchParams = useSearchParams();
   const destination = searchParams.get("destination") || "";
   const checkIn = searchParams.get("checkIn") || "";
@@ -140,11 +151,11 @@ function SearchPageContent() {
       setTotal(data.total);
       setCached(data.cached);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Arama sonuçları yüklenemedi");
+      setError(err instanceof Error ? err.message : t("errors.load"));
     } finally {
       setLoading(false);
     }
-  }, [destination, checkIn, checkOut, guests, sortBy, smartFilters]);
+  }, [destination, checkIn, checkOut, guests, sortBy, smartFilters, t]);
 
   useEffect(() => {
     const timer = setTimeout(() => void load(), 0);
@@ -162,7 +173,7 @@ function SearchPageContent() {
       setLlmMode(data.llmMode);
       setSmartFilters({ ...data.filters, amenities: data.filters.amenities ?? [] });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Akıllı filtre çalışmadı");
+      setError(err instanceof Error ? err.message : t("errors.smart"));
     } finally {
       setSmartBusy(false);
     }
@@ -184,7 +195,7 @@ function SearchPageContent() {
             city: p.location.city,
             latitude: p.location.latitude,
             longitude: p.location.longitude,
-            priceLabel: formatDecimal(p.basePrice, p.currency),
+            priceLabel: f.decimal(p.basePrice, p.currency),
           },
         ]
       : []
@@ -203,12 +214,12 @@ function SearchPageContent() {
       <main id="main" className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="mb-6 rounded-lg bg-white p-4 shadow-sm">
           <h1 className="text-xl font-bold text-gray-900">
-            {destination ? `${destination} için konaklama` : "Tüm konaklama yerleri"}
+            {destination ? t("heading.destination", { destination }) : t("heading.all")}
           </h1>
           <p className="mt-1 text-sm text-gray-700">
             {checkIn && checkOut
-              ? `${new Date(checkIn).toLocaleDateString("tr-TR")} - ${new Date(checkOut).toLocaleDateString("tr-TR")} · ${guests} misafir`
-              : `${guests} misafir`}
+              ? `${f.date(checkIn)} - ${f.date(checkOut)} · ${t("guestCount", { count: guests })}`
+              : t("guestCount", { count: guests })}
           </p>
         </div>
 
@@ -229,13 +240,13 @@ function SearchPageContent() {
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-4">
           <aside className="lg:col-span-1">
             <div className="rounded-lg bg-white p-4 shadow-sm">
-              <h2 className="text-lg font-semibold text-gray-900">Filtreler</h2>
+              <h2 className="text-lg font-semibold text-gray-900">{t("filters.title")}</h2>
 
               <fieldset className="mt-4">
-                <legend className="text-sm font-medium text-gray-800">Fiyat Aralığı</legend>
+                <legend className="text-sm font-medium text-gray-800">{t("filters.price")}</legend>
                 <div className="mt-2 flex items-center gap-2">
                   <label htmlFor="price-min" className="sr-only">
-                    En düşük fiyat
+                    {t("filters.minPrice")}
                   </label>
                   <input
                     id="price-min"
@@ -243,11 +254,11 @@ function SearchPageContent() {
                     value={priceRange[0]}
                     onChange={(e) => setPriceRange([Number(e.target.value), priceRange[1]])}
                     className={smallInput}
-                    placeholder="Min"
+                    placeholder={t("filters.minPlaceholder")}
                   />
                   <span aria-hidden="true">-</span>
                   <label htmlFor="price-max" className="sr-only">
-                    En yüksek fiyat
+                    {t("filters.maxPrice")}
                   </label>
                   <input
                     id="price-max"
@@ -255,13 +266,13 @@ function SearchPageContent() {
                     value={priceRange[1]}
                     onChange={(e) => setPriceRange([priceRange[0], Number(e.target.value)])}
                     className={smallInput}
-                    placeholder="Max"
+                    placeholder={t("filters.maxPlaceholder")}
                   />
                 </div>
               </fieldset>
 
               <fieldset className="mt-4">
-                <legend className="text-sm font-medium text-gray-800">Konaklama Türü</legend>
+                <legend className="text-sm font-medium text-gray-800">{t("filters.type")}</legend>
                 <div className="mt-2 space-y-2">
                   {PROPERTY_TYPES.map((type) => (
                     <label key={type} className="flex items-center gap-2 text-sm text-gray-800">
@@ -271,7 +282,7 @@ function SearchPageContent() {
                         onChange={() => toggleType(type)}
                         className={`h-4 w-4 rounded border-gray-400 text-[#003580] ${focusRing}`}
                       />
-                      {TYPE_LABELS[type]}
+                      {typeLabel(type)}
                     </label>
                   ))}
                 </div>
@@ -279,7 +290,7 @@ function SearchPageContent() {
 
               <div className="mt-4">
                 <label htmlFor="sort-by" className="text-sm font-medium text-gray-800">
-                  Sıralama
+                  {t("filters.sort")}
                 </label>
                 <select
                   id="sort-by"
@@ -287,10 +298,10 @@ function SearchPageContent() {
                   onChange={(e) => setSortBy(e.target.value)}
                   className={`mt-2 ${smallInput}`}
                 >
-                  <option value="recommended">Önerilen</option>
-                  <option value="price_asc">Fiyat (önce en düşük)</option>
-                  <option value="price_desc">Fiyat (önce en yüksek)</option>
-                  <option value="rating">Puan (önce en yüksek)</option>
+                  <option value="recommended">{t("sort.recommended")}</option>
+                  <option value="price_asc">{t("sort.priceAsc")}</option>
+                  <option value="price_desc">{t("sort.priceDesc")}</option>
+                  <option value="rating">{t("sort.rating")}</option>
                 </select>
               </div>
             </div>
@@ -299,19 +310,17 @@ function SearchPageContent() {
           <div className="lg:col-span-3">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
               <p aria-live="polite" className="text-sm text-gray-700">
-                {loading
-                  ? "Yükleniyor..."
-                  : `${visibleResults.length} sonuç gösteriliyor (${total} bulundu)`}
+                {loading ? t("loading") : t("resultCount", { shown: visibleResults.length, total })}
               </p>
               <div className="flex items-center gap-2">
                 {cached && (
                   <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs text-green-800">
-                    Önbellekten
+                    {t("cached")}
                   </span>
                 )}
                 <div
                   role="group"
-                  aria-label="Görünüm"
+                  aria-label={t("view")}
                   className="flex overflow-hidden rounded-md border border-gray-400"
                 >
                   {(["list", "map"] as const).map((v) => (
@@ -327,7 +336,7 @@ function SearchPageContent() {
                         view === v ? "bg-[#003580] text-white" : "bg-white text-gray-800"
                       } ${focusRing}`}
                     >
-                      {v === "list" ? "Liste" : "Harita"}
+                      {v === "list" ? t("list") : t("map")}
                     </button>
                   ))}
                 </div>
@@ -337,13 +346,11 @@ function SearchPageContent() {
             <div aria-live="polite" className="text-sm">
               {view === "map" && mapError && (
                 <p role="alert" className="mb-4 rounded-md bg-amber-50 p-3 text-amber-950">
-                  Harita yüklenemedi (ör. çevrimdışı); liste görünümü gösteriliyor.
+                  {t("mapFailed")}
                 </p>
               )}
               {view === "map" && !mapError && !loading && mapPoints.length === 0 && (
-                <p className="mb-4 rounded-md bg-gray-100 p-3 text-gray-800">
-                  Sonuçlar için konum bilgisi yok; liste görünümü gösteriliyor.
-                </p>
+                <p className="mb-4 rounded-md bg-gray-100 p-3 text-gray-800">{t("noLocation")}</p>
               )}
             </div>
 
@@ -357,8 +364,8 @@ function SearchPageContent() {
 
             {!error && !loading && visibleResults.length === 0 && (
               <div className="rounded-lg bg-white p-12 text-center shadow-sm">
-                <p className="text-lg font-semibold text-gray-900">Sonuç bulunamadı</p>
-                <p className="mt-2 text-sm text-gray-700">Filtreleri değiştirmeyi deneyin.</p>
+                <p className="text-lg font-semibold text-gray-900">{t("noResults")}</p>
+                <p className="mt-2 text-sm text-gray-700">{t("noResultsHint")}</p>
               </div>
             )}
 
@@ -396,7 +403,7 @@ function SearchPageContent() {
                       currency={property.currency}
                       rating={property.ratingAvg}
                       reviewCount={property.ratingCount}
-                      propertyType={TYPE_LABELS[property.propertyType] ?? property.propertyType}
+                      propertyType={typeLabel(property.propertyType)}
                       stay={
                         property.quote && checkIn && checkOut
                           ? {
@@ -434,6 +441,7 @@ function MapResultList({
   selectedId: string | null;
   onSelect: (id: string | null) => void;
 }) {
+  const t = useTranslations("search");
   const itemRefs = useRef(new Map<string, HTMLLIElement>());
   useEffect(() => {
     if (selectedId) itemRefs.current.get(selectedId)?.scrollIntoView({ block: "nearest" });
@@ -441,7 +449,7 @@ function MapResultList({
 
   return (
     <ul
-      aria-label="Haritadaki sonuçlar"
+      aria-label={t("mapResults")}
       className="max-h-[480px] space-y-2 overflow-y-auto rounded-lg bg-white p-2 shadow-sm"
     >
       {points.map((p) => {

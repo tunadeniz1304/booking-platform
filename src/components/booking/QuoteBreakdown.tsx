@@ -1,13 +1,10 @@
 "use client";
 
 import { useLocale, useTranslations } from "next-intl";
+import { useFormat } from "@/i18n/use-format";
 import { formatMoney, money } from "@/lib/money/money";
 import { convert } from "@/lib/money/fx";
 import type { QuoteView } from "./useQuote";
-
-function fmt(amount: number, currency: string): string {
-  return formatMoney(money(amount, currency));
-}
 
 /**
  * Şeffaf, vergi dahil ("all-in") fiyat kırılımı. Tüm tutarlar sunucudaki teklifin
@@ -16,6 +13,11 @@ function fmt(amount: number, currency: string): string {
 export default function QuoteBreakdown({ quote }: { quote: QuoteView }) {
   const t = useTranslations("quote");
   const locale = useLocale();
+  const f = useFormat();
+  const fmt = (amount: number, currency: string) => f.money(amount, currency);
+  // Oran metni dile göre ("%8" / "8%"); sayı string verilir ki ICU yeniden biçimlemesin.
+  const rate = (bps: number | undefined) =>
+    bps !== undefined ? t("rate", { rate: String(bps / 100) }) : "";
   // İngilizce arayüzde bilgi amaçlı USD karşılığı (tahsilat mülkün para biriminde).
   const approx =
     locale === "en" && quote.currency !== "USD"
@@ -28,8 +30,8 @@ export default function QuoteBreakdown({ quote }: { quote: QuoteView }) {
       <div className="flex justify-between text-gray-600">
         <dt>
           {uniform
-            ? `${fmt(quote.nights[0].amount, quote.currency)} × ${n} gece`
-            : `${n} gece (gecelik fiyatlar değişken)`}
+            ? t("nightsUniform", { price: fmt(quote.nights[0].amount, quote.currency), count: n })
+            : t("nightsVariable", { count: n })}
         </dt>
         <dd>{fmt(quote.subtotal, quote.currency)}</dd>
       </div>
@@ -45,7 +47,7 @@ export default function QuoteBreakdown({ quote }: { quote: QuoteView }) {
           <div key={x.code} className="flex justify-between text-gray-600">
             <dt>
               {x.label}
-              {x.rateBps !== undefined && ` (%${x.rateBps / 100})`}
+              {rate(x.rateBps)}
             </dt>
             <dd>{fmt(x.amount, quote.currency)}</dd>
           </div>
@@ -59,9 +61,11 @@ export default function QuoteBreakdown({ quote }: { quote: QuoteView }) {
         .filter((x) => x.inclusive)
         .map((x) => (
           <p key={x.code} className="text-xs text-gray-500" data-testid="quote-included-tax">
-            {x.label}
-            {x.rateBps !== undefined && ` (%${x.rateBps / 100})`} dahil:{" "}
-            {fmt(x.amount, quote.currency)}
+            {t("includedTax", {
+              label: x.label,
+              rate: rate(x.rateBps),
+              amount: fmt(x.amount, quote.currency),
+            })}
           </p>
         ))}
       {approx && (

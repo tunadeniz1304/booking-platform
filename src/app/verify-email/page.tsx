@@ -2,10 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import AuthCard, { Notice } from "@/components/auth/AuthCard";
 
 /** E-posta doğrulama bağlantısının açıldığı sayfa (token tek kullanımlık). */
 export default function VerifyEmailPage() {
+  const t = useTranslations("auth");
   const [state, setState] = useState<"pending" | "ok" | "error">("pending");
   const started = useRef(false);
 
@@ -23,22 +25,17 @@ export default function VerifyEmailPage() {
   }, []);
 
   return (
-    <AuthCard title="E-posta doğrulama">
+    <AuthCard title={t("verify.title")}>
       {state === "pending" && (
         <p role="status" className="mt-4 text-sm text-gray-600">
-          Doğrulanıyor...
+          {t("verify.pending")}
         </p>
       )}
-      {state === "ok" && <Notice kind="success">E-posta adresiniz doğrulandı. Teşekkürler!</Notice>}
-      {state === "error" && (
-        <Notice kind="error">
-          Bağlantı geçersiz veya süresi dolmuş. Hesabınızdan yeni bir doğrulama e-postası
-          isteyebilirsiniz.
-        </Notice>
-      )}
+      {state === "ok" && <Notice kind="success">{t("verify.ok")}</Notice>}
+      {state === "error" && <Notice kind="error">{t("verify.error")}</Notice>}
       <p className="mt-6 text-center text-sm">
         <Link href="/" className="font-semibold text-[#003580] hover:underline">
-          Ana sayfaya dön
+          {t("verify.home")}
         </Link>
       </p>
     </AuthCard>

@@ -16,7 +16,14 @@ export default function LocaleSwitcher() {
         value={locale}
         aria-label={t("label")}
         onChange={(e) => {
-          document.cookie = `${LOCALE_COOKIE}=${e.target.value}; path=/; max-age=31536000; samesite=lax`;
+          const next = e.target.value;
+          document.cookie = `${LOCALE_COOKIE}=${next}; path=/; max-age=31536000; samesite=lax`;
+          // Oturum açıksa kalıcı tercih (e-posta dili) de güncellenir; misafirde 401 sessizce yok sayılır.
+          void fetch("/api/user/locale", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ locale: next }),
+          }).catch(() => undefined);
           router.refresh();
         }}
         className="rounded border border-white/40 bg-transparent px-1 py-0.5"

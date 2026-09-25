@@ -3,12 +3,14 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import { ApiError, apiFetch } from "@/lib/api-client";
 import BookingActions from "@/components/booking/BookingActions";
 import BookingMessages from "@/components/booking/BookingMessages";
 import { toMinor } from "@/lib/money/money";
+import { useFormat } from "@/i18n/use-format";
 
 interface BookingDetail {
   id: string;
@@ -27,17 +29,18 @@ interface BookingDetail {
   room: { name: string };
 }
 
-const STATUS_TITLES: Record<string, string> = {
-  HELD: "Oda sizin için tutuluyor — ödemeyi tamamlayın",
-  PENDING: "Rezervasyon beklemede",
-  CONFIRMED: "Rezervasyonunuz onaylandı",
-  COMPLETED: "Konaklama tamamlandı",
-  CANCELLED: "Rezervasyon iptal edildi",
-  EXPIRED: "Ödeme süresi doldu",
-};
+/** Başlığı çevrilen rezervasyon durumları; bilinmeyen durum ham hâliyle gösterilir. */
+const STATUS_KEYS = ["HELD", "PENDING", "CONFIRMED", "COMPLETED", "CANCELLED", "EXPIRED"] as const;
+type StatusKey = (typeof STATUS_KEYS)[number];
+
+function isStatusKey(status: string): status is StatusKey {
+  return (STATUS_KEYS as readonly string[]).includes(status);
+}
 
 export default function BookingConfirmationPage() {
   const { id } = useParams<{ id: string }>();
+  const t = useTranslations("booking");
+  const f = useFormat();
   const [booking, setBooking] = useState<BookingDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -50,11 +53,11 @@ export default function BookingConfirmationPage() {
       setBooking(data.booking);
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) setNeedsLogin(true);
-      setError(err instanceof Error ? err.message : "Rezervasyon yüklenemedi");
+      setError(err instanceof Error ? err.message : t("detail.loadFailed"));
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, t]);
 
   useEffect(() => {
     const timer = setTimeout(() => void load(), 0);
@@ -67,13 +70,13 @@ export default function BookingConfirmationPage() {
         <Header />
         <main id="main" className="mx-auto flex max-w-3xl flex-1 items-center justify-center px-4">
           <div className="text-center">
-            <h1 className="text-2xl font-bold text-gray-900">Giriş gerekli</h1>
-            <p className="mt-2 text-gray-600">Rezervasyonunuzu görüntülemek için giriş yapın.</p>
+            <h1 className="text-2xl font-bold text-gray-900">{t("detail.loginRequiredTitle")}</h1>
+            <p className="mt-2 text-gray-600">{t("detail.loginRequiredText")}</p>
             <Link
               href="/login"
               className="mt-4 inline-block rounded-lg bg-[#003580] px-6 py-3 text-sm font-semibold text-white"
             >
-              Giriş Yap
+              {t("detail.login")}
             </Link>
           </div>
         </main>
@@ -82,8 +85,7 @@ export default function BookingConfirmationPage() {
     );
   }
 
-  const formatDate = (d: string) =>
-    new Date(d).toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" });
+  const formatDate = (d: string) => f.date(d, "long");
 
   const print = () => window.print();
 
@@ -92,26 +94,29 @@ export default function BookingConfirmationPage() {
       <Header />
       <main id="main" className="mx-auto w-full max-w-3xl flex-1 px-4 py-10">
         {loading ? (
-          <p className="text-center text-gray-500">Yükleniyor...</p>
+          <p className="text-center text-gray-500">{t("detail.loading")}</p>
         ) : error ? (
           <div className="rounded-2xl bg-white p-8 text-center shadow-sm">
-            <h1 className="text-xl font-bold text-red-600">Hata</h1>
+            <h1 className="text-xl font-bold text-red-600">{t("detail.error")}</h1>
             <p className="mt-2 text-gray-600">{error}</p>
             <Link
               href="/"
               className="mt-4 inline-block text-sm font-semibold text-[#003580] hover:underline"
             >
-              Ana sayfaya dön
+              {t("detail.backHome")}
             </Link>
           </div>
         ) : booking ? (
           <div className="overflow-hidden rounded-2xl bg-white shadow-sm">
             <div className="bg-green-600 px-8 py-6 text-white">
               <h1 className="text-2xl font-bold">
-                {STATUS_TITLES[booking.status] ?? booking.status}
+                {isStatusKey(booking.status) ? t(`status.${booking.status}`) : booking.status}
               </h1>
               <p className="mt-1 text-sm text-green-100">
-                Rezervasyon numarası: <span className="font-semibold">{booking.id}</span>
+                {t.rich("detail.bookingNumber", {
+                  id: booking.id,
+                  b: (chunks) => <span className="font-semibold">{chunks}</span>,
+                })}
               </p>
             </div>
 
@@ -125,28 +130,28 @@ export default function BookingConfirmationPage() {
 
               <dl className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-3">
                 <div className="rounded-lg bg-gray-50 p-4">
-                  <dt className="text-gray-500">Giriş</dt>
+                  <dt className="text-gray-500">{t("detail.checkIn")}</dt>
                   <dd className="mt-1 font-medium text-gray-900">{formatDate(booking.checkIn)}</dd>
                 </div>
                 <div className="rounded-lg bg-gray-50 p-4">
-                  <dt className="text-gray-500">Çıkış</dt>
+                  <dt className="text-gray-500">{t("detail.checkOut")}</dt>
                   <dd className="mt-1 font-medium text-gray-900">{formatDate(booking.checkOut)}</dd>
                 </div>
                 <div className="rounded-lg bg-gray-50 p-4">
-                  <dt className="text-gray-500">Oda / Misafir</dt>
+                  <dt className="text-gray-500">{t("detail.roomGuests")}</dt>
                   <dd className="mt-1 font-medium text-gray-900">
-                    {booking.room.name} · {booking.guestCount} kişi
+                    {t("detail.roomGuestsValue", {
+                      room: booking.room.name,
+                      count: booking.guestCount,
+                    })}
                   </dd>
                 </div>
               </dl>
 
               <div className="flex items-center justify-between border-t border-gray-100 pt-4">
-                <span className="text-sm text-gray-600">Toplam Tutar</span>
+                <span className="text-sm text-gray-600">{t("detail.total")}</span>
                 <span className="text-xl font-bold text-gray-900">
-                  {new Intl.NumberFormat("tr-TR", {
-                    style: "currency",
-                    currency: booking.currency,
-                  }).format(booking.totalPrice)}
+                  {f.decimal(booking.totalPrice, booking.currency)}
                 </span>
               </div>
 
@@ -168,19 +173,19 @@ export default function BookingConfirmationPage() {
                   href={`/property/${booking.property.id}`}
                   className="rounded-lg bg-[#003580] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#002b66]"
                 >
-                  Konaklamayı Görüntüle
+                  {t("detail.viewProperty")}
                 </Link>
                 <Link
                   href="/account"
                   className="rounded-lg border border-gray-300 px-6 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
                 >
-                  Rezervasyonlarım
+                  {t("detail.myBookings")}
                 </Link>
                 <button
                   onClick={print}
                   className="rounded-lg border border-gray-300 px-6 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
                 >
-                  Yazdır
+                  {t("detail.print")}
                 </button>
               </div>
             </div>

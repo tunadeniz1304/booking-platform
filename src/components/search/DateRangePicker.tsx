@@ -1,28 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
+import { useFormat } from "@/i18n/use-format";
 
 /**
  * Çift aylık tarih aralığı seçici (OTA'larda yaygın desen).
  * Kullanıcı giriş tarihine tıklar → seçim başlar; çıkış tarihine tıklar → aralık tamamlanır.
  * Girişten önceki bir tarihe tıklanırsa giriş yeniden ayarlanır (Booking davranışı).
  */
-
-const MONTHS_TR = [
-  "Ocak",
-  "Şubat",
-  "Mart",
-  "Nisan",
-  "Mayıs",
-  "Haziran",
-  "Temmuz",
-  "Ağustos",
-  "Eylül",
-  "Ekim",
-  "Kasım",
-  "Aralık",
-];
-const DOW_TR = ["Pt", "Sa", "Ça", "Pe", "Cu", "Ct", "Pz"];
 
 function pad(n: number): string {
   return n < 10 ? `0${n}` : String(n);
@@ -74,8 +60,21 @@ export default function DateRangePicker({
   minDate = new Date(),
   monthCount = 2,
 }: DateRangePickerProps) {
+  const t = useTranslations("search");
+  const f = useFormat();
   const today = startOfDay(minDate);
   const [monthsOffset, setMonthsOffset] = useState(0);
+
+  // Ay ve gün adları etkin dile göre Intl'den gelir.
+  const monthFormat = useMemo(
+    () => new Intl.DateTimeFormat(f.locale, { month: "long", year: "numeric" }),
+    [f.locale]
+  );
+  const weekdays = useMemo(() => {
+    const fmt = new Intl.DateTimeFormat(f.locale, { weekday: "short" });
+    // 1 Ocak 2024 pazartesidir; hafta pazartesiden başlar.
+    return Array.from({ length: 7 }, (_, i) => fmt.format(new Date(2024, 0, 1 + i)));
+  }, [f.locale]);
 
   // current ay + offset => (yıl, ay)
   const baseYear = today.getFullYear();
@@ -143,7 +142,7 @@ export default function DateRangePicker({
           type="button"
           onClick={goPrev}
           disabled={monthsOffset === 0}
-          aria-label="Önceki ay"
+          aria-label={t("picker.prevMonth")}
           className="rounded p-1.5 text-gray-600 hover:bg-gray-100 disabled:opacity-30"
         >
           <svg
@@ -164,14 +163,14 @@ export default function DateRangePicker({
         <div className="flex gap-6 text-sm font-semibold text-gray-800">
           {months.map((m) => (
             <span key={`${m.year}-${m.month}`} className="w-32 text-center">
-              {MONTHS_TR[m.month]} {m.year}
+              {monthFormat.format(new Date(m.year, m.month, 1))}
             </span>
           ))}
         </div>
         <button
           type="button"
           onClick={goNext}
-          aria-label="Sonraki ay"
+          aria-label={t("picker.nextMonth")}
           className="rounded p-1.5 text-gray-600 hover:bg-gray-100"
         >
           <svg
@@ -190,7 +189,7 @@ export default function DateRangePicker({
         {months.map((m) => (
           <div key={`${m.year}-${m.month}`}>
             <div className="grid grid-cols-7 gap-1 text-center text-xs text-gray-500">
-              {DOW_TR.map((d) => (
+              {weekdays.map((d) => (
                 <div key={d} className="py-1">
                   {d}
                 </div>

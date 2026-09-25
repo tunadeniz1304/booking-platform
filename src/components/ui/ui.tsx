@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import { fetchCurrentUser, type SessionUser } from "@/lib/api-client";
@@ -80,11 +81,7 @@ export function Card({
   );
 }
 
-const MODE_LABEL: Record<string, string> = {
-  live: "Canlı LLM",
-  demo: "Demo (deterministik)",
-  fallback: "Yedek (LLM başarısız)",
-};
+const MODE_KEYS = new Set(["live", "demo", "fallback"]);
 
 /** LLM çalışma modu rozeti (P2-2: kullanıcı yapay zekâ çıktısını ayırt edebilmeli). */
 /**
@@ -92,6 +89,7 @@ const MODE_LABEL: Record<string, string> = {
  * ve üretim modu (canlı / demo / yedek) gösterilir.
  */
 export function LlmBadge({ mode }: { mode?: string | null }) {
+  const t = useTranslations("common");
   if (!mode) return null;
   const color =
     mode === "live"
@@ -102,10 +100,10 @@ export function LlmBadge({ mode }: { mode?: string | null }) {
   return (
     <span
       className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${color}`}
-      title="Yapay zekâ çıktısı — doğruluğunu kontrol edin"
+      title={t("ai.hint")}
       data-ai-generated="true"
     >
-      AI tarafından üretildi · {MODE_LABEL[mode] ?? mode}
+      {t("ai.generated")} · {MODE_KEYS.has(mode) ? t(`ai.modes.${mode}`) : mode}
     </span>
   );
 }
@@ -172,29 +170,32 @@ export function RoleGate({
   roles?: ReadonlyArray<SessionUser["role"]>;
   children: (user: SessionUser) => ReactNode;
 }) {
+  const t = useTranslations("common");
   const session = useSession();
   if (session.status === "loading") {
     return (
       <p aria-live="polite" className="text-sm text-gray-600">
-        Yükleniyor…
+        {t("loading")}
       </p>
     );
   }
   if (!session.user) {
     return (
       <p className="text-sm text-gray-800">
-        Bu sayfa için{" "}
-        <Link href="/login" className={`font-semibold text-[#003580] underline ${focusRing}`}>
-          giriş yapın
-        </Link>
-        .
+        {t.rich("loginRequired", {
+          link: (chunks) => (
+            <Link href="/login" className={`font-semibold text-[#003580] underline ${focusRing}`}>
+              {chunks}
+            </Link>
+          ),
+        })}
       </p>
     );
   }
   if (roles && !roles.includes(session.user.role)) {
     return (
       <p role="alert" className="text-sm text-red-700">
-        Bu sayfaya erişim yetkiniz yok ({roles.join(" / ")} rolü gerekir).
+        {t("forbidden", { roles: roles.join(" / ") })}
       </p>
     );
   }
@@ -206,6 +207,7 @@ export function RoleGate({
  * setState yalnızca Promise geri çağrısında yapılır (effect gövdesinde değil).
  */
 export function useLoader<T>(fetcher: () => Promise<T>, deps: ReadonlyArray<unknown> = []) {
+  const t = useTranslations("common");
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
@@ -218,7 +220,7 @@ export function useLoader<T>(fetcher: () => Promise<T>, deps: ReadonlyArray<unkn
         setError(null);
       })
       .catch((e: unknown) => {
-        if (active) setError(errorMessage(e));
+        if (active) setError(errorMessage(e, t("unexpectedError")));
       });
     return () => {
       active = false;
@@ -228,6 +230,7 @@ export function useLoader<T>(fetcher: () => Promise<T>, deps: ReadonlyArray<unkn
   return { data, error, reload: () => setVersion((v) => v + 1) };
 }
 
-export function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "Beklenmeyen bir hata oluştu";
+/** `fallback` verilmezse Türkçe varsayılan kullanılır (çevirici dışındaki çağıranlar için). */
+export function errorMessage(error: unknown, fallback = "Beklenmeyen bir hata oluştu"): string {
+  return error instanceof Error ? error.message : fallback;
 }

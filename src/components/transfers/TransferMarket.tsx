@@ -2,9 +2,10 @@
 
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { apiFetch } from "@/lib/api-client";
 import { toMinor } from "@/lib/money/money";
-import { formatDate, formatDecimal, formatMinor } from "@/lib/ui/format";
+import { useFormat } from "@/i18n/use-format";
 import {
   Button,
   Card,
@@ -41,34 +42,40 @@ interface MyBooking {
 }
 
 export default function TransferMarket() {
+  const t = useTranslations("transfers");
+  const f = useFormat();
   const session = useSession();
   const { data, error } = useLoader(() => apiFetch<DiscoverItem[]>("/api/transfers/discover"));
 
   return (
     <div className="space-y-6">
-      <Card title="Devredilen rezervasyonlar" id="discover">
-        <p className="mb-3 text-sm text-gray-700">
-          Satıcı adları maskelidir. Devralmak için satıcının size ilettiği özel bağlantıyı açın.
-        </p>
+      <Card title={t("discover.title")} id="discover">
+        <p className="mb-3 text-sm text-gray-700">{t("discover.intro")}</p>
         <Status error={error} />
-        {data === null && !error && <p className="text-sm text-gray-600">Yükleniyor…</p>}
-        {data?.length === 0 && <p className="text-sm text-gray-700">Şu an ilan yok.</p>}
+        {data === null && !error && (
+          <p className="text-sm text-gray-600">{t("discover.loading")}</p>
+        )}
+        {data?.length === 0 && <p className="text-sm text-gray-700">{t("discover.empty")}</p>}
         {data && data.length > 0 && (
           <ul className="space-y-2">
-            {data.map((t) => (
-              <li key={t.id} className="rounded-md border p-3 text-sm text-gray-900">
+            {data.map((item) => (
+              <li key={item.id} className="rounded-md border p-3 text-sm text-gray-900">
                 <Link
-                  href={`/property/${t.property.id}`}
+                  href={`/property/${item.property.id}`}
                   className={`font-semibold text-[#003580] underline ${focusRing}`}
                 >
-                  {t.property.title}
+                  {item.property.title}
                 </Link>{" "}
-                · {t.property.city} · {formatDate(t.checkIn)} – {formatDate(t.checkOut)} ·{" "}
-                {t.guestCount} misafir
+                · {item.property.city} · {f.date(item.checkIn)} – {f.date(item.checkOut)} ·{" "}
+                {t("discover.guests", { count: item.guestCount })}
                 <span className="block">
-                  İstenen: <strong>{formatDecimal(t.askPrice, t.currency)}</strong> (orijinal{" "}
-                  {formatDecimal(t.originalPrice, t.currency)}) · satıcı {t.seller} · son{" "}
-                  {formatDate(t.expiresAt)}
+                  {t.rich("discover.terms", {
+                    ask: f.decimal(item.askPrice, item.currency),
+                    original: f.decimal(item.originalPrice, item.currency),
+                    seller: item.seller,
+                    expires: f.date(item.expiresAt),
+                    b: (chunks) => <strong>{chunks}</strong>,
+                  })}
                 </span>
               </li>
             ))}
@@ -80,11 +87,13 @@ export default function TransferMarket() {
         <SellPanel />
       ) : session.status === "ready" ? (
         <p className="text-sm text-gray-800">
-          Kendi rezervasyonunuzu devretmek için{" "}
-          <Link href="/login" className={`font-semibold text-[#003580] underline ${focusRing}`}>
-            giriş yapın
-          </Link>
-          .
+          {t.rich("loginToSell", {
+            link: (chunks) => (
+              <Link href="/login" className={`font-semibold text-[#003580] underline ${focusRing}`}>
+                {chunks}
+              </Link>
+            ),
+          })}
         </p>
       ) : null}
     </div>
@@ -92,6 +101,8 @@ export default function TransferMarket() {
 }
 
 function SellPanel() {
+  const t = useTranslations("transfers");
+  const f = useFormat();
   const { data, error } = useLoader(() => apiFetch<MyBooking[]>("/api/bookings"));
   const confirmed = (data ?? []).filter((b) => b.status === "CONFIRMED");
   const [bookingId, setBookingId] = useState("");
@@ -115,7 +126,7 @@ function SellPanel() {
       );
       setClaimUrl(res.claimUrl);
       setFeedback({
-        message: `Devir ilanı açıldı (${formatMinor(res.askPrice, res.currency)}).`,
+        message: t("sell.created", { amount: f.money(res.askPrice, res.currency) }),
       });
     } catch (err) {
       setFeedback({ error: errorMessage(err) });
@@ -128,19 +139,17 @@ function SellPanel() {
       await navigator.clipboard.writeText(claimUrl);
       setCopied(true);
     } catch {
-      setFeedback({ error: "Kopyalanamadı; bağlantıyı elle seçip kopyalayın." });
+      setFeedback({ error: t("sell.copyFailed") });
     }
   }
 
   return (
-    <Card title="Rezervasyonumu devret" id="sell">
+    <Card title={t("sell.title")} id="sell">
       <Status error={error} />
-      {data && confirmed.length === 0 && (
-        <p className="text-sm text-gray-700">Devredilebilir (onaylı) rezervasyonunuz yok.</p>
-      )}
+      {data && confirmed.length === 0 && <p className="text-sm text-gray-700">{t("sell.none")}</p>}
       {confirmed.length > 0 && (
         <form onSubmit={submit} className="grid gap-3 md:grid-cols-3">
-          <Field label="Rezervasyon" id="sell-booking">
+          <Field label={t("sell.booking")} id="sell-booking">
             <select
               id="sell-booking"
               className={inputClass}
@@ -149,16 +158,15 @@ function SellPanel() {
             >
               {confirmed.map((b) => (
                 <option key={b.id} value={b.id}>
-                  {b.property.title} · {formatDate(b.checkIn)} ·{" "}
-                  {formatDecimal(b.totalPrice, b.currency)}
+                  {b.property.title} · {f.date(b.checkIn)} · {f.decimal(b.totalPrice, b.currency)}
                 </option>
               ))}
             </select>
           </Field>
           <Field
-            label={`İstek fiyatı (${selected?.currency ?? "TRY"})`}
+            label={t("sell.askPrice", { currency: selected?.currency ?? "TRY" })}
             id="sell-ask"
-            hint="Ödediğiniz tutarın üst sınırını aşamaz."
+            hint={t("sell.askHint")}
           >
             <input
               id="sell-ask"
@@ -172,7 +180,7 @@ function SellPanel() {
           </Field>
           <div className="flex items-end">
             <Button type="submit" className="w-full">
-              Devret
+              {t("sell.submit")}
             </Button>
           </div>
         </form>
@@ -182,11 +190,9 @@ function SellPanel() {
       </div>
       {claimUrl && (
         <div className="mt-3 rounded-md border border-amber-400 bg-amber-50 p-3 text-sm text-gray-900">
-          <p className="font-semibold">
-            Devir bağlantısı yalnızca şimdi gösterilir — kopyalayıp alıcıyla paylaşın.
-          </p>
+          <p className="font-semibold">{t("sell.linkOnce")}</p>
           <label htmlFor="claim-url" className="sr-only">
-            Devir bağlantısı
+            {t("sell.linkLabel")}
           </label>
           <input
             id="claim-url"
@@ -197,13 +203,13 @@ function SellPanel() {
           />
           <div className="mt-2 flex items-center gap-3">
             <Button variant="secondary" onClick={copy}>
-              Kopyala
+              {t("sell.copy")}
             </Button>
             <Button variant="secondary" onClick={() => setClaimUrl(null)}>
-              Gizle
+              {t("sell.hide")}
             </Button>
             <span aria-live="polite" className="text-green-800">
-              {copied ? "Kopyalandı." : ""}
+              {copied ? t("sell.copied") : ""}
             </span>
           </div>
         </div>

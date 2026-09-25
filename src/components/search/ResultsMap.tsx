@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import Map, { Marker, NavigationControl, Popup, type MapRef } from "react-map-gl/maplibre";
 import { setWorkerUrl, type StyleSpecification } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
@@ -49,7 +50,12 @@ const OSM_STYLE: StyleSpecification = {
 };
 
 class MapErrorBoundary extends Component<
-  { fallback: ReactNode; children: ReactNode; onError: (reason: string) => void },
+  {
+    fallback: ReactNode;
+    children: ReactNode;
+    onError: (reason: string) => void;
+    initFailedMessage: string;
+  },
   { failed: boolean }
 > {
   state = { failed: false };
@@ -57,7 +63,7 @@ class MapErrorBoundary extends Component<
     return { failed: true };
   }
   componentDidCatch(error: Error) {
-    this.props.onError(error.message || "harita başlatılamadı");
+    this.props.onError(error.message || this.props.initFailedMessage);
   }
   render() {
     return this.state.failed ? this.props.fallback : this.props.children;
@@ -81,6 +87,7 @@ export default function ResultsMap({
   onSelect: (id: string | null) => void;
   onFail: (reason: string) => void;
 }) {
+  const t = useTranslations("search");
   const mapRef = useRef<MapRef>(null);
   // Üst bileşen her render'da yeni dizi verebilir → indeks içerik anahtarıyla önbelleklenir.
   const pointsKey = points.map((p) => `${p.id}:${p.latitude}:${p.longitude}`).join("|");
@@ -138,12 +145,16 @@ export default function ResultsMap({
 
   const fallback = (
     <p role="alert" className="rounded-lg bg-amber-50 p-4 text-sm text-amber-950">
-      Harita yüklenemedi; liste görünümü kullanılıyor.
+      {t("mapView.fallback")}
     </p>
   );
 
   return (
-    <MapErrorBoundary fallback={fallback} onError={onFail}>
+    <MapErrorBoundary
+      fallback={fallback}
+      onError={onFail}
+      initFailedMessage={t("mapView.initFailed")}
+    >
       <div className="h-[480px] w-full overflow-hidden rounded-lg shadow-sm">
         <Map
           ref={mapRef}
@@ -153,7 +164,7 @@ export default function ResultsMap({
           onLoad={syncView}
           onMoveEnd={syncView}
           onError={(e) => {
-            const msg = e.error?.message ?? "harita hatası";
+            const msg = e.error?.message ?? t("mapView.error");
             // Karo erişimi yoksa (çevrimdışı) listeye dön.
             if (/fetch|network|tile|webgl|failed/i.test(msg)) onFail(msg);
           }}
@@ -181,7 +192,7 @@ export default function ResultsMap({
                       ? "border-[#003580] bg-amber-300 text-gray-900"
                       : "border-white bg-[#003580] text-white"
                   } ${focusRing}`}
-                  aria-label={`${item.count} konaklama; yakınlaştırmak için tıklayın`}
+                  aria-label={t("mapView.cluster", { count: item.count })}
                 >
                   {item.count}
                 </button>

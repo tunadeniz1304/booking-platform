@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { apiFetch } from "@/lib/api-client";
-import { formatDate, formatMinor } from "@/lib/ui/format";
+import { useFormat } from "@/i18n/use-format";
 import {
   Button,
   Card,
@@ -54,19 +55,13 @@ interface Overview {
   suggestions: SuggestionView[];
 }
 
-const FACTOR_LABEL: Record<Contribution["factor"], string> = {
-  occupancy: "Doluluk",
-  lead_time: "Varışa kalan süre",
-  holiday: "Resmî tatil",
-  event: "Onaylı etkinlik",
-  clamp: "Taban/tavan",
-};
-
 const CHART = { width: 640, height: 180, pad: 28 } as const;
 
 /** Pickup grafiği: penceredeki oda-gece (çizgi) + günlük giriş (çubuk); saf SVG. */
 function PickupChart({ points }: { points: Overview["pickup"] }) {
-  if (points.length === 0) return <p className="text-sm text-gray-700">Veri yok.</p>;
+  const t = useTranslations("revenue");
+  const f = useFormat();
+  if (points.length === 0) return <p className="text-sm text-gray-700">{t("pickup.noData")}</p>;
   const max = Math.max(1, ...points.map((p) => p.onBooks));
   const innerW = CHART.width - CHART.pad * 2;
   const innerH = CHART.height - CHART.pad * 2;
@@ -84,10 +79,9 @@ function PickupChart({ points }: { points: Overview["pickup"] }) {
         aria-labelledby="pickup-title pickup-desc"
         className="h-auto w-full"
       >
-        <title id="pickup-title">Pickup grafiği</title>
+        <title id="pickup-title">{t("pickup.chartTitle")}</title>
         <desc id="pickup-desc">
-          Son {points.length} günde girilen rezervasyonların penceredeki oda-gece toplamı; son değer{" "}
-          {last.onBooks}.
+          {t("pickup.chartDesc", { count: points.length, last: last.onBooks })}
         </desc>
         <line
           x1={CHART.pad}
@@ -106,7 +100,7 @@ function PickupChart({ points }: { points: Overview["pickup"] }) {
               height={CHART.pad + innerH - y(p.pickup)}
               fill="#93c5fd"
             >
-              <title>{`${formatDate(p.date)}: +${p.pickup}`}</title>
+              <title>{`${f.date(p.date, "short")}: +${p.pickup}`}</title>
             </rect>
           ) : null
         )}
@@ -115,7 +109,7 @@ function PickupChart({ points }: { points: Overview["pickup"] }) {
           {max}
         </text>
         <text x={CHART.pad} y={CHART.height - 6} fontSize={11} fill="#374151">
-          {formatDate(points[0].date)}
+          {f.date(points[0].date, "short")}
         </text>
         <text
           x={CHART.width - CHART.pad}
@@ -124,12 +118,10 @@ function PickupChart({ points }: { points: Overview["pickup"] }) {
           fill="#374151"
           textAnchor="end"
         >
-          {formatDate(last.date)}
+          {f.date(last.date, "short")}
         </text>
       </svg>
-      <figcaption className="mt-1 text-xs text-gray-700">
-        Çizgi: penceredeki toplam oda-gece · Çubuk: o gün girilen oda-gece
-      </figcaption>
+      <figcaption className="mt-1 text-xs text-gray-700">{t("pickup.caption")}</figcaption>
     </figure>
   );
 }
@@ -144,6 +136,8 @@ function Kpi({ label, value }: { label: string; value: string }) {
 }
 
 function SuggestionRow({ s, onDecided }: { s: SuggestionView; onDecided: () => void }) {
+  const t = useTranslations("revenue");
+  const f = useFormat();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const decide = async (action: "accept" | "reject") => {
@@ -162,44 +156,46 @@ function SuggestionRow({ s, onDecided }: { s: SuggestionView; onDecided: () => v
     <li className="space-y-2 rounded-lg border border-gray-200 p-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <p className="font-medium text-gray-900">
-          {s.roomName} · {formatDate(s.date)}
+          {s.roomName} · {f.date(s.date, "short")}
         </p>
         <p className="text-sm text-gray-800">
-          {formatMinor(s.currentMinor, s.currency)} →{" "}
-          <strong>{formatMinor(s.suggestedMinor, s.currency)}</strong>
+          {f.money(s.currentMinor, s.currency)} →{" "}
+          <strong>{f.money(s.suggestedMinor, s.currency)}</strong>
           <span className="ml-2 text-xs text-gray-700">
-            (sınır {formatMinor(s.floorMinor, s.currency)} –{" "}
-            {formatMinor(s.ceilingMinor, s.currency)})
+            {t("suggestions.bounds", {
+              floor: f.money(s.floorMinor, s.currency),
+              ceiling: f.money(s.ceilingMinor, s.currency),
+            })}
           </span>
         </p>
       </div>
       <table className="min-w-full text-left text-sm">
-        <caption className="sr-only">Öneri katkı tablosu</caption>
+        <caption className="sr-only">{t("suggestions.caption")}</caption>
         <thead className="border-b text-gray-700">
           <tr>
             <th scope="col" className="py-1 pr-4">
-              Faktör
+              {t("suggestions.columns.factor")}
             </th>
             <th scope="col" className="py-1 pr-4">
-              Ayrıntı
+              {t("suggestions.columns.detail")}
             </th>
             <th scope="col" className="py-1 pr-4">
-              Çarpan
+              {t("suggestions.columns.multiplier")}
             </th>
             <th scope="col" className="py-1 pr-4 text-right">
-              Katkı
+              {t("suggestions.columns.contribution")}
             </th>
           </tr>
         </thead>
         <tbody>
           {s.contributions.map((c) => (
             <tr key={c.factor} className="border-b last:border-0">
-              <td className="py-1 pr-4">{FACTOR_LABEL[c.factor]}</td>
+              <td className="py-1 pr-4">{t(`factor.${c.factor}`)}</td>
               <td className="py-1 pr-4 text-gray-700">{c.label}</td>
               <td className="py-1 pr-4">×{c.multiplier.toFixed(2)}</td>
               <td className="py-1 pr-4 text-right">
                 {c.amountMinor > 0 ? "+" : ""}
-                {formatMinor(c.amountMinor, s.currency)}
+                {f.money(c.amountMinor, s.currency)}
               </td>
             </tr>
           ))}
@@ -210,10 +206,10 @@ function SuggestionRow({ s, onDecided }: { s: SuggestionView; onDecided: () => v
       </p>
       <div className="flex gap-2">
         <Button onClick={() => decide("accept")} disabled={busy}>
-          Kabul et
+          {t("suggestions.accept")}
         </Button>
         <Button variant="secondary" onClick={() => decide("reject")} disabled={busy}>
-          Reddet
+          {t("suggestions.reject")}
         </Button>
       </div>
       <Status error={error} />
@@ -222,6 +218,8 @@ function SuggestionRow({ s, onDecided }: { s: SuggestionView; onDecided: () => v
 }
 
 function PropertyRevenue({ propertyId }: { propertyId: string }) {
+  const t = useTranslations("revenue");
+  const f = useFormat();
   const { data, error, reload } = useLoader(
     () => apiFetch<Overview>(`/api/host/revenue?propertyId=${encodeURIComponent(propertyId)}`),
     [propertyId]
@@ -232,7 +230,7 @@ function PropertyRevenue({ propertyId }: { propertyId: string }) {
   const [genError, setGenError] = useState<string | null>(null);
 
   if (error) return <Status error={error} />;
-  if (!data) return <p className="text-sm text-gray-600">Yükleniyor…</p>;
+  if (!data) return <p className="text-sm text-gray-600">{t("loading")}</p>;
   const k = data.kpis;
   const selectedRoom = roomId || data.rooms[0]?.id || "";
 
@@ -245,9 +243,7 @@ function PropertyRevenue({ propertyId }: { propertyId: string }) {
         "/api/host/revenue/suggestions",
         { method: "POST", body: JSON.stringify({ roomId: selectedRoom }) }
       );
-      setMessage(
-        `${res.suggestions.length} öneri üretildi. Fiyatlar siz kabul edene kadar değişmez.`
-      );
+      setMessage(t("suggestions.generated", { count: res.suggestions.length }));
       reload();
     } catch (e) {
       setGenError(errorMessage(e));
@@ -258,32 +254,33 @@ function PropertyRevenue({ propertyId }: { propertyId: string }) {
 
   return (
     <div className="space-y-6">
-      <Card title={`Performans (${formatDate(k.from)} – ${formatDate(k.to)})`} id="revenue-kpis">
+      <Card
+        title={t("kpis.title", { from: f.date(k.from, "short"), to: f.date(k.to, "short") })}
+        id="revenue-kpis"
+      >
         <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Kpi label="Doluluk" value={`%${(k.occupancy * 100).toFixed(1)}`} />
-          <Kpi label="ADR" value={formatMinor(k.adrMinor, k.currency)} />
-          <Kpi label="RevPAR" value={formatMinor(k.revparMinor, k.currency)} />
-          <Kpi label="Gelir" value={formatMinor(k.revenueMinor, k.currency)} />
+          <Kpi
+            label={t("kpis.occupancy")}
+            value={t("percent", { value: (k.occupancy * 100).toFixed(1) })}
+          />
+          <Kpi label={t("kpis.adr")} value={f.money(k.adrMinor, k.currency)} />
+          <Kpi label={t("kpis.revpar")} value={f.money(k.revparMinor, k.currency)} />
+          <Kpi label={t("kpis.revenue")} value={f.money(k.revenueMinor, k.currency)} />
         </dl>
         <p className="mt-2 text-xs text-gray-700">
-          {k.soldRoomNights} / {k.availableRoomNights} oda-gece satıldı (onaylı ve tamamlanan
-          rezervasyonlar).
+          {t("kpis.sold", { sold: k.soldRoomNights, available: k.availableRoomNights })}
         </p>
       </Card>
 
-      <Card title="Pickup" id="revenue-pickup">
+      <Card title={t("pickup.title")} id="revenue-pickup">
         <PickupChart points={data.pickup} />
       </Card>
 
-      <Card title="Fiyat önerileri" id="revenue-suggestions">
-        <p className="mb-3 text-sm text-gray-700">
-          Öneri deterministik motordan gelir ve her zaman taban/tavan sınırı içindedir; açıklama
-          cümlesini yapay zekâ yazar. Kabul ettiğiniz fiyat sabitlenir, reddetmek hiçbir fiyatı
-          değiştirmez.
-        </p>
+      <Card title={t("suggestions.title")} id="revenue-suggestions">
+        <p className="mb-3 text-sm text-gray-700">{t("suggestions.intro")}</p>
         <div className="mb-4 flex flex-wrap items-end gap-2">
           <label className="text-sm text-gray-800">
-            Oda
+            {t("suggestions.room")}
             <select
               className={inputClass}
               value={selectedRoom}
@@ -297,12 +294,12 @@ function PropertyRevenue({ propertyId }: { propertyId: string }) {
             </select>
           </label>
           <Button onClick={generate} disabled={busy || !selectedRoom}>
-            Öneri üret
+            {t("suggestions.generate")}
           </Button>
         </div>
         <Status error={genError} message={message} />
         {data.suggestions.length === 0 ? (
-          <p className="text-sm text-gray-700">Bekleyen öneri yok.</p>
+          <p className="text-sm text-gray-700">{t("suggestions.empty")}</p>
         ) : (
           <ul className="space-y-3">
             {data.suggestions.map((s) => (
@@ -316,18 +313,19 @@ function PropertyRevenue({ propertyId }: { propertyId: string }) {
 }
 
 export default function RevenueDashboard() {
+  const t = useTranslations("revenue");
   const { data, error } = useLoader(() =>
     apiFetch<Array<{ id: string; title: string }>>("/api/host/properties")
   );
   const [propertyId, setPropertyId] = useState("");
   if (error) return <Status error={error} />;
-  if (!data) return <p className="text-sm text-gray-600">Mülkler yükleniyor…</p>;
-  if (data.length === 0) return <p className="text-sm text-gray-700">Henüz bir mülkünüz yok.</p>;
+  if (!data) return <p className="text-sm text-gray-600">{t("loadingProperties")}</p>;
+  if (data.length === 0) return <p className="text-sm text-gray-700">{t("noProperties")}</p>;
   const selected = propertyId || data[0].id;
   return (
     <div className="space-y-6">
       <label className="block max-w-sm text-sm text-gray-800">
-        Mülk
+        {t("propertyLabel")}
         <select
           className={inputClass}
           value={selected}

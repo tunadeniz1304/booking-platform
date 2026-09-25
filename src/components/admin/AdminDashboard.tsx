@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { useTranslations } from "next-intl";
 import { apiFetch } from "@/lib/api-client";
-import { formatDate } from "@/lib/ui/format";
+import { useFormat } from "@/i18n/use-format";
 import {
   Button,
   Card,
@@ -74,13 +75,6 @@ interface ExperimentResult {
 
 type Feedback = { error?: string; message?: string };
 
-const EVENT_STATUS: Record<DemandEvent["status"], string> = {
-  PROPOSED: "Önerildi",
-  APPROVED: "Onaylı",
-  REJECTED: "Reddedildi",
-  ROLLED_BACK: "Geri alındı",
-};
-
 export default function AdminDashboard() {
   return (
     <div className="space-y-6">
@@ -96,33 +90,34 @@ export default function AdminDashboard() {
 }
 
 function LlmStatusCard() {
+  const t = useTranslations("admin");
   const { data, error } = useLoader(() => apiFetch<LlmStatus>("/api/llm/status"));
   return (
-    <Card title="LLM durumu" id="llm-status">
+    <Card title={t("llm.title")} id="llm-status">
       <Status error={error} />
       {data && (
         <dl className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm text-gray-800 md:grid-cols-4">
-          <dt className="font-medium">Ayar</dt>
+          <dt className="font-medium">{t("llm.setting")}</dt>
           <dd>{data.mode}</dd>
-          <dt className="font-medium">Etkin mod</dt>
+          <dt className="font-medium">{t("llm.effectiveMode")}</dt>
           <dd>
             <LlmBadge mode={data.effectiveMode} />
           </dd>
-          <dt className="font-medium">Model</dt>
+          <dt className="font-medium">{t("llm.model")}</dt>
           <dd>{data.model}</dd>
-          <dt className="font-medium">Sunucu</dt>
+          <dt className="font-medium">{t("llm.server")}</dt>
           <dd>{data.baseUrlHost || "—"}</dd>
-          <dt className="font-medium">Anahtar tanımlı</dt>
-          <dd>{data.hasKey ? "Evet" : "Hayır"}</dd>
-          <dt className="font-medium">JSON modu</dt>
+          <dt className="font-medium">{t("llm.hasKey")}</dt>
+          <dd>{data.hasKey ? t("llm.yes") : t("llm.no")}</dd>
+          <dt className="font-medium">{t("llm.jsonMode")}</dt>
           <dd>
             {data.jsonModeSupported === null
-              ? "Bilinmiyor"
+              ? t("llm.unknown")
               : data.jsonModeSupported
-                ? "Var"
-                : "Yok"}
+                ? t("llm.supported")
+                : t("llm.unsupported")}
           </dd>
-          <dt className="font-medium">Son hata</dt>
+          <dt className="font-medium">{t("llm.lastError")}</dt>
           <dd className="col-span-1 md:col-span-3">{data.lastError ?? "—"}</dd>
         </dl>
       )}
@@ -131,6 +126,8 @@ function LlmStatusCard() {
 }
 
 function OutboxCard() {
+  const t = useTranslations("admin");
+  const f = useFormat();
   const { data, error, reload } = useLoader(() => apiFetch<OutboxState>("/api/admin/outbox"));
   const [feedback, setFeedback] = useState<Feedback>({});
 
@@ -138,7 +135,7 @@ function OutboxCard() {
     setFeedback({});
     try {
       await apiFetch("/api/admin/outbox", { method: "POST", body: JSON.stringify({ id }) });
-      setFeedback({ message: "Mesaj yeniden kuyruğa alındı." });
+      setFeedback({ message: t("outbox.requeued") });
       reload();
     } catch (e) {
       setFeedback({ error: errorMessage(e) });
@@ -146,7 +143,7 @@ function OutboxCard() {
   }
 
   return (
-    <Card title="Outbox" id="outbox">
+    <Card title={t("outbox.title")} id="outbox">
       <Status error={error ?? feedback.error} message={feedback.message} />
       {data && (
         <>
@@ -156,11 +153,11 @@ function OutboxCard() {
                 {status}: <strong>{count}</strong>
               </li>
             ))}
-            {Object.keys(data.counts).length === 0 && <li>Outbox boş.</li>}
+            {Object.keys(data.counts).length === 0 && <li>{t("outbox.empty")}</li>}
           </ul>
-          <h3 className="mt-4 text-base font-semibold text-gray-900">DEAD mesajlar</h3>
+          <h3 className="mt-4 text-base font-semibold text-gray-900">{t("outbox.deadTitle")}</h3>
           {data.dead.length === 0 ? (
-            <p className="text-sm text-gray-700">DEAD mesaj yok.</p>
+            <p className="text-sm text-gray-700">{t("outbox.deadEmpty")}</p>
           ) : (
             <ul className="mt-2 space-y-2">
               {data.dead.map((m) => (
@@ -169,14 +166,14 @@ function OutboxCard() {
                   className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3 text-sm"
                 >
                   <span>
-                    <strong>{m.eventType}</strong> · {m.aggregateId} · {m.attempts} deneme ·{" "}
-                    {formatDate(m.createdAt)}
+                    <strong>{m.eventType}</strong> · {m.aggregateId} ·{" "}
+                    {t("outbox.attempts", { count: m.attempts })} · {f.date(m.createdAt, "short")}
                     {m.lastError && (
                       <span className="block text-xs text-red-800">{m.lastError}</span>
                     )}
                   </span>
                   <Button variant="secondary" onClick={() => requeue(m.id)}>
-                    Yeniden kuyruğa al
+                    {t("outbox.requeue")}
                   </Button>
                 </li>
               ))}
@@ -189,6 +186,8 @@ function OutboxCard() {
 }
 
 function EventsCard() {
+  const t = useTranslations("admin");
+  const f = useFormat();
   const { data, error, reload } = useLoader(() => apiFetch<DemandEvent[]>("/api/admin/events"));
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
@@ -205,7 +204,7 @@ function EventsCard() {
         body: JSON.stringify({ text }),
       });
       setLastMode(res.llmMode);
-      setFeedback({ message: `Öneri oluşturuldu: ${res.event.title}` });
+      setFeedback({ message: t("events.created", { title: res.event.title }) });
       setText("");
       reload();
     } catch (err) {
@@ -219,7 +218,7 @@ function EventsCard() {
     setFeedback({});
     try {
       await apiFetch(`/api/admin/events/${id}/${action}`, { method: "POST", body: "{}" });
-      setFeedback({ message: "İşlem uygulandı." });
+      setFeedback({ message: t("events.applied") });
       reload();
     } catch (err) {
       setFeedback({ error: errorMessage(err) });
@@ -227,13 +226,9 @@ function EventsCard() {
   }
 
   return (
-    <Card title="Olay sinyali kuyruğu" id="events">
+    <Card title={t("events.title")} id="events">
       <form onSubmit={propose} className="space-y-2">
-        <Field
-          label="Metinden olay öner"
-          id="event-text"
-          hint="Ör. haber metni: 'İzmir'de 12–15 Ekim arası uluslararası fuar düzenlenecek.' Öneri onaylanmadan fiyata yansımaz."
-        >
+        <Field label={t("events.textLabel")} id="event-text" hint={t("events.textHint")}>
           <textarea
             id="event-text"
             rows={3}
@@ -247,7 +242,7 @@ function EventsCard() {
         </Field>
         <div className="flex items-center gap-3">
           <Button type="submit" disabled={busy}>
-            {busy ? "Çıkarılıyor…" : "Öneri oluştur"}
+            {busy ? t("events.extracting") : t("events.create")}
           </Button>
           <LlmBadge mode={lastMode} />
         </div>
@@ -255,28 +250,29 @@ function EventsCard() {
       <div className="mt-3">
         <Status error={error ?? feedback.error} message={feedback.message} />
       </div>
-      {data && data.length === 0 && <p className="text-sm text-gray-700">Olay yok.</p>}
+      {data && data.length === 0 && <p className="text-sm text-gray-700">{t("events.empty")}</p>}
       {data && data.length > 0 && (
         <ul className="mt-2 space-y-2">
           {data.map((ev) => (
             <li key={ev.id} className="rounded-md border p-3 text-sm text-gray-900">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span>
-                  <strong>{ev.title}</strong> · {ev.location.city} · {formatDate(ev.startsAt)}–
-                  {formatDate(ev.endsAt)} · etki {ev.impact}/10 · {EVENT_STATUS[ev.status]}
+                  <strong>{ev.title}</strong> · {ev.location.city} · {f.date(ev.startsAt, "short")}–
+                  {f.date(ev.endsAt, "short")} · {t("events.impact", { impact: ev.impact })} ·{" "}
+                  {t(`events.status.${ev.status}`)}
                 </span>
                 <span className="flex gap-2">
                   {ev.status === "PROPOSED" && (
                     <>
-                      <Button onClick={() => act(ev.id, "approve")}>Onayla</Button>
+                      <Button onClick={() => act(ev.id, "approve")}>{t("events.approve")}</Button>
                       <Button variant="secondary" onClick={() => act(ev.id, "reject")}>
-                        Reddet
+                        {t("events.reject")}
                       </Button>
                     </>
                   )}
                   {ev.status === "APPROVED" && (
                     <Button variant="danger" onClick={() => act(ev.id, "rollback")}>
-                      Geri al
+                      {t("events.rollback")}
                     </Button>
                   )}
                 </span>
@@ -311,6 +307,7 @@ function fraudReasons(reasons: unknown): FraudReason[] {
 }
 
 function FraudCard() {
+  const t = useTranslations("admin");
   const { data, error, reload } = useLoader(() => apiFetch<FraudCheck[]>("/api/admin/fraud"));
   const [feedback, setFeedback] = useState<Feedback>({});
 
@@ -321,7 +318,7 @@ function FraudCard() {
         method: "POST",
         body: JSON.stringify({ id, resolution }),
       });
-      setFeedback({ message: "Karar kaydedildi." });
+      setFeedback({ message: t("decisionSaved") });
       reload();
     } catch (e) {
       setFeedback({ error: errorMessage(e) });
@@ -329,9 +326,9 @@ function FraudCard() {
   }
 
   return (
-    <Card title="Fraud inceleme kuyruğu" id="fraud">
+    <Card title={t("fraud.title")} id="fraud">
       <Status error={error ?? feedback.error} message={feedback.message} />
-      {data?.length === 0 && <p className="text-sm text-gray-700">İncelenecek kayıt yok.</p>}
+      {data?.length === 0 && <p className="text-sm text-gray-700">{t("fraud.empty")}</p>}
       {data && data.length > 0 && (
         <ul className="space-y-2">
           {data.map((f) => (
@@ -340,11 +337,11 @@ function FraudCard() {
               className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3 text-sm"
             >
               <span>
-                Rezervasyon {f.bookingId} · kullanıcı {f.userId} · skor <strong>{f.score}</strong> ·{" "}
-                {f.decision}
+                {t("fraud.booking", { id: f.bookingId })} · {t("fraud.user", { id: f.userId })} ·{" "}
+                {t("fraud.score")} <strong>{f.score}</strong> · {f.decision}
                 <ul
                   className="mt-1 list-disc pl-5 text-xs text-gray-700"
-                  aria-label="Sebep kodları"
+                  aria-label={t("fraud.reasonsLabel")}
                 >
                   {fraudReasons(f.reasons).map((r, i) => (
                     <li key={`${r.code}-${i}`}>
@@ -353,15 +350,15 @@ function FraudCard() {
                       {r.detail && ` — ${r.detail}`}
                     </li>
                   ))}
-                  {fraudReasons(f.reasons).length === 0 && <li>Sebep kaydı yok</li>}
+                  {fraudReasons(f.reasons).length === 0 && <li>{t("fraud.noReasons")}</li>}
                 </ul>
               </span>
               <span className="flex gap-2">
                 <Button variant="secondary" onClick={() => resolve(f.id, "legit")}>
-                  Meşru
+                  {t("fraud.legit")}
                 </Button>
                 <Button variant="danger" onClick={() => resolve(f.id, "fraud")}>
-                  Dolandırıcılık
+                  {t("fraud.fraud")}
                 </Button>
               </span>
             </li>
@@ -385,6 +382,7 @@ interface ModerationItem {
 
 /** P1-7 yorum moderasyon kuyruğu: karar yöneticinin; açıklama yalnızca bilgi amaçlı. */
 function ReviewModerationCard() {
+  const t = useTranslations("admin");
   const { data, error, reload } = useLoader(() => apiFetch<ModerationItem[]>("/api/admin/reviews"));
   const [feedback, setFeedback] = useState<Feedback>({});
 
@@ -395,7 +393,7 @@ function ReviewModerationCard() {
         method: "POST",
         body: JSON.stringify({ id, action }),
       });
-      setFeedback({ message: "Karar kaydedildi." });
+      setFeedback({ message: t("decisionSaved") });
       reload();
     } catch (e) {
       setFeedback({ error: errorMessage(e) });
@@ -403,21 +401,21 @@ function ReviewModerationCard() {
   }
 
   return (
-    <Card title="Yorum moderasyon kuyruğu" id="review-moderation">
+    <Card title={t("moderation.title")} id="review-moderation">
       <Status error={error ?? feedback.error} message={feedback.message} />
-      {data?.length === 0 && <p className="text-sm text-gray-700">İncelenecek yorum yok.</p>}
+      {data?.length === 0 && <p className="text-sm text-gray-700">{t("moderation.empty")}</p>}
       {data && data.length > 0 && (
         <ul className="space-y-2">
           {data.map((r) => (
             <li key={r.id} className="rounded-md border p-3 text-sm">
               <p>
                 <strong>{r.propertyTitle}</strong> · {r.rating}/5 ·{" "}
-                {r.status === "HIDDEN" ? "Şikâyetle gizlendi" : "Yayın öncesi inceleme"} ·{" "}
-                {r.reportCount} şikâyet
+                {r.status === "HIDDEN" ? t("moderation.hidden") : t("moderation.preReview")} ·{" "}
+                {t("moderation.reports", { count: r.reportCount })}
               </p>
               {r.comment && <p className="mt-1 text-gray-800">{r.comment}</p>}
               <p className="mt-1 text-xs text-gray-700">
-                Neden işaretlendi: {r.explanation}{" "}
+                {t("moderation.whyFlagged")} {r.explanation}{" "}
                 {r.reasons.map((x) => (
                   <code key={x.code} className="mr-1">
                     {x.code}
@@ -426,10 +424,10 @@ function ReviewModerationCard() {
               </p>
               <span className="mt-2 flex gap-2">
                 <Button variant="secondary" onClick={() => decide(r.id, "publish")}>
-                  Yayınla
+                  {t("moderation.publish")}
                 </Button>
                 <Button variant="danger" onClick={() => decide(r.id, "remove")}>
-                  Kaldır
+                  {t("moderation.remove")}
                 </Button>
               </span>
             </li>
@@ -440,28 +438,28 @@ function ReviewModerationCard() {
   );
 }
 
-const pct = (v: number) => `%${(v * 100).toFixed(1)}`;
-
 function ExperimentsCard() {
+  const t = useTranslations("admin");
+  const pct = (v: number) => t("percent", { value: (v * 100).toFixed(1) });
   const { data, error } = useLoader(() => apiFetch<ExperimentResult[]>("/api/admin/experiments"));
   return (
-    <Card title="A/B deneyleri" id="experiments">
+    <Card title={t("experiments.title")} id="experiments">
       <Status error={error} />
-      {data?.length === 0 && <p className="text-sm text-gray-700">Tanımlı deney yok.</p>}
+      {data?.length === 0 && <p className="text-sm text-gray-700">{t("experiments.empty")}</p>}
       {data?.map((exp) => (
         <div key={exp.flagKey} className="overflow-x-auto">
           <p className="mb-2 text-sm font-medium">
-            {exp.flagKey} · {exp.enabled ? "açık" : "kapalı"}
+            {exp.flagKey} · {exp.enabled ? t("experiments.on") : t("experiments.off")}
           </p>
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b">
-                <th className="py-1 pr-3">Kol</th>
-                <th className="py-1 pr-3">Maruziyet</th>
-                <th className="py-1 pr-3">Kullanıcı</th>
-                <th className="py-1 pr-3">Dönüşüm</th>
-                <th className="py-1 pr-3">Oran</th>
-                <th className="py-1">%95 Wilson</th>
+                <th className="py-1 pr-3">{t("experiments.columns.arm")}</th>
+                <th className="py-1 pr-3">{t("experiments.columns.exposures")}</th>
+                <th className="py-1 pr-3">{t("experiments.columns.users")}</th>
+                <th className="py-1 pr-3">{t("experiments.columns.conversions")}</th>
+                <th className="py-1 pr-3">{t("experiments.columns.rate")}</th>
+                <th className="py-1">{t("experiments.columns.ci")}</th>
               </tr>
             </thead>
             <tbody>
@@ -486,6 +484,7 @@ function ExperimentsCard() {
 }
 
 function RoleCard() {
+  const t = useTranslations("admin");
   const [userId, setUserId] = useState("");
   const [role, setRole] = useState<"USER" | "HOST" | "ADMIN">("HOST");
   const [feedback, setFeedback] = useState<Feedback>({});
@@ -498,16 +497,16 @@ function RoleCard() {
         `/api/admin/users/${encodeURIComponent(userId.trim())}/role`,
         { method: "PATCH", body: JSON.stringify({ role }) }
       );
-      setFeedback({ message: `Rol güncellendi: ${res.role} (en geç 15 dk içinde yansır).` });
+      setFeedback({ message: t("roles.updated", { role: res.role }) });
     } catch (err) {
       setFeedback({ error: errorMessage(err) });
     }
   }
 
   return (
-    <Card title="Kullanıcı rolü değiştir" id="roles">
+    <Card title={t("roles.title")} id="roles">
       <form onSubmit={submit} className="grid gap-3 md:grid-cols-3">
-        <Field label="Kullanıcı kimliği" id="role-user" hint="Kendi rolünüzü değiştiremezsiniz.">
+        <Field label={t("roles.userId")} id="role-user" hint={t("roles.userIdHint")}>
           <input
             id="role-user"
             className={inputClass}
@@ -516,7 +515,7 @@ function RoleCard() {
             onChange={(e) => setUserId(e.target.value)}
           />
         </Field>
-        <Field label="Yeni rol" id="role-value">
+        <Field label={t("roles.newRole")} id="role-value">
           <select
             id="role-value"
             className={inputClass}
@@ -529,7 +528,7 @@ function RoleCard() {
           </select>
         </Field>
         <div className="flex items-end">
-          <Button type="submit">Rolü güncelle</Button>
+          <Button type="submit">{t("roles.submit")}</Button>
         </div>
       </form>
       <div className="mt-2">

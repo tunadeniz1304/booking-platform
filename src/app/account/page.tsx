@@ -2,10 +2,12 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import { logout } from "@/lib/api-client";
 import PasskeyManager from "@/components/account/PasskeyManager";
+import { useFormat } from "@/i18n/use-format";
 
 interface User {
   id: string;
@@ -51,6 +53,8 @@ interface Favorite {
 }
 
 export default function AccountPage() {
+  const t = useTranslations("account");
+  const fmt = useFormat();
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -62,9 +66,9 @@ export default function AccountPage() {
 
   const fetchFavorites = useCallback(async () => {
     const res = await fetch("/api/favorites");
-    if (!res.ok) throw new Error("Favoriler yüklenemedi");
+    if (!res.ok) throw new Error(t("errors.favoritesLoad"));
     return res.json() as Promise<Favorite[]>;
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     async function loadData() {
@@ -75,7 +79,7 @@ export default function AccountPage() {
         ]);
 
         if (!userRes.ok || !bookingsRes.ok) {
-          throw new Error("Kullanıcı bilgileri yüklenemedi");
+          throw new Error(t("errors.userLoad"));
         }
 
         const [userData, bookingsData] = await Promise.all([
@@ -89,14 +93,14 @@ export default function AccountPage() {
         setBookings(bookingsData);
         setFavorites(favoritesData);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Bir hata oluştu");
+        setError(err instanceof Error ? err.message : t("errors.generic"));
       } finally {
         setLoading(false);
       }
     }
 
     loadData();
-  }, [fetchFavorites]);
+  }, [fetchFavorites, t]);
 
   const toggleFavorite = async (propertyId: string) => {
     setFavoritingId(propertyId);
@@ -107,7 +111,7 @@ export default function AccountPage() {
         const res = await fetch(`/api/favorites?propertyId=${propertyId}`, {
           method: "DELETE",
         });
-        if (!res.ok) throw new Error("Favori kaldırılamadı");
+        if (!res.ok) throw new Error(t("errors.favoriteRemove"));
         setFavorites((prev) => prev.filter((f) => f.propertyId !== propertyId));
       } else {
         const res = await fetch("/api/favorites", {
@@ -115,12 +119,12 @@ export default function AccountPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ propertyId }),
         });
-        if (!res.ok) throw new Error("Favori eklenemedi");
+        if (!res.ok) throw new Error(t("errors.favoriteAdd"));
         const newFavorite = (await res.json()) as Favorite;
         setFavorites((prev) => [newFavorite, ...prev]);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Favori işlemi başarısız");
+      setError(err instanceof Error ? err.message : t("errors.favoriteFailed"));
     } finally {
       setFavoritingId(null);
     }
@@ -132,38 +136,27 @@ export default function AccountPage() {
       const res = await fetch(`/api/bookings/${bookingId}`, {
         method: "DELETE",
       });
-      if (!res.ok) throw new Error("Rezervasyon iptal edilemedi");
+      if (!res.ok) throw new Error(t("errors.cancelBooking"));
       setBookings((prev) =>
         prev.map((b) => (b.id === bookingId ? { ...b, status: "CANCELLED" } : b))
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "İptal işlemi başarısız");
+      setError(err instanceof Error ? err.message : t("errors.cancelFailed"));
     } finally {
       setCancellingId(null);
     }
   };
 
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString("tr-TR", {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    });
-  };
+  const formatDate = (dateStr: string) => fmt.date(dateStr, "long");
 
-  const formatPrice = (price: number, currency: string) => {
-    return new Intl.NumberFormat("tr-TR", {
-      style: "currency",
-      currency,
-    }).format(price);
-  };
+  const formatPrice = (price: number, currency: string) => fmt.decimal(price, currency);
 
   const getStatusLabel = (status: string) => {
     const labels: Record<string, string> = {
-      PENDING: "Beklemede",
-      CONFIRMED: "Onaylandı",
-      CANCELLED: "İptal Edildi",
-      COMPLETED: "Tamamlandı",
+      PENDING: t("status.pending"),
+      CONFIRMED: t("status.confirmed"),
+      CANCELLED: t("status.cancelled"),
+      COMPLETED: t("status.completed"),
     };
     return labels[status] || status;
   };
@@ -198,7 +191,7 @@ export default function AccountPage() {
             onClick={() => window.location.reload()}
             className="mt-4 rounded-md bg-primary-600 px-4 py-2 text-white hover:bg-primary-700"
           >
-            Tekrar Dene
+            {t("retry")}
           </button>
         </div>
       </div>
@@ -210,7 +203,7 @@ export default function AccountPage() {
       <Header />
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold text-gray-900">Hesabım</h1>
+          <h1 className="text-3xl font-bold text-gray-900">{t("title")}</h1>
           <button
             onClick={async () => {
               await logout();
@@ -218,7 +211,7 @@ export default function AccountPage() {
             }}
             className="rounded-md border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
           >
-            Çıkış Yap
+            {t("logout")}
           </button>
         </div>
 
@@ -237,10 +230,10 @@ export default function AccountPage() {
                 <p className="text-sm text-gray-500">{user.email}</p>
                 <span className="mt-1 inline-block rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
                   {user.role === "HOST"
-                    ? "Ev Sahibi"
+                    ? t("role.host")
                     : user.role === "ADMIN"
-                      ? "Yönetici"
-                      : "Kullanıcı"}
+                      ? t("role.admin")
+                      : t("role.user")}
                 </span>
               </div>
             </div>
@@ -252,11 +245,11 @@ export default function AccountPage() {
         <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-2">
           {/* Rezervasyonlar */}
           <section>
-            <h2 className="text-2xl font-semibold text-gray-900">Rezervasyonlarım</h2>
+            <h2 className="text-2xl font-semibold text-gray-900">{t("bookings.title")}</h2>
             <div className="mt-4 space-y-4">
               {bookings.length === 0 ? (
                 <div className="rounded-2xl bg-white p-8 text-center shadow-sm">
-                  <p className="text-gray-500">Henüz rezervasyonunuz yok.</p>
+                  <p className="text-gray-500">{t("bookings.empty")}</p>
                 </div>
               ) : (
                 bookings.map((booking) => (
@@ -269,7 +262,9 @@ export default function AccountPage() {
                         <p className="text-sm text-gray-500">
                           {booking.property.location.city}, {booking.property.location.country}
                         </p>
-                        <p className="mt-1 text-sm text-gray-600">Oda: {booking.room.name}</p>
+                        <p className="mt-1 text-sm text-gray-600">
+                          {t("bookings.room", { name: booking.room.name })}
+                        </p>
                       </div>
                       <span
                         className={`inline-flex shrink-0 items-center rounded-full px-3 py-1 text-xs font-medium ${getStatusColor(
@@ -282,19 +277,19 @@ export default function AccountPage() {
 
                     <div className="mt-4 grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
                       <div>
-                        <p className="text-gray-500">Giriş</p>
+                        <p className="text-gray-500">{t("bookings.checkIn")}</p>
                         <p className="font-medium text-gray-900">{formatDate(booking.checkIn)}</p>
                       </div>
                       <div>
-                        <p className="text-gray-500">Çıkış</p>
+                        <p className="text-gray-500">{t("bookings.checkOut")}</p>
                         <p className="font-medium text-gray-900">{formatDate(booking.checkOut)}</p>
                       </div>
                       <div>
-                        <p className="text-gray-500">Misafir</p>
+                        <p className="text-gray-500">{t("bookings.guests")}</p>
                         <p className="font-medium text-gray-900">{booking.guestCount}</p>
                       </div>
                       <div>
-                        <p className="text-gray-500">Toplam</p>
+                        <p className="text-gray-500">{t("bookings.total")}</p>
                         <p className="font-medium text-gray-900">
                           {formatPrice(booking.totalPrice, booking.currency)}
                         </p>
@@ -309,8 +304,8 @@ export default function AccountPage() {
                           className="rounded-md border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           {cancellingId === booking.id
-                            ? "İptal ediliyor..."
-                            : "Rezervasyonu İptal Et"}
+                            ? t("bookings.cancelling")
+                            : t("bookings.cancel")}
                         </button>
                       )}
                       <button
@@ -323,10 +318,10 @@ export default function AccountPage() {
                         }`}
                       >
                         {favoritingId === booking.propertyId
-                          ? "İşleniyor..."
+                          ? t("bookings.processing")
                           : favorites.some((f) => f.propertyId === booking.propertyId)
-                            ? "Favorilerden Çıkar"
-                            : "Favorilere Ekle"}
+                            ? t("bookings.removeFavorite")
+                            : t("bookings.addFavorite")}
                       </button>
                     </div>
                   </div>
@@ -337,11 +332,11 @@ export default function AccountPage() {
 
           {/* Favoriler */}
           <section>
-            <h2 className="text-2xl font-semibold text-gray-900">Favorilerim</h2>
+            <h2 className="text-2xl font-semibold text-gray-900">{t("favorites.title")}</h2>
             <div className="mt-4 space-y-4">
               {favorites.length === 0 ? (
                 <div className="rounded-2xl bg-white p-8 text-center shadow-sm">
-                  <p className="text-gray-500">Henüz favori eklemediniz.</p>
+                  <p className="text-gray-500">{t("favorites.empty")}</p>
                 </div>
               ) : (
                 favorites.map((favorite) => (
@@ -359,12 +354,15 @@ export default function AccountPage() {
                             {favorite.property.ratingAvg.toFixed(1)}
                           </span>
                           <span className="text-xs text-gray-500">
-                            {favorite.property.ratingCount} değerlendirme
+                            {t("favorites.reviews", { count: favorite.property.ratingCount })}
                           </span>
                         </div>
                         <p className="mt-2 text-lg font-semibold text-gray-900">
                           {formatPrice(favorite.property.basePrice, favorite.property.currency)}
-                          <span className="text-sm font-normal text-gray-500"> / gece</span>
+                          <span className="text-sm font-normal text-gray-500">
+                            {" "}
+                            {t("favorites.perNight")}
+                          </span>
                         </p>
                       </div>
                       <button
@@ -372,7 +370,9 @@ export default function AccountPage() {
                         disabled={favoritingId === favorite.propertyId}
                         className="shrink-0 rounded-md border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        {favoritingId === favorite.propertyId ? "Kaldırılıyor..." : "Kaldır"}
+                        {favoritingId === favorite.propertyId
+                          ? t("favorites.removing")
+                          : t("favorites.remove")}
                       </button>
                     </div>
                   </div>

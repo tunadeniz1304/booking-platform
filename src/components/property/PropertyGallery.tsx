@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import { useTranslations } from "next-intl";
 import { unsplashLoader } from "@/lib/ui/image-loader";
 
 interface PropertyGalleryProps {
@@ -16,6 +17,7 @@ const FALLBACK_IMAGES = [
 ];
 
 export default function PropertyGallery({ images, title }: PropertyGalleryProps) {
+  const t = useTranslations("property");
   const [activeIndex, setActiveIndex] = useState(0);
 
   const galleryImages = images.length > 0 ? images : FALLBACK_IMAGES;
@@ -26,7 +28,7 @@ export default function PropertyGallery({ images, title }: PropertyGalleryProps)
       <div className="relative aspect-[16/9] w-full">
         <Image
           src={activeImage}
-          alt={`${title} - görsel ${activeIndex + 1}`}
+          alt={t("gallery.imageAlt", { title, index: activeIndex + 1 })}
           fill
           loader={unsplashLoader}
           priority
@@ -47,7 +49,7 @@ export default function PropertyGallery({ images, title }: PropertyGalleryProps)
             >
               <Image
                 src={image}
-                alt={`${title} - küçük görsel ${index + 1}`}
+                alt={t("gallery.thumbnailAlt", { title, index: index + 1 })}
                 fill
                 loader={unsplashLoader}
                 // Küçük resimler LCP görseliyle bant genişliği için yarışmasın.

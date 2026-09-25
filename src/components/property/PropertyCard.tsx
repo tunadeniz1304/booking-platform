@@ -4,7 +4,8 @@ import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { formatMoney, money } from "@/lib/money/money";
+import { useTranslations } from "next-intl";
+import { useFormat } from "@/i18n/use-format";
 
 export interface PropertyCardProps {
   id: string;
@@ -32,14 +33,6 @@ export interface PropertyCardProps {
   };
 }
 
-function formatPrice(amount: number, currency: string): string {
-  return new Intl.NumberFormat("tr-TR", {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 0,
-  }).format(amount);
-}
-
 export default function PropertyCard({
   id,
   title,
@@ -63,6 +56,8 @@ export default function PropertyCard({
       }).toString()}`
     : `/property/${id}`;
   const router = useRouter();
+  const t = useTranslations("search");
+  const f = useFormat();
   const [isFavorite, setIsFavorite] = useState(initialFavorite);
   const [busy, setBusy] = useState(false);
 
@@ -108,7 +103,7 @@ export default function PropertyCard({
           onClick={toggleFavorite}
           disabled={busy}
           aria-pressed={isFavorite}
-          aria-label={isFavorite ? "Favorilerden çıkar" : "Favorilere ekle"}
+          aria-label={isFavorite ? t("card.removeFavorite") : t("card.addFavorite")}
           className="absolute right-3 top-3 rounded-full bg-white/90 p-2 text-gray-600 shadow-sm transition hover:bg-white hover:text-red-500 disabled:opacity-50"
         >
           <svg
@@ -167,31 +162,37 @@ export default function PropertyCard({
             <span className="rounded-sm bg-[#003580] px-2 py-1 text-sm font-bold text-white">
               {rating.toFixed(1)}
             </span>
-            <span className="mt-1 text-xs text-gray-500">{reviewCount} değerlendirme</span>
+            <span className="mt-1 text-xs text-gray-500">
+              {t("card.reviews", { count: reviewCount })}
+            </span>
           </div>
         </div>
 
         <div className="mt-4 flex items-end justify-between border-t border-gray-100 pt-4">
           {stay ? (
             <div data-testid="card-price">
-              <p className="text-xs text-gray-500">{stay.nights} gece toplam</p>
-              <p className="text-lg font-bold text-gray-900" data-testid="card-total">
-                {formatMoney(money(stay.total, currency))}
+              <p className="text-xs text-gray-500">
+                {t("card.nightsTotal", { count: stay.nights })}
               </p>
-              <p className="text-xs text-gray-500">vergi ve ücretler dahil</p>
+              <p className="text-lg font-bold text-gray-900" data-testid="card-total">
+                {f.money(stay.total, currency)}
+              </p>
+              <p className="text-xs text-gray-500">{t("card.taxesIncluded")}</p>
             </div>
           ) : (
             <div data-testid="card-price">
-              <p className="text-xs text-gray-500">gecelik başlangıç</p>
-              <p className="text-lg font-bold text-gray-900">{formatPrice(price, currency)}</p>
-              <p className="text-xs text-gray-500">tarih seçince vergi ve ücretler eklenir</p>
+              <p className="text-xs text-gray-500">{t("card.fromPerNight")}</p>
+              <p className="text-lg font-bold text-gray-900">
+                {f.number(price, { style: "currency", currency, maximumFractionDigits: 0 })}
+              </p>
+              <p className="text-xs text-gray-500">{t("card.taxesOnDates")}</p>
             </div>
           )}
           <Link
             href={href}
             className="rounded-sm bg-[#003580] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#002b66]"
           >
-            Fırsatı Gör
+            {t("card.seeDeal")}
           </Link>
         </div>
       </div>

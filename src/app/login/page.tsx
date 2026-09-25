@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import PasskeyLoginButton from "@/components/auth/PasskeyLoginButton";
@@ -13,6 +14,7 @@ interface LoginResponse {
 }
 
 export default function LoginPage() {
+  const t = useTranslations("auth");
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -31,13 +33,13 @@ export default function LoginPage() {
       });
       const data = (await res.json()) as LoginResponse & { error?: string };
       if (!res.ok) {
-        throw new Error(data.error ?? "Giriş yapılamadı");
+        throw new Error(data.error ?? t("login.failed"));
       }
       const redirect = new URLSearchParams(window.location.search).get("redirect") ?? "/";
       router.push(redirect);
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Giriş yapılamadı");
+      setError(err instanceof Error ? err.message : t("login.failed"));
       setSubmitting(false);
     }
   };
@@ -50,15 +52,13 @@ export default function LoginPage() {
         className="mx-auto flex w-full max-w-md flex-1 items-center justify-center px-4 py-16"
       >
         <div className="w-full rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
-          <h1 className="text-2xl font-bold text-gray-900">Giriş Yap</h1>
-          <p className="mt-1 text-sm text-gray-600">
-            Rezervasyonlarınıza ve favorilerinize erişin.
-          </p>
+          <h1 className="text-2xl font-bold text-gray-900">{t("login.title")}</h1>
+          <p className="mt-1 text-sm text-gray-600">{t("login.subtitle")}</p>
 
           <form onSubmit={handleSubmit} className="mt-6 space-y-4">
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                E-posta
+                {t("email")}
               </label>
               <input
                 id="email"
@@ -73,7 +73,7 @@ export default function LoginPage() {
 
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                Parola
+                {t("password")}
               </label>
               <input
                 id="password"
@@ -88,7 +88,7 @@ export default function LoginPage() {
 
             <p className="text-right text-sm">
               <Link href="/forgot-password" className="text-[#003580] hover:underline">
-                Şifremi unuttum
+                {t("login.forgotPassword")}
               </Link>
             </p>
 
@@ -103,7 +103,7 @@ export default function LoginPage() {
               disabled={submitting}
               className="w-full rounded-lg bg-[#003580] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#002b66] disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-700"
             >
-              {submitting ? "Giriş yapılıyor..." : "Giriş Yap"}
+              {submitting ? t("login.submitting") : t("login.submit")}
             </button>
           </form>
 
@@ -116,9 +116,9 @@ export default function LoginPage() {
           />
 
           <p className="mt-6 text-center text-sm text-gray-600">
-            Hesabınız yok mu?{" "}
+            {t("login.noAccount")}{" "}
             <Link href="/register" className="font-semibold text-[#003580] hover:underline">
-              Kayıt Ol
+              {t("login.registerLink")}
             </Link>
           </p>
         </div>

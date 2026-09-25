@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { useTranslations } from "next-intl";
 import { ApiError, apiFetch } from "@/lib/api-client";
+import { useFormat } from "@/i18n/use-format";
 
 interface Msg {
   id: string;
@@ -25,6 +27,8 @@ interface ThreadResponse {
  * taslak yalnızca kutuya yazılır — göndermek ev sahibinin onayıdır.
  */
 export default function BookingMessages({ bookingId }: { bookingId: string }) {
+  const t = useTranslations("chat");
+  const f = useFormat();
   const [thread, setThread] = useState<ThreadResponse | null>(null);
   const [text, setText] = useState("");
   const [fromDraft, setFromDraft] = useState(false);
@@ -33,19 +37,21 @@ export default function BookingMessages({ bookingId }: { bookingId: string }) {
   const listRef = useRef<HTMLOListElement>(null);
 
   const add = useCallback((m: Msg) => {
-    setThread((t) =>
-      t && !t.messages.some((x) => x.id === m.id) ? { ...t, messages: [...t.messages, m] } : t
+    setThread((prev) =>
+      prev && !prev.messages.some((x) => x.id === m.id)
+        ? { ...prev, messages: [...prev.messages, m] }
+        : prev
     );
   }, []);
 
   useEffect(() => {
     let cancelled = false;
     apiFetch<ThreadResponse>(`/api/bookings/${bookingId}/messages`)
-      .then((t) => {
-        if (!cancelled) setThread(t);
+      .then((res) => {
+        if (!cancelled) setThread(res);
       })
       .catch((err: unknown) => {
-        if (!cancelled) setError(err instanceof ApiError ? err.message : "Mesajlar yüklenemedi");
+        if (!cancelled) setError(err instanceof ApiError ? err.message : t("loadFailed"));
       });
     const es = new EventSource(`/api/bookings/${bookingId}/messages/stream`);
     es.addEventListener("message", (e) => {
@@ -59,7 +65,7 @@ export default function BookingMessages({ bookingId }: { bookingId: string }) {
       cancelled = true;
       es.close();
     };
-  }, [bookingId, add]);
+  }, [bookingId, add, t]);
 
   useEffect(() => {
     listRef.current?.lastElementChild?.scrollIntoView?.({ block: "nearest" });
@@ -79,7 +85,7 @@ export default function BookingMessages({ bookingId }: { bookingId: string }) {
       setText("");
       setFromDraft(false);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Mesaj gönderilemedi");
+      setError(err instanceof ApiError ? err.message : t("sendFailed"));
     } finally {
       setBusy(false);
     }
@@ -95,7 +101,7 @@ export default function BookingMessages({ bookingId }: { bookingId: string }) {
       setText(res.draft);
       setFromDraft(true);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Taslak oluşturulamadı");
+      setError(err instanceof ApiError ? err.message : t("draftFailed"));
     } finally {
       setBusy(false);
     }
@@ -105,9 +111,9 @@ export default function BookingMessages({ bookingId }: { bookingId: string }) {
     return (
       <section aria-labelledby="msg-title" className="border-t border-gray-100 pt-6">
         <h2 id="msg-title" className="text-lg font-semibold text-gray-900">
-          Mesajlar
+          {t("title")}
         </h2>
-        <p className="mt-2 text-sm text-gray-500">{error ?? "Yükleniyor..."}</p>
+        <p className="mt-2 text-sm text-gray-500">{error ?? t("loading")}</p>
       </section>
     );
   }
@@ -115,16 +121,11 @@ export default function BookingMessages({ bookingId }: { bookingId: string }) {
   return (
     <section aria-labelledby="msg-title" className="border-t border-gray-100 pt-6">
       <h2 id="msg-title" className="text-lg font-semibold text-gray-900">
-        Mesajlar
+        {t("title")}
       </h2>
-      <p className="mt-1 text-xs text-gray-500">
-        Güvenliğiniz için telefon, e-posta, IBAN ve bağlantılar otomatik gizlenir; ödemeyi yalnızca
-        platform üzerinden yapın.
-      </p>
+      <p className="mt-1 text-xs text-gray-500">{t("safetyNotice")}</p>
       <ol ref={listRef} aria-live="polite" className="mt-4 max-h-80 space-y-2 overflow-y-auto">
-        {thread.messages.length === 0 && (
-          <li className="text-sm text-gray-500">Henüz mesaj yok.</li>
-        )}
+        {thread.messages.length === 0 && <li className="text-sm text-gray-500">{t("empty")}</li>}
         {thread.messages.map((m) => {
           const mine = m.senderRole === thread.role;
           return (
@@ -135,13 +136,13 @@ export default function BookingMessages({ bookingId }: { bookingId: string }) {
                 }`}
               >
                 <span className="sr-only">
-                  {m.senderRole === "HOST" ? "Ev sahibi" : "Misafir"}:{" "}
+                  {m.senderRole === "HOST" ? t("host") : t("guest")}:{" "}
                 </span>
                 {m.body}
               </div>
               <div className="mt-0.5 text-xs text-gray-500">
-                {new Date(m.createdAt).toLocaleString("tr-TR")}
-                {m.maskedKinds.length > 0 && " · iletişim bilgisi gizlendi"}
+                {f.dateTime(m.createdAt)}
+                {m.maskedKinds.length > 0 && ` · ${t("contactMasked")}`}
               </div>
             </li>
           );
@@ -150,7 +151,7 @@ export default function BookingMessages({ bookingId }: { bookingId: string }) {
       {thread.canWrite ? (
         <form onSubmit={send} className="mt-4 space-y-2">
           <label htmlFor="msg-body" className="sr-only">
-            Mesajınız
+            {t("inputLabel")}
           </label>
           <textarea
             id="msg-body"
@@ -158,13 +159,9 @@ export default function BookingMessages({ bookingId }: { bookingId: string }) {
             value={text}
             onChange={(e) => setText(e.target.value)}
             className="w-full rounded-lg border border-gray-300 p-2 text-sm"
-            placeholder="Mesajınızı yazın"
+            placeholder={t("placeholder")}
           />
-          {fromDraft && (
-            <p className="text-xs text-amber-800">
-              Yapay zekâ taslağı — göndermeden önce kontrol edin ve düzenleyin.
-            </p>
-          )}
+          {fromDraft && <p className="text-xs text-amber-800">{t("aiDraftNotice")}</p>}
           {error && (
             <p role="alert" className="text-sm text-red-600">
               {error}
@@ -176,7 +173,7 @@ export default function BookingMessages({ bookingId }: { bookingId: string }) {
               disabled={busy || !text.trim()}
               className="rounded-lg bg-[#003580] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
             >
-              Gönder
+              {t("send")}
             </button>
             {thread.role === "HOST" && (
               <button
@@ -185,15 +182,13 @@ export default function BookingMessages({ bookingId }: { bookingId: string }) {
                 disabled={busy}
                 className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 disabled:opacity-50"
               >
-                Yanıt taslağı öner
+                {t("suggestDraft")}
               </button>
             )}
           </div>
         </form>
       ) : (
-        <p className="mt-4 text-sm text-gray-500">
-          Mesajlaşma yalnızca onaylı rezervasyonlarda açıktır.
-        </p>
+        <p className="mt-4 text-sm text-gray-500">{t("closed")}</p>
       )}
     </section>
   );

@@ -2,6 +2,7 @@
 
 import { useState, useSyncExternalStore } from "react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { focusRing } from "@/components/ui/ui";
 import { CONSENT_COOKIE, readConsent, type ConsentValue } from "@/lib/privacy/consent";
 
@@ -33,6 +34,7 @@ export default function CookieConsent() {
   );
   const [customizing, setCustomizing] = useState(false);
   const [analytics, setAnalytics] = useState(false);
+  const t = useTranslations("cookie");
 
   if (hasConsent) return null;
 
@@ -47,19 +49,23 @@ export default function CookieConsent() {
       <div className="mx-auto flex max-w-5xl flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div className="text-sm text-gray-900">
           <h2 id="cookie-consent-title" className="text-base font-semibold">
-            Çerez tercihleri
+            {t("title")}
           </h2>
           <p className="mt-1">
-            Zorunlu çerezler oturum ve güvenlik için gereklidir. Analitik çerezler yalnızca
-            onayınızla kullanılır. Ayrıntılar için{" "}
-            <Link href="/privacy" className={`font-semibold text-[#003580] underline ${focusRing}`}>
-              aydınlatma metni
-            </Link>
-            .
+            {t.rich("body", {
+              link: (chunks) => (
+                <Link
+                  href="/privacy"
+                  className={`font-semibold text-[#003580] underline ${focusRing}`}
+                >
+                  {chunks}
+                </Link>
+              ),
+            })}
           </p>
           {customizing && (
             <fieldset className="mt-2 space-y-1">
-              <legend className="sr-only">Çerez kategorileri</legend>
+              <legend className="sr-only">{t("categories")}</legend>
               <div className="flex items-center gap-2">
                 <input
                   id="consent-necessary"
@@ -68,7 +74,7 @@ export default function CookieConsent() {
                   disabled
                   className="h-4 w-4"
                 />
-                <label htmlFor="consent-necessary">Zorunlu (her zaman açık)</label>
+                <label htmlFor="consent-necessary">{t("necessary")}</label>
               </div>
               <div className="flex items-center gap-2">
                 <input
@@ -78,7 +84,7 @@ export default function CookieConsent() {
                   checked={analytics}
                   onChange={(e) => setAnalytics(e.target.checked)}
                 />
-                <label htmlFor="consent-analytics">Analitik</label>
+                <label htmlFor="consent-analytics">{t("analytics")}</label>
               </div>
             </fieldset>
           )}
@@ -90,7 +96,7 @@ export default function CookieConsent() {
               className={`${buttonBase} bg-[#003580] text-white hover:bg-[#002b66]`}
               onClick={() => writeConsent(analytics ? "necessary,analytics" : "necessary")}
             >
-              Tercihleri kaydet
+              {t("save")}
             </button>
           ) : (
             <button
@@ -99,7 +105,7 @@ export default function CookieConsent() {
               aria-expanded={customizing}
               onClick={() => setCustomizing(true)}
             >
-              Özelleştir
+              {t("customize")}
             </button>
           )}
           <button
@@ -107,14 +113,14 @@ export default function CookieConsent() {
             className={`${buttonBase} border border-[#003580] text-[#003580] hover:bg-blue-50`}
             onClick={() => writeConsent("necessary")}
           >
-            Yalnızca zorunlu
+            {t("necessaryOnly")}
           </button>
           <button
             type="button"
             className={`${buttonBase} bg-[#003580] text-white hover:bg-[#002b66]`}
             onClick={() => writeConsent("necessary,analytics")}
           >
-            Tümünü kabul et
+            {t("acceptAll")}
           </button>
         </div>
       </div>

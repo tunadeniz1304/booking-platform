@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import QuoteBreakdown from "@/components/booking/QuoteBreakdown";
 import { useQuote } from "@/components/booking/useQuote";
 
@@ -38,6 +39,7 @@ function useStableIdempotencyKey(scope: string): string | null {
 }
 
 function CheckoutContent() {
+  const t = useTranslations("checkout");
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -80,12 +82,12 @@ function CheckoutContent() {
         if (active) setProperty(data);
       })
       .catch(() => {
-        if (active) setLoadError("Konaklama bilgileri alınamadı.");
+        if (active) setLoadError(t("loadFailed"));
       });
     return () => {
       active = false;
     };
-  }, [propertyId]);
+  }, [propertyId, t]);
 
   const room = property?.rooms.find((r) => r.id === roomId) ?? null;
 
@@ -121,19 +123,15 @@ function CheckoutContent() {
       if (!res.ok) {
         if (data.code === "PRICE_CHANGED" || data.code === "QUOTE_EXPIRED") {
           setRefreshKey((k) => k + 1);
-          throw new Error(
-            data.code === "PRICE_CHANGED"
-              ? "Fiyat değişti. Güncel fiyatı kontrol edip tekrar onaylayın."
-              : "Fiyat teklifinin süresi doldu; güncel fiyat yüklendi."
-          );
+          throw new Error(data.code === "PRICE_CHANGED" ? t("priceChanged") : t("quoteExpired"));
         }
-        throw new Error(data.error ?? "Rezervasyon oluşturulamadı.");
+        throw new Error(data.error ?? t("createFailed"));
       }
       const bookingId = data?.booking?.id;
-      if (!bookingId) throw new Error("Rezervasyon yanıtı geçersiz.");
+      if (!bookingId) throw new Error(t("invalidResponse"));
       router.push(`/booking/${bookingId}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Rezervasyon oluşturulamadı.");
+      setError(err instanceof Error ? err.message : t("createFailed"));
       setSubmitting(false);
     }
   };
@@ -145,10 +143,10 @@ function CheckoutContent() {
         className="mx-auto flex min-h-[60vh] max-w-3xl items-center justify-center px-4"
       >
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900">Rezervasyon bilgileri eksik</h1>
-          <p className="mt-2 text-gray-600">{loadError ?? "Lütfen tekrar arama yapın."}</p>
+          <h1 className="text-2xl font-bold text-gray-900">{t("missingTitle")}</h1>
+          <p className="mt-2 text-gray-600">{loadError ?? t("missingHint")}</p>
           <Link href="/" className="mt-4 inline-block text-primary-600 hover:underline">
-            Ana sayfaya dön
+            {t("backHome")}
           </Link>
         </div>
       </main>
@@ -157,19 +155,19 @@ function CheckoutContent() {
 
   return (
     <main id="main" className="mx-auto max-w-3xl px-4 py-8">
-      <h1 className="text-2xl font-bold text-gray-900">Rezervasyonu Tamamla</h1>
+      <h1 className="text-2xl font-bold text-gray-900">{t("title")}</h1>
 
       <form onSubmit={handleSubmit} className="mt-6 space-y-6">
         <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-gray-900">Konaklama Bilgileri</h2>
+          <h2 className="text-lg font-semibold text-gray-900">{t("stayDetails")}</h2>
           <dl className="mt-4 space-y-3 text-sm">
             <div className="flex justify-between">
-              <dt className="text-gray-600">Konaklama</dt>
+              <dt className="text-gray-600">{t("stay")}</dt>
               <dd className="font-medium text-gray-900">{property?.title ?? "…"}</dd>
             </div>
             {property && (
               <div className="flex justify-between">
-                <dt className="text-gray-600">Konum</dt>
+                <dt className="text-gray-600">{t("location")}</dt>
                 <dd className="font-medium text-gray-900">
                   {property.location.city}, {property.location.country}
                 </dd>
@@ -177,20 +175,20 @@ function CheckoutContent() {
             )}
             {room && (
               <div className="flex justify-between">
-                <dt className="text-gray-600">Oda</dt>
+                <dt className="text-gray-600">{t("room")}</dt>
                 <dd className="font-medium text-gray-900">
                   {room.name} ({room.bedType})
                 </dd>
               </div>
             )}
             <div className="flex justify-between">
-              <dt className="text-gray-600">Giriş – Çıkış</dt>
+              <dt className="text-gray-600">{t("dates")}</dt>
               <dd className="font-medium text-gray-900">
                 {checkIn} → {checkOut}
               </dd>
             </div>
             <div className="flex justify-between">
-              <dt className="text-gray-600">Misafir</dt>
+              <dt className="text-gray-600">{t("guests")}</dt>
               <dd className="font-medium text-gray-900">{guestCount}</dd>
             </div>
           </dl>
@@ -200,15 +198,13 @@ function CheckoutContent() {
           className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm"
           aria-live="polite"
         >
-          <h2 className="text-lg font-semibold text-gray-900">Fiyat Özeti</h2>
+          <h2 className="text-lg font-semibold text-gray-900">{t("priceSummary")}</h2>
           <div className="mt-4">
-            {quoteLoading && <p className="text-sm text-gray-500">Fiyat hesaplanıyor…</p>}
+            {quoteLoading && <p className="text-sm text-gray-500">{t("calculating")}</p>}
             {quoteError && <p className="text-sm text-red-600">{quoteError}</p>}
             {quote && <QuoteBreakdown quote={quote} />}
           </div>
-          <p className="mt-3 text-xs text-gray-500">
-            Gösterilen toplam tahsil edilecek tutarın aynısıdır (konaklama vergisi dahil).
-          </p>
+          <p className="mt-3 text-xs text-gray-500">{t("totalNotice")}</p>
         </section>
 
         {error && (
@@ -222,7 +218,7 @@ function CheckoutContent() {
           disabled={submitting || !quote || !idempotencyKey}
           className="w-full rounded-lg bg-[#003580] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#002b66] disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-700"
         >
-          {submitting ? "İşleniyor..." : "Rezervasyonu Tamamla"}
+          {submitting ? t("processing") : t("title")}
         </button>
       </form>
     </main>
@@ -230,6 +226,7 @@ function CheckoutContent() {
 }
 
 export default function CheckoutPage() {
+  const t = useTranslations("checkout");
   return (
     <Suspense
       fallback={
@@ -237,7 +234,7 @@ export default function CheckoutPage() {
           id="main"
           className="mx-auto flex min-h-[60vh] max-w-3xl items-center justify-center px-4"
         >
-          <p className="text-gray-500">Yükleniyor...</p>
+          <p className="text-gray-500">{t("loading")}</p>
         </main>
       }
     >

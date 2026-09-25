@@ -1,6 +1,42 @@
-# booking-platform v2.0.0 — Final raporu
+# booking-platform — Final raporu
 
 > Portföy/demo projesidir; gerçek ödeme alınmaz, gerçek konaklama satılmaz.
+> v3 bölümü en üstte; v2.0.0 raporu aşağıda değiştirilmeden korunur.
+
+# v3
+
+## §3 LLM sözleşmesi — doğrulama tablosu
+
+Her madde koda karşı yeniden doğrulandı; "Test" sütunundaki testler ağa çıkmaz
+(sahte `fetch` / bellek içi bütçe).
+
+| Madde                                                                                               | Kodda                                                                                                               | Test                                                                  |
+| --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| `.env` içeriği okunmaz/loglanmaz/commit edilmez; yalnızca ad listesi                                | `.gitignore`, `.dockerignore` (`.env`, `.env.*`, `!.env.example`); compose `env_file`                               | `tests/unit/regressions/infra.test.ts` (#14, #21)                     |
+| `.env` arama: kök → `../.env`, `override: false`                                                    | `src/lib/config/load-env.ts`                                                                                        | `tests/unit/llm/v3-contract.test.ts` › ".env arama"                   |
+| Anahtar log/hata/status yanıtında yok (pino `redact`)                                               | `src/lib/observability/logger.ts` (`LOGGER_OPTIONS.redact`), `src/lib/llm/status.ts` (`hasKey`)                     | `v3-contract.test.ts` › "pino redact", "/api/llm/status"              |
+| İstemci: `new OpenAI({ apiKey, baseURL, timeout, maxRetries })`                                     | `src/lib/llm/client.ts` (`getSdk`)                                                                                  | `tests/unit/llm/client.test.ts` › "canlı başarı"                      |
+| Değişken önceliği (anahtar/base URL/model) + varsayılanlar                                          | `src/lib/llm/settings.ts`                                                                                           | `tests/unit/llm/settings.test.ts`                                     |
+| `LLM_MODE=auto\|live\|demo`; anahtarsız → demo, ağa çıkılmaz                                        | `settings.ts` (`effectiveMode`), `client.ts`                                                                        | `settings.test.ts`, `client.test.ts` › "anahtar yok → demo"           |
+| timeout/429/5xx/ağ/geçersiz JSON/şema/guard → çağrı bazında demo + `llmMode: "fallback"` + `reason` | `client.ts` (`classifyLlmError`, `handleFailure`)                                                                   | `client.test.ts` › timeout, ağ, geçersiz JSON, zod, boş içerik, guard |
+| `response_format: json_object`; 400'de düz metin + JSON çıkarma                                     | `client.ts` (`create`), `src/lib/llm/json.ts`                                                                       | `client.test.ts` › "json_object 400", `json.test.ts`                  |
+| `reasoning_content` yok sayılır                                                                     | `client.ts` (`contentOf`)                                                                                           | `client.test.ts` › "reasoning_content"                                |
+| Sayı/tarih/atıf halüsinasyon koruması                                                               | `src/lib/llm/guards.ts`                                                                                             | `guards.test.ts`                                                      |
+| LLM bağlayıcı karar vermez                                                                          | fiyat/müsaitlik/iade/fraud deterministik (`pricing/`, `booking/`, `risk/`); AI uçları yalnızca açıklama/özet/taslak | mimari kural; §6                                                      |
+| KVKK redaksiyonu + yanıt sonrası geri koyma                                                         | `src/lib/llm/redaction.ts`                                                                                          | `redaction.test.ts`, `client.test.ts` › "redakte"                     |
+| Metrik + log (latency, token, mod, reason)                                                          | `src/lib/llm/metrics.ts`, `client.ts` (`record`)                                                                    | `tests/unit/observability/observability.test.ts`                      |
+| Başlangıç logu `LLM: CANLI (…)` / `LLM: DEMO modu`                                                  | `settings.ts` (`describeLlmMode`), `src/lib/llm/startup.ts`                                                         | `settings.test.ts` › "açıklama anahtar içermez"                       |
+| `GET /api/llm/status`, `npm run llm:smoke`                                                          | `src/app/api/llm/status/route.ts`, `scripts/llm-smoke.ts`                                                           | `v3-contract.test.ts` › status                                        |
+| **v3-a** kullanıcı başına günlük token bütçesi → demo + `reason: "budget"`                          | `src/lib/llm/budget.ts`, `client.ts` (`overBudget`/`charge`), `src/lib/http/ai.ts`                                  | `v3-contract.test.ts` › "§3 v3-a"                                     |
+| **v3-b** tüm AI uçları `ai` rate-limit kategorisinde (yorum özeti dahil)                            | `src/lib/security/rate-limit.ts` (`categorize`)                                                                     | `v3-contract.test.ts` › "§3 v3-b"                                     |
+| **v3-c** `LLM_LOG_PROMPTS=true` → yalnızca redakte prompt, debug; production'da kapalı              | `client.ts` (`logPrompt`), `settings.ts`                                                                            | `v3-contract.test.ts` › "§3 v3-c"                                     |
+| **v3-d** AI Act Md. 50: API `ai_generated: true`, UI "AI tarafından üretildi"                       | `LlmResult.aiGenerated`, `markAiGenerated` (5 AI ucu), `LlmBadge`                                                   | `v3-contract.test.ts` › "§3 v3-d"                                     |
+| **v3-e** SDK'ya doğrudan erişim yasak (`no-restricted-imports`)                                     | `eslint.config.mjs`; embedding çağrısı `src/lib/llm/embeddings.ts`'e taşındı                                        | `v3-contract.test.ts` › "§3 v3-e"; `npm run lint`                     |
+
+---
+
+# v2.0.0 raporu (arşiv)
+
 > Bu rapordaki tüm sayılar 2026-09-24/25 tarihlerinde gerçekten çalıştırılan komutların çıktısıdır; çalıştırılmayan ölçümler açıkça "koşulmadı" diye belirtilmiştir.
 
 ## 1. Özet

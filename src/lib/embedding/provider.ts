@@ -21,7 +21,7 @@ export interface Embedder {
 }
 
 export class HashEmbedder implements Embedder {
-  readonly name = "hash-fnv1a-128";
+  readonly name = "hash-fnv1a-128-syn";
   readonly dim = EMBEDDING_DIM;
   async embed(texts: string[]): Promise<number[][]> {
     return texts.map(encode);

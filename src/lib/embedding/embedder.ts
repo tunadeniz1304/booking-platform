@@ -8,6 +8,8 @@
  * takılabilir; arayüz (encode) aynı kalır.
  */
 
+import { canonicalToken, foldToken } from "./synonyms";
+
 export const EMBEDDING_DIM = 128;
 
 const stopWords = new Set([
@@ -34,13 +36,23 @@ const stopWords = new Set([
   "at",
 ]);
 
-function tokenize(text: string): string[] {
+/** Türkçe/İngilizce durak sözcükleri (katlanmış biçimde karşılaştırılır). */
+export const STOP_WORDS: ReadonlySet<string> = new Set([...stopWords].map(foldToken));
+
+/** Ham sözcüklere ayırma (doğal yazım korunur, küçük harf). */
+export function splitWords(text: string): string[] {
   return text
     .toLocaleLowerCase("tr-TR")
-    .normalize("NFKD")
-    .replace(/[^\p{L}\p{N}\s]/gu, " ")
-    .split(/\s+/)
-    .filter((t) => t.length > 1 && !stopWords.has(t));
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter((t) => t.length > 1 && !STOP_WORDS.has(foldToken(t)));
+}
+
+/** Gömme belirteçleri: katlanmış + eşanlamlı/önek-kök kanonik biçim (P1-1). */
+export function tokenize(text: string): string[] {
+  return splitWords(text)
+    .map(foldToken)
+    .filter((t) => t.length > 1)
+    .map(canonicalToken);
 }
 
 /** FNV-1a 32-bit karma — deterministik işarete sahip özellik dizini üretir. */
@@ -59,10 +71,15 @@ function fnv1a32(value: string): number {
  * ağırlık = sublinear TF (1 + ln tf) — yaygın motifleri bastırır.
  */
 export function encode(text: string): number[] {
+  return encodeTokens(tokenize(text));
+}
+
+/** Belirteç listesini vektöre çevirir (altın küme v2 taban çizgisi de bunu kullanır). */
+export function encodeTokens(tokens: string[]): number[] {
   const vector = new Float64Array(EMBEDDING_DIM);
   const counts = new Map<string, number>();
 
-  for (const token of tokenize(text)) {
+  for (const token of tokens) {
     counts.set(token, (counts.get(token) ?? 0) + 1);
   }
 

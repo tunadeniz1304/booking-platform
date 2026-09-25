@@ -54,3 +54,6 @@ blob-report/
 
 # MapLibre worker (scripts/copy-maplibre-worker.mjs üretir)
 /public/vendor/
+
+# LTR sentetik tıklama günlüğü (scripts/ltr/generate-clicks.ts çıktısı)
+scripts/ltr/out/

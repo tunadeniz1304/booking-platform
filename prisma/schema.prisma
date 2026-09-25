@@ -71,6 +71,9 @@ model Property {
   isActive             Boolean                     @default(true)
   images               String[]                    @default([])
   embedding            Unsupported("vector(128)")?
+  /// P1-1 hibrit arama: başlık + açıklamadan üretilen tsvector (GENERATED ALWAYS, `simple` +
+  /// `turkish` yapılandırması, GIN indeksli). Yalnızca SQL'de okunur; migration'da tanımlı.
+  searchVector         Unsupported("tsvector")?
   priceHistory         PriceHistory[]
   /// İptal politikası (yoksa varsayılan MODERATE); rezervasyonda snapshot'ı alınır.
   /// Turizm İşletme Belgesi / 7464 izin belgesi no (ör. 34-12345); boşsa ilan yayınlanmaz.
@@ -683,4 +686,20 @@ model WebAuthnCredential {
   lastUsedAt DateTime?
 
   @@index([userId])
+}
+
+/// P1-3: deney maruziyeti (exposure). Özne başına deney başına ilk atama tek satır; aynı
+/// işlemde outbox'a `experiment.exposure` olayı yazılır. Dönüşüm, maruziyetten sonra
+/// oluşturulan iptal edilmemiş rezervasyonlarla hesaplanır (bkz. ADR 0014).
+model ExperimentExposure {
+  id        String   @id @default(cuid())
+  flagKey   String
+  variant   String
+  /// Kullanıcı id'si veya (analitik onayı varsa) anonim oturum id'si.
+  subjectId String
+  userId    String?
+  createdAt DateTime @default(now())
+
+  @@unique([flagKey, subjectId])
+  @@index([flagKey, variant])
 }

@@ -132,6 +132,18 @@ const schema = z.object({
   OUTBOX_MAX_ATTEMPTS: int(8, 1, 50),
   OUTBOX_LEASE_SECONDS: int(60, 5, 3600),
   OUTBOX_BACKOFF_BASE_MS: int(1000, 10, 60000),
+
+  // P1-1 hibrit arama (RRF)
+  SEARCH_RRF_K: int(60, 1, 1000),
+  SEARCH_HYBRID_CANDIDATES: int(200, 10, 5000),
+  SEARCH_HYBRID_MIN_SIMILARITY: num(0.2, -1, 1),
+  SEARCH_HYBRID_MIN_TRGM: num(0.45, 0, 1),
+
+  // P1-2 LTR (ONNX); dosya yoksa ağırlıklı sıralamaya düşülür
+  LTR_MODEL_PATH: z.string().min(1).default("models/ranker.onnx"),
+
+  // P1-3 deneyler: anonim bucket çerezi ömrü (gün)
+  EXPERIMENT_COOKIE_DAYS: int(90, 1, 730),
 });
 
 export type AppConfig = z.infer<typeof schema> & { invalidKeys: string[] };

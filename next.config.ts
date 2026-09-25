@@ -5,7 +5,16 @@ import { STATIC_SECURITY_HEADERS } from "./src/lib/security/headers";
 const nextConfig: NextConfig = {
   output: "standalone",
   poweredByHeader: false,
-  serverExternalPackages: ["pino", "@prisma/client", "ioredis", "bullmq", "pdfkit"],
+  serverExternalPackages: [
+    "pino",
+    "@prisma/client",
+    "ioredis",
+    "bullmq",
+    "pdfkit",
+    // İsteğe bağlı LTR çalışma zamanı (P1-2): paketlenmez, yoksa ağırlıklı sıralamaya düşülür.
+    "onnxruntime-node",
+  ],
+  outputFileTracingExcludes: { "*": ["node_modules/onnxruntime-node/**"] },
   images: {
     remotePatterns: [{ protocol: "https", hostname: "images.unsplash.com" }],
   },

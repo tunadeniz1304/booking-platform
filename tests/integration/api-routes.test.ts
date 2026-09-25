@@ -765,8 +765,11 @@ describeInt("API route handler'ları (integration)", () => {
       );
       expect(res.status).toBe(200);
       const body = await res.json();
-      expect(body.results.map((r: { id: string }) => r.id)).toEqual([fx.propertyId]);
-      expect(body.total).toBe(1);
+      // Hibrit arama (v3#19) sıralı geri getirir: tam başlık eşleşmesi ilk sıradadır, benzer
+      // ilanlar (ortak "Otel" sözcüğü) ardından gelebilir.
+      expect(body.results[0]?.id).toBe(fx.propertyId);
+      expect(body.total).toBeGreaterThanOrEqual(1);
+      expect(body.results.length).toBeLessThanOrEqual(50);
       expect(body.pageSize).toBe(50);
       expect(body.results[0].basePrice).toBe(1000);
 
@@ -805,7 +808,7 @@ describeInt("API route handler'ları (integration)", () => {
     it("properties GET: liste ve popüler görünüm", async () => {
       const list = await propertiesGet(call(`/api/properties?query=${encodeURIComponent(title)}`));
       expect(list.status).toBe(200);
-      expect((await list.json()).results.map((r: { id: string }) => r.id)).toEqual([fx.propertyId]);
+      expect((await list.json()).results[0]?.id).toBe(fx.propertyId);
 
       const popular = await propertiesGet(call("/api/properties?popular=true&limit=3"));
       expect(popular.status).toBe(200);

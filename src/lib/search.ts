@@ -14,15 +14,11 @@ import { convert, type FxSnapshot } from "@/lib/money/fx";
 import { getCurrentFx } from "@/lib/fx/store";
 import { nightsFromInventory, priceStay } from "@/lib/pricing/quote";
 import { checkRestrictions, type RestrictionRow } from "@/lib/booking/restrictions";
-import { rankResults } from "@/lib/search/ranking";
+import { RANKING_WEIGHTS, RANKING_WEIGHTS_WITH_QUERY, rankResults } from "@/lib/search/ranking";
+import { hybridSearch, type HybridHit } from "@/lib/search/hybrid";
+import { rankWithLtr } from "@/lib/search/ltr";
 import { nightsBetween, toDbDate, type IsoDate } from "@/lib/time/nights";
-import {
-  findSemanticCandidates,
-  computeAffinity,
-  affinityBoostFor,
-  isVectorEnabled,
-} from "@/lib/search/vector";
-import { findFuzzyCandidates } from "@/lib/search/fuzzy";
+import { computeAffinity, affinityBoostFor } from "@/lib/search/vector";
 import { breakers, BreakerOpenError } from "@/lib/resilience/circuit-breaker";
 import { taxRulesFor } from "@/lib/pricing/tax";
 import { SearchParamsSchema, type SearchInput, type SearchParams } from "@/lib/search/params";
@@ -33,6 +29,9 @@ export type { SearchParams, SearchInput } from "@/lib/search/params";
 /**
  * Arama (v3#7) — doğruluk öncelikli boru hattı:
  *
+ *  0. **Hibrit aday havuzu** (P1-1, v3#19): serbest metin varsa sözcüksel + vektör +
+ *     trigram kanalları RRF ile birleştirilir (`hybrid.ts`); SQL hatasında v2 alt-dize
+ *     eşleşmesine düşülür.
  *  1. **Katalog adayları** (yapısal filtreler: metin, şehir, tip, olanaklar, kişi) —
  *     `catalog` sürümüyle önbelleklenir; yalnızca mülk oluşturma/güncellemede değişir.
  *  2. **Konaklama teklifleri** (tarih varsa): mülk başına `search:pq:<id>:v<sürüm>:…`
@@ -94,6 +93,13 @@ export interface SearchResult {
   explain?: Record<string, number>;
 }
 
+/** Sıralayıcı seçimi (P1-3 deneyi): "weighted" v2 davranışı, "ltr" ONNX modeli. */
+export type RankingMode = "weighted" | "ltr";
+
+export interface SearchOptions {
+  ranking?: RankingMode;
+}
+
 export interface SearchResponse {
   results: SearchResult[];
   total: number;
@@ -101,7 +107,10 @@ export interface SearchResponse {
   pageSize: number;
   totalPages: number;
   cached: boolean;
+  /** Hibrit (RRF) aday havuzu kullanıldı. */
   semantic?: boolean;
+  /** "Önerilen" sıralamada gerçekte kullanılan sıralayıcı. */
+  ranking?: RankingMode;
 }
 
 interface CatalogRoom {
@@ -419,22 +428,25 @@ function stayOf(params: SearchParams): Stay | null {
   return nights.length > 0 ? { checkIn, checkOut, nights } : null;
 }
 
-async function candidateIdsFor(params: SearchParams): Promise<Map<string, number> | null> {
-  if (!params.semantic || !params.query?.trim() || !(await isVectorEnabled())) return null;
-  const query = params.query;
+async function hybridPoolFor(params: SearchParams): Promise<Map<string, HybridHit> | null> {
+  const query = params.query?.trim();
+  if (!query) return null;
   try {
-    const vector = await breakers.search.call(
-      () => findSemanticCandidates(query, 100),
+    const hits = await breakers.search.call(
+      () =>
+        hybridSearch(query, {
+          city: params.city,
+          country: params.country,
+          propertyType: params.propertyType,
+        }),
       async () => {
-        throw new BreakerOpenError("search-pgvector");
+        throw new BreakerOpenError("search-hybrid");
       }
     );
-    const fuzzy = await findFuzzyCandidates(query, 30).catch(() => []);
-    const pool = new Map<string, number>(vector.map((c) => [c.id, c.similarity]));
-    for (const f of fuzzy) if (!pool.has(f.id)) pool.set(f.id, f.similarity * 0.8);
-    return pool;
-  } catch {
-    return null; // vektör yolu kullanılamıyor → metin araması
+    return new Map(hits.map((h) => [h.id, h]));
+  } catch (error) {
+    logger.warn(errorFields(error), "hybrid search failed; substring fallback");
+    return null; // hibrit yol kullanılamıyor → v2 alt-dize araması
   }
 }
 
@@ -442,15 +454,18 @@ async function candidateIdsFor(params: SearchParams): Promise<Map<string, number
  * Arama giriş noktası. Parametreler sınırda doğrulanmış olmalıdır (`SearchParamsSchema`);
  * doğrudan çağrılarda da şema yeniden uygulanır.
  */
-export async function searchProperties(input: SearchInput): Promise<SearchResponse> {
+export async function searchProperties(
+  input: SearchInput,
+  options: SearchOptions = {}
+): Promise<SearchResponse> {
   const params = SearchParamsSchema.parse(input);
   const page = params.page ?? 1;
   const pageSize = params.pageSize ?? 20;
   const sort = params.sort ?? "recommended";
   const displayCurrency = params.currency ? assertCurrency(params.currency) : undefined;
 
-  const semanticPool = await candidateIdsFor(params);
-  const entries = await loadCatalog(params, semanticPool ? [...semanticPool.keys()] : undefined);
+  const pool = await hybridPoolFor(params);
+  const entries = await loadCatalog(params, pool ? [...pool.keys()] : undefined);
   const stay = stayOf(params);
   const quotes = stay ? await stayQuotes(entries, stay, params.guests ?? 1) : null;
 
@@ -492,6 +507,7 @@ export async function searchProperties(input: SearchInput): Promise<SearchRespon
 
   // Sıralama tüm küme üzerinde (fiyat karşılaştırması tek para biriminde: görüntü birimi).
   let ordered: SearchResult[];
+  let rankingMode: RankingMode | undefined;
   if (sort === "price_asc" || sort === "price_desc") {
     const dir = sort === "price_asc" ? 1 : -1;
     ordered = [...results].sort(
@@ -505,8 +521,13 @@ export async function searchProperties(input: SearchInput): Promise<SearchRespon
   } else {
     const affinity = params.userId ? await computeAffinity(params.userId).catch(() => null) : null;
     const byId = new Map(entries.map((e) => [e.id, e]));
-    const ranked = rankResults(
-      results.map((r) => ({
+    // RRF ve sözcüksel skor kümedeki en iyiye göre 0..1'e ölçeklenir.
+    const maxRrf = Math.max(0, ...results.map((r) => pool?.get(r.id)?.rrf ?? 0));
+    const maxLex = Math.max(0, ...results.map((r) => pool?.get(r.id)?.lexScore ?? 0));
+    const ratio = (v: number, max: number) => (max > 0 ? v / max : 0);
+    const inputs = results.map((r) => {
+      const hit = pool?.get(r.id);
+      return {
         id: r.id,
         price: Math.round(r.display!.amount * 100),
         ratingAvg: r.ratingAvg,
@@ -516,11 +537,28 @@ export async function searchProperties(input: SearchInput): Promise<SearchRespon
               personal: affinityBoostFor(affinity, byId.get(r.id)!.locationId, r.propertyType),
             }
           : {}),
-        ...(semanticPool ? { semantic: semanticPool.get(r.id) ?? 0 } : {}),
-      }))
-    );
+        ...(pool
+          ? {
+              semantic: ratio(hit?.rrf ?? 0, maxRrf),
+              lexical: ratio(hit?.lexScore ?? 0, maxLex),
+              vector: hit?.vecSim ?? 0,
+              trigram: hit?.trgSim ?? 0,
+            }
+          : {}),
+      };
+    });
+    const weights = pool ? RANKING_WEIGHTS_WITH_QUERY : RANKING_WEIGHTS;
+    const ranked =
+      options.ranking === "ltr"
+        ? await rankWithLtr(inputs, weights)
+        : { items: rankResults(inputs, weights), mode: "weighted" as const };
+    rankingMode = ranked.mode;
     const byResult = new Map(results.map((r) => [r.id, r]));
-    ordered = ranked.map((x) => ({ ...byResult.get(x.id)!, score: x.score, explain: x.explain }));
+    ordered = ranked.items.map((x) => ({
+      ...byResult.get(x.id)!,
+      score: x.score,
+      explain: x.explain,
+    }));
   }
 
   const total = ordered.length;
@@ -531,7 +569,8 @@ export async function searchProperties(input: SearchInput): Promise<SearchRespon
     pageSize,
     totalPages: Math.ceil(total / pageSize),
     cached: false,
-    ...(semanticPool ? { semantic: true } : {}),
+    ...(pool ? { semantic: true } : {}),
+    ...(rankingMode ? { ranking: rankingMode } : {}),
   };
 }
 

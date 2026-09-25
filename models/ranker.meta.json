@@ -1,0 +1,22 @@
+{
+  "features": [
+    "relevance",
+    "lexical",
+    "vector",
+    "trigram",
+    "priceFit",
+    "rating",
+    "popularity",
+    "personal"
+  ],
+  "objective": "lambdarank",
+  "trainQueries": 2400,
+  "testQueries": 600,
+  "ndcgAt10": {
+    "weighted": 0.7343,
+    "ltr": 0.813
+  },
+  "liftPct": 10.71,
+  "sizeBytes": 127927,
+  "lightgbm": "4.7.0"
+}

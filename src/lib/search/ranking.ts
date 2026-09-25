@@ -7,8 +7,9 @@
  *  - rating:       Bayes düzeltilmiş puan (az yorumlu 5.0 aşırı öne çıkmaz)
  *  - popularity:   yorum sayısının log ölçeği
  *  - personal:     kullanıcının geçmişine (şehir/tip) yakınlık
- *  - semantic:     metin/vektör benzerliği (sorgu varsa)
- * `explain` bileşenlerinin toplamı skora eşittir. Eşitlikte id ile deterministik.
+ *  - semantic:     hibrit (RRF) ilgi skoru, kümedeki en iyi eşleşmeye göre 0..1 (sorgu varsa)
+ * Sorgu varsa `RANKING_WEIGHTS_WITH_QUERY` kullanılır: ilgi baskın olmalı, yoksa puan/fiyat
+ * metinle alakasız ilanları öne çıkarır (v3#19). `explain` bileşenlerinin toplamı skora eşittir. Eşitlikte id ile deterministik.
  * Reklam/komisyon sıralamayı ETKİLEMEZ.
  */
 
@@ -20,7 +21,17 @@ export const RANKING_WEIGHTS = {
   semantic: 0.15,
 } as const;
 
+/** Serbest metin sorgusu varken ağırlıklar (toplam 1). */
+export const RANKING_WEIGHTS_WITH_QUERY = {
+  priceFit: 0.1,
+  rating: 0.15,
+  popularity: 0.05,
+  personal: 0.1,
+  semantic: 0.6,
+} as const;
+
 export type RankingComponent = keyof typeof RANKING_WEIGHTS;
+export type RankingWeights = Record<RankingComponent, number>;
 
 export interface RankingInput {
   id: string;
@@ -47,22 +58,30 @@ export function bayesianRating(avg: number, count: number): number {
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 const round4 = (v: number) => Math.round(v * 10_000) / 10_000;
 
-export function rankResults(items: RankingInput[], weights = RANKING_WEIGHTS): RankedItem[] {
+/** Ağırlıksız bileşenler (0..1) — LTR özellikleri de bunlardan türetilir. */
+export function rankingComponents(items: RankingInput[]): Record<RankingComponent, number>[] {
   if (items.length === 0) return [];
   const prices = items.map((i) => i.price);
   const min = Math.min(...prices);
   const max = Math.max(...prices);
   const maxLog = Math.log1p(Math.max(...items.map((i) => i.ratingCount), 1));
+  return items.map((item) => ({
+    priceFit: max === min ? 1 : clamp01((max - item.price) / (max - min)),
+    rating: clamp01(bayesianRating(item.ratingAvg, item.ratingCount) / 5),
+    popularity: clamp01(Math.log1p(item.ratingCount) / maxLog),
+    personal: clamp01(item.personal ?? 0),
+    semantic: clamp01(item.semantic ?? 0),
+  }));
+}
 
+export function rankResults(
+  items: RankingInput[],
+  weights: RankingWeights = RANKING_WEIGHTS
+): RankedItem[] {
+  const components = rankingComponents(items);
   return items
-    .map((item) => {
-      const raw: Record<RankingComponent, number> = {
-        priceFit: max === min ? 1 : clamp01((max - item.price) / (max - min)),
-        rating: clamp01(bayesianRating(item.ratingAvg, item.ratingCount) / 5),
-        popularity: clamp01(Math.log1p(item.ratingCount) / maxLog),
-        personal: clamp01(item.personal ?? 0),
-        semantic: clamp01(item.semantic ?? 0),
-      };
+    .map((item, i) => {
+      const raw = components[i];
       const explain = Object.fromEntries(
         (Object.keys(weights) as RankingComponent[]).map((k) => [k, round4(weights[k] * raw[k])])
       ) as Record<RankingComponent, number>;

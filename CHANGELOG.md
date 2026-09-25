@@ -20,6 +20,11 @@ Bu dosyadaki tüm önemli değişiklikler burada belgelenir. Biçim [Keep a Chan
 - **v3 F5 — Hibrit arama (P1-1, ADR 0014):** `Property.searchVector` (simple + turkish tsvector, GIN); sözcüksel, pgvector, trigram ve tam ifade kanalları RRF ile birleşir (`SEARCH_RRF_K`=60); yapısal filtreler kanallardan önce. 30 sorguluk altın kümede nDCG@10 0.24 → 0.87.
 - **v3 F5 — LTR (P1-2):** sentetik tıklama üreteci + LightGBM lambdarank eğitimi (`npm run ltr:clicks`, `npm run ltr:train`), `models/ranker.onnx` (~128 KB); `onnxruntime-node` opsiyonel ve tembel, yoksa ağırlıklı sıralamaya düşer. Ölçümler: `docs/perf/ltr.md`.
 - **v3 F5 — Deneyler (P1-3):** OpenFeature süreç içi sağlayıcı (`config/flags.json`), murmurhash ile deterministik kova, `ExperimentExposure` + outbox `experiment.exposure`; `search-ranking` deneyi (`ranking.weighted` / `ranking.ltr`), `/admin` deney kartında dönüşüm ve Wilson aralığı.
+- **v3 F6 — Mesajlaşma (P1-6, ADR 0017):** rezervasyon başına misafir ↔ ev sahibi yazışması (yalnız taraflar; diğerleri 404), gövde kaydedilmeden önce telefon/e-posta/IBAN/URL/kart/TCKN maskelenir; Redis pub/sub + SSE canlı iletim; ev sahibine yalnızca taslak AI yanıt (saklanmaz, otomatik gönderilmez).
+- **v3 F6 — Yorum moderasyonu (P1-7, ADR 0017):** yalnız COMPLETED rezervasyon sahibi yorum yazar (v3#24); deterministik küfür/PII filtresi yorumu `PENDING_REVIEW` kuyruğuna alır; şikâyet (`POST /api/reviews/:id/report`) `REVIEW_REPORT_HIDE_THRESHOLD` eşiğinde gizler; alt puanlar (temizlik/konum/personel/fiyat-değer), Omnibus doğrulama notu, `/admin` moderasyon kartı (denetim kaydıyla). Puan ve AI özeti yalnız yayındaki yorumları kullanır.
+- **v3 F6 — Fraud v2 + step-up (P1-8, ADR 0017):** gerekçe kodlu kural puanlama (hız, cihaz parmak izi, BIN/IP ülke uyuşmazlığı) → `allow | challenge_3ds | step_up_passkey | review | deny`; step-up passkey ile (403 `STEP_UP_REQUIRED`, passkey yoksa 3DS).
+- **v3 F6 — Passkey arayüzü:** girişte "Passkey ile giriş", hesap sayfasında passkey listele/ekle/sil, ödemede step-up penceresi (doğrulamadan sonra ödeme yeniden denenir).
+- **v3 F6 — Belge/kayıt no (P1-10):** mock TR (7565) ve AB (2024/1028) kayıt doğrulaması; VERIFIED olmayan ilan yayına alınamaz ve aramada görünmez (v3#25); aylık SDEP CSV dışa aktarımı (`scripts/sdep-export.ts`).
 
 ### Changed
 

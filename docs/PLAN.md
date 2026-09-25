@@ -49,7 +49,7 @@ Her faz sonunda kalite kapısı: `npm run lint` · `npm run typecheck` · `npm r
 
 ## v3 F6 — Mesajlaşma, moderasyon, fraud v2, uyum
 
-- [ ] P1-6 mesajlaşma; P1-7 yorum moderasyonu; P1-8 fraud v2 + step-up; passkey UI; P1-10 belge/kayıt no
+- [x] P1-6 mesajlaşma; P1-7 yorum moderasyonu; P1-8 fraud v2 + step-up; passkey UI; P1-10 belge/kayıt no
 
 ## v3 F7 — Agentic booking, host gelir paneli, kanal yöneticisi
 

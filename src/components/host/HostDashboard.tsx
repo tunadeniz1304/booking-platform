@@ -79,6 +79,14 @@ export default function HostDashboard() {
 
   return (
     <div className="space-y-6">
+      <p>
+        <Link
+          href="/host/revenue"
+          className={`text-sm font-semibold text-[#003580] hover:underline ${focusRing}`}
+        >
+          Gelir paneli: doluluk, ADR, RevPAR ve fiyat önerileri →
+        </Link>
+      </p>
       <Status error={error} />
       {properties === null && !error && (
         <p aria-live="polite" className="text-sm text-gray-600">

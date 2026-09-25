@@ -188,6 +188,8 @@ async function repriceLocation(locationId: string, nights: IsoDate[]): Promise<n
     const rows = await tx.inventoryDay.findMany({
       where: {
         date: { gte: first, lte: last },
+        // Ev sahibinin sabitlediği (kabul edilen öneri) geceler motor tarafından ezilmez (P1-5).
+        priceOverride: false,
         roomType: { property: { locationId, isActive: true }, available: true },
       },
       select: {

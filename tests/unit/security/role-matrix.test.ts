@@ -24,6 +24,10 @@ import * as rooms from "@/app/api/properties/[id]/rooms/route";
 import * as ari from "@/app/api/rooms/[roomId]/availability/route";
 import * as hostProps from "@/app/api/host/properties/route";
 import * as hostBookings from "@/app/api/host/bookings/route";
+import * as hostRevenue from "@/app/api/host/revenue/route";
+import * as revenueGenerate from "@/app/api/host/revenue/suggestions/route";
+import * as revenueAccept from "@/app/api/host/revenue/suggestions/[id]/accept/route";
+import * as revenueReject from "@/app/api/host/revenue/suggestions/[id]/reject/route";
 import * as adminEvents from "@/app/api/admin/events/route";
 import * as adminOutbox from "@/app/api/admin/outbox/route";
 import * as adminFraud from "@/app/api/admin/fraud/route";
@@ -48,6 +52,25 @@ const MATRIX: Array<[string, string, Handler, Role[]]> = [
   ["PUT /api/rooms/[roomId]/availability", "PUT", ari.PUT as unknown as Handler, HOST_ADMIN],
   ["GET /api/host/properties", "GET", hostProps.GET as unknown as Handler, HOST_ADMIN],
   ["GET /api/host/bookings", "GET", hostBookings.GET as unknown as Handler, HOST_ADMIN],
+  ["GET /api/host/revenue", "GET", hostRevenue.GET as unknown as Handler, HOST_ADMIN],
+  [
+    "POST /api/host/revenue/suggestions",
+    "POST",
+    revenueGenerate.POST as unknown as Handler,
+    HOST_ADMIN,
+  ],
+  [
+    "POST /api/host/revenue/suggestions/[id]/accept",
+    "POST",
+    revenueAccept.POST as unknown as Handler,
+    HOST_ADMIN,
+  ],
+  [
+    "POST /api/host/revenue/suggestions/[id]/reject",
+    "POST",
+    revenueReject.POST as unknown as Handler,
+    HOST_ADMIN,
+  ],
   ["POST /api/ai/listing-copy", "POST", listingCopy.POST as unknown as Handler, HOST_ADMIN],
   ["GET /api/admin/events", "GET", adminEvents.GET as unknown as Handler, ["ADMIN"]],
   ["GET /api/admin/outbox", "GET", adminOutbox.GET as unknown as Handler, ["ADMIN"]],

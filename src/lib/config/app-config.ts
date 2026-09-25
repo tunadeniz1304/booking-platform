@@ -62,6 +62,24 @@ const schema = z.object({
   EVENT_FACTOR_PER_POINT: num(0.05, 0, 0.5),
   YIELD_HOLD_MAX_SHARE: num(0.2, 0, 1),
 
+  // Host gelir paneli (P1-5)
+  /** KPI penceresi: bugünden itibaren kaç gece (doluluk, ADR, RevPAR). */
+  REVENUE_WINDOW_DAYS: int(30, 1, 365),
+  /** Pickup grafiği: geriye doğru kaç günlük rezervasyon girişi. */
+  REVENUE_PICKUP_DAYS: int(30, 1, 365),
+  /** Öneri üretilen ileri gece sayısı (yarından itibaren). */
+  REVENUE_SUGGESTION_DAYS: int(14, 1, 90),
+  /** Hedef doluluk: üstü fiyatı artırır, altı düşürür. */
+  REVENUE_OCCUPANCY_TARGET: num(0.7, 0, 1),
+  /** Doluluk sapmasının çarpana etkisi: 1 + ağırlık × (doluluk − hedef). */
+  REVENUE_OCCUPANCY_WEIGHT: num(0.5, 0, 5),
+  /** Son dakika penceresi (gün): hedefin altındaki doluluk için indirim uygulanır. */
+  REVENUE_LAST_MINUTE_DAYS: int(3, 0, 60),
+  /** Son dakika indirimi (baz puan). */
+  REVENUE_LAST_MINUTE_DISCOUNT_BPS: int(1000, 0, 9000),
+  /** Resmî tatil/bayram gecesi artışı (baz puan). */
+  REVENUE_HOLIDAY_UPLIFT_BPS: int(1500, 0, 20_000),
+
   // Fiyat içgörüsü + fiyat alarmı (P1-4)
   /** Split conformal hata oranı: 0.1 → %90 tahmin aralığı. */
   PRICE_INSIGHT_ALPHA: num(0.1, 0.01, 0.5),

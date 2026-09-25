@@ -63,11 +63,25 @@ export async function updateAvailabilityPrices(
       explanation,
     };
   });
-  for (const result of results) await cachePrice(result);
+  // Ev sahibinin sabitlediği geceler (P1-5 öneri kabulü) motor tarafından ezilmez.
+  const overridden = new Set(
+    (
+      await prisma.inventoryDay.findMany({
+        where: {
+          roomTypeId: roomId,
+          priceOverride: true,
+          date: { in: dates.map((d) => new Date(d)) },
+        },
+        select: { date: true },
+      })
+    ).map((row) => row.date.toISOString().slice(0, 10))
+  );
+  const writable = results.filter((r) => !overridden.has(r.date));
+  for (const result of writable) await cachePrice(result);
 
   await prisma.$transaction(
     async (tx) => {
-      for (const result of results) {
+      for (const result of writable) {
         const price = new Prisma.Decimal(
           toDecimalString(money(result.explanation.price, currency))
         );

@@ -156,24 +156,25 @@ model Amenity {
 
 /// Oda tipi (v3 P0-2, ADR 0010): "Standart Çift × 12". API'de `roomId` = oda tipi kimliği.
 model RoomType {
-  id             String          @id @default(cuid())
-  propertyId     String
-  property       Property        @relation(fields: [propertyId], references: [id])
-  name           String
-  description    String?
+  id               String            @id @default(cuid())
+  propertyId       String
+  property         Property          @relation(fields: [propertyId], references: [id])
+  name             String
+  description      String?
   /// Bir odada kalabilecek azami kişi.
-  maxOccupancy   Int
+  maxOccupancy     Int
   /// Bu tipten kaç oda satılabilir (günlük `InventoryDay.total` varsayılanı).
-  units          Int             @default(1)
-  bedType        String
-  priceModifier  Decimal         @default(0) @db.Decimal(10, 2)
-  available      Boolean         @default(true)
-  inventory      InventoryDay[]
-  ratePlans      RatePlan[]
-  restrictions   Restriction[]
-  externalBlocks ExternalBlock[]
-  bookings       Booking[]
-  priceAlerts    PriceAlert[]
+  units            Int               @default(1)
+  bedType          String
+  priceModifier    Decimal           @default(0) @db.Decimal(10, 2)
+  available        Boolean           @default(true)
+  inventory        InventoryDay[]
+  ratePlans        RatePlan[]
+  restrictions     Restriction[]
+  externalBlocks   ExternalBlock[]
+  bookings         Booking[]
+  priceAlerts      PriceAlert[]
+  priceSuggestions PriceSuggestion[]
 
   @@index([propertyId])
   @@index([available])
@@ -191,6 +192,8 @@ model InventoryDay {
   price            Decimal  @db.Decimal(10, 2)
   /// "Bu fiyat neden?": taban, faktör-başı katkılar ve tavan/taban kırpması.
   priceExplanation Json?
+  /// Ev sahibi fiyatı elle/öneri kabulüyle sabitledi (P1-5): fiyat motoru bu geceyi ezmez.
+  priceOverride    Boolean  @default(false)
 
   @@unique([roomTypeId, date])
   @@index([date])
@@ -829,4 +832,35 @@ model CheckoutSession {
 
   @@unique([userId, idempotencyKey])
   @@index([userId, createdAt])
+}
+
+enum PriceSuggestionStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+/// Gelir paneli fiyat önerisi (P1-5): deterministik motor [taban, tavan] içinde önerir,
+/// LLM yalnızca Türkçe açıklama cümlesini yazar. Kabul → InventoryDay fiyatı + priceOverride;
+/// ret → hiçbir fiyat değişmez.
+model PriceSuggestion {
+  id             String                @id @default(cuid())
+  roomTypeId     String
+  roomType       RoomType              @relation(fields: [roomTypeId], references: [id])
+  date           DateTime              @db.Date
+  currency       String
+  currentMinor   Int
+  suggestedMinor Int
+  floorMinor     Int
+  ceilingMinor   Int
+  /// Faktör katkıları: [{ factor, multiplier, amountMinor }] (+ kırpma satırı).
+  contributions  Json
+  explanation    String
+  llmMode        String
+  status         PriceSuggestionStatus @default(PENDING)
+  decidedBy      String?
+  decidedAt      DateTime?
+  createdAt      DateTime              @default(now())
+
+  @@index([roomTypeId, status, date])
 }

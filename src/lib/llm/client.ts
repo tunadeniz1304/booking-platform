@@ -48,6 +48,7 @@ export type LlmTask =
   | "event_extraction"
   | "message_draft"
   | "moderation_explain"
+  | "revenue_explain"
   | "smoke";
 
 export type LlmMode = "live" | "demo" | "fallback";

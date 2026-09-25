@@ -2,9 +2,19 @@ import { describe, it, expect } from "vitest";
 import fc from "fast-check";
 import { nightsFromInventory, priceStay, samePrice } from "@/lib/pricing/quote";
 import { money, toDecimalString, toMinor } from "@/lib/money/money";
+import { TaxRuleSchema, type TaxRule } from "@/lib/pricing/tax";
 import { addDays, nightsBetween, parseIsoDate } from "@/lib/time/nights";
 
-const TAX = 0.01;
+/** Hariç (exclusive) konaklama vergisi kuralı. */
+const accTax = (rateBps: number): TaxRule[] => [
+  TaxRuleSchema.parse({
+    code: "ACCOMMODATION_TAX",
+    country: "*",
+    kind: "ACCOMMODATION",
+    label: "Konaklama vergisi",
+    rateBps,
+  }),
+];
 
 /** Veritabanı satırı benzetimi: Decimal fiyat string olarak gelir. */
 function rowsFor(start: string, prices: number[]) {
@@ -26,7 +36,12 @@ describe("regression: #8 gösterilen fiyat = tahsil edilen fiyat", () => {
       nightsBetween(parseIsoDate("2026-10-01"), parseIsoDate("2026-10-04")),
       "TRY"
     );
-    const q = priceStay({ nights: nights!, modifierMinor: 25000, currency: "TRY", taxRate: TAX });
+    const q = priceStay({
+      nights: nights!,
+      modifierMinor: 25000,
+      currency: "TRY",
+      taxRules: accTax(100),
+    });
     expect(q.nights.map((n) => n.amount)).toEqual([175000, 175000, 205000]);
     expect(q.subtotal).toBe(555000);
     expect(q.taxes[0].amount).toBe(5550);
@@ -46,8 +61,8 @@ describe("regression: #8 gösterilen fiyat = tahsil edilen fiyat", () => {
       fc.property(
         fc.array(fc.integer({ min: 1_000, max: 5_000_000 }), { minLength: 1, maxLength: 30 }),
         fc.integer({ min: 0, max: 500_000 }),
-        fc.constantFrom(0, 0.01, 0.02, 0.08),
-        (prices, modifier, taxRate) => {
+        fc.constantFrom(0, 100, 200, 800),
+        (prices, modifier, taxBps) => {
           const stay = nightsBetween(
             parseIsoDate("2026-11-01"),
             addDays(parseIsoDate("2026-11-01"), prices.length)
@@ -58,19 +73,19 @@ describe("regression: #8 gösterilen fiyat = tahsil edilen fiyat", () => {
             nights: nightsFromInventory(rows, stay, "TRY")!,
             modifierMinor: modifier,
             currency: "TRY",
-            taxRate,
+            taxRules: accTax(taxBps),
           });
           const pdp = priceStay({
             nights: nightsFromInventory([...rows].reverse(), stay, "TRY")!,
             modifierMinor: modifier,
             currency: "TRY",
-            taxRate,
+            taxRules: accTax(taxBps),
           });
           const checkout = priceStay({
             nights: nightsFromInventory(rows, stay, "TRY")!,
             modifierMinor: modifier,
             currency: "TRY",
-            taxRate,
+            taxRules: accTax(taxBps),
           });
           expect(samePrice(card, pdp)).toBe(true);
           expect(samePrice(pdp, checkout)).toBe(true);
@@ -116,7 +131,7 @@ describe("v3 P0-2 oda adedi ve fiyat planı", () => {
       planModifierBps: -1000,
       units: 2,
       currency: "TRY",
-      taxRate: 0,
+      taxRules: [],
     });
     expect(nonRef.nights.map((n) => n.amount)).toEqual([180000, 180000]); // 2 oda × 900 TL
     expect(nonRef.total).toBe(360000);

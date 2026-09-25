@@ -31,7 +31,8 @@ const schema = z.object({
   BOOKING_HOLD_TTL_MINUTES: int(15, 1, 24 * 60),
   MAX_STAY_NIGHTS: int(30, 1, 365),
   QUOTE_TTL_MINUTES: int(15, 1, 120),
-  ACCOMMODATION_TAX_RATE: num(0.01, 0, 0.5),
+  /** Platform hizmet bedeli (baz puan; 0 → yok). Vergi kuralları: TAX_RULES_JSON / data/tax-rules.json. */
+  SERVICE_FEE_BPS: int(0, 0, 3000),
   /** Geçmiş envanter günleri bu kadar gün sonra budanır (P0-11). */
   INVENTORY_RETENTION_DAYS: int(400, 30, 3650),
 

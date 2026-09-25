@@ -18,6 +18,7 @@ import { withSerializableRetry } from "@/lib/db/transactions";
 import { transition, type BookingState } from "@/lib/booking/state-machine";
 import { DEFAULT_POLICIES, toSnapshot } from "@/lib/booking/cancellation";
 import { getFxTable } from "@/lib/money/fx";
+import { taxRulesFor } from "@/lib/pricing/tax";
 import { money, toDecimalString, toMinor, assertCurrency } from "@/lib/money/money";
 import {
   clockOf,
@@ -344,6 +345,7 @@ async function reserveInTransaction(
           select: {
             currency: true,
             cancellationPolicy: policySelect,
+            location: { select: { country: true } },
           },
         },
       },
@@ -394,7 +396,8 @@ async function reserveInTransaction(
       planModifierBps: plan.priceModifierBps,
       units: input.units,
       currency,
-      taxRate: config.ACCOMMODATION_TAX_RATE,
+      taxRules: taxRulesFor(room.property.location.country),
+      guests: input.guestCount,
     });
     // İade edilemez plan → NON_REFUNDABLE; değilse planın (yoksa mülkün) politikası.
     const policy = plan.refundable

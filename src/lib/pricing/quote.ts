@@ -8,7 +8,6 @@ import {
   add,
   applyBps,
   money,
-  multiplyRate,
   sum,
   toMinor,
   type CurrencyCode,
@@ -24,6 +23,7 @@ import {
   type IsoDate,
 } from "@/lib/time/nights";
 import { checkRestrictions, describeViolation } from "@/lib/booking/restrictions";
+import { computeTaxes, taxRulesFor, type TaxLine, type TaxRule } from "@/lib/pricing/tax";
 
 /**
  * Fiyatın TEK kaynağı.
@@ -47,18 +47,10 @@ export interface QuoteNight {
   amount: number;
 }
 
-export interface QuoteFee {
-  code: string;
-  label: string;
-  amount: number;
-}
-
-export interface QuoteTax {
-  code: "ACCOMMODATION_TAX";
-  label: string;
-  rate: number;
-  amount: number;
-}
+/** Ücret satırı (hizmet bedeli…) — vergi motorunun satırıyla aynı biçim. */
+export type QuoteFee = TaxLine;
+/** Vergi satırı; `inclusive` ise tutar gece fiyatının içindedir (toplama eklenmez). */
+export type QuoteTax = TaxLine;
 
 export interface PricedStay {
   currency: CurrencyCode;
@@ -100,7 +92,10 @@ export function priceStay(input: {
   /** Oda adedi (gece tutarı × adet). */
   units?: number;
   currency: CurrencyCode | string;
-  taxRate: number;
+  /** Tesisin ülkesine çözümlenmiş vergi/ücret kuralları (`taxRulesFor`). */
+  taxRules: readonly TaxRule[];
+  /** Kişi başı sabit vergiler için misafir sayısı. */
+  guests?: number;
 }): PricedStay {
   const currency = assertCurrency(input.currency);
   const units = input.units ?? 1;
@@ -118,26 +113,14 @@ export function priceStay(input: {
     nights.map((n) => money(n.amount, currency)),
     currency
   );
-  const fees: QuoteFee[] = [];
-  const tax = multiplyRate(subtotal, input.taxRate);
-  const taxes: QuoteTax[] =
-    input.taxRate > 0
-      ? [
-          {
-            code: "ACCOMMODATION_TAX",
-            label: "Konaklama vergisi",
-            rate: input.taxRate,
-            amount: tax.amount,
-          },
-        ]
-      : [];
-  const total = add(
-    subtotal,
-    money(
-      taxes.reduce((s, t) => s + t.amount, 0),
-      currency
-    )
-  );
+  const { taxes, fees, addOn } = computeTaxes({
+    nights,
+    rules: input.taxRules,
+    currency,
+    guests: input.guests,
+    units,
+  });
+  const total = add(subtotal, money(addOn, currency));
   return { currency, nights, subtotal: subtotal.amount, fees, taxes, total: total.amount };
 }
 
@@ -253,6 +236,7 @@ export async function computeTotal(req: QuoteRequest, now: Date = new Date()): P
           timeZone: true,
           checkInTime: true,
           checkOutTime: true,
+          location: { select: { country: true } },
         },
       },
       ratePlans: { select: ratePlanSelect },
@@ -304,7 +288,8 @@ export async function computeTotal(req: QuoteRequest, now: Date = new Date()): P
     planModifierBps: plan.priceModifierBps,
     units,
     currency,
-    taxRate: config.ACCOMMODATION_TAX_RATE,
+    taxRules: taxRulesFor(room.property.location.country),
+    guests: req.guests,
   });
   const expiresAt = new Date(now.getTime() + config.QUOTE_TTL_MINUTES * 60_000);
   return {

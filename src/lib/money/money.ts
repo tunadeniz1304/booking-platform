@@ -111,6 +111,15 @@ export function bpsOf(m: Money, bps: number): Money {
   return money(Number(divHalfUp(BigInt(m.amount) * BigInt(bps), 10_000n)), m.currency);
 }
 
+/**
+ * Vergi DAHİL tutarın içindeki vergi payı: `includedBpsOf(1100, 1000)` = 100 (%10 KDV dahil).
+ * Pay = tutar × bps / (10.000 + bps), half-up.
+ */
+export function includedBpsOf(m: Money, bps: number): Money {
+  if (!Number.isInteger(bps) || bps < 0) throw new MoneyError(`bps tamsayı olmalı: ${bps}`);
+  return money(Number(divHalfUp(BigInt(m.amount) * BigInt(bps), BigInt(10_000 + bps))), m.currency);
+}
+
 /** Tutara baz puan farkı uygular: `applyBps(1000, -1000)` = 900 (%10 indirim). */
 export function applyBps(m: Money, bps: number): Money {
   return add(m, bpsOf(m, bps));

@@ -24,6 +24,7 @@ import {
 } from "@/lib/search/vector";
 import { findFuzzyCandidates } from "@/lib/search/fuzzy";
 import { breakers, BreakerOpenError } from "@/lib/resilience/circuit-breaker";
+import { taxRulesFor } from "@/lib/pricing/tax";
 import { SearchParamsSchema, type SearchInput, type SearchParams } from "@/lib/search/params";
 
 export { SearchParamsSchema, searchParamsFromUrl } from "@/lib/search/params";
@@ -286,7 +287,8 @@ interface Stay {
  */
 async function computeQuotes(
   entries: CatalogEntry[],
-  stay: Stay
+  stay: Stay,
+  guests: number
 ): Promise<Map<string, SearchQuote | null>> {
   const out = new Map<string, SearchQuote | null>(entries.map((e) => [e.id, null]));
   const roomToProperty = new Map<string, CatalogEntry>();
@@ -329,7 +331,6 @@ async function computeQuotes(
   const invByRoom = group(inventory);
   const resByRoom = group(restrictions as Array<RestrictionRow & { roomTypeId: string }>);
   const plansByRoom = group(plans);
-  const taxRate = getConfig().ACCOMMODATION_TAX_RATE;
 
   for (const roomTypeId of available) {
     const entry = roomToProperty.get(roomTypeId)!;
@@ -347,7 +348,8 @@ async function computeQuotes(
         modifierMinor: toMinor(room.priceModifier, entry.currency),
         planModifierBps: plan.priceModifierBps,
         currency: entry.currency,
-        taxRate,
+        taxRules: taxRulesFor(entry.location.country),
+        guests,
       });
       const best = out.get(entry.id);
       if (!best || priced.total < best.total) {
@@ -388,7 +390,7 @@ async function stayQuotes(
   }
   const missing = entries.filter((e) => !result.has(e.id));
   if (missing.length > 0) {
-    const computed = await computeQuotes(missing, stay);
+    const computed = await computeQuotes(missing, stay, guests);
     for (const e of missing) {
       const q = computed.get(e.id) ?? null;
       result.set(e.id, q);

@@ -11,3 +11,15 @@ if (skipReason) {
   process.env.DATABASE_URL = inject("integrationDatabaseUrl");
   process.env.REDIS_URL = inject("integrationRedisUrl");
 }
+
+// Test mülkleri `country: "TEST"` kullanır; varsayılan TR kuralları eşleşmez. Tutar
+// beklentileri sabit kalsın diye tüm ülkelere %1 hariç konaklama vergisi (P0-4 motoru).
+process.env.TAX_RULES_JSON ??= JSON.stringify([
+  {
+    code: "ACCOMMODATION_TAX",
+    country: "*",
+    kind: "ACCOMMODATION",
+    label: "Konaklama vergisi",
+    rateBps: 100,
+  },
+]);

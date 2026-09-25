@@ -13,8 +13,20 @@ export interface QuoteView {
   currency: string;
   nights: Array<{ date: string; amount: number }>;
   subtotal: number;
-  fees: Array<{ code: string; label: string; amount: number }>;
-  taxes: Array<{ code: string; label: string; rate: number; amount: number }>;
+  fees: Array<{
+    code: string;
+    label: string;
+    rateBps?: number;
+    amount: number;
+    inclusive: boolean;
+  }>;
+  taxes: Array<{
+    code: string;
+    label: string;
+    rateBps?: number;
+    amount: number;
+    inclusive: boolean;
+  }>;
   total: number;
   expiresAt: string;
 }

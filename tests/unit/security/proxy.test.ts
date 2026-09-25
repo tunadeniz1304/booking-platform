@@ -133,6 +133,15 @@ describe("proxy yetki ve CSRF", () => {
     expect(res.status).toBe(401);
   });
 
+  it("/api/mcp token'sız: JSON-RPC -32001 gövdesi + WWW-Authenticate (demo senaryosu 5)", async () => {
+    const res = await proxy(req("/api/mcp", { method: "POST" }));
+    expect(res.status).toBe(401);
+    expect(res.headers.get("www-authenticate")).toBe('Bearer realm="booking-mcp"');
+    const body = (await res.json()) as { jsonrpc: string; error: { code: number } };
+    expect(body.jsonrpc).toBe("2.0");
+    expect(body.error.code).toBe(-32001);
+  });
+
   it("çerezli POST farklı Origin'den gelirse 403 (CSRF)", async () => {
     const { token } = await signAccessToken("u2", "USER", 900);
     const res = await proxy(

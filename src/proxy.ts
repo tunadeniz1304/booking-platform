@@ -112,6 +112,16 @@ async function handleApi(req: NextRequest, requestHeaders: Headers, requestId: s
 
   // 3) Korumalı uçlar oturum ister.
   if (!claims && !isPublicApi(pathname, method)) {
+    // MCP istemcileri JSON-RPC hata gövdesi ve `WWW-Authenticate` bekler (ADR 0015).
+    if (pathname.startsWith("/api/mcp")) {
+      responseHeaders.set("WWW-Authenticate", 'Bearer realm="booking-mcp"');
+      responseHeaders.set("Cache-Control", "no-store");
+      return json(
+        401,
+        { jsonrpc: "2.0", error: { code: -32001, message: "Bearer token gerekli" }, id: null },
+        responseHeaders
+      );
+    }
     return json(401, { error: "Oturum açmanız gerekiyor", code: "UNAUTHORIZED" }, responseHeaders);
   }
 

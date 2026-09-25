@@ -17,9 +17,13 @@ Bu dosyadaki tüm önemli değişiklikler burada belgelenir. Biçim [Keep a Chan
 - **v3 F4 — Ödeme sagası (P0-7, ADR 0013):** `hold → authorize → capture → confirm` telafili saga (iade → void → tutmayı bırak), onay sonrası BullMQ FlowProducer ile `invoice → notify`; `saga_compensation_total` metriği, adım başına hata enjeksiyonu testleri.
 - **v3 F4 — Payout ve fatura (#4):** devir sonrası satıcı `Payout` kaydı ve mock `payouts` işi (`PAYOUT_CRON`); mock e-Arşiv PDF fatura (`GET /api/bookings/:id/invoice`, "DEMO — mali değeri yoktur").
 - **v3 F4 — FX saklama:** eski `FxRate` satırları saklama penceresine göre budanır.
+- **v3 F5 — Hibrit arama (P1-1, ADR 0014):** `Property.searchVector` (simple + turkish tsvector, GIN); sözcüksel, pgvector, trigram ve tam ifade kanalları RRF ile birleşir (`SEARCH_RRF_K`=60); yapısal filtreler kanallardan önce. 30 sorguluk altın kümede nDCG@10 0.24 → 0.87.
+- **v3 F5 — LTR (P1-2):** sentetik tıklama üreteci + LightGBM lambdarank eğitimi (`npm run ltr:clicks`, `npm run ltr:train`), `models/ranker.onnx` (~128 KB); `onnxruntime-node` opsiyonel ve tembel, yoksa ağırlıklı sıralamaya düşer. Ölçümler: `docs/perf/ltr.md`.
+- **v3 F5 — Deneyler (P1-3):** OpenFeature süreç içi sağlayıcı (`config/flags.json`), murmurhash ile deterministik kova, `ExperimentExposure` + outbox `experiment.exposure`; `search-ranking` deneyi (`ranking.weighted` / `ranking.ltr`), `/admin` deney kartında dönüşüm ve Wilson aralığı.
 
 ### Changed
 
+- Hash embedding eş anlamlı ve kök genişletmesi kullanır; sağlayıcı adı `hash-fnv1a-128-syn`, `npm run embeddings:backfill` gerekir (ADR 0008). Sorgulu aramada semantik ağırlık 0.6.
 - Tahsilat hatası artık provizyonu void eder, ödemeyi `VOIDED` yapar ve tutmayı hemen bırakır (ADR 0013).
 - Oda API yanıtları `maxOccupancy` döner; `capacity` bir sürüm boyunca takma ad olarak korunur.
 - Pazarlık özelliği kaldırıldı, tek fiyat kaynağı `priceStay` (ADR 0016).
@@ -27,6 +31,7 @@ Bu dosyadaki tüm önemli değişiklikler burada belgelenir. Biçim [Keep a Chan
 
 ### Fixed
 
+- Serbest metin araması kök ekleri, yazım hataları ve eş anlamlıları kaçırıyordu; hibrit RRF araması ile düzeltildi (v3#19).
 - Devredilen rezervasyonun iptal iadesi yeni sahibe değil ödemeyi yapan alıcıya gider (v3#4).
 
 ### Removed

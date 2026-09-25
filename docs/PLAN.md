@@ -43,9 +43,9 @@ Her faz sonunda kalite kapısı: `npm run lint` · `npm run typecheck` · `npm r
 
 ## v3 F5 — Hibrit arama, LTR, deneyler
 
-- [ ] P1-1 hibrit arama RRF (#19)
-- [ ] P1-2 LTR (ONNX, fallback)
-- [ ] P1-3 OpenFeature + ilk A/B
+- [x] P1-1 hibrit arama RRF (#19)
+- [x] P1-2 LTR (ONNX, fallback)
+- [x] P1-3 OpenFeature + ilk A/B
 
 ## v3 F6 — Mesajlaşma, moderasyon, fraud v2, uyum
 

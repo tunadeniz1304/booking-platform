@@ -23,4 +23,10 @@ Farklı boyutlu bir model için ayrı `embeddingV2 vector(n)` kolonu. `dimension
 ## Sonuçlar
 
 - Anahtarsız ortamda davranış değişmez; testler deterministiktir.
-- Hash yaklaşımı eş anlamlıları yakalamaz; sıralamada semantik bileşenin ağırlığı bu yüzden düşük tutulur (0.15, bkz. [METHODOLOGY](../METHODOLOGY.md)).
+- Hash yaklaşımı eş anlamlıları kendiliğinden yakalamaz; sorgusuz sıralamada semantik bileşenin ağırlığı düşük tutulur (0.15, bkz. [METHODOLOGY](../METHODOLOGY.md)).
+
+## Güncelleme — v3 F5 (2026-09-25)
+
+- `HashEmbedder` artık `src/lib/embedding/synonyms.ts` ile genişletilir: Türkçe/İngilizce eş anlamlı kümeleri ve hafif kök bulma (ek kırpma). Türkçe harf katlama tutarlı hale getirildi (`foldToken`; eski NFKD + noktalama silme adımı aksanları rastgele biçimde bırakıyordu); sağlayıcı adı `hash-fnv1a-128-syn` oldu, bu yüzden mevcut vektörler `npm run embeddings:backfill` ile yeniden üretilmelidir.
+- Hâlâ bir ML modeli değildir; sözlük el yapımıdır ve altın küme bilinerek yazıldığı için aşırı uyum riski taşır (bkz. [ADR 0014](0014-hybrid-search-ltr-experiments.md)).
+- Semantik skor artık hibrit RRF füzyonundan gelir (sözcüksel + vektör + trigram); sorgu varken ağırlığı 0.6'dır (`RANKING_WEIGHTS_WITH_QUERY`). Sorgusuz sıralamada 0.15 korunur.

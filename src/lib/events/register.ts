@@ -8,8 +8,9 @@ import {
   type BookingExpiredPayload,
   type PropertyCreatedPayload,
   type AuthEmailRequestedPayload,
+  type PriceDroppedPayload,
 } from "./events";
-import { notifyAuthEmail } from "@/lib/notifications/auth-notifications";
+import { notifyAuthEmail, notifyPriceDrop } from "@/lib/notifications/auth-notifications";
 import { upsertPropertyEmbedding } from "@/lib/embedding/backfill";
 import { invalidatePropertySearchCache } from "@/lib/search";
 import { invalidatePriceCache } from "@/lib/pricing-service";
@@ -60,6 +61,7 @@ export function registerEventHandlers(): void {
     upsertPropertyEmbedding(p.propertyId)
   );
   on<AuthEmailRequestedPayload>(EventTypes.AuthEmailRequested, notifyAuthEmail);
+  on<PriceDroppedPayload>(EventTypes.PriceDropped, notifyPriceDrop);
   on<BookingExpiredPayload>(EventTypes.BookingExpired, async (p) => {
     await invalidateStay(p);
     await notifyBookingExpired(p);

@@ -17,6 +17,8 @@ export const EventTypes = {
   DemandSignalChanged: "demand.signal_changed",
   /** E-posta doğrulama / şifre sıfırlama bağlantısı gönderilmeli (P0-8). */
   AuthEmailRequested: "auth.email_requested",
+  /** İzlenen konaklamanın fiyatı Omnibus referansının altına düştü (P1-4). */
+  PriceDropped: "price.dropped",
 } as const;
 
 export type EventType = (typeof EventTypes)[keyof typeof EventTypes];
@@ -70,6 +72,24 @@ export interface AuthEmailRequestedPayload {
   kind: "EMAIL_VERIFY" | "PASSWORD_RESET";
   /** Tek kullanımlık ham token (yalnızca e-posta bağlantısı için; DB'de özeti tutulur). */
   token: string;
+}
+
+export interface PriceDroppedPayload {
+  alertId: string;
+  userId: string;
+  to: string;
+  name: string;
+  propertyId: string;
+  propertyTitle: string;
+  roomName: string;
+  checkIn: string;
+  checkOut: string;
+  currency: string;
+  /** Omnibus referansı (son N günün en düşüğü), minor unit. */
+  previousMinor: number;
+  currentMinor: number;
+  /** Gözlem günü (YYYY-MM-DD) — e-posta tekilliği için. */
+  observedOn: string;
 }
 
 export interface PropertyCreatedPayload {

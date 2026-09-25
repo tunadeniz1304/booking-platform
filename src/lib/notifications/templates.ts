@@ -125,3 +125,34 @@ export function authLinkEmail(input: {
   );
   return { subject, ...body };
 }
+
+/**
+ * Fiyat düşüşü (P1-4). "Önceki fiyat" Omnibus referansıdır: son N günün en düşük
+ * gözlenen fiyatı (indirimden önceki tek bir yüksek fiyat değil).
+ */
+export function priceDropEmail(input: {
+  name: string;
+  propertyTitle: string;
+  roomName: string;
+  checkIn: string;
+  checkOut: string;
+  currency: string;
+  previousMinor: number;
+  currentMinor: number;
+  omnibusDays: number;
+  link: string;
+}): EmailContent {
+  const subject = `Fiyat düştü — ${input.propertyTitle}`;
+  const body = layout(
+    `Merhaba ${input.name}, izlediğiniz konaklamanın fiyatı düştü.`,
+    [
+      `${input.propertyTitle} · ${input.roomName}`,
+      `Giriş: ${trDate(input.checkIn)} · Çıkış: ${trDate(input.checkOut)}`,
+      `Yeni fiyat (vergiler dahil): ${formatMoney(money(input.currentMinor, input.currency))}`,
+      `Önceki fiyat (son ${input.omnibusDays} günün en düşüğü): ${formatMoney(money(input.previousMinor, input.currency))}`,
+      input.link,
+    ],
+    FOOTER
+  );
+  return { subject, ...body };
+}

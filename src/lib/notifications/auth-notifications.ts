@@ -1,7 +1,7 @@
-import type { AuthEmailRequestedPayload } from "@/lib/events/events";
+import type { AuthEmailRequestedPayload, PriceDroppedPayload } from "@/lib/events/events";
 import { getConfig } from "@/lib/config/app-config";
 import { sendEmail } from "./notifier";
-import { authLinkEmail } from "./templates";
+import { authLinkEmail, priceDropEmail } from "./templates";
 
 /** Uygulamanın dışa açık kök adresi (e-posta bağlantıları için). */
 export function appBaseUrl(): string {
@@ -24,6 +24,27 @@ export async function notifyAuthEmail(p: AuthEmailRequestedPayload) {
       ttlLabel: verify
         ? `${config.AUTH_VERIFY_TOKEN_TTL_HOURS} saat`
         : `${config.AUTH_RESET_TOKEN_TTL_MINUTES} dakika`,
+    }),
+  });
+}
+
+/** Olay → fiyat düşüşü e-postası (alarm + gözlem günü başına tek e-posta). */
+export async function notifyPriceDrop(p: PriceDroppedPayload) {
+  return sendEmail({
+    dedupeKey: `price.dropped:${p.alertId}:${p.observedOn}`,
+    userId: p.userId,
+    to: p.to,
+    content: priceDropEmail({
+      name: p.name,
+      propertyTitle: p.propertyTitle,
+      roomName: p.roomName,
+      checkIn: p.checkIn,
+      checkOut: p.checkOut,
+      currency: p.currency,
+      previousMinor: p.previousMinor,
+      currentMinor: p.currentMinor,
+      omnibusDays: getConfig().PRICE_OMNIBUS_DAYS,
+      link: `${appBaseUrl()}/property/${encodeURIComponent(p.propertyId)}?checkIn=${p.checkIn}&checkOut=${p.checkOut}`,
     }),
   });
 }

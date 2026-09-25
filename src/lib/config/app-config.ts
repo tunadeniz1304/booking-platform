@@ -60,6 +60,20 @@ const schema = z.object({
   EVENT_FACTOR_PER_POINT: num(0.05, 0, 0.5),
   YIELD_HOLD_MAX_SHARE: num(0.2, 0, 1),
 
+  // Fiyat içgörüsü + fiyat alarmı (P1-4)
+  /** Split conformal hata oranı: 0.1 → %90 tahmin aralığı. */
+  PRICE_INSIGHT_ALPHA: num(0.1, 0.01, 0.5),
+  /** Aralık için gereken asgari kalibrasyon gecesi; altında etiket verilmez. */
+  PRICE_INSIGHT_MIN_CALIBRATION: int(20, 1, 100_000),
+  /** Kalibrasyon için bugünden geriye/ileriye bakılan gün sayısı (aynı konum). */
+  PRICE_INSIGHT_WINDOW_DAYS: int(90, 7, 400),
+  /** Omnibus referans fiyatı: son N günün en düşük gözlenen fiyatı ("önceki fiyat"). */
+  PRICE_OMNIBUS_DAYS: int(30, 1, 365),
+  /** Günlük fiyat alarmı işi (cron, UTC). */
+  PRICE_ALERT_CRON: z.string().min(1).default("15 6 * * *"),
+  /** Kullanıcı başına azami aktif fiyat alarmı. */
+  PRICE_ALERT_MAX_PER_USER: int(20, 1, 1000),
+
   // Transfer
   FEATURE_TRANSFER: bool(true),
   TRANSFER_MAX_ASK_RATIO: num(1.0, 0.1, 2),

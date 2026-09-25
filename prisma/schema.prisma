@@ -35,6 +35,7 @@ model User {
   properties          Property[]
   listedTransfers     BookingTransfer[]    @relation("transferSeller")
   claimedTransfers    BookingTransfer[]    @relation("transferBuyer")
+  priceAlerts         PriceAlert[]
 }
 
 enum UserRole {
@@ -164,6 +165,7 @@ model RoomType {
   restrictions   Restriction[]
   externalBlocks ExternalBlock[]
   bookings       Booking[]
+  priceAlerts    PriceAlert[]
 
   @@index([propertyId])
   @@index([available])
@@ -510,6 +512,31 @@ model PriceHistory {
 
   @@unique([propertyId, month])
   @@index([propertyId, month])
+}
+
+/// Fiyat alarmı (P1-4): kullanıcı bir konaklamayı izler; günlük iş fiyatı gözlemler ve
+/// son PRICE_OMNIBUS_DAYS günün en düşüğünün altına inerse e-posta gönderir (outbox).
+model PriceAlert {
+  id             String    @id @default(cuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  roomTypeId     String
+  roomType       RoomType  @relation(fields: [roomTypeId], references: [id], onDelete: Cascade)
+  checkIn        DateTime  @db.Date
+  checkOut       DateTime  @db.Date
+  guests         Int       @default(1)
+  currency       String
+  /// Son gözlenen konaklama toplamı (minor unit).
+  lastTotalMinor Int
+  /// Günlük gözlemler `[{ on: "YYYY-MM-DD", total: <minor> }]` (Omnibus referansı için).
+  observations   Json      @default("[]")
+  active         Boolean   @default(true)
+  lastNotifiedAt DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([userId, roomTypeId, checkIn, checkOut, guests])
+  @@index([active, checkIn])
 }
 
 enum TransferStatus {

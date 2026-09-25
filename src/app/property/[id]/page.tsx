@@ -46,7 +46,20 @@ async function getProperty(id: string): Promise<PropertyDetail | null> {
           id: true,
           name: true,
           description: true,
-          capacity: true,
+          maxOccupancy: true,
+          units: true,
+          ratePlans: {
+            where: { active: true },
+            select: {
+              id: true,
+              name: true,
+              mealPlan: true,
+              refundable: true,
+              priceModifierBps: true,
+              isDefault: true,
+            },
+            orderBy: { priceModifierBps: "asc" },
+          },
           bedType: true,
           priceModifier: true,
           available: true,
@@ -62,6 +75,7 @@ async function getProperty(id: string): Promise<PropertyDetail | null> {
     basePrice: Number(property.basePrice),
     rooms: property.rooms.map((room) => ({
       ...room,
+      capacity: room.maxOccupancy,
       priceModifier: Number(room.priceModifier),
     })),
   };

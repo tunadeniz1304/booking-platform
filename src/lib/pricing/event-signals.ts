@@ -98,17 +98,17 @@ export async function repriceLocation(locationId: string, nights: IsoDate[]): Pr
       },
       select: { id: true, title: true, impact: true, startsAt: true, endsAt: true },
     });
-    const rows = await tx.availability.findMany({
+    // Satılmış gecelerin fiyatı rezervasyon snapshot'ında dondurulmuştur; sayaçlı envanterde
+    // satırın kendisi yeniden fiyatlanır (kalan odalar için geçerli fiyat).
+    const rows = await tx.inventoryDay.findMany({
       where: {
         date: { gte: first, lte: last },
-        isAvailable: true,
-        lockedBy: null,
-        room: { property: { locationId, isActive: true }, available: true },
+        roomType: { property: { locationId, isActive: true }, available: true },
       },
       select: {
         id: true,
         date: true,
-        room: { select: { property: { select: { basePrice: true, currency: true } } } },
+        roomType: { select: { property: { select: { basePrice: true, currency: true } } } },
       },
     });
     if (rows.length === 0) return 0;
@@ -117,17 +117,17 @@ export async function repriceLocation(locationId: string, nights: IsoDate[]): Pr
       const active = events
         .filter((e) => windowOf(e).includes(date))
         .map((e) => ({ id: e.id, title: e.title, impact: e.impact }));
-      const currency = row.room.property.currency;
+      const currency = row.roomType.property.currency;
       const exp = explainNightPrice({
         date,
-        baseMinor: toMinor(row.room.property.basePrice.toString(), currency),
+        baseMinor: toMinor(row.roomType.property.basePrice.toString(), currency),
         currency,
         events: active,
       });
       return Prisma.sql`(${row.id}, ${toDecimalString(money(exp.price, currency))}::numeric, ${JSON.stringify(exp)}::jsonb)`;
     });
     const updated = await tx.$executeRaw`
-      UPDATE "Availability" AS a
+      UPDATE "InventoryDay" AS a
       SET price = v.price, "priceExplanation" = v.explanation
       FROM (VALUES ${Prisma.join(values)}) AS v(id, price, explanation)
       WHERE a.id = v.id`;
@@ -218,8 +218,10 @@ export async function rollbackEvent(id: string) {
 }
 
 /**
- * Yield hold: onaylı olay penceresinde gece başına oda payının en fazla
- * YIELD_HOLD_MAX_SHARE kadarını satıştan geçici olarak çeker (`lockedBy=yield:<id>`).
+ * Yield hold: onaylı olay penceresinde her oda tipinin gecelik odalarının en fazla
+ * YIELD_HOLD_MAX_SHARE kadarını satıştan geçici olarak çeker. Çekilen birimler
+ * `ExternalBlock(source = "yield:<id>")` satırlarıyla izlenir ve `sold`'a sayılır (koşullu
+ * sayaç — asla fazla satış yazmaz); `releaseYieldHold` aynı birimleri iade eder.
  */
 export async function createYieldHold(id: string, share: number) {
   const cfg = getConfig();
@@ -229,31 +231,61 @@ export async function createYieldHold(id: string, share: number) {
   const event = await prisma.demandEvent.findUnique({ where: { id } });
   if (!event || event.status !== "APPROVED")
     throw new ConflictError("Yalnızca onaylı olaylar için", "INVALID_STATE");
+  const source = `yield:${id}`;
   let held = 0;
   for (const night of windowOf(event)) {
-    const rows = await prisma.availability.findMany({
-      where: { date: toDbDate(night), room: { property: { locationId: event.locationId } } },
-      select: { id: true, isAvailable: true, lockedBy: true },
-      orderBy: { id: "asc" },
+    const date = toDbDate(night);
+    const rows = await prisma.inventoryDay.findMany({
+      where: { date, roomType: { property: { locationId: event.locationId } } },
+      select: { roomTypeId: true, total: true, sold: true, held: true },
+      orderBy: { roomTypeId: "asc" },
     });
-    const quota =
-      Math.floor(rows.length * share) - rows.filter((r) => r.lockedBy === `yield:${id}`).length;
-    const free = rows.filter((r) => r.isAvailable && !r.lockedBy).slice(0, Math.max(0, quota));
-    if (free.length > 0) {
-      const res = await prisma.availability.updateMany({
-        where: { id: { in: free.map((r) => r.id) }, isAvailable: true, lockedBy: null },
-        data: { isAvailable: false, lockedBy: `yield:${id}` },
+    for (const row of rows) {
+      held += await prisma.$transaction(async (tx) => {
+        const existing = await tx.externalBlock.count({
+          where: { roomTypeId: row.roomTypeId, source, date },
+        });
+        const want = Math.min(
+          Math.floor(row.total * share) - existing,
+          row.total - row.sold - row.held
+        );
+        if (want <= 0) return 0;
+        const updated = await tx.$executeRaw`
+          UPDATE "InventoryDay" SET sold = sold + ${want}
+          WHERE "roomTypeId" = ${row.roomTypeId} AND date = ${date}
+            AND sold + held + ${want} <= total`;
+        if (updated !== 1) return 0;
+        await tx.externalBlock.createMany({
+          data: Array.from({ length: want }, (_, k) => ({
+            roomTypeId: row.roomTypeId,
+            source,
+            uid: `unit-${existing + k + 1}`,
+            date,
+          })),
+        });
+        return want;
       });
-      held += res.count;
     }
   }
   return held;
 }
 
 export async function releaseYieldHold(id: string): Promise<number> {
-  const res = await prisma.availability.updateMany({
-    where: { lockedBy: `yield:${id}` },
-    data: { isAvailable: true, lockedBy: null },
+  const source = `yield:${id}`;
+  return prisma.$transaction(async (tx) => {
+    const groups = await tx.externalBlock.groupBy({
+      by: ["roomTypeId", "date"],
+      where: { source },
+      _count: { _all: true },
+    });
+    let released = 0;
+    for (const g of groups) {
+      await tx.$executeRaw`
+        UPDATE "InventoryDay" SET sold = sold - ${g._count._all}
+        WHERE "roomTypeId" = ${g.roomTypeId} AND date = ${g.date} AND sold >= ${g._count._all}`;
+      released += g._count._all;
+    }
+    await tx.externalBlock.deleteMany({ where: { source } });
+    return released;
   });
-  return res.count;
 }

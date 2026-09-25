@@ -1,9 +1,12 @@
 import type { Queue } from "bullmq";
 import { expireHolds } from "@/lib/booking-service";
-import { rollAvailabilityForward } from "@/lib/booking/availability-rollover";
+import { pruneInventory, rollAvailabilityForward } from "@/lib/booking/availability-rollover";
+import { completeStays } from "@/lib/booking/complete-stays";
 
 export const EXPIRE_HOLDS_JOB = "expire-holds";
 export const ROLLOVER_JOB = "availability-rollover";
+/** Tesisin yerel çıkış saati geçen CONFIRMED rezervasyonlar → COMPLETED (v3#18). */
+export const COMPLETE_STAYS_JOB = "complete-stays";
 
 /** Her dakika çalışan tekrarlı iş (idempotent scheduler — birden çok worker güvenli). */
 export async function scheduleExpireHolds(queue: Queue): Promise<void> {
@@ -12,7 +15,13 @@ export async function scheduleExpireHolds(queue: Queue): Promise<void> {
     { every: 60_000 },
     { name: EXPIRE_HOLDS_JOB, data: {}, opts: { removeOnComplete: true, removeOnFail: 100 } }
   );
-  // Her gece 02:30 UTC: ileri 365 gecelik envanteri tamamla.
+  // Her 15 dakikada: yerel çıkış saati geçen konaklamaları tamamla (saat dilimleri farklı).
+  await queue.upsertJobScheduler(
+    COMPLETE_STAYS_JOB,
+    { every: 15 * 60_000 },
+    { name: COMPLETE_STAYS_JOB, data: {}, opts: { removeOnComplete: true, removeOnFail: 100 } }
+  );
+  // Her gece 02:30 UTC: ileri 365 gecelik envanteri tamamla ve eski günleri buda.
   await queue.upsertJobScheduler(
     ROLLOVER_JOB,
     { pattern: "30 2 * * *", tz: "UTC" },
@@ -21,7 +30,13 @@ export async function scheduleExpireHolds(queue: Queue): Promise<void> {
 }
 
 export async function runRollover(): Promise<number> {
-  return rollAvailabilityForward(365);
+  const created = await rollAvailabilityForward(365);
+  await pruneInventory();
+  return created;
+}
+
+export async function runCompleteStays(): Promise<number> {
+  return completeStays(new Date());
 }
 
 /** Süresi dolan tutmaları EXPIRED yapar ve envanteri iade eder. */

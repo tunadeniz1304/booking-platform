@@ -70,7 +70,7 @@ export async function getRoomHeat(
   startDate?: string,
   endDate?: string
 ): Promise<RoomHeat | null> {
-  const room = await prisma.room.findUnique({
+  const room = await prisma.roomType.findUnique({
     where: { id: roomId },
     select: {
       propertyId: true,
@@ -87,13 +87,14 @@ export async function getRoomHeat(
     throw new Error("Geçersiz tarih aralığı");
   }
 
-  const availability = await prisma.availability.findMany({
-    where: { roomId, date: { gte: start, lt: end } },
-    select: { isAvailable: true, price: true, date: true },
+  const availability = await prisma.inventoryDay.findMany({
+    where: { roomTypeId: roomId, date: { gte: start, lt: end } },
+    select: { total: true, sold: true, held: true, price: true, date: true },
   });
 
-  const totalNights = availability.length;
-  const bookedNights = availability.filter((a) => !a.isAvailable).length;
+  // Oda-gece cinsinden: toplam satılabilir, satılmış + tutulmuş (sayaçlı envanter, ADR 0010).
+  const totalNights = availability.reduce((s, a) => s + a.total, 0);
+  const bookedNights = availability.reduce((s, a) => s + a.sold + a.held, 0);
   const availableNights = totalNights - bookedNights;
   const scarcity = totalNights > 0 ? bookedNights / totalNights : 0;
 

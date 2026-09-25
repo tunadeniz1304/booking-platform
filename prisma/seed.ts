@@ -208,6 +208,59 @@ function composeReview(
   return { rating, comment };
 }
 
+/** Lokasyon → IANA saat dilimi (ADR 0011). */
+const TIME_ZONES: Record<string, string> = {
+  Paris: "Europe/Paris",
+  Roma: "Europe/Rome",
+  Barselona: "Europe/Madrid",
+  Amsterdam: "Europe/Amsterdam",
+  Viyana: "Europe/Vienna",
+  Dubai: "Asia/Dubai",
+  Londra: "Europe/London",
+  "New York": "America/New_York",
+  Tokyo: "Asia/Tokyo",
+};
+
+/** Oda tipi başına oda adedi: oteller/hosteller çok birimli, villa/daire tek birim. */
+function unitsFor(type: string, priceModifier: number): number {
+  if (type === "HOTEL") return priceModifier === 0 ? 8 : priceModifier < 1500 ? 4 : 2;
+  if (type === "HOSTEL") return 10;
+  if (type === "BED_AND_BREAKFAST") return 3;
+  return 1;
+}
+
+/** Fiyat planları: standart (iade edilebilir), iade edilemez −%10, otel/pansiyonda kahvaltılı +%12. */
+function ratePlansFor(type: string) {
+  const plans: Array<{
+    code: string;
+    name: string;
+    refundable: boolean;
+    priceModifierBps: number;
+    isDefault: boolean;
+    mealPlan?: "BREAKFAST";
+  }> = [
+    { code: "STANDARD", name: "Standart", refundable: true, priceModifierBps: 0, isDefault: true },
+    {
+      code: "NONREF",
+      name: "İade edilemez",
+      refundable: false,
+      priceModifierBps: -1000,
+      isDefault: false,
+    },
+  ];
+  if (type === "HOTEL" || type === "BED_AND_BREAKFAST") {
+    plans.push({
+      code: "BREAKFAST",
+      name: "Kahvaltı dahil",
+      refundable: true,
+      priceModifierBps: 1200,
+      isDefault: false,
+      mealPlan: "BREAKFAST",
+    });
+  }
+  return plans;
+}
+
 type PropSeed = {
   title: string;
   description: string;
@@ -956,8 +1009,12 @@ async function main() {
     await prisma.review.deleteMany();
     await prisma.booking.deleteMany();
     await prisma.favorite.deleteMany();
-    await prisma.availability.deleteMany();
-    await prisma.room.deleteMany();
+    await prisma.externalBlock.deleteMany();
+    await prisma.restriction.deleteMany();
+    await prisma.inventoryDay.deleteMany();
+    await prisma.booking.updateMany({ data: { ratePlanId: null } });
+    await prisma.ratePlan.deleteMany();
+    await prisma.roomType.deleteMany();
     await prisma.priceHistory.deleteMany();
     await prisma.property.deleteMany();
     console.log(`Eski veriler temizlendi (${existing.length} property).`);
@@ -993,6 +1050,8 @@ async function main() {
         description: prop.description,
         propertyType: prop.type as PropertyType,
         locationId: locations[prop.loc],
+        // ADR 0011: her tesis kendi yerel saat diliminde işler (iade penceresi, gece, iCal).
+        timeZone: TIME_ZONES[LOCATIONS[prop.loc].city] ?? "Europe/Istanbul",
         basePrice: new Prisma.Decimal(prop.basePrice),
         currency: "TRY",
         ratingAvg: prop.ratingAvg,
@@ -1010,14 +1069,17 @@ async function main() {
       },
     });
     for (const room of prop.rooms) {
-      const createdRoom = await prisma.room.create({
+      const units = unitsFor(prop.type, room.priceModifier);
+      const createdRoom = await prisma.roomType.create({
         data: {
           propertyId: property.id,
           name: room.name,
-          capacity: room.capacity,
+          maxOccupancy: room.capacity,
+          units,
           bedType: room.bedType,
           priceModifier: new Prisma.Decimal(room.priceModifier),
           available: true,
+          ratePlans: { create: ratePlansFor(prop.type) },
         },
       });
       const availabilities = [];
@@ -1027,14 +1089,21 @@ async function main() {
         const seasonal = month >= 5 && month <= 8 ? 1.3 : month === 11 || month === 0 ? 1.15 : 1.0;
         const price = Math.round((prop.basePrice + room.priceModifier) * seasonal * 100) / 100;
         availabilities.push({
-          roomId: createdRoom.id,
+          roomTypeId: createdRoom.id,
           date,
-          isAvailable: true,
+          total: units,
           price: new Prisma.Decimal(price),
-          lockedBy: null,
         });
       }
-      await prisma.availability.createMany({ data: availabilities });
+      await prisma.inventoryDay.createMany({ data: availabilities });
+      // Villalar/evler: cumartesi varışlarında en az 2 gece (LOS kısıtı demosu).
+      if (prop.type === "VILLA") {
+        await prisma.restriction.createMany({
+          data: availabilities
+            .filter((a) => a.date.getUTCDay() === 6)
+            .map((a) => ({ roomTypeId: createdRoom.id, date: a.date, minStay: 2 })),
+        });
+      }
       roomIds.push({ propertyId: property.id, roomId: createdRoom.id, title: prop.title });
     }
     propertyCount++;
@@ -1056,12 +1125,12 @@ async function main() {
     const checkIn = addDays(today, bp.off);
     const dates: Date[] = [];
     for (let d = 0; d < bp.nights; d++) dates.push(addDays(checkIn, d));
-    const rows = await prisma.availability.findMany({
-      where: { roomId: target.roomId, date: { in: dates } },
+    const rows = await prisma.inventoryDay.findMany({
+      where: { roomTypeId: target.roomId, date: { in: dates } },
       orderBy: { date: "asc" },
     });
     if (rows.length !== bp.nights) continue;
-    const total = rows.reduce((s, r) => s + Number(r.price), 0);
+    const total = rows.reduce((sum, r) => sum + Number(r.price), 0);
     const booking = await prisma.booking.create({
       data: {
         userId: allGuests[bp.g].id,
@@ -1076,9 +1145,10 @@ async function main() {
       },
     });
     if (bp.status === "CONFIRMED") {
-      await prisma.availability.updateMany({
+      // Sayaçlı envanter: onaylı rezervasyon her gecede bir oda satar.
+      await prisma.inventoryDay.updateMany({
         where: { id: { in: rows.map((r) => r.id) } },
-        data: { isAvailable: false, lockedBy: booking.id },
+        data: { sold: { increment: 1 } },
       });
       await prisma.payment.create({
         data: {

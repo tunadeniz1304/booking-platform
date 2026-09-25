@@ -37,10 +37,12 @@ export function useQuote(params: {
   checkIn?: string;
   checkOut?: string;
   guests?: number;
+  /** Fiyat planı (yoksa sunucu varsayılanı). */
+  ratePlanId?: string;
   /** Değiştirildiğinde teklif yeniden alınır (ör. PRICE_CHANGED sonrası). */
   refreshKey?: number;
 }): QuoteState {
-  const { roomId, propertyId, checkIn, checkOut, guests, refreshKey } = params;
+  const { roomId, propertyId, checkIn, checkOut, guests, ratePlanId, refreshKey } = params;
   const key =
     roomId && checkIn && checkOut && checkIn < checkOut
       ? new URLSearchParams({
@@ -49,6 +51,7 @@ export function useQuote(params: {
           checkIn,
           checkOut,
           guests: String(guests ?? 1),
+          ...(ratePlanId ? { ratePlanId } : {}),
           r: String(refreshKey ?? 0),
         }).toString()
       : null;

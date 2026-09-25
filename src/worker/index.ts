@@ -12,6 +12,8 @@ import { QUEUE_NAMES, getQueue, getQueueConnection, type PricingJobData } from "
 import {
   EXPIRE_HOLDS_JOB,
   ROLLOVER_JOB,
+  COMPLETE_STAYS_JOB,
+  runCompleteStays,
   runExpireHolds,
   runRollover,
   scheduleExpireHolds,
@@ -70,6 +72,7 @@ async function main(): Promise<void> {
     async (job: Job) => {
       if (job.name === EXPIRE_HOLDS_JOB) return runExpireHolds();
       if (job.name === ROLLOVER_JOB) return runRollover();
+      if (job.name === COMPLETE_STAYS_JOB) return runCompleteStays();
       throw new Error(`Bilinmeyen bakım işi: ${job.name}`);
     },
     { connection }

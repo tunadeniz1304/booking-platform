@@ -13,6 +13,9 @@ const createBookingSchema = z.object({
   guestCount: z.number().int().positive().max(20),
   /** Checkout'ta gösterilen teklif; fiyat değiştiyse 409 PRICE_CHANGED. */
   quoteId: z.string().uuid().optional(),
+  /** Fiyat planı (yoksa varsayılan) ve oda adedi (v3 P0-2). */
+  ratePlanId: z.string().min(1).max(64).optional(),
+  units: z.number().int().min(1).max(10).optional(),
 });
 
 export const POST = observed("bookings", async function postHandler(req: NextRequest) {

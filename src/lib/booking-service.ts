@@ -16,29 +16,46 @@ import { HttpError } from "@/lib/http/errors";
 import { getConfig } from "@/lib/config/app-config";
 import { withSerializableRetry } from "@/lib/db/transactions";
 import { transition, type BookingState } from "@/lib/booking/state-machine";
-import { toSnapshot } from "@/lib/booking/cancellation";
+import { DEFAULT_POLICIES, toSnapshot } from "@/lib/booking/cancellation";
 import { getFxTable } from "@/lib/money/fx";
 import { money, toDecimalString, toMinor, assertCurrency } from "@/lib/money/money";
-import { DateRangeError, fromDate, parseStay, toDbDate, type IsoDate } from "@/lib/time/nights";
+import {
+  clockOf,
+  DateRangeError,
+  fromDate,
+  parseStay,
+  todayIn,
+  toDbDate,
+  type IsoDate,
+} from "@/lib/time/nights";
 import {
   loadQuote,
-  nightsFromRows,
+  nightsFromInventory,
+  pickRatePlan,
   priceStay,
+  RestrictionError,
   samePrice,
   SoldOutError,
   type PricedStay,
   type Quote,
 } from "@/lib/pricing/quote";
+import { checkRestrictions, describeViolation } from "@/lib/booking/restrictions";
+import { holdUnits, InventoryUnavailableError, releaseForStatus } from "@/lib/booking/inventory";
 import { logger, errorFields } from "@/lib/observability/logger";
 import { counter } from "@/lib/observability/metrics";
 
 /**
- * Rezervasyon çekirdeği — çift rezervasyon kanıtlanabilir biçimde imkânsızdır:
+ * Rezervasyon çekirdeği — fazla satış kanıtlanabilir biçimde imkânsızdır (ADR 0002, 0010):
  *
- *  1. Redlock (oda düzeyi, fencing token) — aynı odaya eşzamanlı yazanları sıralar.
- *  2. SERIALIZABLE işlem + `SELECT … FOR UPDATE` — gecelik envanter satırları kilitlenir;
- *     Redis kilidi kaybedilse bile veritabanı tek doğruluk kaynağıdır.
+ *  1. Redlock (oda tipi düzeyi, fencing token) — aynı oda tipine eşzamanlı yazanları sıralar.
+ *  2. SERIALIZABLE işlem + `SELECT … FOR UPDATE` + koşullu sayaç
+ *     (`held = held + u WHERE sold + held + u <= total`) — veritabanı CHECK kısıtıyla birlikte
+ *     yetkili kaynaktır; Redis kilidi kaybedilse bile fazla satış yazılamaz.
  *  3. Idempotency anahtarı — (userId, key) benzersiz; tekrar eden istek aynı sonucu alır.
+ *
+ * Oda tipinin `units` adedi kadar eşzamanlı rezervasyon kabul edilir; satış kısıtları
+ * (min/max konaklama, CTA/CTD, stop-sell) ve fiyat planı (iade edilemez, kahvaltılı…)
+ * teklifle aynı saf fonksiyonlarla uygulanır.
  *
  * Yeni rezervasyon HELD durumunda doğar (`holdExpiresAt` = şimdi + BOOKING_HOLD_TTL_MINUTES);
  * ödeme onaylanınca CONFIRMED olur, süre dolarsa `expireHolds` envanteri iade eder.
@@ -90,6 +107,10 @@ export interface CreateBookingInput {
   checkIn: string;
   checkOut: string;
   guestCount: number;
+  /** Fiyat planı (yoksa varsayılan plan). */
+  ratePlanId?: string;
+  /** Oda adedi (varsayılan 1). */
+  units?: number;
   /** Idempotency anahtarı (aynı anahtar + kullanıcı → aynı rezervasyon döner). */
   idempotencyKey?: string;
   /** Checkout'ta gösterilen teklif; verilirse fiyat birebir eşleşmelidir. */
@@ -100,6 +121,8 @@ export interface BookingDTO {
   id: string;
   propertyId: string;
   roomId: string;
+  ratePlanId: string | null;
+  units: number;
   checkIn: string;
   checkOut: string;
   guestCount: number;
@@ -121,6 +144,8 @@ const bookingSelect = {
   id: true,
   propertyId: true,
   roomId: true,
+  ratePlanId: true,
+  units: true,
   checkIn: true,
   checkOut: true,
   guestCount: true,
@@ -140,6 +165,8 @@ function toDto(row: BookingRow): BookingDTO {
     id: row.id,
     propertyId: row.propertyId,
     roomId: row.roomId,
+    ratePlanId: row.ratePlanId,
+    units: row.units,
     checkIn: fromDate(row.checkIn),
     checkOut: fromDate(row.checkOut),
     guestCount: row.guestCount,
@@ -175,9 +202,23 @@ function roomLockKey(roomId: string): string {
 
 export async function createBooking(input: CreateBookingInput): Promise<BookingResult> {
   const config = getConfig();
+  const units = input.units ?? 1;
+  if (!Number.isInteger(units) || units < 1 || units > 10) {
+    throw new BookingValidationError("Oda adedi 1–10 olmalıdır");
+  }
+  // "Geçmiş tarih" kontrolü tesisin yerel bugününe göre (v3#6) → önce saat dilimi.
+  const clock = await prisma.roomType
+    .findUnique({
+      where: { id: input.roomId },
+      select: { property: { select: { timeZone: true, checkInTime: true, checkOutTime: true } } },
+    })
+    .then((r) => clockOf(r?.property ?? {}));
   let stay;
   try {
-    stay = parseStay(input.checkIn, input.checkOut, { maxNights: config.MAX_STAY_NIGHTS });
+    stay = parseStay(input.checkIn, input.checkOut, {
+      maxNights: config.MAX_STAY_NIGHTS,
+      today: todayIn(clock.timeZone),
+    });
   } catch (error) {
     if (error instanceof DateRangeError) throw new BookingValidationError(error.message);
     throw error;
@@ -205,7 +246,9 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingR
       quote.propertyId !== input.propertyId ||
       quote.checkIn !== stay.checkIn ||
       quote.checkOut !== stay.checkOut ||
-      quote.guests !== input.guestCount
+      quote.guests !== input.guestCount ||
+      (quote.units ?? 1) !== units ||
+      (input.ratePlanId !== undefined && quote.ratePlan?.id !== input.ratePlanId)
     ) {
       throw new BookingValidationError("Teklif bu rezervasyon bilgileriyle eşleşmiyor");
     }
@@ -213,24 +256,30 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingR
 
   // Hızlı yol: kilit almadan önce dolu olduğu kesin olan istekleri erken reddet.
   // Yalnızca optimizasyondur; sorgu hata verirse atlanır (kilitli yol yetkili kaynaktır).
-  const occupied = await prisma.availability
-    .count({
-      where: {
-        roomId: input.roomId,
-        date: { gte: toDbDate(stay.checkIn), lt: toDbDate(stay.checkOut) },
-        isAvailable: false,
-      },
-    })
+  const full = await prisma.$queryRaw<Array<{ n: bigint }>>`
+      SELECT count(*)::bigint AS n FROM "InventoryDay"
+      WHERE "roomTypeId" = ${input.roomId}
+        AND date >= ${toDbDate(stay.checkIn)} AND date < ${toDbDate(stay.checkOut)}
+        AND sold + held + ${units} > total`
+    .then((r) => Number(r[0]?.n ?? 0))
     .catch(() => 0);
-  if (occupied > 0) {
+  if (full > 0) {
     bookingsCreated.inc({ outcome: "sold_out" });
     throw new SoldOutError();
   }
 
   try {
+    const ratePlanId = input.ratePlanId ?? quote?.ratePlan?.id;
     const row = await redlock.withLock(
       roomLockKey(input.roomId),
-      () => reserveInTransaction(input, stay.checkIn, stay.checkOut, stay.nights, quote),
+      () =>
+        reserveInTransaction(
+          { ...input, ratePlanId, units },
+          stay.checkIn,
+          stay.checkOut,
+          stay.nights,
+          quote
+        ),
       { ttlMs: 15_000, retryCount: 200, retryDelayMs: 25 }
     );
     bookingsCreated.inc({ outcome: "held" });
@@ -253,13 +302,15 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingR
       const existing = await findByIdempotencyKey(input.userId, input.idempotencyKey);
       if (existing) return { booking: existing, paymentRequired: existing.status === "HELD" };
     }
-    if (error instanceof SoldOutError) bookingsCreated.inc({ outcome: "sold_out" });
+    if (error instanceof SoldOutError || error instanceof RestrictionError) {
+      bookingsCreated.inc({ outcome: "sold_out" });
+    }
     throw error;
   }
 }
 
 async function reserveInTransaction(
-  input: CreateBookingInput,
+  input: CreateBookingInput & { units: number },
   checkIn: IsoDate,
   checkOut: IsoDate,
   nights: IsoDate[],
@@ -267,48 +318,88 @@ async function reserveInTransaction(
 ): Promise<BookingDTO> {
   const config = getConfig();
   return withSerializableRetry(async (tx) => {
-    const room = await tx.room.findFirst({
+    const policySelect = { select: { kind: true, version: true, rules: true } } as const;
+    const room = await tx.roomType.findFirst({
       where: { id: input.roomId, propertyId: input.propertyId, property: { isActive: true } },
       select: {
         id: true,
-        capacity: true,
+        maxOccupancy: true,
+        units: true,
         available: true,
         priceModifier: true,
+        ratePlans: {
+          select: {
+            id: true,
+            code: true,
+            name: true,
+            mealPlan: true,
+            refundable: true,
+            priceModifierBps: true,
+            isDefault: true,
+            active: true,
+            cancellationPolicy: policySelect,
+          },
+        },
         property: {
           select: {
             currency: true,
-            cancellationPolicy: { select: { kind: true, version: true, rules: true } },
+            cancellationPolicy: policySelect,
           },
         },
       },
     });
     if (!room) throw new BookingNotFoundError("Oda veya mülk bulunamadı");
-    if (input.guestCount > room.capacity) {
-      throw new BookingValidationError(`Bu oda en fazla ${room.capacity} kişiliktir`);
+    if (input.guestCount > room.maxOccupancy * input.units) {
+      throw new BookingValidationError(`Bu oda en fazla ${room.maxOccupancy} kişiliktir`);
     }
-    if (!room.available) throw new SoldOutError();
+    if (!room.available || input.units > room.units) throw new SoldOutError();
+    let plan;
+    try {
+      plan = pickRatePlan(room.ratePlans, input.ratePlanId);
+    } catch (error) {
+      if (error instanceof SoldOutError) throw error;
+      throw new BookingValidationError((error as Error).message);
+    }
     const currency = assertCurrency(room.property.currency);
 
     const rows = await tx.$queryRaw<
-      Array<{ id: string; date: Date; price: Prisma.Decimal; isAvailable: boolean }>
+      Array<{
+        id: string;
+        date: Date;
+        price: Prisma.Decimal;
+        total: number;
+        sold: number;
+        held: number;
+      }>
     >`
-      SELECT id, date, price, "isAvailable"
-      FROM "Availability"
-      WHERE "roomId" = ${room.id}
+      SELECT id, date, price, total, sold, held
+      FROM "InventoryDay"
+      WHERE "roomTypeId" = ${room.id}
         AND date >= ${toDbDate(checkIn)}
         AND date < ${toDbDate(checkOut)}
       ORDER BY date
       FOR UPDATE
     `;
-    const nightInputs = nightsFromRows(rows, nights, currency);
+    const restrictions = await tx.restriction.findMany({
+      where: { roomTypeId: room.id, date: { gte: toDbDate(checkIn), lte: toDbDate(checkOut) } },
+    });
+    const violation = checkRestrictions({ checkIn, checkOut, nights }, restrictions);
+    if (violation) throw new RestrictionError(describeViolation(violation), violation.code);
+    const nightInputs = nightsFromInventory(rows, nights, currency, input.units);
     if (!nightInputs) throw new SoldOutError();
 
     const priced = priceStay({
       nights: nightInputs,
       modifierMinor: toMinor(room.priceModifier.toString(), currency),
+      planModifierBps: plan.priceModifierBps,
+      units: input.units,
       currency,
       taxRate: config.ACCOMMODATION_TAX_RATE,
     });
+    // İade edilemez plan → NON_REFUNDABLE; değilse planın (yoksa mülkün) politikası.
+    const policy = plan.refundable
+      ? toSnapshot(plan.cancellationPolicy ?? room.property.cancellationPolicy)
+      : DEFAULT_POLICIES.NON_REFUNDABLE;
     if (quote && !samePrice(quote, priced)) {
       throw new BookingConflictError(
         "Fiyat değişti, lütfen yeni fiyatı onaylayın",
@@ -328,6 +419,8 @@ async function reserveInTransaction(
         userId: input.userId,
         propertyId: input.propertyId,
         roomId: room.id,
+        ratePlanId: plan.id,
+        units: input.units,
         checkIn: toDbDate(checkIn),
         checkOut: toDbDate(checkOut),
         guestCount: input.guestCount,
@@ -337,19 +430,20 @@ async function reserveInTransaction(
         holdExpiresAt,
         priceBreakdown: priced as unknown as Prisma.InputJsonValue,
         quoteId: quote?.quoteId ?? null,
-        policySnapshot: toSnapshot(
-          room.property.cancellationPolicy
-        ) as unknown as Prisma.InputJsonValue,
+        policySnapshot: policy as unknown as Prisma.InputJsonValue,
         fxSnapshot: getFxTable() as unknown as Prisma.InputJsonValue,
         idempotencyKey: input.idempotencyKey ?? null,
       },
       select: bookingSelect,
     });
 
-    await tx.availability.updateMany({
-      where: { id: { in: rows.map((r) => r.id) } },
-      data: { isAvailable: false, lockedBy: booking.id },
-    });
+    // Koşullu sayaç: yer yoksa (0 satır / eksik gece) işlem geri alınır → SOLD_OUT.
+    try {
+      await holdUnits(tx, { roomTypeId: room.id, checkIn, checkOut, units: input.units });
+    } catch (error) {
+      if (error instanceof InventoryUnavailableError) throw new SoldOutError();
+      throw error;
+    }
 
     await appendOutbox(
       tx,
@@ -387,20 +481,21 @@ async function afterWrite(propertyId: string, bookingId: string): Promise<void> 
   }
 }
 
-/** Rezervasyonun tuttuğu gece envanterini serbest bırakır (yalnızca bu booking'in kilitleri). */
+/**
+ * Rezervasyonun tuttuğu envanteri iade eder. `status` geçişten ÖNCEKİ durumdur:
+ * HELD/PENDING → `held −= units`, CONFIRMED → `sold −= units`. Aynı işlemde yapılan koşullu
+ * durum geçişi bu çağrının rezervasyon başına tek kez olmasını garanti eder.
+ */
 export async function releaseInventory(
   tx: Prisma.TransactionClient,
-  booking: { id: string; roomId: string; checkIn: Date; checkOut: Date }
-): Promise<number> {
-  const res = await tx.availability.updateMany({
-    where: {
-      roomId: booking.roomId,
-      date: { gte: booking.checkIn, lt: booking.checkOut },
-      lockedBy: booking.id,
-    },
-    data: { isAvailable: true, lockedBy: null },
+  booking: { roomId: string; checkIn: Date; checkOut: Date; units: number; status: string }
+): Promise<void> {
+  await releaseForStatus(tx, booking.status, {
+    roomTypeId: booking.roomId,
+    checkIn: booking.checkIn,
+    checkOut: booking.checkOut,
+    units: booking.units,
   });
-  return res.count;
 }
 
 export interface CancelResult {
@@ -427,6 +522,7 @@ export async function cancelBooking(bookingId: string, userId: string): Promise<
         propertyId: true,
         checkIn: true,
         checkOut: true,
+        units: true,
       },
     });
     if (!booking || booking.userId !== userId) throw new BookingNotFoundError();
@@ -498,9 +594,10 @@ export async function expireHolds(now: Date = new Date(), limit = 100): Promise<
         checkIn: Date;
         checkOut: Date;
         status: BookingStatus;
+        units: number;
       }>
     >`
-      SELECT id, "userId", "roomId", "propertyId", "checkIn", "checkOut", status
+      SELECT id, "userId", "roomId", "propertyId", "checkIn", "checkOut", status, units
       FROM "Booking"
       WHERE (status = 'HELD' AND "holdExpiresAt" <= ${now})
          OR (status = 'PENDING' AND "createdAt" <= ${legacyCutoff})

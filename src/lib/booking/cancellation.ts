@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { money, multiplyRate, type CurrencyCode } from "@/lib/money/money";
-import { toDbDate, type IsoDate } from "@/lib/time/nights";
+import { checkInAt, type IsoDate, type PropertyClock } from "@/lib/time/nights";
 
 /**
  * Sürümlü iptal politikaları ve iade hesabı.
@@ -8,7 +8,8 @@ import { toDbDate, type IsoDate } from "@/lib/time/nights";
  * Rezervasyon anında mülkün politikası `Booking.policySnapshot` olarak kopyalanır;
  * politika sonradan değişse de misafire o anki kurallar uygulanır.
  *
- * Kural: iptal anında check-in anına (check-in günü `CHECKIN_HOUR_UTC`) kalan saat
+ * Kural: iptal anında check-in anına (check-in günü, TESİSİN saat diliminde giriş saati —
+ * v3#6, ADR 0011) kalan gerçek saat
  * bir basamağın `hoursBefore` değerine eşit/büyükse o basamağın `refundPercent`'i
  * iade edilir (en cömert basamaktan başlanır). Check-in anı geçtiyse (no-show) iade yok.
  * `graceHours`: rezervasyondan sonraki bu süre içinde, check-in en az
@@ -100,18 +101,18 @@ export interface RefundDecision {
   reason: "grace_period" | "tier" | "no_show" | "not_paid";
 }
 
-/** Check-in anı: check-in günü `checkinHourUtc`:00 UTC. */
-export function checkInInstant(checkIn: IsoDate, checkinHourUtc: number): Date {
-  return new Date(toDbDate(checkIn).getTime() + checkinHourUtc * 3_600_000);
+/** Check-in anı: check-in günü, tesisin yerel giriş saatinde (DST güvenli). */
+export function checkInInstant(checkIn: IsoDate, clock: PropertyClock): Date {
+  return checkInAt(checkIn, clock);
 }
 
 export function computeRefund(
   snapshot: PolicySnapshot,
   booking: { checkIn: IsoDate; createdAt: Date; paidMinor: number; currency: CurrencyCode },
   now: Date,
-  checkinHourUtc: number
+  clock: PropertyClock
 ): RefundDecision {
-  const start = checkInInstant(booking.checkIn, checkinHourUtc);
+  const start = checkInInstant(booking.checkIn, clock);
   const hoursBefore = (start.getTime() - now.getTime()) / 3_600_000;
   const base = { hoursBeforeCheckIn: Math.round(hoursBefore * 100) / 100 };
 

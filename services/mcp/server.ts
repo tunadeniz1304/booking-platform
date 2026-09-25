@@ -21,7 +21,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
-import { searchProperties, type SearchParams, type SearchResponse } from "@/lib/search";
+import { searchProperties, type SearchInput, type SearchResponse } from "@/lib/search";
 import { computeTotal, type Quote, type QuoteRequest } from "@/lib/pricing/quote";
 import { createBooking, type BookingResult, type CreateBookingInput } from "@/lib/booking-service";
 import { verifyAccessToken, type AccessClaims } from "@/lib/auth/tokens";
@@ -31,7 +31,7 @@ import { HttpError } from "@/lib/http/errors";
 import { logger, errorFields } from "@/lib/observability/logger";
 
 export interface McpDeps {
-  search(params: SearchParams): Promise<SearchResponse>;
+  search(params: SearchInput): Promise<SearchResponse>;
   quote(req: QuoteRequest): Promise<Quote>;
   hold(input: CreateBookingInput): Promise<BookingResult>;
   authenticate(token: string): Promise<AccessClaims | null>;

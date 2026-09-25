@@ -92,6 +92,30 @@ export function multiplyRate(m: Money, rate: number): Money {
  * Tutarı oranlara göre bölüştürür (en büyük kalan yöntemi).
  * Parçaların toplamı daima `m.amount`'a eşittir.
  */
+/** Tamsayı bölme, yarım yukarı (half-up, sıfırdan uzağa) — BigInt ile taşmasız. */
+function divHalfUp(numerator: bigint, denominator: bigint): bigint {
+  const negative = numerator < 0n !== denominator < 0n;
+  const n = numerator < 0n ? -numerator : numerator;
+  const d = denominator < 0n ? -denominator : denominator;
+  let q = n / d;
+  if ((n % d) * 2n >= d) q += 1n;
+  return negative ? -q : q;
+}
+
+/**
+ * Tutarın baz puan (bps, 1/10.000) oranı: `bpsOf(1000 kuruş, 1000)` = 100 kuruş (%10).
+ * Kayan nokta yok — vergi ve plan farkları için tam sonuç (half-up).
+ */
+export function bpsOf(m: Money, bps: number): Money {
+  if (!Number.isInteger(bps)) throw new MoneyError(`bps tamsayı olmalı: ${bps}`);
+  return money(Number(divHalfUp(BigInt(m.amount) * BigInt(bps), 10_000n)), m.currency);
+}
+
+/** Tutara baz puan farkı uygular: `applyBps(1000, -1000)` = 900 (%10 indirim). */
+export function applyBps(m: Money, bps: number): Money {
+  return add(m, bpsOf(m, bps));
+}
+
 export function allocate(m: Money, ratios: readonly number[]): Money[] {
   if (ratios.length === 0) throw new MoneyError("Bölüştürme oranı yok");
   if (ratios.some((r) => r < 0 || !Number.isFinite(r))) {

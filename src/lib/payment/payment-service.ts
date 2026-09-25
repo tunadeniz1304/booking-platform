@@ -15,9 +15,9 @@ import { transition, type BookingState } from "@/lib/booking/state-machine";
 import { computeRefund, parseSnapshot, type RefundDecision } from "@/lib/booking/cancellation";
 import { releaseInventory, BookingNotFoundError } from "@/lib/booking-service";
 import { invalidatePropertySearchCache } from "@/lib/search";
-import { getConfig } from "@/lib/config/app-config";
 import { money, toDecimalString, toMinor, assertCurrency, type Money } from "@/lib/money/money";
-import { fromDate } from "@/lib/time/nights";
+import { clockOf, fromDate } from "@/lib/time/nights";
+import { commitHeld } from "@/lib/booking/inventory";
 import { logger, errorFields } from "@/lib/observability/logger";
 import { counter } from "@/lib/observability/metrics";
 import { audit } from "@/lib/admin/audit";
@@ -353,6 +353,7 @@ export async function confirmInTransaction(
       holdExpiresAt: true,
       totalPrice: true,
       currency: true,
+      units: true,
       payment: { select: { id: true, status: true, providerRef: true } },
     },
   });
@@ -392,6 +393,13 @@ export async function confirmInTransaction(
   if (updated.count !== 1) {
     throw new ConflictError("Rezervasyon eşzamanlı olarak değişti", "CONCURRENT_UPDATE");
   }
+  // Envanter: tutulan birimler satılana taşınır (aynı işlem, ADR 0010).
+  await commitHeld(tx, {
+    roomTypeId: booking.roomId,
+    checkIn: booking.checkIn,
+    checkOut: booking.checkOut,
+    units: booking.units,
+  });
   const amount = amountOf(booking);
   const payment = await tx.payment.findUniqueOrThrow({
     where: { bookingId: booking.id },
@@ -715,7 +723,6 @@ export async function cancelAndRefund(
   userId: string,
   now = new Date()
 ): Promise<CancellationOutcome> {
-  const config = getConfig();
   const result = await withSerializableRetry(async (tx) => {
     const booking = await tx.booking.findUnique({
       where: { id: bookingId },
@@ -730,7 +737,9 @@ export async function cancelAndRefund(
         checkOut: true,
         createdAt: true,
         currency: true,
+        units: true,
         policySnapshot: true,
+        property: { select: { timeZone: true, checkInTime: true, checkOutTime: true } },
         payment: { select: { status: true, amount: true, providerRef: true } },
       },
     });
@@ -751,7 +760,7 @@ export async function cancelAndRefund(
       parseSnapshot(booking.policySnapshot),
       { checkIn: fromDate(booking.checkIn), createdAt: booking.createdAt, paidMinor, currency },
       now,
-      config.CHECKIN_HOUR_UTC
+      clockOf(booking.property)
     );
 
     const updated = await tx.booking.updateMany({

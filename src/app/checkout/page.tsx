@@ -46,6 +46,7 @@ function CheckoutContent() {
   const checkIn = searchParams.get("checkIn") ?? "";
   const checkOut = searchParams.get("checkOut") ?? "";
   const guestCount = Number(searchParams.get("guestCount") ?? "1");
+  const ratePlanId = searchParams.get("ratePlanId") ?? undefined;
 
   const [property, setProperty] = useState<CheckoutProperty | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -66,6 +67,7 @@ function CheckoutContent() {
     checkIn,
     checkOut,
     guests: guestCount,
+    ratePlanId,
     refreshKey,
   });
 
@@ -105,6 +107,7 @@ function CheckoutContent() {
           checkOut,
           guestCount,
           quoteId: quote.quoteId,
+          ...(ratePlanId ? { ratePlanId } : {}),
         }),
       });
 

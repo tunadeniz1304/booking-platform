@@ -1,40 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
-import { searchProperties } from "@/lib/search";
+import { SearchParamsSchema, searchParamsFromUrl, searchProperties } from "@/lib/search";
 import { getAuth } from "@/lib/auth";
-import { logger, errorFields } from "@/lib/observability/logger";
+import { toErrorResponse } from "@/lib/http/errors";
 import { observed } from "@/lib/http/observed";
 
+/**
+ * Arama ucu. Parametreler sınırda zod ile doğrulanır (v3#7): geçersiz tarih/sayı → 400
+ * (v2'de NaN → 500). Kişiselleştirme yalnızca doğrulanmış token'dan.
+ */
 export const GET = observed("search", async function getHandler(req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
-    const page = Number(searchParams.get("page") ?? "1");
-    const pageSize = Number(searchParams.get("pageSize") ?? "12");
-
-    const params = {
-      query: searchParams.get("destination") ?? searchParams.get("query") ?? undefined,
-      city: undefined as string | undefined,
-      country: undefined as string | undefined,
-      checkIn: searchParams.get("checkIn") ?? undefined,
-      checkOut: searchParams.get("checkOut") ?? undefined,
-      guests: searchParams.get("guests") ? Number(searchParams.get("guests")) : undefined,
-      minPrice: searchParams.get("minPrice") ? Number(searchParams.get("minPrice")) : undefined,
-      maxPrice: searchParams.get("maxPrice") ? Number(searchParams.get("maxPrice")) : undefined,
-      propertyType: searchParams.get("propertyType") ?? undefined,
-      amenities: searchParams.get("amenities")?.split(",").filter(Boolean),
-      page: Number.isFinite(page) && page > 0 ? page : 1,
-      pageSize: Number.isFinite(pageSize) && pageSize > 0 ? Math.min(pageSize, 50) : 12,
-      sort: (searchParams.get("sort") ?? "recommended") as
-        "price_asc" | "price_desc" | "rating" | "recommended",
-      semantic: searchParams.get("semantic") === "1" || searchParams.get("semantic") === "true",
-      // Kişiselleştirme yalnızca doğrulanmış token'dan (istemci başlığına güvenilmez).
+    const params = SearchParamsSchema.parse({
+      ...searchParamsFromUrl(req.nextUrl.searchParams),
+      pageSize: req.nextUrl.searchParams.get("pageSize") ?? 12,
       userId: (await getAuth(req))?.userId,
-    };
-
-    const response = await searchProperties(params);
-    return NextResponse.json(response);
+    });
+    return NextResponse.json(await searchProperties(params));
   } catch (error) {
-    logger.error(errorFields(error), "Search API error");
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return toErrorResponse(error, "search");
   }
 });
 

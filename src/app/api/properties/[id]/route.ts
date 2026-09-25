@@ -31,10 +31,24 @@ export async function GET(_req: Request, { params }: Props) {
             id: true,
             name: true,
             description: true,
-            capacity: true,
+            maxOccupancy: true,
+            units: true,
             bedType: true,
             priceModifier: true,
             available: true,
+            ratePlans: {
+              where: { active: true },
+              select: {
+                id: true,
+                code: true,
+                name: true,
+                mealPlan: true,
+                refundable: true,
+                priceModifierBps: true,
+                isDefault: true,
+              },
+              orderBy: { priceModifierBps: "asc" },
+            },
           },
           orderBy: { name: "asc" },
         },
@@ -48,7 +62,12 @@ export async function GET(_req: Request, { params }: Props) {
     return NextResponse.json({
       ...property,
       basePrice: Number(property.basePrice),
-      rooms: property.rooms.map((r) => ({ ...r, priceModifier: Number(r.priceModifier) })),
+      // `capacity`: bir sürüm boyunca `maxOccupancy`'nin geriye uyumlu adı (ADR 0010).
+      rooms: property.rooms.map((r) => ({
+        ...r,
+        capacity: r.maxOccupancy,
+        priceModifier: Number(r.priceModifier),
+      })),
     });
   } catch (error) {
     logger.error(errorFields(error), "Property detail error");

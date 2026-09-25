@@ -17,7 +17,7 @@ export async function draftListingCopy(actor: AccessClaims, propertyId: string) 
       propertyType: true,
       location: { select: { city: true } },
       amenities: { select: { name: true } },
-      rooms: { select: { name: true, capacity: true, bedType: true } },
+      rooms: { select: { name: true, maxOccupancy: true, bedType: true } },
     },
   });
   const facts = {
@@ -25,7 +25,7 @@ export async function draftListingCopy(actor: AccessClaims, propertyId: string) 
     city: p.location.city,
     propertyType: p.propertyType,
     amenities: p.amenities.map((a) => a.name),
-    rooms: p.rooms,
+    rooms: p.rooms.map((r) => ({ name: r.name, capacity: r.maxOccupancy, bedType: r.bedType })),
   };
   const factSet = buildFactSet([JSON.stringify(facts), p.rooms.length]);
   const res = await getLlmClient().completeJson(

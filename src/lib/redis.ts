@@ -14,6 +14,8 @@ import { Redis as IORedis } from "ioredis";
  */
 export interface RedisClient {
   get(key: string): Promise<string | null>;
+  /** Çoklu okuma (sıra korunur; olmayan anahtar null). */
+  mget(keys: string[]): Promise<Array<string | null>>;
   set(key: string, value: string, opts?: { ex?: number; nx?: boolean }): Promise<string | null>;
   /** Değeri okuyup atomik olarak siler (Redis ≥ 6.2 GETDEL). */
   getdel(key: string): Promise<string | null>;
@@ -63,6 +65,7 @@ export function getRedisConnection(): IORedis {
 export function buildRedisClient(connection: () => IORedis = getRedisConnection): RedisClient {
   return {
     get: (key) => connection().get(key),
+    mget: (keys) => (keys.length === 0 ? Promise.resolve([]) : connection().mget(...keys)),
     set: (key, value, opts) => {
       const c = connection();
       if (opts?.nx && opts.ex) return c.set(key, value, "EX", opts.ex, "NX");

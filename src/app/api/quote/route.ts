@@ -10,6 +10,8 @@ const querySchema = z.object({
   checkIn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   checkOut: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   guests: z.coerce.number().int().min(1).max(20).default(1),
+  ratePlanId: z.string().min(1).max(64).optional(),
+  units: z.coerce.number().int().min(1).max(10).optional(),
 });
 
 /**

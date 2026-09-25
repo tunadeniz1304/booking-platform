@@ -3,7 +3,14 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { NotFoundError, ValidationError } from "@/lib/http/errors";
 import { invalidatePropertySearchCache } from "@/lib/search";
-import { diffDays, nightsBetween, parseIsoDate, toDbDate, addDays } from "@/lib/time/nights";
+import {
+  diffDays,
+  fromDate,
+  nightsBetween,
+  parseIsoDate,
+  toDbDate,
+  addDays,
+} from "@/lib/time/nights";
 import type { AccessClaims } from "@/lib/auth";
 
 /**
@@ -30,7 +37,7 @@ export async function assertPropertyAccess(actor: AccessClaims, propertyId: stri
 }
 
 export async function assertRoomAccess(actor: AccessClaims, roomId: string) {
-  const room = await prisma.room.findUnique({
+  const room = await prisma.roomType.findUnique({
     where: { id: roomId },
     select: { id: true, propertyId: true, property: { select: { hostId: true } } },
   });
@@ -83,13 +90,57 @@ export async function updateProperty(
   return updated;
 }
 
-export const roomSchema = z.object({
-  name: z.string().trim().min(1).max(80),
-  capacity: z.number().int().min(1).max(20),
-  bedType: z.string().trim().min(1).max(60),
-  priceModifier: z.number().min(0).max(1_000_000).default(0),
-  description: z.string().max(1000).optional(),
-});
+/**
+ * Oda tipi girdisi. `capacity` bir sürüm boyunca `maxOccupancy`'nin eşanlamlısı olarak
+ * kabul edilir (geriye uyum, ADR 0010). `units`: bu tipten kaç oda satılabilir.
+ */
+export const roomSchema = z
+  .object({
+    name: z.string().trim().min(1).max(80),
+    maxOccupancy: z.number().int().min(1).max(20).optional(),
+    capacity: z.number().int().min(1).max(20).optional(),
+    units: z.number().int().min(1).max(500).default(1),
+    bedType: z.string().trim().min(1).max(60),
+    priceModifier: z.number().min(0).max(1_000_000).default(0),
+    description: z.string().max(1000).optional(),
+  })
+  .refine((v) => v.maxOccupancy !== undefined || v.capacity !== undefined, {
+    message: "maxOccupancy (veya capacity) gerekli",
+    path: ["maxOccupancy"],
+  })
+  .transform(({ capacity, maxOccupancy, ...rest }) => ({
+    ...rest,
+    maxOccupancy: (maxOccupancy ?? capacity) as number,
+  }));
+
+export const roomPatchSchema = z
+  .object({
+    name: z.string().trim().min(1).max(80),
+    maxOccupancy: z.number().int().min(1).max(20),
+    capacity: z.number().int().min(1).max(20),
+    units: z.number().int().min(0).max(500),
+    bedType: z.string().trim().min(1).max(60),
+    priceModifier: z.number().min(0).max(1_000_000),
+    description: z.string().max(1000),
+    available: z.boolean(),
+  })
+  .partial()
+  .transform(({ capacity, maxOccupancy, ...rest }) => ({
+    ...rest,
+    ...((maxOccupancy ?? capacity) ? { maxOccupancy: (maxOccupancy ?? capacity) as number } : {}),
+  }));
+
+/** Varsayılan fiyat planları: standart (iade edilebilir) ve iade edilemez (−%10). */
+export const DEFAULT_RATE_PLANS = [
+  { code: "STANDARD", name: "Standart", refundable: true, priceModifierBps: 0, isDefault: true },
+  {
+    code: "NONREF",
+    name: "İade edilemez",
+    refundable: false,
+    priceModifierBps: -1000,
+    isDefault: false,
+  },
+] as const;
 
 export async function addRoom(
   actor: AccessClaims,
@@ -97,25 +148,54 @@ export async function addRoom(
   input: z.infer<typeof roomSchema>
 ) {
   await assertPropertyAccess(actor, propertyId);
-  return prisma.room.create({
-    data: { ...input, propertyId, priceModifier: new Prisma.Decimal(input.priceModifier) },
+  const room = await prisma.roomType.create({
+    data: {
+      ...input,
+      propertyId,
+      priceModifier: new Prisma.Decimal(input.priceModifier),
+      ratePlans: { create: DEFAULT_RATE_PLANS.map((p) => ({ ...p })) },
+    },
   });
+  await invalidatePropertySearchCache(propertyId);
+  return room;
 }
 
+/**
+ * Oda tipi güncelleme. `units` değişirse gelecekteki `InventoryDay.total` güncellenir; satılmış +
+ * tutulmuş odaların altına inilemez (CHECK kısıtı) — o geceler olduğu gibi bırakılır ve sayısı döner.
+ */
 export async function updateRoom(
   actor: AccessClaims,
   roomId: string,
-  input: Partial<z.infer<typeof roomSchema>> & { available?: boolean }
+  input: z.infer<typeof roomPatchSchema>
 ) {
-  await assertRoomAccess(actor, roomId);
-  return prisma.room.update({
-    where: { id: roomId },
-    data: {
-      ...input,
-      priceModifier:
-        input.priceModifier !== undefined ? new Prisma.Decimal(input.priceModifier) : undefined,
-    },
+  const access = await assertRoomAccess(actor, roomId);
+  const { units, ...rest } = input;
+  const room = await prisma.$transaction(async (tx) => {
+    const updated = await tx.roomType.update({
+      where: { id: roomId },
+      data: {
+        ...rest,
+        ...(units !== undefined ? { units } : {}),
+        priceModifier:
+          rest.priceModifier !== undefined ? new Prisma.Decimal(rest.priceModifier) : undefined,
+      },
+    });
+    let skipped = 0;
+    if (units !== undefined) {
+      const today = toDbDate(fromDate(new Date()));
+      const applied = await tx.$executeRaw`
+        UPDATE "InventoryDay" SET total = ${units}
+        WHERE "roomTypeId" = ${roomId} AND date >= ${today} AND sold + held <= ${units}`;
+      const all = await tx.inventoryDay.count({
+        where: { roomTypeId: roomId, date: { gte: today } },
+      });
+      skipped = all - applied;
+    }
+    return { ...updated, skippedNights: skipped };
   });
+  await invalidatePropertySearchCache(access.propertyId);
+  return room;
 }
 
 export const ariSchema = z
@@ -123,16 +203,31 @@ export const ariSchema = z
     from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     price: z.number().positive().max(1_000_000).optional(),
+    /** false → satış durdurma (stop-sell); true → satışa aç. */
     isAvailable: z.boolean().optional(),
+    /** Gecelik satılabilir oda (allotment); satılmış + tutulmuşun altına inilemez. */
+    total: z.number().int().min(0).max(500).optional(),
+    minStay: z.number().int().min(1).max(60).nullable().optional(),
+    maxStay: z.number().int().min(1).max(365).nullable().optional(),
+    closedToArrival: z.boolean().optional(),
+    closedToDeparture: z.boolean().optional(),
   })
   .refine(
-    (v) => v.price !== undefined || v.isAvailable !== undefined,
-    "price veya isAvailable gerekli"
+    (v) =>
+      v.price !== undefined ||
+      v.isAvailable !== undefined ||
+      v.total !== undefined ||
+      v.minStay !== undefined ||
+      v.maxStay !== undefined ||
+      v.closedToArrival !== undefined ||
+      v.closedToDeparture !== undefined,
+    "En az bir alan (price, isAvailable, total, minStay, maxStay, closedToArrival/Departure) gerekli"
   );
 
 /**
- * Toplu ARI güncellemesi (≤ 365 gece). Aktif HELD/CONFIRMED rezervasyonların kilitlediği
- * geceler ASLA ezilmez (atlanır ve sayısı döner).
+ * Toplu ARI güncellemesi (≤ 365 gece): fiyat, allotment (`total`) ve satış kısıtları.
+ * Satılmış + tutulmuş odaların altına `total` indirilmez (o geceler atlanır ve sayısı döner);
+ * mevcut rezervasyonlar hiçbir koşulda etkilenmez.
  */
 export async function bulkUpdateAvailability(
   actor: AccessClaims,
@@ -145,33 +240,67 @@ export async function bulkUpdateAvailability(
   const span = diffDays(from, to) + 1;
   if (span < 1 || span > 365) throw new ValidationError("Tarih aralığı 1–365 gece olmalı");
   const nights = nightsBetween(from, addDays(to, 1));
+  const units = (
+    await prisma.roomType.findUniqueOrThrow({ where: { id: roomId }, select: { units: true } })
+  ).units;
 
   return prisma.$transaction(async (tx) => {
-    const locked = await tx.availability.count({
-      where: { roomId, date: { gte: toDbDate(from), lte: toDbDate(to) }, lockedBy: { not: null } },
-    });
-    const data: Prisma.AvailabilityUpdateManyMutationInput = {};
-    if (input.price !== undefined) data.price = new Prisma.Decimal(input.price);
-    if (input.isAvailable !== undefined) data.isAvailable = input.isAvailable;
-    const updated = await tx.availability.updateMany({
-      where: { roomId, date: { gte: toDbDate(from), lte: toDbDate(to) }, lockedBy: null },
-      data,
-    });
+    const range = { gte: toDbDate(from), lte: toDbDate(to) };
+    let updated = 0;
+    let skippedLocked = 0;
+    if (input.price !== undefined) {
+      const r = await tx.inventoryDay.updateMany({
+        where: { roomTypeId: roomId, date: range },
+        data: { price: new Prisma.Decimal(input.price) },
+      });
+      updated = Math.max(updated, r.count);
+    }
+    if (input.total !== undefined) {
+      const applied = await tx.$executeRaw`
+        UPDATE "InventoryDay" SET total = ${input.total}
+        WHERE "roomTypeId" = ${roomId} AND date >= ${range.gte} AND date <= ${range.lte}
+          AND sold + held <= ${input.total}`;
+      const all = await tx.inventoryDay.count({ where: { roomTypeId: roomId, date: range } });
+      skippedLocked = all - applied;
+      updated = Math.max(updated, applied);
+    }
     // Eksik geceler yalnızca fiyat verildiyse oluşturulur (fiyatsız envanter satırı yok).
     const created =
       input.price === undefined
         ? { count: 0 }
-        : await tx.availability.createMany({
+        : await tx.inventoryDay.createMany({
             data: nights.map((d) => ({
-              roomId,
+              roomTypeId: roomId,
               date: toDbDate(d),
               price: new Prisma.Decimal(input.price!),
-              isAvailable: input.isAvailable ?? true,
+              total: input.total ?? units,
             })),
             skipDuplicates: true,
           });
+    const restriction: Prisma.RestrictionUpdateInput = {};
+    if (input.isAvailable !== undefined) restriction.stopSell = !input.isAvailable;
+    if (input.minStay !== undefined) restriction.minStay = input.minStay;
+    if (input.maxStay !== undefined) restriction.maxStay = input.maxStay;
+    if (input.closedToArrival !== undefined) restriction.closedToArrival = input.closedToArrival;
+    if (input.closedToDeparture !== undefined) {
+      restriction.closedToDeparture = input.closedToDeparture;
+    }
+    if (Object.keys(restriction).length > 0) {
+      for (const d of nights) {
+        await tx.restriction.upsert({
+          where: { roomTypeId_date: { roomTypeId: roomId, date: toDbDate(d) } },
+          update: restriction,
+          create: {
+            roomTypeId: roomId,
+            date: toDbDate(d),
+            ...(restriction as Omit<Prisma.RestrictionCreateInput, "roomType" | "date">),
+          },
+        });
+      }
+      updated = Math.max(updated, nights.length);
+    }
     await invalidatePropertySearchCache(room.propertyId);
-    return { updated: updated.count, created: created.count, skippedLocked: locked };
+    return { updated, created: created.count, skippedLocked };
   });
 }
 
@@ -187,7 +316,9 @@ export async function listHostProperties(actor: AccessClaims) {
       basePrice: true,
       currency: true,
       ratingAvg: true,
-      rooms: { select: { id: true, name: true, capacity: true, available: true } },
+      rooms: {
+        select: { id: true, name: true, maxOccupancy: true, units: true, available: true },
+      },
     },
     orderBy: { createdAt: "desc" },
     take: 100,

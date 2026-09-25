@@ -75,9 +75,9 @@ export async function updateAvailabilityPrices(
   basePrice: number,
   currency: string
 ): Promise<PricingResult[]> {
-  const room = await prisma.room.findUnique({
+  const room = await prisma.roomType.findUnique({
     where: { id: roomId },
-    select: { propertyId: true },
+    select: { propertyId: true, units: true },
   });
   const propertyId = room?.propertyId ?? "";
 
@@ -97,10 +97,10 @@ export async function updateAvailabilityPrices(
   await prisma.$transaction(
     async (tx) => {
       for (const result of results) {
-        await tx.availability.upsert({
+        await tx.inventoryDay.upsert({
           where: {
-            roomId_date: {
-              roomId,
+            roomTypeId_date: {
+              roomTypeId: roomId,
               date: new Date(result.date),
             },
           },
@@ -108,10 +108,10 @@ export async function updateAvailabilityPrices(
             price: new Prisma.Decimal(result.price),
           },
           create: {
-            roomId,
+            roomTypeId: roomId,
             date: new Date(result.date),
             price: new Prisma.Decimal(result.price),
-            isAvailable: true,
+            total: room?.units ?? 1,
           },
         });
       }

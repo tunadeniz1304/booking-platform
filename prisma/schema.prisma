@@ -53,7 +53,13 @@ model Property {
   locationId           String
   location             Location                    @relation(fields: [locationId], references: [id])
   amenities            Amenity[]                   @relation("PropertyAmenities")
-  rooms                Room[]
+  /// Oda tipleri (v3 P0-2): satış birimi oda tipidir; `units` adet oda.
+  rooms                RoomType[]
+  /// IANA saat dilimi; gece, iade penceresi, iCal ve checkout sonrası tamamlama bu dilimde (ADR 0011).
+  timeZone             String                      @default("Europe/Istanbul")
+  /// Yerel giriş/çıkış saati (SS:DD).
+  checkInTime          String                      @default("15:00")
+  checkOutTime         String                      @default("11:00")
   bookings             Booking[]
   reviews              Review[]
   favorites            Favorite[]
@@ -139,37 +145,104 @@ model Amenity {
   properties Property[] @relation("PropertyAmenities")
 }
 
-model Room {
-  id             String         @id @default(cuid())
+/// Oda tipi (v3 P0-2, ADR 0010): "Standart Çift × 12". API'de `roomId` = oda tipi kimliği.
+model RoomType {
+  id             String          @id @default(cuid())
   propertyId     String
-  property       Property       @relation(fields: [propertyId], references: [id])
+  property       Property        @relation(fields: [propertyId], references: [id])
   name           String
   description    String?
-  capacity       Int
+  /// Bir odada kalabilecek azami kişi.
+  maxOccupancy   Int
+  /// Bu tipten kaç oda satılabilir (günlük `InventoryDay.total` varsayılanı).
+  units          Int             @default(1)
   bedType        String
-  priceModifier  Decimal        @default(0) @db.Decimal(10, 2)
-  available      Boolean        @default(true)
-  availabilities Availability[]
+  priceModifier  Decimal         @default(0) @db.Decimal(10, 2)
+  available      Boolean         @default(true)
+  inventory      InventoryDay[]
+  ratePlans      RatePlan[]
+  restrictions   Restriction[]
+  externalBlocks ExternalBlock[]
   bookings       Booking[]
 
   @@index([propertyId])
   @@index([available])
 }
 
-model Availability {
+/// Gecelik sayaçlı envanter: `sold + held <= total` (CHECK kısıtı migration'da).
+model InventoryDay {
   id               String   @id @default(cuid())
-  roomId           String
-  room             Room     @relation(fields: [roomId], references: [id])
+  roomTypeId       String
+  roomType         RoomType @relation(fields: [roomTypeId], references: [id])
   date             DateTime @db.Date
-  isAvailable      Boolean  @default(true)
+  total            Int
+  sold             Int      @default(0)
+  held             Int      @default(0)
   price            Decimal  @db.Decimal(10, 2)
-  lockedBy         String?
   /// "Bu fiyat neden?": taban, faktör-başı katkılar ve tavan/taban kırpması.
   priceExplanation Json?
 
-  @@unique([roomId, date])
+  @@unique([roomTypeId, date])
   @@index([date])
-  @@index([roomId, isAvailable, date])
+}
+
+enum MealPlan {
+  ROOM_ONLY
+  BREAKFAST
+  HALF_BOARD
+  FULL_BOARD
+}
+
+/// Fiyat planı: aynı oda tipinin farklı koşullarla satışı (kahvaltılı, iade edilemez…).
+model RatePlan {
+  id                   String              @id @default(cuid())
+  roomTypeId           String
+  roomType             RoomType            @relation(fields: [roomTypeId], references: [id])
+  code                 String
+  name                 String
+  mealPlan             MealPlan            @default(ROOM_ONLY)
+  refundable           Boolean             @default(true)
+  /// Planın kendi iptal politikası (yoksa mülkünki; iade edilemezse NON_REFUNDABLE).
+  cancellationPolicyId String?
+  cancellationPolicy   CancellationPolicy? @relation(fields: [cancellationPolicyId], references: [id])
+  /// Gece fiyatına baz puan farkı (−1000 = %10 indirim, +1200 = %12 fark).
+  priceModifierBps     Int                 @default(0)
+  isDefault            Boolean             @default(false)
+  active               Boolean             @default(true)
+  bookings             Booking[]
+  createdAt            DateTime            @default(now())
+
+  @@unique([roomTypeId, code])
+  @@index([roomTypeId, active])
+}
+
+/// Gece bazlı satış kısıtı (LOS / CTA / CTD / stop-sell).
+model Restriction {
+  id                String   @id @default(cuid())
+  roomTypeId        String
+  roomType          RoomType @relation(fields: [roomTypeId], references: [id])
+  date              DateTime @db.Date
+  minStay           Int?
+  maxStay           Int?
+  closedToArrival   Boolean  @default(false)
+  closedToDeparture Boolean  @default(false)
+  stopSell          Boolean  @default(false)
+
+  @@unique([roomTypeId, date])
+}
+
+/// Harici kanaldan (iCal) gelen dolu aralık: başka kanalda satılmış birimler (`sold`'a sayılır).
+model ExternalBlock {
+  id         String   @id @default(cuid())
+  roomTypeId String
+  roomType   RoomType @relation(fields: [roomTypeId], references: [id])
+  source     String
+  uid        String
+  date       DateTime @db.Date
+  createdAt  DateTime @default(now())
+
+  @@unique([roomTypeId, source, uid, date])
+  @@index([roomTypeId, source])
 }
 
 model Booking {
@@ -178,8 +251,13 @@ model Booking {
   user           User              @relation(fields: [userId], references: [id])
   propertyId     String
   property       Property          @relation(fields: [propertyId], references: [id])
+  /// Oda tipi kimliği (geriye uyum için alan adı `roomId`).
   roomId         String
-  room           Room              @relation(fields: [roomId], references: [id])
+  room           RoomType          @relation(fields: [roomId], references: [id])
+  ratePlanId     String?
+  ratePlan       RatePlan?         @relation(fields: [ratePlanId], references: [id])
+  /// Rezerve edilen oda adedi (sayaçlardan bu kadar düşülür).
+  units          Int               @default(1)
   checkIn        DateTime          @db.Date
   checkOut       DateTime          @db.Date
   guestCount     Int
@@ -300,6 +378,7 @@ model CancellationPolicy {
   rules      Json
   createdAt  DateTime               @default(now())
   properties Property[]
+  ratePlans  RatePlan[]
 
   @@unique([kind, version])
 }
@@ -474,7 +553,7 @@ model FraudCheck {
   @@index([bookingId])
 }
 
-/// Kanal (ARI) mesaj sırası: oda başına son uygulanan sıra numarası (P1-9).
+/// Kanal (ARI) mesaj sırası: oda tipi başına son uygulanan sıra numarası (P1-9).
 model ChannelSequence {
   roomId       String   @id
   lastSequence Int

@@ -5,10 +5,14 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth";
 import { ValidationError, toErrorResponse } from "@/lib/http/errors";
 import { httpsUrl } from "@/lib/security/url";
-import { licenseSchema, roomSchema } from "@/lib/host/host-service";
+import { DEFAULT_RATE_PLANS, licenseSchema, roomSchema } from "@/lib/host/host-service";
 import { CURRENCIES } from "@/lib/money/money";
-import { searchProperties, getPopularProperties } from "@/lib/search";
-import { logger, errorFields } from "@/lib/observability/logger";
+import {
+  SearchParamsSchema,
+  searchParamsFromUrl,
+  searchProperties,
+  getPopularProperties,
+} from "@/lib/search";
 import { appendOutbox } from "@/lib/cqrs";
 import { EventTypes, makeEvent, type PropertyCreatedPayload } from "@/lib/events/events";
 
@@ -49,28 +53,15 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    const page = Number(searchParams.get("page") ?? "1");
-    const pageSize = Number(searchParams.get("pageSize") ?? "12");
-    const response = await searchProperties({
-      query: searchParams.get("destination") ?? searchParams.get("query") ?? undefined,
-      checkIn: searchParams.get("checkIn") ?? undefined,
-      checkOut: searchParams.get("checkOut") ?? undefined,
-      guests: searchParams.get("guests") ? Number(searchParams.get("guests")) : undefined,
-      city: undefined,
-      country: undefined,
-      minPrice: searchParams.get("minPrice") ? Number(searchParams.get("minPrice")) : undefined,
-      maxPrice: searchParams.get("maxPrice") ? Number(searchParams.get("maxPrice")) : undefined,
-      propertyType: searchParams.get("propertyType") ?? undefined,
-      amenities: searchParams.get("amenities")?.split(",").filter(Boolean),
-      page: Number.isFinite(page) && page > 0 ? page : 1,
-      pageSize: Number.isFinite(pageSize) && pageSize > 0 ? Math.min(pageSize, 50) : 12,
-      sort: (searchParams.get("sort") ?? "recommended") as
-        "price_asc" | "price_desc" | "rating" | "recommended",
-    });
+    const response = await searchProperties(
+      SearchParamsSchema.parse({
+        ...searchParamsFromUrl(searchParams),
+        pageSize: searchParams.get("pageSize") ?? 12,
+      })
+    );
     return NextResponse.json(response);
   } catch (error) {
-    logger.error(errorFields(error), "Properties list error");
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return toErrorResponse(error, "properties.list");
   }
 }
 
@@ -145,7 +136,9 @@ export async function POST(req: NextRequest) {
           rooms: {
             create: rooms.map((room) => ({
               name: room.name,
-              capacity: room.capacity,
+              maxOccupancy: room.maxOccupancy,
+              units: room.units,
+              ratePlans: { create: DEFAULT_RATE_PLANS.map((p) => ({ ...p })) },
               bedType: room.bedType,
               priceModifier: new Prisma.Decimal(room.priceModifier),
             })),

@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
     const actor = await requireRole(req, ["HOST", "ADMIN"]);
     const { roomId, dates, basePrice } = pricingSchema.parse(await req.json());
 
-    const room = await prisma.room.findUnique({
+    const room = await prisma.roomType.findUnique({
       where: { id: roomId },
       select: { property: { select: { hostId: true, currency: true } } },
     });

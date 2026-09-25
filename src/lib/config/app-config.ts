@@ -32,8 +32,8 @@ const schema = z.object({
   MAX_STAY_NIGHTS: int(30, 1, 365),
   QUOTE_TTL_MINUTES: int(15, 1, 120),
   ACCOMMODATION_TAX_RATE: num(0.01, 0, 0.5),
-  /** Giriş saati (UTC); iptal/iade süreleri buna göre hesaplanır (12 UTC = 15:00 TR). */
-  CHECKIN_HOUR_UTC: int(12, 0, 23),
+  /** Geçmiş envanter günleri bu kadar gün sonra budanır (P0-11). */
+  INVENTORY_RETENTION_DAYS: int(400, 30, 3650),
 
   // Dinamik fiyat / olay sinyalleri
   PRICE_FLOOR_MULTIPLIER: num(0.6, 0.1, 1),

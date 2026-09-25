@@ -1,6 +1,10 @@
 # ADR 0006 — Availability partisyonlama opt-in
 
-- Durum: Kabul edildi
+- Durum: **Yerini aldı** — ADR 0010 (v3). `Availability` tablosu `InventoryDay` sayaçlı
+  envanteriyle değişti; Prisma şemasından sapmış olan `migrations/manual/` partisyon SQL'i ve
+  `npm run db:partitions` kaldırıldı. Veri büyümesi `INVENTORY_RETENTION_DAYS` budamasıyla
+  yönetilir (`pruneInventory`, P0-11). Aşağıdaki metin tarihsel kayıttır.
+- Önceki durum: Kabul edildi
 - Tarih: 2026-09-24
 
 ## Bağlam

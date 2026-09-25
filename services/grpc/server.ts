@@ -15,7 +15,7 @@ import * as grpc from "@grpc/grpc-js";
 import { redis } from "@/lib/redis";
 import { getConfig } from "@/lib/config/app-config";
 import { checkRateLimit, type RateLimitCategory } from "@/lib/security/rate-limit";
-import { computeTotal, SoldOutError } from "@/lib/pricing/quote";
+import { computeTotal, RestrictionError, SoldOutError } from "@/lib/pricing/quote";
 import { money, toDecimalString, assertCurrency } from "@/lib/money/money";
 import { prisma } from "@/lib/prisma";
 import { createBooking } from "@/lib/booking-service";
@@ -140,18 +140,18 @@ function parseRange(range?: DateRange): { start: Date; end: Date } {
 const handlers = {
   GetRoomAvailability: authed(async (req: RoomAvailabilityRequest) => {
     const { start, end } = parseRange(req.range);
-    const room = await prisma.room.findUnique({
+    const room = await prisma.roomType.findUnique({
       where: { id: req.room_id },
       select: {
         property: { select: { currency: true } },
-        availabilities: { where: { date: { gte: start, lt: end } }, orderBy: { date: "asc" } },
+        inventory: { where: { date: { gte: start, lt: end } }, orderBy: { date: "asc" } },
       },
     });
     if (!room) throw new GrpcAuthError(grpc.status.NOT_FOUND, "Oda bulunamadı");
-    const prices = room.availabilities.map((a) => ({
+    const prices = room.inventory.map((a) => ({
       date: a.date.toISOString().slice(0, 10),
       price: Number(a.price),
-      available: a.isAvailable,
+      available: a.sold + a.held < a.total,
     }));
     const currency = assertCurrency(room.property.currency);
     // v3#9: tahmini toplam = arama/PDP/checkout ile aynı computeTotal (oda farkı + vergiler).
@@ -165,16 +165,21 @@ const handlers = {
       });
       totalMinor = quote.total;
     } catch (error) {
-      if (!(error instanceof SoldOutError)) throw error;
+      if (!(error instanceof SoldOutError) && !(error instanceof RestrictionError)) throw error;
     }
     const available = totalMinor > 0;
+    // Aralık boyunca her gece boş kalan en az oda sayısı (sayaçlı envanter).
+    const minFree = room.inventory.reduce(
+      (m, a) => Math.min(m, a.total - a.sold - a.held),
+      Infinity
+    );
     return {
       available,
       prices,
       estimated_total: Number(toDecimalString(money(totalMinor, currency))),
       estimated_total_minor: totalMinor,
       currency,
-      available_rooms: available ? 1 : 0,
+      available_rooms: available && Number.isFinite(minFree) ? minFree : 0,
     };
   }),
 

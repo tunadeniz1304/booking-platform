@@ -31,8 +31,7 @@
     "docs:screenshots": "tsx scripts/screenshots.ts",
     "embeddings:backfill": "tsx scripts/backfill-embeddings.ts",
     "llm:smoke": "tsx --conditions=react-server scripts/llm-smoke.ts",
-    "availability:rollover": "tsx scripts/availability-rollover.ts",
-    "db:partitions": "tsx scripts/partitions.ts"
+    "availability:rollover": "tsx scripts/availability-rollover.ts"
   },
   "dependencies": {
     "@grpc/grpc-js": "^1.14.5",

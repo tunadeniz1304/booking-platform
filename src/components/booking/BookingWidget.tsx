@@ -6,10 +6,21 @@ import DateRangePicker, { toISODate } from "@/components/search/DateRangePicker"
 import QuoteBreakdown from "./QuoteBreakdown";
 import { useQuote } from "./useQuote";
 
+export interface BookingWidgetRatePlan {
+  id: string;
+  name: string;
+  mealPlan: string;
+  refundable: boolean;
+  priceModifierBps: number;
+  isDefault: boolean;
+}
+
 export interface BookingWidgetRoom {
   id: string;
   name: string;
   capacity: number;
+  /** Fiyat planları (iade edilebilir / edilemez, kahvaltılı…); yoksa sunucu varsayılanı. */
+  ratePlans?: BookingWidgetRatePlan[];
   bedType: string;
   priceModifier: number;
   available: boolean;
@@ -41,9 +52,14 @@ export default function BookingWidget({ propertyId, rooms }: BookingWidgetProps)
 
   const selectedRoom =
     availableRooms.find((room) => room.id === selectedRoomId) ?? availableRooms[0];
+  const plans = selectedRoom?.ratePlans ?? [];
+  const [selectedPlanId, setSelectedPlanId] = useState<string | undefined>(undefined);
+  const selectedPlan =
+    plans.find((p) => p.id === selectedPlanId) ?? plans.find((p) => p.isDefault) ?? plans[0];
 
   const { quote, loading, error } = useQuote({
     roomId: selectedRoom?.id,
+    ratePlanId: selectedPlan?.id,
     propertyId,
     checkIn,
     checkOut,
@@ -63,6 +79,7 @@ export default function BookingWidget({ propertyId, rooms }: BookingWidgetProps)
     const params = new URLSearchParams({
       propertyId,
       roomId: selectedRoom.id,
+      ...(selectedPlan ? { ratePlanId: selectedPlan.id } : {}),
       checkIn,
       checkOut,
       guestCount: String(guestCount),
@@ -142,6 +159,33 @@ export default function BookingWidget({ propertyId, rooms }: BookingWidgetProps)
           ))}
         </select>
       </div>
+
+      {plans.length > 1 && (
+        <fieldset className="mt-3">
+          <legend className="block text-sm font-medium text-gray-700">Fiyat seçeneği</legend>
+          <div className="mt-1 space-y-1">
+            {plans.map((plan) => (
+              <label key={plan.id} className="flex items-start gap-2 text-sm text-gray-800">
+                <input
+                  type="radio"
+                  name="rate-plan"
+                  value={plan.id}
+                  checked={selectedPlan?.id === plan.id}
+                  onChange={() => setSelectedPlanId(plan.id)}
+                  className="mt-1"
+                />
+                <span>
+                  {plan.name}
+                  <span className="block text-xs text-gray-600">
+                    {plan.refundable ? "İptal politikasına göre iade" : "İade edilemez"}
+                    {plan.mealPlan === "BREAKFAST" ? " · Kahvaltı dahil" : ""}
+                  </span>
+                </span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      )}
 
       <div className="mt-5 border-t border-gray-200 pt-4" aria-live="polite">
         {loading && <p className="text-sm text-gray-500">Fiyat hesaplanıyor…</p>}

@@ -1,0 +1,323 @@
+{
+  "description": "P1-1 altın küme: 40 ilan, 30 notlu sorgu (0-3). nDCG@10 ile v2 (alt-dize / v2 semantik) ve hibrit RRF karşılaştırılır.",
+  "docs": [
+    {
+      "key": "d01",
+      "city": "Bodrum",
+      "type": "HOTEL",
+      "title": "Sahile sıfır butik otel",
+      "description": "Özel plaj, deniz manzaralı odalar ve kahvaltı dahil."
+    },
+    {
+      "key": "d02",
+      "city": "Bodrum",
+      "type": "VILLA",
+      "title": "Havuzlu aile villası",
+      "description": "Çocuklar için sığ havuz, geniş bahçe, denize 2 km."
+    },
+    {
+      "key": "d03",
+      "city": "Kaş",
+      "type": "VILLA",
+      "title": "Koy manzaralı taş ev",
+      "description": "Akdeniz kıyısında sakin, romantik bir kaçamak."
+    },
+    {
+      "key": "d04",
+      "city": "Kaş",
+      "type": "HOTEL",
+      "title": "Dalış merkezi yanında pansiyon",
+      "description": "Ekonomik odalar, tekne turları."
+    },
+    {
+      "key": "d05",
+      "city": "Uludağ",
+      "type": "HOTEL",
+      "title": "Kayak pistine sıfır dağ oteli",
+      "description": "Şömineli lobi, sauna ve kayak kiralama."
+    },
+    {
+      "key": "d06",
+      "city": "Uludağ",
+      "type": "VILLA",
+      "title": "Şömineli dağ evi",
+      "description": "Karlı zirve manzarası, ahşap iç mekan."
+    },
+    {
+      "key": "d07",
+      "city": "Kapadokya",
+      "type": "HOTEL",
+      "title": "Mağara otel",
+      "description": "Kayaya oyulmuş odalar, balon turu manzarası."
+    },
+    {
+      "key": "d08",
+      "city": "Kapadokya",
+      "type": "HOTEL",
+      "title": "Balon manzaralı teras suit",
+      "description": "Gün doğumunda sıcak hava balonları terastan izlenir."
+    },
+    {
+      "key": "d09",
+      "city": "Beyoğlu",
+      "type": "APARTMENT",
+      "title": "Şehir merkezinde modern daire",
+      "description": "Metroya yürüme mesafesi, hızlı internet."
+    },
+    {
+      "key": "d10",
+      "city": "Beyoğlu",
+      "type": "HOTEL",
+      "title": "Tarihi yarımada butik otel",
+      "description": "Antik surlara yakın, restore edilmiş konak."
+    },
+    {
+      "key": "d11",
+      "city": "Sapanca",
+      "type": "VILLA",
+      "title": "Göl kenarı bungalov",
+      "description": "Orman içinde huzurlu, evcil hayvan kabul edilir."
+    },
+    {
+      "key": "d12",
+      "city": "Abant",
+      "type": "VILLA",
+      "title": "Göl manzaralı ahşap kulübe",
+      "description": "Doğa yürüyüşü, şömine, sessiz ortam."
+    },
+    {
+      "key": "d13",
+      "city": "Alaçatı",
+      "type": "HOTEL",
+      "title": "Rüzgar sörfü okuluna yakın otel",
+      "description": "Sörf ekipmanı kiralama, plaja 300 metre."
+    },
+    {
+      "key": "d14",
+      "city": "Alaçatı",
+      "type": "HOTEL",
+      "title": "Taş ev pansiyon",
+      "description": "Bahçede ev yapımı kahvaltı, dar sokaklar."
+    },
+    {
+      "key": "d15",
+      "city": "Ankara",
+      "type": "HOTEL",
+      "title": "İş merkezi yakınında otel",
+      "description": "Toplantı salonu, ücretsiz otopark, wifi."
+    },
+    {
+      "key": "d16",
+      "city": "Ankara",
+      "type": "APARTMENT",
+      "title": "Uygun fiyatlı stüdyo daire",
+      "description": "Kısa konaklama için ekonomik seçenek."
+    },
+    {
+      "key": "d17",
+      "city": "Antalya",
+      "type": "HOTEL",
+      "title": "Her şey dahil lüks resort",
+      "description": "Spa merkezi, hamam, özel kumsal."
+    },
+    {
+      "key": "d18",
+      "city": "Antalya",
+      "type": "HOTEL",
+      "title": "Kaleiçi tarihi konak",
+      "description": "Eski şehir surları içinde, avlulu."
+    },
+    {
+      "key": "d19",
+      "city": "Fethiye",
+      "type": "HOTEL",
+      "title": "Ölüdeniz yamaç paraşütü oteli",
+      "description": "Mavi lagün manzarası, havuz."
+    },
+    {
+      "key": "d20",
+      "city": "Fethiye",
+      "type": "VILLA",
+      "title": "Kelebekler vadisi kamp evi",
+      "description": "Doğayla iç içe, basit ve ucuz."
+    },
+    {
+      "key": "d21",
+      "city": "Trabzon",
+      "type": "VILLA",
+      "title": "Uzungöl yayla evi",
+      "description": "Sisli yayla, ahşap dağ evi, göl manzarası."
+    },
+    {
+      "key": "d22",
+      "city": "Rize",
+      "type": "HOTEL",
+      "title": "Çay bahçesi içinde pansiyon",
+      "description": "Yeşil tepeler, sakin köy hayatı."
+    },
+    {
+      "key": "d23",
+      "city": "İzmir",
+      "type": "APARTMENT",
+      "title": "Kordon'da deniz manzaralı daire",
+      "description": "Gün batımı, balkon, merkezi konum."
+    },
+    {
+      "key": "d24",
+      "city": "İzmir",
+      "type": "HOTEL",
+      "title": "Havalimanı yakını ekonomik otel",
+      "description": "Ücretsiz servis, 7/24 resepsiyon."
+    },
+    {
+      "key": "d25",
+      "city": "Pamukkale",
+      "type": "HOTEL",
+      "title": "Termal havuzlu spa otel",
+      "description": "Traverten manzarası, kaplıca ve masaj."
+    },
+    {
+      "key": "d26",
+      "city": "Kartepe",
+      "type": "VILLA",
+      "title": "Kayak merkezi yakınında dağ evi",
+      "description": "Kar tatili için şömineli, 6 kişilik."
+    },
+    {
+      "key": "d27",
+      "city": "Kaş",
+      "type": "APARTMENT",
+      "title": "Evcil hayvan dostu apart",
+      "description": "Köpekler için bahçe, denize yürüme mesafesi."
+    },
+    {
+      "key": "d28",
+      "city": "Bodrum",
+      "type": "APARTMENT",
+      "title": "Yalıkavak marina lüks rezidans",
+      "description": "Premium hizmet, sonsuzluk havuzu, yat limanı manzarası."
+    },
+    {
+      "key": "d29",
+      "city": "Kapadokya",
+      "type": "HOTEL",
+      "title": "Aile odalı taş otel",
+      "description": "Çocuklara ücretsiz kahvaltı, geniş odalar."
+    },
+    {
+      "key": "d30",
+      "city": "Beyoğlu",
+      "type": "HOTEL",
+      "title": "Balayı için romantik suit",
+      "description": "Boğaz manzaralı jakuzi, şampanya ikramı."
+    },
+    {
+      "key": "d31",
+      "city": "Datça",
+      "type": "VILLA",
+      "title": "Sessiz koyda glamping",
+      "description": "Çadır konaklama, yıldız gözlemi, doğa."
+    },
+    {
+      "key": "d32",
+      "city": "Bozcaada",
+      "type": "VILLA",
+      "title": "Bağ evi",
+      "description": "Üzüm bağları arasında, bisiklet turu."
+    },
+    {
+      "key": "d33",
+      "city": "Safranbolu",
+      "type": "HOTEL",
+      "title": "Osmanlı konağı otel",
+      "description": "Tarihi çarşıya yürüme mesafesi, geleneksel mimari."
+    },
+    {
+      "key": "d34",
+      "city": "Erciyes",
+      "type": "HOTEL",
+      "title": "Ski-in ski-out otel",
+      "description": "Pist başında, kayak okulu ve ekipman."
+    },
+    {
+      "key": "d35",
+      "city": "Ayvalık",
+      "type": "VILLA",
+      "title": "Zeytinlik içinde taş ev",
+      "description": "Cunda adasına yakın, sahil yolu."
+    },
+    {
+      "key": "d36",
+      "city": "Marmaris",
+      "type": "HOTEL",
+      "title": "Aile dostu tatil köyü",
+      "description": "Aquapark, çocuk kulübü, plaj."
+    },
+    {
+      "key": "d37",
+      "city": "Ankara",
+      "type": "APARTMENT",
+      "title": "Kızılay merkezi apart",
+      "description": "Bakanlıklara yakın, iş seyahati için ideal."
+    },
+    {
+      "key": "d38",
+      "city": "Göcek",
+      "type": "HOTEL",
+      "title": "Tekne turu çıkışlı butik otel",
+      "description": "Koylar, marina, deniz kenarı."
+    },
+    {
+      "key": "d39",
+      "city": "Bursa",
+      "type": "HOTEL",
+      "title": "Kaplıca otel",
+      "description": "Termal su, hamam, şehir merkezi."
+    },
+    {
+      "key": "d40",
+      "city": "Artvin",
+      "type": "HOTEL",
+      "title": "Kaçkar trekking pansiyonu",
+      "description": "Dağ yürüyüşü rotaları, yayla, doğa."
+    }
+  ],
+  "queries": [
+    {
+      "q": "plaja yakın otel",
+      "grades": { "d01": 3, "d13": 2, "d17": 2, "d36": 2, "d38": 1, "d19": 1, "d35": 1 }
+    },
+    { "q": "beach hotel", "grades": { "d01": 3, "d17": 3, "d36": 2, "d13": 2, "d38": 2 } },
+    { "q": "şömineli dağ evi", "grades": { "d06": 3, "d26": 3, "d12": 2, "d05": 2, "d21": 1 } },
+    { "q": "kayak oteli", "grades": { "d05": 3, "d34": 3, "d26": 2, "d06": 1 } },
+    { "q": "ski resort", "grades": { "d34": 3, "d05": 3, "d26": 2 } },
+    { "q": "havuzlu villa", "grades": { "d02": 3, "d28": 1, "d19": 1, "d25": 1 } },
+    { "q": "pool", "grades": { "d02": 3, "d28": 2, "d19": 2, "d25": 2, "d36": 1 } },
+    { "q": "deniz manzaralı daire", "grades": { "d23": 3, "d28": 2, "d01": 1, "d03": 1 } },
+    { "q": "evcil hayvan kabul eden", "grades": { "d27": 3, "d11": 3 } },
+    { "q": "pet friendly", "grades": { "d27": 3, "d11": 3 } },
+    { "q": "romantik balayı", "grades": { "d30": 3, "d03": 2 } },
+    { "q": "honeymoon suite", "grades": { "d30": 3, "d08": 1 } },
+    { "q": "aile tatili çocuk", "grades": { "d36": 3, "d29": 3, "d02": 3 } },
+    { "q": "family hotel kids", "grades": { "d36": 3, "d29": 3, "d02": 2 } },
+    { "q": "göl manzarası", "grades": { "d12": 3, "d21": 3, "d11": 2 } },
+    { "q": "lake cabin", "grades": { "d12": 3, "d11": 2, "d21": 2 } },
+    { "q": "tarihi konak", "grades": { "d18": 3, "d33": 3, "d10": 3 } },
+    { "q": "historic hotel", "grades": { "d10": 3, "d33": 3, "d18": 2, "d07": 1 } },
+    { "q": "spa hamam", "grades": { "d17": 3, "d25": 3, "d39": 3, "d05": 1 } },
+    { "q": "wellness sauna", "grades": { "d05": 2, "d25": 2, "d17": 2, "d39": 2 } },
+    { "q": "ekonomik daire", "grades": { "d16": 3, "d09": 1, "d37": 1 } },
+    { "q": "cheap apartment", "grades": { "d16": 3, "d09": 1, "d37": 1, "d24": 1 } },
+    { "q": "iş toplantısı otopark", "grades": { "d15": 3, "d37": 2 } },
+    { "q": "business trip", "grades": { "d15": 3, "d37": 3 } },
+    { "q": "balon turu kapadokya", "grades": { "d08": 3, "d07": 3, "d29": 1 } },
+    { "q": "mağara otel", "grades": { "d07": 3, "d08": 1 } },
+    { "q": "Bodrm", "grades": { "d01": 3, "d02": 3, "d28": 3 } },
+    { "q": "Kapadokia", "grades": { "d07": 3, "d08": 3, "d29": 3 } },
+    {
+      "q": "sakin doğa kaçamağı",
+      "grades": { "d31": 3, "d11": 2, "d12": 2, "d22": 2, "d20": 2, "d03": 2 }
+    },
+    { "q": "merkezi konumda daire", "grades": { "d09": 3, "d23": 2, "d37": 2 } }
+  ]
+}

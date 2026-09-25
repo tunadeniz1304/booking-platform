@@ -7,6 +7,8 @@ const alias = {
   "server-only": path.resolve(import.meta.dirname, "node_modules/server-only/empty.js"),
 };
 
+const singleProject = process.argv.includes("--project");
+
 /**
  * İki test projesi (P0-10):
  * - `unit`: altyapısız (DB/Redis gerektirmez), `tests/unit/**`.
@@ -23,11 +25,14 @@ export default defineConfig({
       provider: "v8",
       reporter: ["text-summary", "html", "json-summary"],
       reportsDirectory: "coverage",
-      include: ["src/lib/**/*.ts"],
-      exclude: ["**/*.d.ts", "**/*.test.ts"],
-      // booking.md §5: unit + integration birlikte (`npm run test:coverage`) en az %80 satır.
-      // Yalnız unit koşusu DB/Redis yollarını içermez → eşik birleşik koşu içindir.
-      thresholds: { lines: 80 },
+      // v3: kapsam route handler'ları, gRPC/MCP servislerini ve worker'ı da içerir.
+      include: ["src/lib/**/*.ts", "src/app/api/**/*.ts", "services/**/*.ts", "src/worker/**/*.ts"],
+      // Süreç giriş noktaları (yalnızca sunucuyu başlatır) ve tip dosyaları hariç.
+      exclude: ["**/*.d.ts", "**/*.test.ts", "services/*/main.ts", "src/worker/index.ts"],
+      // Eşik birleşik koşu içindir (`npm run test:coverage` = unit + integration);
+      // tek projeli koşu (`--project unit`) DB/Redis yollarını içermediğinden orada
+      // kapsam raporlanır ama eşik zorlanmaz.
+      thresholds: singleProject ? undefined : { lines: 80, branches: 70 },
     },
     projects: [
       {

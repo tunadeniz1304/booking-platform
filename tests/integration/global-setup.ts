@@ -5,7 +5,8 @@
  *
  * Testler ASLA geliştiricinin `DATABASE_URL`'ine yazmaz; bağlantı adresleri
  * `provide()` ile test işçilerine aktarılır. Docker yoksa suite açık bir
- * mesajla atlanır (`INTEGRATION_SKIP_REASON`).
+ * mesajla atlanır (`INTEGRATION_SKIP_REASON`) — yalnızca yerelde; `CI` ortamında
+ * suite başarısız olur.
  */
 import { execFileSync } from "child_process";
 import path from "path";
@@ -34,6 +35,9 @@ export default async function setup(project: TestProject): Promise<() => Promise
         .withDatabase("booking_test")
         .withUsername("booking")
         .withPassword("booking")
+        // Her test dosyası kendi PrismaClient havuzunu açar; varsayılan 100 bağlantı
+        // uzun koşularda tükenip "Can't reach database server" hatasına yol açıyordu.
+        .withCommand(["postgres", "-c", "max_connections=500"])
         .start(),
       new RedisContainer("redis:7-alpine").start(),
     ]);
@@ -52,6 +56,10 @@ export default async function setup(project: TestProject): Promise<() => Promise
     project.provide("integrationSkipReason", "");
   } catch (error) {
     const reason = `Docker/testcontainers kullanılamıyor: ${(error as Error).message.split("\n")[0]}`;
+    // CI'da sessiz atlama yok: entegrasyon testleri koşmadıysa kapı kırmızıdır.
+    if (process.env.CI && !process.env.INTEGRATION_ALLOW_SKIP) {
+      throw new Error(`[integration] CI ortamında Docker zorunlu — ${reason}`);
+    }
     console.warn(`[integration] SKIPPED — ${reason}`);
     project.provide("integrationDatabaseUrl", "");
     project.provide("integrationRedisUrl", "");

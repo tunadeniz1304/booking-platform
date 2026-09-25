@@ -26,36 +26,39 @@ export default function QuoteBreakdown({ quote }: { quote: QuoteView }) {
   const n = quote.nights.length;
   const uniform = quote.nights.every((x) => x.amount === quote.nights[0].amount);
   return (
-    <dl className="space-y-2 text-sm">
-      <div className="flex justify-between text-gray-600">
-        <dt>
-          {uniform
-            ? t("nightsUniform", { price: fmt(quote.nights[0].amount, quote.currency), count: n })
-            : t("nightsVariable", { count: n })}
-        </dt>
-        <dd>{fmt(quote.subtotal, quote.currency)}</dd>
-      </div>
-      {quote.fees.map((f) => (
-        <div key={f.code} className="flex justify-between text-gray-600">
-          <dt>{f.label}</dt>
-          <dd>{fmt(f.amount, quote.currency)}</dd>
+    <div className="space-y-2 text-sm">
+      <dl className="space-y-2">
+        <div className="flex justify-between text-gray-600">
+          <dt>
+            {uniform
+              ? t("nightsUniform", { price: fmt(quote.nights[0].amount, quote.currency), count: n })
+              : t("nightsVariable", { count: n })}
+          </dt>
+          <dd>{fmt(quote.subtotal, quote.currency)}</dd>
         </div>
-      ))}
-      {quote.taxes
-        .filter((x) => !x.inclusive)
-        .map((x) => (
-          <div key={x.code} className="flex justify-between text-gray-600">
-            <dt>
-              {x.label}
-              {rate(x.rateBps)}
-            </dt>
-            <dd>{fmt(x.amount, quote.currency)}</dd>
+        {quote.fees.map((f) => (
+          <div key={f.code} className="flex justify-between text-gray-600">
+            <dt>{f.label}</dt>
+            <dd>{fmt(f.amount, quote.currency)}</dd>
           </div>
         ))}
-      <div className="flex justify-between border-t border-gray-200 pt-2 text-base font-semibold text-gray-900">
-        <dt>{t("total")}</dt>
-        <dd data-testid="quote-total">{fmt(quote.total, quote.currency)}</dd>
-      </div>
+        {quote.taxes
+          .filter((x) => !x.inclusive)
+          .map((x) => (
+            <div key={x.code} className="flex justify-between text-gray-600">
+              <dt>
+                {x.label}
+                {rate(x.rateBps)}
+              </dt>
+              <dd>{fmt(x.amount, quote.currency)}</dd>
+            </div>
+          ))}
+        <div className="flex justify-between border-t border-gray-200 pt-2 text-base font-semibold text-gray-900">
+          <dt>{t("total")}</dt>
+          <dd data-testid="quote-total">{fmt(quote.total, quote.currency)}</dd>
+        </div>
+      </dl>
+      {/* <dl> yalnızca dt/dd grupları içerebilir (axe definition-list); notlar listenin dışında. */}
       {/* Dahil vergiler toplamı değiştirmez; yalnızca bilgi amaçlı (fiyatın içindedir). */}
       {quote.taxes
         .filter((x) => x.inclusive)
@@ -73,6 +76,6 @@ export default function QuoteBreakdown({ quote }: { quote: QuoteView }) {
           {t("approx", { amount: approx, currency: quote.currency })}
         </p>
       )}
-    </dl>
+    </div>
   );
 }

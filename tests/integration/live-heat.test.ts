@@ -28,6 +28,7 @@ describeInt("canlı ısı haritası + fiyat servisi (integration)", () => {
     });
     const property = await prisma.property.create({
       data: {
+        licenseStatus: "VERIFIED",
         hostId: host.id,
         title: "Live test",
         description: "live",

@@ -174,7 +174,7 @@ export async function invalidatePropertySearchCache(propertyId: string): Promise
 // --- 1) Katalog adayları -------------------------------------------------------------
 
 function structuralWhere(params: SearchParams, ids?: string[]): Prisma.PropertyWhereInput {
-  const and: Prisma.PropertyWhereInput[] = [{ isActive: true }];
+  const and: Prisma.PropertyWhereInput[] = [{ isActive: true, licenseStatus: "VERIFIED" }];
   if (ids) and.push({ id: { in: ids } });
   if (params.query && !ids) {
     and.push({
@@ -584,7 +584,7 @@ export async function getPopularProperties(limit = 10): Promise<SearchResult[]> 
     logger.error(errorFields(error), "Popular cache read failed");
   }
   const properties = await prisma.property.findMany({
-    where: { isActive: true },
+    where: { isActive: true, licenseStatus: "VERIFIED" },
     orderBy: [{ ratingAvg: "desc" }, { ratingCount: "desc" }, { id: "asc" }],
     take: limit,
     select: {

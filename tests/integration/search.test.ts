@@ -48,6 +48,7 @@ describeInt("arama (integration)", () => {
     });
     const property = await prisma.property.create({
       data: {
+        licenseStatus: "VERIFIED",
         hostId: userId,
         title: opts.title,
         description: opts.description,

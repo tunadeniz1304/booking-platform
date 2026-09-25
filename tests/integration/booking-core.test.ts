@@ -29,6 +29,7 @@ describeInt("rezervasyon çekirdeği (integration)", () => {
     });
     const property = await prisma.property.create({
       data: {
+        licenseStatus: "VERIFIED",
         hostId,
         title: `Core ${currency}`,
         description: "core test",

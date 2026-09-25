@@ -32,6 +32,7 @@ describeInt("P1-6 trip-planner (integration, demo)", () => {
       });
       const p = await prisma.property.create({
         data: {
+          licenseStatus: "VERIFIED",
           hostId: host.id,
           title: `${c.city} Konak`,
           description: "gezi",

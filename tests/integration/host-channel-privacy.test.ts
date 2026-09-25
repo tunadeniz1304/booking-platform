@@ -41,6 +41,7 @@ describeInt("F7 host / kanal / KVKK (integration)", () => {
     });
     const p = await prisma.property.create({
       data: {
+        licenseStatus: "VERIFIED",
         hostId: host.id,
         title: "Host",
         description: "host test",

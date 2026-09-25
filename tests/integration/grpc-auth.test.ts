@@ -51,6 +51,7 @@ describeInt("regression: #1 gRPC auth (integration)", () => {
     });
     const property = await prisma.property.create({
       data: {
+        licenseStatus: "VERIFIED",
         hostId: owner.id,
         title: "gRPC Oteli",
         description: "grpc test",

@@ -27,6 +27,7 @@ describeInt("P1-4 doğrulanmış yorumlar + atıflı özet (integration)", () =>
     });
     const property = await prisma.property.create({
       data: {
+        licenseStatus: "VERIFIED",
         hostId: host.id,
         title: "Yorum Oteli",
         description: "t",

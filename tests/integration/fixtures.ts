@@ -58,6 +58,7 @@ export async function createStayFixture(
   const price = new Prisma.Decimal(opts.nightlyPrice ?? 1000);
   const property = await prisma.property.create({
     data: {
+      licenseStatus: "VERIFIED",
       hostId: host.id,
       title: `Otel ${stamp}`,
       description: "entegrasyon testi",

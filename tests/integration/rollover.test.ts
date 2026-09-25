@@ -15,6 +15,7 @@ describeInt("P0-9 availability rollover (integration)", () => {
     });
     const property = await prisma.property.create({
       data: {
+        licenseStatus: "VERIFIED",
         hostId: host.id,
         title: "Roll",
         description: "roll",

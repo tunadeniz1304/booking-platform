@@ -14,6 +14,7 @@ import {
   getPopularProperties,
 } from "@/lib/search";
 import { appendOutbox } from "@/lib/cqrs";
+import { verifyLicense } from "@/lib/compliance/license-registry";
 import { EventTypes, makeEvent, type PropertyCreatedPayload } from "@/lib/events/events";
 
 /**
@@ -101,6 +102,9 @@ export async function POST(req: NextRequest) {
       throw new ValidationError("İptal politikası bulunamadı");
     }
 
+    // P1-10: kayıt no ülkeye göre (TR Bakanlık / AB STR) doğrulanır; yalnızca VERIFIED yayınlanır.
+    const license = licenseNumber ? await verifyLicense(licenseNumber, country) : null;
+
     const property = await prisma.$transaction(async (tx) => {
       const location = await tx.location.upsert({
         where: { city_country: { city, country } },
@@ -127,9 +131,11 @@ export async function POST(req: NextRequest) {
           locationId: location.id,
           basePrice: new Prisma.Decimal(basePrice),
           currency,
-          // Belge numarası yoksa ilan yayınlanmaz (7464 / 2634).
-          isActive: Boolean(licenseNumber),
+          // Belge numarası yoksa veya kayıtta doğrulanmadıysa ilan yayınlanmaz (7464 / 7565, v3#25).
+          isActive: license?.status === "VERIFIED",
           licenseNumber,
+          licenseStatus: license?.status ?? "PENDING",
+          licenseCheckedAt: license ? new Date() : null,
           cancellationPolicyId: cancellationPolicyId ?? null,
           images,
           amenities: { connect: amenityRecords.map((a) => ({ id: a.id })) },
@@ -151,6 +157,7 @@ export async function POST(req: NextRequest) {
           basePrice: true,
           currency: true,
           isActive: true,
+          licenseStatus: true,
           location: { select: { city: true, country: true } },
         },
       });

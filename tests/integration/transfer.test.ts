@@ -76,6 +76,7 @@ describeInt("regression: #3 P2P devir (integration)", () => {
     });
     const property = await prisma.property.create({
       data: {
+        licenseStatus: "VERIFIED",
         hostId: seller,
         title: "Devir Oteli",
         description: "t",

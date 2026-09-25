@@ -77,6 +77,7 @@ describeInt("booking-concurrency (integration)", () => {
     });
     testProperty = await prisma.property.create({
       data: {
+        licenseStatus: "VERIFIED",
         hostId: testHost.id,
         title: `Concurrency Test ${Date.now()}`,
         description: "Concurrency test property used by vitest.",

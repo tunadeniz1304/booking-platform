@@ -29,6 +29,7 @@ describeInt("pricing-engine (integration)", () => {
     });
     const property = await prisma.property.create({
       data: {
+        licenseStatus: "VERIFIED",
         hostId: (
           await prisma.user.create({
             data: {

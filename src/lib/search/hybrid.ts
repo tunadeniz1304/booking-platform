@@ -89,7 +89,7 @@ export async function hybridSearch(
   const limit = cfg.SEARCH_HYBRID_CANDIDATES;
   const phrase = text.toLocaleLowerCase("tr-TR");
 
-  const where: Prisma.Sql[] = [Prisma.sql`p."isActive" = true`];
+  const where: Prisma.Sql[] = [Prisma.sql`p."isActive" = true AND p."licenseStatus" = 'VERIFIED'`];
   if (filters.city) where.push(Prisma.sql`lower(l.city) = lower(${filters.city})`);
   if (filters.country) where.push(Prisma.sql`lower(l.country) = lower(${filters.country})`);
   if (filters.propertyType) {

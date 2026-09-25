@@ -28,6 +28,7 @@ describeInt("regression: #13 olay sinyalleri (integration)", () => {
     });
     const property = await prisma.property.create({
       data: {
+        licenseStatus: "VERIFIED",
         hostId: host.id,
         title: "Olay Oteli",
         description: "e",

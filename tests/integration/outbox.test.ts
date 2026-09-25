@@ -58,6 +58,7 @@ describeInt("outbox (integration)", () => {
     });
     property = await prisma.property.create({
       data: {
+        licenseStatus: "VERIFIED",
         hostId: host.id,
         title: "Outbox Test Oteli",
         description: "outbox test",

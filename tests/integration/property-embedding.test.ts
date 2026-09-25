@@ -18,6 +18,7 @@ describeInt("regression: #22 yeni mülk embedding'i (integration)", () => {
     });
     const property = await prisma.property.create({
       data: {
+        licenseStatus: "VERIFIED",
         hostId: host.id,
         title: "Deniz manzaralı butik otel",
         description: "Kahvaltı dahil, havuzlu",

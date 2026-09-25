@@ -33,7 +33,8 @@
     "ltr:clicks": "tsx scripts/ltr/generate-clicks.ts",
     "ltr:train": "python scripts/ltr/train.py",
     "llm:smoke": "tsx --conditions=react-server scripts/llm-smoke.ts",
-    "availability:rollover": "tsx scripts/availability-rollover.ts"
+    "availability:rollover": "tsx scripts/availability-rollover.ts",
+    "sdep:export": "tsx scripts/sdep-export.ts"
   },
   "dependencies": {
     "@grpc/grpc-js": "^1.14.5",

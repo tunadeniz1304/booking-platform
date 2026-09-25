@@ -85,6 +85,7 @@ describeInt("altın küme: hibrit RRF vs v2 (integration)", () => {
       });
       const property = await prisma.property.create({
         data: {
+          licenseStatus: "VERIFIED",
           hostId: host.id,
           title: doc.title,
           description: doc.description,

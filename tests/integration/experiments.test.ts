@@ -37,6 +37,7 @@ describeInt("deney maruziyeti ve sonuçları (integration)", () => {
     });
     const property = await prisma.property.create({
       data: {
+        licenseStatus: "VERIFIED",
         hostId: users[0],
         title: "Deney oteli",
         description: "A/B",

@@ -54,6 +54,7 @@ describeInt("ödeme, iptal, iade ve bildirim (integration)", () => {
     });
     const property = await prisma.property.create({
       data: {
+        licenseStatus: "VERIFIED",
         hostId: user.id,
         title: "Ödeme Oteli",
         description: "payment test",

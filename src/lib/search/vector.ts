@@ -46,7 +46,7 @@ export async function findSemanticCandidates(
     SELECT id,
            1 - (embedding <=> ${literal}::vector) AS similarity
     FROM "Property"
-    WHERE "isActive" = true AND embedding IS NOT NULL
+    WHERE "isActive" = true AND "licenseStatus" = 'VERIFIED' AND embedding IS NOT NULL
     ORDER BY embedding <=> ${literal}::vector
     LIMIT ${limit}
   `;

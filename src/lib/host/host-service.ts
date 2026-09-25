@@ -12,23 +12,30 @@ import {
   addDays,
 } from "@/lib/time/nights";
 import type { AccessClaims } from "@/lib/auth";
+import { LICENSE_RE, isLicenseFormatValid, verifyLicense } from "@/lib/compliance/license-registry";
 
 /**
  * Host extranet (P1-7). Tüm işlemler sahiplik kontrollüdür: HOST yalnızca kendi
  * mülklerini görür/düzenler (başkasınınki 404 — varlık sızdırılmaz), ADMIN hepsini.
  */
 
-/** Turizm İşletme Belgesi / 7464 izin no: il plaka kodu + sıra (+ opsiyonel yıl). */
-export const LICENSE_RE = /^(0[1-9]|[1-7]\d|8[01])-\d{3,6}(-\d{4})?$/;
+export { LICENSE_RE };
+/** TR belge no (ör. 34-12345) veya AB STR kayıt no (ör. FR-75056ABC123); varlığı kayıtta ayrıca doğrulanır. */
 export const licenseSchema = z
   .string()
   .trim()
-  .regex(LICENSE_RE, "Geçersiz belge numarası (ör. 34-12345)");
+  .refine(isLicenseFormatValid, "Geçersiz belge/kayıt numarası (ör. 34-12345 veya FR-75056ABC123)");
 
 export async function assertPropertyAccess(actor: AccessClaims, propertyId: string) {
   const property = await prisma.property.findUnique({
     where: { id: propertyId },
-    select: { id: true, hostId: true, licenseNumber: true },
+    select: {
+      id: true,
+      hostId: true,
+      licenseNumber: true,
+      licenseStatus: true,
+      location: { select: { country: true } },
+    },
   });
   if (!property || (actor.role !== "ADMIN" && property.hostId !== actor.userId)) {
     throw new NotFoundError("Mülk bulunamadı");
@@ -68,6 +75,22 @@ export async function updateProperty(
   if (patch.isActive && !license) {
     throw new ValidationError("Belge numarası olmadan ilan yayınlanamaz");
   }
+  // P1-10: numara değiştiyse kayıtta yeniden doğrulanır; değişmez: yayında ⇒ VERIFIED (v3#25).
+  let licenseStatus = property.licenseStatus;
+  let licenseData: {
+    licenseStatus?: typeof licenseStatus;
+    licenseCheckedAt?: Date;
+    isActive?: boolean;
+  } = {};
+  if (patch.licenseNumber !== undefined && patch.licenseNumber !== property.licenseNumber) {
+    const result = await verifyLicense(patch.licenseNumber, property.location.country);
+    licenseStatus = result.status;
+    licenseData = { licenseStatus, licenseCheckedAt: new Date() };
+  }
+  if (patch.isActive && licenseStatus !== "VERIFIED") {
+    throw new ValidationError("Doğrulanmamış belge/kayıt numarasıyla ilan yayınlanamaz");
+  }
+  if (licenseStatus === "REJECTED") licenseData = { ...licenseData, isActive: false };
   // v3#8: var olmayan politika kimliği FK hatasıyla 500 değil, 400 döner.
   if (
     patch.cancellationPolicyId &&
@@ -82,9 +105,17 @@ export async function updateProperty(
     where: { id: propertyId },
     data: {
       ...patch,
+      ...licenseData,
       basePrice: patch.basePrice !== undefined ? new Prisma.Decimal(patch.basePrice) : undefined,
     },
-    select: { id: true, title: true, isActive: true, licenseNumber: true, basePrice: true },
+    select: {
+      id: true,
+      title: true,
+      isActive: true,
+      licenseNumber: true,
+      licenseStatus: true,
+      basePrice: true,
+    },
   });
   await invalidatePropertySearchCache(propertyId);
   return updated;
@@ -313,6 +344,7 @@ export async function listHostProperties(actor: AccessClaims) {
       description: true,
       isActive: true,
       licenseNumber: true,
+      licenseStatus: true,
       basePrice: true,
       currency: true,
       ratingAvg: true,

@@ -1061,6 +1061,9 @@ async function main() {
         isActive: true,
         // Geçerli izin belgesi no (il plaka kodu 01-81 + sıra no) ve deterministik iptal politikası
         licenseNumber: demoLicenseNumber(propertyCount),
+        // Demo: kayıt doğrulaması yapılmış kabul edilir (P1-10; yayındaki ilan ⇒ VERIFIED).
+        licenseStatus: "VERIFIED",
+        licenseCheckedAt: new Date(),
         cancellationPolicyId: DEMO_POLICIES[propertyCount % DEMO_POLICIES.length],
         images: [
           IMAGE_POOL[propertyCount % IMAGE_POOL.length],

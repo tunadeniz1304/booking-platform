@@ -20,16 +20,19 @@ export async function GET(req: NextRequest) {
   }
 }
 
-/** "Hesabımı sil": anonimleştirme + oturum iptali. */
+/**
+ * "Hesabımı sil": aktif rezervasyonlar politikaya göre iptal, anonimleştirme ve TÜM
+ * oturumların iptali (tokenVersion — diğer cihazlar dahil, v3#5).
+ */
 export async function DELETE(req: NextRequest) {
   try {
     const claims = await requireAuth(req);
-    await deleteAccount(claims.userId);
+    const result = await deleteAccount(claims.userId);
     await revokeSession({
       refreshToken: req.cookies.get(REFRESH_COOKIE)?.value,
       access: { jti: claims.jti, exp: claims.exp },
     });
-    const res = NextResponse.json({ deleted: true });
+    const res = NextResponse.json({ deleted: true, ...result });
     clearSessionCookies(res);
     return res;
   } catch (error) {

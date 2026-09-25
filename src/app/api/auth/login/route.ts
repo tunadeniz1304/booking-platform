@@ -4,6 +4,13 @@ import { prisma } from "@/lib/prisma";
 import { verifyPasswordConstantTime } from "@/lib/auth";
 import { issueSession } from "@/lib/auth/session";
 import { setSessionCookies } from "@/lib/auth/cookies";
+import {
+  AccountLockedError,
+  checkLoginAttemptLimit,
+  lockRemainingSeconds,
+  recordFailedLogin,
+  recordSuccessfulLogin,
+} from "@/lib/auth/account";
 import { UnauthorizedError, toErrorResponse } from "@/lib/http/errors";
 import { observed } from "@/lib/http/observed";
 
@@ -15,6 +22,8 @@ const loginSchema = z.object({
 export const POST = observed("auth.login", async function postHandler(req: NextRequest) {
   try {
     const { email, password } = loginSchema.parse(await req.json());
+    // Hesap bazlı limit (IP'den bağımsız; parmak izi değiştirerek aşılamaz) — v3#3.
+    await checkLoginAttemptLimit(email);
 
     const user = await prisma.user.findUnique({
       where: { email: email.toLowerCase() },
@@ -25,12 +34,23 @@ export const POST = observed("auth.login", async function postHandler(req: NextR
         email: true,
         role: true,
         passwordHash: true,
+        tokenVersion: true,
+        lockedUntil: true,
+        deletedAt: true,
+        emailVerifiedAt: true,
       },
     });
 
     // Kullanıcı yoksa da bcrypt karşılaştırması yapılır (zamanlama e-posta varlığını ele vermez).
     const valid = await verifyPasswordConstantTime(password, user?.passwordHash);
-    if (!user || !valid) throw new UnauthorizedError("E-posta veya parola hatalı");
+    const locked = lockRemainingSeconds(user?.lockedUntil ?? null);
+    // Kilitliyken doğru parola da kabul edilmez (kaba kuvvet kilit süresince durur).
+    if (user && locked > 0) throw new AccountLockedError(locked);
+    if (!user || user.deletedAt || !valid) {
+      if (user && !user.deletedAt) await recordFailedLogin(user.id);
+      throw new UnauthorizedError("E-posta veya parola hatalı");
+    }
+    await recordSuccessfulLogin(user.id);
 
     const session = await issueSession(user);
     const response = NextResponse.json({
@@ -40,6 +60,7 @@ export const POST = observed("auth.login", async function postHandler(req: NextR
         lastName: user.lastName,
         email: user.email,
         role: user.role,
+        emailVerified: Boolean(user.emailVerifiedAt),
       },
       // Tarayıcı dışı istemciler için (Bearer). Tarayıcı çerezi kullanır, bunu saklamaz.
       accessToken: session.accessToken,

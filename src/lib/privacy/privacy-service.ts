@@ -1,6 +1,11 @@
 import { randomBytes } from "crypto";
+import { BookingStatus, TransferStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/auth";
+import { bumpTokenVersion, publishTokenVersion } from "@/lib/auth/token-version";
+import { cancelAndRefund } from "@/lib/payment/payment-service";
+import { cancelTransferListing } from "@/lib/transfer/transfer-service";
+import { logger, errorFields } from "@/lib/observability/logger";
 
 /**
  * KVKK/GDPR self-servis (P2-5).
@@ -54,11 +59,57 @@ export async function exportUserData(userId: string) {
   return { exportedAt: new Date().toISOString(), user, notifications };
 }
 
-export async function deleteAccount(userId: string): Promise<void> {
+export interface DeleteAccountResult {
+  cancelledBookings: string[];
+  cancelledTransfers: string[];
+}
+
+/**
+ * Hesap silme (v3#5):
+ *  1. Gelecekteki aktif rezervasyonlar (HELD/CONFIRMED) rezervasyon anındaki iptal
+ *     politikasına göre iptal edilir (iade `cancelAndRefund` ile).
+ *  2. Açık devir ilanları geri çekilir.
+ *  3. Kişisel alanlar pseudonimleştirilir, passkey'ler ve tek kullanımlık token'lar silinir.
+ *  4. `tokenVersion` artırılır → TÜM cihazlardaki erişim/yenileme token'ları geçersiz.
+ */
+export async function deleteAccount(
+  userId: string,
+  now = new Date()
+): Promise<DeleteAccountResult> {
+  const active = await prisma.booking.findMany({
+    where: {
+      userId,
+      status: { in: [BookingStatus.HELD, BookingStatus.CONFIRMED, BookingStatus.PENDING] },
+      checkOut: { gt: now },
+    },
+    select: { id: true },
+  });
+  const cancelledBookings: string[] = [];
+  for (const b of active) {
+    try {
+      await cancelAndRefund(b.id, userId, now);
+      cancelledBookings.push(b.id);
+    } catch (error) {
+      // Silme durdurulmaz; iptal edilemeyen rezervasyon loglanır (yönetici takibi).
+      logger.error({ bookingId: b.id, ...errorFields(error) }, "account deletion: cancel failed");
+    }
+  }
+  const listings = await prisma.bookingTransfer.findMany({
+    where: { sellerId: userId, status: TransferStatus.LISTED },
+    select: { id: true },
+  });
+  const cancelledTransfers: string[] = [];
+  for (const t of listings) {
+    await cancelTransferListing(t.id, userId).then(
+      () => cancelledTransfers.push(t.id),
+      (error) => logger.error({ transferId: t.id, ...errorFields(error) }, "transfer cancel failed")
+    );
+  }
+
   const pseudo = `silinmis-${userId.slice(-8)}`;
   const unusableHash = await hashPassword(randomBytes(32).toString("hex"));
-  await prisma.$transaction([
-    prisma.user.update({
+  const version = await prisma.$transaction(async (tx) => {
+    await tx.user.update({
       where: { id: userId },
       data: {
         email: `${pseudo}@anon.invalid`,
@@ -66,13 +117,21 @@ export async function deleteAccount(userId: string): Promise<void> {
         lastName: "Kullanıcı",
         avatarUrl: null,
         passwordHash: unusableHash,
+        deletedAt: now,
+        lockedUntil: null,
+        failedLoginCount: 0,
       },
-    }),
-    prisma.review.updateMany({ where: { userId }, data: { comment: null } }),
-    prisma.favorite.deleteMany({ where: { userId } }),
-    prisma.notification.updateMany({
+    });
+    await tx.review.updateMany({ where: { userId }, data: { comment: null } });
+    await tx.favorite.deleteMany({ where: { userId } });
+    await tx.webAuthnCredential.deleteMany({ where: { userId } });
+    await tx.authToken.deleteMany({ where: { userId } });
+    await tx.notification.updateMany({
       where: { userId },
       data: { to: `${pseudo}@anon.invalid`, text: "", html: "" },
-    }),
-  ]);
+    });
+    return bumpTokenVersion(userId, tx);
+  });
+  await publishTokenVersion(userId, version);
+  return { cancelledBookings, cancelledTransfers };
 }

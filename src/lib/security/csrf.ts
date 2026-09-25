@@ -50,6 +50,23 @@ export function allowedOriginsFromEnv(): string[] {
     .filter((o): o is string => Boolean(o));
 }
 
+/**
+ * Login CSRF (v3#14): oturum çerezi henüz yokken de `/api/auth/*` durum değiştiren
+ * istekleri başka bir siteden tetiklenemez (saldırganın hesabına giriş yaptırma).
+ * Tarayıcılar POST'ta daima `Origin` gönderir; başlık hiç yoksa (tarayıcı dışı
+ * istemci) istek geçer, varsa izinli origin olmalıdır.
+ */
+export function isLoginCsrfViolation(input: Omit<CsrfInput, "hasCookieAuth">): boolean {
+  if (!UNSAFE_METHODS.has(input.method.toUpperCase())) return false;
+  if (input.hasBearer) return false;
+  if (input.headers.get("sec-fetch-site") === "cross-site") return true;
+  const raw = input.headers.get("origin") ?? input.headers.get("referer");
+  if (!raw || raw === "null") return raw === "null";
+  const origin = originOf(raw);
+  if (!origin) return true;
+  return !new Set([input.selfOrigin, ...(input.allowedOrigins ?? [])]).has(origin);
+}
+
 /** `true` → istek reddedilmeli. */
 export function isCsrfViolation(input: CsrfInput): boolean {
   if (!UNSAFE_METHODS.has(input.method.toUpperCase())) return false;

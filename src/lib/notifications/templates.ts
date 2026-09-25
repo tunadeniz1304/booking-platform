@@ -102,3 +102,26 @@ export function bookingExpiredEmail(b: BookingInfo): EmailContent {
   );
   return { subject, ...body };
 }
+
+/** E-posta doğrulama / şifre sıfırlama bağlantısı (P0-8). */
+export function authLinkEmail(input: {
+  kind: "EMAIL_VERIFY" | "PASSWORD_RESET";
+  name: string;
+  link: string;
+  ttlLabel: string;
+}): EmailContent {
+  const verify = input.kind === "EMAIL_VERIFY";
+  const subject = verify ? "E-posta adresinizi doğrulayın" : "Şifre sıfırlama bağlantınız";
+  const body = layout(
+    `Merhaba ${input.name},`,
+    [
+      verify
+        ? "Hesabınızı etkinleştirmek için aşağıdaki bağlantıyı açın:"
+        : "Şifrenizi sıfırlamak için aşağıdaki bağlantıyı açın. Bu isteği siz yapmadıysanız bu e-postayı yok sayın.",
+      input.link,
+      `Bağlantı tek kullanımlıktır ve ${input.ttlLabel} geçerlidir.`,
+    ],
+    FOOTER
+  );
+  return { subject, ...body };
+}

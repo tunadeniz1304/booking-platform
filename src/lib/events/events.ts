@@ -15,6 +15,8 @@ export const EventTypes = {
   PropertyCreated: "property.created",
   PropertyAvailabilityChanged: "property.availability_changed",
   DemandSignalChanged: "demand.signal_changed",
+  /** E-posta doğrulama / şifre sıfırlama bağlantısı gönderilmeli (P0-8). */
+  AuthEmailRequested: "auth.email_requested",
 } as const;
 
 export type EventType = (typeof EventTypes)[keyof typeof EventTypes];
@@ -58,6 +60,16 @@ export interface BookingTransferredPayload extends BookingRef {
   fromUserId: string;
   toUserId: string;
   transferId: string;
+}
+
+export interface AuthEmailRequestedPayload {
+  tokenId: string;
+  userId: string;
+  to: string;
+  name: string;
+  kind: "EMAIL_VERIFY" | "PASSWORD_RESET";
+  /** Tek kullanımlık ham token (yalnızca e-posta bağlantısı için; DB'de özeti tutulur). */
+  token: string;
 }
 
 export interface PropertyCreatedPayload {

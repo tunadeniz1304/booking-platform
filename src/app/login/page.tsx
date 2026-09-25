@@ -85,6 +85,12 @@ export default function LoginPage() {
               />
             </div>
 
+            <p className="text-right text-sm">
+              <Link href="/forgot-password" className="text-[#003580] hover:underline">
+                Şifremi unuttum
+              </Link>
+            </p>
+
             {error && (
               <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
                 {error}

@@ -8,11 +8,21 @@ vi.mock("@/lib/redis", async () => {
   const { FakeRedis } = await import("../../helpers/fake-redis");
   return { redis: new FakeRedis() };
 });
+/** Test içi `User.tokenVersion` tablosu (bump senaryoları için). */
+const tokenVersions = vi.hoisted(() => new Map<string, number>());
+
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     user: {
       findUnique: vi.fn(async ({ where }: { where: { id?: string; email?: string } }) =>
-        where.id === "u-deleted" || where.email ? null : { id: where.id, role: "HOST" }
+        where.id === "u-deleted" || where.email
+          ? null
+          : {
+              id: where.id,
+              role: "HOST",
+              tokenVersion: tokenVersions.get(where.id ?? "") ?? 0,
+              deletedAt: null,
+            }
       ),
     },
   },
@@ -32,6 +42,8 @@ import * as logoutRoute from "@/app/api/auth/logout/route";
 import { POST as login } from "@/app/api/auth/login/route";
 import { httpsUrl } from "@/lib/security/url";
 import { assertSeedAllowed } from "@/lib/config/seed-guard";
+import { selectPaymentProvider } from "@/lib/payment";
+import { isLoginCsrfViolation } from "@/lib/security/csrf";
 
 const fake = redis as unknown as FakeRedis;
 
@@ -96,11 +108,11 @@ describe("regression: #16 kimlik doğrulama", () => {
     expect(await verifyAccessToken(foreign)).toBeNull();
   });
 
-  it("erişim token'ı 15 dk ömürlü (varsayılan)", async () => {
+  it("regression: v3#14 erişim token'ı 5 dk ömürlü (varsayılan, kısaltıldı)", async () => {
     const session = await issueSession({ id: "u1", role: "USER" });
     const minutes = (session.accessExpiresAt.getTime() - Date.now()) / 60000;
-    expect(minutes).toBeGreaterThan(14);
-    expect(minutes).toBeLessThanOrEqual(15);
+    expect(minutes).toBeGreaterThan(4);
+    expect(minutes).toBeLessThanOrEqual(5);
   });
 
   it("logout sonrası erişim token'ı iptal listesinde (getAuth null)", async () => {
@@ -173,10 +185,74 @@ describe("regression: #16 kimlik doğrulama", () => {
     expect(httpsUrl.safeParse("http://x.io/a.jpg").success).toBe(false);
     expect(httpsUrl.safeParse("data:image/png;base64,AAAA").success).toBe(false);
   });
+});
 
-  it("demo seed production'da DEMO_SEED=true olmadan çalışmaz", () => {
+describe("regression: v3#11 demo/prod ayrımı", () => {
+  it("DEMO_MODE=false iken demo seed reddedilir; production'da açık true gerekir", () => {
     expect(() => assertSeedAllowed({ NODE_ENV: "production" })).toThrow();
-    expect(() => assertSeedAllowed({ NODE_ENV: "production", DEMO_SEED: "true" })).not.toThrow();
+    expect(() => assertSeedAllowed({ NODE_ENV: "production", DEMO_MODE: "true" })).not.toThrow();
+    expect(() => assertSeedAllowed({ NODE_ENV: "development", DEMO_MODE: "false" })).toThrow();
     expect(() => assertSeedAllowed({ NODE_ENV: "development" })).not.toThrow();
+    // Eski bayrak artık seed açmaz.
+    expect(() => assertSeedAllowed({ NODE_ENV: "production", DEMO_SEED: "true" })).toThrow();
+  });
+
+  it("MockPsp demo dışı ortamda yalnızca açık PAYMENT_PROVIDER=mock ile", () => {
+    const prod = { NODE_ENV: "production", DEMO_MODE: "false" };
+    expect(() => selectPaymentProvider(prod)).toThrow();
+    expect(selectPaymentProvider({ ...prod, PAYMENT_PROVIDER: "mock" })).toBe("mock");
+    expect(selectPaymentProvider({ NODE_ENV: "production", DEMO_MODE: "true" })).toBe("mock");
+    // stripe seçilip anahtar yoksa sessizce mock'a düşülmez.
+    expect(() => selectPaymentProvider({ PAYMENT_PROVIDER: "stripe" })).toThrow();
+  });
+});
+
+describe("regression: v3#5 tüm oturumların iptali (tokenVersion)", () => {
+  it("sürüm artınca eski erişim token'ı reddedilir, yenisi kabul edilir", async () => {
+    const { token } = await signAccessToken("u-tv", "USER", 300, 0);
+    expect(await getAuth(req({ authorization: `Bearer ${token}` }))).not.toBeNull();
+    await fake.set("auth:tv:u-tv", "1");
+    expect(await getAuth(req({ authorization: `Bearer ${token}` }))).toBeNull();
+    const fresh = await signAccessToken("u-tv", "USER", 300, 1);
+    expect(await getAuth(req({ authorization: `Bearer ${fresh.token}` }))).not.toBeNull();
+  });
+
+  it("sürüm artınca DİĞER cihazların yenileme token'ı da reddedilir", async () => {
+    tokenVersions.set("u-dev", 0);
+    const other = await issueSession({ id: "u-dev", role: "USER", tokenVersion: 0 });
+    tokenVersions.set("u-dev", 1); // ör. hesap silme / rol değişimi / şifre sıfırlama
+    await expect(rotateRefreshToken(other.refreshToken)).rejects.toMatchObject({ status: 401 });
+    tokenVersions.delete("u-dev");
+  });
+});
+
+describe("regression: v3#14 auth sertleştirme", () => {
+  it("denylist Redis yokken fail-closed (token reddedilir)", async () => {
+    const { token } = await signAccessToken("u-fc", "USER", 300);
+    fake.failing = true;
+    expect(await getAuth(req({ authorization: `Bearer ${token}` }))).toBeNull();
+    fake.failing = false;
+  });
+
+  it("login CSRF: çerez yokken de başka origin'den giriş reddedilir", () => {
+    const base = {
+      method: "POST",
+      selfOrigin: "http://localhost:3000",
+      hasBearer: false,
+      allowedOrigins: [],
+    };
+    const h = (init: Record<string, string>) => new Headers(init);
+    expect(isLoginCsrfViolation({ ...base, headers: h({ origin: "https://evil.example" }) })).toBe(
+      true
+    );
+    expect(isLoginCsrfViolation({ ...base, headers: h({ "sec-fetch-site": "cross-site" }) })).toBe(
+      true
+    );
+    expect(isLoginCsrfViolation({ ...base, headers: h({ origin: "null" }) })).toBe(true);
+    expect(isLoginCsrfViolation({ ...base, headers: h({ origin: "http://localhost:3000" }) })).toBe(
+      false
+    );
+    // Tarayıcı dışı istemci (Origin yok) geçer.
+    expect(isLoginCsrfViolation({ ...base, headers: h({}) })).toBe(false);
   });
 });

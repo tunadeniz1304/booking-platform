@@ -10,14 +10,16 @@ export async function denyAccessToken(jti: string, expUnixSeconds: number): Prom
 }
 
 /**
- * Token iptal edilmiş mi? Redis erişilemezse `false` (fail-open) — erişim
- * token'ları zaten kısa ömürlüdür; durum loglanır.
+ * Token iptal edilmiş mi? Redis erişilemezse `true` (fail-CLOSED, v3#14): çıkış veya
+ * rol değişiminden hemen sonraki kısa pencerede iptal edilmiş bir token'ın kabul
+ * edilmemesi, geçici bir oturum kesintisinden daha önemlidir. Erişim token'ı ömrü
+ * (5 dk) bu pencereyi sınırlar; durum loglanır.
  */
 export async function isAccessTokenDenied(jti: string): Promise<boolean> {
   try {
     return (await redis.exists(`${DENY_PREFIX}${jti}`)) === 1;
   } catch (error) {
-    logger.warn(errorFields(error), "denylist check failed (fail-open)");
-    return false;
+    logger.warn(errorFields(error), "denylist check failed (fail-closed)");
+    return true;
   }
 }

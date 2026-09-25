@@ -11,6 +11,7 @@ const claims = (userId: string, role: AccessClaims["role"]): AccessClaims => ({
   role,
   jti: "j",
   exp: 0,
+  tv: 0,
 });
 
 describeInt("F7 host / kanal / KVKK (integration)", () => {

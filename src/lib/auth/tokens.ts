@@ -4,8 +4,9 @@ import { randomUUID } from "crypto";
 /**
  * Erişim token'ları (JWT, HS256, yalnızca `jose` — Node ve proxy ortak).
  *
- * Kısa ömürlüdür (varsayılan 15 dk); rol değişiklikleri en geç bu sürede
- * yansır. İptal: `denylist.ts` (logout) — `jti` Redis'te kalan ömür kadar tutulur.
+ * Kısa ömürlüdür (varsayılan 5 dk). İptal: `denylist.ts` (logout — `jti` Redis'te kalan
+ * ömür kadar) ve `tv` (oturum dönemi, `token-version.ts`): hesap silme / rol değişimi /
+ * şifre sıfırlamada kullanıcının tüm token'ları anında geçersizleşir (v3#5).
  */
 
 export type Role = "USER" | "HOST" | "ADMIN";
@@ -21,6 +22,8 @@ export interface AccessClaims {
   jti: string;
   /** Unix saniye. */
   exp: number;
+  /** Üretildiği andaki `User.tokenVersion`. */
+  tv: number;
 }
 
 /**
@@ -42,12 +45,13 @@ export function getJwtSecret(): Uint8Array {
 export async function signAccessToken(
   userId: string,
   role: Role,
-  ttlSeconds: number
+  ttlSeconds: number,
+  tokenVersion = 0
 ): Promise<{ token: string; jti: string; expiresAt: Date }> {
   const jti = randomUUID();
   const now = Math.floor(Date.now() / 1000);
   const exp = now + ttlSeconds;
-  const token = await new SignJWT({ role, typ: "access" })
+  const token = await new SignJWT({ role, typ: "access", tv: tokenVersion })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(userId)
     .setJti(jti)
@@ -75,6 +79,7 @@ export async function verifyAccessToken(token: string): Promise<AccessClaims | n
       role: role as Role,
       jti: payload.jti,
       exp: payload.exp ?? 0,
+      tv: typeof payload.tv === "number" ? payload.tv : 0,
     };
   } catch {
     return null;

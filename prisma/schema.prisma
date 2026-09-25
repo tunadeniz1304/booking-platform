@@ -9,22 +9,32 @@ datasource db {
 }
 
 model User {
-  id               String            @id @default(cuid())
-  email            String            @unique
-  passwordHash     String
-  firstName        String
-  lastName         String
-  avatarUrl        String?
-  role             UserRole          @default(USER)
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
-  bookings         Booking[]
-  reviews          Review[]
-  favorites        Favorite[]
-  payments         Payment[]
-  properties       Property[]
-  listedTransfers  BookingTransfer[] @relation("transferSeller")
-  claimedTransfers BookingTransfer[] @relation("transferBuyer")
+  id                  String               @id @default(cuid())
+  email               String               @unique
+  passwordHash        String
+  firstName           String
+  lastName            String
+  avatarUrl           String?
+  role                UserRole             @default(USER)
+  /// Oturum dönemi: artırıldığında bu kullanıcının TÜM erişim/yenileme token'ları geçersizleşir
+  /// (hesap silme, rol değişimi, şifre sıfırlama — v3#5).
+  tokenVersion        Int                  @default(0)
+  emailVerifiedAt     DateTime?
+  /// Art arda başarısız giriş sayısı ve kilit bitişi (AUTH_LOCKOUT_*).
+  failedLoginCount    Int                  @default(0)
+  lockedUntil         DateTime?
+  deletedAt           DateTime?
+  authTokens          AuthToken[]
+  webAuthnCredentials WebAuthnCredential[]
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  bookings            Booking[]
+  reviews             Review[]
+  favorites           Favorite[]
+  payments            Payment[]
+  properties          Property[]
+  listedTransfers     BookingTransfer[]    @relation("transferSeller")
+  claimedTransfers    BookingTransfer[]    @relation("transferBuyer")
 }
 
 enum UserRole {
@@ -57,7 +67,7 @@ model Property {
   priceHistory         PriceHistory[]
   /// İptal politikası (yoksa varsayılan MODERATE); rezervasyonda snapshot'ı alınır.
   /// Turizm İşletme Belgesi / 7464 izin belgesi no (ör. 34-12345); boşsa ilan yayınlanmaz.
-  licenseNumber String?
+  licenseNumber        String?
   cancellationPolicyId String?
   cancellationPolicy   CancellationPolicy?         @relation(fields: [cancellationPolicyId], references: [id])
   createdAt            DateTime                    @default(now())
@@ -92,14 +102,14 @@ model Location {
 }
 
 model DemandEvent {
-  id         String   @id @default(cuid())
+  id         String            @id @default(cuid())
   locationId String
-  location   Location @relation(fields: [locationId], references: [id])
+  location   Location          @relation(fields: [locationId], references: [id])
   title      String
-  startsAt   DateTime @db.Date
-  endsAt     DateTime @db.Date
+  startsAt   DateTime          @db.Date
+  endsAt     DateTime          @db.Date
   // Talep etkisi 1-10; fiyat motoru yakınlıkla ağırlıklar.
-  impact     Int      @default(5)
+  impact     Int               @default(5)
   /// Öneri → onay akışı: yalnızca APPROVED olaylar fiyata yansır.
   status     DemandEventStatus @default(APPROVED)
   category   String?
@@ -108,7 +118,7 @@ model DemandEvent {
   proposedBy String?
   approvedBy String?
   approvedAt DateTime?
-  createdAt  DateTime @default(now())
+  createdAt  DateTime          @default(now())
 
   @@index([locationId, startsAt])
   @@index([startsAt, endsAt])
@@ -147,13 +157,13 @@ model Room {
 }
 
 model Availability {
-  id          String   @id @default(cuid())
-  roomId      String
-  room        Room     @relation(fields: [roomId], references: [id])
-  date        DateTime @db.Date
-  isAvailable Boolean  @default(true)
-  price       Decimal  @db.Decimal(10, 2)
-  lockedBy    String?
+  id               String   @id @default(cuid())
+  roomId           String
+  room             Room     @relation(fields: [roomId], references: [id])
+  date             DateTime @db.Date
+  isAvailable      Boolean  @default(true)
+  price            Decimal  @db.Decimal(10, 2)
+  lockedBy         String?
   /// "Bu fiyat neden?": taban, faktör-başı katkılar ve tavan/taban kırpması.
   priceExplanation Json?
 
@@ -186,7 +196,7 @@ model Booking {
   /// Rezervasyon anındaki iptal politikası (sonradan değişse de bu geçerlidir).
   policySnapshot Json?
   /// Rezervasyon anındaki kur tablosu (yalnızca görüntüleme karşılıkları için).
-  fxSnapshot Json?
+  fxSnapshot     Json?
   ledgerEntries  LedgerEntry[]
   confirmedAt    DateTime?
   cancelledAt    DateTime?
@@ -326,19 +336,19 @@ enum PaymentStatus {
 }
 
 model Review {
-  id         String   @id @default(cuid())
-  bookingId  String   @unique
-  booking    Booking  @relation(fields: [bookingId], references: [id])
-  userId     String
-  user       User     @relation(fields: [userId], references: [id])
-  propertyId String
-  property   Property @relation(fields: [propertyId], references: [id])
-  rating     Int
-  comment    String?
+  id            String    @id @default(cuid())
+  bookingId     String    @unique
+  booking       Booking   @relation(fields: [bookingId], references: [id])
+  userId        String
+  user          User      @relation(fields: [userId], references: [id])
+  propertyId    String
+  property      Property  @relation(fields: [propertyId], references: [id])
+  rating        Int
+  comment       String?
   /// Ev sahibinin herkese açık yanıtı.
-  hostReply  String?
+  hostReply     String?
   hostRepliedAt DateTime?
-  createdAt  DateTime @default(now())
+  createdAt     DateTime  @default(now())
 
   @@index([propertyId])
   @@index([userId])
@@ -450,15 +460,15 @@ model AuditLog {
 
 /// Ödeme öncesi kural tabanlı risk değerlendirmesi (P1-10); admin inceleme kuyruğu.
 model FraudCheck {
-  id        String   @id @default(cuid())
-  bookingId String
-  userId    String
-  score     Int
-  decision  String
-  reasons   Json
+  id         String    @id @default(cuid())
+  bookingId  String
+  userId     String
+  score      Int
+  decision   String
+  reasons    Json
   reviewedBy String?
   reviewedAt DateTime?
-  createdAt DateTime @default(now())
+  createdAt  DateTime  @default(now())
 
   @@index([decision, createdAt])
   @@index([bookingId])
@@ -470,4 +480,38 @@ model ChannelSequence {
   lastSequence Int
   lastKey      String?
   updatedAt    DateTime @updatedAt
+}
+
+enum AuthTokenKind {
+  EMAIL_VERIFY
+  PASSWORD_RESET
+}
+
+/// Tek kullanımlık e-posta doğrulama / şifre sıfırlama token'ı — yalnızca SHA-256 özeti saklanır.
+model AuthToken {
+  id        String        @id @default(cuid())
+  userId    String
+  user      User          @relation(fields: [userId], references: [id])
+  kind      AuthTokenKind
+  tokenHash String        @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime      @default(now())
+
+  @@index([userId, kind])
+}
+
+/// Passkey (WebAuthn) kimlik bilgisi; `id` = base64url credential ID.
+model WebAuthnCredential {
+  id         String    @id
+  userId     String
+  user       User      @relation(fields: [userId], references: [id])
+  publicKey  Bytes
+  counter    Int       @default(0)
+  transports String[]  @default([])
+  name       String?
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime?
+
+  @@index([userId])
 }

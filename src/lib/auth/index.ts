@@ -1,6 +1,7 @@
 import { ForbiddenError, UnauthorizedError } from "@/lib/http/errors";
 import { extractAccessToken, verifyAccessToken, type AccessClaims, type Role } from "./tokens";
 import { isAccessTokenDenied } from "./denylist";
+import { isTokenVersionCurrent } from "./token-version";
 
 export type { AccessClaims, Role } from "./tokens";
 export { ROLES, signAccessToken, verifyAccessToken, extractAccessToken } from "./tokens";
@@ -22,6 +23,7 @@ export async function getAuth(req: AuthRequest): Promise<AccessClaims | null> {
   const claims = await verifyAccessToken(token);
   if (!claims) return null;
   if (await isAccessTokenDenied(claims.jti)) return null;
+  if (!(await isTokenVersionCurrent(claims.userId, claims.tv))) return null;
   return claims;
 }
 

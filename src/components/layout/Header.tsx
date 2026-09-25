@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -27,12 +27,20 @@ const NAV_ITEMS: readonly NavItem[] = [
 const focusRing =
   "focus:outline-none focus-visible:ring-2 focus-visible:ring-[#febb02] focus-visible:ring-offset-2 focus-visible:ring-offset-[#003580]";
 
+const noopSubscribe = () => () => {};
+
+/** Posta kutusu bağlantısı yalnızca demo modunda (sunucu `<html data-demo>` yazar). */
+function isDemoDocument(): boolean {
+  return typeof document !== "undefined" && document.documentElement.dataset.demo === "true";
+}
+
 export default function Header() {
   const t = useTranslations("nav");
   const router = useRouter();
   const pathname = usePathname();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [user, setUser] = useState<SessionUser | null>(null);
+  const demo = useSyncExternalStore(noopSubscribe, isDemoDocument, () => false);
 
   useEffect(() => {
     let active = true;
@@ -55,7 +63,10 @@ export default function Header() {
     ? `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`.toUpperCase()
     : "";
 
-  const items = NAV_ITEMS.filter((item) => !item.roles || (user && item.roles.includes(user.role)));
+  const items = NAV_ITEMS.filter(
+    (item) =>
+      (item.key !== "mailbox" || demo) && (!item.roles || (user && item.roles.includes(user.role)))
+  );
   const isCurrent = (href: string) =>
     href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
 

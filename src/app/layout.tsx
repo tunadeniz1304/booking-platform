@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages } from "next-intl/server";
 import CookieConsent from "@/components/privacy/CookieConsent";
+import { isDemoMode } from "@/lib/config/demo";
 import "../styles/globals.css";
 
 export const metadata: Metadata = {
@@ -17,9 +18,23 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   await headers();
   const locale = await getLocale();
   const messages = await getMessages();
+  const demo = isDemoMode();
   return (
-    <html lang={locale}>
+    <html lang={locale} data-demo={demo ? "true" : "false"}>
       <body>
+        {demo && (
+          <div
+            role="note"
+            className="bg-[#febb02] px-4 py-1 text-center text-xs font-semibold text-gray-900"
+          >
+            <span className="mr-2 rounded bg-gray-900 px-1.5 py-0.5 text-[10px] tracking-wider text-[#febb02]">
+              DEMO
+            </span>
+            {locale === "en"
+              ? "Demo environment — no real payments are taken, no real stays are sold."
+              : "Demo ortamı — gerçek ödeme alınmaz, gerçek konaklama satılmaz."}
+          </div>
+        )}
         <NextIntlClientProvider locale={locale} messages={messages}>
           {children}
           <CookieConsent />

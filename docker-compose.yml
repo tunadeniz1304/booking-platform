@@ -3,29 +3,37 @@
 # - Postgres ve Redis host'a AÇILMAZ (yalnızca iç ağ). Yerel geliştirme için
 #   `docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d db redis`.
 # - Sırlar imajda yok; `.env`'de verilmezse `secrets-init` rastgele üretir.
-# - Opsiyonel profiller: `search` (Elasticsearch), `observability` (Prometheus/Grafana/Tempo).
+# - Opsiyonel profil: `observability` (Prometheus/Grafana/Tempo).
+
+# Tüm uygulama servislerinde ortak ortam (v3#16). Servisler `environment`'ı
+# `<<: *common-env` ile GENİŞLETİR; haritayı yeniden tanımlamak değişkenleri
+# sessizce düşürmez (YAML merge yalnızca üst düzey anahtarları birleştirir).
+x-common-env: &common-env
+  NODE_ENV: production
+  POSTGRES_HOST: db
+  POSTGRES_USER: ${POSTGRES_USER:-booking}
+  POSTGRES_DB: ${POSTGRES_DB:-booking}
+  REDIS_HOST: redis
+  DATABASE_URL: ""
+  REDIS_URL: ""
+  # Demo ortamında sırlar daima `secrets-init` üretimidir (.env'deki değerler ezilir).
+  JWT_SECRET: ""
+  INTERNAL_API_SECRET: ""
+  TRANSFER_SIGNING_SECRET: ""
+  PSP_WEBHOOK_SECRET: ""
+  METRICS_TOKEN: ""
+  CHANNEL_FEED_SECRET: ""
+  GRPC_HOST: grpc
+  COOKIE_SECURE: ${COOKIE_SECURE:-false}
+  # v3#11: açık demo bayrağı (false → demo seed reddedilir, /dev/mailbox 404).
+  DEMO_MODE: ${DEMO_MODE:-true}
 
 x-app-env: &app-env
   env_file:
     - path: .env
       required: false
   environment:
-    NODE_ENV: production
-    POSTGRES_HOST: db
-    POSTGRES_USER: ${POSTGRES_USER:-booking}
-    POSTGRES_DB: ${POSTGRES_DB:-booking}
-    REDIS_HOST: redis
-    DATABASE_URL: ""
-    REDIS_URL: ""
-    # Demo ortamında sırlar daima `secrets-init` üretimidir (.env'deki değerler ezilir).
-    JWT_SECRET: ""
-    INTERNAL_API_SECRET: ""
-    TRANSFER_SIGNING_SECRET: ""
-    PSP_WEBHOOK_SECRET: ""
-    METRICS_TOKEN: ""
-    CHANNEL_FEED_SECRET: ""
-    GRPC_HOST: grpc
-    COOKIE_SECURE: ${COOKIE_SECURE:-false}
+    <<: *common-env
   volumes:
     - booking_secrets:/run/booking-secrets:ro
 
@@ -78,24 +86,10 @@ services:
       timeout: 5s
       retries: 20
 
-  # Tek seferlik: migration + (DEMO_SEED=true ise ve veritabanı boşsa) demo verisi.
+  # Tek seferlik: migration + (DEMO_MODE=true ise ve veritabanı boşsa) demo verisi.
   migrate:
     image: booking-platform-worker
     <<: *app-env
-    environment:
-      NODE_ENV: production
-      POSTGRES_HOST: db
-      POSTGRES_USER: ${POSTGRES_USER:-booking}
-      POSTGRES_DB: ${POSTGRES_DB:-booking}
-      REDIS_HOST: redis
-      DATABASE_URL: ""
-      REDIS_URL: ""
-      DEMO_SEED: ${DEMO_SEED:-true}
-      JWT_SECRET: ""
-      INTERNAL_API_SECRET: ""
-      TRANSFER_SIGNING_SECRET: ""
-      PSP_WEBHOOK_SECRET: ""
-      METRICS_TOKEN: ""
     command: ["npx", "tsx", "scripts/migrate-and-seed.ts"]
     depends_on:
       secrets-init: { condition: service_completed_successfully }
@@ -125,19 +119,8 @@ services:
     image: booking-platform-worker
     <<: *app-env
     environment:
-      NODE_ENV: production
-      POSTGRES_HOST: db
-      POSTGRES_USER: ${POSTGRES_USER:-booking}
-      POSTGRES_DB: ${POSTGRES_DB:-booking}
-      REDIS_HOST: redis
-      DATABASE_URL: ""
-      REDIS_URL: ""
+      <<: *common-env
       GRPC_HOST: 0.0.0.0
-      JWT_SECRET: ""
-      INTERNAL_API_SECRET: ""
-      TRANSFER_SIGNING_SECRET: ""
-      PSP_WEBHOOK_SECRET: ""
-      METRICS_TOKEN: ""
       GRPC_PORT: "50051"
     command: ["npx", "tsx", "--conditions=react-server", "services/grpc/main.ts"]
     expose:
@@ -145,17 +128,6 @@ services:
     restart: unless-stopped
     depends_on:
       migrate: { condition: service_completed_successfully }
-
-  elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
-    profiles: ["search"]
-    restart: unless-stopped
-    environment:
-      discovery.type: single-node
-      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
-      xpack.security.enabled: "false"
-    volumes:
-      - es_data:/usr/share/elasticsearch/data
 
   # --- Gözlemlenebilirlik (opsiyonel): docker compose --profile observability up ---
   # İz göndermek için .env: OTEL_EXPORTER_OTLP_ENDPOINT=http://tempo:4318
@@ -166,7 +138,8 @@ services:
       - ./docker/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - booking_secrets:/run/booking-secrets:ro
     ports:
-      - "127.0.0.1:9090:9090"
+      # Başka projelerle çakışmasın diye host portu ayarlanabilir (v3#16).
+      - "127.0.0.1:${PROMETHEUS_PORT:-9090}:9090"
 
   tempo:
     image: grafana/tempo:2.5.0
@@ -185,10 +158,9 @@ services:
       - ./docker/observability/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./docs/observability:/var/lib/grafana/dashboards:ro
     ports:
-      - "127.0.0.1:3001:3000"
+      - "127.0.0.1:${GRAFANA_PORT:-3001}:3000"
 
 volumes:
   postgres_data:
   redis_data:
-  es_data:
   booking_secrets:

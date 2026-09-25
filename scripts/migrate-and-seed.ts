@@ -1,12 +1,14 @@
 /**
- * Compose `migrate` görevi: `prisma migrate deploy`, ardından DEMO_SEED=true ise ve
+ * Compose `migrate` görevi: `prisma migrate deploy`, ardından DEMO_MODE=true ise ve
  * veritabanında hiç kullanıcı yoksa demo seed'i. Tekrar çalıştırmak güvenlidir
  * (idempotent): migration'lar uygulanmışsa atlanır, dolu veritabanına seed yazılmaz.
+ * `DEMO_MODE=false` iken demo hesapları asla seed'lenmez (v3#11).
  */
 import { spawnSync } from "child_process";
 import path from "path";
 import { PrismaClient } from "@prisma/client";
 import { loadEnv } from "../src/lib/config/load-env";
+import { isDemoMode } from "../src/lib/config/demo";
 
 function run(args: string[]): void {
   const result = spawnSync(process.execPath, args, { stdio: "inherit", env: process.env });
@@ -19,8 +21,8 @@ async function main(): Promise<void> {
   loadEnv();
   run([path.resolve("node_modules/prisma/build/index.js"), "migrate", "deploy"]);
 
-  if (process.env.DEMO_SEED !== "true") {
-    console.log("DEMO_SEED kapalı — seed atlandı");
+  if (!isDemoMode()) {
+    console.log("DEMO_MODE kapalı — demo seed atlandı");
     return;
   }
   const prisma = new PrismaClient();

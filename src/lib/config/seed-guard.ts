@@ -1,13 +1,14 @@
+import { isDemoMode } from "./demo";
+
 /**
- * Demo seed'i production ortamında (NODE_ENV=production) varsayılan olarak
- * ÇALIŞMAZ: bilinen demo parolalı hesaplar (admin dahil) gerçek bir ortama
- * sızmamalıdır. Yalnızca açık `DEMO_SEED=true` ile (ör. docker compose demo
- * ortamı) izin verilir.
+ * Demo seed'i (bilinen `Password123!` parolalı admin/host/misafir hesapları) yalnızca
+ * demo modunda çalışır (v3#11): `DEMO_MODE=false` iken — ve production'da açık
+ * `DEMO_MODE=true` verilmedikçe — reddedilir; bu hesaplar gerçek bir ortama sızmaz.
  */
 export function assertSeedAllowed(env: Record<string, string | undefined> = process.env): void {
-  if (env.NODE_ENV === "production" && env.DEMO_SEED !== "true") {
+  if (!isDemoMode(env)) {
     throw new Error(
-      "Demo seed production'da devre dışı. Demo ortamı için DEMO_SEED=true ayarlayın."
+      "Demo seed yalnızca demo modunda çalışır. Demo ortamı için DEMO_MODE=true ayarlayın."
     );
   }
 }

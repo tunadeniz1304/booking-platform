@@ -16,7 +16,7 @@ interface Mail {
 }
 
 /** Geliştirme posta kutusu (SMTP yokken gönderilen Türkçe e-postalar). */
-export default function MailboxPage() {
+export default function MailboxClient() {
   const [mails, setMails] = useState<Mail[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 

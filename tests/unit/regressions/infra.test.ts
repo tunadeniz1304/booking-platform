@@ -64,7 +64,7 @@ describe("regression: #15 compose ve CI", () => {
     expect(compose).toMatch(/target: worker/);
     const grpcBlock = compose.slice(
       compose.indexOf("\n  grpc:"),
-      compose.indexOf("\n  elasticsearch:")
+      compose.indexOf("\n  prometheus:")
     );
     expect(grpcBlock).not.toMatch(/ports:/);
     expect(grpcBlock).toMatch(/expose:/);
@@ -124,5 +124,49 @@ describe("regression: #21 .env.example eksiksiz", () => {
     ]) {
       expect(example).toMatch(new RegExp(`^${name}=$`, "m"));
     }
+  });
+});
+
+describe("regression: v3#16 compose ortak ortam", () => {
+  const compose = read("docker-compose.yml");
+
+  it("ortak env anchor'ı tek yerde; servisler environment'ı GENİŞLETİR, ezmez", () => {
+    expect(compose).toMatch(/^x-common-env: &common-env$/m);
+    const common = compose.slice(compose.indexOf("x-common-env"), compose.indexOf("x-app-env"));
+    for (const key of ["CHANNEL_FEED_SECRET", "COOKIE_SECURE", "DEMO_MODE", "JWT_SECRET"]) {
+      expect(common).toContain(`${key}:`);
+    }
+    // Servis düzeyinde her `environment:` bloğu ortak haritayı birleştirerek başlar.
+    const services = compose.slice(compose.indexOf("\nservices:"));
+    const appServices = ["migrate", "app", "worker", "grpc"];
+    for (const name of appServices) {
+      const start = services.indexOf(`\n  ${name}:`);
+      const next = services.slice(start + 1).search(/\n {2}[a-z-]+:\n/);
+      const block = services.slice(start, next === -1 ? undefined : start + 1 + next);
+      const envAt = block.indexOf("\n    environment:");
+      if (envAt !== -1) {
+        expect(block.slice(envAt, envAt + 60)).toMatch(/environment:\n\s+<<: \*common-env/);
+      } else {
+        expect(block).toMatch(/<<: \*app-env/);
+      }
+    }
+  });
+
+  it("Prometheus/Grafana host portları ayarlanabilir", () => {
+    expect(compose).toMatch(/\$\{PROMETHEUS_PORT:-9090\}:9090/);
+    expect(compose).toMatch(/\$\{GRAFANA_PORT:-3001\}:3000/);
+  });
+
+  it("eski DEMO_SEED bayrağı kaldırıldı; DEMO_MODE kullanılır", () => {
+    expect(compose).not.toMatch(/DEMO_SEED/);
+    expect(read(".env.example")).toMatch(/^DEMO_MODE=/m);
+  });
+});
+
+describe("regression: v3#17 ölü kod/ayar", () => {
+  it("kullanılmayan Elasticsearch istemcisi ve compose `search` profili kaldırıldı", () => {
+    expect(() => statSync(path.join(root, "src/lib/search/elastic.ts"))).toThrow();
+    expect(read("docker-compose.yml")).not.toMatch(/elasticsearch/i);
+    expect(read(".env.example")).not.toMatch(/ELASTICSEARCH_URL/);
   });
 });

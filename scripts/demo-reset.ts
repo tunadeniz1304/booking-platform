@@ -1,7 +1,7 @@
 /**
  * `npm run demo:reset` — demo veritabanını sıfırlar: `prisma migrate reset --force
- * --skip-seed`, ardından demo seed. Yıkıcıdır; production'da (NODE_ENV=production)
- * yalnızca açık `DEMO_SEED=true` ile çalışır (seed guard ile aynı kural).
+ * --skip-seed`, ardından demo seed. Yıkıcıdır; yalnızca demo modunda (`DEMO_MODE=true`,
+ * seed guard ile aynı kural) çalışır.
  */
 import { spawnSync } from "child_process";
 import path from "path";

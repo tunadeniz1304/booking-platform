@@ -4,6 +4,22 @@ Bu dosyadaki tüm önemli değişiklikler burada belgelenir. Biçim [Keep a Chan
 
 ## [Unreleased]
 
+### Added
+
+- **v3 F0/F1:** genişletilmiş kapsam (route handler, gRPC/MCP, worker; satır 80 / dal 70), CI'da Docker zorunlu entegrasyon testleri; LLM bütçeleri, redakte prompt logu, `ai_generated` etiketi; auth sertleştirme (tokenVersion, lockout, e-posta doğrulama, şifre sıfırlama, passkey), `DEMO_MODE`.
+- **v3 F2 — Envanter v2 (ADR 0010):** `RoomType{units}`, `RatePlan` (iade edilemez / kahvaltılı), `Restriction` (minStay/maxStay/CTA/CTD/stopSell), `InventoryDay{total, sold, held}` (`CHECK sold+held<=total`), `ExternalBlock`; `Availability` verisi tek migration'da taşındı. units=3 odada 100 paralel istek → tam 3 başarı.
+- **v3 F2 — Tesis saat dilimi (ADR 0011):** `Property.timeZone/checkInTime/checkOutTime`, Temporal yardımcıları; iCal içe aktarma ve `complete-stays` job'ı tesisin yerel gününde çalışır.
+- **v3 F2 — Arama doğruluğu:** tek zod arama şeması (`src/lib/search/params.ts`), geçersiz girdi 400; fiyat filtresi toplam fiyat üzerinden; `pageSize` 50'ye kırpılır.
+
+### Changed
+
+- Oda API yanıtları `maxOccupancy` döner; `capacity` bir sürüm boyunca takma ad olarak korunur.
+- Pazarlık özelliği kaldırıldı, tek fiyat kaynağı `priceStay` (ADR 0016).
+
+### Removed
+
+- Aylık `Availability` partisyon betiği (`scripts/partitions.ts`, `migrations/manual/…`): sayaçlı envanterde gerekmez; eski geceler `pruneInventory` ile budanır.
+
 ## [2.0.0] - 2026-09-25
 
 v1'in prototip çekirdeği üretim kalitesinde bir rezervasyon platformuna dönüştürüldü. 22 bilinen hatanın her biri düzeltildi ve regresyon testiyle korunuyor.

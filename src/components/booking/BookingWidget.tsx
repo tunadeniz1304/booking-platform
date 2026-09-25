@@ -32,7 +32,17 @@ interface BookingWidgetProps {
   /** Yalnızca "başlangıç fiyatı" gösterimi için; toplam daima sunucu teklifinden gelir. */
   basePrice?: number;
   currency?: string;
+  /** Arama kartından gelen seçim (kartta gösterilen toplamla aynı teklif için). */
+  initial?: {
+    checkIn?: string;
+    checkOut?: string;
+    guests?: number;
+    roomId?: string;
+    ratePlanId?: string;
+  };
 }
+
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
 
 function addDaysISO(days: number): string {
   const d = new Date();
@@ -40,20 +50,30 @@ function addDaysISO(days: number): string {
   return toISODate(d);
 }
 
-export default function BookingWidget({ propertyId, rooms }: BookingWidgetProps) {
+export default function BookingWidget({ propertyId, rooms, initial }: BookingWidgetProps) {
   const router = useRouter();
+  const validStay =
+    initial?.checkIn !== undefined &&
+    initial.checkOut !== undefined &&
+    ISO_DAY.test(initial.checkIn) &&
+    ISO_DAY.test(initial.checkOut) &&
+    initial.checkIn < initial.checkOut;
   const [calendarOpen, setCalendarOpen] = useState(false);
-  const [checkIn, setCheckIn] = useState(addDaysISO(1));
-  const [checkOut, setCheckOut] = useState(addDaysISO(2));
-  const [guestCount, setGuestCount] = useState(2);
-  const [selectedRoomId, setSelectedRoomId] = useState<string>(rooms[0]?.id ?? "");
+  const [checkIn, setCheckIn] = useState(validStay ? initial!.checkIn! : addDaysISO(1));
+  const [checkOut, setCheckOut] = useState(validStay ? initial!.checkOut! : addDaysISO(2));
+  const [guestCount, setGuestCount] = useState(
+    initial?.guests && initial.guests >= 1 ? Math.floor(initial.guests) : 2
+  );
+  const [selectedRoomId, setSelectedRoomId] = useState<string>(
+    rooms.find((r) => r.id === initial?.roomId)?.id ?? rooms[0]?.id ?? ""
+  );
 
   const availableRooms = rooms.filter((room) => room.available);
 
   const selectedRoom =
     availableRooms.find((room) => room.id === selectedRoomId) ?? availableRooms[0];
   const plans = selectedRoom?.ratePlans ?? [];
-  const [selectedPlanId, setSelectedPlanId] = useState<string | undefined>(undefined);
+  const [selectedPlanId, setSelectedPlanId] = useState<string | undefined>(initial?.ratePlanId);
   const selectedPlan =
     plans.find((p) => p.id === selectedPlanId) ?? plans.find((p) => p.isDefault) ?? plans[0];
 

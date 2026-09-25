@@ -37,6 +37,8 @@ interface SearchResultItem {
   images?: string[];
   availableRooms: number;
   totalPrice?: number;
+  /** Tarih seçiliyse sunucu teklifi (vergi + ücret dahil, minor-unit). */
+  quote?: { roomId: string; ratePlanId: string; total: number; currency: string; nights: number };
   score?: number;
   explain?: Record<string, number>;
 }
@@ -395,6 +397,19 @@ function SearchPageContent() {
                       rating={property.ratingAvg}
                       reviewCount={property.ratingCount}
                       propertyType={TYPE_LABELS[property.propertyType] ?? property.propertyType}
+                      stay={
+                        property.quote && checkIn && checkOut
+                          ? {
+                              total: property.quote.total,
+                              nights: property.quote.nights,
+                              checkIn,
+                              checkOut,
+                              guests,
+                              roomId: property.quote.roomId,
+                              ratePlanId: property.quote.ratePlanId,
+                            }
+                          : undefined
+                      }
                     />
                     <RankingWhy score={property.score} explain={property.explain} />
                   </div>

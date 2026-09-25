@@ -9,7 +9,10 @@ import ReviewsSection from "@/components/property/ReviewsSection";
 
 interface PropertyPageProps {
   params: Promise<{ id: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }
+
+const one = (v: string | string[] | undefined) => (typeof v === "string" ? v : undefined);
 
 interface PropertyDetail {
   id: string;
@@ -89,8 +92,16 @@ export async function generateMetadata({ params }: PropertyPageProps): Promise<M
   };
 }
 
-export default async function PropertyPage({ params }: PropertyPageProps) {
+export default async function PropertyPage({ params, searchParams }: PropertyPageProps) {
   const { id } = await params;
+  const sp = (await searchParams) ?? {};
+  const initial = {
+    checkIn: one(sp.checkIn),
+    checkOut: one(sp.checkOut),
+    guests: Number(one(sp.guests)) || undefined,
+    roomId: one(sp.roomId),
+    ratePlanId: one(sp.ratePlanId),
+  };
   const property = await getProperty(id);
 
   if (!property) {
@@ -149,6 +160,7 @@ export default async function PropertyPage({ params }: PropertyPageProps) {
                 rooms={property.rooms}
                 basePrice={property.basePrice}
                 currency={property.currency}
+                initial={initial}
               />
             </div>
           </div>

@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import { formatMoney, money } from "@/lib/money/money";
 
 export interface PropertyCardProps {
   id: string;
@@ -16,6 +17,27 @@ export interface PropertyCardProps {
   reviewCount: number;
   propertyType: string;
   initialFavorite?: boolean;
+  /**
+   * Tarih seçiliyse sunucunun `priceStay` teklifi (vergi + ücret dahil, minor-unit). Varsa kartta
+   * EN BELİRGİN fiyat budur (FTC "all-in" kuralı); gecelik taban fiyat gösterilmez.
+   */
+  stay?: {
+    total: number;
+    nights: number;
+    checkIn: string;
+    checkOut: string;
+    guests: number;
+    roomId: string;
+    ratePlanId: string;
+  };
+}
+
+function formatPrice(amount: number, currency: string): string {
+  return new Intl.NumberFormat("tr-TR", {
+    style: "currency",
+    currency,
+    maximumFractionDigits: 0,
+  }).format(amount);
 }
 
 export default function PropertyCard({
@@ -29,7 +51,17 @@ export default function PropertyCard({
   reviewCount,
   propertyType,
   initialFavorite = false,
+  stay,
 }: PropertyCardProps) {
+  const href = stay
+    ? `/property/${id}?${new URLSearchParams({
+        checkIn: stay.checkIn,
+        checkOut: stay.checkOut,
+        guests: String(stay.guests),
+        roomId: stay.roomId,
+        ratePlanId: stay.ratePlanId,
+      }).toString()}`
+    : `/property/${id}`;
   const router = useRouter();
   const [isFavorite, setIsFavorite] = useState(initialFavorite);
   const [busy, setBusy] = useState(false);
@@ -103,7 +135,7 @@ export default function PropertyCard({
         <div className="flex items-start justify-between gap-2">
           <div>
             <h3 className="text-base font-semibold text-gray-900">
-              <Link href={`/property/${id}`} className="transition hover:text-[#003580]">
+              <Link href={href} className="transition hover:text-[#003580]">
                 {title}
               </Link>
             </h3>
@@ -140,18 +172,23 @@ export default function PropertyCard({
         </div>
 
         <div className="mt-4 flex items-end justify-between border-t border-gray-100 pt-4">
-          <div>
-            <p className="text-xs text-gray-500">gecelik</p>
-            <p className="text-lg font-bold text-gray-900">
-              {new Intl.NumberFormat("tr-TR", {
-                style: "currency",
-                currency,
-                maximumFractionDigits: 0,
-              }).format(price)}
-            </p>
-          </div>
+          {stay ? (
+            <div data-testid="card-price">
+              <p className="text-xs text-gray-500">{stay.nights} gece toplam</p>
+              <p className="text-lg font-bold text-gray-900" data-testid="card-total">
+                {formatMoney(money(stay.total, currency))}
+              </p>
+              <p className="text-xs text-gray-500">vergi ve ücretler dahil</p>
+            </div>
+          ) : (
+            <div data-testid="card-price">
+              <p className="text-xs text-gray-500">gecelik başlangıç</p>
+              <p className="text-lg font-bold text-gray-900">{formatPrice(price, currency)}</p>
+              <p className="text-xs text-gray-500">tarih seçince vergi ve ücretler eklenir</p>
+            </div>
+          )}
           <Link
-            href={`/property/${id}`}
+            href={href}
             className="rounded-sm bg-[#003580] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#002b66]"
           >
             Fırsatı Gör

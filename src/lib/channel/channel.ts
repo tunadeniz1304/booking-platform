@@ -34,15 +34,45 @@ function feedSecret(): string {
   return s;
 }
 
-export function feedToken(roomId: string): string {
-  return createHmac("sha256", feedSecret()).update(`ical:${roomId}`).digest("base64url");
+/**
+ * İmzalı akış tokenı. Sürüm 0 eski biçimi korur (yayınlanmış URL'ler kırılmaz); host tokenı
+ * döndürdüğünde (`rotateFeedToken`) sürüm artar ve önceki URL'ler 403 alır (v3#21).
+ */
+export function feedToken(roomId: string, version = 0): string {
+  const payload = version === 0 ? `ical:${roomId}` : `ical:${roomId}:v${version}`;
+  return createHmac("sha256", feedSecret()).update(payload).digest("base64url");
 }
 
-export function verifyFeedToken(roomId: string, token: string | null): boolean {
+async function feedVersion(roomId: string): Promise<number> {
+  const row = await prisma.channelFeed.findUnique({
+    where: { roomTypeId: roomId },
+    select: { tokenVersion: true },
+  });
+  return row?.tokenVersion ?? 0;
+}
+
+/** Odanın GÜNCEL akış tokenı. */
+export async function currentFeedToken(roomId: string): Promise<string> {
+  return feedToken(roomId, await feedVersion(roomId));
+}
+
+/** Yalnızca güncel sürümün tokenı geçerlidir (sabit zamanlı karşılaştırma). */
+export async function verifyFeedToken(roomId: string, token: string | null): Promise<boolean> {
   if (!token) return false;
-  const a = Buffer.from(feedToken(roomId));
+  const a = Buffer.from(feedToken(roomId, await feedVersion(roomId)));
   const b = Buffer.from(token);
   return a.length === b.length && timingSafeEqual(a, b);
+}
+
+/** Tokenı döndürür: sürümü atomik artırır, yeni tokenı verir; eski URL'ler anında geçersiz. */
+export async function rotateFeedToken(roomId: string): Promise<{ token: string; version: number }> {
+  const row = await prisma.channelFeed.upsert({
+    where: { roomTypeId: roomId },
+    create: { roomTypeId: roomId, tokenVersion: 1 },
+    update: { tokenVersion: { increment: 1 } },
+    select: { tokenVersion: true },
+  });
+  return { token: feedToken(roomId, row.tokenVersion), version: row.tokenVersion };
 }
 
 /** Satılabilir oda kalmamış veya satışa kapalı gelecek geceleri tam gün VEVENT olarak verir. */
@@ -246,4 +276,46 @@ export async function applyAriMessage(msg: {
     if (room) await invalidatePropertySearchCache(room.propertyId);
   }
   return result;
+}
+
+export interface ParityRate {
+  date: IsoDate;
+  /** Minor-unit. */
+  amount: number;
+}
+
+export interface ParityWarning {
+  date: IsoDate;
+  ours: number;
+  theirs: number;
+  /** (harici − bizim) / bizim, baz puan. */
+  diffBps: number;
+  direction: "cheaper_elsewhere" | "pricier_elsewhere";
+}
+
+/**
+ * Parite kontrolü (P1-9): YALNIZCA host'a uyarı üretir. DMA gereği fiyat eşitliği
+ * zorlanmaz; bu fonksiyon hiçbir fiyatı değiştirmez. Saf fonksiyon.
+ */
+export function checkRateParity(
+  ours: readonly ParityRate[],
+  theirs: readonly ParityRate[],
+  toleranceBps: number
+): ParityWarning[] {
+  const mine = new Map(ours.map((r) => [r.date, r.amount]));
+  const out: ParityWarning[] = [];
+  for (const t of theirs) {
+    const o = mine.get(t.date);
+    if (o === undefined || o <= 0) continue;
+    const diffBps = Math.round(((t.amount - o) * 10_000) / o);
+    if (Math.abs(diffBps) <= toleranceBps) continue;
+    out.push({
+      date: t.date,
+      ours: o,
+      theirs: t.amount,
+      diffBps,
+      direction: diffBps < 0 ? "cheaper_elsewhere" : "pricier_elsewhere",
+    });
+  }
+  return out.sort((a, b) => a.date.localeCompare(b.date));
 }

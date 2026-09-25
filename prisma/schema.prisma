@@ -726,6 +726,32 @@ model ChannelSequence {
   updatedAt    DateTime @updatedAt
 }
 
+/// iCal dışa aktarım tokenının sürümü (v3#21): sürüm artırılınca eski akış URL'leri geçersizleşir.
+model ChannelFeed {
+  roomTypeId   String   @id
+  tokenVersion Int      @default(0)
+  updatedAt    DateTime @updatedAt
+}
+
+/// Harici kanal iCal aboneliği (v3#21): worker `ICAL_POLL_MINUTES` aralığıyla koşullu GET yapar.
+model IcalSubscription {
+  id           String    @id @default(cuid())
+  roomTypeId   String
+  source       String    @db.VarChar(40)
+  url          String    @db.VarChar(2048)
+  etag         String?   @db.VarChar(512)
+  lastModified String?   @db.VarChar(128)
+  lastPolledAt DateTime?
+  lastStatus   String?   @db.VarChar(32)
+  lastError    String?   @db.VarChar(500)
+  active       Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([roomTypeId, source])
+  @@index([active, lastPolledAt])
+}
+
 enum AuthTokenKind {
   EMAIL_VERIFY
   PASSWORD_RESET

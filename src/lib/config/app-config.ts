@@ -113,6 +113,17 @@ const schema = z.object({
   /** Bu kadar farklı kullanıcı şikâyeti → yorum otomatik gizlenir (admin incelemesine düşer). */
   REVIEW_REPORT_HIDE_THRESHOLD: int(3, 1, 100),
 
+  // Kanal yöneticisi (P1-9, v3#21)
+  /** iCal abonelikleri bu aralıkla (dk) koşullu GET ile yoklanır. */
+  ICAL_POLL_MINUTES: int(30, 5, 24 * 60),
+  /** Tek yoklama turunda işlenecek azami abonelik. */
+  ICAL_POLL_BATCH: int(50, 1, 1000),
+  ICAL_FETCH_TIMEOUT_MS: int(10_000, 500, 60_000),
+  /** Uzak iCal gövdesi için üst sınır (bayt); aşılırsa istek kesilir. */
+  ICAL_MAX_BYTES: int(1_000_000, 10_000, 10_000_000),
+  /** Parite uyarısı: harici kanal fiyatı bizimkinden bu kadar baz puan farklıysa host uyarılır. */
+  CHANNEL_PARITY_TOLERANCE_BPS: int(100, 0, 10_000),
+
   // Güvenlik / ağ
   TRUSTED_PROXY_HOPS: int(0, 0, 10),
   /** hops=0 iken önde başlığı ezen tek ters vekil varsa `x-real-ip`'ye güven (v3#3). */

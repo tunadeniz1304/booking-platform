@@ -22,6 +22,7 @@ import {
 import { FX_REFRESH_JOB, runFxRefresh, scheduleFxRefresh } from "./jobs/fx-refresh";
 import { PRICE_ALERT_JOB, runPriceAlertsJob, schedulePriceAlerts } from "./jobs/price-alerts";
 import { PAYOUT_JOB, runPayouts, schedulePayouts } from "./jobs/payouts";
+import { ICAL_POLL_JOB, runIcalPoll, scheduleIcalPoll } from "./jobs/ical-poll";
 import { runOutboxRelay } from "@/lib/cqrs";
 import { registerEventHandlers } from "@/lib/events/register";
 import { updateAvailabilityPrices } from "@/lib/pricing-service";
@@ -80,6 +81,7 @@ async function main(): Promise<void> {
       if (job.name === FX_REFRESH_JOB) return runFxRefresh();
       if (job.name === PRICE_ALERT_JOB) return runPriceAlertsJob();
       if (job.name === PAYOUT_JOB) return runPayouts();
+      if (job.name === ICAL_POLL_JOB) return runIcalPoll();
       throw new Error(`Bilinmeyen bakım işi: ${job.name}`);
     },
     { connection }
@@ -106,6 +108,7 @@ async function main(): Promise<void> {
   await scheduleFxRefresh(getQueue(QUEUE_NAMES.maintenance));
   await schedulePriceAlerts(getQueue(QUEUE_NAMES.maintenance));
   await schedulePayouts(getQueue(QUEUE_NAMES.maintenance));
+  await scheduleIcalPoll(getQueue(QUEUE_NAMES.maintenance));
 
   // Prometheus için işçi metrikleri (outbox, expire, bildirim sayaçları).
   const metricsPort = Number(process.env.WORKER_METRICS_PORT ?? 9464);

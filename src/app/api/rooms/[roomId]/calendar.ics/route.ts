@@ -6,7 +6,7 @@ import { toErrorResponse } from "@/lib/http/errors";
 export async function GET(req: NextRequest, { params }: { params: Promise<{ roomId: string }> }) {
   try {
     const { roomId } = await params;
-    if (!verifyFeedToken(roomId, req.nextUrl.searchParams.get("token"))) {
+    if (!(await verifyFeedToken(roomId, req.nextUrl.searchParams.get("token")))) {
       return NextResponse.json({ error: "Geçersiz takvim tokenı" }, { status: 403 });
     }
     return new NextResponse(await exportRoomCalendar(roomId), {

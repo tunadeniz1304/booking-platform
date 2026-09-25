@@ -22,7 +22,14 @@ export function categorize(pathname: string): RateLimitCategory {
     return "booking";
   }
   if (pathname.startsWith("/api/payments")) return "payment";
-  if (pathname.startsWith("/api/ai") || pathname.startsWith("/api/search/smart")) return "ai";
+  // Tüm AI uçları (yorum özeti dahil) `ai` kategorisinde — §3 v3-b.
+  if (
+    pathname.startsWith("/api/ai") ||
+    pathname.startsWith("/api/search/smart") ||
+    /^\/api\/properties\/[^/]+\/reviews\/summary$/.test(pathname)
+  ) {
+    return "ai";
+  }
   if (
     pathname.startsWith("/api/search") ||
     pathname.startsWith("/api/properties") ||

@@ -1,6 +1,5 @@
-import OpenAI from "openai";
 import { EMBEDDING_DIM, encode } from "./embedder";
-import { getLlmSettings } from "@/lib/llm/settings";
+import { createRemoteEmbedFn, type EmbedFn } from "@/lib/llm/embeddings";
 import { logger, errorFields } from "@/lib/observability/logger";
 
 /**
@@ -33,7 +32,7 @@ export class OpenAIEmbedder implements Embedder {
   readonly dim = EMBEDDING_DIM;
   private readonly fallback = new HashEmbedder();
   constructor(
-    private readonly client: OpenAI,
+    private readonly embedFn: EmbedFn,
     private readonly model: string
   ) {}
   get name(): string {
@@ -41,12 +40,7 @@ export class OpenAIEmbedder implements Embedder {
   }
   async embed(texts: string[]): Promise<number[][]> {
     try {
-      const res = await this.client.embeddings.create({
-        model: this.model,
-        input: texts,
-        dimensions: this.dim,
-      });
-      const vectors = res.data.map((d) => d.embedding);
+      const vectors = await this.embedFn(texts, this.dim);
       if (vectors.some((v) => v.length !== this.dim)) throw new Error("Boyut uyuşmazlığı");
       return vectors;
     } catch (error) {
@@ -61,19 +55,8 @@ let cached: Embedder | null = null;
 export function getEmbedder(): Embedder {
   if (cached) return cached;
   const model = process.env.EMBEDDING_MODEL?.trim();
-  const llm = getLlmSettings();
-  cached =
-    model && llm.effectiveMode === "live" && llm.apiKey
-      ? new OpenAIEmbedder(
-          new OpenAI({
-            apiKey: llm.apiKey,
-            baseURL: llm.baseUrl,
-            timeout: llm.timeoutSeconds * 1000,
-            maxRetries: llm.maxRetries,
-          }),
-          model
-        )
-      : new HashEmbedder();
+  const remote = createRemoteEmbedFn(model);
+  cached = remote && model ? new OpenAIEmbedder(remote, model) : new HashEmbedder();
   return cached;
 }
 

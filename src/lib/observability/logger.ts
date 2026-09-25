@@ -14,7 +14,8 @@ function defaultLevel(): string {
   return "info";
 }
 
-const options: pino.LoggerOptions = {
+/** Dışa açık: redaksiyon yollarının testi için (anahtar/parola log'a girmez). */
+export const LOGGER_OPTIONS: pino.LoggerOptions = {
   level: defaultLevel(),
   base: { service: process.env.SERVICE_NAME ?? "booking-web" },
   timestamp: pino.stdTimeFunctions.isoTime,
@@ -47,7 +48,9 @@ const options: pino.LoggerOptions = {
 
 // stdio protokolü konuşan süreçler (MCP sunucusu) stdout'u JSON-RPC'ye ayırır → `LOG_TO_STDERR=true`.
 export const logger =
-  process.env.LOG_TO_STDERR === "true" ? pino(options, pino.destination(2)) : pino(options);
+  process.env.LOG_TO_STDERR === "true"
+    ? pino(LOGGER_OPTIONS, pino.destination(2))
+    : pino(LOGGER_OPTIONS);
 
 export type Logger = typeof logger;
 

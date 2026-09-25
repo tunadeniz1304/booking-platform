@@ -18,6 +18,13 @@ import { LlmJsonError, parseJsonWithSchema } from "./json";
 import { Redactor } from "./redaction";
 import { GuardError } from "./guards";
 import { llmLatencySeconds, llmRequestsTotal, llmTokensTotal } from "./metrics";
+import {
+  createRedisBudget,
+  currentLlmSubject,
+  llmBudgetExceededTotal,
+  type LlmBudget,
+} from "./budget";
+import { redis } from "@/lib/redis";
 
 /**
  * LLM Sözleşmesi — tüm GenAI özellikleri LLM'e YALNIZCA bu istemci üzerinden erişir.
@@ -50,6 +57,7 @@ export type FallbackReason =
   | "aborted"
   | "empty_response"
   | "tool_loop_exceeded"
+  | "budget"
   | "unknown";
 
 export interface LlmMessage {
@@ -64,6 +72,8 @@ export interface LlmUsage {
 
 export interface LlmResult<T> {
   data: T;
+  /** AI Act Md. 50: her AI çıktısı işaretlenir (UI "AI tarafından üretildi" rozeti). */
+  aiGenerated: true;
   llmMode: LlmMode;
   model: string;
   latencyMs: number;
@@ -84,6 +94,8 @@ export interface LlmCallOptions<T> {
   signal?: AbortSignal;
   temperature?: number;
   maxTokens?: number;
+  /** Bütçe öznesi; verilmezse istek bağlamından (`runWithLlmSubject`) alınır. */
+  subject?: string;
 }
 
 /** Araç çağrılı (tool-calling) döngü için araç tanımı. */
@@ -187,6 +199,8 @@ export interface CreateLlmClientOptions {
   settings?: LlmSettings;
   /** Testler için: OpenAI SDK'nın kullanacağı `fetch`. */
   fetch?: typeof fetch;
+  /** Günlük token bütçesi (varsayılan: Redis sayaçlı, `LLM_DAILY_TOKEN_BUDGET_PER_USER`). */
+  budget?: LlmBudget;
 }
 
 type Completion = Pick<ChatCompletion, "choices" | "usage" | "model">;
@@ -194,6 +208,29 @@ type Completion = Pick<ChatCompletion, "choices" | "usage" | "model">;
 export function createLlmClient(options: CreateLlmClientOptions = {}): LlmClient {
   const settings = options.settings ?? getLlmSettings();
   const jsonKey = `${settings.baseUrlHost}|${settings.model}`;
+  const budget = options.budget ?? createRedisBudget(redis, settings.dailyTokenBudgetPerUser);
+
+  /** Canlı çağrı öncesi: özne bütçesini doldurduysa `true` (→ demo, reason "budget"). */
+  async function overBudget(task: LlmTask, subject: string | undefined): Promise<boolean> {
+    if (!subject) return false;
+    if (!(await budget.exceeded(subject))) return false;
+    llmBudgetExceededTotal.inc({ task });
+    return true;
+  }
+
+  async function charge(subject: string | undefined, usage?: LlmUsage): Promise<void> {
+    if (subject && usage)
+      await budget.consume(subject, usage.promptTokens + usage.completionTokens);
+  }
+
+  /**
+   * `LLM_LOG_PROMPTS=true` (production dışı) iken YALNIZCA redakte edilmiş prompt debug
+   * seviyesinde loglanır (§3 v3-c) — ham kişisel veri asla log'a girmez.
+   */
+  function logPrompt(task: LlmTask, messages: ChatCompletionMessageParam[]): void {
+    if (!settings.logPrompts) return;
+    logger.debug({ task, messages }, "llm prompt (redacted)");
+  }
 
   let sdk: OpenAI | null = null;
   function getSdk(): OpenAI {
@@ -306,7 +343,14 @@ export function createLlmClient(options: CreateLlmClientOptions = {}): LlmClient
       undefined,
       reason
     );
-    return { data, llmMode: mode, model: settings.model, latencyMs, ...(reason ? { reason } : {}) };
+    return {
+      data,
+      aiGenerated: true,
+      llmMode: mode,
+      model: settings.model,
+      latencyMs,
+      ...(reason ? { reason } : {}),
+    };
   }
 
   async function handleFailure<T>(
@@ -334,25 +378,39 @@ export function createLlmClient(options: CreateLlmClientOptions = {}): LlmClient
       if (settings.effectiveMode === "demo") {
         return demoResult(task, opts.demo, "demo", started);
       }
+      const subject = opts.subject ?? currentLlmSubject();
+      if (await overBudget(task, subject)) {
+        return demoResult(task, opts.demo, "fallback", started, "budget");
+      }
       const redactor = new Redactor(opts.knownNames ?? []);
       try {
+        const redacted = redactMessages(messages, redactor);
+        logPrompt(task, redacted);
         const res = await create(
           {
-            messages: redactMessages(messages, redactor),
+            messages: redacted,
             temperature: opts.temperature ?? settings.temperature,
             max_tokens: opts.maxTokens ?? settings.maxTokens,
           },
           true,
           opts.signal
         );
+        const usage = usageOf(res);
+        await charge(subject, usage);
         let data = parseJsonWithSchema(contentOf(res), schema);
         if (opts.restorePii !== false) data = redactor.restoreDeep(data);
         if (opts.validate) data = opts.validate(data) ?? data;
         const latencyMs = Date.now() - started;
-        const usage = usageOf(res);
         runtimeStatus.lastError = null;
         record(task, "live", "success", latencyMs, usage);
-        return { data, llmMode: "live", model: settings.model, latencyMs, usage };
+        return {
+          data,
+          aiGenerated: true,
+          llmMode: "live",
+          model: settings.model,
+          latencyMs,
+          usage,
+        };
       } catch (error) {
         return handleFailure(task, error, opts.demo, started);
       }
@@ -367,25 +425,39 @@ export function createLlmClient(options: CreateLlmClientOptions = {}): LlmClient
       if (settings.effectiveMode === "demo") {
         return demoResult(task, opts.demo, "demo", started);
       }
+      const subject = opts.subject ?? currentLlmSubject();
+      if (await overBudget(task, subject)) {
+        return demoResult(task, opts.demo, "fallback", started, "budget");
+      }
       const redactor = new Redactor(opts.knownNames ?? []);
       try {
+        const redacted = redactMessages(messages, redactor);
+        logPrompt(task, redacted);
         const res = await create(
           {
-            messages: redactMessages(messages, redactor),
+            messages: redacted,
             temperature: opts.temperature ?? settings.temperature,
             max_tokens: opts.maxTokens ?? settings.maxTokens,
           },
           false,
           opts.signal
         );
+        const usage = usageOf(res);
+        await charge(subject, usage);
         let text = contentOf(res).trim();
         if (opts.restorePii !== false) text = redactor.restore(text);
         if (opts.validate) text = opts.validate(text) ?? text;
         const latencyMs = Date.now() - started;
-        const usage = usageOf(res);
         runtimeStatus.lastError = null;
         record(task, "live", "success", latencyMs, usage);
-        return { data: text, llmMode: "live", model: settings.model, latencyMs, usage };
+        return {
+          data: text,
+          aiGenerated: true,
+          llmMode: "live",
+          model: settings.model,
+          latencyMs,
+          usage,
+        };
       } catch (error) {
         return handleFailure(task, error, opts.demo, started);
       }
@@ -405,6 +477,13 @@ export function createLlmClient(options: CreateLlmClientOptions = {}): LlmClient
       if (settings.effectiveMode === "demo") {
         return { ...(await demoResult(task, opts.demo, "demo", started)), toolCalls };
       }
+      const subject = opts.subject ?? currentLlmSubject();
+      if (await overBudget(task, subject)) {
+        return {
+          ...(await demoResult(task, opts.demo, "fallback", started, "budget")),
+          toolCalls,
+        };
+      }
       const redactor = new Redactor(opts.knownNames ?? []);
       const byName = new Map(tools.map((t) => [t.name, t]));
       const toolDefs: ChatCompletionTool[] = tools.map((t) => ({
@@ -412,6 +491,7 @@ export function createLlmClient(options: CreateLlmClientOptions = {}): LlmClient
         function: { name: t.name, description: t.description, parameters: t.parameters },
       }));
       const convo: ChatCompletionMessageParam[] = redactMessages(messages, redactor);
+      logPrompt(task, convo);
       const usage: LlmUsage = { promptTokens: 0, completionTokens: 0 };
 
       try {
@@ -430,6 +510,7 @@ export function createLlmClient(options: CreateLlmClientOptions = {}): LlmClient
           if (u) {
             usage.promptTokens += u.promptTokens;
             usage.completionTokens += u.completionTokens;
+            await charge(subject, u);
           }
           const message = res.choices?.[0]?.message;
           const calls = message?.tool_calls ?? [];
@@ -441,7 +522,15 @@ export function createLlmClient(options: CreateLlmClientOptions = {}): LlmClient
             const latencyMs = Date.now() - started;
             runtimeStatus.lastError = null;
             record(task, "live", "success", latencyMs, usage);
-            return { data, llmMode: "live", model: settings.model, latencyMs, usage, toolCalls };
+            return {
+              data,
+              aiGenerated: true,
+              llmMode: "live",
+              model: settings.model,
+              latencyMs,
+              usage,
+              toolCalls,
+            };
           }
           if (step === settings.maxToolSteps) break;
           convo.push({

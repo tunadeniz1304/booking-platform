@@ -11,14 +11,12 @@ let loaded = false;
  *
  * Değerler hiçbir koşulda loglanmaz.
  */
-export function loadEnv(): void {
-  if (loaded) return;
+export function loadEnv(opts: { cwd?: string; force?: boolean } = {}): void {
+  if (loaded && !opts.force) return;
   loaded = true;
-  if (process.env.SKIP_DOTENV === "1") return;
-  for (const candidate of [
-    path.resolve(process.cwd(), ".env"),
-    path.resolve(process.cwd(), "..", ".env"),
-  ]) {
+  if (process.env.SKIP_DOTENV === "1" && !opts.force) return;
+  const cwd = opts.cwd ?? process.cwd();
+  for (const candidate of [path.resolve(cwd, ".env"), path.resolve(cwd, "..", ".env")]) {
     dotenv.config({ path: candidate, override: false, quiet: true });
   }
 }

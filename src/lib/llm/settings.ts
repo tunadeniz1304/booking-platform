@@ -22,6 +22,8 @@ export const LLM_DEFAULTS = {
   temperature: 0.2,
   maxTokens: 800,
   maxToolSteps: 5,
+  /** Kullanıcı (özne) başına günlük token bütçesi; 0 = sınırsız. */
+  dailyTokenBudgetPerUser: 50_000,
 } as const;
 
 const KEY_VARS = ["LLM_API_KEY", "DEEPSEEK_API_KEY", "EVREN_API_KEY", "OPENAI_API_KEY"] as const;
@@ -43,6 +45,12 @@ const settingsSchema = z.object({
   temperature: z.coerce.number().min(0).max(1.5).default(LLM_DEFAULTS.temperature),
   maxTokens: z.coerce.number().int().min(64).max(4096).default(LLM_DEFAULTS.maxTokens),
   maxToolSteps: z.coerce.number().int().min(1).max(10).default(LLM_DEFAULTS.maxToolSteps),
+  dailyTokenBudgetPerUser: z.coerce
+    .number()
+    .int()
+    .min(0)
+    .max(10_000_000)
+    .default(LLM_DEFAULTS.dailyTokenBudgetPerUser),
   logPrompts: z.boolean().default(false),
 });
 
@@ -89,6 +97,7 @@ export function parseLlmSettings(env: Env): LlmSettings {
     temperature: env.LLM_TEMPERATURE || undefined,
     maxTokens: env.LLM_MAX_TOKENS || undefined,
     maxToolSteps: env.LLM_MAX_TOOL_STEPS || undefined,
+    dailyTokenBudgetPerUser: env.LLM_DAILY_TOKEN_BUDGET_PER_USER || undefined,
     logPrompts: env.LLM_LOG_PROMPTS === "true" && env.NODE_ENV !== "production",
   };
 

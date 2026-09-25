@@ -87,6 +87,10 @@ const MODE_LABEL: Record<string, string> = {
 };
 
 /** LLM çalışma modu rozeti (P2-2: kullanıcı yapay zekâ çıktısını ayırt edebilmeli). */
+/**
+ * AI Act Md. 50 şeffaflık rozeti: her AI çıktısının yanında "AI tarafından üretildi"
+ * ve üretim modu (canlı / demo / yedek) gösterilir.
+ */
 export function LlmBadge({ mode }: { mode?: string | null }) {
   if (!mode) return null;
   const color =
@@ -99,8 +103,9 @@ export function LlmBadge({ mode }: { mode?: string | null }) {
     <span
       className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${color}`}
       title="Yapay zekâ çıktısı — doğruluğunu kontrol edin"
+      data-ai-generated="true"
     >
-      YZ: {MODE_LABEL[mode] ?? mode}
+      AI tarafından üretildi · {MODE_LABEL[mode] ?? mode}
     </span>
   );
 }

@@ -4,6 +4,7 @@ import { translateQuery } from "@/lib/ai/smart-filter";
 import { searchProperties } from "@/lib/search";
 import { getAuth } from "@/lib/auth";
 import { observed } from "@/lib/http/observed";
+import { markAiGenerated, withAiSubject } from "@/lib/http/ai";
 
 const bodySchema = z.object({ text: z.string().trim().min(3).max(300) });
 
@@ -13,7 +14,7 @@ const bodySchema = z.object({ text: z.string().trim().min(3).max(300) });
  */
 export const POST = observed("search.smart", async function smartHandler(req: NextRequest) {
   const { text } = bodySchema.parse(await req.json());
-  const translated = await translateQuery(text);
+  const translated = await withAiSubject(req, () => translateQuery(text));
   const f = translated.data;
   const results = await searchProperties({
     city: f.city,
@@ -30,8 +31,10 @@ export const POST = observed("search.smart", async function smartHandler(req: Ne
     pageSize: 24,
     userId: (await getAuth(req))?.userId,
   });
+  // AI yalnızca filtre çevirisini yapar (işaretli); sonuç listesi deterministik aramadır.
   return NextResponse.json({
-    filters: f,
+    filters: markAiGenerated(f),
+    ai_generated: true,
     llmMode: translated.llmMode,
     reason: translated.reason,
     ...results,

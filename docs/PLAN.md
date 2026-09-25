@@ -10,17 +10,17 @@ Her faz sonunda kalite kapısı: `npm run lint` · `npm run typecheck` · `npm r
 
 ## v3 F0 — Keşif + genişletilmiş kalite kapısı
 
-- [ ] `origin/main` ile senkron
-- [ ] Coverage kapsamı: `src/lib`, `src/app/api`, `services`, `src/worker`; eşik satır 80 / dal 70
-- [ ] `test:int`: CI'da Docker yoksa başarısız; yerelde uyarıyla atlanır
-- [ ] `@prisma/client` / `prisma` / `@prisma/instrumentation` sürüm hizalama
+- [x] `origin/main` ile senkron
+- [x] Coverage kapsamı: `src/lib`, `src/app/api`, `services`, `src/worker`; eşik satır 80 / dal 70
+- [x] `test:int`: CI'da Docker yoksa başarısız; yerelde uyarıyla atlanır
+- [x] `@prisma/client` / `prisma` / `@prisma/instrumentation` sürüm hizalama
 
 ## v3 F1 — LLM sözleşmesi doğrulama + güvenlik & para hataları
 
-- [ ] §3 doğrulama tablosu + v3 eklemeleri (bütçe, `ai` kategorisi, redakte prompt logu, `ai_generated`, `no-restricted-imports`)
-- [ ] Hatalar #1, #2, #3, #5, #8, #11, #12, #13, #14, #16
-- [ ] P0-8 auth sertleştirme (tokenVersion, lockout, e-posta doğrulama, şifre sıfırlama, passkey)
-- [ ] P0-9 demo/prod ayrımı (`DEMO_MODE`)
+- [x] §3 doğrulama tablosu + v3 eklemeleri (bütçe, `ai` kategorisi, redakte prompt logu, `ai_generated`, `no-restricted-imports`)
+- [x] Hatalar #1, #2, #3, #5, #8, #11, #12, #13, #14, #16
+- [x] P0-8 auth sertleştirme (tokenVersion, lockout, e-posta doğrulama, şifre sıfırlama, passkey)
+- [x] P0-9 demo/prod ayrımı (`DEMO_MODE`)
 
 ## v3 F2 — Envanter v2 + saat dilimi + arama doğruluğu
 

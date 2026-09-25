@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
+import PasskeyLoginButton from "@/components/auth/PasskeyLoginButton";
 
 interface LoginResponse {
   user: { id: string; firstName: string; lastName: string; email: string; role: string };
@@ -105,6 +106,14 @@ export default function LoginPage() {
               {submitting ? "Giriş yapılıyor..." : "Giriş Yap"}
             </button>
           </form>
+
+          <PasskeyLoginButton
+            onSuccess={() => {
+              const redirect = new URLSearchParams(window.location.search).get("redirect") ?? "/";
+              router.push(redirect.startsWith("/") && !redirect.startsWith("//") ? redirect : "/");
+              router.refresh();
+            }}
+          />
 
           <p className="mt-6 text-center text-sm text-gray-600">
             Hesabınız yok mu?{" "}

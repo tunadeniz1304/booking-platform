@@ -5,7 +5,9 @@ import dynamic from "next/dynamic";
 import { ApiError, apiFetch } from "@/lib/api-client";
 import { CardValidationError, TEST_CARDS, tokenizeCard } from "@/lib/payment/card-token";
 import { formatMoney, money } from "@/lib/money/money";
+import { deviceFingerprint } from "@/lib/risk/device-fingerprint";
 import type { PayResponse } from "./StripePaymentForm";
+import StepUpDialog from "./StepUpDialog";
 
 // Stripe.js yalnızca `PAYMENT_PROVIDER=stripe` iken ve istemcide yüklenir.
 const StripePaymentForm = dynamic(() => import("./StripePaymentForm"), { ssr: false });
@@ -47,6 +49,8 @@ export default function BookingActions({
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ kind: "error" | "info"; text: string } | null>(null);
+  /** Step-up bekleyen ödeme (mock formda doğrulamadan sonra otomatik yeniden denenir). */
+  const [stepUp, setStepUp] = useState<{ cardToken: string; cardBin?: string } | null>(null);
   const [idemKey] = useState(() =>
     typeof crypto !== "undefined" ? crypto.randomUUID() : String(Date.now())
   );
@@ -65,12 +69,38 @@ export default function BookingActions({
     setMessage({ kind: "error", text: err instanceof ApiError ? err.message : fallback });
   }
 
-  function submitToken(cardToken: string) {
+  function submitToken(cardToken: string, cardBin?: string) {
     return apiFetch<PayResponse>(`/api/bookings/${bookingId}/pay`, {
       method: "POST",
       headers: { "Idempotency-Key": idemKey },
-      body: JSON.stringify({ cardToken }),
+      body: JSON.stringify({
+        cardToken,
+        ...(cardBin ? { cardBin } : {}),
+        ...(deviceFingerprint() ? { deviceId: deviceFingerprint() } : {}),
+      }),
     });
+  }
+
+  const isStepUp = (err: unknown) => err instanceof ApiError && err.code === "STEP_UP_REQUIRED";
+
+  async function afterStepUp() {
+    const pending = stepUp;
+    setStepUp(null);
+    if (!pending?.cardToken) {
+      setMessage({ kind: "info", text: "Doğrulandı. Ödemeyi yeniden gönderebilirsiniz." });
+      return;
+    }
+    setBusy(true);
+    try {
+      const out = await submitToken(pending.cardToken, pending.cardBin);
+      if (out.status === "requires_action")
+        setChallenge(out.challenge?.hint ?? "Doğrulama gerekli");
+      else onChanged();
+    } catch (err) {
+      showError(err, "Ödeme başarısız");
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function stripeSubmit(cardToken: string): Promise<PayResponse> {
@@ -81,7 +111,9 @@ export default function BookingActions({
       if (out.status !== "requires_action") onChanged();
       return out;
     } catch (err) {
-      showError(err, "Ödeme başarısız");
+      // Stripe akışında token tekrar kullanılamaz: doğrulamadan sonra kullanıcı yeniden gönderir.
+      if (isStepUp(err)) setStepUp({ cardToken: "" });
+      else showError(err, "Ödeme başarısız");
       return { status: "failed" };
     } finally {
       setBusy(false);
@@ -119,13 +151,19 @@ export default function BookingActions({
       });
       return;
     }
+    const digits = card.number.replace(/\D/g, "");
+    const cardBin = digits.length >= 6 ? digits.slice(0, 6) : undefined;
     setBusy(true);
     try {
-      const out = await submitToken(cardToken);
+      const out = await submitToken(cardToken, cardBin);
       if (out.status === "requires_action")
         setChallenge(out.challenge?.hint ?? "Doğrulama gerekli");
       else onChanged();
     } catch (err) {
+      if (isStepUp(err)) {
+        setStepUp({ cardToken, cardBin });
+        return;
+      }
       setMessage({
         kind: "error",
         text: err instanceof ApiError ? err.message : "Ödeme başarısız",
@@ -288,6 +326,10 @@ export default function BookingActions({
         >
           Rezervasyonu iptal et
         </button>
+      )}
+
+      {stepUp && (
+        <StepUpDialog onVerified={() => void afterStepUp()} onCancel={() => setStepUp(null)} />
       )}
 
       {message && (

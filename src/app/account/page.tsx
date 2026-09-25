@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import { logout } from "@/lib/api-client";
+import PasskeyManager from "@/components/account/PasskeyManager";
 
 interface User {
   id: string;
@@ -245,6 +246,8 @@ export default function AccountPage() {
             </div>
           </div>
         )}
+
+        <PasskeyManager />
 
         <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-2">
           {/* Rezervasyonlar */}

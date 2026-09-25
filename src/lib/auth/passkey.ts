@@ -27,6 +27,8 @@ import { logger, errorFields } from "@/lib/observability/logger";
 
 const REG_PREFIX = "webauthn:reg:";
 const AUTH_PREFIX = "webauthn:auth:";
+const STEP_UP_PREFIX = "webauthn:stepup:";
+const STEP_UP_OK_PREFIX = "stepup:ok:";
 
 function rp() {
   const c = getConfig();
@@ -151,6 +153,27 @@ export async function verifyPasskeyLogin(
   if (stored.user.lockedUntil && stored.user.lockedUntil > now) {
     throw new UnauthorizedError("Hesap geçici olarak kilitli");
   }
+  await verifyAssertion(stored, response, expectedChallenge, now, "passkey login rejected");
+  const { id, role, email, firstName, lastName } = stored.user;
+  return { id, role, email, firstName, lastName };
+}
+
+interface StoredCredential {
+  id: string;
+  publicKey: Uint8Array | Buffer;
+  counter: number;
+  transports: string[];
+}
+
+/** Giriş ve step-up için ortak doğrulama + koşullu sayaç güncellemesi. */
+async function verifyAssertion(
+  stored: StoredCredential,
+  response: AuthenticationResponseJSON,
+  expectedChallenge: string,
+  now: Date,
+  logMessage: string,
+  requireUserVerification = false
+): Promise<void> {
   const { rpID, origin } = rp();
   let verification;
   try {
@@ -159,7 +182,7 @@ export async function verifyPasskeyLogin(
       expectedChallenge,
       expectedOrigin: origin,
       expectedRPID: rpID,
-      requireUserVerification: false,
+      requireUserVerification,
       credential: {
         id: stored.id,
         publicKey: new Uint8Array(stored.publicKey),
@@ -168,7 +191,7 @@ export async function verifyPasskeyLogin(
       },
     });
   } catch (error) {
-    logger.warn(errorFields(error), "passkey login rejected");
+    logger.warn(errorFields(error), logMessage);
     throw new UnauthorizedError("Passkey doğrulanamadı");
   }
   if (!verification.verified) throw new UnauthorizedError("Passkey doğrulanamadı");
@@ -182,8 +205,59 @@ export async function verifyPasskeyLogin(
     data: { counter: newCounter, lastUsedAt: now },
   });
   if (updated.count !== 1) throw new UnauthorizedError("Passkey doğrulanamadı");
-  const { id, role, email, firstName, lastName } = stored.user;
-  return { id, role, email, firstName, lastName };
+}
+
+/**
+ * P1-8 risk bazlı step-up: oturum açık kullanıcıdan yalnızca KENDİ passkey'leriyle
+ * (allowCredentials) yeni bir doğrulama istenir. Başarılı doğrulama STEP_UP_TTL_SECONDS
+ * ömürlü, tek kullanımlık bir işaret bırakır; ödeme bu işareti consumeStepUp ile tüketir.
+ */
+export async function stepUpOptions(
+  userId: string
+): Promise<PublicKeyCredentialRequestOptionsJSON> {
+  const creds = await prisma.webAuthnCredential.findMany({
+    where: { userId },
+    select: { id: true, transports: true },
+  });
+  if (creds.length === 0) throw new ValidationError("Hesapta kayıtlı passkey yok");
+  const { rpID } = rp();
+  const options = await generateAuthenticationOptions({
+    rpID,
+    userVerification: "required",
+    allowCredentials: creds.map((c) => ({
+      id: c.id,
+      transports: c.transports as AuthenticatorTransportFuture[],
+    })),
+  });
+  await storeChallenge(`${STEP_UP_PREFIX}${userId}`, options.challenge);
+  return options;
+}
+
+export async function verifyStepUp(
+  userId: string,
+  response: AuthenticationResponseJSON,
+  now = new Date()
+): Promise<{ validForSeconds: number }> {
+  const expectedChallenge = await takeChallenge(`${STEP_UP_PREFIX}${userId}`);
+  const stored = await prisma.webAuthnCredential.findUnique({
+    where: { id: response.id },
+    select: { id: true, userId: true, publicKey: true, counter: true, transports: true },
+  });
+  // Başka kullanıcının passkey'i ile step-up yapılamaz (aynı hata; varlık sızdırılmaz).
+  if (!stored || stored.userId !== userId) throw new UnauthorizedError("Passkey tanınmadı");
+  await verifyAssertion(stored, response, expectedChallenge, now, "passkey step-up rejected", true);
+  const ttl = getConfig().STEP_UP_TTL_SECONDS;
+  await redis.set(`${STEP_UP_OK_PREFIX}${userId}`, now.toISOString(), { ex: ttl });
+  return { validForSeconds: ttl };
+}
+
+/** Geçerli step-up işareti varsa tüketir (tek kullanımlık). */
+export async function consumeStepUp(userId: string): Promise<boolean> {
+  return Boolean(await redis.getdel(`${STEP_UP_OK_PREFIX}${userId}`));
+}
+
+export async function hasPasskey(userId: string): Promise<boolean> {
+  return (await prisma.webAuthnCredential.count({ where: { userId } })) > 0;
 }
 
 export async function listPasskeys(userId: string) {

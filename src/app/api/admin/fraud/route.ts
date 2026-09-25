@@ -5,13 +5,13 @@ import { requireRole } from "@/lib/auth";
 import { toErrorResponse } from "@/lib/http/errors";
 import { audit } from "@/lib/admin/audit";
 
-/** Fraud inceleme kuyruğu (ADMIN): review/block kararları ve kural açıklamaları. */
+/** Fraud inceleme kuyruğu (ADMIN): review/deny kararları ve sebep kodları ("block" = v1 kayıtları). */
 export async function GET(req: NextRequest) {
   try {
     await requireRole(req, ["ADMIN"]);
     return NextResponse.json(
       await prisma.fraudCheck.findMany({
-        where: { decision: { in: ["review", "block"] } },
+        where: { decision: { in: ["review", "deny", "block"] } },
         orderBy: { createdAt: "desc" },
         take: 100,
       })

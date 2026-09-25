@@ -84,9 +84,34 @@ const schema = z.object({
   TRANSFER_MIN_HOURS_BEFORE_CHECKIN: int(48, 0, 24 * 60),
   TRANSFER_LINK_TTL_HOURS: int(24 * 7, 1, 24 * 60),
 
-  // Fraud
-  FRAUD_REVIEW_THRESHOLD: int(40, 0, 100),
+  // Fraud v2 (P1-8): skor → allow < challenge_3ds < step_up_passkey < review < deny
+  FRAUD_CHALLENGE_THRESHOLD: int(30, 0, 100),
+  FRAUD_STEP_UP_THRESHOLD: int(45, 0, 100),
+  FRAUD_REVIEW_THRESHOLD: int(60, 0, 100),
   FRAUD_BLOCK_THRESHOLD: int(80, 0, 100),
+  /** Hız kuralları: kullanıcı / 10 dk, istemci anahtarı / saat, kart / saat. */
+  FRAUD_VELOCITY_USER_MAX: int(3, 1, 1000),
+  FRAUD_VELOCITY_IP_MAX: int(10, 1, 10_000),
+  FRAUD_VELOCITY_CARD_MAX: int(5, 1, 1000),
+  /** Yeni hesapta "yüksek tutar" eşiği (minor-unit; 2.000.000 = 20.000 TRY). */
+  FRAUD_HIGH_AMOUNT_MINOR: int(2_000_000, 1),
+  /** Aynı cihaz izinde bundan fazla farklı hesap → device_shared. */
+  FRAUD_DEVICE_MAX_ACCOUNTS: int(3, 1, 100),
+  /** Cihaz izi ↔ hesap eşleşmelerinin tutulma süresi (gün). */
+  FRAUD_DEVICE_TTL_DAYS: int(90, 1, 365),
+  /** Passkey step-up doğrulamasının geçerlilik süresi (tek kullanımlık). */
+  STEP_UP_TTL_SECONDS: int(300, 30, 3600),
+
+  // Mesajlaşma (P1-6)
+  MESSAGE_MAX_LENGTH: int(2000, 50, 20_000),
+  /** Thread başına döndürülen azami mesaj. */
+  MESSAGE_PAGE_SIZE: int(200, 10, 1000),
+  /** SSE bağlantısı canlı tutma aralığı. */
+  MESSAGE_SSE_HEARTBEAT_MS: int(25_000, 1000, 120_000),
+
+  // Yorum moderasyonu (P1-7)
+  /** Bu kadar farklı kullanıcı şikâyeti → yorum otomatik gizlenir (admin incelemesine düşer). */
+  REVIEW_REPORT_HIDE_THRESHOLD: int(3, 1, 100),
 
   // Güvenlik / ağ
   TRUSTED_PROXY_HOPS: int(0, 0, 10),

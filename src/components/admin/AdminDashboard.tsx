@@ -289,19 +289,24 @@ function EventsCard() {
   );
 }
 
-function reasonsText(reasons: unknown): string {
-  if (Array.isArray(reasons)) {
-    return reasons
-      .map((r) =>
-        typeof r === "string"
-          ? r
-          : r && typeof r === "object" && "code" in r
-            ? String((r as { code: unknown }).code)
-            : JSON.stringify(r)
-      )
-      .join(", ");
-  }
-  return reasons ? JSON.stringify(reasons) : "—";
+interface FraudReason {
+  code: string;
+  points: number | null;
+  detail: string;
+}
+
+/** Kural isabetlerini (`{rule, points, detail}`) okunur sebep listesine çevirir. */
+function fraudReasons(reasons: unknown): FraudReason[] {
+  if (!Array.isArray(reasons)) return [];
+  return reasons.map((r) => {
+    if (typeof r === "string") return { code: r, points: null, detail: "" };
+    const o = (r ?? {}) as Record<string, unknown>;
+    return {
+      code: String(o.rule ?? o.code ?? "?"),
+      points: typeof o.points === "number" ? o.points : null,
+      detail: typeof o.detail === "string" ? o.detail : "",
+    };
+  });
 }
 
 function FraudCard() {
@@ -336,9 +341,19 @@ function FraudCard() {
               <span>
                 Rezervasyon {f.bookingId} · kullanıcı {f.userId} · skor <strong>{f.score}</strong> ·{" "}
                 {f.decision}
-                <span className="block text-xs text-gray-700">
-                  Kurallar: {reasonsText(f.reasons)}
-                </span>
+                <ul
+                  className="mt-1 list-disc pl-5 text-xs text-gray-700"
+                  aria-label="Sebep kodları"
+                >
+                  {fraudReasons(f.reasons).map((r, i) => (
+                    <li key={`${r.code}-${i}`}>
+                      <code>{r.code}</code>
+                      {r.points !== null && ` (+${r.points})`}
+                      {r.detail && ` — ${r.detail}`}
+                    </li>
+                  ))}
+                  {fraudReasons(f.reasons).length === 0 && <li>Sebep kaydı yok</li>}
+                </ul>
               </span>
               <span className="flex gap-2">
                 <Button variant="secondary" onClick={() => resolve(f.id, "legit")}>

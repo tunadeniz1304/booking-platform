@@ -26,7 +26,8 @@ import { audit } from "@/lib/admin/audit";
 import { getPaymentProvider, type AuthorizeResult } from "./index";
 import type { WebhookEvent } from "./webhook";
 import type { PaymentChallenge } from "./provider";
-import { assessPayment } from "@/lib/risk/fraud";
+import { assessPayment, type FraudDecision } from "@/lib/risk/fraud";
+import { consumeStepUp, hasPasskey } from "@/lib/auth/passkey";
 
 /**
  * Ödeme orkestrasyonu (P0-5, v3 P0-6).
@@ -532,7 +533,14 @@ export async function payForBooking(input: {
   cardToken: string;
   idempotencyKey: string;
   /** Risk sinyalleri (route'tan): istemci anahtarı ve ülke bilgisi. */
-  context?: { ip?: string; ipCountry?: string | null; billingCountry?: string | null };
+  context?: {
+    ip?: string;
+    ipCountry?: string | null;
+    billingCountry?: string | null;
+    /** Kartın ilk 6 hanesi (BIN) ve istemci cihaz izi (P1-8). */
+    cardBin?: string | null;
+    deviceId?: string | null;
+  };
 }): Promise<PayOutcome> {
   // IDOR kontrolü kilitten önce (başkasının rezervasyonuna kilit bile alınmaz).
   await loadPayable(input.bookingId, input.userId);
@@ -555,7 +563,7 @@ async function payLocked(input: Parameters<typeof payForBooking>[0]): Promise<Pa
   }
   assertPayable(booking);
 
-  // P1-10: kural tabanlı risk skoru → allow / review (3DS zorunlu) / block.
+  // P1-8 fraud v2: allow / challenge_3ds / step_up_passkey / review / deny (yalnızca kurallar).
   const [account, recentFailed] = await Promise.all([
     prisma.user.findUnique({ where: { id: input.userId }, select: { createdAt: true } }),
     prisma.payment.count({
@@ -575,7 +583,17 @@ async function payLocked(input: Parameters<typeof payForBooking>[0]): Promise<Pa
     recentFailedPayments: recentFailed,
     ipCountry: input.context?.ipCountry,
     billingCountry: input.context?.billingCountry,
+    cardBin: input.context?.cardBin,
+    deviceId: input.context?.deviceId,
   });
+  const gate = await resolveStepUp(input.userId, risk.decision);
+  if (gate === "fallback_3ds") {
+    risk.hits.push({
+      rule: "step_up_unavailable_3ds",
+      points: 0,
+      detail: "Hesapta passkey yok; step-up yerine 3DS istendi",
+    });
+  }
   await prisma.fraudCheck.create({
     data: {
       bookingId: booking.id,
@@ -585,7 +603,18 @@ async function payLocked(input: Parameters<typeof payForBooking>[0]): Promise<Pa
       reasons: risk.hits as unknown as Prisma.InputJsonValue,
     },
   });
-  if (risk.decision === "block") {
+  if (gate === "required") {
+    paymentsTotal.inc({ outcome: "step_up_required" });
+    throw new HttpError(
+      403,
+      "STEP_UP_REQUIRED",
+      "Bu ödeme için passkey ile yeniden doğrulama gerekli",
+      {
+        score: risk.score,
+      }
+    );
+  }
+  if (risk.decision === "deny") {
     paymentsTotal.inc({ outcome: "fraud_blocked" });
     throw new HttpError(403, "FRAUD_BLOCKED", "Ödeme güvenlik kontrolünden geçemedi", {
       score: risk.score,
@@ -596,7 +625,10 @@ async function payLocked(input: Parameters<typeof payForBooking>[0]): Promise<Pa
     amount: amountOf(booking),
     cardToken: input.cardToken,
     idempotencyKey: `auth:${booking.id}:${input.idempotencyKey}`,
-    metadata: { bookingId: booking.id, ...(risk.decision === "review" ? { force3ds: "1" } : {}) },
+    metadata: {
+      bookingId: booking.id,
+      ...(gate === "force_3ds" || gate === "fallback_3ds" ? { force3ds: "1" } : {}),
+    },
   });
 
   if (result.status === "declined") {
@@ -622,6 +654,19 @@ async function payLocked(input: Parameters<typeof payForBooking>[0]): Promise<Pa
     return { status: "requires_action", bookingId: booking.id, challenge: result.challenge };
   }
   return captureAndConfirm(booking, result.providerRef);
+}
+
+type StepUpGate = "proceed" | "force_3ds" | "fallback_3ds" | "required";
+
+/**
+ * Karar → ödeme kapısı. step_up_passkey: geçerli (tek kullanımlık) step-up işareti varsa
+ * devam; yoksa passkey'i olan kullanıcıdan step-up istenir, olmayandan 3DS.
+ */
+async function resolveStepUp(userId: string, decision: FraudDecision): Promise<StepUpGate> {
+  if (decision === "challenge_3ds" || decision === "review") return "force_3ds";
+  if (decision !== "step_up_passkey") return "proceed";
+  if (await consumeStepUp(userId)) return "proceed";
+  return (await hasPasskey(userId)) ? "required" : "fallback_3ds";
 }
 
 /** 3DS doğrulamasını tamamlar. */

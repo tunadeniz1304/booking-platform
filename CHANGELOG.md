@@ -13,12 +13,21 @@ Bu dosyadaki tüm önemli değişiklikler burada belgelenir. Biçim [Keep a Chan
 - **v3 F3 — Vergi/ücret motoru (ADR 0012):** veri tabanlı kurallar (`data/tax-rules.json` / `TAX_RULES_JSON`), dahil/hariç vergiler, tarih aralıklı kurallar, `SERVICE_FEE_BPS`; arama kartı, PDP, checkout ve tahsilat aynı vergiler dahil toplamı gösterir.
 - **v3 F3 — Kalıcı FX (ADR 0012):** `FxRate` tablosu, günlük `fx-refresh` işi (TCMB → ECB → statik yedek, bayat işareti); teklif kur tablosunu sabitler (`fxSnapshotId`), tahsilat teklifteki tutarla yapılır.
 - **v3 F3 — Fiyat içgörüsü ve alarmı:** split conformal tahmin aralığı (%90, `PRICE_INSIGHT_ALPHA`) ile düşük/tipik/yüksek etiketi (`GET /api/price-insight`); `PriceAlert` ve günlük `price-alerts` işi, toplam Omnibus referansının (son 30 günün en düşüğü, "önceki fiyat") altına inince e-posta gönderir (`/api/price-alerts`).
+- **v3 F4 — Gerçek Stripe (P0-6, #10):** Stripe SDK sağlayıcısı, imzalı webhook ve Payment Element; ödeme kilidi ile tek tahsilat.
+- **v3 F4 — Ödeme sagası (P0-7, ADR 0013):** `hold → authorize → capture → confirm` telafili saga (iade → void → tutmayı bırak), onay sonrası BullMQ FlowProducer ile `invoice → notify`; `saga_compensation_total` metriği, adım başına hata enjeksiyonu testleri.
+- **v3 F4 — Payout ve fatura (#4):** devir sonrası satıcı `Payout` kaydı ve mock `payouts` işi (`PAYOUT_CRON`); mock e-Arşiv PDF fatura (`GET /api/bookings/:id/invoice`, "DEMO — mali değeri yoktur").
+- **v3 F4 — FX saklama:** eski `FxRate` satırları saklama penceresine göre budanır.
 
 ### Changed
 
+- Tahsilat hatası artık provizyonu void eder, ödemeyi `VOIDED` yapar ve tutmayı hemen bırakır (ADR 0013).
 - Oda API yanıtları `maxOccupancy` döner; `capacity` bir sürüm boyunca takma ad olarak korunur.
 - Pazarlık özelliği kaldırıldı, tek fiyat kaynağı `priceStay` (ADR 0016).
 - Legacy fiyat motoru (`src/lib/pricing/engine.ts`) `event-signals` içine katlandı; `pricing-service` ve canlı ısı haritası tek motoru kullanır (#9).
+
+### Fixed
+
+- Devredilen rezervasyonun iptal iadesi yeni sahibe değil ödemeyi yapan alıcıya gider (v3#4).
 
 ### Removed
 

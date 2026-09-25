@@ -37,9 +37,9 @@ Her faz sonunda kalite kapısı: `npm run lint` · `npm run typecheck` · `npm r
 
 ## v3 F4 — Ödeme, saga, devir ledger'ı
 
-- [ ] P0-6 gerçek Stripe + ödeme kilidi; #10
-- [ ] P0-7 saga + telafi
-- [ ] #4 devir iadesi + payout ledger; mock e-Arşiv PDF
+- [x] P0-6 gerçek Stripe + ödeme kilidi; #10
+- [x] P0-7 saga + telafi
+- [x] #4 devir iadesi + payout ledger; mock e-Arşiv PDF
 
 ## v3 F5 — Hibrit arama, LTR, deneyler
 

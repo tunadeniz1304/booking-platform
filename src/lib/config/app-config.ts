@@ -49,6 +49,8 @@ const schema = z.object({
   FX_REFRESH_CRON: z.string().min(1).default("45 12 * * *"),
   /** Bu kadar saatten eski kur tablosu "stale" sayılır. */
   FX_STALE_HOURS: int(72, 1, 24 * 30),
+  /** Bu kadar günden eski, rezervasyona bağlı olmayan kur satırları budanır (en yenisi kalır). */
+  FX_RETENTION_DAYS: int(90, 1, 3650),
   /** Güncel tablo bellekte bu kadar saniye tutulur. */
   FX_CACHE_SECONDS: int(60, 0, 3600),
   /** Tesis para birimi dışında tahsilat yapılabilecek para birimleri ("USD,EUR"); boş → yalnızca tesis. */

@@ -166,3 +166,27 @@ export function chargeAmount(total: Money, currency: CurrencyCode, table: FxTabl
   const charged = total.currency === currency ? total : convert(total, currency, table);
   return { currency, total: money(charged.amount, currency).amount, fxSnapshotId: table.id };
 }
+
+const DAY_MS = 86_400_000;
+
+/**
+ * Kur tablosu saklama politikası: `FX_RETENTION_DAYS`'ten eski ve hiçbir rezervasyonun
+ * bağlı olmadığı satırlar silinir. En yeni satır her durumda korunur (tablo asla boşalmaz);
+ * rezervasyona bağlı satırlar denetim/iade için kalır.
+ */
+export async function pruneFxRates(now: Date = new Date()): Promise<number> {
+  const cutoff = new Date(now.getTime() - getConfig().FX_RETENTION_DAYS * DAY_MS);
+  const newest = await prisma.fxRate.findFirst({
+    orderBy: { fetchedAt: "desc" },
+    select: { id: true },
+  });
+  const { count } = await prisma.fxRate.deleteMany({
+    where: {
+      fetchedAt: { lt: cutoff },
+      bookings: { none: {} },
+      ...(newest ? { id: { not: newest.id } } : {}),
+    },
+  });
+  if (count > 0) logger.info({ count, cutoff: cutoff.toISOString() }, "eski kur satırları budandı");
+  return count;
+}

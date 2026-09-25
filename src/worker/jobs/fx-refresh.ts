@@ -1,8 +1,11 @@
 import type { Queue } from "bullmq";
 import { getConfig } from "@/lib/config/app-config";
-import { refreshFxRates } from "@/lib/fx/store";
+import { pruneFxRates, refreshFxRates } from "@/lib/fx/store";
 
-/** Günlük kur yenileme (P0-5): TCMB → ECB → statik yedek; her çalışma yeni `FxRate` satırı. */
+/**
+ * Günlük kur yenileme (P0-5): TCMB → ECB → statik yedek; her çalışma yeni `FxRate` satırı.
+ * Ardından saklama süresini aşan, rezervasyona bağlı olmayan satırlar budanır.
+ */
 export const FX_REFRESH_JOB = "fx-refresh";
 
 /** İdempotent scheduler (birden çok worker güvenli); desen `FX_REFRESH_CRON`, UTC. */
@@ -14,7 +17,8 @@ export async function scheduleFxRefresh(queue: Queue): Promise<void> {
   );
 }
 
-export async function runFxRefresh(): Promise<{ source: string; stale: boolean }> {
+export async function runFxRefresh(): Promise<{ source: string; stale: boolean; pruned: number }> {
   const table = await refreshFxRates();
-  return { source: table.source, stale: table.stale };
+  const pruned = await pruneFxRates();
+  return { source: table.source, stale: table.stale, pruned };
 }

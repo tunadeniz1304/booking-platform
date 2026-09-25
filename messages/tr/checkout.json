@@ -1,0 +1,22 @@
+{
+  "loadFailed": "Konaklama bilgileri alınamadı.",
+  "priceChanged": "Fiyat değişti. Güncel fiyatı kontrol edip tekrar onaylayın.",
+  "quoteExpired": "Fiyat teklifinin süresi doldu; güncel fiyat yüklendi.",
+  "createFailed": "Rezervasyon oluşturulamadı.",
+  "invalidResponse": "Rezervasyon yanıtı geçersiz.",
+  "missingTitle": "Rezervasyon bilgileri eksik",
+  "missingHint": "Lütfen tekrar arama yapın.",
+  "backHome": "Ana sayfaya dön",
+  "title": "Rezervasyonu Tamamla",
+  "stayDetails": "Konaklama Bilgileri",
+  "stay": "Konaklama",
+  "location": "Konum",
+  "room": "Oda",
+  "dates": "Giriş – Çıkış",
+  "guests": "Misafir",
+  "priceSummary": "Fiyat Özeti",
+  "calculating": "Fiyat hesaplanıyor…",
+  "totalNotice": "Gösterilen toplam tahsil edilecek tutarın aynısıdır (konaklama vergisi dahil).",
+  "processing": "İşleniyor...",
+  "loading": "Yükleniyor..."
+}

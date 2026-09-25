@@ -1,0 +1,5 @@
+{
+  "title": "Mailbox (demo)",
+  "subtitle": "When SMTP is not configured, emails appear here.",
+  "empty": "No emails yet."
+}

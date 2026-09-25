@@ -1,0 +1,95 @@
+{
+  "page": {
+    "title": "Yönetim paneli",
+    "intro": "Kuyrukları izleyin, olay sinyallerini onaylayın ve kullanıcı rollerini yönetin."
+  },
+  "decisionSaved": "Karar kaydedildi.",
+  "percent": "%{value}",
+  "llm": {
+    "title": "LLM durumu",
+    "setting": "Ayar",
+    "effectiveMode": "Etkin mod",
+    "model": "Model",
+    "server": "Sunucu",
+    "hasKey": "Anahtar tanımlı",
+    "jsonMode": "JSON modu",
+    "lastError": "Son hata",
+    "yes": "Evet",
+    "no": "Hayır",
+    "unknown": "Bilinmiyor",
+    "supported": "Var",
+    "unsupported": "Yok"
+  },
+  "outbox": {
+    "title": "Outbox",
+    "empty": "Outbox boş.",
+    "deadTitle": "DEAD mesajlar",
+    "deadEmpty": "DEAD mesaj yok.",
+    "attempts": "{count} deneme",
+    "requeue": "Yeniden kuyruğa al",
+    "requeued": "Mesaj yeniden kuyruğa alındı."
+  },
+  "events": {
+    "title": "Olay sinyali kuyruğu",
+    "textLabel": "Metinden olay öner",
+    "textHint": "Ör. haber metni: 'İzmir'de 12–15 Ekim arası uluslararası fuar düzenlenecek.' Öneri onaylanmadan fiyata yansımaz.",
+    "extracting": "Çıkarılıyor…",
+    "create": "Öneri oluştur",
+    "created": "Öneri oluşturuldu: {title}",
+    "applied": "İşlem uygulandı.",
+    "empty": "Olay yok.",
+    "impact": "etki {impact}/10",
+    "approve": "Onayla",
+    "reject": "Reddet",
+    "rollback": "Geri al",
+    "status": {
+      "PROPOSED": "Önerildi",
+      "APPROVED": "Onaylı",
+      "REJECTED": "Reddedildi",
+      "ROLLED_BACK": "Geri alındı"
+    }
+  },
+  "fraud": {
+    "title": "Fraud inceleme kuyruğu",
+    "empty": "İncelenecek kayıt yok.",
+    "booking": "Rezervasyon {id}",
+    "user": "kullanıcı {id}",
+    "score": "skor",
+    "reasonsLabel": "Sebep kodları",
+    "noReasons": "Sebep kaydı yok",
+    "legit": "Meşru",
+    "fraud": "Dolandırıcılık"
+  },
+  "moderation": {
+    "title": "Yorum moderasyon kuyruğu",
+    "empty": "İncelenecek yorum yok.",
+    "hidden": "Şikâyetle gizlendi",
+    "preReview": "Yayın öncesi inceleme",
+    "reports": "{count} şikâyet",
+    "whyFlagged": "Neden işaretlendi:",
+    "publish": "Yayınla",
+    "remove": "Kaldır"
+  },
+  "experiments": {
+    "title": "A/B deneyleri",
+    "empty": "Tanımlı deney yok.",
+    "on": "açık",
+    "off": "kapalı",
+    "columns": {
+      "arm": "Kol",
+      "exposures": "Maruziyet",
+      "users": "Kullanıcı",
+      "conversions": "Dönüşüm",
+      "rate": "Oran",
+      "ci": "%95 Wilson"
+    }
+  },
+  "roles": {
+    "title": "Kullanıcı rolü değiştir",
+    "userId": "Kullanıcı kimliği",
+    "userIdHint": "Kendi rolünüzü değiştiremezsiniz.",
+    "newRole": "Yeni rol",
+    "submit": "Rolü güncelle",
+    "updated": "Rol güncellendi: {role} (en geç 15 dk içinde yansır)."
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "title": "Gezi planlayıcı",
+  "intro": "Şehirleri ve gün sayısını girin; en kısa rotayı ve her durak için uygun konaklamayı önerelim.",
+  "form": {
+    "title": "Gezi bilgileri",
+    "cities": "Şehirler (virgülle ayırın, en fazla 6)",
+    "days": "Toplam gün",
+    "guests": "Misafir sayısı",
+    "startDate": "Başlangıç tarihi",
+    "submit": "Plan oluştur",
+    "submitting": "Planlanıyor…"
+  },
+  "result": {
+    "title": "Önerilen plan",
+    "route": "Rota: <b>{route}</b> · yaklaşık {km} km",
+    "nights": "{count} gece",
+    "hold": "Tut (hold)",
+    "holding": "Tutuluyor…",
+    "holdLabel": "{city} konaklamasını tut (hold)",
+    "noStay": "Bu tarihlerde uygun konaklama bulunamadı.",
+    "total": "Konaklama toplamı: <b>{amount}</b>",
+    "note": "Plan rezervasyon yapmaz; «Tut» ile odayı kısa süre ayırıp ödemeye geçersiniz."
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "page": {
+    "title": "Gelir paneli",
+    "intro": "Doluluk, ADR ve RevPAR'ı izleyin; fiyat önerilerini katkı tablosuyla inceleyip kabul edin veya reddedin."
+  },
+  "loading": "Yükleniyor…",
+  "loadingProperties": "Mülkler yükleniyor…",
+  "noProperties": "Henüz bir mülkünüz yok.",
+  "propertyLabel": "Mülk",
+  "percent": "%{value}",
+  "factor": {
+    "occupancy": "Doluluk",
+    "lead_time": "Varışa kalan süre",
+    "holiday": "Resmî tatil",
+    "event": "Onaylı etkinlik",
+    "clamp": "Taban/tavan"
+  },
+  "kpis": {
+    "title": "Performans ({from} – {to})",
+    "occupancy": "Doluluk",
+    "adr": "ADR",
+    "revpar": "RevPAR",
+    "revenue": "Gelir",
+    "sold": "{sold} / {available} oda-gece satıldı (onaylı ve tamamlanan rezervasyonlar)."
+  },
+  "pickup": {
+    "title": "Pickup",
+    "noData": "Veri yok.",
+    "chartTitle": "Pickup grafiği",
+    "chartDesc": "Son {count} günde girilen rezervasyonların penceredeki oda-gece toplamı; son değer {last}.",
+    "caption": "Çizgi: penceredeki toplam oda-gece · Çubuk: o gün girilen oda-gece"
+  },
+  "suggestions": {
+    "title": "Fiyat önerileri",
+    "intro": "Öneri deterministik motordan gelir ve her zaman taban/tavan sınırı içindedir; açıklama cümlesini yapay zekâ yazar. Kabul ettiğiniz fiyat sabitlenir, reddetmek hiçbir fiyatı değiştirmez.",
+    "room": "Oda",
+    "generate": "Öneri üret",
+    "generated": "{count} öneri üretildi. Fiyatlar siz kabul edene kadar değişmez.",
+    "empty": "Bekleyen öneri yok.",
+    "bounds": "(sınır {floor} – {ceiling})",
+    "caption": "Öneri katkı tablosu",
+    "columns": {
+      "factor": "Faktör",
+      "detail": "Ayrıntı",
+      "multiplier": "Çarpan",
+      "contribution": "Katkı"
+    },
+    "accept": "Kabul et",
+    "reject": "Reddet"
+  }
+}

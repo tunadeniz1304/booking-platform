@@ -1,0 +1,22 @@
+{
+  "loadFailed": "The property details could not be loaded.",
+  "priceChanged": "The price has changed. Check the current price and confirm again.",
+  "quoteExpired": "The price quote expired; the current price has been loaded.",
+  "createFailed": "The booking could not be created.",
+  "invalidResponse": "The booking response was invalid.",
+  "missingTitle": "Booking details are missing",
+  "missingHint": "Please search again.",
+  "backHome": "Back to home",
+  "title": "Complete booking",
+  "stayDetails": "Stay details",
+  "stay": "Property",
+  "location": "Location",
+  "room": "Room",
+  "dates": "Check-in – Check-out",
+  "guests": "Guests",
+  "priceSummary": "Price summary",
+  "calculating": "Calculating price…",
+  "totalNotice": "The total shown is exactly the amount that will be charged (accommodation tax included).",
+  "processing": "Processing...",
+  "loading": "Loading..."
+}

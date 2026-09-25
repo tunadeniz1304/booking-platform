@@ -1,0 +1,59 @@
+{
+  "widget": {
+    "selectDates": "Tarih seçin",
+    "title": "Rezervasyon Yap",
+    "dates": "Giriş - Çıkış",
+    "guests": "Misafir Sayısı",
+    "guestOption": "{count} misafir",
+    "room": "Oda Seçimi",
+    "noRooms": "Uygun oda yok",
+    "roomOption": "{name} - {capacity} kişi - {bedType}",
+    "ratePlan": "Fiyat seçeneği",
+    "refundable": "İptal politikasına göre iade",
+    "nonRefundable": "İade edilemez",
+    "breakfastIncluded": "Kahvaltı dahil",
+    "calculating": "Fiyat hesaplanıyor…",
+    "submit": "Rezervasyonu Onayla"
+  },
+  "priceInsight": {
+    "title": "Fiyat içgörüsü",
+    "labelLine": "Bu tarihler için fiyat <b>{label}</b> (gecelik {nightly}).",
+    "labels": {
+      "low": "düşük",
+      "typical": "olağan",
+      "high": "yüksek"
+    },
+    "notEnoughData": "Bu oda için fiyatı karşılaştıracak kadar veri henüz yok.",
+    "interval": "Beklenen gecelik fiyat aralığı ({level} güven): {low} – {high}",
+    "setAlert": "Fiyat alarmı kur",
+    "alertCreated": "Fiyat alarmı kuruldu.",
+    "alertLoginRequired": "Fiyat alarmı kurmak için giriş yapın.",
+    "alertFailed": "Fiyat alarmı kurulamadı."
+  },
+  "status": {
+    "HELD": "Oda sizin için tutuluyor — ödemeyi tamamlayın",
+    "PENDING": "Rezervasyon beklemede",
+    "CONFIRMED": "Rezervasyonunuz onaylandı",
+    "COMPLETED": "Konaklama tamamlandı",
+    "CANCELLED": "Rezervasyon iptal edildi",
+    "EXPIRED": "Ödeme süresi doldu"
+  },
+  "detail": {
+    "loadFailed": "Rezervasyon yüklenemedi",
+    "loginRequiredTitle": "Giriş gerekli",
+    "loginRequiredText": "Rezervasyonunuzu görüntülemek için giriş yapın.",
+    "login": "Giriş Yap",
+    "loading": "Yükleniyor...",
+    "error": "Hata",
+    "backHome": "Ana sayfaya dön",
+    "bookingNumber": "Rezervasyon numarası: <b>{id}</b>",
+    "checkIn": "Giriş",
+    "checkOut": "Çıkış",
+    "roomGuests": "Oda / Misafir",
+    "roomGuestsValue": "{room} · {count} kişi",
+    "total": "Toplam Tutar",
+    "viewProperty": "Konaklamayı Görüntüle",
+    "myBookings": "Rezervasyonlarım",
+    "print": "Yazdır"
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "title": "Misafir yorumları",
+  "verification": "Yorumlar nasıl doğrulanır? Yalnızca bu platformda rezervasyon yapıp konaklamasını tamamlamış misafir, o rezervasyon için bir kez yorum yazabilir. Küfür veya kişisel bilgi içeren yorumlar yayından önce incelenir; şikâyet eşiğini aşan yorumlar gizlenir. Yorumlar için ödeme veya teşvik verilmez; olumsuz yorumlar da yayımlanır.",
+  "loading": "Yorumlar yükleniyor…",
+  "empty": "Henüz yorum yok.",
+  "verifiedStay": "Doğrulanmış konaklama",
+  "hostReply": "Ev sahibinin yanıtı",
+  "starsLabel": "5 üzerinden {rating} puan",
+  "summary": {
+    "title": "Yorumların özeti",
+    "basedOn": "{count} yoruma dayanır; köşeli numaralar kaynak yorumlardır.",
+    "sourceLabel": "Kaynak yorum {n}",
+    "pros": "Olumlu",
+    "cons": "Olumsuz",
+    "sources": "Kaynaklar:",
+    "unavailable": "Yorum özeti şu an kullanılamıyor."
+  },
+  "subScores": {
+    "cleanliness": "Temizlik",
+    "location": "Konum",
+    "staff": "Personel",
+    "value": "Fiyat/performans"
+  },
+  "report": {
+    "received": "Şikâyetiniz alındı, teşekkürler.",
+    "loginRequired": "Şikâyet için giriş yapmalısınız.",
+    "failed": "Şikâyet gönderilemedi",
+    "reasonLabel": "Şikâyet nedeni",
+    "submit": "Gönder",
+    "cancel": "Vazgeç",
+    "open": "Şikâyet et",
+    "reasons": {
+      "OFFENSIVE": "Saldırgan / uygunsuz",
+      "SPAM": "Spam / reklam",
+      "FAKE": "Sahte yorum",
+      "PRIVACY": "Kişisel bilgi içeriyor",
+      "OTHER": "Diğer"
+    }
+  }
+}

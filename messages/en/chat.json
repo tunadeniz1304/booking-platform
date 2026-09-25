@@ -1,0 +1,18 @@
+{
+  "title": "Messages",
+  "loading": "Loading...",
+  "loadFailed": "Messages could not be loaded",
+  "sendFailed": "The message could not be sent",
+  "draftFailed": "The draft could not be created",
+  "safetyNotice": "For your safety, phone numbers, email addresses, IBANs and links are hidden automatically; only pay through the platform.",
+  "empty": "No messages yet.",
+  "host": "Host",
+  "guest": "Guest",
+  "contactMasked": "contact details hidden",
+  "inputLabel": "Your message",
+  "placeholder": "Write your message",
+  "aiDraftNotice": "AI draft — check and edit it before sending.",
+  "send": "Send",
+  "suggestDraft": "Suggest a reply draft",
+  "closed": "Messaging is only available for confirmed bookings."
+}

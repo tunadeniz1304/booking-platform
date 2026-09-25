@@ -1,0 +1,34 @@
+{
+  "demo": "Portföy/demo projesidir; gerçek ödeme alınmaz, gerçek konaklama satılmaz.",
+  "ranking": "Sıralama nasıl çalışır?",
+  "privacy": "Gizlilik ve KVKK",
+  "columns": {
+    "support": {
+      "title": "Destek",
+      "helpCenter": "Yardım Merkezi",
+      "covid": "COVID-19 ile ilgili bilgiler",
+      "refundPolicy": "İade politikası",
+      "refunds": "Para iadesi",
+      "accessibility": "Erişilebilirlik"
+    },
+    "discover": {
+      "title": "Keşfet",
+      "allStays": "Tüm konaklama seçenekleri",
+      "holidayRentals": "Tatil kiralık evleri",
+      "packages": "Tatil paketleri",
+      "cityCentre": "Şehir merkezindeki oteller",
+      "budget": "Uygun oteller"
+    },
+    "contact": {
+      "title": "Bizimle iletişime geçin",
+      "hosts": "Otel sahibi misiniz?",
+      "partners": "Ortaklık programı",
+      "careers": "Kariyer",
+      "corporate": "Kurumsal iletişim"
+    }
+  },
+  "privacyNotice": "Gizlilik Bildirimi",
+  "myData": "Verilerim",
+  "terms": "Kullanım Koşulları",
+  "cookies": "Çerez Bildirimi"
+}

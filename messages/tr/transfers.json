@@ -1,0 +1,46 @@
+{
+  "page": {
+    "title": "Rezervasyon devri",
+    "intro": "Gidemeyeceğiniz onaylı rezervasyonu devredin ya da başkasının ilanını inceleyin."
+  },
+  "discover": {
+    "title": "Devredilen rezervasyonlar",
+    "intro": "Satıcı adları maskelidir. Devralmak için satıcının size ilettiği özel bağlantıyı açın.",
+    "loading": "Yükleniyor…",
+    "empty": "Şu an ilan yok.",
+    "guests": "{count} misafir",
+    "terms": "İstenen: <b>{ask}</b> (orijinal {original}) · satıcı {seller} · son {expires}"
+  },
+  "loginToSell": "Kendi rezervasyonunuzu devretmek için <link>giriş yapın</link>.",
+  "sell": {
+    "title": "Rezervasyonumu devret",
+    "created": "Devir ilanı açıldı ({amount}).",
+    "copyFailed": "Kopyalanamadı; bağlantıyı elle seçip kopyalayın.",
+    "none": "Devredilebilir (onaylı) rezervasyonunuz yok.",
+    "booking": "Rezervasyon",
+    "askPrice": "İstek fiyatı ({currency})",
+    "askHint": "Ödediğiniz tutarın üst sınırını aşamaz.",
+    "submit": "Devret",
+    "linkOnce": "Devir bağlantısı yalnızca şimdi gösterilir — kopyalayıp alıcıyla paylaşın.",
+    "linkLabel": "Devir bağlantısı",
+    "copy": "Kopyala",
+    "hide": "Gizle",
+    "copied": "Kopyalandı."
+  },
+  "claim": {
+    "title": "Rezervasyonu devral",
+    "intro": "Ödeme onaylanmadan sahiplik değişmez. Ödeme reddedilirse devir gerçekleşmez.",
+    "invalidCard": "Kart doğrulanamadı",
+    "done": "Devir tamamlandı. Ödenen: {amount}.",
+    "invalidLink": "Geçerli bir devir bağlantısı bulunamadı. Satıcının paylaştığı bağlantının tamamını açın.",
+    "paymentTitle": "Ödeme bilgileri",
+    "owned": "Rezervasyon artık sizin: <link>rezervasyonu görüntüle</link>",
+    "cardNumber": "Kart numarası",
+    "cardHint": "Demo kartları: onay {success}, ret {decline}. Kart bilgisi sunucuya gönderilmez; yalnızca token gider.",
+    "month": "Ay",
+    "year": "Yıl",
+    "cvc": "CVC",
+    "processing": "İşleniyor…",
+    "submit": "Öde ve devral"
+  }
+}

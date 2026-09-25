@@ -1,0 +1,23 @@
+{
+  "meta": {
+    "title": "booking-platform — konaklama arama ve rezervasyon (demo)",
+    "description": "Portföy/demo projesi: konaklama arayın, karşılaştırın ve rezervasyon yapın. Gerçek ödeme alınmaz."
+  },
+  "demo": {
+    "tag": "DEMO",
+    "banner": "Demo ortamı — gerçek ödeme alınmaz, gerçek konaklama satılmaz."
+  },
+  "loading": "Yükleniyor…",
+  "unexpectedError": "Beklenmeyen bir hata oluştu",
+  "loginRequired": "Bu sayfa için <link>giriş yapın</link>.",
+  "forbidden": "Bu sayfaya erişim yetkiniz yok ({roles} rolü gerekir).",
+  "ai": {
+    "generated": "AI tarafından üretildi",
+    "hint": "Yapay zekâ çıktısı — doğruluğunu kontrol edin",
+    "modes": {
+      "live": "Canlı LLM",
+      "demo": "Demo (deterministik)",
+      "fallback": "Yedek (LLM başarısız)"
+    }
+  }
+}

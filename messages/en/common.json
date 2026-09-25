@@ -1,0 +1,23 @@
+{
+  "meta": {
+    "title": "booking-platform — search and book stays (demo)",
+    "description": "Portfolio/demo project: search, compare and book stays. No real payments are taken."
+  },
+  "demo": {
+    "tag": "DEMO",
+    "banner": "Demo environment — no real payments are taken, no real stays are sold."
+  },
+  "loading": "Loading…",
+  "unexpectedError": "An unexpected error occurred",
+  "loginRequired": "Please <link>sign in</link> to view this page.",
+  "forbidden": "You don't have access to this page (requires the {roles} role).",
+  "ai": {
+    "generated": "AI-generated",
+    "hint": "AI output — please verify its accuracy",
+    "modes": {
+      "live": "Live LLM",
+      "demo": "Demo (deterministic)",
+      "fallback": "Fallback (LLM failed)"
+    }
+  }
+}

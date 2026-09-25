@@ -1,0 +1,36 @@
+{
+  "metaTitle": "Sıralama nasıl çalışır? — booking-platform",
+  "title": "Sıralama nasıl çalışır?",
+  "intro": "\"Önerilen\" sıralamada her konaklamanın skoru aşağıdaki bileşenlerin ağırlıklı toplamıdır. Sonuç kartındaki \"Bu sıralama neden?\" bağlantısı her bileşenin katkısını gösterir. Ücretli yerleşim veya komisyon oranı sıralamayı etkilemez.",
+  "table": {
+    "component": "Bileşen",
+    "weight": "Ağırlık",
+    "description": "Açıklama"
+  },
+  "weightValue": "%{value}",
+  "factors": {
+    "priceFit": {
+      "label": "Fiyat uyumu",
+      "description": "Seçtiğiniz tarihlerdeki vergi dahil toplamın, sonuçlar arasındaki göreli uygunluğu."
+    },
+    "rating": {
+      "label": "Misafir puanı",
+      "description": "Az yorumlu ilanların aşırı öne çıkmaması için Bayes düzeltmeli ortalama puan."
+    },
+    "popularity": {
+      "label": "Yorum sayısı",
+      "description": "Doğrulanmış konaklamalara bağlı yorum sayısının logaritmik ölçeği."
+    },
+    "personal": {
+      "label": "Kişiselleştirme",
+      "description": "Giriş yaptıysanız geçmiş rezervasyon ve favorilerinizdeki şehir/tip benzerliği."
+    },
+    "semantic": {
+      "label": "Arama metni benzerliği",
+      "description": "Arama metninizle ilan metni arasındaki benzerlik."
+    }
+  },
+  "footnote": "Fiyat, puan veya en çok beğenilen sıralamalarını seçtiğinizde yalnızca o ölçüt kullanılır.",
+  "why": "Bu sıralama neden?",
+  "totalScore": "Toplam skor: {score}"
+}

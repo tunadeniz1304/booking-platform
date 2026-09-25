@@ -1,0 +1,11 @@
+{
+  "metaTitle": "{title} | Booking Platform",
+  "notFoundTitle": "Property not found",
+  "ratingCount": "{count, plural, one {# review} other {# reviews}}",
+  "description": "Description",
+  "amenities": "Amenities",
+  "gallery": {
+    "imageAlt": "{title} - image {index}",
+    "thumbnailAlt": "{title} - thumbnail {index}"
+  }
+}

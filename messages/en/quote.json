@@ -1,0 +1,12 @@
+{
+  "nights": "{count, plural, one {# night} other {# nights}}",
+  "subtotal": "Subtotal",
+  "tax": "Accommodation tax",
+  "total": "Total (taxes included)",
+  "approx": "Approx. {amount} (for information; charged in {currency})",
+  "fetchFailed": "Could not get the price",
+  "nightsUniform": "{price} × {count, plural, one {# night} other {# nights}}",
+  "nightsVariable": "{count, plural, one {# night} other {# nights}} (nightly prices vary)",
+  "includedTax": "{label}{rate} included: {amount}",
+  "rate": " ({rate}%)"
+}

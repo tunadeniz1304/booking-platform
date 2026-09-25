@@ -1,0 +1,11 @@
+{
+  "metaTitle": "{title} | Booking Platform",
+  "notFoundTitle": "Property Bulunamadı",
+  "ratingCount": "{count} değerlendirme",
+  "description": "Açıklama",
+  "amenities": "Olanaklar",
+  "gallery": {
+    "imageAlt": "{title} - görsel {index}",
+    "thumbnailAlt": "{title} - küçük görsel {index}"
+  }
+}

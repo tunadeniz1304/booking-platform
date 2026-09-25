@@ -1,0 +1,95 @@
+{
+  "page": {
+    "title": "Admin dashboard",
+    "intro": "Monitor the queues, approve event signals and manage user roles."
+  },
+  "decisionSaved": "Decision saved.",
+  "percent": "{value}%",
+  "llm": {
+    "title": "LLM status",
+    "setting": "Setting",
+    "effectiveMode": "Effective mode",
+    "model": "Model",
+    "server": "Server",
+    "hasKey": "API key set",
+    "jsonMode": "JSON mode",
+    "lastError": "Last error",
+    "yes": "Yes",
+    "no": "No",
+    "unknown": "Unknown",
+    "supported": "Supported",
+    "unsupported": "Not supported"
+  },
+  "outbox": {
+    "title": "Outbox",
+    "empty": "Outbox is empty.",
+    "deadTitle": "DEAD messages",
+    "deadEmpty": "No DEAD messages.",
+    "attempts": "{count, plural, one {# attempt} other {# attempts}}",
+    "requeue": "Requeue",
+    "requeued": "Message requeued."
+  },
+  "events": {
+    "title": "Event signal queue",
+    "textLabel": "Propose an event from text",
+    "textHint": "E.g. a news snippet: 'An international trade fair will be held in İzmir on 12–15 October.' A proposal does not affect prices until it is approved.",
+    "extracting": "Extracting…",
+    "create": "Create proposal",
+    "created": "Proposal created: {title}",
+    "applied": "Action applied.",
+    "empty": "No events.",
+    "impact": "impact {impact}/10",
+    "approve": "Approve",
+    "reject": "Reject",
+    "rollback": "Roll back",
+    "status": {
+      "PROPOSED": "Proposed",
+      "APPROVED": "Approved",
+      "REJECTED": "Rejected",
+      "ROLLED_BACK": "Rolled back"
+    }
+  },
+  "fraud": {
+    "title": "Fraud review queue",
+    "empty": "Nothing to review.",
+    "booking": "Booking {id}",
+    "user": "user {id}",
+    "score": "score",
+    "reasonsLabel": "Reason codes",
+    "noReasons": "No reasons recorded",
+    "legit": "Legitimate",
+    "fraud": "Fraud"
+  },
+  "moderation": {
+    "title": "Review moderation queue",
+    "empty": "No reviews to moderate.",
+    "hidden": "Hidden after reports",
+    "preReview": "Pre-publication review",
+    "reports": "{count, plural, one {# report} other {# reports}}",
+    "whyFlagged": "Why it was flagged:",
+    "publish": "Publish",
+    "remove": "Remove"
+  },
+  "experiments": {
+    "title": "A/B experiments",
+    "empty": "No experiments defined.",
+    "on": "on",
+    "off": "off",
+    "columns": {
+      "arm": "Arm",
+      "exposures": "Exposures",
+      "users": "Users",
+      "conversions": "Conversions",
+      "rate": "Rate",
+      "ci": "95% Wilson"
+    }
+  },
+  "roles": {
+    "title": "Change user role",
+    "userId": "User ID",
+    "userIdHint": "You cannot change your own role.",
+    "newRole": "New role",
+    "submit": "Update role",
+    "updated": "Role updated: {role} (takes effect within 15 minutes)."
+  }
+}

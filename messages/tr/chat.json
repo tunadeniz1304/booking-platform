@@ -1,0 +1,18 @@
+{
+  "title": "Mesajlar",
+  "loading": "Yükleniyor...",
+  "loadFailed": "Mesajlar yüklenemedi",
+  "sendFailed": "Mesaj gönderilemedi",
+  "draftFailed": "Taslak oluşturulamadı",
+  "safetyNotice": "Güvenliğiniz için telefon, e-posta, IBAN ve bağlantılar otomatik gizlenir; ödemeyi yalnızca platform üzerinden yapın.",
+  "empty": "Henüz mesaj yok.",
+  "host": "Ev sahibi",
+  "guest": "Misafir",
+  "contactMasked": "iletişim bilgisi gizlendi",
+  "inputLabel": "Mesajınız",
+  "placeholder": "Mesajınızı yazın",
+  "aiDraftNotice": "Yapay zekâ taslağı — göndermeden önce kontrol edin ve düzenleyin.",
+  "send": "Gönder",
+  "suggestDraft": "Yanıt taslağı öner",
+  "closed": "Mesajlaşma yalnızca onaylı rezervasyonlarda açıktır."
+}

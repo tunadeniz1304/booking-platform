@@ -1,0 +1,34 @@
+{
+  "demo": "Portfolio/demo project; no real payments are taken and no real stays are sold.",
+  "ranking": "How ranking works",
+  "privacy": "Privacy",
+  "columns": {
+    "support": {
+      "title": "Support",
+      "helpCenter": "Help Centre",
+      "covid": "COVID-19 information",
+      "refundPolicy": "Refund policy",
+      "refunds": "Refunds",
+      "accessibility": "Accessibility"
+    },
+    "discover": {
+      "title": "Discover",
+      "allStays": "All accommodation types",
+      "holidayRentals": "Holiday rentals",
+      "packages": "Holiday packages",
+      "cityCentre": "City-centre hotels",
+      "budget": "Budget hotels"
+    },
+    "contact": {
+      "title": "Get in touch",
+      "hosts": "Own a hotel?",
+      "partners": "Partner programme",
+      "careers": "Careers",
+      "corporate": "Corporate contact"
+    }
+  },
+  "privacyNotice": "Privacy Notice",
+  "myData": "My data",
+  "terms": "Terms of Use",
+  "cookies": "Cookie Notice"
+}

@@ -34,7 +34,8 @@
     "ltr:train": "python scripts/ltr/train.py",
     "llm:smoke": "tsx --conditions=react-server scripts/llm-smoke.ts",
     "availability:rollover": "tsx scripts/availability-rollover.ts",
-    "sdep:export": "tsx scripts/sdep-export.ts"
+    "sdep:export": "tsx scripts/sdep-export.ts",
+    "i18n:check": "tsx scripts/i18n-check.ts"
   },
   "dependencies": {
     "@grpc/grpc-js": "^1.14.5",

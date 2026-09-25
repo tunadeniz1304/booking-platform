@@ -1,21 +1,14 @@
 import { describe, it, expect } from "vitest";
-import tr from "../../../messages/tr.json";
-import en from "../../../messages/en.json";
+import path from "node:path";
 import { convert, getFxTable } from "@/lib/money/fx";
 import { formatMoney, money } from "@/lib/money/money";
 import { resolveLocale } from "@/i18n/config";
-
-function keys(obj: Record<string, unknown>, prefix = ""): string[] {
-  return Object.entries(obj).flatMap(([k, v]) =>
-    v && typeof v === "object"
-      ? keys(v as Record<string, unknown>, `${prefix}${k}.`)
-      : [`${prefix}${k}`]
-  );
-}
+import { NAMESPACES } from "@/i18n/messages";
+import { checkMessagesDir } from "@/lib/i18n/check";
 
 describe("P1-3 çoklu para birimi + i18n", () => {
   it("tr ve en mesaj dosyaları aynı anahtarlara sahip; varsayılan dil tr", () => {
-    expect(keys(en).sort()).toEqual(keys(tr).sort());
+    expect(checkMessagesDir(path.resolve("messages"), NAMESPACES)).toEqual([]);
     expect(resolveLocale(undefined)).toBe("tr");
     expect(resolveLocale("de")).toBe("tr");
     expect(resolveLocale("en")).toBe("en");

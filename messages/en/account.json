@@ -1,0 +1,70 @@
+{
+  "title": "My Account",
+  "logout": "Sign Out",
+  "retry": "Try Again",
+  "errors": {
+    "favoritesLoad": "Could not load favorites",
+    "userLoad": "Could not load user information",
+    "generic": "Something went wrong",
+    "favoriteRemove": "Could not remove favorite",
+    "favoriteAdd": "Could not add favorite",
+    "favoriteFailed": "Favorite action failed",
+    "cancelBooking": "Could not cancel booking",
+    "cancelFailed": "Cancellation failed"
+  },
+  "role": {
+    "host": "Host",
+    "admin": "Administrator",
+    "user": "User"
+  },
+  "status": {
+    "pending": "Pending",
+    "confirmed": "Confirmed",
+    "cancelled": "Cancelled",
+    "completed": "Completed"
+  },
+  "bookings": {
+    "title": "My Bookings",
+    "empty": "You don't have any bookings yet.",
+    "room": "Room: {name}",
+    "checkIn": "Check-in",
+    "checkOut": "Check-out",
+    "guests": "Guests",
+    "total": "Total",
+    "cancel": "Cancel Booking",
+    "cancelling": "Cancelling...",
+    "processing": "Processing...",
+    "removeFavorite": "Remove from Favorites",
+    "addFavorite": "Add to Favorites"
+  },
+  "favorites": {
+    "title": "My Favorites",
+    "empty": "You haven't added any favorites yet.",
+    "reviews": "{count, plural, one {# review} other {# reviews}}",
+    "perNight": "/ night",
+    "remove": "Remove",
+    "removing": "Removing..."
+  },
+  "passkeys": {
+    "title": "Passkeys",
+    "description": "Used for passwordless sign-in and for extra verification on payments that look risky.",
+    "loading": "Loading...",
+    "empty": "No passkeys registered.",
+    "unnamed": "Unnamed passkey",
+    "added": "Added {date}",
+    "lastUsed": " · last used {date}",
+    "delete": "Delete",
+    "nameLabel": "Passkey name",
+    "namePlaceholder": "Name (e.g. Laptop)",
+    "add": "Add passkey",
+    "unsupported": "This browser does not support passkeys.",
+    "confirmDelete": "Delete this passkey?",
+    "addedOk": "Passkey added.",
+    "deletedOk": "Passkey deleted.",
+    "loadFailed": "Could not load passkeys",
+    "addFailed": "Could not add passkey",
+    "deleteFailed": "Could not delete passkey",
+    "cancelled": "The passkey operation was cancelled or timed out",
+    "alreadyRegistered": "A passkey on this device is already registered"
+  }
+}

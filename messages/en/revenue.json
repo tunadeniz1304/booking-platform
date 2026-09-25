@@ -1,0 +1,51 @@
+{
+  "page": {
+    "title": "Revenue dashboard",
+    "intro": "Track occupancy, ADR and RevPAR; review price suggestions with their contribution table, then accept or reject them."
+  },
+  "loading": "Loading…",
+  "loadingProperties": "Loading properties…",
+  "noProperties": "You don't have any properties yet.",
+  "propertyLabel": "Property",
+  "percent": "{value}%",
+  "factor": {
+    "occupancy": "Occupancy",
+    "lead_time": "Lead time",
+    "holiday": "Public holiday",
+    "event": "Approved event",
+    "clamp": "Floor/ceiling"
+  },
+  "kpis": {
+    "title": "Performance ({from} – {to})",
+    "occupancy": "Occupancy",
+    "adr": "ADR",
+    "revpar": "RevPAR",
+    "revenue": "Revenue",
+    "sold": "{sold} / {available} room-nights sold (confirmed and completed bookings)."
+  },
+  "pickup": {
+    "title": "Pickup",
+    "noData": "No data.",
+    "chartTitle": "Pickup chart",
+    "chartDesc": "Room-nights in the window from bookings made over the last {count} days; latest value {last}.",
+    "caption": "Line: total room-nights in the window · Bars: room-nights booked that day"
+  },
+  "suggestions": {
+    "title": "Price suggestions",
+    "intro": "Suggestions come from a deterministic engine and always stay within the floor/ceiling limits; the explanation sentence is written by AI. A price you accept is locked in; rejecting changes no prices.",
+    "room": "Room",
+    "generate": "Generate suggestions",
+    "generated": "{count, plural, one {# suggestion generated.} other {# suggestions generated.}} Prices won't change until you accept them.",
+    "empty": "No pending suggestions.",
+    "bounds": "(limits {floor} – {ceiling})",
+    "caption": "Suggestion contribution table",
+    "columns": {
+      "factor": "Factor",
+      "detail": "Details",
+      "multiplier": "Multiplier",
+      "contribution": "Contribution"
+    },
+    "accept": "Accept",
+    "reject": "Reject"
+  }
+}

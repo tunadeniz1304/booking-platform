@@ -1,0 +1,62 @@
+{
+  "meta": {
+    "title": "KVKK Aydınlatma Metni (demo) — booking-platform",
+    "description": "Kişisel verilerin işlenmesine ilişkin demo aydınlatma metni."
+  },
+  "notice": {
+    "title": "Kişisel Verilerin Korunması Aydınlatma Metni",
+    "disclaimer": "Bu metin bir portföy/demo projesi içindir ve <strong>hukuki görüş değildir</strong>. Gerçek bir hizmette bir hukuk uzmanı tarafından hazırlanmalıdır.",
+    "controller": {
+      "title": "1. Veri sorumlusu",
+      "body": "6698 sayılı Kişisel Verilerin Korunması Kanunu (\"KVKK\") uyarınca veri sorumlusu, bu demo platformun işletmecisidir. Demo ortamında gerçek ödeme alınmaz ve gerçek kişisel veri girilmemelidir."
+    },
+    "data": {
+      "title": "2. İşlenen kişisel veriler",
+      "identity": "Kimlik ve iletişim: ad, soyad, e-posta adresi.",
+      "transactions": "Müşteri işlem: rezervasyonlar, favoriler, yorumlar, devir işlemleri.",
+      "finance": "Finans: ödeme sağlayıcısından dönen token ve işlem referansları (kart numarası saklanmaz).",
+      "security": "İşlem güvenliği: oturum çerezleri, IP adresi, istek kayıtları, dolandırıcılık skoru."
+    },
+    "purpose": {
+      "title": "3. İşleme amaçları ve hukuki sebepler",
+      "body": "Veriler; rezervasyon sözleşmesinin kurulması ve ifası (KVKK md. 5/2-c), hukuki yükümlülüklerin yerine getirilmesi (md. 5/2-ç), hizmet güvenliğinin sağlanması ve dolandırıcılığın önlenmesi için meşru menfaat (md. 5/2-f) ile analitik çerezler bakımından açık rızanız (md. 5/1) hukuki sebeplerine dayanılarak işlenir."
+    },
+    "transfer": {
+      "title": "4. Aktarım",
+      "body": "Veriler yalnızca hizmetin gerektirdiği ölçüde konaklama tesisine (rezervasyon bilgileri), ödeme hizmet sağlayıcısına ve yasal olarak yetkili kurumlara aktarılabilir. Yapay zekâ özellikleri canlı modda çalışıyorsa, istem içeriği kişisel veri içermeyecek şekilde model sağlayıcısına gönderilir."
+    },
+    "retention": {
+      "title": "5. Saklama süresi",
+      "body": "Hesabınızı sildiğinizde kişisel alanlar silinir veya takma adla değiştirilir. Rezervasyon ve ödeme kayıtları, yasal saklama yükümlülükleri nedeniyle anonimleştirilmiş olarak tutulur."
+    },
+    "cookies": {
+      "title": "6. Çerezler",
+      "body": "<strong>Zorunlu çerezler</strong> (oturum, güvenlik, dil tercihi) hizmetin çalışması için gereklidir ve onaya tabi değildir. <strong>Analitik çerezler</strong> yalnızca çerez bandında onay vermeniz hâlinde kullanılır. Tercihiniz <code>cookie_consent</code> çerezinde saklanır; çerezi silerek tercihinizi değiştirebilirsiniz."
+    },
+    "rights": {
+      "title": "7. Haklarınız (KVKK md. 11)",
+      "body": "Verilerinizin işlenip işlenmediğini öğrenme, bilgi talep etme, düzeltme, silme ve itiraz haklarına sahipsiniz. Verilerinizi indirmek veya hesabınızı silmek için <link>Gizlilik ve verilerim</link> sayfasını kullanabilirsiniz."
+    }
+  },
+  "accountPage": {
+    "title": "Gizlilik ve verilerim",
+    "intro": "KVKK md. 11 kapsamındaki haklarınızı buradan kullanabilirsiniz."
+  },
+  "center": {
+    "exportFileName": "verilerim.json",
+    "exported": "Verileriniz indirildi ({file}).",
+    "deleted": "Hesabınız silindi. Ana sayfaya yönlendiriliyorsunuz…",
+    "exportTitle": "Verilerimi indir",
+    "exportBody": "Hesabınıza ait kişisel verilerin (profil, rezervasyonlar, yorumlar, favoriler) bir kopyasını JSON olarak indirin. Parola özeti dışa aktarılmaz.",
+    "exportButton": "Verilerimi indir",
+    "deleteTitle": "Hesabımı sil",
+    "deleteBody": "Kişisel alanlarınız silinir veya takma adla değiştirilir. Rezervasyon ve ödeme kayıtları yasal saklama yükümlülüğü nedeniyle anonimleştirilerek tutulur. Bu işlem geri alınamaz.",
+    "deleteButton": "Hesabımı sil",
+    "confirmTitle": "Hesabınızı kalıcı olarak silmek istediğinize emin misiniz?",
+    "acknowledge": "İşlemin geri alınamayacağını anladım.",
+    "deleting": "Siliniyor…",
+    "confirmDelete": "Evet, hesabımı sil",
+    "cancel": "Vazgeç",
+    "noticeLink": "Verilerinizin nasıl işlendiğini <link>aydınlatma metninde</link> okuyabilirsiniz."
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "page": {
+    "title": "Booking transfer",
+    "intro": "Transfer a confirmed booking you can't use, or browse other people's listings."
+  },
+  "discover": {
+    "title": "Bookings for transfer",
+    "intro": "Seller names are masked. To take over a booking, open the private link the seller sent you.",
+    "loading": "Loading…",
+    "empty": "No listings right now.",
+    "guests": "{count, plural, one {# guest} other {# guests}}",
+    "terms": "Asking: <b>{ask}</b> (original {original}) · seller {seller} · expires {expires}"
+  },
+  "loginToSell": "<link>Sign in</link> to transfer your own booking.",
+  "sell": {
+    "title": "Transfer my booking",
+    "created": "Transfer listing created ({amount}).",
+    "copyFailed": "Could not copy; select and copy the link manually.",
+    "none": "You have no transferable (confirmed) bookings.",
+    "booking": "Booking",
+    "askPrice": "Asking price ({currency})",
+    "askHint": "Cannot exceed the amount you paid.",
+    "submit": "Transfer",
+    "linkOnce": "The transfer link is shown only now — copy it and share it with the buyer.",
+    "linkLabel": "Transfer link",
+    "copy": "Copy",
+    "hide": "Hide",
+    "copied": "Copied."
+  },
+  "claim": {
+    "title": "Take over booking",
+    "intro": "Ownership does not change until the payment is approved. If the payment is declined, the transfer does not happen.",
+    "invalidCard": "The card could not be validated",
+    "done": "Transfer complete. Paid: {amount}.",
+    "invalidLink": "No valid transfer link was found. Open the full link the seller shared.",
+    "paymentTitle": "Payment details",
+    "owned": "The booking is now yours: <link>view booking</link>",
+    "cardNumber": "Card number",
+    "cardHint": "Demo cards: approve {success}, decline {decline}. Card details are never sent to the server; only a token is.",
+    "month": "Month",
+    "year": "Year",
+    "cvc": "CVC",
+    "processing": "Processing…",
+    "submit": "Pay and take over"
+  }
+}

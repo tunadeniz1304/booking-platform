@@ -1,0 +1,40 @@
+{
+  "title": "Guest reviews",
+  "verification": "How are reviews verified? Only a guest who booked on this platform and completed their stay can write a review, once per booking. Reviews containing profanity or personal information are checked before publication; reviews that exceed the report threshold are hidden. No payment or incentive is given for reviews; negative reviews are published too.",
+  "loading": "Loading reviews…",
+  "empty": "No reviews yet.",
+  "verifiedStay": "Verified stay",
+  "hostReply": "Host's reply",
+  "starsLabel": "{rating} out of 5 stars",
+  "summary": {
+    "title": "Review summary",
+    "basedOn": "Based on {count, plural, one {# review} other {# reviews}}; bracketed numbers point to the source reviews.",
+    "sourceLabel": "Source review {n}",
+    "pros": "Pros",
+    "cons": "Cons",
+    "sources": "Sources:",
+    "unavailable": "The review summary is not available right now."
+  },
+  "subScores": {
+    "cleanliness": "Cleanliness",
+    "location": "Location",
+    "staff": "Staff",
+    "value": "Value for money"
+  },
+  "report": {
+    "received": "Your report was received, thank you.",
+    "loginRequired": "You need to sign in to report.",
+    "failed": "The report could not be sent",
+    "reasonLabel": "Reason for report",
+    "submit": "Send",
+    "cancel": "Cancel",
+    "open": "Report",
+    "reasons": {
+      "OFFENSIVE": "Offensive / inappropriate",
+      "SPAM": "Spam / advertising",
+      "FAKE": "Fake review",
+      "PRIVACY": "Contains personal information",
+      "OTHER": "Other"
+    }
+  }
+}

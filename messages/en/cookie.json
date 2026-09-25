@@ -1,0 +1,11 @@
+{
+  "title": "Cookie preferences",
+  "body": "Necessary cookies are required for sessions and security. Analytics cookies are used only with your consent. For details, see the <link>privacy notice</link>.",
+  "categories": "Cookie categories",
+  "necessary": "Necessary (always on)",
+  "analytics": "Analytics",
+  "save": "Save preferences",
+  "customize": "Customize",
+  "necessaryOnly": "Necessary only",
+  "acceptAll": "Accept all"
+}

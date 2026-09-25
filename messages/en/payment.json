@@ -1,0 +1,36 @@
+{
+  "title": "Payment",
+  "verifiedRetry": "Verified. You can submit the payment again.",
+  "verificationRequired": "Verification required",
+  "failed": "Payment failed",
+  "verificationFailed": "Verification failed",
+  "verificationStartFailed": "Verification could not be started",
+  "invalidCard": "Invalid card details",
+  "holdUntil": "Your room is held for you until {time}.",
+  "cardNumber": "Card number",
+  "expiry": "Expiry (MM/YY)",
+  "cvc": "CVC",
+  "testCards": "Demo test cards: {success} (approve), {decline} (decline), {threeDs} (3D Secure). No real payment is taken.",
+  "stripeTestMode": "Stripe test mode — no real payment is taken.",
+  "processing": "Processing...",
+  "payAndConfirm": "Pay and confirm",
+  "threeDsTitle": "3D Secure verification",
+  "verificationCode": "Verification code",
+  "verify": "Verify",
+  "cancel": {
+    "confirm": "Are you sure you want to cancel the booking?",
+    "refunded": "Cancelled. Refund: {amount} ({percent}%).",
+    "noRefund": "Cancelled. No refund under the policy.",
+    "failed": "The booking could not be cancelled",
+    "button": "Cancel booking"
+  },
+  "stepUp": {
+    "failed": "Verification failed",
+    "title": "Additional verification required",
+    "description": "To protect your account, we ask you to approve this payment with your passkey. After approval the payment is retried automatically.",
+    "managePasskeys": "Manage my passkeys",
+    "waiting": "Waiting...",
+    "verify": "Verify with passkey",
+    "cancel": "Cancel"
+  }
+}

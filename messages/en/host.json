@@ -1,0 +1,95 @@
+{
+  "page": {
+    "title": "Host dashboard",
+    "intro": "Edit your properties, add rooms, update the calendar in bulk and track your bookings."
+  },
+  "messagesPage": {
+    "back": "← Host dashboard"
+  },
+  "dashboard": {
+    "revenueLink": "Revenue dashboard: occupancy, ADR, RevPAR and price suggestions →",
+    "loadingProperties": "Loading properties…",
+    "noProperties": "You don't have any properties yet."
+  },
+  "bookings": {
+    "title": "Bookings",
+    "loading": "Loading…",
+    "empty": "No bookings.",
+    "caption": "Bookings for your properties",
+    "columns": {
+      "property": "Property",
+      "checkIn": "Check-in",
+      "checkOut": "Check-out",
+      "guests": "Guests",
+      "amount": "Amount",
+      "status": "Status",
+      "messages": "Messages"
+    },
+    "messagesLink": "Messages"
+  },
+  "bookingStatus": {
+    "PENDING": "Pending",
+    "HELD": "On hold",
+    "CONFIRMED": "Confirmed",
+    "CANCELLED": "Cancelled",
+    "EXPIRED": "Expired",
+    "COMPLETED": "Completed"
+  },
+  "licenseStatus": {
+    "PENDING": "Awaiting verification",
+    "VERIFIED": "Verified",
+    "REJECTED": "Not found in registry"
+  },
+  "property": {
+    "basePrice": "Base price: {price}",
+    "rating": "Rating {rating}",
+    "published": "Live",
+    "unpublished": "Not live",
+    "license": "Licence:",
+    "fields": {
+      "title": "Title",
+      "basePrice": "Base nightly price ({currency})",
+      "description": "Description",
+      "licenseNumber": "Licence number",
+      "licenseHint": "Province plate code + sequence number, e.g. 34-12345. Listings without a licence cannot go live.",
+      "isActive": "Listing is live"
+    },
+    "saving": "Saving…",
+    "save": "Save",
+    "saved": "Saved."
+  },
+  "rooms": {
+    "title": "Rooms",
+    "capacity": "{count, plural, one {# guest} other {# guests}}",
+    "closed": "(closed)",
+    "add": {
+      "ariaLabel": "Add room",
+      "name": "Room name",
+      "capacity": "Capacity",
+      "bedType": "Bed type",
+      "defaultBedType": "Double",
+      "priceModifier": "Price difference",
+      "submit": "Add room",
+      "added": "Room added."
+    }
+  },
+  "calendar": {
+    "title": "Bulk calendar update",
+    "room": "Room",
+    "from": "Start",
+    "to": "End (inclusive)",
+    "price": "Nightly price (empty = unchanged)",
+    "availability": "Availability",
+    "keep": "Don't change",
+    "open": "Open for sale",
+    "close": "Close for sale",
+    "submit": "Update calendar",
+    "noChange": "Enter a price or availability change.",
+    "result": "Nights updated: {updated}, added: {created}, skipped because booked: {skipped}."
+  },
+  "listingCopy": {
+    "suggesting": "Preparing suggestion…",
+    "suggest": "Suggest listing copy",
+    "draft": "Draft (not published automatically; edit and approve it)"
+  }
+}

@@ -1,0 +1,95 @@
+{
+  "page": {
+    "title": "Ev sahibi paneli",
+    "intro": "Mülklerinizi düzenleyin, oda ekleyin, takvimi toplu güncelleyin ve rezervasyonları izleyin."
+  },
+  "messagesPage": {
+    "back": "← Ev sahibi paneli"
+  },
+  "dashboard": {
+    "revenueLink": "Gelir paneli: doluluk, ADR, RevPAR ve fiyat önerileri →",
+    "loadingProperties": "Mülkler yükleniyor…",
+    "noProperties": "Henüz bir mülkünüz yok."
+  },
+  "bookings": {
+    "title": "Rezervasyonlar",
+    "loading": "Yükleniyor…",
+    "empty": "Rezervasyon yok.",
+    "caption": "Mülklerinize ait rezervasyonlar",
+    "columns": {
+      "property": "Mülk",
+      "checkIn": "Giriş",
+      "checkOut": "Çıkış",
+      "guests": "Misafir",
+      "amount": "Tutar",
+      "status": "Durum",
+      "messages": "Mesajlar"
+    },
+    "messagesLink": "Mesajlar"
+  },
+  "bookingStatus": {
+    "PENDING": "Beklemede",
+    "HELD": "Tutuldu",
+    "CONFIRMED": "Onaylandı",
+    "CANCELLED": "İptal",
+    "EXPIRED": "Süresi doldu",
+    "COMPLETED": "Tamamlandı"
+  },
+  "licenseStatus": {
+    "PENDING": "Doğrulama bekliyor",
+    "VERIFIED": "Doğrulandı",
+    "REJECTED": "Kayıtta bulunamadı"
+  },
+  "property": {
+    "basePrice": "Taban fiyat: {price}",
+    "rating": "Puan {rating}",
+    "published": "Yayında",
+    "unpublished": "Yayında değil",
+    "license": "Belge:",
+    "fields": {
+      "title": "Başlık",
+      "basePrice": "Taban gecelik fiyat ({currency})",
+      "description": "Açıklama",
+      "licenseNumber": "İzin belgesi no",
+      "licenseHint": "İl plaka kodu + sıra no, ör. 34-12345. Belgesiz ilan yayınlanamaz.",
+      "isActive": "İlan yayında"
+    },
+    "saving": "Kaydediliyor…",
+    "save": "Kaydet",
+    "saved": "Kaydedildi."
+  },
+  "rooms": {
+    "title": "Odalar",
+    "capacity": "{count} kişi",
+    "closed": "(kapalı)",
+    "add": {
+      "ariaLabel": "Oda ekle",
+      "name": "Oda adı",
+      "capacity": "Kapasite",
+      "bedType": "Yatak tipi",
+      "defaultBedType": "Çift kişilik",
+      "priceModifier": "Fiyat farkı",
+      "submit": "Oda ekle",
+      "added": "Oda eklendi."
+    }
+  },
+  "calendar": {
+    "title": "Toplu takvim güncellemesi",
+    "room": "Oda",
+    "from": "Başlangıç",
+    "to": "Bitiş (dahil)",
+    "price": "Gecelik fiyat (boş = değişmez)",
+    "availability": "Müsaitlik",
+    "keep": "Değiştirme",
+    "open": "Satışa aç",
+    "close": "Satışa kapat",
+    "submit": "Takvimi güncelle",
+    "noChange": "Fiyat veya müsaitlik değişikliği girin.",
+    "result": "Güncellenen gece: {updated}, eklenen: {created}, rezervasyonlu olduğu için atlanan: {skipped}."
+  },
+  "listingCopy": {
+    "suggesting": "Öneri hazırlanıyor…",
+    "suggest": "İlan metni önerisi",
+    "draft": "Taslak (otomatik yayınlanmaz, düzenleyip onaylayın)"
+  }
+}

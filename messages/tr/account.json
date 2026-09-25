@@ -1,0 +1,70 @@
+{
+  "title": "Hesabım",
+  "logout": "Çıkış Yap",
+  "retry": "Tekrar Dene",
+  "errors": {
+    "favoritesLoad": "Favoriler yüklenemedi",
+    "userLoad": "Kullanıcı bilgileri yüklenemedi",
+    "generic": "Bir hata oluştu",
+    "favoriteRemove": "Favori kaldırılamadı",
+    "favoriteAdd": "Favori eklenemedi",
+    "favoriteFailed": "Favori işlemi başarısız",
+    "cancelBooking": "Rezervasyon iptal edilemedi",
+    "cancelFailed": "İptal işlemi başarısız"
+  },
+  "role": {
+    "host": "Ev Sahibi",
+    "admin": "Yönetici",
+    "user": "Kullanıcı"
+  },
+  "status": {
+    "pending": "Beklemede",
+    "confirmed": "Onaylandı",
+    "cancelled": "İptal Edildi",
+    "completed": "Tamamlandı"
+  },
+  "bookings": {
+    "title": "Rezervasyonlarım",
+    "empty": "Henüz rezervasyonunuz yok.",
+    "room": "Oda: {name}",
+    "checkIn": "Giriş",
+    "checkOut": "Çıkış",
+    "guests": "Misafir",
+    "total": "Toplam",
+    "cancel": "Rezervasyonu İptal Et",
+    "cancelling": "İptal ediliyor...",
+    "processing": "İşleniyor...",
+    "removeFavorite": "Favorilerden Çıkar",
+    "addFavorite": "Favorilere Ekle"
+  },
+  "favorites": {
+    "title": "Favorilerim",
+    "empty": "Henüz favori eklemediniz.",
+    "reviews": "{count} değerlendirme",
+    "perNight": "/ gece",
+    "remove": "Kaldır",
+    "removing": "Kaldırılıyor..."
+  },
+  "passkeys": {
+    "title": "Passkey'ler",
+    "description": "Parolasız giriş ve riskli görünen ödemelerde ek doğrulama için kullanılır.",
+    "loading": "Yükleniyor...",
+    "empty": "Kayıtlı passkey yok.",
+    "unnamed": "Adsız passkey",
+    "added": "Eklendi {date}",
+    "lastUsed": " · son kullanım {date}",
+    "delete": "Sil",
+    "nameLabel": "Passkey adı",
+    "namePlaceholder": "Ad (ör. Dizüstü)",
+    "add": "Passkey ekle",
+    "unsupported": "Bu tarayıcı passkey desteklemiyor.",
+    "confirmDelete": "Bu passkey silinsin mi?",
+    "addedOk": "Passkey eklendi.",
+    "deletedOk": "Passkey silindi.",
+    "loadFailed": "Passkey'ler yüklenemedi",
+    "addFailed": "Passkey eklenemedi",
+    "deleteFailed": "Passkey silinemedi",
+    "cancelled": "Passkey işlemi iptal edildi veya zaman aşımına uğradı",
+    "alreadyRegistered": "Bu cihazdaki passkey zaten kayıtlı"
+  }
+}

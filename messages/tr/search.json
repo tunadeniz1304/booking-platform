@@ -1,0 +1,115 @@
+{
+  "mapLoading": "Harita yükleniyor…",
+  "errors": {
+    "load": "Arama sonuçları yüklenemedi",
+    "smart": "Akıllı filtre çalışmadı"
+  },
+  "types": {
+    "hotel": "Otel",
+    "apartment": "Apart",
+    "villa": "Villa",
+    "hostel": "Hostel",
+    "bedAndBreakfast": "Pansiyon"
+  },
+  "heading": {
+    "destination": "{destination} için konaklama",
+    "all": "Tüm konaklama yerleri"
+  },
+  "guestCount": "{count} misafir",
+  "filters": {
+    "title": "Filtreler",
+    "price": "Fiyat Aralığı",
+    "minPrice": "En düşük fiyat",
+    "maxPrice": "En yüksek fiyat",
+    "minPlaceholder": "Min",
+    "maxPlaceholder": "Max",
+    "type": "Konaklama Türü",
+    "sort": "Sıralama"
+  },
+  "sort": {
+    "recommended": "Önerilen",
+    "priceAsc": "Fiyat (önce en düşük)",
+    "priceDesc": "Fiyat (önce en yüksek)",
+    "rating": "Puan (önce en yüksek)"
+  },
+  "loading": "Yükleniyor...",
+  "resultCount": "{shown} sonuç gösteriliyor ({total} bulundu)",
+  "cached": "Önbellekten",
+  "view": "Görünüm",
+  "list": "Liste",
+  "map": "Harita",
+  "mapFailed": "Harita yüklenemedi (ör. çevrimdışı); liste görünümü gösteriliyor.",
+  "noLocation": "Sonuçlar için konum bilgisi yok; liste görünümü gösteriliyor.",
+  "noResults": "Sonuç bulunamadı",
+  "noResultsHint": "Filtreleri değiştirmeyi deneyin.",
+  "mapResults": "Haritadaki sonuçlar",
+  "bar": {
+    "destination": "Nereye?",
+    "dates": "Giriş - Çıkış",
+    "pickDate": "Tarih seçin",
+    "checkInOnly": "{date} - çıkış?",
+    "guests": "Misafirler",
+    "guestsSummary": "{guests} misafir · {rooms} oda",
+    "adults": "Yetişkinler",
+    "adultsHint": "13 yaş ve üzeri",
+    "children": "Çocuklar",
+    "childrenHint": "0-12 yaş",
+    "rooms": "Odalar",
+    "decrease": "Azalt",
+    "increase": "Artır",
+    "submit": "Ara"
+  },
+  "picker": {
+    "prevMonth": "Önceki ay",
+    "nextMonth": "Sonraki ay"
+  },
+  "autocomplete": {
+    "placeholder": "Şehir, otel veya bölge",
+    "popular": "Popüler destinasyonlar",
+    "searching": "Aranıyor...",
+    "suggestions": "Öneriler",
+    "noResults": "Sonuç bulunamadı"
+  },
+  "mapView": {
+    "initFailed": "harita başlatılamadı",
+    "error": "harita hatası",
+    "fallback": "Harita yüklenemedi; liste görünümü kullanılıyor.",
+    "cluster": "{count} konaklama; yakınlaştırmak için tıklayın"
+  },
+  "smart": {
+    "label": "Akıllı filtre — ne aradığınızı yazın",
+    "placeholder": "ör. Antalya'da havuzlu, 4 kişilik, gecelik 3000 TL altı villa",
+    "interpreting": "Yorumlanıyor…",
+    "submit": "Filtrele",
+    "noFilters": "Metinden filtre çıkarılamadı.",
+    "extracted": "Çıkarılan filtreler",
+    "remove": "{label} filtresini kaldır",
+    "clear": "Akıllı filtreyi temizle",
+    "chips": {
+      "city": "Şehir: {value}",
+      "query": "Metin: {value}",
+      "guests": "{count} misafir",
+      "minPrice": "En az {value}",
+      "maxPrice": "En çok {value}",
+      "checkIn": "Giriş: {value}",
+      "checkOut": "Çıkış: {value}",
+      "sort": "Sıralama: {value}"
+    },
+    "sort": {
+      "recommended": "Önerilen",
+      "priceAsc": "Fiyat artan",
+      "priceDesc": "Fiyat azalan",
+      "rating": "Puan"
+    }
+  },
+  "card": {
+    "reviews": "{count} değerlendirme",
+    "nightsTotal": "{count} gece toplam",
+    "taxesIncluded": "vergi ve ücretler dahil",
+    "fromPerNight": "gecelik başlangıç",
+    "taxesOnDates": "tarih seçince vergi ve ücretler eklenir",
+    "seeDeal": "Fırsatı Gör",
+    "addFavorite": "Favorilere ekle",
+    "removeFavorite": "Favorilerden çıkar"
+  }
+}

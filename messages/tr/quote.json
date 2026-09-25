@@ -1,0 +1,12 @@
+{
+  "nights": "{count} gece",
+  "subtotal": "Ara toplam",
+  "tax": "Konaklama vergisi",
+  "total": "Toplam (vergiler dahil)",
+  "approx": "Yaklaşık {amount} (bilgi amaçlı; tahsilat {currency} ile)",
+  "fetchFailed": "Fiyat alınamadı",
+  "nightsUniform": "{price} × {count} gece",
+  "nightsVariable": "{count} gece (gecelik fiyatlar değişken)",
+  "includedTax": "{label}{rate} dahil: {amount}",
+  "rate": " (%{rate})"
+}

@@ -1,0 +1,62 @@
+{
+  "meta": {
+    "title": "KVKK Privacy Notice (demo) — booking-platform",
+    "description": "Demo privacy notice on the processing of personal data."
+  },
+  "notice": {
+    "title": "Personal Data Protection Privacy Notice",
+    "disclaimer": "This text is for a portfolio/demo project and <strong>is not legal advice</strong>. For a real service it must be prepared by a legal professional.",
+    "controller": {
+      "title": "1. Data controller",
+      "body": "Under Personal Data Protection Law No. 6698 (\"KVKK\"), the data controller is the operator of this demo platform. No real payments are taken in the demo environment, and no real personal data should be entered."
+    },
+    "data": {
+      "title": "2. Personal data processed",
+      "identity": "Identity and contact: first name, last name, email address.",
+      "transactions": "Customer transactions: bookings, favorites, reviews, transfer transactions.",
+      "finance": "Finance: tokens and transaction references returned by the payment provider (card numbers are not stored).",
+      "security": "Transaction security: session cookies, IP address, request logs, fraud score."
+    },
+    "purpose": {
+      "title": "3. Purposes of processing and legal grounds",
+      "body": "Data is processed on the legal grounds of establishing and performing the booking contract (KVKK Art. 5/2-c), fulfilling legal obligations (Art. 5/2-ç), legitimate interest in ensuring service security and preventing fraud (Art. 5/2-f), and, for analytics cookies, your explicit consent (Art. 5/1)."
+    },
+    "transfer": {
+      "title": "4. Transfers",
+      "body": "Data may be transferred only to the extent required by the service to the accommodation property (booking details), to the payment service provider and to legally authorized authorities. If AI features are running in live mode, prompt content is sent to the model provider in a form that does not contain personal data."
+    },
+    "retention": {
+      "title": "5. Retention period",
+      "body": "When you delete your account, personal fields are deleted or replaced with a pseudonym. Booking and payment records are kept in anonymized form due to legal retention obligations."
+    },
+    "cookies": {
+      "title": "6. Cookies",
+      "body": "<strong>Essential cookies</strong> (session, security, language preference) are required for the service to work and are not subject to consent. <strong>Analytics cookies</strong> are used only if you give consent in the cookie banner. Your preference is stored in the <code>cookie_consent</code> cookie; you can change your preference by deleting that cookie."
+    },
+    "rights": {
+      "title": "7. Your rights (KVKK Art. 11)",
+      "body": "You have the right to learn whether your data is processed, to request information, and to rectification, erasure and objection. To download your data or delete your account, you can use the <link>Privacy and my data</link> page."
+    }
+  },
+  "accountPage": {
+    "title": "Privacy and my data",
+    "intro": "You can exercise your rights under KVKK Art. 11 here."
+  },
+  "center": {
+    "exportFileName": "my-data.json",
+    "exported": "Your data has been downloaded ({file}).",
+    "deleted": "Your account has been deleted. Redirecting you to the home page…",
+    "exportTitle": "Download my data",
+    "exportBody": "Download a copy of the personal data associated with your account (profile, bookings, reviews, favorites) as JSON. The password hash is not exported.",
+    "exportButton": "Download my data",
+    "deleteTitle": "Delete my account",
+    "deleteBody": "Your personal fields are deleted or replaced with a pseudonym. Booking and payment records are kept in anonymized form due to legal retention obligations. This action cannot be undone.",
+    "deleteButton": "Delete my account",
+    "confirmTitle": "Are you sure you want to permanently delete your account?",
+    "acknowledge": "I understand this action cannot be undone.",
+    "deleting": "Deleting…",
+    "confirmDelete": "Yes, delete my account",
+    "cancel": "Cancel",
+    "noticeLink": "You can read how your data is processed in the <link>privacy notice</link>."
+  }
+}

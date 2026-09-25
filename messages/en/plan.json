@@ -1,0 +1,24 @@
+{
+  "title": "Trip planner",
+  "intro": "Enter the cities and the number of days; we'll suggest the shortest route and a suitable stay for each stop.",
+  "form": {
+    "title": "Trip details",
+    "cities": "Cities (comma-separated, up to 6)",
+    "days": "Total days",
+    "guests": "Number of guests",
+    "startDate": "Start date",
+    "submit": "Create plan",
+    "submitting": "Planning…"
+  },
+  "result": {
+    "title": "Suggested plan",
+    "route": "Route: <b>{route}</b> · about {km} km",
+    "nights": "{count, plural, one {# night} other {# nights}}",
+    "hold": "Hold",
+    "holding": "Holding…",
+    "holdLabel": "Hold the stay in {city}",
+    "noStay": "No available stay was found for these dates.",
+    "total": "Stays total: <b>{amount}</b>",
+    "note": "The plan does not make a booking; «Hold» reserves the room briefly and takes you to payment."
+  }
+}

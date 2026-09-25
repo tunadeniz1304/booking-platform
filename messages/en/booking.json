@@ -1,0 +1,59 @@
+{
+  "widget": {
+    "selectDates": "Select dates",
+    "title": "Book a stay",
+    "dates": "Check-in - Check-out",
+    "guests": "Number of guests",
+    "guestOption": "{count, plural, one {# guest} other {# guests}}",
+    "room": "Room",
+    "noRooms": "No rooms available",
+    "roomOption": "{name} - {capacity, plural, one {# person} other {# people}} - {bedType}",
+    "ratePlan": "Rate option",
+    "refundable": "Refund per cancellation policy",
+    "nonRefundable": "Non-refundable",
+    "breakfastIncluded": "Breakfast included",
+    "calculating": "Calculating price…",
+    "submit": "Confirm booking"
+  },
+  "priceInsight": {
+    "title": "Price insight",
+    "labelLine": "The price for these dates is <b>{label}</b> ({nightly} per night).",
+    "labels": {
+      "low": "low",
+      "typical": "typical",
+      "high": "high"
+    },
+    "notEnoughData": "There is not enough data yet to compare this room's price.",
+    "interval": "Expected nightly price range ({level} confidence): {low} – {high}",
+    "setAlert": "Set a price alert",
+    "alertCreated": "Price alert set.",
+    "alertLoginRequired": "Sign in to set a price alert.",
+    "alertFailed": "The price alert could not be set."
+  },
+  "status": {
+    "HELD": "Your room is on hold — complete the payment",
+    "PENDING": "Booking pending",
+    "CONFIRMED": "Your booking is confirmed",
+    "COMPLETED": "Stay completed",
+    "CANCELLED": "Booking cancelled",
+    "EXPIRED": "Payment window expired"
+  },
+  "detail": {
+    "loadFailed": "The booking could not be loaded",
+    "loginRequiredTitle": "Sign-in required",
+    "loginRequiredText": "Sign in to view your booking.",
+    "login": "Sign in",
+    "loading": "Loading...",
+    "error": "Error",
+    "backHome": "Back to home",
+    "bookingNumber": "Booking number: <b>{id}</b>",
+    "checkIn": "Check-in",
+    "checkOut": "Check-out",
+    "roomGuests": "Room / Guests",
+    "roomGuestsValue": "{room} · {count, plural, one {# guest} other {# guests}}",
+    "total": "Total amount",
+    "viewProperty": "View property",
+    "myBookings": "My bookings",
+    "print": "Print"
+  }
+}

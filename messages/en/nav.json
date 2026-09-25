@@ -1,0 +1,18 @@
+{
+  "search": "Search",
+  "account": "My account",
+  "login": "Sign in",
+  "register": "Sign up",
+  "logout": "Sign out",
+  "transfers": "Transfer market",
+  "plan": "Plan a trip",
+  "stays": "Stays",
+  "host": "Host dashboard",
+  "admin": "Admin",
+  "mailbox": "Mailbox (demo)",
+  "primary": "Main menu",
+  "mobile": "Mobile menu",
+  "toggleMenu": "Toggle menu",
+  "privacy": "Privacy",
+  "skipToContent": "Skip to content"
+}

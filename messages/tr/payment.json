@@ -1,0 +1,36 @@
+{
+  "title": "Ödeme",
+  "verifiedRetry": "Doğrulandı. Ödemeyi yeniden gönderebilirsiniz.",
+  "verificationRequired": "Doğrulama gerekli",
+  "failed": "Ödeme başarısız",
+  "verificationFailed": "Doğrulama başarısız",
+  "verificationStartFailed": "Doğrulama başlatılamadı",
+  "invalidCard": "Kart bilgisi geçersiz",
+  "holdUntil": "Oda sizin için {time}'e kadar tutuluyor.",
+  "cardNumber": "Kart numarası",
+  "expiry": "Son kullanma (AA/YY)",
+  "cvc": "CVC",
+  "testCards": "Demo test kartları: {success} (onay), {decline} (ret), {threeDs} (3D Secure). Gerçek ödeme alınmaz.",
+  "stripeTestMode": "Stripe test modu — gerçek ödeme alınmaz.",
+  "processing": "İşleniyor...",
+  "payAndConfirm": "Öde ve onayla",
+  "threeDsTitle": "3D Secure doğrulaması",
+  "verificationCode": "Doğrulama kodu",
+  "verify": "Doğrula",
+  "cancel": {
+    "confirm": "Rezervasyonu iptal etmek istediğinize emin misiniz?",
+    "refunded": "İptal edildi. İade: {amount} (%{percent}).",
+    "noRefund": "İptal edildi. Politika gereği iade yok.",
+    "failed": "İptal edilemedi",
+    "button": "Rezervasyonu iptal et"
+  },
+  "stepUp": {
+    "failed": "Doğrulama başarısız",
+    "title": "Ek doğrulama gerekli",
+    "description": "Hesabınızı korumak için bu ödemeyi passkey'inizle onaylamanızı istiyoruz. Onaydan sonra ödeme otomatik olarak yeniden denenir.",
+    "managePasskeys": "Passkey'lerimi yönet",
+    "waiting": "Bekleniyor...",
+    "verify": "Passkey ile doğrula",
+    "cancel": "Vazgeç"
+  }
+}

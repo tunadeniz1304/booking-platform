@@ -1,0 +1,36 @@
+{
+  "metaTitle": "How ranking works — booking-platform",
+  "title": "How ranking works",
+  "intro": "In the \"Recommended\" order, each stay's score is the weighted sum of the components below. The \"Why this ranking?\" link on each result card shows how much every component contributes. Paid placement and commission rates do not affect the ranking.",
+  "table": {
+    "component": "Component",
+    "weight": "Weight",
+    "description": "Description"
+  },
+  "weightValue": "{value}%",
+  "factors": {
+    "priceFit": {
+      "label": "Price fit",
+      "description": "How favourable the tax-inclusive total for your selected dates is compared with the other results."
+    },
+    "rating": {
+      "label": "Guest rating",
+      "description": "Bayesian-adjusted average rating, so listings with few reviews are not over-promoted."
+    },
+    "popularity": {
+      "label": "Review count",
+      "description": "Logarithmic scale of the number of reviews tied to verified stays."
+    },
+    "personal": {
+      "label": "Personalisation",
+      "description": "If you are signed in, city/type similarity to your past bookings and favourites."
+    },
+    "semantic": {
+      "label": "Search text similarity",
+      "description": "Similarity between your search text and the listing text."
+    }
+  },
+  "footnote": "When you sort by price, rating or most liked, only that criterion is used.",
+  "why": "Why this ranking?",
+  "totalScore": "Total score: {score}"
+}

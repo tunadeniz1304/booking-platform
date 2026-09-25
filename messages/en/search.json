@@ -1,0 +1,115 @@
+{
+  "mapLoading": "Loading map…",
+  "errors": {
+    "load": "Could not load search results",
+    "smart": "The smart filter did not work"
+  },
+  "types": {
+    "hotel": "Hotel",
+    "apartment": "Apartment",
+    "villa": "Villa",
+    "hostel": "Hostel",
+    "bedAndBreakfast": "Guesthouse"
+  },
+  "heading": {
+    "destination": "Stays in {destination}",
+    "all": "All stays"
+  },
+  "guestCount": "{count, plural, one {# guest} other {# guests}}",
+  "filters": {
+    "title": "Filters",
+    "price": "Price range",
+    "minPrice": "Minimum price",
+    "maxPrice": "Maximum price",
+    "minPlaceholder": "Min",
+    "maxPlaceholder": "Max",
+    "type": "Property type",
+    "sort": "Sort by"
+  },
+  "sort": {
+    "recommended": "Recommended",
+    "priceAsc": "Price (lowest first)",
+    "priceDesc": "Price (highest first)",
+    "rating": "Rating (highest first)"
+  },
+  "loading": "Loading...",
+  "resultCount": "Showing {shown} results ({total} found)",
+  "cached": "From cache",
+  "view": "View",
+  "list": "List",
+  "map": "Map",
+  "mapFailed": "The map could not be loaded (e.g. offline); showing the list view.",
+  "noLocation": "These results have no location data; showing the list view.",
+  "noResults": "No results found",
+  "noResultsHint": "Try changing the filters.",
+  "mapResults": "Results on the map",
+  "bar": {
+    "destination": "Where to?",
+    "dates": "Check-in - Check-out",
+    "pickDate": "Select dates",
+    "checkInOnly": "{date} - check-out?",
+    "guests": "Guests",
+    "guestsSummary": "{guests, plural, one {# guest} other {# guests}} · {rooms, plural, one {# room} other {# rooms}}",
+    "adults": "Adults",
+    "adultsHint": "Ages 13 and over",
+    "children": "Children",
+    "childrenHint": "Ages 0-12",
+    "rooms": "Rooms",
+    "decrease": "Decrease",
+    "increase": "Increase",
+    "submit": "Search"
+  },
+  "picker": {
+    "prevMonth": "Previous month",
+    "nextMonth": "Next month"
+  },
+  "autocomplete": {
+    "placeholder": "City, hotel or region",
+    "popular": "Popular destinations",
+    "searching": "Searching...",
+    "suggestions": "Suggestions",
+    "noResults": "No results found"
+  },
+  "mapView": {
+    "initFailed": "the map could not be initialised",
+    "error": "map error",
+    "fallback": "The map could not be loaded; using the list view.",
+    "cluster": "{count} stays; click to zoom in"
+  },
+  "smart": {
+    "label": "Smart filter — describe what you're looking for",
+    "placeholder": "e.g. villa in Antalya with a pool, for 4 people, under 3000 TL per night",
+    "interpreting": "Interpreting…",
+    "submit": "Filter",
+    "noFilters": "No filters could be extracted from the text.",
+    "extracted": "Extracted filters",
+    "remove": "Remove filter {label}",
+    "clear": "Clear smart filter",
+    "chips": {
+      "city": "City: {value}",
+      "query": "Text: {value}",
+      "guests": "{count, plural, one {# guest} other {# guests}}",
+      "minPrice": "At least {value}",
+      "maxPrice": "At most {value}",
+      "checkIn": "Check-in: {value}",
+      "checkOut": "Check-out: {value}",
+      "sort": "Sort: {value}"
+    },
+    "sort": {
+      "recommended": "Recommended",
+      "priceAsc": "Price ascending",
+      "priceDesc": "Price descending",
+      "rating": "Rating"
+    }
+  },
+  "card": {
+    "reviews": "{count, plural, one {# review} other {# reviews}}",
+    "nightsTotal": "{count, plural, one {total for # night} other {total for # nights}}",
+    "taxesIncluded": "taxes and fees included",
+    "fromPerNight": "per night from",
+    "taxesOnDates": "taxes and fees are added once you pick dates",
+    "seeDeal": "See deal",
+    "addFavorite": "Add to favourites",
+    "removeFavorite": "Remove from favourites"
+  }
+}

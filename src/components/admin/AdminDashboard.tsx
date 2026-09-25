@@ -88,6 +88,7 @@ export default function AdminDashboard() {
       <OutboxCard />
       <EventsCard />
       <FraudCard />
+      <ReviewModerationCard />
       <ExperimentsCard />
       <RoleCard />
     </div>
@@ -361,6 +362,74 @@ function FraudCard() {
                 </Button>
                 <Button variant="danger" onClick={() => resolve(f.id, "fraud")}>
                   Dolandırıcılık
+                </Button>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
+  );
+}
+
+interface ModerationItem {
+  id: string;
+  propertyTitle: string;
+  rating: number;
+  comment: string | null;
+  status: "PENDING_REVIEW" | "HIDDEN";
+  reportCount: number;
+  reasons: { code: string; detail: string }[];
+  explanation: string;
+}
+
+/** P1-7 yorum moderasyon kuyruğu: karar yöneticinin; açıklama yalnızca bilgi amaçlı. */
+function ReviewModerationCard() {
+  const { data, error, reload } = useLoader(() => apiFetch<ModerationItem[]>("/api/admin/reviews"));
+  const [feedback, setFeedback] = useState<Feedback>({});
+
+  async function decide(id: string, action: "publish" | "remove") {
+    setFeedback({});
+    try {
+      await apiFetch("/api/admin/reviews", {
+        method: "POST",
+        body: JSON.stringify({ id, action }),
+      });
+      setFeedback({ message: "Karar kaydedildi." });
+      reload();
+    } catch (e) {
+      setFeedback({ error: errorMessage(e) });
+    }
+  }
+
+  return (
+    <Card title="Yorum moderasyon kuyruğu" id="review-moderation">
+      <Status error={error ?? feedback.error} message={feedback.message} />
+      {data?.length === 0 && <p className="text-sm text-gray-700">İncelenecek yorum yok.</p>}
+      {data && data.length > 0 && (
+        <ul className="space-y-2">
+          {data.map((r) => (
+            <li key={r.id} className="rounded-md border p-3 text-sm">
+              <p>
+                <strong>{r.propertyTitle}</strong> · {r.rating}/5 ·{" "}
+                {r.status === "HIDDEN" ? "Şikâyetle gizlendi" : "Yayın öncesi inceleme"} ·{" "}
+                {r.reportCount} şikâyet
+              </p>
+              {r.comment && <p className="mt-1 text-gray-800">{r.comment}</p>}
+              <p className="mt-1 text-xs text-gray-700">
+                Neden işaretlendi: {r.explanation}{" "}
+                {r.reasons.map((x) => (
+                  <code key={x.code} className="mr-1">
+                    {x.code}
+                  </code>
+                ))}
+              </p>
+              <span className="mt-2 flex gap-2">
+                <Button variant="secondary" onClick={() => decide(r.id, "publish")}>
+                  Yayınla
+                </Button>
+                <Button variant="danger" onClick={() => decide(r.id, "remove")}>
+                  Kaldır
                 </Button>
               </span>
             </li>

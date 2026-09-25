@@ -19,6 +19,14 @@ const bodySchema = z.object({
   bookingId: z.string().min(1).max(64),
   rating: z.number().int().min(1).max(5),
   comment: z.string().trim().max(2000).optional(),
+  subScores: z
+    .object({
+      cleanliness: z.number().int().min(1).max(5).optional(),
+      location: z.number().int().min(1).max(5).optional(),
+      staff: z.number().int().min(1).max(5).optional(),
+      value: z.number().int().min(1).max(5).optional(),
+    })
+    .optional(),
 });
 
 /** Yalnızca konaklamasını tamamlamış misafir (booking başına 1). */

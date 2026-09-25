@@ -1,7 +1,7 @@
 "use client";
 
-import { Fragment, type ReactNode } from "react";
-import { apiFetch } from "@/lib/api-client";
+import { Fragment, useState, type ReactNode } from "react";
+import { ApiError, apiFetch } from "@/lib/api-client";
 import { formatDate } from "@/lib/ui/format";
 import { LlmBadge, focusRing, useLoader } from "@/components/ui/ui";
 
@@ -13,6 +13,102 @@ interface ReviewItem {
   createdAt: string;
   author: string;
   verifiedStay: boolean;
+  subScores?: Record<SubScoreKey, number | null>;
+}
+
+type SubScoreKey = "cleanliness" | "location" | "staff" | "value";
+
+const SUB_SCORE_LABEL: Record<SubScoreKey, string> = {
+  cleanliness: "Temizlik",
+  location: "Konum",
+  staff: "Personel",
+  value: "Fiyat/performans",
+};
+
+const REPORT_REASONS = [
+  ["OFFENSIVE", "Saldırgan / uygunsuz"],
+  ["SPAM", "Spam / reklam"],
+  ["FAKE", "Sahte yorum"],
+  ["PRIVACY", "Kişisel bilgi içeriyor"],
+  ["OTHER", "Diğer"],
+] as const;
+
+/** Yorum şikâyeti (P1-7): oturum gerekir; eşik aşılınca yorum incelemeye alınır. */
+function ReportButton({ reviewId }: { reviewId: string }) {
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState<string>("OFFENSIVE");
+  const [status, setStatus] = useState<string | null>(null);
+
+  async function submit() {
+    setStatus(null);
+    try {
+      await apiFetch(`/api/reviews/${reviewId}/report`, {
+        method: "POST",
+        body: JSON.stringify({ reason }),
+      });
+      setStatus("Şikâyetiniz alındı, teşekkürler.");
+      setOpen(false);
+    } catch (e) {
+      setStatus(
+        e instanceof ApiError && e.status === 401
+          ? "Şikâyet için giriş yapmalısınız."
+          : e instanceof ApiError
+            ? e.message
+            : "Şikâyet gönderilemedi"
+      );
+    }
+  }
+
+  return (
+    <div className="mt-2 text-xs">
+      {open ? (
+        <span className="flex flex-wrap items-center gap-2">
+          <label htmlFor={`report-${reviewId}`} className="sr-only">
+            Şikâyet nedeni
+          </label>
+          <select
+            id={`report-${reviewId}`}
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            className="rounded border border-gray-300 px-1 py-0.5"
+          >
+            {REPORT_REASONS.map(([v, l]) => (
+              <option key={v} value={v}>
+                {l}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={() => void submit()}
+            className={`font-semibold text-red-800 underline ${focusRing}`}
+          >
+            Gönder
+          </button>
+          <button
+            type="button"
+            onClick={() => setOpen(false)}
+            className={`text-gray-700 underline ${focusRing}`}
+          >
+            Vazgeç
+          </button>
+        </span>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className={`text-gray-700 underline ${focusRing}`}
+        >
+          Şikâyet et
+        </button>
+      )}
+      {status && (
+        <p role="status" className="mt-1 text-gray-700">
+          {status}
+        </p>
+      )}
+    </div>
+  );
 }
 
 interface ReviewSummary {
@@ -87,6 +183,12 @@ export default function ReviewsSection({ propertyId }: { propertyId: string }) {
       <h2 id="reviews-title" className="text-xl font-semibold text-gray-900">
         Misafir yorumları
       </h2>
+      <p className="mt-1 text-xs text-gray-700" data-testid="review-verification">
+        Yorumlar nasıl doğrulanır? Yalnızca bu platformda rezervasyon yapıp konaklamasını tamamlamış
+        misafir, o rezervasyon için bir kez yorum yazabilir. Küfür veya kişisel bilgi içeren
+        yorumlar yayından önce incelenir; şikâyet eşiğini aşan yorumlar gizlenir. Yorumlar için
+        ödeme veya teşvik verilmez; olumsuz yorumlar da yayımlanır.
+      </p>
 
       <div aria-live="polite">
         {summary.data && summary.data.reviewCount > 0 && (
@@ -172,6 +274,18 @@ export default function ReviewsSection({ propertyId }: { propertyId: string }) {
                 )}
                 <span className="text-xs text-gray-700">{formatDate(r.createdAt)}</span>
               </div>
+              {r.subScores && Object.values(r.subScores).some((v) => v !== null) && (
+                <dl className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-700">
+                  {(Object.keys(SUB_SCORE_LABEL) as SubScoreKey[])
+                    .filter((k) => r.subScores?.[k] != null)
+                    .map((k) => (
+                      <div key={k} className="flex gap-1">
+                        <dt>{SUB_SCORE_LABEL[k]}:</dt>
+                        <dd className="font-semibold text-gray-900">{r.subScores?.[k]}/5</dd>
+                      </div>
+                    ))}
+                </dl>
+              )}
               {r.comment && <p className="mt-2 text-gray-800">{r.comment}</p>}
               {r.hostReply && (
                 <div className="mt-3 border-l-4 border-[#003580] bg-gray-50 p-3">
@@ -179,6 +293,7 @@ export default function ReviewsSection({ propertyId }: { propertyId: string }) {
                   <p className="mt-1 text-gray-800">{r.hostReply}</p>
                 </div>
               )}
+              <ReportButton reviewId={r.id} />
             </li>
           ))}
         </ul>

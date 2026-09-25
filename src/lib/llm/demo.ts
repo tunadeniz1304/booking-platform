@@ -187,3 +187,13 @@ export function demoMessageDraft(f: MessageDraftFacts): { reply: string } {
     reply: `Merhaba ${f.guestName}, ${opener} ${f.propertyTitle} için ${f.checkIn} – ${f.checkOut} tarihlerinde sizi ağırlamayı dört gözle bekliyoruz. Başka bir sorunuz olursa buradan yazabilirsiniz.`,
   };
 }
+
+/** P1-7: moderasyon gerekçe kodlarından deterministik açıklama (karar değil, yalnızca ifade). */
+export function demoModerationExplain(reasons: { code: string; detail: string }[]): {
+  explanation: string;
+} {
+  if (reasons.length === 0) return { explanation: "Kayıtlı bir işaretleme gerekçesi yok." };
+  return {
+    explanation: `Bu yorum otomatik kurallarca işaretlendi: ${reasons.map((r) => r.detail).join("; ")}. Yayınlama ya da kaldırma kararı yöneticiye aittir.`,
+  };
+}

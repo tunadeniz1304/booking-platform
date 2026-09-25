@@ -41,7 +41,7 @@ export async function summarizeReviews(propertyId: string): Promise<SummaryRespo
   if (cached) return JSON.parse(cached) as SummaryResponse;
 
   const rows = await prisma.review.findMany({
-    where: { propertyId },
+    where: { propertyId, moderationStatus: "PUBLISHED" },
     orderBy: { createdAt: "desc" },
     take: MAX_REVIEWS,
     select: {

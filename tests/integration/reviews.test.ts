@@ -39,7 +39,7 @@ describeInt("P1-4 doğrulanmış yorumlar + atıflı özet (integration)", () =>
     const room = await prisma.roomType.create({
       data: { propertyId: property.id, name: "O", maxOccupancy: 2, bedType: "Ç" },
     });
-    const booking = (status: "CONFIRMED" | "HELD", out: number) =>
+    const booking = (status: "CONFIRMED" | "COMPLETED" | "HELD", out: number) =>
       prisma.booking.create({
         data: {
           userId: guest.id,
@@ -52,8 +52,13 @@ describeInt("P1-4 doğrulanmış yorumlar + atıflı özet (integration)", () =>
           status,
         },
       });
-    const past = await booking("CONFIRMED", -1);
+    const past = await booking("COMPLETED", -1);
     const future = await booking("CONFIRMED", 10);
+    // v3#24: çıkışı geçmiş ama COMPLETED olmayan (CONFIRMED) rezervasyon yorum hakkı vermez.
+    const pastConfirmed = await booking("CONFIRMED", -3);
+    await expect(
+      createReview({ userId: guest.id, bookingId: pastConfirmed.id, rating: 5 })
+    ).rejects.toMatchObject({ status: 403 });
 
     await expect(
       createReview({ userId: stranger.id, bookingId: past.id, rating: 5 })

@@ -12,7 +12,7 @@ vi.mock("@/lib/redis", async () => {
 vi.mock("@/lib/queue", () => ({ addPricingUpdateJob }));
 vi.mock("@/lib/prisma", () => ({
   prisma: {
-    room: {
+    roomType: {
       findUnique: vi.fn(async ({ where }: { where: { id: string } }) =>
         where.id === "room-of-h1" ? { property: { hostId: "h1", currency: "TRY" } } : null
       ),

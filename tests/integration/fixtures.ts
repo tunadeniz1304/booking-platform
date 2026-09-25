@@ -28,7 +28,10 @@ export async function createStayFixture(
     days?: number;
     policyId?: string;
     capacity?: number;
+    /** Oda tipi adedi (varsayılan 1). */
+    units?: number;
     country?: string;
+    timeZone?: string;
   }
 ): Promise<StayFixture> {
   const stamp = `${opts.tag}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -62,21 +65,31 @@ export async function createStayFixture(
       locationId: location.id,
       basePrice: price,
       cancellationPolicyId: opts.policyId ?? "policy_moderate_v1",
+      ...(opts.timeZone ? { timeZone: opts.timeZone } : {}),
     },
   });
-  const room = await prisma.room.create({
+  const units = opts.units ?? 1;
+  const room = await prisma.roomType.create({
     data: {
       propertyId: property.id,
       name: "Oda",
-      capacity: opts.capacity ?? 2,
+      maxOccupancy: opts.capacity ?? 2,
+      units,
       bedType: "Çift",
+      ratePlans: {
+        create: [
+          { code: "STANDARD", name: "Standart", isDefault: true },
+          { code: "NONREF", name: "İade edilemez", refundable: false, priceModifierBps: -1000 },
+        ],
+      },
     },
   });
-  await prisma.availability.createMany({
+  await prisma.inventoryDay.createMany({
     data: Array.from({ length: opts.days ?? 120 }, (_, i) => ({
-      roomId: room.id,
+      roomTypeId: room.id,
       date: utcDay(i + 1),
       price,
+      total: units,
     })),
   });
 

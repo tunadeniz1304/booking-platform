@@ -68,23 +68,24 @@ describeInt("outbox (integration)", () => {
         isActive: true,
       },
     });
-    room = await prisma.room.create({
+    room = await prisma.roomType.create({
       data: {
         propertyId: property.id,
         name: "Outbox Oda",
-        capacity: 2,
+        maxOccupancy: 2,
         bedType: "Çift Kişilik",
         priceModifier: new Prisma.Decimal(0),
         available: true,
+        ratePlans: { create: [{ code: "STANDARD", name: "Standart", isDefault: true }] },
       },
     });
     const d1 = addDays(todayUtcMidnight(), 8);
     const d2 = addDays(d1, 1);
-    await prisma.availability.createMany({
+    await prisma.inventoryDay.createMany({
       data: [d1, d2].map((d) => ({
-        roomId: room.id,
+        roomTypeId: room.id,
         date: d,
-        isAvailable: true,
+        total: 1,
         price: new Prisma.Decimal(900),
       })),
     });
@@ -92,9 +93,10 @@ describeInt("outbox (integration)", () => {
 
   afterAll(async () => {
     await prisma.outboxMessage.deleteMany({ where: { aggregateId: bookingId } });
-    await prisma.availability.deleteMany({ where: { roomId: room.id } });
+    await prisma.inventoryDay.deleteMany({ where: { roomTypeId: room.id } });
     await prisma.booking.deleteMany({ where: { id: bookingId } });
-    await prisma.room.deleteMany({ where: { id: room.id } });
+    await prisma.ratePlan.deleteMany({ where: { roomTypeId: room.id } });
+    await prisma.roomType.deleteMany({ where: { id: room.id } });
     await prisma.property.deleteMany({ where: { id: property.id } });
     const locs = await prisma.location.findMany({
       where: { city: { startsWith: "OutboxCity-" } },

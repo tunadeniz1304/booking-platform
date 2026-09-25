@@ -71,7 +71,9 @@ describeInt("regression: #3 P2P devir (integration)", () => {
     });
     propertyId = property.id;
     roomId = (
-      await prisma.room.create({ data: { propertyId, name: "Oda", capacity: 2, bedType: "Çift" } })
+      await prisma.roomType.create({
+        data: { propertyId, name: "Oda", maxOccupancy: 2, bedType: "Çift" },
+      })
     ).id;
   });
 

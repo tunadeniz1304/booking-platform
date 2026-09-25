@@ -59,8 +59,24 @@ describeInt("regression: #1 gRPC auth (integration)", () => {
         basePrice: new Prisma.Decimal(1000),
       },
     });
-    const room = await prisma.room.create({
-      data: { propertyId: property.id, name: "Oda", capacity: 2, bedType: "Çift" },
+    const room = await prisma.roomType.create({
+      data: {
+        propertyId: property.id,
+        name: "Oda",
+        maxOccupancy: 2,
+        bedType: "Çift",
+        ratePlans: { create: [{ code: "STANDARD", name: "Standart", isDefault: true }] },
+      },
+    });
+    // HELD rezervasyonun tuttuğu birim sayaçta da görünmeli (onay held → sold taşır)
+    await prisma.inventoryDay.createMany({
+      data: [20, 21].map((d) => ({
+        roomTypeId: room.id,
+        date: utcDay(d),
+        total: 1,
+        held: 1,
+        price: new Prisma.Decimal(1000),
+      })),
     });
     const booking = await prisma.booking.create({
       data: {
@@ -123,5 +139,16 @@ describeInt("regression: #1 gRPC auth (integration)", () => {
     });
     expect(err).toBeNull();
     expect(res?.status).toBe("PAID");
+    const days = await prisma.inventoryDay.findMany({
+      where: {
+        date: { in: [utcDay(20), utcDay(21)] },
+        roomType: { bookings: { some: { id: bookingId } } },
+      },
+      select: { sold: true, held: true },
+    });
+    expect(days).toEqual([
+      { sold: 1, held: 0 },
+      { sold: 1, held: 0 },
+    ]); // onay: held → sold
   });
 });

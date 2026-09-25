@@ -39,15 +39,14 @@ describeInt("booking-concurrency (integration)", () => {
   async function makeAvailable(roomId: string, dates: Date[]): Promise<void> {
     await Promise.all(
       dates.map(async (date) => {
-        await prisma.availability.upsert({
-          where: { roomId_date: { roomId, date } },
-          update: { isAvailable: true, lockedBy: null },
+        await prisma.inventoryDay.upsert({
+          where: { roomTypeId_date: { roomTypeId: roomId, date } },
+          update: { total: 1, sold: 0, held: 0 },
           create: {
-            roomId,
+            roomTypeId: roomId,
             date,
-            isAvailable: true,
+            total: 1,
             price: new Prisma.Decimal(1000),
-            lockedBy: null,
           },
         });
       })
@@ -88,22 +87,24 @@ describeInt("booking-concurrency (integration)", () => {
         isActive: true,
       },
     });
-    testRoom = await prisma.room.create({
+    testRoom = await prisma.roomType.create({
       data: {
         propertyId: testProperty.id,
         name: "Test Room",
-        capacity: 2,
+        maxOccupancy: 2,
         bedType: "Çift Kişilik Yatak",
         priceModifier: new Prisma.Decimal(0),
         available: true,
+        ratePlans: { create: [{ code: "STANDARD", name: "Standart", isDefault: true }] },
       },
     });
   });
 
   afterAll(async () => {
-    await prisma.availability.deleteMany({ where: { roomId: testRoom.id } });
+    await prisma.inventoryDay.deleteMany({ where: { roomTypeId: testRoom.id } });
     await prisma.booking.deleteMany({ where: { userId: testUser.id } });
-    await prisma.room.deleteMany({ where: { id: testRoom.id } });
+    await prisma.ratePlan.deleteMany({ where: { roomTypeId: testRoom.id } });
+    await prisma.roomType.deleteMany({ where: { id: testRoom.id } });
     await prisma.property.deleteMany({ where: { hostId: testHost.id } });
     await prisma.location.deleteMany({ where: { city: { startsWith: "TestCity-" } } });
     await prisma.user.deleteMany({ where: { id: { in: [testUser.id, testHost.id] } } });
@@ -140,6 +141,16 @@ describeInt("booking-concurrency (integration)", () => {
         where: { userId: testUser.id, propertyId: testProperty.id },
       });
       expect(count).toBe(1);
+
+      // Sayaç: her gece tam 1 birim tutuldu, hiçbir gecede fazla satış yok
+      const days = await prisma.inventoryDay.findMany({
+        where: { roomTypeId: testRoom.id, date: { in: nightDates } },
+        select: { sold: true, held: true },
+      });
+      expect(days.map((d) => d.sold + d.held)).toEqual([1, 1, 1]);
+      const [{ over }] = await prisma.$queryRaw<{ over: bigint }[]>`
+        SELECT count(*) AS over FROM "InventoryDay" WHERE sold + held > total`;
+      expect(Number(over)).toBe(0);
     }, 30000);
   });
 
@@ -170,6 +181,11 @@ describeInt("booking-concurrency (integration)", () => {
         where: { userId: testUser.id, idempotencyKey },
       });
       expect(count).toBe(1);
+      // Tekrar eden istek sayacı ikinci kez hareket ettirmez
+      const day = await prisma.inventoryDay.findUniqueOrThrow({
+        where: { roomTypeId_date: { roomTypeId: testRoom.id, date: nightDate } },
+      });
+      expect(day.held + day.sold).toBe(1);
     }, 30000);
   });
 });

@@ -1,4 +1,4 @@
-import { beforeAll, afterAll, it, expect } from "vitest";
+import { beforeAll, beforeEach, afterAll, it, expect } from "vitest";
 import { PrismaClient, Prisma } from "@prisma/client";
 import { describeInt, iso, utcDay } from "./helpers";
 import { createBooking, expireHolds } from "@/lib/booking-service";
@@ -11,6 +11,7 @@ import {
 import { relayOutbox } from "@/lib/cqrs";
 import { registerEventHandlers } from "@/lib/events/register";
 import { MOCK_3DS_CODE } from "@/lib/payment/card-token";
+import { redis } from "@/lib/redis";
 
 describeInt("ödeme, iptal, iade ve bildirim (integration)", () => {
   const prisma = new PrismaClient();
@@ -34,6 +35,12 @@ describeInt("ödeme, iptal, iade ve bildirim (integration)", () => {
     return booking;
   }
 
+  // Dolandırıcılık hız sayaçları Redis'te dosyalar arası paylaşılır; aynı test kartını
+  // kullanan diğer dosyalar bu dosyadaki ödemeleri "review" (3DS) eşiğine itmesin.
+  beforeEach(async () => {
+    await redis.del(`fraud:v:user:${userId}`, "fraud:v:card:tok_mock_ok_4242");
+  });
+
   beforeAll(async () => {
     registerEventHandlers();
     const user = await prisma.user.create({
@@ -55,13 +62,20 @@ describeInt("ödeme, iptal, iade ve bildirim (integration)", () => {
       },
     });
     propertyId = property.id;
-    const room = await prisma.room.create({
-      data: { propertyId, name: "Oda", capacity: 2, bedType: "Çift" },
+    const room = await prisma.roomType.create({
+      data: {
+        propertyId,
+        name: "Oda",
+        maxOccupancy: 2,
+        bedType: "Çift",
+        ratePlans: { create: [{ code: "STANDARD", name: "Standart", isDefault: true }] },
+      },
     });
     roomId = room.id;
-    await prisma.availability.createMany({
+    await prisma.inventoryDay.createMany({
       data: Array.from({ length: 90 }, (_, i) => ({
-        roomId,
+        roomTypeId: roomId,
+        total: 1,
         date: utcDay(i + 1),
         price: new Prisma.Decimal(1000),
       })),

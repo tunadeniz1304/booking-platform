@@ -50,19 +50,22 @@ describeInt("F7 host / kanal / KVKK (integration)", () => {
         isActive: false,
       },
     });
-    const room = await prisma.room.create({
-      data: { propertyId: p.id, name: "O", capacity: 2, bedType: "Ç" },
+    const ratePlans = { create: [{ code: "STANDARD", name: "Standart", isDefault: true }] };
+    const room = await prisma.roomType.create({
+      data: { propertyId: p.id, name: "O", maxOccupancy: 2, bedType: "Ç", ratePlans },
     });
-    await prisma.availability.createMany({
+    await prisma.inventoryDay.createMany({
       data: Array.from({ length: 20 }, (_, i) => ({
-        roomId: room.id,
+        roomTypeId: room.id,
         date: utcDay(i + 1),
         price: new Prisma.Decimal(800),
+        total: 1,
       })),
     });
-    await prisma.availability.update({
-      where: { roomId_date: { roomId: room.id, date: utcDay(5) } },
-      data: { isAvailable: false, lockedBy: "booking-x" },
+    // 5. gece satılmış (tek birim dolu): sayaç modelinde "rezervasyonlu gece" = sold > 0
+    await prisma.inventoryDay.update({
+      where: { roomTypeId_date: { roomTypeId: room.id, date: utcDay(5) } },
+      data: { sold: 1 },
     });
 
     // IDOR: başka host 404; belge yoksa yayınlanamaz
@@ -81,17 +84,27 @@ describeInt("F7 host / kanal / KVKK (integration)", () => {
       ).isActive
     ).toBe(true);
 
+    // Allotment'ı 0'a indirme girişimi: satılmış gecede total, sold + held altına inemez
     const r = await bulkUpdateAvailability(claims(host.id, "HOST"), room.id, {
       from: iso(utcDay(1)),
       to: iso(utcDay(10)),
       price: 999,
+      total: 0,
     });
     expect(r.skippedLocked).toBe(1);
-    const lockedNight = await prisma.availability.findUniqueOrThrow({
-      where: { roomId_date: { roomId: room.id, date: utcDay(5) } },
+    const lockedNight = await prisma.inventoryDay.findUniqueOrThrow({
+      where: { roomTypeId_date: { roomTypeId: room.id, date: utcDay(5) } },
     });
-    expect(Number(lockedNight.price)).toBe(800);
-    expect(lockedNight.lockedBy).toBe("booking-x");
+    expect(lockedNight.total).toBe(1);
+    expect(lockedNight.sold).toBe(1);
+    const closedNight = await prisma.inventoryDay.findUniqueOrThrow({
+      where: { roomTypeId_date: { roomTypeId: room.id, date: utcDay(4) } },
+    });
+    expect(closedNight.total).toBe(0);
+    const [{ overbooked }] = await prisma.$queryRaw<Array<{ overbooked: number }>>`
+      SELECT count(*)::int AS overbooked FROM "InventoryDay"
+      WHERE "roomTypeId" = ${room.id} AND sold + held > total`;
+    expect(overbooked).toBe(0);
 
     // ARI: aynı mesaj iki kez → tek etki; eski sıra reddedilir
     const msg = {
@@ -109,25 +122,32 @@ describeInt("F7 host / kanal / KVKK (integration)", () => {
     // iCal gidiş-dönüş: dışa aktarılan dolu gece başka odaya içe aktarılınca bloklanır
     const ics = await exportRoomCalendar(room.id);
     expect(ics).toContain("BEGIN:VCALENDAR");
-    const room2 = await prisma.room.create({
-      data: { propertyId: p.id, name: "O2", capacity: 2, bedType: "Ç" },
+    // Dışa aktarımda: satılmış 5. gece + total=0'a inen 1–4 ve 6–10. geceler
+    const room2 = await prisma.roomType.create({
+      data: { propertyId: p.id, name: "O2", maxOccupancy: 2, bedType: "Ç", ratePlans },
     });
-    await prisma.availability.createMany({
+    await prisma.inventoryDay.createMany({
       data: Array.from({ length: 20 }, (_, i) => ({
-        roomId: room2.id,
+        roomTypeId: room2.id,
         date: utcDay(i + 1),
         price: new Prisma.Decimal(800),
+        total: 1,
       })),
     });
     const imported = await importCalendar(room2.id, ics, "ota-x");
-    expect(imported.blocked).toBe(1);
+    expect(imported).toMatchObject({ nights: 10, added: 10, removed: 0, conflicts: [] });
+    const night5 = await prisma.inventoryDay.findUniqueOrThrow({
+      where: { roomTypeId_date: { roomTypeId: room2.id, date: utcDay(5) } },
+    });
+    expect(night5.sold).toBe(1);
     expect(
-      (
-        await prisma.availability.findUniqueOrThrow({
-          where: { roomId_date: { roomId: room2.id, date: utcDay(5) } },
-        })
-      ).lockedBy
-    ).toBe("ical:ota-x");
+      await prisma.externalBlock.count({
+        where: { roomTypeId: room2.id, source: "ical:ota-x", date: utcDay(5) },
+      })
+    ).toBe(1);
+    // Aynı takvim tekrar içe aktarılırsa uzlaştırma idempotent: yeni blok yok
+    const again = await importCalendar(room2.id, ics, "ota-x");
+    expect(again).toMatchObject({ added: 0, removed: 0 });
 
     // KVKK: dışa aktarımda parola özeti yok; silme sonrası kişisel alanlar pseudonim
     const exported = JSON.stringify(await exportUserData(host.id));

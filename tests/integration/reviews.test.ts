@@ -35,8 +35,8 @@ describeInt("P1-4 doğrulanmış yorumlar + atıflı özet (integration)", () =>
         basePrice: new Prisma.Decimal(500),
       },
     });
-    const room = await prisma.room.create({
-      data: { propertyId: property.id, name: "O", capacity: 2, bedType: "Ç" },
+    const room = await prisma.roomType.create({
+      data: { propertyId: property.id, name: "O", maxOccupancy: 2, bedType: "Ç" },
     });
     const booking = (status: "CONFIRMED" | "HELD", out: number) =>
       prisma.booking.create({

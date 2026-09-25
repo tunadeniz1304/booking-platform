@@ -79,3 +79,17 @@ describe("regression: #20 para — tamsayı minor-unit", () => {
     );
   });
 });
+
+describe("baz puan (bps) yardımcıları — v3", () => {
+  it("bpsOf / applyBps tam ve half-up", async () => {
+    const { bpsOf, applyBps, money } = await import("@/lib/money/money");
+    expect(bpsOf(money(1000, "TRY"), 1000).amount).toBe(100);
+    expect(bpsOf(money(1005, "TRY"), 1000).amount).toBe(101); // 100.5 → 101
+    expect(bpsOf(money(-1005, "TRY"), 1000).amount).toBe(-101);
+    expect(applyBps(money(10_000, "TRY"), -1000).amount).toBe(9_000);
+    expect(applyBps(money(12_345, "EUR"), 1200).amount).toBe(13_826); // 1481.4 → 1481
+    expect(() => bpsOf(money(1, "TRY"), 1.5)).toThrow();
+    // Çok büyük tutarlarda taşma yok.
+    expect(bpsOf(money(9_007_199_254_740_000, "TRY"), 1).amount).toBe(900_719_925_474);
+  });
+});

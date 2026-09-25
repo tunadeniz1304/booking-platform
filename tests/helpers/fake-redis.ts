@@ -19,6 +19,10 @@ export class FakeRedis implements RedisClient {
     if (this.failing) throw new Error("redis down");
   }
 
+  async mget(keys: string[]) {
+    return Promise.all(keys.map((k) => this.get(k)));
+  }
+
   async get(key: string) {
     this.guard("get");
     return this.store.get(key) ?? null;

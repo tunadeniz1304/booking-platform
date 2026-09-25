@@ -40,12 +40,19 @@ describeInt("P1-6 trip-planner (integration, demo)", () => {
           basePrice: new Prisma.Decimal(c.price),
         },
       });
-      const room = await prisma.room.create({
-        data: { propertyId: p.id, name: "Çift", capacity: 2, bedType: "Çift" },
+      const room = await prisma.roomType.create({
+        data: {
+          propertyId: p.id,
+          name: "Çift",
+          maxOccupancy: 2,
+          bedType: "Çift",
+          ratePlans: { create: [{ code: "STANDARD", name: "Standart", isDefault: true }] },
+        },
       });
-      await prisma.availability.createMany({
+      await prisma.inventoryDay.createMany({
         data: Array.from({ length: 60 }, (_, i) => ({
-          roomId: room.id,
+          roomTypeId: room.id,
+          total: 1,
           date: utcDay(i + 1),
           price: new Prisma.Decimal(c.price),
         })),

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import fc from "fast-check";
-import { nightsFromRows, priceStay, samePrice } from "@/lib/pricing/quote";
+import { nightsFromInventory, priceStay, samePrice } from "@/lib/pricing/quote";
 import { money, toDecimalString, toMinor } from "@/lib/money/money";
 import { addDays, nightsBetween, parseIsoDate } from "@/lib/time/nights";
 
@@ -12,14 +12,16 @@ function rowsFor(start: string, prices: number[]) {
   return prices.map((p, i) => ({
     date: new Date(`${addDays(first, i)}T00:00:00.000Z`),
     price: toDecimalString(money(p, "TRY")),
-    isAvailable: true,
+    total: 1,
+    sold: 0,
+    held: 0,
   }));
 }
 
 describe("regression: #8 gösterilen fiyat = tahsil edilen fiyat", () => {
   it("vergi dahil all-in toplam ve kırılım tutarlı", () => {
     const rows = rowsFor("2026-10-01", [150000, 150000, 180000]);
-    const nights = nightsFromRows(
+    const nights = nightsFromInventory(
       rows,
       nightsBetween(parseIsoDate("2026-10-01"), parseIsoDate("2026-10-04")),
       "TRY"
@@ -34,9 +36,9 @@ describe("regression: #8 gösterilen fiyat = tahsil edilen fiyat", () => {
   it("eksik veya dolu gece → teklif yok (SOLD_OUT)", () => {
     const rows = rowsFor("2026-10-01", [100000, 100000]);
     const stay = nightsBetween(parseIsoDate("2026-10-01"), parseIsoDate("2026-10-04"));
-    expect(nightsFromRows(rows, stay, "TRY")).toBeNull();
-    rows[1].isAvailable = false;
-    expect(nightsFromRows(rows, stay.slice(0, 2), "TRY")).toBeNull();
+    expect(nightsFromInventory(rows, stay, "TRY")).toBeNull();
+    rows[1].sold = 1; // tek odalı tip dolu
+    expect(nightsFromInventory(rows, stay.slice(0, 2), "TRY")).toBeNull();
   });
 
   it("property: kart (arama) = PDP (/api/quote) = checkout (rezervasyon) = tahsilat", () => {
@@ -53,19 +55,19 @@ describe("regression: #8 gösterilen fiyat = tahsil edilen fiyat", () => {
           const rows = rowsFor("2026-11-01", prices);
           // Arama kartı, PDP teklifi ve rezervasyon işlemi aynı satırlardan aynı fonksiyonu çağırır.
           const card = priceStay({
-            nights: nightsFromRows(rows, stay, "TRY")!,
+            nights: nightsFromInventory(rows, stay, "TRY")!,
             modifierMinor: modifier,
             currency: "TRY",
             taxRate,
           });
           const pdp = priceStay({
-            nights: nightsFromRows([...rows].reverse(), stay, "TRY")!,
+            nights: nightsFromInventory([...rows].reverse(), stay, "TRY")!,
             modifierMinor: modifier,
             currency: "TRY",
             taxRate,
           });
           const checkout = priceStay({
-            nights: nightsFromRows(rows, stay, "TRY")!,
+            nights: nightsFromInventory(rows, stay, "TRY")!,
             modifierMinor: modifier,
             currency: "TRY",
             taxRate,
@@ -95,5 +97,28 @@ describe("regression: #8 gösterilen fiyat = tahsil edilen fiyat", () => {
     ]) {
       expect(readFileSync(file, "utf8")).not.toMatch(/\.toFixed\(/);
     }
+  });
+});
+
+describe("v3 P0-2 oda adedi ve fiyat planı", () => {
+  it("birden çok oda: gece başına kalan ≥ adet olmalı; plan farkı bps ile", () => {
+    const rows = [
+      { date: new Date("2026-10-01T00:00:00Z"), price: "1000.00", total: 5, sold: 3, held: 0 },
+      { date: new Date("2026-10-02T00:00:00Z"), price: "1000.00", total: 5, sold: 2, held: 1 },
+    ];
+    const stay = nightsBetween(parseIsoDate("2026-10-01"), parseIsoDate("2026-10-03"));
+    expect(nightsFromInventory(rows, stay, "TRY", 2)).not.toBeNull();
+    expect(nightsFromInventory(rows, stay, "TRY", 3)).toBeNull();
+    const nights = nightsFromInventory(rows, stay, "TRY", 2)!;
+    const nonRef = priceStay({
+      nights,
+      modifierMinor: 0,
+      planModifierBps: -1000,
+      units: 2,
+      currency: "TRY",
+      taxRate: 0,
+    });
+    expect(nonRef.nights.map((n) => n.amount)).toEqual([180000, 180000]); // 2 oda × 900 TL
+    expect(nonRef.total).toBe(360000);
   });
 });

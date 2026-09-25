@@ -23,28 +23,36 @@ describeInt("P0-9 availability rollover (integration)", () => {
         basePrice: new Prisma.Decimal(750),
       },
     });
-    const room = await prisma.room.create({
-      data: { propertyId: property.id, name: "O", capacity: 2, bedType: "Ç" },
+    const room = await prisma.roomType.create({
+      data: { propertyId: property.id, name: "O", maxOccupancy: 2, bedType: "Ç", units: 2 },
     });
-    await prisma.availability.create({
+    // Mevcut gece: farklı fiyat + dolu sayaçlar (2 birimin ikisi satılmış)
+    await prisma.inventoryDay.create({
       data: {
-        roomId: room.id,
+        roomTypeId: room.id,
         date: utcDay(3),
         price: new Prisma.Decimal(999),
-        isAvailable: false,
+        total: 2,
+        sold: 2,
       },
     });
 
     await rollAvailabilityForward(30);
-    expect(await prisma.availability.count({ where: { roomId: room.id } })).toBe(30);
-    const kept = await prisma.availability.findUniqueOrThrow({
-      where: { roomId_date: { roomId: room.id, date: utcDay(3) } },
+    expect(await prisma.inventoryDay.count({ where: { roomTypeId: room.id } })).toBe(30);
+    const kept = await prisma.inventoryDay.findUniqueOrThrow({
+      where: { roomTypeId_date: { roomTypeId: room.id, date: utcDay(3) } },
     });
     expect(Number(kept.price)).toBe(999);
-    expect(kept.isAvailable).toBe(false);
+    expect(kept).toMatchObject({ total: 2, sold: 2, held: 0 });
+    // Yeni geceler taban fiyat ve total = units ile açılır
+    const fresh = await prisma.inventoryDay.findUniqueOrThrow({
+      where: { roomTypeId_date: { roomTypeId: room.id, date: utcDay(10) } },
+    });
+    expect(Number(fresh.price)).toBe(750);
+    expect(fresh).toMatchObject({ total: 2, sold: 0, held: 0 });
 
     await rollAvailabilityForward(30);
-    expect(await prisma.availability.count({ where: { roomId: room.id } })).toBe(30);
+    expect(await prisma.inventoryDay.count({ where: { roomTypeId: room.id } })).toBe(30);
     await prisma.$disconnect();
   });
 });

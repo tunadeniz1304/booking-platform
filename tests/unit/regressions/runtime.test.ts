@@ -39,11 +39,13 @@ describe("regression: #18 arama önbelleği KEYS kullanmaz", () => {
     fake.store.clear();
   });
 
-  it("geçersiz kılma sürüm sayacını artırır (O(1)), KEYS çağrılmaz", async () => {
+  it("regression: v3#7 tesis bazlı sürüm sayacı (O(1)), KEYS çağrılmaz", async () => {
     const { invalidatePropertySearchCache } = await import("@/lib/search");
     await invalidatePropertySearchCache("p1");
     await invalidatePropertySearchCache("p1");
-    expect(fake.store.get("search:version")).toBe("2");
+    // v3#7: yalnızca O mülkün sürümü artar (global sürüm değil).
+    expect(fake.store.get("search:pv:p1")).toBe("2");
+    expect(fake.store.get("search:pv:p2")).toBeUndefined();
     expect(fake.calls).not.toContain("keys");
   });
 });

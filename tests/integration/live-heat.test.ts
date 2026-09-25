@@ -36,17 +36,24 @@ describeInt("canlı ısı haritası + fiyat servisi (integration)", () => {
         basePrice: new Prisma.Decimal(1000),
       },
     });
-    const room = await prisma.room.create({
-      data: { propertyId: property.id, name: "Oda", capacity: 2, bedType: "Çift" },
+    const room = await prisma.roomType.create({
+      data: {
+        propertyId: property.id,
+        name: "Oda",
+        maxOccupancy: 2,
+        bedType: "Çift",
+        ratePlans: { create: [{ code: "STANDARD", name: "Standart", isDefault: true }] },
+      },
     });
     roomId = room.id;
     // 4 gecenin 3'ü dolu → kıtlık 0.75 ("limited")
-    await prisma.availability.createMany({
+    await prisma.inventoryDay.createMany({
       data: Array.from({ length: 4 }, (_, i) => ({
-        roomId,
+        roomTypeId: roomId,
         date: utcDay(i + 1),
         price: new Prisma.Decimal(1000),
-        isAvailable: i === 0,
+        total: 1,
+        sold: i === 0 ? 0 : 1,
       })),
     });
   });
@@ -139,13 +146,14 @@ describeInt("canlı ısı haritası + fiyat servisi (integration)", () => {
       expect(r.price).toBeGreaterThan(0);
       expect(JSON.parse((await redis.get(`price:${roomId}:${r.date}`))!).price).toBe(r.price);
     }
-    const rows = await prisma.availability.findMany({
-      where: { roomId, date: { in: dates.map((d) => new Date(d)) } },
+    const rows = await prisma.inventoryDay.findMany({
+      where: { roomTypeId: roomId, date: { in: dates.map((d) => new Date(d)) } },
       orderBy: { date: "asc" },
     });
     expect(rows).toHaveLength(2); // 10. gün satırı upsert ile oluşturuldu
     expect(Number(rows[1].price)).toBe(results[1].price);
-    expect(rows[1].isAvailable).toBe(true);
+    // Yeni gece satılabilir: tek birim, hiçbiri satılmamış/tutulmamış
+    expect(rows[1]).toMatchObject({ total: 1, sold: 0, held: 0 });
 
     await invalidatePriceCache(roomId, dates[0]);
     expect(await redis.get(`price:${roomId}:${dates[0]}`)).toBeNull();

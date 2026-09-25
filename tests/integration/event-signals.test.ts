@@ -36,26 +36,29 @@ describeInt("regression: #13 olay sinyalleri (integration)", () => {
         basePrice: new Prisma.Decimal(1000),
       },
     });
-    const rooms = await Promise.all(
-      [1, 2, 3, 4, 5].map((i) =>
-        prisma.room.create({
-          data: { propertyId: property.id, name: `O${i}`, capacity: 2, bedType: "Ç" },
-        })
-      )
-    );
-    await prisma.availability.createMany({
-      data: rooms.flatMap((r) =>
-        Array.from({ length: 40 }, (_, i) => ({
-          roomId: r.id,
-          date: utcDay(i + 1),
-          price: new Prisma.Decimal(1000),
-        }))
-      ),
+    // 5 birimlik tek oda tipi (v2'deki 5 ayrı odanın sayaçlı karşılığı)
+    const roomType = await prisma.roomType.create({
+      data: {
+        propertyId: property.id,
+        name: "O",
+        maxOccupancy: 2,
+        units: 5,
+        bedType: "Ç",
+        ratePlans: { create: [{ code: "STANDARD", name: "Standart", isDefault: true }] },
+      },
+    });
+    await prisma.inventoryDay.createMany({
+      data: Array.from({ length: 40 }, (_, i) => ({
+        roomTypeId: roomType.id,
+        date: utcDay(i + 1),
+        total: 5,
+        price: new Prisma.Decimal(1000),
+      })),
     });
     const prices = async () =>
       (
-        await prisma.availability.findMany({
-          where: { roomId: rooms[0].id },
+        await prisma.inventoryDay.findMany({
+          where: { roomTypeId: roomType.id },
           orderBy: { date: "asc" },
           select: { price: true },
         })
@@ -77,22 +80,34 @@ describeInt("regression: #13 olay sinyalleri (integration)", () => {
     expect(await prices()).toEqual(once); // 10 kez = 1 kez (bileşik artış yok)
     expect(once[19]).toBeGreaterThan(baseline[19]);
     expect(Math.max(...once)).toBeLessThanOrEqual(1000 * 2.0); // PRICE_CEILING_MULTIPLIER
-    const explained = await prisma.availability.findFirstOrThrow({
-      where: { roomId: rooms[0].id, date: utcDay(20) },
+    const explained = await prisma.inventoryDay.findFirstOrThrow({
+      where: { roomTypeId: roomType.id, date: utcDay(20) },
     });
     expect((explained.priceExplanation as { events: unknown[] }).events).toHaveLength(1);
 
     const held = await createYieldHold(event.id, 0.2);
     expect(held).toBeGreaterThan(0);
-    const perNight = await prisma.availability.count({
-      where: { date: utcDay(20), lockedBy: `yield:${event.id}` },
+    const perNight = await prisma.externalBlock.count({
+      where: { roomTypeId: roomType.id, date: utcDay(20), source: `yield:${event.id}` },
     });
     expect(perNight).toBeLessThanOrEqual(1); // 5 odanın %20'si
+    expect(perNight).toBe(1);
+    const night20 = await prisma.inventoryDay.findFirstOrThrow({
+      where: { roomTypeId: roomType.id, date: utcDay(20) },
+    });
+    expect(night20.sold).toBe(1); // yield hold `sold`'a sayılır
+    // Tekrar çağrı paya ek birim çekmez (zaten %20 tutuluyor)
+    expect(await createYieldHold(event.id, 0.2)).toBe(0);
     await expect(createYieldHold(event.id, 0.5)).rejects.toMatchObject({ status: 400 });
 
     await rollbackEvent(event.id);
     expect(await prices()).toEqual(baseline);
     expect(await releaseYieldHold(event.id)).toBe(0);
+    const soldAfter = await prisma.inventoryDay.aggregate({
+      where: { roomTypeId: roomType.id },
+      _sum: { sold: true },
+    });
+    expect(soldAfter._sum.sold).toBe(0); // geri alma tüm yield birimlerini iade etti
     await prisma.$disconnect();
   });
 });

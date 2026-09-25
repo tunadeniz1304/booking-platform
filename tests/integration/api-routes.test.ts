@@ -467,8 +467,8 @@ describeInt("API route handler'ları (integration)", () => {
 
       const later = { ...params, checkIn: iso(utcDay(25)), checkOut: iso(utcDay(26)) };
       const q2 = await (await quoteGet(call(quoteUrl(later)), undefined)).json();
-      await prisma.availability.updateMany({
-        where: { roomId: fx.roomId, date: utcDay(25) },
+      await prisma.inventoryDay.updateMany({
+        where: { roomTypeId: fx.roomId, date: utcDay(25) },
         data: { price: new Prisma.Decimal(1500) },
       });
       const changed = await bookingsPost(
@@ -1659,15 +1659,38 @@ describeInt("API route handler'ları (integration)", () => {
         ).status
       ).toBe(400);
 
-      await fx.hold({ startInDays: 6, nights: 2 }); // 6. ve 7. geceler kilitli
-      const res = await availabilityPut(call(url, { method: "PUT", token: hostToken, body }), c);
+      await fx.hold({ startInDays: 6, nights: 2 }); // 6. ve 7. gecelerde birer birim tutuldu
+      // Satışı kapatma (total 0): tutulan geceler sold + held altına indirilemez → atlanır
+      const res = await availabilityPut(
+        call(url, {
+          method: "PUT",
+          token: hostToken,
+          body: { from: body.from, to: body.to, total: 0 },
+        }),
+        c
+      );
       expect(res.status).toBe(200);
       expect(await res.json()).toEqual({ updated: 3, created: 0, skippedLocked: 2 });
-      const rows = await prisma.availability.findMany({
-        where: { roomId: fx.roomId, date: { gte: utcDay(5), lte: utcDay(9) } },
+      const rows = await prisma.inventoryDay.findMany({
+        where: { roomTypeId: fx.roomId, date: { gte: utcDay(5), lte: utcDay(9) } },
         orderBy: { date: "asc" },
       });
-      expect(rows.map((r) => Number(r.price))).toEqual([1200, 1000, 1000, 1200, 1200]);
+      expect(rows.map((r) => r.total)).toEqual([0, 1, 1, 0, 0]);
+      expect(rows.map((r) => r.held)).toEqual([0, 1, 1, 0, 0]); // tutma ezilmedi
+
+      // Fiyat güncellemesi sayaçlara dokunmaz, tüm gecelere uygulanır
+      const priced = await availabilityPut(call(url, { method: "PUT", token: hostToken, body }), c);
+      expect(priced.status).toBe(200);
+      expect(await priced.json()).toEqual({ updated: 5, created: 0, skippedLocked: 0 });
+      const after = await prisma.inventoryDay.findMany({
+        where: { roomTypeId: fx.roomId, date: { gte: utcDay(5), lte: utcDay(9) } },
+        orderBy: { date: "asc" },
+      });
+      expect(after.map((r) => Number(r.price))).toEqual([1200, 1200, 1200, 1200, 1200]);
+      expect(after.map((r) => r.held)).toEqual([0, 1, 1, 0, 0]);
+      const [{ over }] = await prisma.$queryRaw<{ over: bigint }[]>`
+        SELECT count(*) AS over FROM "InventoryDay" WHERE sold + held > total`;
+      expect(Number(over)).toBe(0);
     });
 
     it("calendar.ics: geçersiz token 403; imzalı token ile iCal akışı", async () => {
@@ -1722,12 +1745,21 @@ describeInt("API route handler'ları (integration)", () => {
 
       const res = await calendarImportPost(call(url, { token: hostToken, body }), c);
       expect(res.status).toBe(200);
-      expect(await res.json()).toEqual({ nights: 2, blocked: 2 });
-      const locked = await prisma.availability.findMany({
-        where: { roomId: fx.roomId, lockedBy: "ical:ota-test" },
+      expect(await res.json()).toEqual({ nights: 2, added: 2, removed: 0, conflicts: [] });
+      const locked = await prisma.externalBlock.findMany({
+        where: { roomTypeId: fx.roomId, source: "ical:ota-test" },
         orderBy: { date: "asc" },
       });
       expect(locked.map((r) => iso(r.date))).toEqual([iso(utcDay(15)), iso(utcDay(16))]);
+      // Harici blok başka kanalda satılmış birimdir: `sold` artar
+      const days = await prisma.inventoryDay.findMany({
+        where: { roomTypeId: fx.roomId, date: { in: [utcDay(15), utcDay(16)] } },
+        orderBy: { date: "asc" },
+      });
+      expect(days.map((d) => d.sold)).toEqual([1, 1]);
+      // Aynı takvimin tekrar içe aktarımı idempotent
+      const again = await calendarImportPost(call(url, { token: hostToken, body }), c);
+      expect(await again.json()).toEqual({ nights: 2, added: 0, removed: 0, conflicts: [] });
 
       const feed = await (
         await calendarGet(

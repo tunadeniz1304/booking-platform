@@ -67,21 +67,24 @@ describeInt("arama (integration)", () => {
           : undefined,
       },
     });
-    const room = await prisma.room.create({
+    const room = await prisma.roomType.create({
       data: {
         propertyId: property.id,
         name: "Oda",
-        capacity: opts.capacity ?? 2,
+        maxOccupancy: opts.capacity ?? 2,
         bedType: "Çift",
         priceModifier: new Prisma.Decimal(0),
+        ratePlans: { create: [{ code: "STANDARD", name: "Standart", isDefault: true }] },
       },
     });
-    await prisma.availability.createMany({
+    await prisma.inventoryDay.createMany({
       data: Array.from({ length: 14 }, (_, i) => ({
-        roomId: room.id,
+        roomTypeId: room.id,
         date: utcDay(i + 1),
         price: new Prisma.Decimal(opts.price),
-        isAvailable: opts.bookedNight === undefined || i + 1 !== opts.bookedNight,
+        total: 1,
+        // Dolu gece: tek birim satılmış (sold + held = total)
+        sold: opts.bookedNight !== undefined && i + 1 === opts.bookedNight ? 1 : 0,
       })),
     });
     const literal = toVectorLiteral(encode(`${opts.title} ${opts.description} ${opts.cityName}`));
@@ -148,9 +151,16 @@ describeInt("arama (integration)", () => {
     expect(first.results[0].score).toBeTypeOf("number");
     expect(first.results[0].explain).toBeDefined();
 
+    // Sonuç sayfaları önbelleklenmez; katalog adayları sürümlü önbellekten gelir. Kanıt: DB'de
+    // başlık geçersiz kılma olmadan değişse de ikinci çağrı önbellekteki başlığı döndürür.
+    await prisma.property.update({ where: { id: cheap.id }, data: { title: "Önbellek dışı" } });
     const second = await searchProperties({ city });
-    expect(second.cached).toBe(true);
     expect(second.results.map((r) => r.id)).toEqual(first.results.map((r) => r.id));
+    expect(second.results.find((r) => r.id === cheap.id)!.title).toContain(token);
+    await prisma.property.update({
+      where: { id: cheap.id },
+      data: { title: first.results.find((r) => r.id === cheap.id)!.title },
+    });
   });
 
   it("fiyat sıralamaları ve fiyat/tip/olanak filtreleri DB tarafında uygulanır", async () => {
@@ -225,23 +235,31 @@ describeInt("arama (integration)", () => {
   it("popüler mülkler önbelleklenir; geçersiz kılma sürümü artırır ve önbelleği boşaltır", async () => {
     const popular = await getPopularProperties(5);
     expect(popular.length).toBeGreaterThan(0);
-    const version = (await redis.get("search:version")) ?? "0";
-    // Anahtar sürüm + limit içerir (farklı limitler karışmaz).
+    const version = (await redis.get("search:catalog:version")) ?? "0";
+    // Anahtar katalog sürümü + limit içerir (farklı limitler karışmaz).
     expect(await redis.get(`search:popular:v${version}:5`)).not.toBeNull();
     expect(await redis.get(`search:popular:v${version}:3`)).toBeNull();
     const again = await getPopularProperties(5);
     expect(again.map((p) => p.id)).toEqual(popular.map((p) => p.id));
 
-    const before = Number((await redis.get("search:version")) ?? "0");
+    // Mülk bazlı geçersiz kılma: yalnızca o mülkün sürümü artar, detay önbelleği silinir,
+    // tarihli teklif önbelleği yeni sürüm anahtarında boştur; diğer mülkler etkilenmez.
+    await searchProperties({ city, checkIn, checkOut, guests: 2 });
+    const pv = Number((await redis.get(`search:pv:${cheap.id}`)) ?? "0");
+    const otherPv = await redis.get(`search:pv:${pricey.id}`);
+    const quoteKey = (v: number) => `search:pq:${cheap.id}:v${v}:${checkIn}:${checkOut}:2`;
+    expect(await redis.get(quoteKey(pv))).not.toBeNull();
     await redis.set(`property:${cheap.id}`, "x");
     await invalidatePropertySearchCache(cheap.id);
-    expect(Number(await redis.get("search:version"))).toBe(before + 1);
-    expect(await redis.get(`search:popular:v${before + 1}:5`)).toBeNull();
+    expect(Number(await redis.get(`search:pv:${cheap.id}`))).toBe(pv + 1);
+    expect(await redis.get(`search:pv:${pricey.id}`)).toBe(otherPv);
+    expect(await redis.get(quoteKey(pv + 1))).toBeNull();
     expect(await redis.get(`property:${cheap.id}`)).toBeNull();
 
-    // Sürüm değişti → aynı parametreler artık önbellekten gelmez.
-    const fresh = await searchProperties({ city });
-    expect(fresh.cached).toBe(false);
+    // Katalog sürümü değişti → popüler önbellek yeni anahtarda boş.
     await invalidateSearchCache();
+    const next = Number(await redis.get("search:catalog:version"));
+    expect(next).toBe(Number(version) + 1);
+    expect(await redis.get(`search:popular:v${next}:5`)).toBeNull();
   });
 });

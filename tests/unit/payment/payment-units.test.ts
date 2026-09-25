@@ -6,10 +6,13 @@ import { StripeProvider } from "@/lib/payment/stripe-provider";
 import { signWebhook, verifyWebhook, WebhookSignatureError } from "@/lib/payment/webhook";
 import { bookingConfirmedEmail, escapeHtml } from "@/lib/notifications/templates";
 import { money } from "@/lib/money/money";
-import { parseIsoDate } from "@/lib/time/nights";
+import { clockOf, parseIsoDate } from "@/lib/time/nights";
+
+/** İstanbul 15:00 = 12:00Z (v2 davranışıyla aynı an). */
+const TR = clockOf({ timeZone: "Europe/Istanbul" });
 
 const CI = parseIsoDate("2026-12-20"); // check-in anı: 2026-12-20T12:00Z
-const start = checkInInstant(CI, 12).getTime();
+const start = checkInInstant(CI, TR).getTime();
 const hoursBefore = (h: number) => new Date(start - h * 3_600_000);
 const booking = {
   checkIn: CI,
@@ -18,7 +21,24 @@ const booking = {
   currency: "TRY" as const,
 };
 
-describe("P0-4 iptal politikası ve iade (tablo testleri, UTC)", () => {
+describe("regression: v3#6 iade penceresi tesis saatinde", () => {
+  it("Tokyo tesisi: 24 saat kala sınırı yerel 15:00'a göre (UTC 12:00'ye göre değil)", () => {
+    const tokyo = clockOf({ timeZone: "Asia/Tokyo" });
+    const start = checkInInstant(CI, tokyo); // 2026-12-20T06:00Z
+    expect(start.toISOString()).toBe("2026-12-20T06:00:00.000Z");
+    const at = (h: number) => new Date(start.getTime() - h * 3_600_000);
+    expect(computeRefund(DEFAULT_POLICIES.FLEXIBLE, booking, at(24), tokyo).refundPercent).toBe(
+      100
+    );
+    expect(computeRefund(DEFAULT_POLICIES.FLEXIBLE, booking, at(23), tokyo).refundPercent).toBe(0);
+    // Eski global CHECKIN_HOUR_UTC=12 ile aynı an (18 saat kala) Tokyo'da tam iade sayılırdı.
+    const legacyStart = new Date("2026-12-20T12:00:00Z");
+    const now = new Date(legacyStart.getTime() - 24 * 3_600_000);
+    expect(computeRefund(DEFAULT_POLICIES.FLEXIBLE, booking, now, tokyo).refundPercent).toBe(0);
+  });
+});
+
+describe("P0-4 iptal politikası ve iade (tablo testleri, İstanbul)", () => {
   it.each([
     ["FLEXIBLE", 25, 100],
     ["FLEXIBLE", 24, 100], // sınır: tam 24 saat → tam iade
@@ -32,19 +52,19 @@ describe("P0-4 iptal politikası ve iade (tablo testleri, UTC)", () => {
     ["STRICT", 100, 0],
     ["NON_REFUNDABLE", 1000, 0],
   ] as const)("%s, check-in'e %s saat → %%%s", (kind, h, pct) => {
-    const r = computeRefund(DEFAULT_POLICIES[kind], booking, hoursBefore(h), 12);
+    const r = computeRefund(DEFAULT_POLICIES[kind], booking, hoursBefore(h), TR);
     expect(r.refundPercent).toBe(pct);
     expect(r.refundMinor).toBe((100_000 * pct) / 100);
   });
 
   it("check-in anı geçtiyse (no-show) iade yok", () => {
-    const r = computeRefund(DEFAULT_POLICIES.FLEXIBLE, booking, new Date(start + 1000), 12);
+    const r = computeRefund(DEFAULT_POLICIES.FLEXIBLE, booking, new Date(start + 1000), TR);
     expect(r).toMatchObject({ refundMinor: 0, reason: "no_show" });
   });
 
   it("ödeme yoksa iade 0", () => {
     expect(
-      computeRefund(DEFAULT_POLICIES.FLEXIBLE, { ...booking, paidMinor: 0 }, hoursBefore(100), 12)
+      computeRefund(DEFAULT_POLICIES.FLEXIBLE, { ...booking, paidMinor: 0 }, hoursBefore(100), TR)
         .reason
     ).toBe("not_paid");
   });
@@ -52,7 +72,7 @@ describe("P0-4 iptal politikası ve iade (tablo testleri, UTC)", () => {
   it("STRICT cayma penceresi: 48 saat içinde ve check-in ≥ 14 gün uzaktaysa tam iade", () => {
     const createdAt = new Date(start - 20 * 24 * 3_600_000);
     const now = new Date(createdAt.getTime() + 10 * 3_600_000);
-    const r = computeRefund(DEFAULT_POLICIES.STRICT, { ...booking, createdAt }, now, 12);
+    const r = computeRefund(DEFAULT_POLICIES.STRICT, { ...booking, createdAt }, now, TR);
     expect(r).toMatchObject({ refundPercent: 100, reason: "grace_period" });
   });
 
@@ -61,7 +81,7 @@ describe("P0-4 iptal politikası ve iade (tablo testleri, UTC)", () => {
       DEFAULT_POLICIES.MODERATE,
       { ...booking, paidMinor: 100_001 },
       hoursBefore(48),
-      12
+      TR
     );
     expect(r.refundMinor).toBe(50_001);
   });

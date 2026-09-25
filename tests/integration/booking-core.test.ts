@@ -14,6 +14,15 @@ describeInt("rezervasyon çekirdeği (integration)", () => {
   let usdProperty = { id: "", roomId: "" };
   const userIds: string[] = [];
 
+  /** Oda tipinin [fromDay, toDay) gecelerindeki sayaçlar. */
+  async function counters(roomTypeId: string, fromDay: number, toDay: number) {
+    return prisma.inventoryDay.findMany({
+      where: { roomTypeId, date: { gte: utcDay(fromDay), lt: utcDay(toDay) } },
+      orderBy: { date: "asc" },
+      select: { total: true, sold: true, held: true },
+    });
+  }
+
   async function makeProperty(currency: string, price: number) {
     const location = await prisma.location.create({
       data: { city: `CoreCity-${currency}-${stamp}`, country: "TEST" },
@@ -29,21 +38,23 @@ describeInt("rezervasyon çekirdeği (integration)", () => {
         currency,
       },
     });
-    const room = await prisma.room.create({
+    const room = await prisma.roomType.create({
       data: {
         propertyId: property.id,
         name: "Son Oda",
-        capacity: 2,
+        maxOccupancy: 2,
+        units: 1,
         bedType: "Çift",
         priceModifier: new Prisma.Decimal(50),
+        ratePlans: { create: [{ code: "STANDARD", name: "Standart", isDefault: true }] },
       },
     });
-    await prisma.availability.createMany({
+    await prisma.inventoryDay.createMany({
       data: Array.from({ length: 80 }, (_, i) => ({
-        roomId: room.id,
+        roomTypeId: room.id,
         date: utcDay(i + 1),
         price: new Prisma.Decimal(price),
-        isAvailable: true,
+        total: 1,
       })),
     });
     return { id: property.id, roomId: room.id };
@@ -99,17 +110,19 @@ describeInt("rezervasyon çekirdeği (integration)", () => {
     expect(codes).toHaveLength(99);
     expect(new Set(codes)).toEqual(new Set(["SOLD_OUT"]));
 
-    // SQL ile doğrulanmış overbooking = 0: her gece en fazla bir aktif rezervasyon
+    // SQL ile doğrulanmış overbooking = 0: hiçbir gecede sold + held > total yok
     const overbooked = await prisma.$queryRaw<Array<{ n: bigint }>>`
-      SELECT COUNT(*)::bigint AS n FROM (
-        SELECT a.date FROM "Availability" a
-        JOIN "Booking" b ON b."roomId" = a."roomId"
-          AND a.date >= b."checkIn" AND a.date < b."checkOut"
-          AND b.status IN ('PENDING','HELD','CONFIRMED')
-        WHERE a."roomId" = ${tryProperty.roomId}
-        GROUP BY a.date HAVING COUNT(*) > 1
-      ) x`;
+      SELECT COUNT(*)::bigint AS n FROM "InventoryDay" WHERE sold + held > total`;
     expect(Number(overbooked[0].n)).toBe(0);
+    // ...ve aktif rezervasyonlar sayaçlarla birebir: her gece tam 1 birim tutuldu
+    expect(await counters(tryProperty.roomId, 10, 12)).toEqual([
+      { total: 1, sold: 0, held: 1 },
+      { total: 1, sold: 0, held: 1 },
+    ]);
+    const active = await prisma.booking.count({
+      where: { roomId: tryProperty.roomId, status: { in: ["PENDING", "HELD", "CONFIRMED"] } },
+    });
+    expect(active).toBe(1);
   }, 120_000);
 
   it("regression: #4 hold süresi dolunca EXPIRED olur ve envanter geri gelir", async () => {
@@ -131,10 +144,11 @@ describeInt("rezervasyon çekirdeği (integration)", () => {
     expect(await expireHolds(later)).toBeGreaterThanOrEqual(1);
     const after = await prisma.booking.findUniqueOrThrow({ where: { id: booking.id } });
     expect(after.status).toBe("EXPIRED");
-    const locked = await prisma.availability.count({
-      where: { roomId: tryProperty.roomId, lockedBy: booking.id },
-    });
-    expect(locked).toBe(0);
+    // Tutulan birimler iade edildi (held 1 → 0)
+    expect(await counters(tryProperty.roomId, 20, 22)).toEqual([
+      { total: 1, sold: 0, held: 0 },
+      { total: 1, sold: 0, held: 0 },
+    ]);
 
     // Oda yeniden rezerve edilebilir
     const again = await createBooking({
@@ -193,8 +207,8 @@ describeInt("rezervasyon çekirdeği (integration)", () => {
     await cancelBooking(ok.booking.id, userIds[4]);
 
     const stale = await createQuote(req);
-    await prisma.availability.updateMany({
-      where: { roomId: tryProperty.roomId, date: utcDay(41) },
+    await prisma.inventoryDay.updateMany({
+      where: { roomTypeId: tryProperty.roomId, date: utcDay(41) },
       data: { price: new Prisma.Decimal(1300) },
     });
     await expect(
@@ -235,10 +249,16 @@ describeInt("rezervasyon çekirdeği (integration)", () => {
       checkOut: iso(utcDay(52)),
       guestCount: 1,
     });
+    expect((await counters(tryProperty.roomId, 50, 52)).map((d) => d.held)).toEqual([1, 1]);
     const res = await cancelBooking(booking.id, userIds[7]);
     expect(res.status).toBe("CANCELLED");
-    expect(await prisma.availability.count({ where: { lockedBy: booking.id } })).toBe(0);
+    expect(await counters(tryProperty.roomId, 50, 52)).toEqual([
+      { total: 1, sold: 0, held: 0 },
+      { total: 1, sold: 0, held: 0 },
+    ]);
     await expect(cancelBooking(booking.id, userIds[7])).rejects.toMatchObject({ status: 409 });
+    // İkinci (reddedilen) iptal sayaçları tekrar hareket ettirmez
+    expect((await counters(tryProperty.roomId, 50, 52)).map((d) => d.held)).toEqual([0, 0]);
     // Başkası iptal edemez (404 — IDOR)
     await expect(cancelBooking(booking.id, userIds[8])).rejects.toMatchObject({ status: 404 });
   });

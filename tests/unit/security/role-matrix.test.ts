@@ -34,6 +34,8 @@ import * as adminFraud from "@/app/api/admin/fraud/route";
 import * as adminRole from "@/app/api/admin/users/[id]/role/route";
 import * as adminRefunds from "@/app/api/admin/refunds/route";
 import * as adminReconciliation from "@/app/api/admin/reconciliation/route";
+import * as hostPhotos from "@/app/api/host/properties/[id]/photos/route";
+import * as hostPhoto from "@/app/api/host/properties/[id]/photos/[photoId]/route";
 import * as accountSessions from "@/app/api/account/sessions/route";
 import * as bookings from "@/app/api/bookings/route";
 import * as account from "@/app/api/account/route";
@@ -54,6 +56,19 @@ const MATRIX: Array<[string, string, Handler, Role[]]> = [
   ["POST /api/properties/[id]/rooms", "POST", rooms.POST as unknown as Handler, HOST_ADMIN],
   ["PUT /api/rooms/[roomId]/availability", "PUT", ari.PUT as unknown as Handler, HOST_ADMIN],
   ["GET /api/host/properties", "GET", hostProps.GET as unknown as Handler, HOST_ADMIN],
+  ["GET /api/host/properties/[id]/photos", "GET", hostPhotos.GET as unknown as Handler, HOST_ADMIN],
+  [
+    "POST /api/host/properties/[id]/photos",
+    "POST",
+    hostPhotos.POST as unknown as Handler,
+    HOST_ADMIN,
+  ],
+  [
+    "DELETE /api/host/properties/[id]/photos/[photoId]",
+    "DELETE",
+    hostPhoto.DELETE as unknown as Handler,
+    HOST_ADMIN,
+  ],
   ["GET /api/host/bookings", "GET", hostBookings.GET as unknown as Handler, HOST_ADMIN],
   ["GET /api/host/revenue", "GET", hostRevenue.GET as unknown as Handler, HOST_ADMIN],
   [

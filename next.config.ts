@@ -1,6 +1,6 @@
 import type { NextConfig } from "next";
 import createNextIntlPlugin from "next-intl/plugin";
-import { STATIC_SECURITY_HEADERS } from "./src/lib/security/headers";
+import { SERVICE_WORKER_HEADERS, STATIC_SECURITY_HEADERS } from "./src/lib/security/headers";
 
 const nextConfig: NextConfig = {
   output: "standalone",
@@ -19,7 +19,11 @@ const nextConfig: NextConfig = {
     remotePatterns: [{ protocol: "https", hostname: "images.unsplash.com" }],
   },
   async headers() {
-    return [{ source: "/:path*", headers: [...STATIC_SECURITY_HEADERS] }];
+    return [
+      { source: "/:path*", headers: [...STATIC_SECURITY_HEADERS] },
+      // P1-12: service worker betiği — kendi CSP'si, önbelleksiz, kök kapsam.
+      { source: "/sw.js", headers: [...SERVICE_WORKER_HEADERS] },
+    ];
   },
 };
 

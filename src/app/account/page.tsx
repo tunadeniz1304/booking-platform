@@ -55,6 +55,7 @@ interface Favorite {
 
 export default function AccountPage() {
   const t = useTranslations("account");
+  const tPwa = useTranslations("pwa.trips");
   const fmt = useFormat();
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
@@ -246,6 +247,10 @@ export default function AccountPage() {
         <p className="mt-4 text-sm">
           <Link href="/account/sessions" className="font-medium text-blue-700 hover:underline">
             {t("sessions.manageLink")}
+          </Link>
+          {" · "}
+          <Link href="/trips" className="font-medium text-blue-700 hover:underline">
+            {tPwa("accountLink")}
           </Link>
         </p>
 

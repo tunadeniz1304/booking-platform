@@ -1,0 +1,43 @@
+{
+  "manifest": {
+    "name": "Booking — Stay Reservations",
+    "shortName": "Booking",
+    "description": "Search stays and view your bookings and QR card even offline (portfolio/demo project)."
+  },
+  "trips": {
+    "title": "My trips",
+    "intro": "Your upcoming bookings. Once opened, this page is available without an internet connection.",
+    "loading": "Loading trips…",
+    "empty": "You have no upcoming confirmed bookings.",
+    "loginRequired": "Sign in to see your trips.",
+    "loginLink": "Sign in",
+    "loadError": "Trips could not be loaded.",
+    "offlineBanner": "You are offline — showing your last saved itinerary ({time}).",
+    "offlineUnavailable": "You are offline and no itinerary has been saved yet. Open this page once while online.",
+    "room": "Room: {name}",
+    "checkIn": "Check-in",
+    "checkOut": "Check-out",
+    "checkInFrom": "from {time}",
+    "guests": "{count, plural, one {# guest} other {# guests}}",
+    "codeLabel": "Booking code",
+    "qrAlt": "Booking QR code for {property}",
+    "qrHint": "Show this QR code at check-in. It contains no personal data; the property verifies it on the server.",
+    "accountLink": "My trips (offline)"
+  },
+  "push": {
+    "title": "Push notifications",
+    "description": "Get notified on this device when a stay on your price alert drops in price and before check-in.",
+    "enable": "Enable notifications on this device",
+    "disable": "Disable notifications on this device",
+    "working": "Working…",
+    "enabled": "This device receives notifications.",
+    "disabledServer": "Push notifications are not configured on this server (no VAPID keys); email notifications keep working.",
+    "unsupported": "Your browser does not support push notifications.",
+    "denied": "Notification permission was denied. You can allow it in your browser settings.",
+    "error": "The notification setting could not be changed."
+  },
+  "offline": {
+    "title": "You are offline",
+    "body": "This page is not available offline. My trips and your booking QR card open offline too."
+  }
+}

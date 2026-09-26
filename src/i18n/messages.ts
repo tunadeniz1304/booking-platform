@@ -26,6 +26,7 @@ export const NAMESPACES = [
   "plan",
   "privacy",
   "property",
+  "pwa",
   "quote",
   "ranking",
   "revenue",

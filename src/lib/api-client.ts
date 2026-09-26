@@ -1,5 +1,7 @@
 "use client";
 
+import { clearOfflineUserData } from "@/lib/pwa/client";
+
 /**
  * İstemci tarafı API yardımcıları.
  *
@@ -91,4 +93,6 @@ export async function logout(): Promise<void> {
   } catch {
     // ağ hatasında çerezler sunucu tarafında zaten kısa ömürlü
   }
+  // P1-12: paylaşılan cihazda çevrimdışı seyahat planı bir sonraki kullanıcıya kalmasın.
+  await clearOfflineUserData();
 }

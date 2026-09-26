@@ -42,6 +42,8 @@ import * as adminTakedown from "@/app/api/admin/takedowns/[id]/route";
 import * as adminNotices from "@/app/api/admin/notices/route";
 import * as adminNotice from "@/app/api/admin/notices/[id]/route";
 import * as adminTransparency from "@/app/api/admin/compliance/transparency/route";
+import * as itinerary from "@/app/api/itinerary/route";
+import * as pushSubscription from "@/app/api/push/subscription/route";
 import * as bookings from "@/app/api/bookings/route";
 import * as account from "@/app/api/account/route";
 import * as listingCopy from "@/app/api/ai/listing-copy/route";
@@ -119,6 +121,10 @@ const MATRIX: Array<[string, string, Handler, Role[]]> = [
     adminTransparency.GET as unknown as Handler,
     ["ADMIN"],
   ],
+  ["GET /api/itinerary", "GET", itinerary.GET as unknown as Handler, ALL],
+  ["GET /api/push/subscription", "GET", pushSubscription.GET as unknown as Handler, ALL],
+  ["POST /api/push/subscription", "POST", pushSubscription.POST as unknown as Handler, ALL],
+  ["DELETE /api/push/subscription", "DELETE", pushSubscription.DELETE as unknown as Handler, ALL],
   ["GET /api/bookings", "GET", bookings.GET as unknown as Handler, ALL],
   ["GET /api/account", "GET", account.GET as unknown as Handler, ALL],
   ["GET /api/dev/mailbox", "GET", mailbox.GET as unknown as Handler, ALL],

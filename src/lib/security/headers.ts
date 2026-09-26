@@ -23,7 +23,9 @@ export function buildCsp(nonce: string, isDev: boolean, opts: CspOptions = {}): 
     "font-src 'self' data:",
     `connect-src 'self' ${tiles}${stripe ? " https://api.stripe.com" : ""}`,
     ...(stripe ? ["frame-src https://js.stripe.com https://hooks.stripe.com"] : []),
+    // P1-12: service worker yalnızca kendi kökenimizden (/sw.js); harita blob işçileri için blob:.
     "worker-src 'self' blob:",
+    "manifest-src 'self'",
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
@@ -31,6 +33,21 @@ export function buildCsp(nonce: string, isDev: boolean, opts: CspOptions = {}): 
     ...(isDev ? [] : ["upgrade-insecure-requests"]),
   ].join("; ");
 }
+
+/**
+ * `/sw.js` yanıt başlıkları (P1-12). Proxy bu dosyayı atlar (nonce'lu sayfa CSP'si işçiye
+ * uygulanmaz); işçinin kendi sıkı CSP'si: yalnızca aynı köken, satır içi/eval yok. Tarayıcı
+ * güncellemeyi kaçırmasın diye önbelleğe alınmaz.
+ */
+export const SERVICE_WORKER_CSP =
+  "default-src 'self'; script-src 'self'; connect-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'";
+
+export const SERVICE_WORKER_HEADERS: ReadonlyArray<{ key: string; value: string }> = [
+  { key: "Content-Type", value: "application/javascript; charset=utf-8" },
+  { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
+  { key: "Service-Worker-Allowed", value: "/" },
+  { key: "Content-Security-Policy", value: SERVICE_WORKER_CSP },
+];
 
 /** Tüm yanıtlara eklenen statik güvenlik başlıkları (next.config `headers()`). */
 export const STATIC_SECURITY_HEADERS: ReadonlyArray<{ key: string; value: string }> = [

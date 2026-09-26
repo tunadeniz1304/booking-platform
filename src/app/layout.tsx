@@ -1,16 +1,30 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import { headers } from "next/headers";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages, getTranslations } from "next-intl/server";
 import CookieConsent from "@/components/privacy/CookieConsent";
+import ServiceWorkerRegistrar from "@/components/pwa/ServiceWorkerRegistrar";
+import { THEME_COLOR } from "@/lib/pwa/manifest";
 import { isDemoMode } from "@/lib/config/demo";
 import "../styles/globals.css";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("common");
-  return { title: t("meta.title"), description: t("meta.description") };
+  return {
+    title: t("meta.title"),
+    description: t("meta.description"),
+    // P1-12 PWA: kurulabilir uygulama bildirimi + ikonlar.
+    manifest: "/manifest.webmanifest",
+    icons: {
+      icon: [{ url: "/icons/icon.svg", type: "image/svg+xml" }],
+      apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180" }],
+    },
+    appleWebApp: { capable: true, title: "Booking", statusBarStyle: "default" },
+  };
 }
+
+export const viewport: Viewport = { themeColor: THEME_COLOR };
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
   // İstek başına CSP nonce'u (proxy üretir) — başlığın okunması sayfaları dinamik render'a zorlar.
@@ -39,6 +53,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         <NextIntlClientProvider locale={locale} messages={messages}>
           {children}
           <CookieConsent />
+          <ServiceWorkerRegistrar />
         </NextIntlClientProvider>
       </body>
     </html>

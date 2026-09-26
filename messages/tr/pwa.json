@@ -1,0 +1,43 @@
+{
+  "manifest": {
+    "name": "Booking — Konaklama Rezervasyonu",
+    "shortName": "Booking",
+    "description": "Konaklama arayın, rezervasyonlarınızı ve QR kartınızı çevrimdışı da görün (portföy/demo projesi)."
+  },
+  "trips": {
+    "title": "Seyahatlerim",
+    "intro": "Yaklaşan rezervasyonlarınız. Bu sayfa bir kez açıldıktan sonra internet olmadan da görüntülenir.",
+    "loading": "Seyahatler yükleniyor…",
+    "empty": "Yaklaşan onaylı rezervasyonunuz yok.",
+    "loginRequired": "Seyahatlerinizi görmek için giriş yapın.",
+    "loginLink": "Giriş yap",
+    "loadError": "Seyahatler yüklenemedi.",
+    "offlineBanner": "Çevrimdışısınız — son kaydedilen seyahat planı gösteriliyor ({time}).",
+    "offlineUnavailable": "Çevrimdışısınız ve kaydedilmiş seyahat planı yok. Sayfayı bir kez internete bağlıyken açın.",
+    "room": "Oda: {name}",
+    "checkIn": "Giriş",
+    "checkOut": "Çıkış",
+    "checkInFrom": "{time} itibarıyla",
+    "guests": "{count, plural, one {# misafir} other {# misafir}}",
+    "codeLabel": "Rezervasyon kodu",
+    "qrAlt": "{property} için rezervasyon QR kodu",
+    "qrHint": "Girişte bu QR kodu gösterin. Kod kişisel bilgi içermez; tesis sunucuda doğrular.",
+    "accountLink": "Seyahatlerim (çevrimdışı)"
+  },
+  "push": {
+    "title": "Anlık bildirimler",
+    "description": "Fiyat alarmınızdaki konaklamanın fiyatı düştüğünde ve check-in'den önce bu cihaza bildirim gönderelim.",
+    "enable": "Bu cihazda bildirimleri aç",
+    "disable": "Bu cihazda bildirimleri kapat",
+    "working": "İşleniyor…",
+    "enabled": "Bu cihaz bildirim alıyor.",
+    "disabledServer": "Anlık bildirimler bu sunucuda yapılandırılmamış (VAPID anahtarları yok); e-posta bildirimleri çalışmaya devam eder.",
+    "unsupported": "Tarayıcınız anlık bildirimleri desteklemiyor.",
+    "denied": "Bildirim izni reddedildi. Tarayıcı ayarlarından izin verebilirsiniz.",
+    "error": "Bildirim ayarı değiştirilemedi."
+  },
+  "offline": {
+    "title": "Çevrimdışısınız",
+    "body": "Bu sayfa çevrimdışı kullanılamıyor. Seyahatlerim sayfası ve rezervasyon QR kartınız çevrimdışı da açılır."
+  }
+}

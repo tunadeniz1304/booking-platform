@@ -12,12 +12,24 @@ export const WEBHOOK_TOLERANCE_SECONDS = 300;
 
 export const webhookEventSchema = z.object({
   id: z.string().min(1).max(100),
-  type: z.enum(["payment.succeeded", "payment.failed", "refund.succeeded"]),
+  type: z.enum([
+    "payment.succeeded",
+    "payment.failed",
+    "refund.succeeded",
+    // P1-5: PSP itirazı (chargeback) → çözüm merkezinde CHARGEBACK talebi.
+    "dispute.created",
+    "dispute.updated",
+    "dispute.closed",
+  ]),
   data: z.object({
     providerRef: z.string().min(1).max(200),
     /** Minor-unit; verilirse kayıtlı ödemeyle birebir eşleşmelidir (v3#2). */
     amount: z.number().int().optional(),
     currency: z.string().optional(),
+    /** İtiraz olaylarında: PSP itiraz kimliği, durumu ve gerekçesi. */
+    disputeId: z.string().min(1).max(200).optional(),
+    disputeStatus: z.string().max(64).optional(),
+    reason: z.string().max(200).optional(),
   }),
 });
 

@@ -13,6 +13,7 @@ import {
   type PriceDroppedPayload,
   type PropertyAvailabilityChangedPayload,
   type PartyRiskFlaggedPayload,
+  type ClaimEventPayload,
 } from "./events";
 import { notifyAuthEmail, notifyPriceDrop } from "@/lib/notifications/auth-notifications";
 import { upsertPropertyEmbedding } from "@/lib/embedding/backfill";
@@ -38,6 +39,11 @@ import {
 } from "@/lib/pricing/price-calendar-jobs";
 import { onBookingCreatedPartyRisk } from "@/lib/trust/party-risk-service";
 import { notifyHostPartyRisk } from "@/lib/notifications/trust-notifications";
+import {
+  notifyClaimEscalated,
+  notifyClaimOpened,
+  notifyClaimResolved,
+} from "@/lib/notifications/resolution-notifications";
 
 /**
  * Outbox'tan yayınlanan domain olaylarının tüketicileri (worker sürecinde).
@@ -107,6 +113,10 @@ export function registerEventHandlers(): void {
   on<SplitShareInvitedPayload>(EventTypes.SplitShareInvited, notifySplitShareInvited);
   on<NoticeEventPayload>(EventTypes.NoticeReceived, notifyNoticeReceived);
   on<NoticeEventPayload>(EventTypes.NoticeDecided, notifyNoticeDecided);
+  // P1-5 çözüm merkezi: karşı tarafa yanıt çağrısı, eskalasyonda yöneticiler, kararda taraflar.
+  on<ClaimEventPayload>(EventTypes.ClaimOpened, notifyClaimOpened);
+  on<ClaimEventPayload>(EventTypes.ClaimEscalated, notifyClaimEscalated);
+  on<ClaimEventPayload>(EventTypes.ClaimResolved, notifyClaimResolved);
   on<BookingExpiredPayload>(EventTypes.BookingExpired, async (p) => {
     await invalidateStay(p);
     await notifyBookingExpired(p);

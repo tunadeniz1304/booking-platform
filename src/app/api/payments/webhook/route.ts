@@ -8,6 +8,7 @@ import {
 import { getPaymentProvider } from "@/lib/payment";
 import { toErrorResponse } from "@/lib/http/errors";
 import { logger } from "@/lib/observability/logger";
+import { handleDisputeEvent, isDisputeEvent } from "@/lib/resolution/disputes";
 
 /**
  * PSP webhook'u. İmza YALNIZCA aktif sağlayıcının şemasıyla doğrulanır (v4#16): Stripe
@@ -39,6 +40,11 @@ export async function POST(req: NextRequest) {
   // İmzası geçerli ama ilgilenmediğimiz Stripe olay türü → 200 (Stripe yeniden denemesin).
   if (!event) return NextResponse.json({ received: true, ignored: true });
   try {
+    // P1-5: PSP itirazı → çözüm merkezinde CHARGEBACK talebi (ödeme durumu değişmez).
+    if (isDisputeEvent(event)) {
+      const { duplicate } = await handleDisputeEvent(event);
+      return NextResponse.json({ received: true, duplicate });
+    }
     const { duplicate } = await handleWebhookEvent(event);
     return NextResponse.json({ received: true, duplicate });
   } catch (error) {

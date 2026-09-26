@@ -9,6 +9,7 @@ import { WebhookSignatureError, webhookEventSchema, type WebhookEvent } from "./
  *  - `payment_intent.succeeded`       → `payment.succeeded` (tutar = `amount_received`)
  *  - `payment_intent.payment_failed`  → `payment.failed`
  *  - `charge.refunded`                → `refund.succeeded` (ref = `charge.payment_intent`)
+ *  - `charge.dispute.created|updated|closed` → `dispute.*` (P1-5 CHARGEBACK talebi)
  *
  * Diğer olay türleri imzası doğrulandıktan sonra yok sayılır (`null`).
  */
@@ -52,6 +53,26 @@ export function mapStripeEvent(event: StripeEvent): WebhookEvent | null {
       const providerRef = refOf(object.payment_intent);
       if (!providerRef) return null;
       mapped = { id: event.id, type: "refund.succeeded", data: { providerRef } };
+      break;
+    }
+    case "charge.dispute.created":
+    case "charge.dispute.updated":
+    case "charge.dispute.closed": {
+      // P1-5: itiraz → CHARGEBACK talebi. Ref = itiraz edilen ödemenin PaymentIntent'i.
+      const providerRef = refOf(object.payment_intent);
+      if (!providerRef) return null;
+      mapped = {
+        id: event.id,
+        type: `dispute.${event.type.slice("charge.dispute.".length)}`,
+        data: {
+          providerRef,
+          amount: object.amount,
+          currency: String(object.currency ?? "").toUpperCase(),
+          disputeId: object.id,
+          disputeStatus: object.status,
+          reason: object.reason ?? undefined,
+        },
+      };
       break;
     }
     default:

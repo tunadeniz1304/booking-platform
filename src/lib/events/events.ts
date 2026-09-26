@@ -31,6 +31,12 @@ export const EventTypes = {
   PartyRiskFlagged: "trust.party_risk_flagged",
   /** Bölünmüş ödeme: pay daveti / organizatöre yedek ödeme çağrısı → e-posta (P1-2). */
   SplitShareInvited: "cart.split_share_invited",
+  /** Çözüm merkezi talebi açıldı → karşı tarafa yanıt çağrısı (P1-5). */
+  ClaimOpened: "resolution.claim_opened",
+  /** Talep eskale edildi (SLA aşımı / PSP itirazı) → yöneticilere bildirim (P1-5). */
+  ClaimEscalated: "resolution.claim_escalated",
+  /** Talep karara bağlandı → taraflara sonuç (P1-5). */
+  ClaimResolved: "resolution.claim_resolved",
 } as const;
 
 export type EventType = (typeof EventTypes)[keyof typeof EventTypes];
@@ -176,4 +182,9 @@ export function makeEvent<T>(
     correlationId,
     occurredAt: Date.now(),
   };
+}
+
+/** Çözüm merkezi olayları (P1-5): tüketici talebi kimlikten yeniden okur. */
+export interface ClaimEventPayload {
+  claimId: string;
 }

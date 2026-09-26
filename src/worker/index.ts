@@ -37,6 +37,7 @@ import {
   scheduleLedgerReconcile,
 } from "./jobs/ledger-reconcile";
 import { processComplianceJob, scheduleTakedownSlaSweep } from "./jobs/compliance";
+import { processResolutionJob, scheduleResolutionSweeps } from "./jobs/resolution";
 import {
   PUSH_CHECKIN_REMINDER_JOB,
   runPushReminders,
@@ -148,6 +149,16 @@ async function main(): Promise<void> {
   );
   workers.push(compliance);
 
+  // P1-5: çözüm merkezi — talep SLA'sı + depozito void (gecikmeli) ve yedek süpürücüler.
+  const resolution = new Worker(QUEUE_NAMES.resolution, processResolutionJob, { connection });
+  resolution.on("failed", (job, err) =>
+    logger.error(
+      { jobId: job?.id, queue: QUEUE_NAMES.resolution, ...errorFields(err) },
+      "job failed"
+    )
+  );
+  workers.push(resolution);
+
   // P1-3: fiyat takvimi (MinPriceByDate) — artımlı olay işleri + tekrarlayan tam hesaplama.
   const priceCalendar = new Worker(
     QUEUE_NAMES.priceCalendar,
@@ -172,6 +183,7 @@ async function main(): Promise<void> {
   await scheduleTakedownSlaSweep(getQueue(QUEUE_NAMES.compliance));
   await schedulePushReminders(getQueue(QUEUE_NAMES.maintenance));
   await schedulePriceCalendarRefresh(getQueue(QUEUE_NAMES.priceCalendar));
+  await scheduleResolutionSweeps(getQueue(QUEUE_NAMES.resolution));
 
   // Prometheus için işçi metrikleri (outbox, expire, bildirim sayaçları).
   const metricsPort = Number(process.env.WORKER_METRICS_PORT ?? 9464);

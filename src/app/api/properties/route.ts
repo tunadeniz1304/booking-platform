@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth";
 import { ValidationError, toErrorResponse } from "@/lib/http/errors";
 import { httpsUrl } from "@/lib/security/url";
+import { withAiSubject } from "@/lib/http/ai";
 import { DEFAULT_RATE_PLANS, licenseSchema, roomSchema } from "@/lib/host/host-service";
 import { CURRENCIES } from "@/lib/money/money";
 import {
@@ -54,12 +55,12 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    const response = await searchProperties(
-      SearchParamsSchema.parse({
-        ...searchParamsFromUrl(searchParams),
-        pageSize: searchParams.get("pageSize") ?? 12,
-      })
-    );
+    const params = SearchParamsSchema.parse({
+      ...searchParamsFromUrl(searchParams),
+      pageSize: searchParams.get("pageSize") ?? 12,
+    });
+    // Sorgu embedding'i (uzak model açıksa) isteğin öznesine faturalanır (v4#3).
+    const response = await withAiSubject(req, () => searchProperties(params));
     return NextResponse.json(response);
   } catch (error) {
     return toErrorResponse(error, "properties.list");

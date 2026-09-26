@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth";
 import { toErrorResponse } from "@/lib/http/errors";
+import { withAiSubject } from "@/lib/http/ai";
 import { generateSchema, generateSuggestions } from "@/lib/pricing/revenue";
 
 /** Odanın önümüzdeki geceleri için fiyat önerisi üretir (fiyat DEĞİŞMEZ; karar ev sahibinin). */
@@ -9,7 +10,7 @@ export async function POST(req: NextRequest) {
     const actor = await requireRole(req, ["HOST", "ADMIN"]);
     const { roomId } = generateSchema.parse(await req.json());
     return NextResponse.json(
-      { suggestions: await generateSuggestions(actor, roomId) },
+      { suggestions: await withAiSubject(req, () => generateSuggestions(actor, roomId)) },
       { status: 201 }
     );
   } catch (error) {

@@ -3,6 +3,7 @@ import { SearchParamsSchema, searchParamsFromUrl, searchProperties } from "@/lib
 import { getAuth } from "@/lib/auth";
 import { toErrorResponse } from "@/lib/http/errors";
 import { observed } from "@/lib/http/observed";
+import { withAiSubject } from "@/lib/http/ai";
 import { getRankingVariant } from "@/lib/flags";
 import { resolveSubject, setExperimentCookie } from "@/lib/flags/subject";
 
@@ -26,7 +27,10 @@ export const GET = observed("search", async function getHandler(req: NextRequest
       : { subject: null, newSessionId: null };
     const { variant } = await getRankingVariant(subject);
     const ranking = variant === "ranking.ltr" ? "ltr" : "weighted";
-    const res = NextResponse.json(await searchProperties(params, { ranking }));
+    // Sorgu embedding'i (uzak model açıksa) isteğin öznesine faturalanır (v4#3).
+    const res = NextResponse.json(
+      await withAiSubject(req, () => searchProperties(params, { ranking }))
+    );
     if (newSessionId) setExperimentCookie(res, newSessionId);
     return res;
   } catch (error) {

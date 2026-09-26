@@ -79,6 +79,8 @@ const schema = z.object({
   REVENUE_LAST_MINUTE_DISCOUNT_BPS: int(1000, 0, 9000),
   /** Resmî tatil/bayram gecesi artışı (baz puan). */
   REVENUE_HOLIDAY_UPLIFT_BPS: int(1500, 0, 20_000),
+  /** Gelir önerisi LLM açıklaması önbelleği (sn); aynı olgular günde bir kez açıklanır. 0 = kapalı. */
+  REVENUE_EXPLAIN_CACHE_TTL_SECONDS: int(86_400, 0, 7 * 86_400),
 
   // Fiyat içgörüsü + fiyat alarmı (P1-4)
   /** Split conformal hata oranı: 0.1 → %90 tahmin aralığı. */
@@ -139,6 +141,10 @@ const schema = z.object({
   ICAL_FETCH_TIMEOUT_MS: int(10_000, 500, 60_000),
   /** Uzak iCal gövdesi için üst sınır (bayt); aşılırsa istek kesilir. */
   ICAL_MAX_BYTES: int(1_000_000, 10_000, 10_000_000),
+  /** Tek iCal çekiminin TOPLAM süre sınırı (ms; yavaş-damla gövdeye karşı, v4#11). */
+  ICAL_FETCH_DEADLINE_MS: int(30_000, 1_000, 300_000),
+  /** Bir yoklama turunda aynı anda çekilen azami abonelik (v4#11). */
+  ICAL_POLL_CONCURRENCY: int(4, 1, 32),
   /** Parite uyarısı: harici kanal fiyatı bizimkinden bu kadar baz puan farklıysa host uyarılır. */
   CHANNEL_PARITY_TOLERANCE_BPS: int(100, 0, 10_000),
   /** Ajan checkout oturumu (ACP) geçerlilik süresi (dk); dolunca oturum iptal sayılır. */

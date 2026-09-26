@@ -1,10 +1,14 @@
 import "server-only";
+import { createHash } from "node:crypto";
 import { Prisma, type PriceSuggestion } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getConfig } from "@/lib/config/app-config";
 import { ConflictError, NotFoundError } from "@/lib/http/errors";
 import { getLlmClient } from "@/lib/llm/client";
+import { getLlmSettings } from "@/lib/llm/settings";
+import { redis } from "@/lib/redis";
+import { mapLimit } from "@/lib/resilience/limit";
 import { assertNumbersGrounded, buildFactSet } from "@/lib/llm/guards";
 import { logger } from "@/lib/observability/logger";
 import { money, toDecimalString, toMinor } from "@/lib/money/money";
@@ -232,6 +236,36 @@ export async function getRevenueOverview(
   };
 }
 
+type Explained = { text: string; llmMode: string };
+
+/**
+ * Açıklama önbelleği (v4#3): aynı olgu kümesi için gün (UTC) başına tek LLM çağrısı.
+ * Yalnızca canlı/demo sonuçlar saklanır (geçici hata → fallback önbelleğe girmez).
+ * Redis erişilemezse önbelleksiz devam edilir.
+ */
+function explainCacheKey(facts: unknown, now: Date): string {
+  const digest = createHash("sha256").update(JSON.stringify(facts)).digest("hex");
+  return `revenue:explain:${now.toISOString().slice(0, 10)}:${digest}`;
+}
+
+async function readExplainCache(key: string): Promise<Explained | null> {
+  try {
+    const raw = await redis.get(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<Explained>;
+    return typeof parsed.text === "string" && typeof parsed.llmMode === "string"
+      ? { text: parsed.text, llmMode: parsed.llmMode }
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+async function writeExplainCache(key: string, value: Explained, ttl: number): Promise<void> {
+  if (ttl <= 0 || value.llmMode === "fallback") return;
+  await redis.set(key, JSON.stringify(value), { ex: ttl }).catch(() => undefined);
+}
+
 /** LLM yalnızca açıklama cümlesini yazar; sayı guard'ı geçmezse demo cümlesi. */
 async function explainSuggestion(input: {
   date: IsoDate;
@@ -242,7 +276,8 @@ async function explainSuggestion(input: {
   leadDays: number;
   holiday: string | null;
   events: ReadonlyArray<{ title: string; impact: number }>;
-}): Promise<{ text: string; llmMode: string }> {
+  now: Date;
+}): Promise<Explained> {
   const s = input.suggestion;
   const facts = {
     date: input.date,
@@ -263,6 +298,12 @@ async function explainSuggestion(input: {
       amount: majorString(c.amountMinor),
     })),
   };
+  const ttl = getConfig().REVENUE_EXPLAIN_CACHE_TTL_SECONDS;
+  const cacheKey = explainCacheKey(facts, input.now);
+  if (ttl > 0) {
+    const cached = await readExplainCache(cacheKey);
+    if (cached) return cached;
+  }
   const factSet = buildFactSet([JSON.stringify(facts), input.events.length]);
   const demo = () =>
     demoRevenueExplanation({
@@ -294,7 +335,9 @@ async function explainSuggestion(input: {
       },
     }
   );
-  return { text: res.data, llmMode: res.llmMode };
+  const explained = { text: res.data, llmMode: res.llmMode };
+  await writeExplainCache(cacheKey, explained, ttl);
+  return explained;
 }
 
 /** Odanın önümüzdeki gecelerine öneri üretir; aynı aralıktaki eski bekleyen öneriler silinir. */
@@ -338,37 +381,39 @@ export async function generateSuggestions(
     }),
   ]);
 
-  const drafts = await Promise.all(
-    rows
-      .filter((row) => row.total > 0)
-      .map(async (row) => {
-        const date = fromDate(row.date);
-        const occupancy = Math.min(1, (row.sold + row.held) / row.total);
-        const leadDays = diffDays(today, date);
-        const holiday = trHolidayOn(date);
-        const active = events
-          .filter((e) => fromDate(e.startsAt) <= date && date <= fromDate(e.endsAt))
-          .map((e) => ({ title: e.title, impact: e.impact }));
-        const suggestion = suggestPrice({
-          baseMinor,
-          occupancy,
-          leadDays,
-          holiday,
-          events: active,
-        });
-        const currentMinor = toMinor(row.price.toString(), currency);
-        const explained = await explainSuggestion({
-          date,
-          currency,
-          currentMinor,
-          suggestion,
-          occupancy,
-          leadDays,
-          holiday,
-          events: active,
-        });
-        return { date, currentMinor, suggestion, explained };
-      })
+  // v4#3: gece başına açıklama çağrıları LLM_MAX_CONCURRENCY ile sınırlı (≤90 paralel değil).
+  const drafts = await mapLimit(
+    rows.filter((row) => row.total > 0),
+    getLlmSettings().maxConcurrency,
+    async (row) => {
+      const date = fromDate(row.date);
+      const occupancy = Math.min(1, (row.sold + row.held) / row.total);
+      const leadDays = diffDays(today, date);
+      const holiday = trHolidayOn(date);
+      const active = events
+        .filter((e) => fromDate(e.startsAt) <= date && date <= fromDate(e.endsAt))
+        .map((e) => ({ title: e.title, impact: e.impact }));
+      const suggestion = suggestPrice({
+        baseMinor,
+        occupancy,
+        leadDays,
+        holiday,
+        events: active,
+      });
+      const currentMinor = toMinor(row.price.toString(), currency);
+      const explained = await explainSuggestion({
+        date,
+        currency,
+        currentMinor,
+        suggestion,
+        occupancy,
+        leadDays,
+        holiday,
+        events: active,
+        now,
+      });
+      return { date, currentMinor, suggestion, explained };
+    }
   );
 
   const created = await prisma.$transaction(async (tx) => {

@@ -134,6 +134,9 @@ export async function sendMessage(
   return event;
 }
 
+/** LLM'e misafir adı yerine giden takma ad (pseudonim). */
+export const GUEST_NAME_PLACEHOLDER = "[MISAFIR]";
+
 /**
  * Ev sahibi için yanıt TASLAĞI: yalnızca öneridir, KAYDEDİLMEZ ve GÖNDERİLMEZ.
  * Ev sahibi metni düzenleyip `sendMessage(..., fromAiDraft: true)` ile kendisi gönderir.
@@ -158,25 +161,28 @@ export async function draftHostReply(bookingId: string, userId: string) {
     checkOut: access.checkOut.toISOString().slice(0, 10),
     lastGuestMessage: lastGuest,
   };
+  // v4#3: misafirin adı modele GİTMEZ — yer tutucuyla gönderilir, yanıtta geri konur.
+  // Geçmiş mesajlardaki ad da (≥3 harf) istemci redaksiyonunda `knownNames` ile maskelenir.
+  const llmFacts = { ...facts, guestName: GUEST_NAME_PLACEHOLDER };
   const res = await getLlmClient().completeJson(
     "message_draft",
     z.object({ reply: z.string().min(5).max(getConfig().MESSAGE_MAX_LENGTH) }),
     [
       {
         role: "system",
-        content:
-          "Ev sahibi adına misafire kısa, nazik bir Türkçe yanıt taslağı yaz. Söz verme, fiyat/iade taahhüdü verme, iletişim bilgisi veya harici bağlantı ekleme. JSON: {reply}",
+        content: `Ev sahibi adına misafire kısa, nazik bir Türkçe yanıt taslağı yaz. Misafire hitap ederken adı yerine ${GUEST_NAME_PLACEHOLDER} yer tutucusunu aynen kullan. Söz verme, fiyat/iade taahhüdü verme, iletişim bilgisi veya harici bağlantı ekleme. JSON: {reply}`,
       },
       {
         role: "user",
         content: JSON.stringify({
-          ...facts,
+          ...llmFacts,
           history: recent.reverse().map((m) => `${m.senderRole}: ${m.body}`),
         }),
       },
     ],
-    { demo: () => demoMessageDraft(facts) }
+    { demo: () => demoMessageDraft(facts), knownNames: [access.guestName] }
   );
+  const reply = res.data.reply.split(GUEST_NAME_PLACEHOLDER).join(access.guestName);
   // Taslak da platform dışı iletişim içeremez.
-  return { draft: maskMessage(res.data.reply).text, llmMode: res.llmMode };
+  return { draft: maskMessage(reply).text, llmMode: res.llmMode };
 }

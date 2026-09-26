@@ -3,13 +3,14 @@ import { z } from "zod";
 import { requireRole } from "@/lib/auth";
 import { toErrorResponse } from "@/lib/http/errors";
 import { audit } from "@/lib/admin/audit";
+import { withAiSubject } from "@/lib/http/ai";
 import { decideModeration, listModerationQueue } from "@/lib/reviews/moderation-queue";
 
 /** Yorum moderasyon kuyruğu (ADMIN): filtreye takılan ve şikâyetle gizlenen yorumlar. */
 export async function GET(req: NextRequest) {
   try {
     await requireRole(req, ["ADMIN"]);
-    return NextResponse.json(await listModerationQueue());
+    return NextResponse.json(await withAiSubject(req, () => listModerationQueue()));
   } catch (error) {
     return toErrorResponse(error, "admin.reviews");
   }

@@ -308,14 +308,15 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingR
 
   // Hızlı yol: kilit almadan önce dolu olduğu kesin olan istekleri erken reddet.
   // Yalnızca optimizasyondur; sorgu hata verirse atlanır (kilitli yol yetkili kaynaktır).
-  const full = await prisma.$queryRaw<Array<{ n: bigint }>>`
+  const isFull = () =>
+    prisma.$queryRaw<Array<{ n: bigint }>>`
       SELECT count(*)::bigint AS n FROM "InventoryDay"
       WHERE "roomTypeId" = ${input.roomId}
         AND date >= ${toDbDate(stay.checkIn)} AND date < ${toDbDate(stay.checkOut)}
         AND sold + held + ${units} > total`
-    .then((r) => Number(r[0]?.n ?? 0))
-    .catch(() => 0);
-  if (full > 0) {
+      .then((r) => Number(r[0]?.n ?? 0) > 0)
+      .catch(() => false);
+  if (await isFull()) {
     bookingsCreated.inc({ outcome: "sold_out" });
     throw new SoldOutError();
   }
@@ -338,13 +339,19 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingR
           quote,
           fx
         ),
-      { ttlMs: 15_000, retryCount: 200, retryDelayMs: 25 }
+      { ttlMs: 15_000, retryDelayMs: 25, waitMs: config.LOCK_WAIT_BUDGET_MS }
     );
     bookingsCreated.inc({ outcome: "held" });
     await afterWrite(row.propertyId, row.id);
     return { booking: row, paymentRequired: true };
   } catch (error) {
     if (error instanceof LockError) {
+      // Kilit bütçesi doldu: bu sürede oda dolduysa (son odaya sürü) meşgul değil
+      // "tükendi" dön → istemci yeniden denemez (409 SOLD_OUT ≠ 409 ROOM_BUSY).
+      if (await isFull()) {
+        bookingsCreated.inc({ outcome: "sold_out" });
+        throw new SoldOutError();
+      }
       bookingsCreated.inc({ outcome: "busy" });
       throw new BookingConflictError(
         "Oda şu anda başka bir misafir tarafından rezerve ediliyor. Lütfen tekrar deneyin.",

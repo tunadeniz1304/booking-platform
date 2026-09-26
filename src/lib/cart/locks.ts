@@ -21,6 +21,8 @@ export interface OrderedLockOptions {
   ttlMs?: number;
   retryCount?: number;
   retryDelayMs?: number;
+  /** Kilit başına toplam bekleme bütçesi (ms); verilirse `retryCount` yerine geçer. */
+  waitMs?: number;
 }
 
 /**

@@ -322,6 +322,12 @@ const schema = z.object({
   WEBAUTHN_ORIGIN: z.string().url().default("http://localhost:3000"),
   WEBAUTHN_CHALLENGE_TTL_SECONDS: int(300, 30, 3600),
 
+  /**
+   * Oda kilidi (Redlock) için rezervasyon/sepet tutmasının toplam bekleme bütçesi (ms).
+   * Aşılırsa doluluk yeniden kontrol edilir: dolu → 409 SOLD_OUT, değilse 409 ROOM_BUSY.
+   */
+  LOCK_WAIT_BUDGET_MS: int(7_500, 100, 60_000),
+
   // Rate-limit (pencere başına istek)
   RATE_LIMIT_WINDOW_SECONDS: int(60, 1, 3600),
   RATE_LIMIT_DEFAULT_MAX: int(100, 1),

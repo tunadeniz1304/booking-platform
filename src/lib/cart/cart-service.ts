@@ -12,7 +12,7 @@ import { transition, type BookingState } from "@/lib/booking/state-machine";
 import { invalidateBookingCache } from "@/lib/booking/booking-cache";
 import { invalidatePropertySearchCache } from "@/lib/search";
 import { releaseInventory, reserveBookingInTx } from "@/lib/booking-service";
-import { computeTotal, type Quote } from "@/lib/pricing/quote";
+import { computeTotal, SoldOutError, type Quote } from "@/lib/pricing/quote";
 import { getCurrentFx, getFxById, type FxTable } from "@/lib/fx/store";
 import { minorFromDb, minorToDb } from "@/lib/money/money";
 import { fromDate, toDbDate } from "@/lib/time/nights";
@@ -373,6 +373,32 @@ export interface PriceChange {
 }
 
 /** Kalem hatasına hangi kalemin başarısız olduğunu ekler (tümü-ya-hiç → hiçbiri tutulmadı). */
+/**
+ * Kilit zaman aşımı sonrası doluluk yeniden kontrolü: kendi adedi artık sığmayan ilk kalemin
+ * kimliği (yoksa null). Yalnızca hata eşleme içindir; sorgu hatası "dolu değil" sayılır.
+ */
+async function firstSoldOutItem(
+  items: ReadonlyArray<{
+    id: string;
+    roomTypeId: string;
+    checkIn: Date;
+    checkOut: Date;
+    quantity: number;
+  }>
+): Promise<string | null> {
+  for (const item of items) {
+    const full = await prisma.$queryRaw<Array<{ n: bigint }>>`
+      SELECT count(*)::bigint AS n FROM "InventoryDay"
+      WHERE "roomTypeId" = ${item.roomTypeId}
+        AND date >= ${toDbDate(fromDate(item.checkIn))} AND date < ${toDbDate(fromDate(item.checkOut))}
+        AND sold + held + ${item.quantity} > total`
+      .then((r) => Number(r[0]?.n ?? 0) > 0)
+      .catch(() => false);
+    if (full) return item.id;
+  }
+  return null;
+}
+
 function withItem(error: unknown, itemId: string): unknown {
   if (!(error instanceof HttpError)) return error;
   const details =
@@ -542,12 +568,18 @@ export async function holdCart(
           },
           { timeout: 30_000, maxWait: 10_000 }
         ),
-      { ttlMs: 15_000, retryCount: 200, retryDelayMs: 25 }
+      { ttlMs: 15_000, retryDelayMs: 25, waitMs: config.LOCK_WAIT_BUDGET_MS }
     );
     cartHoldTotal.inc({ outcome: "held" });
     await afterBookingsWrite(bookings);
   } catch (error) {
     if (error instanceof LockError) {
+      // Kilit bütçesi doldu: bu sürede bir kalemin odası dolduysa ROOM_BUSY değil SOLD_OUT.
+      const fullItemId = await firstSoldOutItem(cartRow.items);
+      if (fullItemId) {
+        cartHoldTotal.inc({ outcome: "unavailable" });
+        throw withItem(new SoldOutError(), fullItemId);
+      }
       cartHoldTotal.inc({ outcome: "busy" });
       throw new ConflictError(
         "Odalardan biri şu anda başka bir misafir tarafından rezerve ediliyor. Tekrar deneyin.",

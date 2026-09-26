@@ -1,6 +1,7 @@
 import { PrismaClient, PropertyType, UserRole, BookingStatus } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { assertSeedAllowed } from "../src/lib/config/seed-guard";
+import { seedV4Extras } from "./seed-v4";
 
 const prisma = new PrismaClient();
 
@@ -898,7 +899,7 @@ async function main() {
   const passwordHash = await bcrypt.hash("Password123!", 10);
   // Demo/seed kullanıcıları e-postası doğrulanmış gelir (v4#6 requireVerifiedEmail).
   const emailVerifiedAt = new Date("2025-01-01T00:00:00Z");
-  await prisma.user.upsert({
+  const admin = await prisma.user.upsert({
     where: { email: "admin@booking.test" },
     update: { emailVerifiedAt },
     create: {
@@ -1026,7 +1027,7 @@ async function main() {
   const existing = await prisma.property.findMany({ select: { id: true } });
   if (existing.length > 0) {
     // Defter yalnızca eklenir (UPDATE/DELETE tetikle reddedilir); sıfırlama TRUNCATE ile.
-    await prisma.$executeRawUnsafe(`TRUNCATE "JournalLine", "JournalEntry"`);
+    await prisma.$executeRawUnsafe(`TRUNCATE "JournalLine", "JournalEntry", "LedgerEntry"`);
     await prisma.invoice.deleteMany();
     // P1-1: sepetler (kalemler + sepet ödemesi kaskadla silinir).
     await prisma.cart.deleteMany();
@@ -1040,6 +1041,8 @@ async function main() {
     await prisma.loyaltyCashback.deleteMany();
     await prisma.loyaltyAccount.deleteMany();
     await prisma.payout.deleteMany();
+    // P2-2: demo senaryolarının devirleri (payout'lardan sonra; rezervasyona FK).
+    await prisma.bookingTransfer.deleteMany();
     await prisma.payment.deleteMany();
     await prisma.review.deleteMany();
     await prisma.booking.deleteMany();
@@ -1049,6 +1052,8 @@ async function main() {
     await prisma.inventoryDay.deleteMany();
     await prisma.booking.updateMany({ data: { ratePlanId: null } });
     await prisma.ratePlan.deleteMany();
+    // P2-2: demo senaryosu 6'nın fiyat önerileri (oda tipine FK).
+    await prisma.priceSuggestion.deleteMany();
     await prisma.roomType.deleteMany();
     await prisma.priceHistory.deleteMany();
     await prisma.property.deleteMany();
@@ -1389,6 +1394,9 @@ async function main() {
   }
   if (historyRows.length > 0) await prisma.priceHistory.createMany({ data: historyRows });
   console.log(`Fiyat geçmişi satırları: ${historyRows.length}`);
+
+  // v4 (P2-2): HostAccount, promosyonlar, fotoğraflar, erişilebilirlik, tahsilat jurnalleri.
+  await seedV4Extras(prisma, { hostId: host.id, adminId: admin.id });
 
   console.log("Seeding tamamlandı ✅");
 }

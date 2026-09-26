@@ -1766,3 +1766,40 @@ model ClaimEvidence {
 
   @@index([claimId, createdAt])
 }
+
+/// P2-1a: DSA md. 20 iç şikâyet (itiraz). Bildiren (REPORTER) ya da kararla etkilenen ev
+/// sahibi (HOST) karar e-postasındaki imzalı bağlantıyla itiraz eder; karar başına rol
+/// başına tek itiraz. UPHELD önceki kararı tersine çevirir (REMOVED → yeniden yayın serbest;
+/// NO_ACTION → ilan kaldırılır). İlişki alanı yok (Notice modeline dokunulmadı).
+model NoticeAppeal {
+  id             String             @id @default(cuid())
+  noticeId       String
+  propertyId     String?
+  appellantRole  NoticeAppealRole
+  appellantEmail String
+  reason         String
+  locale         String             @default("tr")
+  status         NoticeAppealStatus @default(PENDING)
+  response       String?
+  decisionGround NoticeGround?
+  decidedAt      DateTime?
+  decidedById    String?
+  createdAt      DateTime           @default(now())
+
+  @@unique([noticeId, appellantRole])
+  @@index([status, createdAt])
+  @@index([propertyId])
+}
+
+enum NoticeAppealRole {
+  REPORTER
+  HOST
+}
+
+enum NoticeAppealStatus {
+  PENDING
+  /// İtiraz kabul edildi: önceki karar tersine çevrildi.
+  UPHELD
+  /// İtiraz reddedildi: karar geçerli.
+  REJECTED
+}

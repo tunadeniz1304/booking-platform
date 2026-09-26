@@ -421,6 +421,8 @@ const schema = z.object({
   /** DSA herkese açık bildirim formu: istemci başına pencere içinde en fazla bildirim. */
   DSA_NOTICE_MAX_PER_WINDOW: int(5, 1, 1000),
   DSA_NOTICE_WINDOW_SECONDS: int(3600, 60, 86_400),
+  /** DSA md. 20(1): karardan sonra itiraz süresi (gün; en az 6 ay). */
+  DSA_APPEAL_WINDOW_DAYS: int(180, 180, 3650),
 
   // P1-6 KYC ve güven-emniyet (karar kodda; LLM yalnızca ek sinyal)
   /** Kimlik doğrulama sağlayıcısı: auto → Stripe anahtarı + STRIPE_IDENTITY_WEBHOOK_SECRET varsa stripe, yoksa mock. */

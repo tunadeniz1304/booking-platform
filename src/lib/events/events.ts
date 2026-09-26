@@ -27,6 +27,10 @@ export const EventTypes = {
   NoticeReceived: "compliance.notice_received",
   /** DSA bildirimine karar verildi → gerekçeli karar bildirimi (P1-13b). */
   NoticeDecided: "compliance.notice_decided",
+  /** DSA md. 20 itirazı alındı → itiraz edene alındı onayı (P2-1a). */
+  NoticeAppealReceived: "compliance.notice_appeal_received",
+  /** DSA md. 20 itirazına karar verildi → itiraz edene sonuç (P2-1a). */
+  NoticeAppealDecided: "compliance.notice_appeal_decided",
   /** Parti riski skoru eşik üstünde → ev sahibine uyarı (P1-6). */
   PartyRiskFlagged: "trust.party_risk_flagged",
   /** Bölünmüş ödeme: pay daveti / organizatöre yedek ödeme çağrısı → e-posta (P1-2). */

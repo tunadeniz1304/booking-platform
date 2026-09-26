@@ -15,6 +15,7 @@ import {
 import type { AccessClaims } from "@/lib/auth";
 import { LICENSE_RE, isLicenseFormatValid, verifyLicense } from "@/lib/compliance/license-registry";
 import { assertNoOpenTakedown } from "@/lib/compliance/takedown";
+import { assertNoActiveDsaRestriction } from "@/lib/compliance/dsa-appeal";
 import { noteAvailabilityChanged } from "@/lib/pricing/price-calendar-jobs";
 
 /**
@@ -81,6 +82,8 @@ export async function updateProperty(
   const property = await assertPropertyAccess(actor, propertyId);
   // P1-13a: açık 7565 kaldırma talebi varken ilan yeniden yayına alınamaz.
   if (patch.isActive) await assertNoOpenTakedown(propertyId);
+  // P2-1a: yürürlükteki DSA kaldırma kararı (itirazla geri alınmamış) da yeniden yayını engeller.
+  if (patch.isActive) await assertNoActiveDsaRestriction(propertyId);
   const license = patch.licenseNumber ?? property.licenseNumber;
   if (patch.isActive && !license) {
     throw new ValidationError("Belge numarası olmadan ilan yayınlanamaz");

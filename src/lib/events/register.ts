@@ -28,10 +28,13 @@ import { invalidateBookingCache } from "@/lib/booking/booking-cache";
 import { notifySecurityAlert } from "@/lib/notifications/security-notifications";
 import { notifySplitShareInvited } from "@/lib/notifications/split-notifications";
 import {
+  notifyNoticeAppealDecided,
+  notifyNoticeAppealReceived,
   notifyNoticeDecided,
   notifyNoticeReceived,
 } from "@/lib/notifications/compliance-notifications";
 import type { NoticeEventPayload } from "@/lib/compliance/dsa";
+import type { NoticeAppealEventPayload } from "@/lib/compliance/dsa-appeal";
 import { pushPriceDrop } from "@/lib/push/notifications";
 import {
   onAvailabilityChanged,
@@ -117,6 +120,8 @@ export function registerEventHandlers(): void {
   on<ClaimEventPayload>(EventTypes.ClaimOpened, notifyClaimOpened);
   on<ClaimEventPayload>(EventTypes.ClaimEscalated, notifyClaimEscalated);
   on<ClaimEventPayload>(EventTypes.ClaimResolved, notifyClaimResolved);
+  on<NoticeAppealEventPayload>(EventTypes.NoticeAppealReceived, notifyNoticeAppealReceived);
+  on<NoticeAppealEventPayload>(EventTypes.NoticeAppealDecided, notifyNoticeAppealDecided);
   on<BookingExpiredPayload>(EventTypes.BookingExpired, async (p) => {
     await invalidateStay(p);
     await notifyBookingExpired(p);

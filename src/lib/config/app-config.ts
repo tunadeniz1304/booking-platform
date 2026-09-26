@@ -268,6 +268,26 @@ const schema = z.object({
   /** Görsel kNN kanalına girmek için en düşük kosinüs benzerliği (CLIP'te ilgisiz görseller ~0.5–0.7). */
   VISION_MIN_SIMILARITY: num(0.75, -1, 1),
 
+  // v4 P1-9: AI yorum öne çıkanları + ilan karşılaştırma
+  /** Öne çıkanlara giren en yeni yayınlanmış yorum sayısı (PDP listesiyle aynı pencere). */
+  REVIEW_HIGHLIGHTS_MAX_REVIEWS: int(50, 1, 500),
+  /** Öne çıkan üretmek için gereken en az yorum. */
+  REVIEW_HIGHLIGHTS_MIN_REVIEWS: int(2, 1, 100),
+  /** En fazla küme (tema) sayısı; gerçek k = min(bu, ⌈√(cümle/2)⌉). */
+  REVIEW_HIGHLIGHTS_MAX_CLUSTERS: int(4, 1, 12),
+  /** k-means++ tohumu (deterministik kümeleme). */
+  REVIEW_HIGHLIGHTS_KMEANS_SEED: int(42, 0, 2_147_483_647),
+  REVIEW_HIGHLIGHTS_KMEANS_MAX_ITERATIONS: int(50, 1, 1000),
+  /** Küme başına en fazla iddia (alıntı). */
+  REVIEW_HIGHLIGHTS_MAX_CLAIMS: int(3, 1, 10),
+  /** Birebir alıntının en az karakter sayısı (tek sözcüklük "alıntılar" reddedilir). */
+  REVIEW_HIGHLIGHTS_MIN_QUOTE_CHARS: int(12, 1, 200),
+  /** Sonuç önbelleği (sn); anahtar yorum setinin karmasıdır. 0 = kapalı. */
+  REVIEW_HIGHLIGHTS_CACHE_TTL_SECONDS: int(86_400, 0, 30 * 86_400),
+  /** Karşılaştırmada ilan sayısı sınırları. */
+  COMPARE_MIN_LISTINGS: int(2, 2, 4),
+  COMPARE_MAX_LISTINGS: int(4, 2, 6),
+
   // P1-3 deneyler: anonim bucket çerezi ömrü (gün)
   EXPERIMENT_COOKIE_DAYS: int(90, 1, 730),
 

@@ -53,6 +53,8 @@ export type LlmTask =
   | "message_draft"
   | "moderation_explain"
   | "revenue_explain"
+  | "review_highlights"
+  | "listing_compare"
   | "smoke";
 
 export type LlmMode = "live" | "demo" | "fallback";

@@ -36,7 +36,9 @@ export function categorize(pathname: string): RateLimitCategory {
   if (
     pathname.startsWith("/api/ai") ||
     pathname.startsWith("/api/search/smart") ||
-    /^\/api\/properties\/[^/]+\/reviews\/summary$/.test(pathname)
+    /^\/api\/properties\/[^/]+\/reviews\/summary$/.test(pathname) ||
+    /^\/api\/properties\/[^/]+\/review-highlights$/.test(pathname) ||
+    pathname === "/api/compare"
   ) {
     return "ai";
   }

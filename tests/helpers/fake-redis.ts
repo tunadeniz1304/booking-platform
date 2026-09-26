@@ -72,8 +72,19 @@ export class FakeRedis implements RedisClient {
     if (v === 1) this.ttls.set(key, seconds);
     return v;
   }
-  async eval(): Promise<unknown> {
+  /** Yalnızca HyperLogLog betikleri (PFADD+TTL / PFCOUNT) kesin küme ile taklit edilir. */
+  async eval(script = "", keys: string[] = [], args: string[] = []): Promise<unknown> {
     this.guard("eval");
+    if (script.includes("'PFADD'")) {
+      const added = await this.sadd(keys[0], args[0]);
+      if (args[1]) this.ttls.set(keys[0], Number(args[1]));
+      return added > 0 ? 1 : 0;
+    }
+    if (script.includes("'PFCOUNT'")) {
+      const union = new Set<string>();
+      keys.forEach((k) => this.sets.get(k)?.forEach((m) => union.add(m)));
+      return union.size;
+    }
     throw new Error("FakeRedis.eval desteklenmiyor");
   }
   async sadd(key: string, ...members: string[]) {

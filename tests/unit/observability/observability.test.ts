@@ -18,7 +18,7 @@ import { GET as metrics } from "@/app/api/metrics/route";
 import { GET as live } from "@/app/api/rooms/[roomId]/live/route";
 import { observed } from "@/lib/http/observed";
 import { acquireConnectionSlot } from "@/lib/live/hub";
-import { recordRoomView } from "@/lib/live/stats";
+import { countRoomViewers, recordRoomView } from "@/lib/live/stats";
 import { resetConfigForTests } from "@/lib/config/app-config";
 
 const fake = redis as unknown as FakeRedis;
@@ -103,10 +103,10 @@ describe("regression: #11 canlı SSE sınırları", () => {
     delete process.env.LIVE_MAX_CONNECTIONS_PER_IP;
   });
 
-  it("görüntülenme sayacı atomik ve IP başına tekil", async () => {
-    expect(await recordRoomView("r1", "9.9.9.9")).toBe(true);
-    expect(await recordRoomView("r1", "9.9.9.9")).toBe(false);
-    expect(await recordRoomView("r1", "8.8.8.8")).toBe(true);
-    expect(fake.store.get("live:room:r1:views")).toBe("2");
+  it("görüntülenme sayacı izleyici (imzalı oturum/cihaz) başına tekil — HLL (v4#18)", async () => {
+    expect(await recordRoomView("r1", "d:device-a")).toBe(true);
+    expect(await recordRoomView("r1", "d:device-a")).toBe(false);
+    expect(await recordRoomView("r1", "u:user-b")).toBe(true);
+    expect(await countRoomViewers("r1")).toBe(2);
   });
 });

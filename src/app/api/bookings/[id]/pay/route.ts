@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAuth } from "@/lib/auth";
+import { requireVerifiedEmail } from "@/lib/auth";
 import { toErrorResponse, ValidationError } from "@/lib/http/errors";
 import { payForBooking } from "@/lib/payment/payment-service";
 import { getConfig } from "@/lib/config/app-config";
@@ -29,7 +29,7 @@ export const POST = observed(
     };
     try {
       const { id } = await params;
-      const { userId } = await requireAuth(req);
+      const { userId } = await requireVerifiedEmail(req);
       const { cardToken, stepUpToken } = bodySchema.parse(await req.json());
       const idempotencyKey = req.headers.get("idempotency-key")?.slice(0, 128);
       if (!idempotencyKey) throw new ValidationError("Idempotency-Key başlığı zorunludur");

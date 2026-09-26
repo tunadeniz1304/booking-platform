@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/auth";
+import { requireAuth, requireVerifiedEmail } from "@/lib/auth";
 import { toErrorResponse } from "@/lib/http/errors";
 import { observed } from "@/lib/http/observed";
 import {
@@ -31,7 +31,7 @@ export const POST = observed(
   async function postHandler(req: NextRequest, { params }: Ctx) {
     try {
       const { id } = await params;
-      const { userId } = await requireAuth(req);
+      const { userId } = await requireVerifiedEmail(req);
       requireIdempotencyKey(req);
       const patch = updateCheckoutSchema.parse(await req.json());
       return NextResponse.json(await updateCheckoutSession(userId, id, patch));

@@ -884,10 +884,13 @@ async function main() {
   assertSeedAllowed();
   console.log("Seeding başlıyor...");
   const passwordHash = await bcrypt.hash("Password123!", 10);
+  // Demo/seed kullanıcıları e-postası doğrulanmış gelir (v4#6 requireVerifiedEmail).
+  const emailVerifiedAt = new Date("2025-01-01T00:00:00Z");
   await prisma.user.upsert({
     where: { email: "admin@booking.test" },
-    update: {},
+    update: { emailVerifiedAt },
     create: {
+      emailVerifiedAt,
       email: "admin@booking.test",
       passwordHash,
       firstName: "Sistem",
@@ -897,8 +900,9 @@ async function main() {
   });
   const host = await prisma.user.upsert({
     where: { email: "host@booking.test" },
-    update: {},
+    update: { emailVerifiedAt },
     create: {
+      emailVerifiedAt,
       email: "host@booking.test",
       passwordHash,
       firstName: "Ahmet",
@@ -908,8 +912,9 @@ async function main() {
   });
   const guest = await prisma.user.upsert({
     where: { email: "guest@booking.test" },
-    update: {},
+    update: { emailVerifiedAt },
     create: {
+      emailVerifiedAt,
       email: "guest@booking.test",
       passwordHash,
       firstName: "Ayşe",
@@ -928,8 +933,9 @@ async function main() {
   for (const eg of extraSeed) {
     const u = await prisma.user.upsert({
       where: { email: eg.email },
-      update: {},
+      update: { emailVerifiedAt },
       create: {
+        emailVerifiedAt,
         email: eg.email,
         passwordHash,
         firstName: eg.firstName,

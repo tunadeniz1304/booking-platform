@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createBooking, listUserBookingsPage } from "@/lib/booking-service";
-import { requireAuth } from "@/lib/auth";
+import { requireAuth, requireVerifiedEmail } from "@/lib/auth";
 import { toErrorResponse } from "@/lib/http/errors";
 import { observed } from "@/lib/http/observed";
 
@@ -26,7 +26,7 @@ const createBookingSchema = z.object({
 
 export const POST = observed("bookings", async function postHandler(req: NextRequest) {
   try {
-    const { userId } = await requireAuth(req);
+    const { userId } = await requireVerifiedEmail(req);
     const parsed = createBookingSchema.parse(await req.json());
     const idempotencyKey = req.headers.get("idempotency-key")?.slice(0, 128) || undefined;
 

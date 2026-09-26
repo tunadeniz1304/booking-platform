@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/auth";
+import { requireVerifiedEmail } from "@/lib/auth";
 import { toErrorResponse } from "@/lib/http/errors";
 import { observed } from "@/lib/http/observed";
 import { completeCheckoutSchema, completeCheckoutSession } from "@/lib/agentic/checkout";
@@ -14,7 +14,7 @@ export const POST = observed(
   async function postHandler(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
       const { id } = await params;
-      const { userId } = await requireAuth(req);
+      const { userId } = await requireVerifiedEmail(req);
       const idempotencyKey = requireIdempotencyKey(req);
       const { payment_data } = completeCheckoutSchema.parse(await req.json());
       const session = await completeCheckoutSession(

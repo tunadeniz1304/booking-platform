@@ -43,6 +43,7 @@ describeInt("P1-6 rezervasyon mesajlaşması (integration)", () => {
         data: {
           email: `${tag}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}@t.test`,
           passwordHash: "x",
+          emailVerifiedAt: new Date(),
           firstName: "X",
           lastName: "Y",
           role,

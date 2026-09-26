@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAuth } from "@/lib/auth";
+import { requireAuth, requireVerifiedEmail } from "@/lib/auth";
 import { toErrorResponse } from "@/lib/http/errors";
 import { listBookingForTransfer, listMyTransfers } from "@/lib/transfer/transfer-service";
 
@@ -13,7 +13,7 @@ const listSchema = z.object({
 /** Devir ilanı açar; imzalı claim linki yalnızca bu yanıtta bir kez döner. */
 export async function POST(req: NextRequest) {
   try {
-    const { userId } = await requireAuth(req);
+    const { userId } = await requireVerifiedEmail(req);
     const { bookingId, askPriceMinor } = listSchema.parse(await req.json());
     const listed = await listBookingForTransfer(bookingId, userId, askPriceMinor);
     const claimUrl = `${req.nextUrl.origin}/transfers/claim#token=${encodeURIComponent(listed.claimToken)}`;

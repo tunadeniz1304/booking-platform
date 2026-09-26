@@ -34,6 +34,7 @@ describeInt("P1-7 yorum moderasyonu (integration)", () => {
       data: {
         email: `rm-${tag}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}@t.test`,
         passwordHash: "x",
+        emailVerifiedAt: new Date(),
         firstName: "R",
         lastName: "M",
         role,

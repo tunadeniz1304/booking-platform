@@ -39,6 +39,8 @@ export async function createStayFixture(
     data: {
       email: `u-${stamp}@t.test`,
       passwordHash: "x",
+      // v4#6: fixture kullanıcıları varsayılan olarak e-postası doğrulanmış.
+      emailVerifiedAt: new Date(),
       firstName: "Test",
       lastName: "Kullanıcı",
     },
@@ -47,6 +49,7 @@ export async function createStayFixture(
     data: {
       email: `h-${stamp}@t.test`,
       passwordHash: "x",
+      emailVerifiedAt: new Date(),
       firstName: "Host",
       lastName: "Test",
       role: "HOST",

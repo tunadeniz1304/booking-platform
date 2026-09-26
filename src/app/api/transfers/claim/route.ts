@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAuth } from "@/lib/auth";
+import { requireVerifiedEmail } from "@/lib/auth";
 import { toErrorResponse } from "@/lib/http/errors";
 import { claimTransfer } from "@/lib/transfer/transfer-service";
 
@@ -12,7 +12,7 @@ const claimSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
-    const { userId } = await requireAuth(req);
+    const { userId } = await requireVerifiedEmail(req);
     const { token, cardToken } = claimSchema.parse(await req.json());
     return NextResponse.json(await claimTransfer({ token, buyerId: userId, cardToken }));
   } catch (error) {

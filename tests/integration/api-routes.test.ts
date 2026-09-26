@@ -111,12 +111,14 @@ describeInt("API route handler'ları (integration)", () => {
   /** Hiçbir mülkün sahibi olmayan ikinci host. */
   let otherHostToken: string;
 
-  async function makeUser(tag: string, role: Role = "USER") {
+  // v4#6: varsayılan olarak e-postası doğrulanmış; doğrulanmamış senaryo için verified=false.
+  async function makeUser(tag: string, role: Role = "USER", verified = true) {
     userSeq += 1;
     return prisma.user.create({
       data: {
         email: `${tag}-${userSeq}-${stamp}@t.test`,
         passwordHash: "x",
+        emailVerifiedAt: verified ? new Date() : null,
         firstName: "Api",
         lastName: "Test",
         role,
@@ -1276,7 +1278,7 @@ describeInt("API route handler'ları (integration)", () => {
     });
 
     it("verify-email/resend: doğrulanmamış → 202 + outbox; doğrulanmış → alreadyVerified", async () => {
-      const user = await makeUser("resend");
+      const user = await makeUser("resend", "USER", false);
       const token = await tokenFor(user.id, "USER");
       expect(
         (await resendPost(call("/api/auth/verify-email/resend", { method: "POST" }), undefined))

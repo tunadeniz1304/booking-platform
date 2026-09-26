@@ -1,4 +1,5 @@
-import { ForbiddenError, UnauthorizedError } from "@/lib/http/errors";
+import { EmailNotVerifiedError, ForbiddenError, UnauthorizedError } from "@/lib/http/errors";
+import { prisma } from "@/lib/prisma";
 import { extractAccessToken, verifyAccessToken, type AccessClaims, type Role } from "./tokens";
 import { isAccessTokenDenied } from "./denylist";
 import { isTokenVersionCurrent } from "./token-version";
@@ -38,5 +39,21 @@ export async function requireAuth(req: AuthRequest): Promise<AccessClaims> {
 export async function requireRole(req: AuthRequest, roles: readonly Role[]): Promise<AccessClaims> {
   const claims = await requireAuth(req);
   if (!roles.includes(claims.role)) throw new ForbiddenError();
+  return claims;
+}
+
+/**
+ * E-postası doğrulanmış oturum zorunlu (v4#6): rezervasyon, ödeme, yorum, devir ve
+ * ajan checkout gibi para/itibar etkili işlemler. Oturum yoksa 401; kullanıcı yoksa
+ * veya `emailVerifiedAt` boşsa 403 `EMAIL_NOT_VERIFIED`. Durum her istekte DB'den
+ * okunur (token'a gömülmez) — doğrulama sonrası yeniden giriş gerekmez.
+ */
+export async function requireVerifiedEmail(req: AuthRequest): Promise<AccessClaims> {
+  const claims = await requireAuth(req);
+  const user = await prisma.user.findUnique({
+    where: { id: claims.userId },
+    select: { emailVerifiedAt: true },
+  });
+  if (!user?.emailVerifiedAt) throw new EmailNotVerifiedError();
   return claims;
 }

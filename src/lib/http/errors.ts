@@ -35,6 +35,14 @@ export class ForbiddenError extends HttpError {
   }
 }
 
+/** E-posta adresi doğrulanmamış kullanıcı hassas bir işlem denedi (v4#6). */
+export class EmailNotVerifiedError extends HttpError {
+  constructor(message = "Bu işlem için e-posta adresinizi doğrulamanız gerekiyor") {
+    super(403, "EMAIL_NOT_VERIFIED", message);
+    this.name = "EmailNotVerifiedError";
+  }
+}
+
 export class NotFoundError extends HttpError {
   constructor(message = "Kayıt bulunamadı") {
     super(404, "NOT_FOUND", message);

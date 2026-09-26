@@ -174,6 +174,8 @@ const schema = z.object({
   RATE_LIMIT_AI_MAX: int(20, 1),
   /** MCP HTTP ve ajan checkout uçları (`/api/mcp`, `/api/agentic`) — fail-closed. */
   RATE_LIMIT_AGENTIC_MAX: int(30, 1),
+  /** IP bilinmeyen anonimlerin paylaştığı `anon` kovasının limit çarpanı (v4#4). */
+  RATE_LIMIT_ANON_SHARED_MULTIPLIER: int(20, 1, 1000),
 
   // Canlı ısı haritası (SSE)
   LIVE_MAX_RANGE_DAYS: int(60, 1, 366),

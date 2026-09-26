@@ -1,22 +1,24 @@
 import type { NextRequest } from "next/server";
 import { getAuth } from "@/lib/auth";
 import { getConfig } from "@/lib/config/app-config";
-import { clientKey } from "@/lib/security/ip";
+import { anonymousIdentities } from "@/lib/security/ip";
 import { runWithLlmSubject } from "@/lib/llm/budget";
 
 /**
  * AI uçları için ortak yardımcılar.
- *  - Bütçe öznesi: oturum varsa `u:<id>`, yoksa istemci anahtarı (IP / parmak izi).
+ *  - Bütçe öznesi: oturum varsa `u:<id>`, yoksa güvenilir IP kovası; IP
+ *    bilinmiyorsa paylaşılan `anon` bütçesi (UA değiştirerek sıfırlanamaz, v4#4).
  *  - `ai_generated: true` (AI Act Md. 50) — her AI çıktısı API'de işaretlenir.
  */
 async function aiSubject(req: NextRequest): Promise<string> {
   const claims = await getAuth(req);
   if (claims) return `u:${claims.userId}`;
   const config = getConfig();
-  return clientKey(req.headers, {
+  return anonymousIdentities(req.headers, {
     trustedProxyHops: config.TRUSTED_PROXY_HOPS,
     trustRealIpHeader: config.TRUST_REAL_IP_HEADER,
-  });
+    socketIp: (req as unknown as { ip?: string }).ip,
+  }).primary;
 }
 
 /** `fn` içindeki LLM çağrılarını isteğin öznesine faturalar. */

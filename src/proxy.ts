@@ -6,7 +6,7 @@ import { isTokenVersionCurrent } from "@/lib/auth/token-version";
 import { ACCESS_COOKIE, REFRESH_COOKIE } from "@/lib/auth/cookies";
 import { redis } from "@/lib/redis";
 import { getConfig } from "@/lib/config/app-config";
-import { clientKey } from "@/lib/security/ip";
+import { anonymousIdentities, SHARED_ANON_KEY } from "@/lib/security/ip";
 import { categorize, checkRateLimit } from "@/lib/security/rate-limit";
 import {
   allowedOriginsFromEnv,
@@ -57,18 +57,31 @@ async function handleApi(req: NextRequest, requestHeaders: Headers, requestId: s
   const responseHeaders = new Headers({ "x-request-id": requestId });
 
   // 1) Rate-limit — kimlik yalnızca doğrulanmış kaynaklardan.
-  // IP bilinmiyorsa anonimler tek kovaya değil parmak izi kovalarına düşer (v3#3).
-  const identity = claims
-    ? `u:${claims.userId}`
-    : clientKey(req.headers, {
+  // Anonimde anahtar soket/güvenilir-proxy IP'sidir (IPv6 /64). IP bilinmiyorsa
+  // paylaşılan `anon` kovası birincildir; UA parmak izi yalnızca ikincil, daha dar
+  // bir kovadır — UA değiştirmek toplam kotayı büyütmez (v4#4).
+  const category = categorize(pathname);
+  const identities = claims
+    ? { primary: `u:${claims.userId}`, secondary: null }
+    : anonymousIdentities(req.headers, {
         trustedProxyHops: config.TRUSTED_PROXY_HOPS,
         trustRealIpHeader: config.TRUST_REAL_IP_HEADER,
+        socketIp: (req as unknown as { ip?: string }).ip,
       });
-  const decision = await checkRateLimit(redis, {
-    category: categorize(pathname),
-    identity,
+  let decision = await checkRateLimit(redis, {
+    category,
+    identity: identities.primary,
     config,
+    limitMultiplier:
+      identities.primary === SHARED_ANON_KEY ? config.RATE_LIMIT_ANON_SHARED_MULTIPLIER : 1,
   });
+  if (identities.secondary && decision.allowed && !decision.unavailable) {
+    decision = await checkRateLimit(redis, {
+      category,
+      identity: identities.secondary,
+      config,
+    });
+  }
   responseHeaders.set("X-RateLimit-Limit", String(decision.limit));
   responseHeaders.set("X-RateLimit-Remaining", String(decision.remaining));
   responseHeaders.set("X-RateLimit-Reset", String(decision.resetSeconds));

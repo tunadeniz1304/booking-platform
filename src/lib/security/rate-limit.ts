@@ -8,8 +8,9 @@ import type { AppConfig } from "@/lib/config/app-config";
  * güvenilir proxy zincirinden çözülen IP. İstemcinin gönderdiği `x-user-id`
  * gibi başlıklar asla anahtara girmez (atlatma önlenir).
  *
- * Redis hatasında hassas kategoriler (auth, booking, payment, agentic) fail-CLOSED,
- * diğerleri fail-open davranır.
+ * Redis hatasında hassas kategoriler (auth, booking, payment, agentic, ai) fail-CLOSED,
+ * diğerleri fail-open davranır. `ai` ölçülmeyen LLM harcamasına kapı açmamak için
+ * kapalı kalır (v4#4).
  */
 
 export type RateLimitCategory =
@@ -20,6 +21,7 @@ const SENSITIVE: ReadonlySet<RateLimitCategory> = new Set([
   "booking",
   "payment",
   "agentic",
+  "ai",
 ]);
 
 export function categorize(pathname: string): RateLimitCategory {
@@ -82,10 +84,17 @@ export interface RateLimitDecision {
 
 export async function checkRateLimit(
   redis: Pick<RedisClient, "incrWithTtl">,
-  input: { category: RateLimitCategory; identity: string; config: AppConfig; now?: number }
+  input: {
+    category: RateLimitCategory;
+    identity: string;
+    config: AppConfig;
+    now?: number;
+    /** Paylaşılan anonim kova gibi çok istemcili kimlikler için limit çarpanı. */
+    limitMultiplier?: number;
+  }
 ): Promise<RateLimitDecision> {
   const { category, identity, config } = input;
-  const limit = limitFor(category, config);
+  const limit = limitFor(category, config) * Math.max(1, input.limitMultiplier ?? 1);
   const window = config.RATE_LIMIT_WINDOW_SECONDS;
   const nowSeconds = Math.floor((input.now ?? Date.now()) / 1000);
   const bucket = Math.floor(nowSeconds / window);

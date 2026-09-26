@@ -94,6 +94,13 @@ export interface RefundJournalInput {
   /** Bu iadeden önce aynı ödemeden iade edilmiş toplam. */
   refundedBeforeMinor?: bigint;
   occurredAt?: Date;
+  /** P1-7: iadenin gideceği yer — kart (`psp`, varsayılan) ya da misafir kredisi. */
+  to?: "psp" | "guest_credit";
+  /**
+   * P1-7: tahsilatta yazılmış vergi payı (verilmezse `priceBreakdown`'dan `grossMinor` için
+   * hesaplanır). Kredi harcamasının vergisi fark yöntemiyle yazıldığından iadesi bunu kullanır.
+   */
+  capturedTaxMinor?: bigint;
 }
 
 /**
@@ -188,7 +195,7 @@ export async function postRefundFromEscrow(
     select: { id: true },
   });
   if (existing) return { entryId: existing.id, created: false };
-  const capturedTax = taxShareMinor(i.priceBreakdown, i.grossMinor);
+  const capturedTax = i.capturedTaxMinor ?? taxShareMinor(i.priceBreakdown, i.grossMinor);
   const taxMinor = refundTaxMinor(
     capturedTax,
     i.grossMinor,
@@ -204,7 +211,7 @@ export async function postRefundFromEscrow(
     currency: i.currency,
     amountMinor: i.refundMinor,
     taxMinor,
-    to: "psp" as const,
+    to: i.to ?? ("psp" as const),
     occurredAt: i.occurredAt,
   };
   if (!released) return postJournal(tx, refundIssued({ ...base, from: "escrow" }));

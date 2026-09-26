@@ -12,6 +12,8 @@ export const EventTypes = {
   BookingCancelled: "booking.cancelled",
   BookingExpired: "booking.expired",
   BookingTransferred: "booking.transferred",
+  /** P1-7: yerel çıkış saati geçti → COMPLETED (sadakat seviyesi + cashback tüketicisi). */
+  BookingCompleted: "booking.completed",
   PropertyCreated: "property.created",
   PropertyAvailabilityChanged: "property.availability_changed",
   DemandSignalChanged: "demand.signal_changed",
@@ -67,6 +69,11 @@ export interface BookingConfirmedPayload extends BookingRef {
   totalMinor: number;
   currency: string;
   paymentId: string;
+}
+
+export interface BookingCompletedPayload extends BookingRef {
+  /** COMPLETED geçiş anı (ISO); cashback vadesi bundan hesaplanır. */
+  completedAt: string;
 }
 
 export interface BookingCancelledPayload extends BookingRef {

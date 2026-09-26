@@ -36,6 +36,16 @@ import { consumeStepUp, hasStepUpPasskey, type StepUpBinding } from "@/lib/auth/
 import { getConfig } from "@/lib/config/app-config";
 import { getQueue, QUEUE_NAMES } from "@/lib/queue";
 import { postBookingCapture, postRefundFromEscrow } from "@/lib/ledger";
+import {
+  activeCreditSpend,
+  refundBookingCreditInTx,
+  releaseBookingCredit,
+  releaseBookingCreditInTx,
+  reserveBookingCreditInTx,
+  reserveCreditForCheckout,
+  settleBookingCreditInTx,
+} from "@/lib/wallet/wallet-service";
+import { splitRefund as splitCardCreditRefund } from "@/lib/wallet/rules";
 
 /** BullMQ `refund-retry` kuyruğundaki iş adı (v4#7). */
 export const REFUND_RETRY_JOB = "refund-retry";
@@ -120,7 +130,16 @@ export class WebhookMismatchError extends HttpError {
 }
 
 export type PayOutcome =
-  | { status: "confirmed"; bookingId: string; paymentId: string; amount: number; currency: string }
+  | {
+      status: "confirmed";
+      bookingId: string;
+      paymentId: string;
+      /** Kartla tahsil edilen tutar (P1-7: kredi kullanıldıysa toplam − kredi). */
+      amount: number;
+      currency: string;
+      /** P1-7: cüzdan kredisiyle ödenen kısım (minor-unit). */
+      creditMinor?: number;
+    }
   | { status: "requires_action"; bookingId: string; challenge: PaymentChallenge };
 
 interface PayableBooking {
@@ -138,6 +157,8 @@ interface PayableBooking {
   payment: { id: string; status: PaymentStatus; providerRef: string | null } | null;
   /** P1-1: sepet kalemi → ödeme yalnızca sepet üzerinden (`/api/cart/pay`). */
   cartId: string | null;
+  /** P1-7: etkin (RESERVED | SPENT) kredi harcaması; kart tutarı = toplam − kredi. */
+  creditMinor: bigint;
 }
 
 async function loadPayable(bookingId: string, userId: string): Promise<PayableBooking> {
@@ -161,7 +182,20 @@ async function loadPayable(bookingId: string, userId: string): Promise<PayableBo
   });
   // IDOR: başkasının rezervasyonu "bulunamadı"
   if (!booking || booking.userId !== userId) throw new BookingNotFoundError();
-  return booking;
+  const spend = await activeCreditSpend(prisma, bookingId);
+  return { ...booking, creditMinor: spend?.amountMinor ?? 0n };
+}
+
+/** Kartla tahsil edilecek tutar: toplam − kullanılan kredi (P1-7). */
+function chargeOf(booking: {
+  totalPriceMinor: bigint;
+  currency: string;
+  creditMinor: bigint;
+}): Money {
+  return amountOf({
+    totalPriceMinor: booking.totalPriceMinor - booking.creditMinor,
+    currency: booking.currency,
+  });
 }
 
 function amountOf(booking: { totalPriceMinor: bigint; currency: string }): Money {
@@ -185,11 +219,12 @@ async function transitionPayment(
   },
   where: { providerRef?: string } = {}
 ): Promise<string | null> {
-  const amount = amountOf(booking);
+  const amount = chargeOf(booking);
   const provider = getPaymentProvider().name;
+  // Açık satırın tutarı da güncellenir (P1-7: yeniden denemede kredi payı değişmiş olabilir).
   const updated = await prisma.payment.updateMany({
     where: { bookingId: booking.id, status: { in: [...from] }, ...where },
-    data: { ...data, provider },
+    data: { ...data, provider, amountMinor: minorToDb(amount.amount) },
   });
   if (updated.count === 1) {
     const row = await prisma.payment.findUniqueOrThrow({
@@ -317,6 +352,15 @@ const PAYMENT_SAGA_STEPS: SagaStep<PaymentSagaCtx, PayOutcome>[] = [
     compensate: (ctx) => releaseHold(ctx.booking.id),
   },
   {
+    name: SAGA_STEPS.credit,
+    // P1-7: kredi rezervi saga öncesi (provizyondan önce) alındı; adım yalnızca telafiyi taşır.
+    run: async () => undefined,
+    compensate: async (ctx) => {
+      if (ctx.booking.creditMinor <= 0n) return false;
+      await releaseBookingCredit(ctx.booking.id, "payment_failed");
+    },
+  },
+  {
     name: SAGA_STEPS.authorize,
     // Provizyon PSP'de saga öncesi alındı (3DS olabilir); adım yalnızca telafiyi taşır.
     run: async () => undefined,
@@ -405,6 +449,7 @@ const PAYMENT_SAGA_STEPS: SagaStep<PaymentSagaCtx, PayOutcome>[] = [
           paymentId,
           amount: ctx.amount.amount,
           currency: ctx.amount.currency,
+          ...creditField(ctx.booking.creditMinor),
         },
       };
     },
@@ -420,7 +465,7 @@ async function captureAndConfirm(
   const ctx: PaymentSagaCtx = {
     booking,
     providerRef,
-    amount: amountOf(booking),
+    amount: chargeOf(booking),
     claimFrom,
     claimed: false,
     captured: false,
@@ -437,6 +482,10 @@ async function captureAndConfirm(
   }
 }
 
+function creditField(creditMinor: bigint): { creditMinor?: number } {
+  return creditMinor > 0n ? { creditMinor: minorFromDb(creditMinor) } : {};
+}
+
 /** Rezervasyon başka bir ödemeyle onaylandıysa onu (idempotent sonuç) döner. */
 async function alreadyConfirmed(bookingId: string, userId: string): Promise<PayOutcome> {
   const fresh = await loadPayable(bookingId, userId);
@@ -445,13 +494,14 @@ async function alreadyConfirmed(bookingId: string, userId: string): Promise<PayO
     fresh.payment &&
     SETTLED_STATUSES.includes(fresh.payment.status)
   ) {
-    const amount = amountOf(fresh);
+    const amount = chargeOf(fresh);
     return {
       status: "confirmed",
       bookingId,
       paymentId: fresh.payment.id,
       amount: amount.amount,
       currency: amount.currency,
+      ...creditField(fresh.creditMinor),
     };
   }
   throw new PaymentInProgressError();
@@ -493,6 +543,14 @@ export async function confirmInTransaction(
   const payment = await tx.payment.findUniqueOrThrow({
     where: { bookingId: booking.id },
     select: { id: true, amountMinor: true },
+  });
+  // P1-7: kredi payı (RESERVED → SPENT + creditSpent jurnali); kart + kredi = toplam değilse 409.
+  await settleBookingCreditInTx(tx, {
+    bookingId: booking.id,
+    totalMinor: booking.totalPriceMinor,
+    cardMinor: payment.amountMinor,
+    priceBreakdown: booking.priceBreakdown,
+    currency: booking.currency,
   });
   await applyConfirmation(tx, booking, next, payment, providerRef);
   return payment.id;
@@ -565,12 +623,14 @@ export async function applyConfirmation(
     units: booking.units,
   });
   const amount = amountOf(booking);
+  // Eski defter PSP tahsilatını izler (P1-7: kredi payı hariç; tek kart ödemesinde = toplam).
+  const legacyCharge = minorToDb(amount.amount);
   await tx.ledgerEntry.create({
     data: {
       bookingId: booking.id,
       userId: booking.userId,
       kind: "CHARGE",
-      amountMinor: minorToDb(amount.amount),
+      amountMinor: payment.amountMinor < legacyCharge ? payment.amountMinor : legacyCharge,
       currency: amount.currency,
       reference: providerRef,
     },
@@ -696,6 +756,8 @@ export async function payForBooking(input: {
   idempotencyKey: string;
   /** Passkey step-up token'ı (v4#2): bu rezervasyon + tutara bağlı, tek kullanımlık. */
   stepUpToken?: string | null;
+  /** P1-7: cüzdan kredisinden kullanılacak tutar (minor-unit; 0/yok → yalnız kart). */
+  creditMinor?: number;
   /** Risk sinyalleri (route'tan): istemci anahtarı ve ülke bilgisi. */
   context?: {
     ip?: string;
@@ -793,17 +855,36 @@ async function payLocked(input: Parameters<typeof payForBooking>[0]): Promise<Pa
     });
   }
 
-  const result: AuthorizeResult = await getPaymentProvider().authorize({
-    amount: amountOf(booking),
-    cardToken: input.cardToken,
-    idempotencyKey: `auth:${booking.id}:${input.idempotencyKey}`,
-    metadata: {
+  // P1-7 saga adımı "credit": kart provizyonundan ÖNCE kredi rezervi (FIFO lot, FOR UPDATE).
+  booking.creditMinor = BigInt(
+    await reserveCreditForCheckout({
       bookingId: booking.id,
-      ...(gate === "force_3ds" || gate === "fallback_3ds" ? { force3ds: "1" } : {}),
-    },
-  });
+      userId: input.userId,
+      currency: booking.currency,
+      totalMinor: minorFromDb(booking.totalPriceMinor),
+      creditMinor: input.creditMinor ?? 0,
+    })
+  );
+
+  let result: AuthorizeResult;
+  try {
+    result = await getPaymentProvider().authorize({
+      amount: chargeOf(booking),
+      cardToken: input.cardToken,
+      idempotencyKey: `auth:${booking.id}:${input.idempotencyKey}:${booking.creditMinor}`,
+      metadata: {
+        bookingId: booking.id,
+        ...(gate === "force_3ds" || gate === "fallback_3ds" ? { force3ds: "1" } : {}),
+      },
+    });
+  } catch (error) {
+    await releaseBookingCredit(booking.id, "authorize_failed");
+    throw error;
+  }
 
   if (result.status === "declined") {
+    // Kart reddi → kredi geri (saga dışı: provizyon hiç alınmadı).
+    await releaseBookingCredit(booking.id, "card_declined");
     await transitionPayment(booking, OPEN_STATUSES, {
       status: PaymentStatus.FAILED,
       providerRef: result.providerRef,
@@ -882,6 +963,7 @@ export async function confirmPaymentChallenge(input: {
         { status: PaymentStatus.FAILED, failureCode: code },
         { providerRef: ref }
       );
+      await releaseBookingCredit(booking.id, "challenge_failed");
       paymentsTotal.inc({ outcome: "declined" });
       await recordFailedAttempt(booking);
       throw new PaymentDeclinedError(code);
@@ -1094,6 +1176,24 @@ async function reconcileLateSuccess(
       if (reopened.count !== 1) {
         throw new ConflictError("Rezervasyon eşzamanlı olarak değişti", "CONCURRENT_UPDATE");
       }
+      // P1-7: süre dolumunda bırakılan kredi payı yeniden rezerve edilir (yetmezse 409 → iade).
+      const late = await tx.payment.findFirst({
+        where: { bookingId: booking.id, providerRef },
+        select: { amountMinor: true, userId: true },
+      });
+      const full = await tx.booking.findUniqueOrThrow({
+        where: { id: booking.id },
+        select: { totalPriceMinor: true, currency: true, userId: true },
+      });
+      const creditGap = late ? full.totalPriceMinor - late.amountMinor : 0n;
+      if (creditGap > 0n && !(await activeCreditSpend(tx, booking.id))) {
+        await reserveBookingCreditInTx(tx, {
+          bookingId: booking.id,
+          userId: full.userId,
+          currency: full.currency,
+          amountMinor: minorFromDb(creditGap),
+        });
+      }
       // Bu providerRef'in ödeme satırı (süresi dolunca açık kalmış) tahsil hakkını alır.
       await tx.payment.updateMany({
         where: { bookingId: booking.id, providerRef, status: { in: OPEN_STATUSES } },
@@ -1241,13 +1341,26 @@ async function cancelLocked(
     }
     const currency = assertCurrency(booking.currency);
     const target = refundTarget(booking, currency);
-    const paidMinor = booking.payment?.status === PaymentStatus.PAID ? target.refundableMinor : 0;
+    const cardPaidMinor =
+      booking.payment?.status === PaymentStatus.PAID ? target.refundableMinor : 0;
+    // P1-7: krediyle ödenen kısım da iade politikasına girer (devredilmiş rezervasyonda
+    // iade alıcının kart ödemesine gider; satıcının kredisi devir bedeliyle karşılandı).
+    const spend = await activeCreditSpend(tx, booking.id);
+    const ownPayment = target.providerRef === pspRefOf(booking.payment);
+    const creditPaidMinor =
+      spend?.status === "SPENT" && cardPaidMinor > 0 && ownPayment
+        ? minorFromDb(spend.amountMinor - spend.refundedMinor)
+        : 0;
+    const paidMinor = cardPaidMinor + creditPaidMinor;
     const decision = computeRefund(
       parseSnapshot(booking.policySnapshot),
       { checkIn: fromDate(booking.checkIn), createdAt: booking.createdAt, paidMinor, currency },
       now,
       clockOf(booking.property)
     );
+    // İade simetrisi: kart/kredi ödendikleri oranda (tek yuvarlama `allocateMinor`).
+    const parts = splitCardCreditRefund(decision.refundMinor, cardPaidMinor, creditPaidMinor);
+    const cardRefundMinor = parts.cardMinor;
 
     const updated = await tx.booking.updateMany({
       where: { id: booking.id, status: booking.status, version: booking.version },
@@ -1269,22 +1382,34 @@ async function cancelLocked(
           where: { bookingId: booking.id },
           data: {
             status:
-              decision.refundMinor === paidMinor && paidMinor > 0
+              cardRefundMinor === cardPaidMinor && cardPaidMinor > 0
                 ? PaymentStatus.REFUNDED
-                : decision.refundMinor > 0
+                : cardRefundMinor > 0
                   ? PaymentStatus.PARTIALLY_REFUNDED
                   : PaymentStatus.PAID,
-            refundedAmountMinor: minorToDb(decision.refundMinor),
-            refundedAt: decision.refundMinor > 0 ? now : null,
+            refundedAmountMinor: minorToDb(cardRefundMinor),
+            refundedAt: cardRefundMinor > 0 ? now : null,
           },
         });
-        if (decision.refundMinor > 0) {
+        if (parts.creditMinor > 0) {
+          await refundBookingCreditInTx(
+            tx,
+            {
+              bookingId: booking.id,
+              paymentId: booking.payment.id,
+              refundMinor: parts.creditMinor,
+              priceBreakdown: booking.priceBreakdown,
+            },
+            now
+          );
+        }
+        if (cardRefundMinor > 0) {
           await tx.ledgerEntry.create({
             data: {
               bookingId: booking.id,
               userId: booking.userId,
               kind: "REFUND",
-              amountMinor: minorToDb(decision.refundMinor),
+              amountMinor: minorToDb(cardRefundMinor),
               currency,
               reference: target.providerRef,
             },
@@ -1298,7 +1423,7 @@ async function cancelLocked(
             payment: {
               id: booking.payment.id,
               amountMinor: booking.payment.amountMinor,
-              refundedAmountMinor: minorToDb(decision.refundMinor),
+              refundedAmountMinor: minorToDb(cardRefundMinor),
             },
             currency,
             occurredAt: now,
@@ -1309,12 +1434,14 @@ async function cancelLocked(
             splitRefund = await allocateSplitRefundInTx(tx, {
               cartPaymentId: booking.payment.cartPayment.id,
               bookingId: booking.id,
-              refundMinor: decision.refundMinor,
+              refundMinor: cardRefundMinor,
               currency,
             });
           }
         }
       } else if (booking.payment.status !== PaymentStatus.FAILED) {
+        // Ödenmemiş (HELD) rezervasyonun kredi rezervi geri.
+        await releaseBookingCreditInTx(tx, booking.id, "cancelled", now);
         await tx.payment.update({
           where: { bookingId: booking.id },
           data: { status: PaymentStatus.VOIDED },
@@ -1322,6 +1449,7 @@ async function cancelLocked(
       }
     }
 
+    if (!booking.payment) await releaseBookingCreditInTx(tx, booking.id, "cancelled", now);
     await appendOutbox(
       tx,
       makeEvent<BookingCancelledPayload>(EventTypes.BookingCancelled, booking.id, "booking", {
@@ -1336,10 +1464,10 @@ async function cancelLocked(
         reason: decision.reason,
       })
     );
-    return { booking, decision, currency, next, target };
+    return { booking, decision, currency, next, target, cardRefundMinor };
   });
 
-  const { booking, decision, currency, target } = result;
+  const { booking, decision, currency, target, cardRefundMinor } = result;
   const provider = getPaymentProvider();
   if (splitRefund) {
     try {
@@ -1354,10 +1482,10 @@ async function cancelLocked(
     }
   } else if (pspRefOf(booking.payment)) {
     try {
-      if (decision.refundMinor > 0 && target.providerRef) {
+      if (cardRefundMinor > 0 && target.providerRef) {
         await provider.refund(
           target.providerRef,
-          money(decision.refundMinor, currency),
+          money(cardRefundMinor, currency),
           `refund:${booking.id}`
         );
       } else if (

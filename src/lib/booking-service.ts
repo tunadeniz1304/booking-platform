@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { redis } from "@/lib/redis";
 import { invalidatePropertySearchCache } from "@/lib/search";
 import { createRedlock, LockError } from "@/lib/distributed-lock/redlock";
+import { releaseBookingCreditInTx } from "@/lib/wallet/wallet-service";
 import { appendOutbox } from "@/lib/cqrs";
 import {
   EventTypes,
@@ -688,6 +689,7 @@ export async function cancelBooking(bookingId: string, userId: string): Promise<
       throw new BookingConflictError("Rezervasyon eşzamanlı olarak değişti", "CONCURRENT_UPDATE");
     }
     await releaseInventory(tx, booking);
+    await releaseBookingCreditInTx(tx, booking.id, "cancelled");
 
     await appendOutbox(
       tx,
@@ -761,6 +763,8 @@ export async function expireHolds(now: Date = new Date(), limit = 100): Promise<
       });
       if (updated.count !== 1) continue;
       await releaseInventoryOrSkipDrift(tx, booking);
+      // P1-7: ödenmeden düşen tutmanın kredi rezervi geri.
+      await releaseBookingCreditInTx(tx, booking.id, "hold_timeout", now);
       await appendOutbox(
         tx,
         makeEvent<BookingExpiredPayload>(EventTypes.BookingExpired, booking.id, "booking", {
@@ -852,6 +856,7 @@ export async function releaseHold(bookingId: string): Promise<boolean> {
     });
     if (updated.count !== 1) return null;
     await releaseInventory(tx, booking);
+    await releaseBookingCreditInTx(tx, booking.id, "payment_failed");
     await appendOutbox(
       tx,
       makeEvent<BookingExpiredPayload>(EventTypes.BookingExpired, booking.id, "booking", {

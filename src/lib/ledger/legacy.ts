@@ -99,6 +99,8 @@ async function deriveFromJournal(db: Db, bookingId: string): Promise<LedgerViewR
   const out: LedgerViewRow[] = [];
   for (const e of entries) {
     const psp = e.lines.find((l) => l.account.kind === "PSP_CLEARING");
+    // P1-7: krediye yapılan iade (Cr guest_credit) PSP parası değildir → eski görünümde yok.
+    if (e.kind === JournalKinds.RefundIssued && !psp) continue;
     const any = psp ?? e.lines[0];
     const currency = any.currency;
     const sumSide = (side: "DEBIT" | "CREDIT") =>

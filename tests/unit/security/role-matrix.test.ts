@@ -63,6 +63,8 @@ import * as adminClaims from "@/app/api/admin/claims/route";
 import * as adminClaimDecision from "@/app/api/admin/claims/[id]/decision/route";
 import * as hostDeposit from "@/app/api/host/properties/[id]/deposit/route";
 import * as account from "@/app/api/account/route";
+import * as accountWallet from "@/app/api/account/wallet/route";
+import * as bookingCredit from "@/app/api/bookings/[id]/credit/route";
 import * as listingCopy from "@/app/api/ai/listing-copy/route";
 import * as mailbox from "@/app/api/dev/mailbox/route";
 import * as cart from "@/app/api/cart/route";
@@ -155,6 +157,8 @@ const MATRIX: Array<[string, string, Handler, Role[]]> = [
     ["ADMIN"],
   ],
   ["GET /api/account/sessions", "GET", accountSessions.GET as unknown as Handler, ALL],
+  ["GET /api/account/wallet", "GET", accountWallet.GET as unknown as Handler, ALL],
+  ["GET /api/bookings/[id]/credit", "GET", bookingCredit.GET as unknown as Handler, ALL],
   ["GET /api/account/identity", "GET", accountIdentity.GET as unknown as Handler, ALL],
   ["GET /api/host/trust/party-risk", "GET", hostPartyRisk.GET as unknown as Handler, HOST_ADMIN],
   ["GET /api/admin/takedowns", "GET", adminTakedowns.GET as unknown as Handler, ["ADMIN"]],

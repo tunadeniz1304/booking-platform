@@ -1,5 +1,8 @@
 import { BookingStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { appendOutbox } from "@/lib/cqrs";
+import { withSerializableRetry } from "@/lib/db/transactions";
+import { EventTypes, makeEvent, type BookingCompletedPayload } from "@/lib/events/events";
 import { transition, type BookingState } from "@/lib/booking/state-machine";
 import { checkOutAt, clockOf, fromDate } from "@/lib/time/nights";
 import { logger } from "@/lib/observability/logger";
@@ -14,7 +17,8 @@ const completedTotal = counter("booking_completed_total", "COMPLETED yapılan ko
  * Aday seçimi kaba bir UTC ön filtresiyle (çıkış günü ≤ bugün + 1) yapılır; kesin karar her
  * rezervasyon için tesisin saat diliminde `checkOutAt` ile verilir (Tokyo 11:00 ≠ New York
  * 11:00). Geçiş `status + version` koşulludur → birden çok işçi güvenle çalışır; idempotent.
- * Envanter değişmez (satılan gece zaten geçmişte kaldı).
+ * Envanter değişmez (satılan gece zaten geçmişte kaldı). P1-7: geçişle AYNI işlemde outbox
+ * `booking.completed` yazılır (sadakat seviyesi + cashback tüketicisi).
  */
 export async function completeStays(now: Date = new Date(), limit = 500): Promise<number> {
   const horizon = new Date(now.getTime() + 36 * 3_600_000);
@@ -23,6 +27,10 @@ export async function completeStays(now: Date = new Date(), limit = 500): Promis
     select: {
       id: true,
       version: true,
+      userId: true,
+      propertyId: true,
+      roomId: true,
+      checkIn: true,
       checkOut: true,
       property: { select: { timeZone: true, checkInTime: true, checkOutTime: true } },
     },
@@ -33,11 +41,27 @@ export async function completeStays(now: Date = new Date(), limit = 500): Promis
   for (const b of candidates) {
     if (checkOutAt(fromDate(b.checkOut), clockOf(b.property)).getTime() > now.getTime()) continue;
     const next = transition(BookingStatus.CONFIRMED as BookingState, "COMPLETE");
-    const res = await prisma.booking.updateMany({
-      where: { id: b.id, status: BookingStatus.CONFIRMED, version: b.version },
-      data: { status: next as BookingStatus, version: { increment: 1 } },
+    const count = await withSerializableRetry(async (tx) => {
+      const res = await tx.booking.updateMany({
+        where: { id: b.id, status: BookingStatus.CONFIRMED, version: b.version },
+        data: { status: next as BookingStatus, version: { increment: 1 } },
+      });
+      if (res.count !== 1) return 0;
+      await appendOutbox(
+        tx,
+        makeEvent<BookingCompletedPayload>(EventTypes.BookingCompleted, b.id, "booking", {
+          bookingId: b.id,
+          propertyId: b.propertyId,
+          roomId: b.roomId,
+          checkIn: fromDate(b.checkIn),
+          checkOut: fromDate(b.checkOut),
+          userId: b.userId,
+          completedAt: now.toISOString(),
+        })
+      );
+      return 1;
     });
-    completed += res.count;
+    completed += count;
   }
   if (completed > 0) {
     completedTotal.inc(completed);

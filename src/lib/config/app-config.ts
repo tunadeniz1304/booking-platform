@@ -20,6 +20,28 @@ const int = (def: number, min?: number, max?: number) => {
   if (max !== undefined) s = s.max(max);
   return s.default(def);
 };
+/**
+ * "0,2,5,10" → [0,2,5,10]: `n` adet negatif olmayan tamsayı; `increasing` → ilk değer 0 ve
+ * kesin artan (seviye eşikleri), değilse azalmayan (seviye avantajları).
+ */
+const csvInts = (def: string, n: number, increasing: boolean) =>
+  z
+    .string()
+    .default(def)
+    .transform((v) => v.split(",").map((x) => Number(x.trim())))
+    .refine(
+      (a) =>
+        a.length === n &&
+        (!increasing || a[0] === 0) &&
+        a.every(
+          (x, i) =>
+            Number.isSafeInteger(x) &&
+            x >= 0 &&
+            (i === 0 || (increasing ? x > a[i - 1] : x >= a[i - 1]))
+        ),
+      `${n} adet negatif olmayan sıralı tamsayı (virgülle) olmalı`
+    );
+
 const bool = (def: boolean) =>
   z
     .enum(["true", "false", "1", "0"])
@@ -178,6 +200,20 @@ const schema = z.object({
   CLAIM_EVIDENCE_MAX_PIXELS: int(40_000_000, 10_000, 268_402_689),
   CLAIM_EVIDENCE_MAX_EDGE_PX: int(2560, 256, 8192),
   CLAIM_EVIDENCE_MAX_FILES: int(10, 1, 50),
+
+  // Sadakat & cüzdan (P1-7, ADR 0020 §Kredi)
+  /** Seviye eşikleri: tamamlanan konaklama sayısı (4 seviye, 0 ile başlar, artan). */
+  LOYALTY_TIER_THRESHOLDS: csvInts("0,2,5,10", 4, true),
+  /** Seviye başına cashback (baz puan; 100 = %1, en fazla 10000), eşiklerle aynı sırada. */
+  LOYALTY_CASHBACK_BPS: csvInts("100,200,300,500", 4, false),
+  /** Konaklama tamamlandıktan bu kadar gün sonra (iade/talep penceresi) cashback krediye döner. */
+  LOYALTY_CASHBACK_DELAY_DAYS: int(14, 0, 365),
+  /** Kredi lot'unun geçerlilik süresi (gün). */
+  WALLET_CREDIT_TTL_DAYS: int(365, 1, 3650),
+  /** Krediyle kısmi ödemede kartla ödenecek asgari tutar (minor-unit; tam kredi ödemesi yok). */
+  WALLET_MIN_CARD_MINOR: int(100, 1, 1_000_000),
+  /** Cashback verme + kredi süre dolumu işinin cron'u (UTC). */
+  WALLET_SWEEP_CRON: z.string().min(1).default("*/30 * * * *"),
 
   // PWA + Web Push (P1-12)
   /** VAPID anahtar çifti (base64url) ve iletişim (`mailto:` / `https:`); biri eksikse push kapalı. */

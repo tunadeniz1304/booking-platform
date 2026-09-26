@@ -23,6 +23,8 @@ export const PAYMENT_SAGA = "booking_payment";
 export const FULFILMENT_SAGA = "booking_fulfilment";
 export const SAGA_STEPS = {
   hold: "hold",
+  /** P1-7: cüzdan kredisi rezervi (telafi: kredi geri). */
+  credit: "credit",
   authorize: "authorize",
   capture: "capture",
   confirm: "confirm",

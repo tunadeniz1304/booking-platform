@@ -1034,6 +1034,11 @@ async function main() {
     await prisma.claim.deleteMany();
     await prisma.damageDeposit.deleteMany();
     await prisma.damageDepositSetting.deleteMany();
+    // P1-7: cüzdan (harcama dağılımları kaskadla) + cashback + seviye (FK yok; jurnal üstte silindi).
+    await prisma.creditSpend.deleteMany();
+    await prisma.walletCredit.deleteMany();
+    await prisma.loyaltyCashback.deleteMany();
+    await prisma.loyaltyAccount.deleteMany();
     await prisma.payout.deleteMany();
     await prisma.payment.deleteMany();
     await prisma.review.deleteMany();

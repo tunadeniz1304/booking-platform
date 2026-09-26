@@ -26,6 +26,7 @@ export const JournalKinds = {
   TransferSettled: "TRANSFER_SETTLED",
   CreditIssued: "CREDIT_ISSUED",
   CreditSpent: "CREDIT_SPENT",
+  CreditExpired: "CREDIT_EXPIRED",
   DepositCaptured: "DEPOSIT_CAPTURED",
 } as const;
 
@@ -370,6 +371,29 @@ export function creditSpent(i: CreditSpentInput): JournalInput {
   );
 }
 
+export interface CreditExpiredInput extends Common {
+  /** Süre dolumu anahtarı (`<lotId>:<önceden düşülen>` — aynı lot'ta tekrar dolum ayrı jurnal). */
+  expiryRef: string;
+  guestId: string;
+  amountMinor: bigint;
+}
+
+/**
+ * Süresi dolan kredi (P1-7): Dr guest_credit / Cr platform_revenue — ikramın (cashback)
+ * kullanılmayan kısmı gelire geri döner (creditIssued'ın tersi, "breakage").
+ */
+export function creditExpired(i: CreditExpiredInput): JournalInput {
+  const amount = positive("amountMinor", i.amountMinor);
+  return entry(
+    i,
+    { idempotencyKey: `credit-expired:${i.expiryRef}`, kind: JournalKinds.CreditExpired },
+    [
+      dr(account.guestCredit(i.guestId), amount, i.currency),
+      cr(account.platformRevenue(), amount, i.currency),
+    ]
+  );
+}
+
 export interface DepositCapturedInput extends Common {
   depositId: string;
   bookingId: string;
@@ -414,5 +438,6 @@ export const post = {
   transferSettled: (tx: Tx, i: TransferSettledInput) => postJournal(tx, transferSettled(i)),
   creditIssued: (tx: Tx, i: CreditIssuedInput) => postJournal(tx, creditIssued(i)),
   creditSpent: (tx: Tx, i: CreditSpentInput) => postJournal(tx, creditSpent(i)),
+  creditExpired: (tx: Tx, i: CreditExpiredInput) => postJournal(tx, creditExpired(i)),
   depositCaptured: (tx: Tx, i: DepositCapturedInput) => postJournal(tx, depositCaptured(i)),
 };

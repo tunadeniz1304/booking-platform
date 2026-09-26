@@ -14,7 +14,9 @@ import {
   type PropertyAvailabilityChangedPayload,
   type PartyRiskFlaggedPayload,
   type ClaimEventPayload,
+  type BookingCompletedPayload,
 } from "./events";
+import { onStayCompleted } from "@/lib/wallet/wallet-service";
 import { notifyAuthEmail, notifyPriceDrop } from "@/lib/notifications/auth-notifications";
 import { upsertPropertyEmbedding } from "@/lib/embedding/backfill";
 import { invalidatePropertySearchCache } from "@/lib/search";
@@ -62,6 +64,7 @@ export const BOOKING_STATE_EVENTS = [
   EventTypes.BookingCancelled,
   EventTypes.BookingExpired,
   EventTypes.BookingTransferred,
+  EventTypes.BookingCompleted,
 ] as const;
 
 /** Boş birim sayısını değiştiren rezervasyon olayları (onay held→sold, boşluk değişmez). */
@@ -122,6 +125,8 @@ export function registerEventHandlers(): void {
   on<ClaimEventPayload>(EventTypes.ClaimResolved, notifyClaimResolved);
   on<NoticeAppealEventPayload>(EventTypes.NoticeAppealReceived, notifyNoticeAppealReceived);
   on<NoticeAppealEventPayload>(EventTypes.NoticeAppealDecided, notifyNoticeAppealDecided);
+  // P1-7: konaklama tamamlandı → sadakat seviyesi + (iade penceresi sonrası) cashback kaydı.
+  on<BookingCompletedPayload>(EventTypes.BookingCompleted, onStayCompleted);
   on<BookingExpiredPayload>(EventTypes.BookingExpired, async (p) => {
     await invalidateStay(p);
     await notifyBookingExpired(p);

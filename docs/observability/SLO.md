@@ -98,16 +98,28 @@ sum by (source) (increase(takedown_sla_breach_total[1h])) > 0
 **İlk müdahale:** `/admin/compliance` kuyruğundaki açık talebi işleyin; ihlal kaydı denetim
 izine (AuditLog) yazılmıştır.
 
-## Saga telafisi (page)
+## Saga telafisi ve ertelenen onay (fix-sweep-3)
 
-`SagaCompensationFailed` — 15 dk içinde herhangi bir `saga_compensation_total{outcome="failed"}`.
-Telafi adımı (PSP iadesi/void'i, tutma serbest bırakma) düştüğünde saga yeniden denemez; PSP'de
-yetkilendirilmiş ya da tahsil edilmiş tutar askıda kalabilir (P2-3 kaos koşusunda 2 sepet
-`CANCELLED` + `CartPayment AUTHORIZED` kaldı).
+`SagaCompensationFailed` (ticket) — 15 dk içinde herhangi bir `saga_compensation_total{outcome="failed"}`.
+Telafi adımı (PSP iadesi/void'i, tutma serbest bırakma) düştüğünde saga artık BullMQ
+`saga-compensation-retry` işini planlar (`saga_compensation_retry_total{outcome="scheduled"}`);
+iş durumu DB'den yeniden kurup aynı idempotent telafileri üstel geri çekilmeyle tekrarlar
+(`SAGA_COMPENSATION_RETRY_MAX_ATTEMPTS`, `SAGA_COMPENSATION_RETRY_BASE_DELAY_MS`).
 
-**İlk müdahale:** logda `saga compensation failed` satırının `saga`/`step`'i → ilgili sepet/
-rezervasyonun `CartPayment`/`Payment` durumu → PSP panelinden void/iade; ardından
-`scripts/load-assert.ts` benzeri mutabakat.
+- `SagaCompensationRetryNotScheduled` (page): telafi düştü ama iş kuyruğa alınamadı.
+- `SagaCompensationRetryExhausted` (page): iş tüm denemelerde düştü; audit
+  `saga.compensation_exhausted` ve BullMQ başarısız listesi (`saga-compensation-retry`) yönetici
+  kuyruğudur.
+
+`ConfirmRetryExhausted` (page) / `ConfirmRetryRefunds` (ticket): sepet / bölünmüş ödeme onayı
+capture sonrası SERIALIZABLE çakışmada kalınca iade edilmez; `CartPayment.failureCode =
+CONFIRM_PENDING`, tutmalar uzatılır ve `confirm-retry` işi onayı yeniden dener
+(`confirm_retry_total{outcome}`: deferred → confirmed | refunded | exhausted_refunded; `exhausted`
+= iş tamamen düştü).
+
+**İlk müdahale:** logda `saga compensation retry exhausted` / `confirm retry exhausted` satırının
+`saga`/`cartId`/`planId`/`bookingId`'si → `CartPayment`/`PaymentShare`/`Payment` durumu → PSP
+panelinden void/iade; ardından `scripts/load-assert.ts` benzeri mutabakat.
 
 ## Para hijyeni alarmları (ticket)
 

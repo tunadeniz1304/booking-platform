@@ -75,12 +75,36 @@ groups:
         annotations:
           summary: "Bölünmüş ödeme planları iptal oluyor (süre sonu ya da onay adımında serileştirme çakışması — abortReason'a bakın)"
       - alert: SagaCompensationFailed
-        # Telafi adımı başarısız (ör. PSP iadesi/void'i düştü) → para PSP'de kalmış olabilir;
-        # saga kendiliğinden yeniden denemez, elle müdahale gerekir (P2-3 kaos koşusu).
+        # Telafi adımı başarısız (ör. PSP iadesi/void'i düştü). fix-sweep-3: saga bunu
+        # `saga-compensation-retry` işine devreder → bilgi/izleme; asıl sayfa aşağıdaki iki kural.
         expr: sum by (saga, step) (increase(saga_compensation_total{outcome="failed"}[15m])) > 0
+        labels: { severity: ticket }
+        annotations:
+          summary: "Saga telafisi başarısız ({{ $labels.saga }}/{{ $labels.step }}) — otomatik yeniden deneme planlandı"
+      - alert: SagaCompensationRetryNotScheduled
+        # Telafi düştü ama yeniden deneme işi kuyruğa alınamadı (Redis/BullMQ) → elle müdahale.
+        expr: >-
+          sum by (saga) (increase(saga_compensation_total{outcome="failed"}[15m])) > 0
+          unless sum by (saga) (increase(saga_compensation_retry_total{outcome="scheduled"}[15m])) > 0
         labels: { severity: page }
         annotations:
-          summary: "Saga telafisi başarısız ({{ $labels.saga }}/{{ $labels.step }}) — PSP'de askıda tutar olabilir, elle iade/void"
+          summary: "Saga telafisi ({{ $labels.saga }}) başarısız ve yeniden deneme planlanamadı — PSP'de askıda tutar olabilir"
+      - alert: SagaCompensationRetryExhausted
+        expr: sum by (saga) (increase(saga_compensation_retry_total{outcome="exhausted"}[30m])) > 0
+        labels: { severity: page }
+        annotations:
+          summary: "Saga telafisi ({{ $labels.saga }}) tüm denemelerde düştü — elle void/iade (audit saga.compensation_exhausted)"
+      - alert: ConfirmRetryRefunds
+        # Capture alınmış ödeme onay kuyruğunda da onaylanamayıp iade edildi (tutma düştü / bütçe bitti).
+        expr: sum(increase(confirm_retry_total{outcome=~"refunded|exhausted_refunded"}[1h])) > 5
+        labels: { severity: ticket }
+        annotations:
+          summary: "Ertelenen ödeme onaylarından saatte 5+ iade — SERIALIZABLE çakışma / envanter baskısı"
+      - alert: ConfirmRetryExhausted
+        expr: sum(increase(confirm_retry_total{outcome="exhausted"}[30m])) > 0
+        labels: { severity: page }
+        annotations:
+          summary: "confirm-retry işi tüm denemelerde düştü — capture alınmış ödeme onaysız/iadesiz kalmış olabilir"
       - alert: PayoutFailures
         expr: sum(increase(payouts_total{outcome=~"failed|error"}[1h])) > 0
         labels: { severity: ticket }

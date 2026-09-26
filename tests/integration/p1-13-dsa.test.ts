@@ -163,6 +163,38 @@ describeInt("P1-13b DSA bildirim-ve-eylem", () => {
     expect(hostMail?.text).toContain("Olgular ve gerekçe / Facts and reasoning");
   });
 
+  it("ilansız bildirim: kaldırma 400, işlem yapmama kararı yalnız bildirene gider", async () => {
+    const created = await noticePost(
+      json("POST", "/api/notices", validNotice({ propertyId: undefined, locale: "en" }))
+    );
+    const { id } = (await created.json()) as { id: string };
+    const decide = (body: unknown) =>
+      decidePost(json("POST", `/api/admin/notices/${id}`, body, adminToken), {
+        params: Promise.resolve({ id }),
+      });
+    expect(
+      (
+        await decide({
+          decision: "REMOVED",
+          ground: "TERMS_OF_SERVICE",
+          facts: "İlana bağlı değil, kaldırılamaz.",
+        })
+      ).status
+    ).toBe(400);
+    expect(
+      (await decide({ decision: "NO_ACTION", facts: "Hukuka aykırılık tespit edilmedi." })).status
+    ).toBe(200);
+    await relayOutbox(200);
+    const mail = await prisma.notification.findUnique({
+      where: { dedupeKey: `dsa.notice_decided:${id}:reporter` },
+    });
+    expect(mail?.subject).toBe("Decision on your notice");
+    expect(mail?.text).toContain("No action was taken on the content.");
+    expect(
+      await prisma.notification.count({ where: { dedupeKey: `dsa.notice_decided:${id}:host` } })
+    ).toBe(0);
+  });
+
   it("şeffaflık raporu JSON/CSV (yalnız ADMIN)", async () => {
     const from = startedAt.toISOString();
     const to = new Date(Date.now() + 60_000).toISOString();

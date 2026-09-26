@@ -6,6 +6,11 @@
  * 2. streamable HTTP (P1-11): `handleMcpHttp`'yi süreç içi geçici bir HTTP sunucusuna
  *    bağlar; token'sız/geçersiz token ile `create_hold` → 401, geçici imzalı token ile
  *    araç listesi. Kimlik doğrulama yalnızca imza kontrolüdür (Redis'e gidilmez).
+ * 3. AP2 mandate (P1-11, §8 madde 6): HTTP üzerinden `checkout_stay` — GERÇEK mandate
+ *    imzalama/doğrulaması (`signMandate` + `authorizeMandate`, süreç içi nonce deposu) ile;
+ *    teklif/rezervasyon/ödeme sabit bir sahte checkout'tur (DB gerekmez). Mandate'li ödeme
+ *    başarılı; mandate'siz / süresi dolmuş / tutarı aşan / tekrar kullanılan mandate ve
+ *    doğrulanmamış e-posta reddedilir. Gerçek DB'li akış: tests/integration/p1-11-*.
  */
 import { randomBytes } from "node:crypto";
 import http from "node:http";
@@ -13,9 +18,12 @@ import type { AddressInfo } from "node:net";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import type { McpDeps } from "@/lib/mcp/server";
+import type { CheckoutSessionView } from "@/lib/agentic/checkout";
 
 const EXPECTED_TOOLS = [
   "cancel_booking",
+  "checkout_stay",
   "create_hold",
   "get_price_insight",
   "get_quote",
@@ -136,11 +144,137 @@ async function smokeHttp(): Promise<boolean> {
   }
 }
 
+/** Sahte checkout: sabit teklif; mandate kapısı gerçek (imza, süre, kapsam, tutar, nonce). */
+const SMOKE_TOTAL = 150_000;
+const SMOKE_PROPERTY = "p-smoke";
+
+async function smokeMandate(): Promise<boolean> {
+  process.env.JWT_SECRET ||= randomBytes(32).toString("hex");
+  const { handleMcpHttp } = await import("@/lib/mcp/http");
+  const { defaultDeps } = await import("@/lib/mcp/server");
+  const { signAccessToken, verifyAccessToken } = await import("@/lib/auth/tokens");
+  const { authorizeMandate, memoryNonceStore, signMandate } = await import("@/lib/agentic/mandate");
+  const { HttpError } = await import("@/lib/http/errors");
+  const nonces = memoryNonceStore();
+  const deps: McpDeps = {
+    ...defaultDeps,
+    authenticate: (t: string) => verifyAccessToken(t),
+    isEmailVerified: async (userId: string) => userId !== "mcp-smoke-unverified",
+    hold: async () => {
+      throw new HttpError(503, "SMOKE_NO_DB", "smoke: rezervasyon servisi yok");
+    },
+    checkout: async (input) => {
+      const sessionId = `cs-${input.idempotencyKey}`;
+      await authorizeMandate(
+        input.mandate,
+        {
+          userId: input.userId,
+          checkoutSessionId: sessionId,
+          amountMinor: SMOKE_TOTAL,
+          currency: "TRY",
+          propertyId: SMOKE_PROPERTY,
+        },
+        { nonces, record: async () => undefined }
+      );
+      return {
+        id: sessionId,
+        status: "completed",
+        currency: "TRY",
+        order: { id: `b-${input.idempotencyKey}` },
+      } as unknown as CheckoutSessionView;
+    },
+  };
+
+  const server = http.createServer(adapt((req) => handleMcpHttp(req, deps)));
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const url = new URL(`http://127.0.0.1:${(server.address() as AddressInfo).port}/api/mcp`);
+  const connect = async (userId: string) => {
+    const { token } = await signAccessToken(userId, "USER", 60);
+    const client = new Client({ name: "mcp-smoke-mandate", version: "1.0.0" });
+    await client.connect(
+      new StreamableHTTPClientTransport(url, {
+        requestInit: { headers: { authorization: `Bearer ${token}` } },
+      })
+    );
+    return client;
+  };
+  const code = (res: Awaited<ReturnType<Client["callTool"]>>) => {
+    const [first] = res.content as { text: string }[];
+    const body = JSON.parse(first.text) as { code?: string; status?: string };
+    return res.isError ? (body.code ?? "ERROR") : `OK:${body.status}`;
+  };
+  const args = (key: string, mandate?: string) => ({
+    roomId: "r-smoke",
+    checkIn: "2026-10-01",
+    checkOut: "2026-10-02",
+    guests: 1,
+    spt: "spt_mock_ok",
+    idempotencyKey: key,
+    ...(mandate ? { mandate } : {}),
+  });
+  try {
+    const user = "mcp-smoke";
+    const client = await connect(user);
+    const call = async (label: string, key: string, mandate?: string) => {
+      const res = await client.callTool({ name: "checkout_stay", arguments: args(key, mandate) });
+      const out = code(res);
+      process.stdout.write(`[mandate] ${label}: ${out}\n`);
+      return out;
+    };
+    const valid = await signMandate(user, {
+      maxAmountMinor: SMOKE_TOTAL,
+      currency: "TRY",
+      propertyIds: [SMOKE_PROPERTY],
+      expiresInMinutes: 10,
+    });
+    const expired = await signMandate(
+      user,
+      { maxAmountMinor: SMOKE_TOTAL, currency: "TRY", expiresInMinutes: 1 },
+      new Date(Date.now() - 5 * 60_000)
+    );
+    const tooSmall = await signMandate(user, { maxAmountMinor: SMOKE_TOTAL - 1, currency: "TRY" });
+
+    const results = {
+      ok: await call("mandate'li rezervasyon", "k-ok", valid.mandate),
+      none: await call("mandate'siz", "k-none"),
+      expired: await call("süresi dolmuş mandate", "k-expired", expired.mandate),
+      exceeded: await call("tutarı aşan", "k-exceeded", tooSmall.mandate),
+      replay: await call("aynı mandate başka checkout", "k-replay", valid.mandate),
+    };
+    await client.close();
+
+    const unverified = await connect("mcp-smoke-unverified");
+    const hold = code(await unverified.callTool({ name: "create_hold", arguments: HOLD_ARGS }));
+    const pay = code(
+      await unverified.callTool({ name: "checkout_stay", arguments: args("k-u", valid.mandate) })
+    );
+    process.stdout.write(
+      `[mandate] doğrulanmamış e-posta: create_hold=${hold} checkout_stay=${pay}\n`
+    );
+    await unverified.close();
+
+    return (
+      results.ok === "OK:completed" &&
+      results.none === "MANDATE_REQUIRED" &&
+      results.expired === "MANDATE_EXPIRED" &&
+      results.exceeded === "MANDATE_AMOUNT_EXCEEDED" &&
+      results.replay === "MANDATE_REPLAYED" &&
+      hold === "EMAIL_NOT_VERIFIED" &&
+      pay === "EMAIL_NOT_VERIFIED"
+    );
+  } finally {
+    server.close();
+  }
+}
+
 async function main(): Promise<void> {
   const stdioOk = await smokeStdio();
   const httpOk = await smokeHttp();
-  if (!stdioOk || !httpOk) {
-    process.stderr.write(`MCP smoke FAILED (stdio=${stdioOk}, http=${httpOk})\n`);
+  const mandateOk = await smokeMandate();
+  if (!stdioOk || !httpOk || !mandateOk) {
+    process.stderr.write(
+      `MCP smoke FAILED (stdio=${stdioOk}, http=${httpOk}, mandate=${mandateOk})\n`
+    );
     process.exit(1);
   }
   process.stdout.write("MCP smoke OK\n");

@@ -28,7 +28,9 @@ export async function startRetryProxy(
   opts: { firstByteTimeoutMs?: number; maxAttempts?: number } = {}
 ): Promise<RetryProxy> {
   const firstByteTimeoutMs = opts.firstByteTimeoutMs ?? 4000;
-  const maxAttempts = opts.maxAttempts ?? 12;
+  // ~4,2 sn × 30 ≈ 2 dk: tam koşularda nadiren dakikalık kesintiler de görüldü; üst sınırı
+  // yine de testin kendi zaman aşımı (90 sn) ve kanca zaman aşımı (180 sn) belirler.
+  const maxAttempts = opts.maxAttempts ?? 30;
   const stats = { connections: 0, retries: 0, gaveUp: 0 };
   const sockets = new Set<net.Socket>();
 

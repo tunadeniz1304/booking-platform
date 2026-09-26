@@ -50,7 +50,7 @@ export default async function setup(project: TestProject): Promise<() => Promise
     // (Prisma varsayılanı 5 sn). pool_timeout: 100 paralel istek 20 bağlantıyı beklerken yük
     // altında 30 sn sınırdaydı. Hepsi bekleme üst sınırıdır; iş mantığını/yarışları değiştirmez.
     // `migrate deploy` doğrudan porta gider (tek bağlantı, vekilden önce).
-    const directDatabaseUrl = `${pg.getConnectionUri()}?connection_limit=20&pool_timeout=60&connect_timeout=60`;
+    const directDatabaseUrl = `${pg.getConnectionUri()}?connection_limit=20&pool_timeout=60&connect_timeout=150`;
     const pgProxy = await startRetryProxy({ host: pg.getHost(), port: pg.getMappedPort(5432) });
     const redisProxy = await startRetryProxy({
       host: redis.getHost(),

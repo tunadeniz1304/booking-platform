@@ -1,0 +1,336 @@
+import type { Prisma } from "@prisma/client";
+import { account, type AccountRef } from "./accounts";
+import {
+  LedgerError,
+  postJournal,
+  type JournalInput,
+  type JournalLineInput,
+  type PostResult,
+} from "./journal";
+
+/**
+ * Hazır jurnal şablonları (ADR 0020). Her şablon SAF bir `JournalInput` üretir (property
+ * testleri DB'siz koşar) ve `post.*` aynı girdiyi `postJournal` ile yazar. Tutarlar
+ * minor-unit bigint; sıfır tutarlı satırlar atlanır. Bölüşüm girdisi tutarı aşarsa 422.
+ *
+ * Akış:  capture → escrow (+vergi) → konaklama sonrası release → host_payable + gelir →
+ *        payout ile psp_clearing'den çıkış. İade, paranın o an durduğu hesaptan düşer.
+ */
+export const JournalKinds = {
+  BookingCaptured: "BOOKING_CAPTURED",
+  RefundIssued: "REFUND_ISSUED",
+  PayoutReleased: "PAYOUT_RELEASED",
+  EscrowHeld: "ESCROW_HELD",
+  EscrowReleased: "ESCROW_RELEASED",
+  TransferSettled: "TRANSFER_SETTLED",
+  CreditIssued: "CREDIT_ISSUED",
+  CreditSpent: "CREDIT_SPENT",
+} as const;
+
+interface Common {
+  currency: string;
+  occurredAt?: Date;
+  memo?: string;
+}
+
+function dr(acc: AccountRef, amountMinor: bigint, currency: string): JournalLineInput {
+  return { account: acc, side: "DEBIT", amountMinor, currency };
+}
+function cr(acc: AccountRef, amountMinor: bigint, currency: string): JournalLineInput {
+  return { account: acc, side: "CREDIT", amountMinor, currency };
+}
+
+function nonNegative(name: string, value: bigint): bigint {
+  if (value < 0n) {
+    throw new LedgerError(422, "LEDGER_INVALID_AMOUNT", `${name} negatif olamaz`, {
+      [name]: value.toString(),
+    });
+  }
+  return value;
+}
+
+function positive(name: string, value: bigint): bigint {
+  if (nonNegative(name, value) === 0n) {
+    throw new LedgerError(422, "LEDGER_INVALID_AMOUNT", `${name} sıfırdan büyük olmalı`);
+  }
+  return value;
+}
+
+/** total − parçalar; negatifse bölüşüm hatası. */
+function remainder(total: bigint, parts: Record<string, bigint>): bigint {
+  let rest = total;
+  for (const [name, v] of Object.entries(parts)) rest -= nonNegative(name, v);
+  if (rest < 0n) {
+    throw new LedgerError(422, "LEDGER_INVALID_SPLIT", "Bölüşüm toplamı tutarı aşıyor", {
+      total: total.toString(),
+    });
+  }
+  return rest;
+}
+
+function entry(
+  base: Common,
+  meta: Omit<JournalInput, "lines" | "occurredAt" | "memo">,
+  lines: JournalLineInput[]
+): JournalInput {
+  return {
+    ...meta,
+    occurredAt: base.occurredAt,
+    memo: base.memo,
+    lines: lines.filter((l) => l.amountMinor !== 0n),
+  };
+}
+
+export interface BookingCapturedInput extends Common {
+  bookingId: string;
+  paymentId: string;
+  grossMinor: bigint;
+  taxMinor?: bigint;
+}
+
+/** PSP tahsilatı: Dr psp_clearing brüt / Cr escrow (brüt − vergi) / Cr tax_payable vergi. */
+export function bookingCaptured(i: BookingCapturedInput): JournalInput {
+  const gross = positive("grossMinor", i.grossMinor);
+  const tax = i.taxMinor ?? 0n;
+  const held = remainder(gross, { taxMinor: tax });
+  return entry(
+    i,
+    {
+      idempotencyKey: `booking-captured:${i.paymentId}`,
+      kind: JournalKinds.BookingCaptured,
+      bookingId: i.bookingId,
+      paymentId: i.paymentId,
+    },
+    [
+      dr(account.pspClearing(), gross, i.currency),
+      cr(account.escrow(), held, i.currency),
+      cr(account.taxPayable(), tax, i.currency),
+    ]
+  );
+}
+
+export interface EscrowHeldInput extends Common {
+  /** Tutmanın doğal anahtarı (örn. depozito kimliği). */
+  reference: string;
+  amountMinor: bigint;
+  bookingId?: string;
+  paymentId?: string;
+}
+
+/** Ek tahsilatı emanete al: Dr psp_clearing / Cr escrow. */
+export function escrowHeld(i: EscrowHeldInput): JournalInput {
+  const amount = positive("amountMinor", i.amountMinor);
+  return entry(
+    i,
+    {
+      idempotencyKey: `escrow-held:${i.reference}`,
+      kind: JournalKinds.EscrowHeld,
+      bookingId: i.bookingId,
+      paymentId: i.paymentId,
+    },
+    [dr(account.pspClearing(), amount, i.currency), cr(account.escrow(), amount, i.currency)]
+  );
+}
+
+export interface EscrowReleasedInput extends Common {
+  bookingId: string;
+  hostId: string;
+  /** Emanetten çıkan tutar (vergi hariç brüt = ev sahibi payı + platform komisyonu). */
+  amountMinor: bigint;
+  platformFeeMinor?: bigint;
+}
+
+/** Konaklama sonrası serbest bırakma: Dr escrow / Cr host_payable(host) / Cr platform_revenue. */
+export function escrowReleased(i: EscrowReleasedInput): JournalInput {
+  const amount = positive("amountMinor", i.amountMinor);
+  const fee = i.platformFeeMinor ?? 0n;
+  const hostNet = remainder(amount, { platformFeeMinor: fee });
+  return entry(
+    i,
+    {
+      idempotencyKey: `escrow-released:${i.bookingId}`,
+      kind: JournalKinds.EscrowReleased,
+      bookingId: i.bookingId,
+    },
+    [
+      dr(account.escrow(), amount, i.currency),
+      cr(account.hostPayable(i.hostId), hostNet, i.currency),
+      cr(account.platformRevenue(), fee, i.currency),
+    ]
+  );
+}
+
+export interface RefundIssuedInput extends Common {
+  /** İadenin doğal anahtarı (PSP iade kimliği veya `cancel:<bookingId>`). */
+  refundRef: string;
+  bookingId: string;
+  paymentId?: string;
+  guestId: string;
+  amountMinor: bigint;
+  /** İade edilen vergi payı (tax_payable'dan düşer). */
+  taxMinor?: bigint;
+  /**
+   * Para nerede duruyor: `escrow` (serbest bırakılmadan önce) ya da `released`
+   * (sonra; ev sahibi payı + platform komisyonu geri alınır).
+   */
+  from: "escrow" | "released";
+  hostId?: string;
+  /** `released` iadede platform komisyonundan geri alınan pay. */
+  platformFeeMinor?: bigint;
+  /** Nereye: kartına (`psp`) ya da misafir kredisine (`guest_credit`). */
+  to?: "psp" | "guest_credit";
+}
+
+/** İade: Dr (escrow | host_payable + platform_revenue) + tax_payable / Cr psp_clearing | guest_credit. */
+export function refundIssued(i: RefundIssuedInput): JournalInput {
+  const amount = positive("amountMinor", i.amountMinor);
+  const tax = i.taxMinor ?? 0n;
+  const debits: JournalLineInput[] = [dr(account.taxPayable(), tax, i.currency)];
+  if (i.from === "escrow") {
+    debits.push(dr(account.escrow(), remainder(amount, { taxMinor: tax }), i.currency));
+  } else {
+    if (!i.hostId) {
+      throw new LedgerError(422, "LEDGER_INVALID_SPLIT", "Serbest bırakılmış iade hostId ister");
+    }
+    const fee = i.platformFeeMinor ?? 0n;
+    const hostPart = remainder(amount, { taxMinor: tax, platformFeeMinor: fee });
+    debits.push(
+      dr(account.hostPayable(i.hostId), hostPart, i.currency),
+      dr(account.platformRevenue(), fee, i.currency)
+    );
+  }
+  const target = i.to === "guest_credit" ? account.guestCredit(i.guestId) : account.pspClearing();
+  return entry(
+    i,
+    {
+      idempotencyKey: `refund-issued:${i.refundRef}`,
+      kind: JournalKinds.RefundIssued,
+      bookingId: i.bookingId,
+      paymentId: i.paymentId,
+    },
+    [...debits, cr(target, amount, i.currency)]
+  );
+}
+
+export interface PayoutReleasedInput extends Common {
+  payoutId: string;
+  payeeId: string;
+  amountMinor: bigint;
+  bookingId?: string;
+  transferId?: string;
+}
+
+/** Ödeme çıkışı: Dr host_payable(payee) / Cr psp_clearing. */
+export function payoutReleased(i: PayoutReleasedInput): JournalInput {
+  const amount = positive("amountMinor", i.amountMinor);
+  return entry(
+    i,
+    {
+      idempotencyKey: `payout-released:${i.payoutId}`,
+      kind: JournalKinds.PayoutReleased,
+      bookingId: i.bookingId,
+      transferId: i.transferId,
+    },
+    [
+      dr(account.hostPayable(i.payeeId), amount, i.currency),
+      cr(account.pspClearing(), amount, i.currency),
+    ]
+  );
+}
+
+export interface TransferSettledInput extends Common {
+  transferId: string;
+  bookingId: string;
+  sellerId: string;
+  /** Alıcının ödediği devir bedeli. */
+  askMinor: bigint;
+  platformFeeMinor?: bigint;
+}
+
+/** Devir kesinleşti: Dr psp_clearing ask / Cr host_payable(seller) / Cr platform_revenue. */
+export function transferSettled(i: TransferSettledInput): JournalInput {
+  const ask = positive("askMinor", i.askMinor);
+  const fee = i.platformFeeMinor ?? 0n;
+  const sellerNet = remainder(ask, { platformFeeMinor: fee });
+  return entry(
+    i,
+    {
+      idempotencyKey: `transfer-settled:${i.transferId}`,
+      kind: JournalKinds.TransferSettled,
+      bookingId: i.bookingId,
+      transferId: i.transferId,
+    },
+    [
+      dr(account.pspClearing(), ask, i.currency),
+      cr(account.hostPayable(i.sellerId), sellerNet, i.currency),
+      cr(account.platformRevenue(), fee, i.currency),
+    ]
+  );
+}
+
+export interface CreditIssuedInput extends Common {
+  creditRef: string;
+  guestId: string;
+  amountMinor: bigint;
+  /** Kredinin kaynağı: platform ikramı (gelirden) ya da emanetteki tutarın krediye çevrilmesi. */
+  fundedBy: "platform" | "escrow";
+  bookingId?: string;
+}
+
+/** Kredi tanımla: Dr platform_revenue | escrow / Cr guest_credit(guest). */
+export function creditIssued(i: CreditIssuedInput): JournalInput {
+  const amount = positive("amountMinor", i.amountMinor);
+  const source = i.fundedBy === "escrow" ? account.escrow() : account.platformRevenue();
+  return entry(
+    i,
+    {
+      idempotencyKey: `credit-issued:${i.creditRef}`,
+      kind: JournalKinds.CreditIssued,
+      bookingId: i.bookingId,
+    },
+    [dr(source, amount, i.currency), cr(account.guestCredit(i.guestId), amount, i.currency)]
+  );
+}
+
+export interface CreditSpentInput extends Common {
+  spendRef: string;
+  guestId: string;
+  bookingId: string;
+  amountMinor: bigint;
+  taxMinor?: bigint;
+}
+
+/** Kredi ile ödeme (capture'ın kredi karşılığı): Dr guest_credit / Cr escrow + tax_payable. */
+export function creditSpent(i: CreditSpentInput): JournalInput {
+  const amount = positive("amountMinor", i.amountMinor);
+  const tax = i.taxMinor ?? 0n;
+  const held = remainder(amount, { taxMinor: tax });
+  return entry(
+    i,
+    {
+      idempotencyKey: `credit-spent:${i.spendRef}`,
+      kind: JournalKinds.CreditSpent,
+      bookingId: i.bookingId,
+    },
+    [
+      dr(account.guestCredit(i.guestId), amount, i.currency),
+      cr(account.escrow(), held, i.currency),
+      cr(account.taxPayable(), tax, i.currency),
+    ]
+  );
+}
+
+type Tx = Prisma.TransactionClient;
+
+/** Şablonu aynı işlemde yazan kısayollar: `await post.bookingCaptured(tx, {...})`. */
+export const post = {
+  bookingCaptured: (tx: Tx, i: BookingCapturedInput): Promise<PostResult> =>
+    postJournal(tx, bookingCaptured(i)),
+  escrowHeld: (tx: Tx, i: EscrowHeldInput) => postJournal(tx, escrowHeld(i)),
+  escrowReleased: (tx: Tx, i: EscrowReleasedInput) => postJournal(tx, escrowReleased(i)),
+  refundIssued: (tx: Tx, i: RefundIssuedInput) => postJournal(tx, refundIssued(i)),
+  payoutReleased: (tx: Tx, i: PayoutReleasedInput) => postJournal(tx, payoutReleased(i)),
+  transferSettled: (tx: Tx, i: TransferSettledInput) => postJournal(tx, transferSettled(i)),
+  creditIssued: (tx: Tx, i: CreditIssuedInput) => postJournal(tx, creditIssued(i)),
+  creditSpent: (tx: Tx, i: CreditSpentInput) => postJournal(tx, creditSpent(i)),
+};

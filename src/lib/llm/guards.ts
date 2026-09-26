@@ -6,17 +6,22 @@
  *   demo çıktısına düşer (`assertNumbersGrounded`).
  * - Atıflar: `[r:<reviewId>]` biçimindeki her atıf gerçekten verilen yorum
  *   id'lerinden biri olmalıdır (`assertCitationsGrounded`).
+ * - Alıntılar (v4 P1-9): yorum öne çıkanlarındaki her iddia, kaynak yorumdan
+ *   BİREBİR bir alıntı span'i taşımalıdır; alıntı o yorumda aynen yoksa (yalnızca
+ *   boşluk farkı tolere edilir) iddia reddedilir (`filterQuotedClaims`).
  */
 
 export class GuardError extends Error {
   constructor(
-    readonly code: "ungrounded_number" | "ungrounded_citation",
+    readonly code: "ungrounded_number" | "ungrounded_citation" | "ungrounded_quote",
     readonly offenders: string[]
   ) {
     super(
       code === "ungrounded_number"
         ? `Kaynakta olmayan sayı: ${offenders.slice(0, 5).join(", ")}`
-        : `Geçersiz atıf: ${offenders.slice(0, 5).join(", ")}`
+        : code === "ungrounded_quote"
+          ? `Kaynakta birebir bulunmayan alıntı: ${offenders.slice(0, 3).join(" | ")}`
+          : `Geçersiz atıf: ${offenders.slice(0, 5).join(", ")}`
     );
     this.name = "GuardError";
   }
@@ -157,4 +162,128 @@ export function assertCitationsGrounded(
   const valid = new Set(validIds);
   const offenders = [...citations].filter((id) => !valid.has(id));
   if (offenders.length > 0) throw new GuardError("ungrounded_citation", offenders);
+}
+
+// --- Alıntı span guard'ı (v4 P1-9) --------------------------------------------------
+
+/** Kaynak metin: iddia alıntılarının aranacağı yorum. */
+export interface QuoteSource {
+  id: string;
+  text: string;
+}
+
+/** Alıntılı iddia: `quote` kaynak yorumdan birebir alınmış olmalıdır. */
+export interface QuotedClaim {
+  text: string;
+  quote: string;
+  /** Alıntının geldiği yorum; verilmezse tüm kaynaklarda aranır. */
+  sourceId?: string | null;
+}
+
+export interface QuoteSpan {
+  sourceId: string;
+  /** Kaynak metindeki [start, end) karakter aralığı (UI vurgusu için). */
+  start: number;
+  end: number;
+}
+
+export type QuoteRejectReason =
+  "missing_quote" | "quote_too_short" | "unknown_source" | "quote_not_found" | "ungrounded_number";
+
+export interface QuoteGuardResult<C extends QuotedClaim> {
+  accepted: Array<C & QuoteSpan & { quote: string }>;
+  rejected: Array<{ claim: C; reason: QuoteRejectReason }>;
+}
+
+function isSpace(ch: string): boolean {
+  return /\s/u.test(ch);
+}
+
+/**
+ * `quote`'u `source` içinde BİREBİR arar (büyük/küçük harf ve noktalama dahil); yalnızca
+ * ardışık boşluk farkları eşdeğer sayılır. Bulunursa kaynaktaki özgün aralık döner.
+ */
+export function locateQuote(quote: string, source: string): { start: number; end: number } | null {
+  const needle = quote.trim().split(/\s+/u).filter(Boolean);
+  if (needle.length === 0) return null;
+  // Kaynağı boşluk-normalize ederken her karakterin özgün konumunu tut.
+  let norm = "";
+  const pos: number[] = [];
+  let prevSpace = true;
+  for (let i = 0; i < source.length; i++) {
+    const ch = source[i];
+    if (isSpace(ch)) {
+      if (!prevSpace) {
+        norm += " ";
+        pos.push(i);
+      }
+      prevSpace = true;
+    } else {
+      norm += ch;
+      pos.push(i);
+      prevSpace = false;
+    }
+  }
+  const target = needle.join(" ");
+  const at = norm.indexOf(target);
+  if (at === -1) return null;
+  return { start: pos[at], end: pos[at + target.length - 1] + 1 };
+}
+
+/**
+ * İddiaları alıntı guard'ından geçirir: alıntısız, çok kısa, bilinmeyen kaynağa atıflı,
+ * kaynakta birebir bulunmayan veya olgu kümesinde olmayan sayı içeren iddialar reddedilir.
+ * Kabul edilen iddianın `quote`'u kaynaktaki özgün metinle değiştirilir.
+ */
+export function filterQuotedClaims<C extends QuotedClaim>(
+  claims: readonly C[],
+  sources: readonly QuoteSource[],
+  opts: { facts?: FactSet; minQuoteLength?: number } = {}
+): QuoteGuardResult<C> {
+  const minLength = opts.minQuoteLength ?? 1;
+  const byId = new Map(sources.map((s) => [s.id, s]));
+  const result: QuoteGuardResult<C> = { accepted: [], rejected: [] };
+  for (const claim of claims) {
+    const quote = (claim.quote ?? "").trim();
+    if (!quote) {
+      result.rejected.push({ claim, reason: "missing_quote" });
+      continue;
+    }
+    if (quote.length < minLength) {
+      result.rejected.push({ claim, reason: "quote_too_short" });
+      continue;
+    }
+    if (claim.sourceId && !byId.has(claim.sourceId)) {
+      result.rejected.push({ claim, reason: "unknown_source" });
+      continue;
+    }
+    const candidates = claim.sourceId ? [byId.get(claim.sourceId)!] : sources;
+    let span: QuoteSpan | null = null;
+    for (const source of candidates) {
+      const hit = locateQuote(quote, source.text);
+      if (hit) {
+        span = { sourceId: source.id, ...hit };
+        break;
+      }
+    }
+    if (!span) {
+      result.rejected.push({ claim, reason: "quote_not_found" });
+      continue;
+    }
+    if (opts.facts && findUngroundedNumbers(claim.text, opts.facts).length > 0) {
+      result.rejected.push({ claim, reason: "ungrounded_number" });
+      continue;
+    }
+    const original = byId.get(span.sourceId)!.text.slice(span.start, span.end);
+    result.accepted.push({ ...claim, ...span, quote: original });
+  }
+  return result;
+}
+
+/** Tek iddia için katı sürüm: reddedilirse `GuardError("ungrounded_quote")`. */
+export function assertClaimQuoted(claim: QuotedClaim, sources: readonly QuoteSource[]): QuoteSpan {
+  const { accepted, rejected } = filterQuotedClaims([claim], sources);
+  if (rejected.length > 0) throw new GuardError("ungrounded_quote", [claim.quote ?? ""]);
+  const { sourceId, start, end } = accepted[0];
+  return { sourceId, start, end };
 }

@@ -758,15 +758,23 @@ describeInt("API route handler'ları (integration)", () => {
   describe("arama ve mülk listeleri", () => {
     let fx: StayFixture;
     let title: string;
+    /** Fixture'ın benzersiz şehri: paylaşımlı DB'de başka dosyaların "Otel …" ilanları
+     * (LTR/popülerlik sinyalleriyle) sıralamada öne geçmesin diye sorgu bununla sınırlanır. */
+    let cityQ: string;
 
     beforeAll(async () => {
       fx = await createStayFixture(prisma, { tag: "srch", days: 30 });
-      title = (await prisma.property.findUniqueOrThrow({ where: { id: fx.propertyId } })).title;
+      const prop = await prisma.property.findUniqueOrThrow({
+        where: { id: fx.propertyId },
+        select: { title: true, location: { select: { city: true } } },
+      });
+      title = prop.title;
+      cityQ = `&city=${encodeURIComponent(prop.location.city)}`;
     });
 
     it("search: destination ile deterministik sonuç; sayfa boyutu 50 ile sınırlı", async () => {
       const res = await searchGet(
-        call(`/api/search?destination=${encodeURIComponent(title)}&pageSize=500`),
+        call(`/api/search?destination=${encodeURIComponent(title)}&pageSize=500${cityQ}`),
         undefined
       );
       expect(res.status).toBe(200);
@@ -782,7 +790,7 @@ describeInt("API route handler'ları (integration)", () => {
       // Oturumlu istek de aynı sonucu verir (kişiselleştirme yalnız sıralamayı etkiler).
       const authed = await searchGet(
         call(
-          `/api/search?destination=${encodeURIComponent(title)}&checkIn=${iso(utcDay(3))}&checkOut=${iso(utcDay(5))}&guests=2`,
+          `/api/search?destination=${encodeURIComponent(title)}&checkIn=${iso(utcDay(3))}&checkOut=${iso(utcDay(5))}&guests=2${cityQ}`,
           { token: strangerToken }
         ),
         undefined
@@ -812,7 +820,9 @@ describeInt("API route handler'ları (integration)", () => {
     });
 
     it("properties GET: liste ve popüler görünüm", async () => {
-      const list = await propertiesGet(call(`/api/properties?query=${encodeURIComponent(title)}`));
+      const list = await propertiesGet(
+        call(`/api/properties?query=${encodeURIComponent(title)}${cityQ}`)
+      );
       expect(list.status).toBe(200);
       expect((await list.json()).results[0]?.id).toBe(fx.propertyId);
 

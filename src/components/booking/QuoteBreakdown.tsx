@@ -24,6 +24,11 @@ export default function QuoteBreakdown({ quote }: { quote: QuoteView }) {
       ? formatMoney(convert(money(quote.total, quote.currency), "USD"), "en-US")
       : null;
   const n = quote.nights.length;
+  // P1-8 Omnibus: indirim gösteriliyorsa referans fiyat son N günün en düşüğüdür (sunucudan).
+  const discounted = (quote.discountTotal ?? 0) > 0;
+  const reference = quote.lowestPrice30dMinor ?? null;
+  const omnibusDays = quote.omnibusDays ?? 30;
+  const strike = discounted && reference !== null && reference > quote.total;
   const uniform = quote.nights.every((x) => x.amount === quote.nights[0].amount);
   return (
     <div className="space-y-2 text-sm">
@@ -36,6 +41,20 @@ export default function QuoteBreakdown({ quote }: { quote: QuoteView }) {
           </dt>
           <dd>{fmt(quote.subtotal, quote.currency)}</dd>
         </div>
+        {(quote.discounts ?? []).map((d) => (
+          <div
+            key={d.promotionId}
+            className="flex justify-between text-green-800"
+            data-testid="quote-discount"
+          >
+            <dt>
+              {d.couponCode
+                ? t("coupon", { code: d.couponCode })
+                : t("promotion", { name: d.name })}
+            </dt>
+            <dd>−{fmt(d.amount, quote.currency)}</dd>
+          </div>
+        ))}
         {quote.fees.map((f) => (
           <div key={f.code} className="flex justify-between text-gray-600">
             <dt>{f.label}</dt>
@@ -55,9 +74,23 @@ export default function QuoteBreakdown({ quote }: { quote: QuoteView }) {
           ))}
         <div className="flex justify-between border-t border-gray-200 pt-2 text-base font-semibold text-gray-900">
           <dt>{t("total")}</dt>
-          <dd data-testid="quote-total">{fmt(quote.total, quote.currency)}</dd>
+          <dd data-testid="quote-total">
+            {/* Omnibus: üstü çizili referans yalnız son N günün en düşüğü toplamdan yüksekse. */}
+            {strike && (
+              <s className="mr-2 text-sm font-normal text-gray-500" data-testid="quote-reference">
+                {fmt(reference!, quote.currency)}
+              </s>
+            )}
+            {fmt(quote.total, quote.currency)}
+          </dd>
         </div>
       </dl>
+      {discounted && reference !== null && (
+        <p className="text-xs text-gray-600" data-testid="quote-lowest-30d">
+          {t("lowest30d", { days: omnibusDays, amount: fmt(reference, quote.currency) })}
+          {strike && <span className="sr-only"> {t("lowest30dHint", { days: omnibusDays })}</span>}
+        </p>
+      )}
       {/* <dl> yalnızca dt/dd grupları içerebilir (axe definition-list); notlar listenin dışında. */}
       {/* Dahil vergiler toplamı değiştirmez; yalnızca bilgi amaçlı (fiyatın içindedir). */}
       {quote.taxes

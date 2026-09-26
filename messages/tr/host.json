@@ -104,5 +104,59 @@
     "remove": "Fotoğrafı kaldır",
     "lowQuality": "Fotoğraf bulanık veya pozlaması zayıf görünüyor; daha net bir kare yüklemeyi düşünün.",
     "visualOff": "Görsel benzerlik araması bu ortamda kapalı; fotoğraf yine de yayınlandı."
+  },
+  "promotions": {
+    "title": "Promosyonlar",
+    "intro": "İndirimler teklifte ayrı satır olarak görünür. Çakışmada öncelik, sonra en büyük indirim kazanır; birleşebilir işaretliler birlikte uygulanır.",
+    "loading": "Promosyonlar yükleniyor…",
+    "empty": "Henüz promosyon yok.",
+    "caption": "Promosyon listesi",
+    "columns": {
+      "name": "Ad",
+      "type": "Tür",
+      "discount": "İndirim",
+      "scope": "Kapsam",
+      "usage": "Kullanım",
+      "status": "Durum",
+      "actions": "İşlemler"
+    },
+    "types": {
+      "EARLY_BIRD": "Erken rezervasyon",
+      "LAST_MINUTE": "Son dakika",
+      "LONG_STAY": "Uzun konaklama",
+      "MOBILE_RATE": "Mobil fiyat",
+      "COUPON": "Kupon"
+    },
+    "condition": {
+      "EARLY_BIRD": "Varışa en az {count} gün",
+      "LAST_MINUTE": "Varışa en çok {count} gün",
+      "LONG_STAY": "En az {count} gece"
+    },
+    "percentOff": "%{percent}",
+    "allListings": "Tüm ilanlarım",
+    "active": "Aktif",
+    "inactive": "Pasif",
+    "activate": "Etkinleştir",
+    "deactivate": "Durdur",
+    "delete": "Sil",
+    "created": "Promosyon oluşturuldu.",
+    "deleted": "Promosyon silindi.",
+    "deactivated": "Promosyon kullanıldığı için silinmedi, durduruldu.",
+    "form": {
+      "ariaLabel": "Yeni promosyon",
+      "name": "Ad",
+      "type": "Tür",
+      "percent": "İndirim (%)",
+      "minDaysBefore": "Varışa en az (gün)",
+      "maxDaysBefore": "Varışa en çok (gün)",
+      "minNights": "En az gece",
+      "couponCode": "Kupon kodu",
+      "usageLimit": "Kullanım limiti (boş = sınırsız)",
+      "scope": "Kapsam",
+      "priority": "Öncelik",
+      "priorityHint": "Yüksek öncelik önce uygulanır.",
+      "stackable": "Diğer promosyonlarla birleşebilir",
+      "submit": "Promosyon ekle"
+    }
   }
 }

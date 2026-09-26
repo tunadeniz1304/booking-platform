@@ -17,6 +17,7 @@ import {
   inputClass,
   useLoader,
 } from "@/components/ui/ui";
+import PromotionsPanel from "./PromotionsPanel";
 
 interface HostRoom {
   id: string;
@@ -100,6 +101,7 @@ export default function HostDashboard() {
       {properties?.map((p) => (
         <PropertyPanel key={p.id} property={p} onChanged={load} />
       ))}
+      {properties && properties.length > 0 && <PromotionsPanel properties={properties} />}
 
       <Card title={t("bookings.title")} id="host-bookings">
         {bookings === null ? (

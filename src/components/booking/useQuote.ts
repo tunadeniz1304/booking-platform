@@ -30,6 +30,20 @@ export interface QuoteView {
   }>;
   total: number;
   expiresAt: string;
+  /** P1-8: promosyon satırları (tutar pozitif = indirim). */
+  discounts?: Array<{
+    promotionId: string;
+    name: string;
+    type: string;
+    couponCode: string | null;
+    amount: number;
+  }>;
+  discountTotal?: number;
+  coupon?: { code: string; status: string } | null;
+  couponCode?: string | null;
+  /** P1-8 Omnibus: son `omnibusDays` günün en düşük (promosyonsuz, vergi dahil) toplamı. */
+  lowestPrice30dMinor?: number;
+  omnibusDays?: number;
 }
 
 /** Ağ/yanıt hatasında yer tutucu; dönüşte etkin dildeki mesaja çevrilir. */
@@ -57,9 +71,12 @@ export function useQuote(params: {
   ratePlanId?: string;
   /** Değiştirildiğinde teklif yeniden alınır (ör. PRICE_CHANGED sonrası). */
   refreshKey?: number;
+  /** P1-8: kupon kodu (sunucu doğrular ve uygular). */
+  couponCode?: string;
 }): QuoteState {
   const t = useTranslations("quote");
-  const { roomId, propertyId, checkIn, checkOut, guests, ratePlanId, refreshKey } = params;
+  const { roomId, propertyId, checkIn, checkOut, guests, ratePlanId, refreshKey, couponCode } =
+    params;
   const key =
     roomId && checkIn && checkOut && checkIn < checkOut
       ? new URLSearchParams({
@@ -69,6 +86,7 @@ export function useQuote(params: {
           checkOut,
           guests: String(guests ?? 1),
           ...(ratePlanId ? { ratePlanId } : {}),
+          ...(couponCode ? { couponCode } : {}),
           r: String(refreshKey ?? 0),
         }).toString()
       : null;

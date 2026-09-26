@@ -104,5 +104,59 @@
     "remove": "Remove photo",
     "lowQuality": "The photo looks blurry or poorly exposed; consider uploading a sharper shot.",
     "visualOff": "Visual similarity search is disabled here; the photo was still published."
+  },
+  "promotions": {
+    "title": "Promotions",
+    "intro": "Discounts appear as separate lines in the quote. On conflict the higher priority wins, then the larger discount; promotions marked stackable apply together.",
+    "loading": "Loading promotions…",
+    "empty": "No promotions yet.",
+    "caption": "Promotion list",
+    "columns": {
+      "name": "Name",
+      "type": "Type",
+      "discount": "Discount",
+      "scope": "Scope",
+      "usage": "Usage",
+      "status": "Status",
+      "actions": "Actions"
+    },
+    "types": {
+      "EARLY_BIRD": "Early bird",
+      "LAST_MINUTE": "Last minute",
+      "LONG_STAY": "Long stay",
+      "MOBILE_RATE": "Mobile rate",
+      "COUPON": "Coupon"
+    },
+    "condition": {
+      "EARLY_BIRD": "At least {count} days before arrival",
+      "LAST_MINUTE": "At most {count} days before arrival",
+      "LONG_STAY": "At least {count} nights"
+    },
+    "percentOff": "{percent}%",
+    "allListings": "All my listings",
+    "active": "Active",
+    "inactive": "Paused",
+    "activate": "Activate",
+    "deactivate": "Pause",
+    "delete": "Delete",
+    "created": "Promotion created.",
+    "deleted": "Promotion deleted.",
+    "deactivated": "Promotion was used, so it was paused instead of deleted.",
+    "form": {
+      "ariaLabel": "New promotion",
+      "name": "Name",
+      "type": "Type",
+      "percent": "Discount (%)",
+      "minDaysBefore": "Min. days before arrival",
+      "maxDaysBefore": "Max. days before arrival",
+      "minNights": "Min. nights",
+      "couponCode": "Coupon code",
+      "usageLimit": "Usage limit (empty = unlimited)",
+      "scope": "Scope",
+      "priority": "Priority",
+      "priorityHint": "Higher priority is applied first.",
+      "stackable": "Can be combined with other promotions",
+      "submit": "Add promotion"
+    }
   }
 }

@@ -8,5 +8,22 @@
   "nightsUniform": "{price} × {count, plural, one {# night} other {# nights}}",
   "nightsVariable": "{count, plural, one {# night} other {# nights}} (nightly prices vary)",
   "includedTax": "{label}{rate} included: {amount}",
-  "rate": " ({rate}%)"
+  "rate": " ({rate}%)",
+  "promotion": "{name}",
+  "coupon": "Coupon {code}",
+  "discountTotal": "Total discount",
+  "lowest30d": "Lowest price in the last {days} days: {amount}",
+  "lowest30dHint": "The struck-through price is the lowest price applied in the {days} days before the discount.",
+  "couponLabel": "Coupon code",
+  "couponApply": "Apply",
+  "couponRemove": "Remove",
+  "couponStatus": {
+    "APPLIED": "Coupon applied.",
+    "NOT_FOUND": "Coupon not found.",
+    "USAGE_LIMIT_REACHED": "This coupon has reached its usage limit.",
+    "EXPIRED": "This coupon has expired.",
+    "NOT_STARTED": "This coupon is not valid yet.",
+    "INACTIVE": "This coupon is not valid.",
+    "other": "This coupon does not apply to this stay."
+  }
 }

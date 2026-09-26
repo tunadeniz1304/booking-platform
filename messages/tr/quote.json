@@ -8,5 +8,22 @@
   "nightsUniform": "{price} × {count} gece",
   "nightsVariable": "{count} gece (gecelik fiyatlar değişken)",
   "includedTax": "{label}{rate} dahil: {amount}",
-  "rate": " (%{rate})"
+  "rate": " (%{rate})",
+  "promotion": "{name}",
+  "coupon": "Kupon {code}",
+  "discountTotal": "Toplam indirim",
+  "lowest30d": "Son {days} günün en düşük fiyatı: {amount}",
+  "lowest30dHint": "Üstü çizili fiyat, indirimden önceki son {days} günde uygulanan en düşük fiyattır.",
+  "couponLabel": "Kupon kodu",
+  "couponApply": "Uygula",
+  "couponRemove": "Kaldır",
+  "couponStatus": {
+    "APPLIED": "Kupon uygulandı.",
+    "NOT_FOUND": "Kupon bulunamadı.",
+    "USAGE_LIMIT_REACHED": "Kuponun kullanım limiti doldu.",
+    "EXPIRED": "Kuponun süresi dolmuş.",
+    "NOT_STARTED": "Kupon henüz geçerli değil.",
+    "INACTIVE": "Kupon geçerli değil.",
+    "other": "Kupon bu konaklamaya uygulanamıyor."
+  }
 }

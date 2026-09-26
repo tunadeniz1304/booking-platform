@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import QuoteBreakdown from "@/components/booking/QuoteBreakdown";
 import { useQuote } from "@/components/booking/useQuote";
+import CouponField from "@/components/booking/CouponField";
 
 interface CheckoutProperty {
   id: string;
@@ -55,9 +56,10 @@ function CheckoutContent() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [couponCode, setCouponCode] = useState("");
 
   const idempotencyKey = useStableIdempotencyKey(
-    `${propertyId}:${roomId}:${checkIn}:${checkOut}:${guestCount}`
+    `${propertyId}:${roomId}:${checkIn}:${checkOut}:${guestCount}:${couponCode.toUpperCase()}`
   );
   const {
     quote,
@@ -71,6 +73,7 @@ function CheckoutContent() {
     guests: guestCount,
     ratePlanId,
     refreshKey,
+    couponCode: couponCode || undefined,
   });
 
   useEffect(() => {
@@ -110,6 +113,8 @@ function CheckoutContent() {
           guestCount,
           quoteId: quote.quoteId,
           ...(ratePlanId ? { ratePlanId } : {}),
+          // Yalnız teklifte uygulanan kupon gönderilir (uygulanamayan kupon rezervasyonu engeller).
+          ...(quote.coupon?.status === "APPLIED" ? { couponCode: quote.coupon.code } : {}),
         }),
       });
 
@@ -121,6 +126,10 @@ function CheckoutContent() {
       }
       const data = await res.json();
       if (!res.ok) {
+        if (data.code === "COUPON_EXHAUSTED" || data.code === "COUPON_NOT_APPLICABLE") {
+          setRefreshKey((k) => k + 1);
+          throw new Error(data.error ?? t("createFailed"));
+        }
         if (data.code === "PRICE_CHANGED" || data.code === "QUOTE_EXPIRED") {
           setRefreshKey((k) => k + 1);
           throw new Error(data.code === "PRICE_CHANGED" ? t("priceChanged") : t("quoteExpired"));
@@ -203,6 +212,11 @@ function CheckoutContent() {
             {quoteLoading && <p className="text-sm text-gray-500">{t("calculating")}</p>}
             {quoteError && <p className="text-sm text-red-600">{quoteError}</p>}
             {quote && <QuoteBreakdown quote={quote} />}
+            <CouponField
+              applied={couponCode}
+              status={quote?.coupon?.status ?? null}
+              onApply={setCouponCode}
+            />
           </div>
           <p className="mt-3 text-xs text-gray-500">{t("totalNotice")}</p>
         </section>

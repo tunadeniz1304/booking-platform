@@ -1,98 +1,99 @@
 # Demo akışı (3 dakika)
 
-Ön koşul: `cp .env.example .env && docker compose -f docker-compose.yml -f docker-compose.demo.yml up --build`, <http://localhost:3000> açık, seed yüklü. LLM anahtarı yoksa her şey **DEMO** modunda çalışır ve yanıtlarda `llmMode: "demo"` görünür.
+Ön koşul: `docker compose -f docker-compose.yml -f docker-compose.demo.yml up --build`, <http://localhost:3000> açık, seed yüklü (`.env` gerekmez). LLM anahtarı yoksa her şey **DEMO** modunda çalışır ve yanıtlarda `llmMode: "demo"` görünür; ödeme, payout, KYC ve e-Arşiv entegratörü mock'tur.
 
-Demo hesapları (**yalnızca demo**, parola `Password123!`): `guest@booking.test`, `host@booking.test`, `admin@booking.test`.
+Demo hesapları (**yalnızca demo override'ında**, parola `Password123!`): `guest@booking.test`, `host@booking.test`, `admin@booking.test`, ek misafirler `elif@test.com`, `mehmet@test.com`. Hepsinin e-postası doğrulanmıştır.
 
-> Adımlar arayüzden (`/search`, `/host`, `/admin`, `/plan`) yapılabilir; tekrarlanabilirlik için aşağıda API çağrılarıyla da gösterilir — yanıtlar aynı servis katmanından gelir. Adım 1, 3 ve host takvimi `tests/e2e/` altında Playwright ile otomatik doğrulanır.
+> Akış arayüzden yapılır (`/cart`, `/checkout/cart`, `/pay/share/…`, `/account`, `/resolution`, `/admin/claims`); tekrarlanabilirlik için API karşılıkları da verilir — yanıtlar aynı servis katmanından gelir. v3 akışı (Smart Filter, 3DS, iki sekme yarışı, olay sinyali, trip-planner) sayfanın sonundaki ekte korunur.
 
-API adımları için oturum (Bearer token, CSRF gerektirmez):
+API adımları için oturum (Bearer token, CSRF gerektirmez). Girişten sonraki 5 dakika "recent-auth" sayılır (mandate verme bunu ister):
 
 ```bash
 login() { curl -s localhost:3000/api/auth/login -H 'content-type: application/json' \
   -d "{\"email\":\"$1\",\"password\":\"Password123!\"}" | jq -r .accessToken; }
-GUEST=$(login guest@booking.test); HOST=$(login host@booking.test); ADMIN=$(login admin@booking.test)
+GUEST=$(login guest@booking.test); ELIF=$(login elif@test.com); ADMIN=$(login admin@booking.test)
 ```
+
+Mock kart token'ı (tarayıcıdaki hosted fields bunu üretir; sunucuya kart numarası gitmez): `tok_mock_ok_424242_4242`.
 
 ---
 
-## 1. Smart Filter ile arama (~25 sn)
+## 1. Grup sepeti: iki oda, tümü-ya-hiç tutma (~40 sn)
+
+`guest@booking.test` ile bir ilanda iki farklı oda tipini aynı tarihler için **Sepete ekle** → üst menüde **Sepetim** → `/cart` → **Tut**.
 
 ```bash
-curl -s localhost:3000/api/search/smart -H 'content-type: application/json' \
-  -d '{"text":"Kadıköy'\''de denize yakın, kahvaltılı, 2 kişi, gecesi 3000 TL altı"}' | jq '{llmMode, filters}'
+item() { curl -s localhost:3000/api/cart/items -H "authorization: Bearer $GUEST" -H 'content-type: application/json' \
+  -d "{\"propertyId\":\"<propertyId>\",\"roomTypeId\":\"$1\",\"checkIn\":\"<YYYY-MM-DD>\",\"checkOut\":\"<YYYY-MM-DD>\",\"adults\":2}"; }
+CART=$(item <roomTypeA> | jq -r .cart.id); item <roomTypeB> >/dev/null
+curl -s -X POST localhost:3000/api/cart/$CART/hold -H "authorization: Bearer $GUEST" | jq '.cart | {status, holdExpiresAt}'
 ```
 
-**Beklenen:** `filters` içinde `city: "İstanbul"`, `query: "Kadıköy"`, `guests: 2`, `maxPrice: 3000`, `amenities: ["Kahvaltı Dahil", "Deniz Manzarası"]` ve bu filtrelerle deterministik arama sonuçları. Bilinmeyen bir olanak ("jakuzili saray") filtreye girmez. `/search` sayfasında aynı filtreler elle de verilebilir; sonuçların sıralama gerekçesi `/ranking` sayfasında açıklanır.
+**Beklenen:** Her kalem teklif motoruyla fiyatlanır (vergi dahil toplam PDP ile aynı); tutma iki odayı **tek işlemde** alır ve sepet `HELD` olur. Kalemlerden biri doluysa hiçbiri tutulmaz (409, `details.itemId`) — ters sıralı 100 paralel sepette aşırı satış 0 olduğu `tests/integration/v4-cart.test.ts` ile kanıtlanır.
 
-## 2. PDP: atıflı yorum özeti ve fiyat kırılımı (~30 sn)
+## 2. Bölünmüş ödeme: iki kişi, iki kart, tek onay (~40 sn)
 
-Arama sonucundan bir mülke girin (`/property/<id>`).
+`/checkout/cart` → **Bölünmüş ödeme** → eşit bölme, katılımcı `elif@test.com` → davet linki kopyalanır (e-posta `/dev/mailbox`'a da düşer). Organizatör **Payımı öde**; Elif linki açıp kendi payını öder.
 
 ```bash
-curl -s localhost:3000/api/properties/<propertyId>/reviews/summary | jq '{llmMode, summary, pros, cons, citations}'
+curl -s localhost:3000/api/cart/$CART/split -H "authorization: Bearer $GUEST" -H 'content-type: application/json' \
+  -d '{"mode":"equal","participants":[{"email":"elif@test.com"}]}' \
+  | jq '.plan | {status, totalMinor, deadlineAt, shares: [.shares[] | {position, amountMinor, status, inviteUrl}]}'
 ```
 
-**Beklenen:**
-
-- Özet ve artı/eksiler gerçek yorum cümlelerinden; her `[r:<reviewId>]` atfı o mülkün gerçek bir yorumuna işaret eder (`citations`). Yeni yorum eklenince cache sürümü değiştiği için özet yenilenir.
-- PDP'deki rezervasyon kutusu tarih seçilince `GET /api/quote` sonucunu gösterir: gece gece fiyat, "Konaklama vergisi" kalemi (%1) ve vergi dahil toplam. Bu toplam checkout ve tahsilatla birebir aynıdır.
-
-## 3. Checkout → mock 3DS → onay e-postası (~45 sn)
-
-1. `guest@booking.test` ile giriş yapın, PDP'de tarih seçip **Rezervasyon yap** → `/checkout`.
-2. Onaylayın: `POST /api/bookings` rezervasyonu **HELD** olarak oluşturur (`holdExpiresAt` = şimdi + 15 dk) ve `/booking/<id>` sayfasına yönlendirir.
-3. Kart: `4000 0000 0000 3220`, gelecekte bir son kullanma tarihi, herhangi bir CVC. Kart tarayıcıda token'a çevrilir; sunucuya numara gitmez.
-4. `POST /api/bookings/<id>/pay` → `requires_action` (3DS). Doğrulama kodu: **`123456`** → `POST /api/bookings/<id>/pay/confirm`.
-5. <http://localhost:3000/dev/mailbox> sayfasını açın.
-
-**Beklenen:** Rezervasyon **CONFIRMED**, ödeme capture edildi. Worker outbox mesajını işledikten sonra (birkaç saniye) mailbox'ta Türkçe "Rezervasyonunuz onaylandı" e-postası görünür. Aynı olay iki kez işlense bile tek e-posta vardır. `4000 0000 0000 0002` ile ödeme reddedilir, rezervasyon HELD kalır ve süre dolunca **EXPIRED** olur.
-
-## 4. İki sekmeden aynı son odaya yarış (~20 sn)
-
-Tek birimli bir oda ve aynı tarihler için iki tarayıcı sekmesinde checkout'u açın ve ikisinde de neredeyse aynı anda onaylayın. API ile:
+Pay ödemesi (organizatör kendi payının linkiyle, Elif kendi linkiyle; `<token>` = `inviteUrl`'in son parçası):
 
 ```bash
-BODY='{"propertyId":"<propertyId>","roomId":"<roomId>","checkIn":"<YYYY-MM-DD>","checkOut":"<YYYY-MM-DD>","guestCount":2}'
-for i in 1 2; do curl -s localhost:3000/api/bookings -H "authorization: Bearer $GUEST" \
-  -H 'content-type: application/json' -H "idempotency-key: race-$i" -d "$BODY" & done; wait
+curl -s localhost:3000/api/pay/share/<token> -H "authorization: Bearer $ELIF" -H 'content-type: application/json' \
+  -d '{"cardToken":"tok_mock_ok_424242_4242"}' | jq
 ```
 
-**Beklenen:** Bir istek `201` + `HELD`, diğeri `409` ve `code: "SOLD_OUT"` (kilit o an doluysa `ROOM_BUSY`). Aynı garanti 100 paralel istekle entegrasyon testinde kanıtlanır: 1 başarı / 99 `SOLD_OUT`, SQL ile overbooking = 0.
+**Beklenen:** Paylar kuruşu kuruşuna toplamı verir (kalan kuruş organizatöre). İlk pay yalnız **yetkilendirilir**, sepet `HELD` kalır; son pay gelince tüm paylar capture edilir ve iki rezervasyon tek pivotta `CONFIRMED` olur. Başka bir e-postayla link açılırsa 403 `SHARE_EMAIL_MISMATCH`; süresi dolan link 410 `SHARE_LINK_EXPIRED`. Kimse ödemezse süre sonunda organizatöre yedek pay açılır veya tüm yetkiler bırakılır (`SPLIT_PAY_FALLBACK`).
 
-## 5. Host takvimi + olay sinyali onayı → fiyat değişimi ve açıklaması (~40 sn)
+## 3. Ajanla mandate'li rezervasyon (~40 sn)
 
-Host takvimi (toplu ARI; aktif HELD/CONFIRMED geceler ezilmez):
+Kullanıcı `/account` → ajan yetkileri bölümünden tutar ve süre sınırlı bir mandate verir (oturum 5 dakikadan eskiyse parola/passkey ile yeniden doğrulama penceresi açılır). Ajan bu mandate ile ACP checkout'u tamamlar:
 
 ```bash
-curl -s -X PUT localhost:3000/api/rooms/<roomId>/availability -H "authorization: Bearer $HOST" \
-  -H 'content-type: application/json' -d '{"from":"<YYYY-MM-DD>","to":"<YYYY-MM-DD>","price":2500}'
+MANDATE=$(curl -s localhost:3000/api/account/agent-mandates -H "authorization: Bearer $GUEST" -H 'content-type: application/json' \
+  -d '{"maxAmountMinor":1000000,"currency":"TRY","expiresInMinutes":30}' | jq -r .mandate)
+ACS=$(curl -s localhost:3000/api/agentic/checkout_sessions -H "authorization: Bearer $GUEST" -H 'content-type: application/json' \
+  -H 'idempotency-key: demo-acs-1' -d '{"room_id":"<roomId>","check_in":"<YYYY-MM-DD>","check_out":"<YYYY-MM-DD>","guests":2}' | jq -r .id)
+curl -s localhost:3000/api/agentic/checkout_sessions/$ACS/complete -H "authorization: Bearer $GUEST" -H 'content-type: application/json' \
+  -H 'idempotency-key: demo-acs-1-pay' -d "{\"payment_data\":{\"token\":\"spt_mock_ok\",\"provider\":\"mock\"},\"mandate\":\"$MANDATE\"}" | jq '{status}'
 ```
 
-Admin olay önerisi → onay:
+**Beklenen:** `status: "completed"`, rezervasyon `CONFIRMED` — insan checkout'uyla aynı saga. Aynı çağrı mandate'siz 403 `MANDATE_REQUIRED`; limitin altında bir mandate ile 402 `MANDATE_AMOUNT_EXCEEDED`; aynı mandate başka bir oturumda 409 `MANDATE_REPLAYED`; `/account`'ta iptal edilince 403 `MANDATE_REVOKED`. MCP istemcisinde aynı akış `checkout_stay` aracıyladır; `npm run mcp:smoke` bunu anahtarsız doğrular.
+
+## 4. Hasar talebi → depozito (~30 sn)
+
+Hasar talebi konaklama başladıktan sonra açılabildiği için canlı demoda zaman ileri sarılamaz; bu adım süreç içi v4 senaryosuyla gösterilir (tesis depozito ayarı → girişten önce off-session provizyon → ev sahibinin `HOST_DAMAGE` talebi → admin kararı). Senaryo `DATABASE_URL`, `REDIS_URL` ve `DEMO_MODE=true` ortamı ister; compose yığınında worker konteyneri bunlara sahiptir:
 
 ```bash
-curl -s localhost:3000/api/admin/events -H "authorization: Bearer $ADMIN" -H 'content-type: application/json' \
-  -d '{"text":"İstanbul'\''da 14-16 Kasım 2026 tarihlerinde büyük bir teknoloji fuarı düzenlenecek."}' | jq '{llmMode, event: .event | {id, status, impact, startsAt, endsAt}}'
-curl -s -X POST localhost:3000/api/admin/events/<eventId>/approve -H "authorization: Bearer $ADMIN" | jq '{status: .event.status, repriced}'
+docker compose -f docker-compose.yml -f docker-compose.demo.yml exec worker \
+  npx tsx --conditions=react-server scripts/demo-scenarios.ts --only=10
 ```
 
-**Beklenen:** Olay önce `PROPOSED` (fiyata etkisi yok); onaydan sonra `APPROVED` ve `repriced` > 0. Olay penceresindeki tarihler için `GET /api/quote` artık daha yüksek toplam döner. Her gecenin `Availability.priceExplanation` alanında kırılım bulunur: `factors { season, weekday, event }`, `rawMultiplier`, `multiplier`, `clamped` (tavana takıldıysa `"ceiling"`). Onayı tekrar çağırmak fiyatı değiştirmez (idempotent); hiçbir gece `PRICE_CEILING_MULTIPLIER` (2.0) katını aşmaz. `POST /api/admin/events/<eventId>/rollback` fiyatları eski hâline döndürür.
+Ardından `admin@booking.test` ile `/admin/claims` (talep, kanıt, SLA, karar) açılır; misafir tarafı `/resolution`'dadır.
 
-## 6. Trip-planner: 3 şehir (~20 sn)
+**Beklenen:** 300 TL depozito `AUTHORIZED`; 450 TL talep onaylanır → 300 TL capture + 150 TL `uncollectedMinor` (deftere yazılmaz); `deposit-captured` jurnali ev sahibinin alacağına yazılır. Senaryo sonunda "mizan dengede, mutabakat farkı 0" satırı basılır.
+
+## 5. Admin mutabakat raporu (~20 sn)
 
 ```bash
-curl -s localhost:3000/api/ai/trip-plan -H "authorization: Bearer $GUEST" -H 'content-type: application/json' \
-  -d '{"cities":["İstanbul","Kapadokya","İzmir"],"days":7,"guests":2}' | jq '{llmMode, order: .route.order, algorithm: .route.algorithm, total, narrative}'
+curl -s "localhost:3000/api/admin/reconciliation?date=$(date -u +%F)" -H "authorization: Bearer $ADMIN" \
+  | jq '{date, checked, imbalancedEntries, differences: (.differences | length), ok}'
 ```
 
-**Beklenen:** Rota Held-Karp ile optimize edilir (`algorithm: "held-karp"`); her durak için bir konaklama ve tarih aralığı; `total` durakların quote toplamlarının toplamına eşittir. Anlatım yalnızca araç çıktısındaki sayıları kullanır ve "Rezervasyon yapılmadı" der — plan asla otomatik rezervasyon oluşturmaz.
+**Beklenen:** Bugünkü sepet, bölünmüş ödeme, ajan ve depozito tahsilatları için PSP kayıtları jurnalle karşılaştırılır: `imbalancedEntries: 0`, `differences: 0`, `ok: true`. Gece `ledger-reconcile` işi aynı raporu dün için çalıştırıp audit'e yazar; fark çıkarsa `ledger_imbalance_total{source="reconciliation"}` artar. Ev sahibi tarafı `/host/payouts`'ta (emanette / serbest / rezerv / ödenen) görünür; escrow check-in + 24 saat sonra serbest kalır.
+
+---
 
 ---
 
 ## Demo senaryoları (P2-2)
 
-`scripts/demo-scenarios.ts`, 1–7. senaryolarda **çalışan** yığına HTTP ile bağlanır ve aşağıdaki 7 iddiayı uçtan uca doğrular (8–13 için aşağıdaki "v4 senaryoları"). Her senaryo için bir `[PASS]`/`[FAIL]` satırı ve temel sayılar yazılır. Herhangi bir senaryo başarısız olursa çıkış kodu `1` olur.
+`scripts/demo-scenarios.ts`, 1–7. senaryolarda **çalışan** yığına HTTP ile bağlanır ve aşağıdaki 7 iddiayı uçtan uca doğrular (8–14 için aşağıdaki "v4 senaryoları"). Her senaryo için bir `[PASS]`/`[FAIL]` satırı ve temel sayılar yazılır. Herhangi bir senaryo başarısız olursa çıkış kodu `1` olur.
 
 ```bash
 npm run demo:reset                         # seed (senaryo 7'nin belgesiz ilanı dahil)
@@ -151,14 +152,15 @@ Bu yedi senaryo HTTP yerine servisleri doğrudan çağırır (zaman ileri sarma 
 npm run demo:scenarios -- --suite=v4      # yalnız v4 (çalışan web sunucusu gerekmez)
 ```
 
-| #   | Senaryo                                        | Beklenen                                                                                                                         |
-| --- | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| 8   | (a1) Grup sepeti 3 oda + 3 kişi bölünmüş ödeme | Katılımcılar yalnız yetkiler, sepet HELD kalır; son pay → 3 pay CAPTURED, 3 rezervasyon CONFIRMED, sepet CHECKED_OUT             |
-| 9   | (a2) 1 kişi ödemez                             | Süre sonu → pay EXPIRED, kalan tutar organizatörün yedek payına; geç ödeme 409 `SPLIT_DEADLINE_PASSED`; organizatör öder → onay  |
-| 10  | (b) Hasar talebi → admin kararı                | 300 TL depozito AUTHORIZED; 450 TL talep onaylanır → 300 TL capture (CAPTURED) + 150 TL yalnız kayıt; `deposit-captured` jurnali |
-| 11  | (c) 7565 kaldırma                              | İlan pasif, ev sahibi yeniden yayın 409 `TAKEDOWN_ACTIVE`; SLA +25 s `ok`; ilan dışarıdan açılırsa `breached` → zorla pasif      |
-| 12  | (d) Ajan mandate'i                             | Mandate'li ACP ödemesi CONFIRMED; aşan mandate 402 `MANDATE_AMOUNT_EXCEEDED`; tekrar 409 `MANDATE_REPLAYED`                      |
-| 13  | (e) Devir capture hatası (v4#1)                | 502 `TRANSFER_PAYMENT_FAILED`, sahiplik/ödeme satıcıda, yetki void, payout 0; yeniden listeleme sağlıklı PSP ile COMPLETED       |
+| #   | Senaryo                                        | Beklenen                                                                                                                                                                                |
+| --- | ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 8   | (a1) Grup sepeti 3 oda + 3 kişi bölünmüş ödeme | Katılımcılar yalnız yetkiler, sepet HELD kalır; son pay → 3 pay CAPTURED, 3 rezervasyon CONFIRMED, sepet CHECKED_OUT                                                                    |
+| 9   | (a2) 1 kişi ödemez                             | Süre sonu → pay EXPIRED, kalan tutar organizatörün yedek payına; geç ödeme 409 `SPLIT_DEADLINE_PASSED`; organizatör öder → onay                                                         |
+| 10  | (b) Hasar talebi → admin kararı                | 300 TL depozito AUTHORIZED; 450 TL talep onaylanır → 300 TL capture (CAPTURED) + 150 TL yalnız kayıt; `deposit-captured` jurnali                                                        |
+| 11  | (c) 7565 kaldırma                              | İlan pasif, ev sahibi yeniden yayın 409 `TAKEDOWN_ACTIVE`; SLA +25 s `ok`; ilan dışarıdan açılırsa `breached` → zorla pasif                                                             |
+| 12  | (d) Ajan mandate'i                             | Mandate'li ACP ödemesi CONFIRMED; aşan mandate 402 `MANDATE_AMOUNT_EXCEEDED`; tekrar 409 `MANDATE_REPLAYED`                                                                             |
+| 13  | (e) Devir capture hatası (v4#1)                | 502 `TRANSFER_PAYMENT_FAILED`, sahiplik/ödeme satıcıda, yetki void, payout 0; yeniden listeleme sağlıklı PSP ile COMPLETED                                                              |
+| 14  | (g) Cüzdan: cashback → kredi ile ödeme → iptal | Konaklama tamamlanır → cashback kredisi ISSUED; ikinci rezervasyon kart + kredi ile ödenir; iptalde karta ve krediye oransal iade; her adımda `guest_credit` = Σ lot kalanı + Σ rezerve |
 
 (f) Her v4 senaryosunun sonunda: mizan dengede, dokunulan günlerde dengesiz jurnal 0 ve senaryonun ödeme/depozito/devir öznelerinde mutabakat farkı 0 (özet tablonun "Defter" sütunu).
 
@@ -198,3 +200,81 @@ Sonuç: 7/7 senaryo geçti.
 | Mailbox boş                        | Worker loglarını kontrol edin: `docker compose logs worker`                                 |
 | `llmMode: "fallback"`              | Canlı çağrı başarısız oldu; `GET /api/llm/status` içindeki `lastError` kodu nedeni gösterir |
 | Seed yok                           | `DEMO_SEED` kapalı veya DB boş değil; `docker compose down -v` ile sıfırlayın               |
+
+---
+
+## Ek: v3 demo adımları
+
+Aşağıdaki adımlar v3 akışıdır ve değişmeden çalışır (oturum için yukarıdaki `login` fonksiyonu; ayrıca `HOST=$(login host@booking.test)`).
+
+### A1. Smart Filter ile arama (~25 sn)
+
+```bash
+curl -s localhost:3000/api/search/smart -H 'content-type: application/json' \
+  -d '{"text":"Kadıköy'\''de denize yakın, kahvaltılı, 2 kişi, gecesi 3000 TL altı"}' | jq '{llmMode, filters}'
+```
+
+**Beklenen:** `filters` içinde `city: "İstanbul"`, `query: "Kadıköy"`, `guests: 2`, `maxPrice: 3000`, `amenities: ["Kahvaltı Dahil", "Deniz Manzarası"]` ve bu filtrelerle deterministik arama sonuçları. Bilinmeyen bir olanak ("jakuzili saray") filtreye girmez. `/search` sayfasında aynı filtreler elle de verilebilir; sonuçların sıralama gerekçesi `/ranking` sayfasında açıklanır.
+
+### A2. PDP: atıflı yorum özeti ve fiyat kırılımı (~30 sn)
+
+Arama sonucundan bir mülke girin (`/property/<id>`).
+
+```bash
+curl -s localhost:3000/api/properties/<propertyId>/reviews/summary | jq '{llmMode, summary, pros, cons, citations}'
+```
+
+**Beklenen:**
+
+- Özet ve artı/eksiler gerçek yorum cümlelerinden; her `[r:<reviewId>]` atfı o mülkün gerçek bir yorumuna işaret eder (`citations`). Yeni yorum eklenince cache sürümü değiştiği için özet yenilenir.
+- PDP'deki rezervasyon kutusu tarih seçilince `GET /api/quote` sonucunu gösterir: gece gece fiyat, "Konaklama vergisi" kalemi (%1) ve vergi dahil toplam. Bu toplam checkout ve tahsilatla birebir aynıdır.
+
+### A3. Checkout → mock 3DS → onay e-postası (~45 sn)
+
+1. `guest@booking.test` ile giriş yapın, PDP'de tarih seçip **Rezervasyon yap** → `/checkout`.
+2. Onaylayın: `POST /api/bookings` rezervasyonu **HELD** olarak oluşturur (`holdExpiresAt` = şimdi + 15 dk) ve `/booking/<id>` sayfasına yönlendirir.
+3. Kart: `4000 0000 0000 3220`, gelecekte bir son kullanma tarihi, herhangi bir CVC. Kart tarayıcıda token'a çevrilir; sunucuya numara gitmez.
+4. `POST /api/bookings/<id>/pay` → `requires_action` (3DS). Doğrulama kodu: **`123456`** → `POST /api/bookings/<id>/pay/confirm`.
+5. <http://localhost:3000/dev/mailbox> sayfasını açın.
+
+**Beklenen:** Rezervasyon **CONFIRMED**, ödeme capture edildi. Worker outbox mesajını işledikten sonra (birkaç saniye) mailbox'ta Türkçe "Rezervasyonunuz onaylandı" e-postası görünür. Aynı olay iki kez işlense bile tek e-posta vardır. `4000 0000 0000 0002` ile ödeme reddedilir, rezervasyon HELD kalır ve süre dolunca **EXPIRED** olur.
+
+### A4. İki sekmeden aynı son odaya yarış (~20 sn)
+
+Tek birimli bir oda ve aynı tarihler için iki tarayıcı sekmesinde checkout'u açın ve ikisinde de neredeyse aynı anda onaylayın. API ile:
+
+```bash
+BODY='{"propertyId":"<propertyId>","roomId":"<roomId>","checkIn":"<YYYY-MM-DD>","checkOut":"<YYYY-MM-DD>","guestCount":2}'
+for i in 1 2; do curl -s localhost:3000/api/bookings -H "authorization: Bearer $GUEST" \
+  -H 'content-type: application/json' -H "idempotency-key: race-$i" -d "$BODY" & done; wait
+```
+
+**Beklenen:** Bir istek `201` + `HELD`, diğeri `409` ve `code: "SOLD_OUT"` (kilit o an doluysa `ROOM_BUSY`). Aynı garanti 100 paralel istekle entegrasyon testinde kanıtlanır: 1 başarı / 99 `SOLD_OUT`, SQL ile overbooking = 0.
+
+### A5. Host takvimi + olay sinyali onayı → fiyat değişimi ve açıklaması (~40 sn)
+
+Host takvimi (toplu ARI; aktif HELD/CONFIRMED geceler ezilmez):
+
+```bash
+curl -s -X PUT localhost:3000/api/rooms/<roomId>/availability -H "authorization: Bearer $HOST" \
+  -H 'content-type: application/json' -d '{"from":"<YYYY-MM-DD>","to":"<YYYY-MM-DD>","price":2500}'
+```
+
+Admin olay önerisi → onay:
+
+```bash
+curl -s localhost:3000/api/admin/events -H "authorization: Bearer $ADMIN" -H 'content-type: application/json' \
+  -d '{"text":"İstanbul'\''da 14-16 Kasım 2026 tarihlerinde büyük bir teknoloji fuarı düzenlenecek."}' | jq '{llmMode, event: .event | {id, status, impact, startsAt, endsAt}}'
+curl -s -X POST localhost:3000/api/admin/events/<eventId>/approve -H "authorization: Bearer $ADMIN" | jq '{status: .event.status, repriced}'
+```
+
+**Beklenen:** Olay önce `PROPOSED` (fiyata etkisi yok); onaydan sonra `APPROVED` ve `repriced` > 0. Olay penceresindeki tarihler için `GET /api/quote` artık daha yüksek toplam döner. Her gecenin `Availability.priceExplanation` alanında kırılım bulunur: `factors { season, weekday, event }`, `rawMultiplier`, `multiplier`, `clamped` (tavana takıldıysa `"ceiling"`). Onayı tekrar çağırmak fiyatı değiştirmez (idempotent); hiçbir gece `PRICE_CEILING_MULTIPLIER` (2.0) katını aşmaz. `POST /api/admin/events/<eventId>/rollback` fiyatları eski hâline döndürür.
+
+### A6. Trip-planner: 3 şehir (~20 sn)
+
+```bash
+curl -s localhost:3000/api/ai/trip-plan -H "authorization: Bearer $GUEST" -H 'content-type: application/json' \
+  -d '{"cities":["İstanbul","Kapadokya","İzmir"],"days":7,"guests":2}' | jq '{llmMode, order: .route.order, algorithm: .route.algorithm, total, narrative}'
+```
+
+**Beklenen:** Rota Held-Karp ile optimize edilir (`algorithm: "held-karp"`); her durak için bir konaklama ve tarih aralığı; `total` durakların quote toplamlarının toplamına eşittir. Anlatım yalnızca araç çıktısındaki sayıları kullanır ve "Rezervasyon yapılmadı" der — plan asla otomatik rezervasyon oluşturmaz.

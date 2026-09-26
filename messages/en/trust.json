@@ -1,0 +1,74 @@
+{
+  "message": {
+    "warnTitle": "Caution: this message may contain suspicious content",
+    "highTitle": "Warning: this message shows signs of fraud",
+    "advice": "Only pay through the platform; requests to pay by bank transfer, external link or messaging app are not covered by our protection.",
+    "reasonsLabel": "Reasons:",
+    "blocked": "Your message was not sent because it asks for off-platform payment or contact."
+  },
+  "reasons": {
+    "IBAN": "IBAN / bank account number",
+    "BANK_TRANSFER_REQUEST": "Bank/wire transfer request",
+    "OFF_PLATFORM_PAYMENT_REQUEST": "Request to pay outside the platform",
+    "OFF_PLATFORM_CONTACT": "Invitation to contact outside the platform",
+    "MESSENGER_LINK": "Messaging app link",
+    "SHORTENED_LINK": "Shortened link",
+    "PAYMENT_LINK": "Off-platform payment link",
+    "CRYPTO_PAYMENT": "Crypto payment",
+    "EXTERNAL_LINK": "External link",
+    "URGENCY_PRESSURE": "Urgency pressure"
+  },
+  "kyc": {
+    "title": "Identity verification",
+    "intro": "Verify your identity to build trust with hosts and guests. Your document images are not stored on the platform; the provider performs the check.",
+    "loading": "Loading verification status…",
+    "loadFailed": "Could not load verification status.",
+    "status": {
+      "NOT_STARTED": "Not started",
+      "PENDING": "In review",
+      "VERIFIED": "Verified",
+      "REQUIRES_INPUT": "More information needed",
+      "FAILED": "Could not be verified"
+    },
+    "statusLabel": "Status:",
+    "verifiedAt": "Verified on {date}",
+    "lastError": "Provider code: {code}",
+    "start": "Start verification",
+    "retry": "Try again",
+    "starting": "Starting…",
+    "startFailed": "Could not start verification.",
+    "redirecting": "Redirecting you to the verification page…",
+    "requiredHost": "Hosts must verify their identity before creating a listing.",
+    "requiredGuest": "Guests must verify their identity before booking.",
+    "mockNotice": "Demo mode: no real document is required. Pick a test document to choose the outcome.",
+    "testDocumentLabel": "Test document",
+    "testDocuments": {
+      "valid": "Valid ID",
+      "blurry": "Blurry photo",
+      "expired": "Expired document",
+      "fake": "Fake document"
+    }
+  },
+  "partyRisk": {
+    "title": "Party-risk warnings",
+    "intro": "Automatic warnings computed from young account, single night, large group, near date and weekend signals. The booking is not cancelled; confirm the house rules with the guest.",
+    "loading": "Loading warnings…",
+    "loadFailed": "Could not load warnings.",
+    "empty": "No party-risk warnings for your upcoming bookings.",
+    "caption": "Bookings flagged for party risk",
+    "columns": {
+      "property": "Listing",
+      "dates": "Dates",
+      "guests": "Guests",
+      "score": "Score",
+      "reasons": "Reasons"
+    },
+    "reasons": {
+      "YOUNG_ACCOUNT": "New account",
+      "SINGLE_NIGHT": "Single night",
+      "LARGE_GROUP": "Large group",
+      "NEAR_DATE": "Near date",
+      "WEEKEND": "Weekend"
+    }
+  }
+}

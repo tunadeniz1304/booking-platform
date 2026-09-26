@@ -8,6 +8,7 @@ import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import { logout } from "@/lib/api-client";
 import PasskeyManager from "@/components/account/PasskeyManager";
+import IdentityVerification from "@/components/account/IdentityVerification";
 import { useFormat } from "@/i18n/use-format";
 
 interface User {
@@ -241,6 +242,8 @@ export default function AccountPage() {
             </div>
           </div>
         )}
+
+        <IdentityVerification role={user?.role} />
 
         <PasskeyManager />
 

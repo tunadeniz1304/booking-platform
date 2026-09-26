@@ -3,6 +3,7 @@ import { z } from "zod";
 import { PropertyType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth";
+import { assertIdentityRequirement } from "@/lib/trust/kyc";
 import { ValidationError, toErrorResponse } from "@/lib/http/errors";
 import { httpsUrl } from "@/lib/security/url";
 import { withAiSubject } from "@/lib/http/ai";
@@ -77,6 +78,8 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const host = await requireRole(req, ["HOST", "ADMIN"]);
+    // P1-6: KYC_REQUIRED_FOR_HOSTS açıksa ev sahibi kimliğini doğrulamış olmalı.
+    if (host.role === "HOST") await assertIdentityRequirement(host.userId, "HOST");
 
     const body = await req.json();
     const parsed = createPropertySchema.safeParse(body);

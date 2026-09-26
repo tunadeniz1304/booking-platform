@@ -4,6 +4,7 @@ import { createBooking, listUserBookingsPage, presentBooking } from "@/lib/booki
 import { requireAuth, requireVerifiedEmail } from "@/lib/auth";
 import { toErrorResponse } from "@/lib/http/errors";
 import { observed } from "@/lib/http/observed";
+import { assertIdentityRequirement } from "@/lib/trust/kyc";
 
 const createBookingSchema = z.object({
   propertyId: z.string().min(1).max(64),
@@ -27,6 +28,8 @@ const createBookingSchema = z.object({
 export const POST = observed("bookings", async function postHandler(req: NextRequest) {
   try {
     const { userId } = await requireVerifiedEmail(req);
+    // P1-6: KYC_REQUIRED_FOR_GUESTS açıksa doğrulanmış kimlik gerekir.
+    await assertIdentityRequirement(userId, "GUEST");
     const parsed = createBookingSchema.parse(await req.json());
     const idempotencyKey = req.headers.get("idempotency-key")?.slice(0, 128) || undefined;
 

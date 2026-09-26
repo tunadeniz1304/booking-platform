@@ -1,0 +1,74 @@
+{
+  "message": {
+    "warnTitle": "Dikkat: bu mesaj şüpheli içerik barındırıyor olabilir",
+    "highTitle": "Uyarı: bu mesaj dolandırıcılık belirtileri taşıyor",
+    "advice": "Ödemeyi yalnızca platform üzerinden yapın; havale, harici link veya mesajlaşma uygulaması üzerinden ödeme istekleri korumamız dışındadır.",
+    "reasonsLabel": "Gerekçeler:",
+    "blocked": "Mesajınız platform dışı ödeme veya iletişim isteği içerdiği için gönderilmedi."
+  },
+  "reasons": {
+    "IBAN": "IBAN / banka hesap numarası",
+    "BANK_TRANSFER_REQUEST": "Havale/EFT isteği",
+    "OFF_PLATFORM_PAYMENT_REQUEST": "Platform dışında ödeme isteği",
+    "OFF_PLATFORM_CONTACT": "Platform dışı iletişime davet",
+    "MESSENGER_LINK": "Mesajlaşma uygulaması bağlantısı",
+    "SHORTENED_LINK": "Kısaltılmış bağlantı",
+    "PAYMENT_LINK": "Platform dışı ödeme bağlantısı",
+    "CRYPTO_PAYMENT": "Kripto para ile ödeme",
+    "EXTERNAL_LINK": "Harici bağlantı",
+    "URGENCY_PRESSURE": "Aciliyet baskısı"
+  },
+  "kyc": {
+    "title": "Kimlik doğrulama",
+    "intro": "Kimliğinizi doğrulayarak ev sahiplerine ve misafirlere güven verin. Belge görüntünüz platformda saklanmaz; doğrulamayı sağlayıcı yapar.",
+    "loading": "Doğrulama durumu yükleniyor…",
+    "loadFailed": "Doğrulama durumu yüklenemedi.",
+    "status": {
+      "NOT_STARTED": "Başlatılmadı",
+      "PENDING": "İnceleniyor",
+      "VERIFIED": "Doğrulandı",
+      "REQUIRES_INPUT": "Ek bilgi gerekiyor",
+      "FAILED": "Doğrulanamadı"
+    },
+    "statusLabel": "Durum:",
+    "verifiedAt": "Doğrulama tarihi: {date}",
+    "lastError": "Sağlayıcı kodu: {code}",
+    "start": "Doğrulamayı başlat",
+    "retry": "Yeniden dene",
+    "starting": "Başlatılıyor…",
+    "startFailed": "Doğrulama başlatılamadı.",
+    "redirecting": "Doğrulama sayfasına yönlendiriliyorsunuz…",
+    "requiredHost": "Ev sahiplerinin ilan oluşturmak için kimliğini doğrulaması gerekir.",
+    "requiredGuest": "Misafirlerin rezervasyon için kimliğini doğrulaması gerekir.",
+    "mockNotice": "Demo modu: gerçek belge istenmez. Sonucu belirlemek için bir test belgesi seçin.",
+    "testDocumentLabel": "Test belgesi",
+    "testDocuments": {
+      "valid": "Geçerli kimlik",
+      "blurry": "Bulanık fotoğraf",
+      "expired": "Süresi dolmuş belge",
+      "fake": "Sahte belge"
+    }
+  },
+  "partyRisk": {
+    "title": "Parti riski uyarıları",
+    "intro": "Genç hesap, tek gece, kalabalık grup, yakın tarih ve hafta sonu sinyallerinden hesaplanan otomatik uyarılar. Rezervasyon iptal edilmez; misafirle ev kurallarını teyit edin.",
+    "loading": "Uyarılar yükleniyor…",
+    "loadFailed": "Uyarılar yüklenemedi.",
+    "empty": "Yaklaşan rezervasyonlarınızda parti riski uyarısı yok.",
+    "caption": "Parti riski işaretli rezervasyonlar",
+    "columns": {
+      "property": "İlan",
+      "dates": "Tarihler",
+      "guests": "Misafir",
+      "score": "Skor",
+      "reasons": "Gerekçeler"
+    },
+    "reasons": {
+      "YOUNG_ACCOUNT": "Yeni hesap",
+      "SINGLE_NIGHT": "Tek gece",
+      "LARGE_GROUP": "Kalabalık grup",
+      "NEAR_DATE": "Yakın tarih",
+      "WEEKEND": "Hafta sonu"
+    }
+  }
+}

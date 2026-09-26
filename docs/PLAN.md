@@ -1,6 +1,6 @@
 # booking-platform — Faz Takibi
 
-> v3 turu en üstte; v2 (etiket `v2.0.0`) geçmişi aşağıda korunur.
+> v3 turu en üstte; v2 (etiket `v2.0.0`) geçmişi aşağıda korunur; v4 turu dosyanın sonundadır.
 
 # v3 — "OTA seviyesi" turu
 
@@ -136,3 +136,63 @@ Her faz sonunda kalite kapısı: `npm run lint`, `npm run typecheck`, `npm run f
 - [x] `ci.yml` (e2e job'ı dahil), CHANGELOG, LICENSE, `docs/FINAL_REPORT.md`, `package.json` 2.0.0
 - [x] README ekran görüntüleri (`docs/img/`, `npm run docs:screenshots`)
 - [x] `v2.0.0` tag + push, CI'nın GitHub'da yeşil olduğunun doğrulanması
+
+# v4 — Sepet, pazar yeri parası, güven ve ajan ticareti turu
+
+Başlangıç: `v3.0.0` (main @ `05f7199`). Bitiş: `v4.0.0`. Her faz sonunda kalite kapısı:
+`npm run lint` · `npm run typecheck` · `npm run format:check` · `npm run test:unit -- --coverage` ·
+`npm run test:int` (Docker) · `npm run i18n:check` · `npm run build` · `docker compose build` ·
+`npm audit --omit=dev --audit-level=high` · (F3+) `npm run test:e2e` · (F7+) `npm run mcp:smoke`.
+
+## v4 F0 — Taban çizgisi (2026-09-26)
+
+| Kapı                                | Sonuç                                                         |
+| ----------------------------------- | ------------------------------------------------------------- |
+| `lint` (`--max-warnings=0`)         | yeşil                                                         |
+| `typecheck`                         | yeşil                                                         |
+| `format:check`                      | yeşil (yerel plan/ajan dosyaları `.prettierignore`'a eklendi) |
+| `test:unit -- --coverage`           | 57 dosya / **503 test** yeşil (~4,5 dk)                       |
+| unit coverage (yalnız unit projesi) | satır %44,97 · dal %42,85 · fonksiyon %45,82 · ifade %45,13   |
+| `test:int` (testcontainers)         | 35 dosya / **176 test** yeşil (~11 dk, build ile eşzamanlı)   |
+| `i18n:check`                        | 24 ad alanı, tr/en eşit                                       |
+| `build`                             | yeşil                                                         |
+| `npm audit --omit=dev` (high)       | yeşil (0 high/critical, 4 moderate)                           |
+| `docker compose build` · `test:e2e` | F0'da atlandı (süre); e2e tabanı 18 test                      |
+
+Not: satır ≥ %80 / dal ≥ %70 eşiği `vitest.config.ts`'te yalnızca birleşik (unit + integration)
+koşuda uygulanır; tek proje koşusunda eşik devre dışıdır. v4 kuralı: **yeni kodda** satır ≥ %80,
+dal ≥ %70.
+
+## v4 faz tablosu
+
+| Faz | İçerik                                                                                  | ADR / çıktı                  |
+| --- | --------------------------------------------------------------------------------------- | ---------------------------- |
+| F0  | Keşif, kalite kapısı, taban çizgisi, plan                                               | bu bölüm                     |
+| F1  | LLM sözleşmesi doğrulama + hata #1–#20 (`regression: v4#N`) + P0-4 recent-auth/step-up  | 20 regresyon testi, ADR 0024 |
+| F2  | P0-2 `BigInt` minor-unit para migration'ı + P0-3 çift girişli defter + mutabakat        | ADR 0019, 0020               |
+| F3  | P1-1 grup sepeti + P1-2 bölünmüş ödeme + P1-3 esnek tarih fiyat takvimi                 | sepet e2e                    |
+| F4  | P1-4 escrow/payout/DAC7 + P1-5 hasar depozitosu & çözüm merkezi + P1-7 sadakat/cüzdan   | ADR 0021                     |
+| F5  | P1-6 KYC & güven-emniyet + P1-8 promosyon motoru + Omnibus 30 gün en düşük fiyat        | kural tablosu testleri       |
+| F6  | P1-9 AI yorum öne çıkanları & karşılaştırma + P1-10 görsel zekâ / çok-modlu arama       | ADR 0022                     |
+| F7  | P1-11 ajan ticareti v2 (ACP + UCP + AP2 mandate) + P1-12 PWA / Web Push                 | ADR 0023, `mcp:smoke`        |
+| F8  | P1-13 uyum otomasyonu + P2-1 UI + P2-2 demo senaryoları + P2-3 yük/kaos, e2e genişletme | `docs/perf/`                 |
+| F9  | Dokümanlar, CI, cila, `FINAL_REPORT.md`, `CHANGELOG.md`, `v4.0.0` etiketi               | sürüm                        |
+
+F1 paralel yürütme için dört bağımsız gruba ayrılır (aynı dosyaya dokunan hatalar aynı grupta):
+
+- **A — şema/migration + rezervasyon çekirdeği:** #1, #9, #14, #15, #19
+- **B — ödeme + step-up:** #2, #7, #8, #13, #16
+- **C — kimlik/güvenlik/altyapı:** #4, #5, #6, #12, #17, #18, #20
+- **D — LLM maliyeti + ajan checkout + SSRF:** #3, #10, #11
+
+## v4 riskler
+
+| Risk                                                                                                                           | Etki   | Önlem                                                                              |
+| ------------------------------------------------------------------------------------------------------------------------------ | ------ | ---------------------------------------------------------------------------------- |
+| #15 (`Decimal` → `BigInt`) F2 P0-2 ile örtüşür, geniş okuyucu yüzeyi                                                           | yüksek | expand/contract; F1'de yalnızca kapsamı dar tut, asıl göç F2'de tek ADR (0019) ile |
+| Paralel F1 grupları ortak dosyalarda çakışır (`app-config.ts`, `.env.example`, `messages/*`, `src/worker/index.ts`, route'lar) | orta   | yalnızca ekleme yap, sık `git pull --rebase`; #6 route bağlantısı en son yapılır   |
+| Integration suite uzun (~10 dk) ve Docker'a bağımlı                                                                            | orta   | önce ilgili dosyalar, faz sonunda bir kez tam suite                                |
+| Birleşik coverage eşiği (80/70) mevcut kodda tutmayabilir                                                                      | orta   | yeni kod için eşik; birleşik koşu F9'da ölçülür                                    |
+| Ağır opsiyonel bağımlılıklar (CLIP/ONNX, `sharp`) build/CI'yı şişirir                                                          | orta   | `optionalDependencies` + dinamik import + özellik bayrağı                          |
+| Dış servis yokluğu (Stripe, Identity, VAPID, LLM)                                                                              | düşük  | mock/demo yolları; testler ağa çıkmaz                                              |
+| Regülasyon yorum hatası (7565, DSA, DAC7, UBL-TR)                                                                              | düşük  | eğitim amaçlı notu; kural tabloları testle sabitlenir                              |

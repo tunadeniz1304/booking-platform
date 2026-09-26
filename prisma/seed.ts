@@ -1013,6 +1013,8 @@ async function main() {
 
   const existing = await prisma.property.findMany({ select: { id: true } });
   if (existing.length > 0) {
+    // Defter yalnızca eklenir (UPDATE/DELETE tetikle reddedilir); sıfırlama TRUNCATE ile.
+    await prisma.$executeRawUnsafe(`TRUNCATE "JournalLine", "JournalEntry"`);
     await prisma.invoice.deleteMany();
     await prisma.payout.deleteMany();
     await prisma.payment.deleteMany();

@@ -895,3 +895,73 @@ model PriceSuggestion {
 
   @@index([roomTypeId, status, date])
 }
+
+// ─── P0-3: çift girişli defter (ledger v2, ADR 0020) ──────────────────────────
+
+/// Hesap planı türleri (src/lib/ledger/accounts.ts). Borç/alacak doğal yönü türden gelir.
+enum LedgerAccountKind {
+  GUEST_RECEIVABLE
+  PSP_CLEARING
+  HOST_PAYABLE
+  PLATFORM_REVENUE
+  TAX_PAYABLE
+  GUEST_CREDIT
+  ESCROW
+}
+
+enum JournalSide {
+  DEBIT
+  CREDIT
+}
+
+/// Defter hesabı. Sistem hesapları tekildir (`code` = tür adı); kişi alt hesapları
+/// `ownerId` taşır (`host_payable:<userId>`, `guest_credit:<userId>`).
+model LedgerAccount {
+  id        String            @id @default(cuid())
+  code      String            @unique
+  kind      LedgerAccountKind
+  ownerId   String?
+  name      String
+  createdAt DateTime          @default(now())
+  lines     JournalLine[]
+
+  @@index([kind, ownerId])
+}
+
+/// Dengeli jurnal kaydı (Σborç = Σalacak, para birimi başına). Yalnızca eklenir.
+model JournalEntry {
+  id             String        @id
+  /// Aynı iş olayı ikinci kez yazılmaz (örn. `booking-captured:<paymentId>`).
+  idempotencyKey String        @unique
+  /// Şablon adı (BOOKING_CAPTURED, REFUND_ISSUED, …).
+  kind           String
+  /// Satırların kanonik özeti — aynı anahtarla farklı içerik 409 döner.
+  linesHash      String
+  bookingId      String?
+  paymentId      String?
+  transferId     String?
+  occurredAt     DateTime
+  memo           String?
+  createdAt      DateTime      @default(now())
+  lines          JournalLine[]
+
+  @@index([bookingId])
+  @@index([paymentId])
+  @@index([transferId])
+  @@index([occurredAt])
+}
+
+model JournalLine {
+  id          String        @id @default(cuid())
+  entryId     String
+  entry       JournalEntry  @relation(fields: [entryId], references: [id])
+  accountId   String
+  account     LedgerAccount @relation(fields: [accountId], references: [id])
+  side        JournalSide
+  /// Pozitif minor-unit tutar (TRY: kuruş); yön `side` ile verilir.
+  amountMinor BigInt
+  currency    String
+
+  @@index([entryId])
+  @@index([accountId, currency])
+}

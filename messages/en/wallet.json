@@ -1,0 +1,45 @@
+{
+  "title": "Wallet & loyalty",
+  "loading": "Loading…",
+  "loadFailed": "Could not load your wallet.",
+  "tier": {
+    "0": "Member",
+    "1": "Silver",
+    "2": "Gold",
+    "3": "Platinum"
+  },
+  "tierBadge": "{tier} tier",
+  "tierAria": "Loyalty tier: {tier}",
+  "cashbackRate": "You earn {rate}% cashback on completed stays.",
+  "completedStays": "{count, plural, =0 {No completed stays yet} one {# completed stay} other {# completed stays}}",
+  "nextTier": "{count, plural, one {# more stay} other {# more stays}} to reach {tier} ({rate}% cashback).",
+  "topTier": "You are at the top tier.",
+  "balance": "Available credit",
+  "noBalance": "No credit yet. Cashback from completed stays will appear here.",
+  "nextExpiry": "Next expiry: {date}",
+  "lots": {
+    "title": "Credit activity",
+    "source": {
+      "CASHBACK": "Cashback",
+      "REFUND": "Refunded credit"
+    },
+    "remaining": "{remaining} left of {amount}",
+    "expires": "Expires: {date}",
+    "expired": "Expired",
+    "used": "Used"
+  },
+  "pending": {
+    "title": "Pending cashback",
+    "item": "Becomes credit on {date} ({rate}%) after the refund/claim window."
+  },
+  "checkout": {
+    "title": "Wallet credit",
+    "use": "Use my credit",
+    "available": "Available: {amount}",
+    "amount": "Credit to apply",
+    "max": "Up to {amount} (part must be paid by card)",
+    "cardRemainder": "Card charge: {amount}",
+    "invalid": "Credit must be between 0 and {max}.",
+    "notice": "Credit is reserved first; if the card payment fails, your credit is returned."
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "title": "Cüzdan ve sadakat",
+  "loading": "Yükleniyor…",
+  "loadFailed": "Cüzdan bilgisi yüklenemedi.",
+  "tier": {
+    "0": "Üye",
+    "1": "Gümüş",
+    "2": "Altın",
+    "3": "Platin"
+  },
+  "tierBadge": "{tier} seviye",
+  "tierAria": "Sadakat seviyesi: {tier}",
+  "cashbackRate": "Tamamlanan konaklamalarınızda %{rate} cashback kazanırsınız.",
+  "completedStays": "{count, plural, =0 {Henüz tamamlanan konaklama yok} one {# tamamlanan konaklama} other {# tamamlanan konaklama}}",
+  "nextTier": "{count, plural, one {# konaklama} other {# konaklama}} sonra {tier} seviyesi (%{rate} cashback).",
+  "topTier": "En üst seviyedesiniz.",
+  "balance": "Kullanılabilir kredi",
+  "noBalance": "Henüz krediniz yok. Konaklamanız tamamlandıktan sonra cashback krediniz burada görünür.",
+  "nextExpiry": "En yakın son kullanma: {date}",
+  "lots": {
+    "title": "Kredi hareketleri",
+    "source": {
+      "CASHBACK": "Cashback",
+      "REFUND": "İade edilen kredi"
+    },
+    "remaining": "Kalan {remaining} / {amount}",
+    "expires": "Son kullanma: {date}",
+    "expired": "Süresi doldu",
+    "used": "Kullanıldı"
+  },
+  "pending": {
+    "title": "Bekleyen cashback",
+    "item": "{date} tarihinde krediye dönüşür (%{rate}); iade/talep penceresi bekleniyor."
+  },
+  "checkout": {
+    "title": "Cüzdan kredisi",
+    "use": "Kredimi kullan",
+    "available": "Kullanılabilir: {amount}",
+    "amount": "Kullanılacak kredi",
+    "max": "En fazla {amount} (kartla en az bir kısım ödenir)",
+    "cardRemainder": "Kartla ödenecek: {amount}",
+    "invalid": "Kredi tutarı 0 ile {max} arasında olmalı.",
+    "notice": "Kredi önce ayrılır; kart ödemesi başarısız olursa krediniz iade edilir."
+  }
+}

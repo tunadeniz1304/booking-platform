@@ -10,6 +10,7 @@ import { logout } from "@/lib/api-client";
 import PasskeyManager from "@/components/account/PasskeyManager";
 import IdentityVerification from "@/components/account/IdentityVerification";
 import AgentMandates from "@/components/account/AgentMandates";
+import WalletPanel from "@/components/account/WalletPanel";
 import { useFormat } from "@/i18n/use-format";
 
 interface User {
@@ -244,6 +245,8 @@ export default function AccountPage() {
             </div>
           </div>
         )}
+
+        <WalletPanel />
 
         <IdentityVerification role={user?.role} />
 

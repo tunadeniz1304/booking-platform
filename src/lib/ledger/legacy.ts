@@ -44,10 +44,13 @@ export async function listBookingLedger(db: Db, bookingId: string): Promise<Ledg
   }));
   const derived = await deriveFromJournal(db, bookingId);
   const unmatched = [...rows];
+  const same = (r: LedgerViewRow, d: LedgerViewRow) =>
+    r.kind === d.kind && r.amountMinor === d.amountMinor && r.currency === d.currency;
   for (const d of derived) {
-    const i = unmatched.findIndex(
-      (r) => r.kind === d.kind && r.reference === d.reference && r.amountMinor === d.amountMinor
-    );
+    // Önce referans da eşleşen satır; yoksa (ör. devredilmiş rezervasyonun iadesi eski
+    // defterde alıcının devir ödemesine referanslı) aynı tür + tutar + para birimi.
+    let i = unmatched.findIndex((r) => same(r, d) && r.reference === d.reference);
+    if (i < 0) i = unmatched.findIndex((r) => same(r, d));
     if (i >= 0) unmatched.splice(i, 1);
     else rows.push(d);
   }

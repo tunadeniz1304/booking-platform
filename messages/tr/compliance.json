@@ -94,6 +94,96 @@
       "VISUAL_ALARM": "Görsel yangın alarmı",
       "LOWERED_BED": "Alçak yatak",
       "ACCESSIBLE_TOILET": "Erişilebilir tuvalet"
+    },
+    "host": {
+      "title": "Erişilebilirlik özellikleri",
+      "intro": "Tesisinizin erişilebilirlik özelliklerini beyan edin ve her biri için ilan fotoğraflarınızdan bir kanıt bağlayın. Yalnızca platform ekibinin kanıtla doğruladığı özellikler ilanda ve aramada görünür.",
+      "property": "İlan",
+      "loading": "Özellikler yükleniyor…",
+      "empty": "Henüz beyan edilmiş özellik yok.",
+      "listLabel": "Beyan edilmiş erişilebilirlik özellikleri",
+      "pendingReview": "İnceleme bekliyor",
+      "needsEvidence": "Kanıt fotoğrafı gerekli",
+      "noEvidence": "Kanıt yok",
+      "photoOption": "Fotoğraf {index}",
+      "viewEvidence": "Kanıtı görüntüle",
+      "delete": "Sil",
+      "deleteLabel": "{name} özelliğini sil",
+      "addTitle": "Yeni özellik ekle",
+      "code": "Özellik",
+      "scope": "Kapsam",
+      "widthCm": "Net kapı genişliği (cm)",
+      "widthRange": "{min}–{max} cm arasında bir tam sayı girin.",
+      "evidenceHint": "Kanıt değiştirilirse doğrulama yeniden yapılır.",
+      "note": "Not (isteğe bağlı)",
+      "add": "Özelliği ekle",
+      "added": "Özellik eklendi.",
+      "evidenceSaved": "Kanıt güncellendi; özellik yeniden incelenecek.",
+      "deleted": "Özellik silindi."
+    },
+    "admin": {
+      "title": "Erişilebilirlik doğrulama kuyruğu",
+      "intro": "Ev sahiplerinin kanıt fotoğraflı beyanları. Fotoğraf özelliği açıkça gösteriyorsa doğrulayın.",
+      "filter": "Kuyruk filtresi",
+      "tabs": {
+        "pending": "Bekleyen",
+        "verified": "Doğrulanmış"
+      },
+      "empty": "Kuyrukta kayıt yok.",
+      "evidenceAlt": "{name} için kanıt fotoğrafı",
+      "verify": "Doğrula",
+      "unverify": "Doğrulamayı kaldır",
+      "verifiedOk": "Özellik doğrulandı.",
+      "unverifiedOk": "Doğrulama kaldırıldı."
+    }
+  },
+  "appeal": {
+    "title": "Karara itiraz",
+    "intro": "DSA md. 20 kapsamında içerik moderasyonu kararına itiraz edebilirsiniz. İtirazınızı yetkili bir çalışan inceler; sonuç e-postayla bildirilir.",
+    "invalidLink": "İtiraz bağlantısı geçersiz ya da süresi dolmuş. Lütfen karar e-postanızdaki bağlantıyı kullanın.",
+    "decisionTitle": "İtiraz edilen karar",
+    "decision": "Karar",
+    "decisions": {
+      "REMOVED": "İçerik yayından kaldırıldı",
+      "NO_ACTION": "İşlem yapılmadı"
+    },
+    "decidedAt": "Karar tarihi",
+    "windowEnds": "Son itiraz tarihi",
+    "statement": "Gerekçeli karar bildirimi",
+    "existing": {
+      "PENDING": "İtirazınız alındı ve inceleniyor (itiraz no: {reference}).",
+      "UPHELD": "İtirazınız kabul edildi; karar geri alındı (itiraz no: {reference}).",
+      "REJECTED": "İtirazınız reddedildi (itiraz no: {reference}). DSA md. 21 kapsamında mahkeme dışı uyuşmazlık çözümüne başvurabilirsiniz."
+    },
+    "windowClosed": "Bu karar için itiraz süresi doldu.",
+    "formTitle": "İtirazınız",
+    "reason": "İtiraz gerekçesi",
+    "reasonHint": "Kararın neden hatalı olduğunu açıklayın (en az 20 karakter).",
+    "reasonTooShort": "Gerekçe en az 20 karakter olmalı.",
+    "submit": "İtirazı gönder",
+    "sending": "Gönderiliyor…",
+    "sent": "İtirazınız alındı (itiraz no: {reference}). Sonuç e-postayla bildirilecek.",
+    "rateLimited": "Çok fazla deneme yapıldı; lütfen daha sonra tekrar deneyin.",
+    "alreadySubmitted": "Bu karar için itirazınız zaten alındı.",
+    "error": "İtiraz gönderilemedi. Lütfen tekrar deneyin.",
+    "admin": {
+      "title": "DSA itirazları (md. 20)",
+      "intro": "Kabul edilen itiraz önceki kararı geri alır: kaldırma kararında ilan yeniden yayına alınabilir; işlem yapılmadı kararında ilan kaldırılır.",
+      "empty": "Bekleyen itiraz yok.",
+      "roles": {
+        "REPORTER": "Bildiren",
+        "HOST": "Ev sahibi"
+      },
+      "statement": "Gerekçeli karar bildirimi",
+      "outcome": "Sonuç",
+      "outcomes": {
+        "UPHELD": "Kabul (kararı geri al)",
+        "REJECTED": "Ret (karar geçerli)"
+      },
+      "groundHint": "İlan kaldırılacağı için dayanak zorunludur.",
+      "response": "Gerekçe (itiraz edene gönderilir)",
+      "submit": "İtiraz kararını kaydet",
+      "decided": "İtiraz kararı kaydedildi; sonuç e-postalanacak."
     }
   }
 }

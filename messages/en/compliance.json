@@ -94,6 +94,96 @@
       "VISUAL_ALARM": "Visual fire alarm",
       "LOWERED_BED": "Lowered bed",
       "ACCESSIBLE_TOILET": "Accessible toilet"
+    },
+    "host": {
+      "title": "Accessibility features",
+      "intro": "Declare your property's accessibility features and link evidence from your listing photos to each one. Only features our team has verified against the evidence appear on the listing and in search.",
+      "property": "Listing",
+      "loading": "Loading features…",
+      "empty": "No features declared yet.",
+      "listLabel": "Declared accessibility features",
+      "pendingReview": "Awaiting review",
+      "needsEvidence": "Evidence photo required",
+      "noEvidence": "No evidence",
+      "photoOption": "Photo {index}",
+      "viewEvidence": "View evidence",
+      "delete": "Delete",
+      "deleteLabel": "Delete {name}",
+      "addTitle": "Add a feature",
+      "code": "Feature",
+      "scope": "Scope",
+      "widthCm": "Clear door width (cm)",
+      "widthRange": "Enter a whole number between {min} and {max} cm.",
+      "evidenceHint": "Changing the evidence resets verification.",
+      "note": "Note (optional)",
+      "add": "Add feature",
+      "added": "Feature added.",
+      "evidenceSaved": "Evidence updated; the feature will be reviewed again.",
+      "deleted": "Feature deleted."
+    },
+    "admin": {
+      "title": "Accessibility verification queue",
+      "intro": "Host declarations with evidence photos. Verify only when the photo clearly shows the feature.",
+      "filter": "Queue filter",
+      "tabs": {
+        "pending": "Pending",
+        "verified": "Verified"
+      },
+      "empty": "The queue is empty.",
+      "evidenceAlt": "Evidence photo for {name}",
+      "verify": "Verify",
+      "unverify": "Remove verification",
+      "verifiedOk": "Feature verified.",
+      "unverifiedOk": "Verification removed."
+    }
+  },
+  "appeal": {
+    "title": "Appeal a decision",
+    "intro": "Under DSA Art. 20 you can appeal a content moderation decision. A qualified member of staff reviews your appeal and emails you the outcome.",
+    "invalidLink": "This appeal link is invalid or has expired. Please use the link in your decision email.",
+    "decisionTitle": "Decision under appeal",
+    "decision": "Decision",
+    "decisions": {
+      "REMOVED": "Content removed",
+      "NO_ACTION": "No action taken"
+    },
+    "decidedAt": "Decision date",
+    "windowEnds": "Appeal deadline",
+    "statement": "Statement of reasons",
+    "existing": {
+      "PENDING": "Your appeal was received and is under review (reference: {reference}).",
+      "UPHELD": "Your appeal was upheld; the decision was reversed (reference: {reference}).",
+      "REJECTED": "Your appeal was rejected (reference: {reference}). You may refer the matter to an out-of-court dispute settlement body (DSA Art. 21)."
+    },
+    "windowClosed": "The appeal period for this decision has ended.",
+    "formTitle": "Your appeal",
+    "reason": "Grounds for appeal",
+    "reasonHint": "Explain why the decision is wrong (at least 20 characters).",
+    "reasonTooShort": "Please write at least 20 characters.",
+    "submit": "Submit appeal",
+    "sending": "Sending…",
+    "sent": "We received your appeal (reference: {reference}). You will be emailed the outcome.",
+    "rateLimited": "Too many attempts; please try again later.",
+    "alreadySubmitted": "You have already appealed this decision.",
+    "error": "The appeal could not be sent. Please try again.",
+    "admin": {
+      "title": "DSA appeals (Art. 20)",
+      "intro": "Upholding an appeal reverses the earlier decision: after a removal the host may relist; after a no-action decision the listing is removed.",
+      "empty": "No pending appeals.",
+      "roles": {
+        "REPORTER": "Notifier",
+        "HOST": "Host"
+      },
+      "statement": "Statement of reasons",
+      "outcome": "Outcome",
+      "outcomes": {
+        "UPHELD": "Uphold (reverse decision)",
+        "REJECTED": "Reject (decision stands)"
+      },
+      "groundHint": "A ground is required because the listing will be removed.",
+      "response": "Reasons (sent to the appellant)",
+      "submit": "Save appeal decision",
+      "decided": "Appeal decision saved; the outcome will be emailed."
     }
   }
 }

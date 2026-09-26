@@ -99,5 +99,40 @@
     "confirmRevokeOthers": "Bu cihaz dışındaki tüm oturumlar kapatılsın mı?",
     "revokedOk": "Oturum kapatıldı",
     "revokeFailed": "Oturum kapatılamadı"
+  },
+  "mandates": {
+    "title": "Yapay zekâ ajanı ödeme yetkileri",
+    "intro": "Bir yapay zekâ ajanının sizin adınıza rezervasyon ödemesi yapabilmesi için sınırlı bir yetki (mandate) verin. Yetki tutar, süre ve isteğe bağlı olarak ilanlarla sınırlıdır; dilediğiniz an iptal edebilirsiniz.",
+    "amount": "Azami tutar",
+    "amountInvalid": "Sıfırdan büyük bir tutar girin.",
+    "currency": "Para birimi",
+    "duration": "Geçerlilik süresi",
+    "durations": {
+      "1h": "1 saat",
+      "1d": "1 gün",
+      "7d": "7 gün"
+    },
+    "properties": "İlan kısıtı (isteğe bağlı)",
+    "propertiesHint": "Yalnız belirli ilanlar için yetki vermek istiyorsanız ilan kimliklerini virgülle ayırarak girin.",
+    "create": "Yetki ver",
+    "creating": "Oluşturuluyor…",
+    "created": "Yetki oluşturuldu.",
+    "tokenOnce": "Bu yetki belgesi yalnızca şimdi gösterilir. Ajanınıza iletin; başkalarıyla paylaşmayın.",
+    "tokenLabel": "İmzalı yetki belgesi",
+    "copy": "Kopyala",
+    "listTitle": "Verilmiş yetkiler",
+    "empty": "Henüz yetki verilmedi.",
+    "limit": "Limit {amount}",
+    "status": {
+      "active": "Etkin",
+      "expired": "Süresi doldu",
+      "revoked": "İptal edildi"
+    },
+    "used": "Kullanıldı",
+    "validUntil": "Geçerlilik: {date}",
+    "scoped": "{count, plural, other {# ilanla sınırlı}}",
+    "revoke": "İptal et",
+    "revokeLabel": "{amount} limitli yetkiyi iptal et",
+    "revoked": "Yetki iptal edildi; ajan bu yetkiyle ödeme yapamaz."
   }
 }

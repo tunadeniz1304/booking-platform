@@ -99,5 +99,40 @@
     "confirmRevokeOthers": "Sign out every session except this device?",
     "revokedOk": "Session signed out",
     "revokeFailed": "Could not sign the session out"
+  },
+  "mandates": {
+    "title": "AI agent payment mandates",
+    "intro": "Give an AI agent limited permission (a mandate) to pay for bookings on your behalf. Each mandate is capped by amount and time and can be limited to specific listings; you can revoke it at any time.",
+    "amount": "Maximum amount",
+    "amountInvalid": "Enter an amount greater than zero.",
+    "currency": "Currency",
+    "duration": "Valid for",
+    "durations": {
+      "1h": "1 hour",
+      "1d": "1 day",
+      "7d": "7 days"
+    },
+    "properties": "Listing restriction (optional)",
+    "propertiesHint": "To allow only specific listings, enter their IDs separated by commas.",
+    "create": "Grant mandate",
+    "creating": "Creating…",
+    "created": "Mandate created.",
+    "tokenOnce": "This signed mandate is shown only once. Give it to your agent; do not share it with anyone else.",
+    "tokenLabel": "Signed mandate",
+    "copy": "Copy",
+    "listTitle": "Granted mandates",
+    "empty": "No mandates granted yet.",
+    "limit": "Limit {amount}",
+    "status": {
+      "active": "Active",
+      "expired": "Expired",
+      "revoked": "Revoked"
+    },
+    "used": "Used",
+    "validUntil": "Valid until {date}",
+    "scoped": "{count, plural, one {Limited to # listing} other {Limited to # listings}}",
+    "revoke": "Revoke",
+    "revokeLabel": "Revoke mandate with limit {amount}",
+    "revoked": "Mandate revoked; the agent can no longer pay with it."
   }
 }

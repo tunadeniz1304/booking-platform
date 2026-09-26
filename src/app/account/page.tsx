@@ -9,6 +9,7 @@ import Footer from "@/components/layout/Footer";
 import { logout } from "@/lib/api-client";
 import PasskeyManager from "@/components/account/PasskeyManager";
 import IdentityVerification from "@/components/account/IdentityVerification";
+import AgentMandates from "@/components/account/AgentMandates";
 import { useFormat } from "@/i18n/use-format";
 
 interface User {
@@ -247,6 +248,8 @@ export default function AccountPage() {
         <IdentityVerification role={user?.role} />
 
         <PasskeyManager />
+
+        <AgentMandates />
 
         <p className="mt-4 text-sm">
           <Link href="/account/sessions" className="font-medium text-blue-700 hover:underline">

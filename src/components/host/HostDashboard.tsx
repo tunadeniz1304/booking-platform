@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/ui";
 import DepositSettings from "./DepositSettings";
 import PromotionsPanel from "./PromotionsPanel";
+import AccessibilityPanel from "./AccessibilityPanel";
 
 interface HostRoom {
   id: string;
@@ -119,6 +120,7 @@ export default function HostDashboard() {
         <PropertyPanel key={p.id} property={p} onChanged={load} />
       ))}
       {properties && properties.length > 0 && <PromotionsPanel properties={properties} />}
+      {properties && properties.length > 0 && <AccessibilityPanel properties={properties} />}
 
       <Card title={t("bookings.title")} id="host-bookings">
         {bookings === null ? (

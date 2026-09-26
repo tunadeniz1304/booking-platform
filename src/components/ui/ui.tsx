@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import {
+  cloneElement,
+  isValidElement,
+  useEffect,
+  useState,
+  type ReactElement,
+  type ReactNode,
+} from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import Header from "@/components/layout/Header";
@@ -33,24 +40,49 @@ export function Button({
   );
 }
 
+/**
+ * Etiketli form alanı. `hint` ve `error` tek alt öğeye (input/select/textarea)
+ * `aria-describedby` ile bağlanır; hata varken `aria-invalid` (WCAG 3.3.1 / 1.3.1).
+ */
 export function Field({
   label,
   id,
   hint,
+  error,
   children,
 }: {
   label: string;
   id: string;
   hint?: string;
+  error?: string | null;
   children: ReactNode;
 }) {
+  const hintId = hint ? `${id}-hint` : undefined;
+  const errorId = error ? `${id}-error` : undefined;
+  const describedBy = [hintId, errorId].filter(Boolean).join(" ") || undefined;
+  const control =
+    isValidElement(children) && describedBy
+      ? cloneElement(children as ReactElement<Record<string, unknown>>, {
+          "aria-describedby": describedBy,
+          ...(error ? { "aria-invalid": true } : {}),
+        })
+      : children;
   return (
     <div>
       <label htmlFor={id} className="block text-sm font-medium text-gray-800">
         {label}
       </label>
-      {children}
-      {hint && <p className="mt-1 text-xs text-gray-600">{hint}</p>}
+      {control}
+      {hint && (
+        <p id={hintId} className="mt-1 text-xs text-gray-600">
+          {hint}
+        </p>
+      )}
+      {error && (
+        <p id={errorId} className="mt-1 text-xs font-medium text-red-700">
+          {error}
+        </p>
+      )}
     </div>
   );
 }

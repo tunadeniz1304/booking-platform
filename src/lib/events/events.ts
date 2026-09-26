@@ -23,6 +23,10 @@ export const EventTypes = {
   ExperimentExposure: "experiment.exposure",
   /** Hesapta güvenlik açısından önemli değişiklik (yeni passkey vb.) → e-posta (v4#2). */
   SecurityAlert: "auth.security_alert",
+  /** DSA bildirimi alındı → bildirene alındı onayı (P1-13b). */
+  NoticeReceived: "compliance.notice_received",
+  /** DSA bildirimine karar verildi → gerekçeli karar bildirimi (P1-13b). */
+  NoticeDecided: "compliance.notice_decided",
 } as const;
 
 export type EventType = (typeof EventTypes)[keyof typeof EventTypes];

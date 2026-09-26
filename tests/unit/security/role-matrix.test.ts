@@ -37,6 +37,11 @@ import * as adminReconciliation from "@/app/api/admin/reconciliation/route";
 import * as hostPhotos from "@/app/api/host/properties/[id]/photos/route";
 import * as hostPhoto from "@/app/api/host/properties/[id]/photos/[photoId]/route";
 import * as accountSessions from "@/app/api/account/sessions/route";
+import * as adminTakedowns from "@/app/api/admin/takedowns/route";
+import * as adminTakedown from "@/app/api/admin/takedowns/[id]/route";
+import * as adminNotices from "@/app/api/admin/notices/route";
+import * as adminNotice from "@/app/api/admin/notices/[id]/route";
+import * as adminTransparency from "@/app/api/admin/compliance/transparency/route";
 import * as bookings from "@/app/api/bookings/route";
 import * as account from "@/app/api/account/route";
 import * as listingCopy from "@/app/api/ai/listing-copy/route";
@@ -103,6 +108,17 @@ const MATRIX: Array<[string, string, Handler, Role[]]> = [
     ["ADMIN"],
   ],
   ["GET /api/account/sessions", "GET", accountSessions.GET as unknown as Handler, ALL],
+  ["GET /api/admin/takedowns", "GET", adminTakedowns.GET as unknown as Handler, ["ADMIN"]],
+  ["POST /api/admin/takedowns", "POST", adminTakedowns.POST as unknown as Handler, ["ADMIN"]],
+  ["POST /api/admin/takedowns/[id]", "POST", adminTakedown.POST as unknown as Handler, ["ADMIN"]],
+  ["GET /api/admin/notices", "GET", adminNotices.GET as unknown as Handler, ["ADMIN"]],
+  ["POST /api/admin/notices/[id]", "POST", adminNotice.POST as unknown as Handler, ["ADMIN"]],
+  [
+    "GET /api/admin/compliance/transparency",
+    "GET",
+    adminTransparency.GET as unknown as Handler,
+    ["ADMIN"],
+  ],
   ["GET /api/bookings", "GET", bookings.GET as unknown as Handler, ALL],
   ["GET /api/account", "GET", account.GET as unknown as Handler, ALL],
   ["GET /api/dev/mailbox", "GET", mailbox.GET as unknown as Handler, ALL],

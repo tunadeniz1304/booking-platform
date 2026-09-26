@@ -22,6 +22,7 @@ const PUBLIC_API: readonly PublicRule[] = [
   { prefix: "/api/rooms/", methods: ["GET"] },
   { prefix: "/api/routing/optimize", methods: ["GET"] },
   { prefix: "/api/transfers/discover", methods: ["GET"] },
+  { prefix: "/api/notices", methods: ["POST"] }, // DSA md. 16 herkese açık bildirim (P1-13b)
 ];
 
 /** CSRF Origin kontrolünün uygulanmadığı (kendi imza/sır doğrulaması olan) uçlar. */

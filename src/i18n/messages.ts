@@ -13,6 +13,7 @@ export const NAMESPACES = [
   "chat",
   "checkout",
   "common",
+  "compliance",
   "cookie",
   "footer",
   "home",

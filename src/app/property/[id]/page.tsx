@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { prisma } from "@/lib/prisma";
 import { LISTABLE_PROPERTY } from "@/lib/compliance/listing";
@@ -107,6 +108,7 @@ export default async function PropertyPage({ params, searchParams }: PropertyPag
   };
   const property = await getProperty(id);
   const t = await getTranslations("property");
+  const tc = await getTranslations("compliance.report");
 
   if (!property) {
     notFound();
@@ -157,6 +159,16 @@ export default async function PropertyPage({ params, searchParams }: PropertyPag
             )}
 
             <ReviewsSection propertyId={property.id} />
+
+            {/* P1-13b: DSA md. 16 bildirim bağlantısı */}
+            <p className="mt-8 text-sm">
+              <Link
+                href={`/report?propertyId=${encodeURIComponent(property.id)}`}
+                className="text-gray-600 underline hover:text-[#003580]"
+              >
+                {tc("reportListing")}
+              </Link>
+            </p>
           </div>
 
           <div className="lg:col-span-1">

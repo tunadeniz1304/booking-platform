@@ -1,0 +1,74 @@
+{
+  "report": {
+    "title": "Report content",
+    "intro": "Report a listing or content you believe is illegal (EU Digital Services Act Art. 16). A person reviews every notice; the decision and its reasons are emailed to you.",
+    "reportListing": "Report this listing",
+    "contentUrl": "Content address (URL)",
+    "category": "Notice type",
+    "categories": {
+      "ILLEGAL_LISTING": "Illegal listing",
+      "UNLICENSED": "Unlicensed / unregistered accommodation",
+      "FRAUD_SCAM": "Fraud or scam",
+      "IP_INFRINGEMENT": "Intellectual property infringement",
+      "DISCRIMINATION": "Discrimination",
+      "UNSAFE": "Unsafe accommodation",
+      "OTHER": "Other"
+    },
+    "explanation": "Explain why it is illegal (at least 20 characters)",
+    "reporterName": "Your name (optional)",
+    "reporterEmail": "Your email address",
+    "goodFaith": "I believe in good faith that the information and allegations in this notice are accurate and complete.",
+    "submit": "Send notice",
+    "sending": "Sending…",
+    "sent": "We received your notice. Your reference: {reference}. A confirmation email was sent.",
+    "invalid": "Please fill in all required fields correctly.",
+    "rateLimited": "Too many notices sent; please try again later.",
+    "error": "The notice could not be sent; please try again."
+  },
+  "admin": {
+    "title": "Compliance",
+    "intro": "7565 takedown requests (24-hour SLA), DSA notices and the transparency report.",
+    "open": "Compliance panel",
+    "takedowns": "7565 takedown requests",
+    "source": "Source",
+    "sources": {
+      "MINISTRY_7565": "Ministry (7565)",
+      "COURT_ORDER": "Court order",
+      "OTHER_AUTHORITY": "Other authority"
+    },
+    "propertyId": "Listing ID",
+    "referenceNo": "Document no.",
+    "reason": "Reason",
+    "createTakedown": "Record request and take listing down",
+    "takedownCreated": "Request recorded; the listing was taken down.",
+    "takedownClosed": "Request closed.",
+    "defaultResolution": "Closed by an administrator",
+    "status": {
+      "RECEIVED": "Received",
+      "ACTIONED": "Listing removed",
+      "CLOSED": "Closed"
+    },
+    "slaDue": "SLA due {at} UTC",
+    "breached": "SLA breached",
+    "close": "Close",
+    "notices": "Pending DSA notices",
+    "noNotices": "No pending notices.",
+    "decision": "Decision",
+    "decisions": {
+      "REMOVED": "Remove",
+      "NO_ACTION": "No action"
+    },
+    "ground": "Ground",
+    "grounds": {
+      "ILLEGAL_CONTENT": "Illegal content",
+      "TERMS_OF_SERVICE": "Terms of service"
+    },
+    "facts": "Facts and reasoning",
+    "legalReference": "Legal reference",
+    "decide": "Record decision",
+    "noticeDecided": "Decision recorded; the statement of reasons will be sent.",
+    "transparency": "Transparency report",
+    "exportCsv": "Download CSV (this year)",
+    "exportJson": "View JSON (this year)"
+  }
+}

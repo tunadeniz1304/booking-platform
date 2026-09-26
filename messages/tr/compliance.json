@@ -1,0 +1,74 @@
+{
+  "report": {
+    "title": "İçerik bildir",
+    "intro": "Yasa dışı olduğunu düşündüğünüz bir ilanı veya içeriği bildirin (AB Dijital Hizmetler Yasası md. 16). Bildiriminiz insan tarafından incelenir; karar ve gerekçesi e-postanıza gönderilir.",
+    "reportListing": "Bu ilanı bildir",
+    "contentUrl": "İçeriğin adresi (URL)",
+    "category": "Bildirim türü",
+    "categories": {
+      "ILLEGAL_LISTING": "Yasa dışı ilan",
+      "UNLICENSED": "Belgesiz / kayıtsız konaklama",
+      "FRAUD_SCAM": "Dolandırıcılık",
+      "IP_INFRINGEMENT": "Fikrî mülkiyet ihlali",
+      "DISCRIMINATION": "Ayrımcılık",
+      "UNSAFE": "Güvensiz konaklama",
+      "OTHER": "Diğer"
+    },
+    "explanation": "Neden yasa dışı olduğunu açıklayın (en az 20 karakter)",
+    "reporterName": "Adınız (isteğe bağlı)",
+    "reporterEmail": "E-posta adresiniz",
+    "goodFaith": "Bu bildirimdeki bilgilerin ve iddiaların doğru ve eksiksiz olduğuna iyi niyetle inanıyorum.",
+    "submit": "Bildirimi gönder",
+    "sending": "Gönderiliyor…",
+    "sent": "Bildiriminiz alındı. Başvuru numaranız: {reference}. Onay e-postası gönderildi.",
+    "invalid": "Lütfen tüm zorunlu alanları doğru doldurun.",
+    "rateLimited": "Çok fazla bildirim gönderildi; lütfen daha sonra tekrar deneyin.",
+    "error": "Bildirim gönderilemedi; lütfen tekrar deneyin."
+  },
+  "admin": {
+    "title": "Uyum",
+    "intro": "7565 kaldırma talepleri (24 saat SLA), DSA bildirimleri ve şeffaflık raporu.",
+    "open": "Uyum paneli",
+    "takedowns": "7565 kaldırma talepleri",
+    "source": "Kaynak",
+    "sources": {
+      "MINISTRY_7565": "Bakanlık (7565)",
+      "COURT_ORDER": "Mahkeme kararı",
+      "OTHER_AUTHORITY": "Diğer makam"
+    },
+    "propertyId": "İlan kimliği",
+    "referenceNo": "Evrak no",
+    "reason": "Gerekçe",
+    "createTakedown": "Talebi kaydet ve ilanı kaldır",
+    "takedownCreated": "Talep kaydedildi; ilan yayından kaldırıldı.",
+    "takedownClosed": "Talep kapatıldı.",
+    "defaultResolution": "Yönetici tarafından kapatıldı",
+    "status": {
+      "RECEIVED": "Alındı",
+      "ACTIONED": "İlan kaldırıldı",
+      "CLOSED": "Kapalı"
+    },
+    "slaDue": "SLA bitişi {at} UTC",
+    "breached": "SLA aşıldı",
+    "close": "Kapat",
+    "notices": "Bekleyen DSA bildirimleri",
+    "noNotices": "Bekleyen bildirim yok.",
+    "decision": "Karar",
+    "decisions": {
+      "REMOVED": "Kaldır",
+      "NO_ACTION": "İşlem yapma"
+    },
+    "ground": "Dayanak",
+    "grounds": {
+      "ILLEGAL_CONTENT": "Hukuka aykırı içerik",
+      "TERMS_OF_SERVICE": "Kullanım koşulları"
+    },
+    "facts": "Olgular ve gerekçe",
+    "legalReference": "Hukuki referans",
+    "decide": "Kararı kaydet",
+    "noticeDecided": "Karar kaydedildi; gerekçeli karar bildirimi gönderilecek.",
+    "transparency": "Şeffaflık raporu",
+    "exportCsv": "CSV indir (bu yıl)",
+    "exportJson": "JSON görüntüle (bu yıl)"
+  }
+}

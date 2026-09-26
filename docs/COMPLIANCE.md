@@ -81,3 +81,10 @@ yok, yükümlülük yalnızca burada not edilmiş · **Kapsam dışı**: bilinç
 Sınırlar: gerçek Bakanlık entegrasyonu (resmî yazının otomatik alınması) ve gerçek özel
 entegratör istemcisi yok (demo); DSA itiraz (md. 20) iş akışı bu kapsamda değildir.
 Erişilebilirlikte yerinde denetim yok: doğrulama host'un fotoğraf kanıtına dayanır.
+
+## 7. Saklama politikası (P0-5)
+
+Gecelik `data-retention` bakım işi (`src/lib/privacy/retention.ts`, `npm run data:retention`) operasyonel kayıtları `RETENTION_*_DAYS` sonrasında partiler hâlinde siler: denetim kaydı (730 g), webhook tekilleştirme `PaymentEvent` (90 g, sağlayıcı yeniden deneme penceresinden uzun), işlenmiş outbox (30 g), gece fiyat geçmişi (400 g, Omnibus penceresi başındaki fiyat korunur), engellenmemiş mesaj risk bayrakları (365 g), süresi dolmuş e-posta token'ları (30 g) — KVKK m.4/GDPR md.5(1)(e) veri en aza indirme.
+**Silinmez (yasal saklama):** fatura/e-Arşiv, jurnal ve ödeme/payout kayıtları (VUK md.253 ve TTK md.82: 5–10 yıl; DAC7 raporlama), DSA bildirim/itiraz/kaldırma kayıtları ve gerekçe e-postaları (DSA md.16–17, 20 ve 24 şeffaflık), KYC doğrulamaları (MASAK/5549), çözüm merkezi talepleri, engellenen mesajlar (moderasyon kararı).
+Denetim kaydında bu alanların eylemleri (`dsa.`, `takedown.`, `kyc.`, `claim.`, `payment.`, `cart.`, `transfer.`, `ledger.`, `agent_mandate.`, `accessibility.`, `fraud.`, `user.role`, `message.blocked`) `LEGAL_HOLD_AUDIT_PREFIXES` ile hiç budanmaz; yeni yasal kayıt eylemi eklenirse listeye eklenmelidir.
+Tablolar bölümlenmiş değildir; silme `LIMIT`'li partilerle ve zaman sütunu indeksleriyle (`20260928900000_retention_indexes`) yapılır.

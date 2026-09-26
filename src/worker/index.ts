@@ -57,6 +57,7 @@ import { registerTracing } from "@/lib/observability/tracing";
 import { createServer } from "http";
 import { registry } from "@/lib/observability/metrics";
 import { metricsAuthorized } from "@/lib/observability/metrics-auth";
+import { DATA_RETENTION_JOB, runDataRetention, scheduleDataRetention } from "./jobs/data-retention";
 
 loadEnv();
 
@@ -113,6 +114,7 @@ async function main(): Promise<void> {
       if (job.name === TRANSFER_SWEEP_JOB) return runTransferSweep();
       if (job.name === LEDGER_RECONCILE_JOB) return runLedgerReconcile();
       if (job.name === PUSH_CHECKIN_REMINDER_JOB) return runPushReminders();
+      if (job.name === DATA_RETENTION_JOB) return runDataRetention();
       throw new Error(`Bilinmeyen bakım işi: ${job.name}`);
     },
     { connection }
@@ -185,6 +187,7 @@ async function main(): Promise<void> {
   await scheduleLedgerReconcile(getQueue(QUEUE_NAMES.maintenance));
   await scheduleTakedownSlaSweep(getQueue(QUEUE_NAMES.compliance));
   await schedulePushReminders(getQueue(QUEUE_NAMES.maintenance));
+  await scheduleDataRetention(getQueue(QUEUE_NAMES.maintenance));
   await schedulePriceCalendarRefresh(getQueue(QUEUE_NAMES.priceCalendar));
   await scheduleResolutionSweeps(getQueue(QUEUE_NAMES.resolution));
 

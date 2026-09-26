@@ -442,6 +442,8 @@ model PaymentEvent {
   receivedAt  DateTime @default(now())
 
   @@index([providerRef])
+  /// P0-5: saklama bakımının parti silme taraması
+  @@index([receivedAt])
 }
 
 enum LedgerKind {
@@ -645,6 +647,8 @@ model OutboxMessage {
   @@index([status, lockedUntil])
   @@index([aggregateType, aggregateId])
   @@index([correlationId])
+  /// P0-5: saklama bakımının parti silme taraması
+  @@index([status, processedAt])
 }
 
 model PriceHistory {
@@ -775,6 +779,8 @@ model AuditLog {
 
   @@index([actorId, createdAt])
   @@index([entity, entityId])
+  /// P0-5: saklama bakımının parti silme taraması
+  @@index([createdAt])
 }
 
 /// Ödeme öncesi kural tabanlı risk değerlendirmesi (P1-10); admin inceleme kuyruğu.
@@ -844,6 +850,8 @@ model AuthToken {
   createdAt DateTime      @default(now())
 
   @@index([userId, kind])
+  /// P0-5: saklama bakımının parti silme taraması
+  @@index([expiresAt])
 }
 
 /// Passkey (WebAuthn) kimlik bilgisi; `id` = base64url credential ID.
@@ -1258,6 +1266,8 @@ model MessageRiskFlag {
   createdAt DateTime @default(now())
 
   @@index([bookingId, createdAt])
+  /// P0-5: saklama bakımının parti silme taraması
+  @@index([createdAt])
 }
 
 /// Parti riski değerlendirmesi (P1-6): rezervasyon başına tek satır, açıklanabilir gerekçe kodlarıyla.
@@ -1452,6 +1462,8 @@ model InventoryPriceHistory {
   effectiveAt DateTime @default(now())
 
   @@index([roomTypeId, date, effectiveAt])
+  /// P0-5: saklama bakımının parti silme taraması
+  @@index([effectiveAt])
 }
 
 /// P1-4 ev sahibi ödeme hesabı (ADR 0021). `kycStatus` payout sağlayıcısının bağlı hesap

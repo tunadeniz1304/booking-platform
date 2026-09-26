@@ -71,6 +71,25 @@ const schema = z.object({
   SERVICE_FEE_BPS: int(0, 0, 3000),
   /** Geçmiş envanter günleri bu kadar gün sonra budanır (P0-11). */
   INVENTORY_RETENTION_DAYS: int(400, 30, 3650),
+  // Veri yaşam döngüsü (P0-5): `data-retention` bakım işi; yasal saklamalı kayıtlar (fatura,
+  // jurnal, DSA/KYC/talep denetim izleri) HİÇ silinmez — docs/COMPLIANCE.md "Saklama politikası".
+  /** Denetim kaydı (yasal saklamaya tabi eylemler hariç: bkz. LEGAL_HOLD_AUDIT_PREFIXES). */
+  RETENTION_AUDIT_LOG_DAYS: int(730, 180, 3650),
+  /** Webhook tekilleştirme kaydı; sağlayıcı yeniden deneme penceresinden (≤30 gün) uzun olmalı. */
+  RETENTION_PAYMENT_EVENT_DAYS: int(90, 35, 3650),
+  /** İşlenmiş (DONE) outbox mesajları; FAILED/DEAD admin yeniden kuyruğu için kalır. */
+  RETENTION_OUTBOX_DAYS: int(30, 7, 3650),
+  /** Gece fiyat geçmişi; Omnibus penceresinden (PRICE_OMNIBUS_DAYS) kısa olamaz. */
+  RETENTION_PRICE_HISTORY_DAYS: int(400, 60, 3650),
+  /** Engellenmemiş mesaj risk bayrakları (engellenenler moderasyon kararı → silinmez). */
+  RETENTION_MESSAGE_RISK_DAYS: int(365, 30, 3650),
+  /** Süresi dolmuş/kullanılmış doğrulama ve sıfırlama token'ları (bitişten sonra gün). */
+  RETENTION_AUTH_TOKEN_DAYS: int(30, 1, 3650),
+  /** Tek DELETE partisinin satır sayısı ve tablo başına çalıştırma başına azami parti. */
+  RETENTION_BATCH_SIZE: int(1000, 10, 50_000),
+  RETENTION_MAX_BATCHES: int(100, 1, 10_000),
+  /** Bakım işinin zamanlaması (cron, UTC). */
+  RETENTION_CRON: z.string().min(1).default("15 3 * * *"),
   /** Rezervasyon detay önbelleği (sn); durum değişiminde outbox tüketicisi siler (v4#14). */
   BOOKING_CACHE_TTL_SECONDS: int(600, 0, 3600),
   /** GET /api/bookings sayfa boyutu: varsayılan ve üst sınır (cursor pagination, v4#14). */

@@ -24,6 +24,7 @@ import { runSaga, type SagaStep } from "@/lib/saga/saga";
 import { logger, errorFields } from "@/lib/observability/logger";
 import { counter } from "@/lib/observability/metrics";
 import { audit } from "@/lib/admin/audit";
+import { post } from "@/lib/ledger";
 
 /**
  * P2P rezervasyon devri (ikincil pazar).
@@ -407,6 +408,15 @@ function claimSteps(provider: PaymentProvider): SagaStep<ClaimContext, string>[]
                 reference: transfer.id,
               },
             ],
+          });
+          // Çift girişli defter (ADR 0020, dual-write): alıcının ödemesi satıcıya borç.
+          await post.transferSettled(tx, {
+            transferId: transfer.id,
+            bookingId: booking.id,
+            sellerId: transfer.sellerId,
+            currency,
+            askMinor: amount,
+            occurredAt: now,
           });
           await appendOutbox(
             tx,

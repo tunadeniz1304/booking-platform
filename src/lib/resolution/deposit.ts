@@ -261,13 +261,36 @@ export async function ensureDeposits(
   return created;
 }
 
+/**
+ * Depozitonun kartı: rezervasyonun kendi tahsilatı, sepet tahsilatı ya da (fix-sweep-2)
+ * bölünmüş ödemede ORGANİZATÖRÜN payı. Gerekçe: rezervasyonların sahibi ve konaklamadan
+ * sorumlu taraf organizatördür; katılımcı kartları yalnız kendi payları için yetkilendirildi
+ * (depozito onayı vermediler). Organizatörün asıl payı ödenmediyse yedek (fallback) payı.
+ */
 async function sourcePaymentRef(bookingId: string): Promise<string | null> {
   const payment = await prisma.payment.findUnique({
     where: { bookingId },
-    select: { providerRef: true, status: true, cartPayment: { select: { providerRef: true } } },
+    select: {
+      providerRef: true,
+      status: true,
+      cartPayment: { select: { id: true, providerRef: true } },
+    },
   });
   if (!payment || !["PAID", "PARTIALLY_REFUNDED"].includes(payment.status)) return null;
-  return payment.providerRef ?? payment.cartPayment?.providerRef ?? null;
+  const direct = payment.providerRef ?? payment.cartPayment?.providerRef ?? null;
+  if (direct || !payment.cartPayment) return direct;
+  const share = await prisma.paymentShare.findFirst({
+    where: {
+      cartPaymentId: payment.cartPayment.id,
+      plan: { status: "SETTLED" },
+      OR: [{ position: 0 }, { isFallback: true }],
+      status: { in: ["CAPTURED", "REFUNDED"] },
+      providerRef: { not: null },
+    },
+    orderBy: [{ status: "asc" }, { position: "asc" }],
+    select: { providerRef: true },
+  });
+  return share?.providerRef ?? null;
 }
 
 export type AuthorizeOutcome = "authorized" | "declined" | "failed" | "skipped" | "not_due";

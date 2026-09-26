@@ -5,7 +5,7 @@
 import { afterAll, afterEach, beforeAll, expect, it } from "vitest";
 import { NextRequest } from "next/server";
 import { PrismaClient } from "@prisma/client";
-import { describeInt } from "./helpers";
+import { describeInt, iso, utcDay } from "./helpers";
 import { createStayFixture, type StayFixture } from "./fixtures";
 import {
   cancelAndRefund,
@@ -23,6 +23,15 @@ import { account, getAccountBalance, isTrialBalanced, reconcile, trialBalance } 
 import { releaseAt, runEscrowRelease } from "@/lib/payout/escrow";
 import { getConfig } from "@/lib/config/app-config";
 import { handleDisputeEvent } from "@/lib/resolution/disputes";
+import { authorizeDeposit } from "@/lib/resolution/deposit";
+import {
+  addCartItem,
+  confirmShareChallenge,
+  createSplitPlan,
+  holdCart,
+  payShare,
+  type ShareOutcome,
+} from "@/lib/cart";
 import type { WebhookEvent } from "@/lib/payment/webhook";
 import type { AccessClaims } from "@/lib/auth";
 import { decideClaim, openClaim } from "@/lib/resolution/claims";
@@ -412,5 +421,164 @@ describeInt("fix-sweep-2: ödeme düzeltmeleri", () => {
     ).toBeGreaterThanOrEqual(loss);
     await prisma.hostPayout.deleteMany({ where: { userId: fx2.hostId } });
     await assertBooksClean();
+  });
+
+  it("bölünmüş ödeme: talep iadesi paylara oransal; PSP hatasında yeniden deneme çift iade yapmaz; iptal kalanı paylara; depozito organizatör payından", async () => {
+    const a = await createStayFixture(prisma, {
+      tag: "fs2-split-a",
+      units: 2,
+      country: "Türkiye",
+      policyId: "policy_flexible_v1",
+    });
+    const b = await createStayFixture(prisma, {
+      tag: "fs2-split-b",
+      units: 2,
+      country: "Türkiye",
+      policyId: "policy_flexible_v1",
+    });
+    const mkUser = async (tag: string) =>
+      prisma.user.create({
+        data: {
+          email: `fs2-${tag}-${Date.now()}@t.test`,
+          passwordHash: "x",
+          firstName: tag,
+          lastName: "Test",
+          emailVerifiedAt: new Date(),
+        },
+      });
+    const organizer = await mkUser("org");
+    const friend = await mkUser("friend");
+    const item = (fxI: StayFixture) => ({
+      propertyId: fxI.propertyId,
+      roomTypeId: fxI.roomId,
+      checkIn: iso(utcDay(20)),
+      checkOut: iso(utcDay(22)),
+      adults: 1,
+      children: 0,
+      quantity: 1,
+    });
+    await addCartItem(organizer.id, item(a));
+    await addCartItem(organizer.id, item(b));
+    const cart = await holdCart(organizer.id);
+    const plan = await createSplitPlan({
+      cartId: cart.id,
+      userId: organizer.id,
+      mode: "equal",
+      participants: [{ email: friend.email }],
+    });
+    const token = (position: number) =>
+      decodeURIComponent(
+        plan.shares.find((x) => x.position === position)!.inviteUrl!.split("/pay/share/")[1]
+      );
+    const payAs = async (position: number, userId: string): Promise<ShareOutcome> => {
+      let out = await payShare({
+        token: token(position),
+        userId,
+        cardToken: "tok_mock_ok_4242",
+        idempotencyKey: `fs2-share-${position}-${Date.now()}`,
+        context: { ip: `10.77.0.${position + 1}` },
+      });
+      if (out.status === "requires_action") {
+        out = await confirmShareChallenge({
+          token: token(position),
+          userId,
+          code: MOCK_3DS_CODE,
+        });
+      }
+      return out;
+    };
+    expect((await payAs(1, friend.id)).status).toBe("authorized");
+    expect((await payAs(0, organizer.id)).status).toBe("confirmed");
+
+    const bookings = await prisma.booking.findMany({
+      where: { cartId: cart.id },
+      include: { payment: true },
+      orderBy: { createdAt: "asc" },
+    });
+    for (const bk of bookings) touchedBookings.add(bk.id);
+    const bookingA = bookings.find((x) => x.propertyId === a.propertyId)!;
+    const bookingB = bookings.find((x) => x.propertyId === b.propertyId)!;
+    expect(bookingA.payment?.providerRef).toBeNull();
+    const shares = await prisma.paymentShare.findMany({
+      where: { cartId: cart.id },
+      orderBy: { position: "asc" },
+    });
+    expect(shares.every((x) => x.status === "CAPTURED")).toBe(true);
+
+    // (1) Misafir talebi (organizatör) artık açılabilir; ilk karar denemesinde 2. payın
+    // iadesi düşer → 502, talep açık kalır; yeniden deneme yalnız eksik payı iade eder.
+    const checkInAt = await checkInOf(bookingA.id);
+    const guestClaims = claims(organizer.id, "USER");
+    const claim = await openClaim(
+      guestClaims,
+      { bookingId: bookingA.id, type: "GUEST_REFUND", amountMinor: 10_001, description: "Isıtma" },
+      new Date(checkInAt.getTime() + HOUR)
+    );
+    psp.refunds = [];
+    psp.failRefundKeys.add(`claim-refund:${claim.id}:${shares[1].id}`);
+    await expect(
+      decideClaim(
+        admin(),
+        claim.id,
+        { decision: "APPROVE", note: "Haklı" },
+        new Date(checkInAt.getTime() + 2 * HOUR)
+      )
+    ).rejects.toMatchObject({ code: "CLAIM_REFUND_FAILED" });
+    expect(psp.refunds).toHaveLength(1);
+    expect((await prisma.claim.findUniqueOrThrow({ where: { id: claim.id } })).status).toBe(
+      "AWAITING_RESPONSE"
+    );
+    const res = await decideClaim(
+      admin(),
+      claim.id,
+      { decision: "APPROVE", note: "Haklı" },
+      new Date(checkInAt.getTime() + 3 * HOUR)
+    );
+    expect(res.settledMinor).toBe(10_001n);
+    expect(psp.refunds).toHaveLength(2);
+    expect(new Set(psp.refunds.map((r) => r.key)).size).toBe(2);
+    expect(psp.refunds.reduce((sum, r) => sum + r.amount, 0)).toBe(10_001);
+    // Oransal: eşit paylarda kalan kuruş organizatöre (pozisyon 0).
+    const splitRows = await prisma.claimShareRefund.findMany({
+      where: { claimId: claim.id },
+      orderBy: { createdAt: "asc" },
+    });
+    expect(splitRows.every((r) => r.status === "DONE")).toBe(true);
+    const byShare = new Map(splitRows.map((r) => [r.shareId, r.amountMinor]));
+    expect(byShare.get(shares[0].id)! - byShare.get(shares[1].id)!).toBeGreaterThanOrEqual(0n);
+    expect(byShare.get(shares[0].id)! - byShare.get(shares[1].id)!).toBeLessThanOrEqual(1n);
+    const payA = await prisma.payment.findUniqueOrThrow({ where: { bookingId: bookingA.id } });
+    expect(payA).toMatchObject({ refundedAmountMinor: 10_001n, status: "PARTIALLY_REFUNDED" });
+    await assertBooksClean();
+
+    // (2) İptal: kalan tutar paylara; paylardan iade edilen toplam = A'nın tahsilatı.
+    psp.refunds = [];
+    const out = await cancelAndRefund(bookingA.id, organizer.id, new Date(Date.now() + 60_000));
+    expect(out.refund.refundMinor).toBe(Number(payA.amountMinor) - 10_001);
+    expect(psp.refunds.reduce((sum, r) => sum + r.amount, 0)).toBe(
+      Number(payA.amountMinor) - 10_001
+    );
+    const after = await prisma.paymentShare.findMany({ where: { cartId: cart.id } });
+    expect(after.reduce((sum, x) => sum + x.refundedAmountMinor, 0n)).toBe(payA.amountMinor);
+    expect(
+      await prisma.payment.findUniqueOrThrow({ where: { bookingId: bookingA.id } })
+    ).toMatchObject({ refundedAmountMinor: payA.amountMinor, status: "REFUNDED" });
+    await assertBooksClean();
+
+    // (3) Depozito (B): kaynak organizatörün payı (katılımcı kartı kullanılmaz).
+    const deposit = await prisma.damageDeposit.create({
+      data: {
+        bookingId: bookingB.id,
+        amountMinor: 20_000n,
+        currency: "TRY",
+        provider: "mock",
+        authorizeAfter: new Date(Date.now() - 1000),
+        voidAfter: new Date(Date.now() + 30 * 24 * HOUR),
+      },
+    });
+    expect(await authorizeDeposit(deposit.id)).toBe("authorized");
+    expect(
+      await prisma.damageDeposit.findUniqueOrThrow({ where: { id: deposit.id } })
+    ).toMatchObject({ status: "AUTHORIZED", sourcePaymentRef: shares[0].providerRef });
   });
 });

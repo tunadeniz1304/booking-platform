@@ -62,7 +62,7 @@
     "authorizeAfter": "Pre-authorization time",
     "authorizedAt": "Pre-authorized at",
     "voidAfter": "Release time",
-    "note": "The deposit is not charged; only a pre-authorization is placed. It is released at the end of the period unless a damage claim is approved.",
+    "note": "The deposit is not charged; only a pre-authorization is placed. It is released at the end of the period unless a damage claim is approved. With a split payment the pre-authorization is placed on the organizer’s (booking owner’s) card; participants’ cards are not used.",
     "statuses": {
       "SCHEDULED": "Scheduled",
       "AUTHORIZED": "Pre-authorized",
@@ -170,7 +170,8 @@
     "CLAIM_AMOUNT_EXCEEDS_REFUNDABLE": "The amount exceeds the refundable limit (at most {amount}).",
     "CLAIM_BOOKING_NOT_ELIGIBLE": "A claim cannot be opened for this booking.",
     "CLAIM_TRANSFERRED_BOOKING": "Refund claims cannot be opened for transferred bookings.",
-    "CLAIM_SPLIT_PAYMENT_UNSUPPORTED": "Refund claims cannot be opened for split-payment bookings; use the cancellation flow instead.",
+    "CLAIM_REFUND_IN_PROGRESS": "This claim's refund was partly issued with a different amount; please review it with support.",
+    "CLAIM_SPLIT_CAPACITY": "There is no refundable amount left on the split-payment shares.",
     "CLAIM_EVIDENCE_LIMIT": "The evidence limit for this claim has been reached.",
     "CLAIM_PSP_MANAGED": "This claim is managed by the payment provider.",
     "CLAIM_CLOSED": "The claim is closed; no action is possible.",

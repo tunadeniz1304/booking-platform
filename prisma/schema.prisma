@@ -1927,3 +1927,24 @@ model CreditSpendAllocation {
   @@unique([spendId, creditId])
   @@index([creditId])
 }
+
+/// fix-sweep-2: bölünmüş ödemeli (P1-2) rezervasyonda çözüm merkezi misafir iadesinin
+/// (GUEST_REFUND) tahsil edilmiş paylara dağılımı. Kapasite, PSP çağrısından ÖNCE ayrılır
+/// (PaymentShare.refundedAmountMinor artar) → eşzamanlı kalem iptali aynı payı aşamaz.
+/// PENDING → PSP iadesi bekleniyor (karar yeniden denenirse aynı satır kullanılır); DONE →
+/// iade edildi. İlişki alanı yok (mevcut modellere dokunmamak için).
+model ClaimShareRefund {
+  id          String   @id @default(cuid())
+  claimId     String
+  shareId     String
+  bookingId   String
+  amountMinor BigInt
+  currency    String
+  status      String   @default("PENDING")
+  refundRef   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([claimId, shareId])
+  @@index([bookingId])
+}

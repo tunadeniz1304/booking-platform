@@ -17,6 +17,12 @@ import { prisma } from "@/lib/prisma";
 import { getQueue, QUEUE_NAMES } from "@/lib/queue";
 import { redis } from "@/lib/redis";
 import { checkInAt, checkOutAt, clockOf, fromDate } from "@/lib/time/nights";
+import {
+  executeClaimShareRefunds,
+  releaseClaimShareRefunds,
+  reserveClaimShareRefunds,
+  settledSplitPlanId,
+} from "@/lib/cart/split-refund";
 import { captureDeposit, depositAuthValid, releaseDeposit, toDepositView } from "./deposit";
 import { sanitizeEvidence } from "./evidence";
 
@@ -122,7 +128,7 @@ const bookingSelect = {
       amountMinor: true,
       refundedAmountMinor: true,
       providerRef: true,
-      cartPayment: { select: { providerRef: true } },
+      cartPayment: { select: { id: true, providerRef: true } },
     },
   },
 } satisfies Prisma.BookingSelect;
@@ -228,13 +234,14 @@ export async function openClaim(
     if (now.getTime() > deadline) {
       throw new ClaimError(409, "CLAIM_WINDOW_CLOSED", "İade talebi süresi doldu");
     }
-    if (!booking.payment?.providerRef && !booking.payment?.cartPayment?.providerRef) {
-      // P1-2 bölünmüş ödeme: tek PSP işlemi yok (paylar); talep iadesi pay dağıtımı gerektirir.
-      throw new ClaimError(
-        409,
-        "CLAIM_SPLIT_PAYMENT_UNSUPPORTED",
-        "Bölünmüş ödemeli rezervasyonda iade talebi çözüm merkezinden açılamaz"
-      );
+    if (
+      !booking.payment?.providerRef &&
+      !booking.payment?.cartPayment?.providerRef &&
+      !(await settledSplitPlanId(prisma, booking.payment?.cartPayment?.id))
+    ) {
+      // P1-2 bölünmüş ödeme desteklenir (fix-sweep-2: iade paylara dağıtılır); hiçbir PSP
+      // işlemi yoksa iade edilecek tahsilat da yoktur.
+      throw new ClaimError(409, "CLAIM_NO_PAYMENT", "Rezervasyonun tahsilatı yok");
     }
     const transferred = await prisma.bookingTransfer.count({
       where: { bookingId: booking.id, status: "COMPLETED" },
@@ -376,6 +383,10 @@ export async function withdrawClaim(
   if (res.count !== 1) throw new ClaimError(409, "CLAIM_CLOSED", "Talep kapanmış");
   claimsTotal.inc({ type: claim.type, stage: "withdrawn" });
   if (claim.type === "HOST_DAMAGE") await releaseAfterDamageClaim(claim.bookingId, now);
+  if (claim.type === "GUEST_REFUND") {
+    // Başarısız bir karar denemesinden kalmış pay ayrımları (bölünmüş ödeme) serbest kalır.
+    await withBookingLock(claim.bookingId, () => releaseClaimShareRefunds(claimId));
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -805,7 +816,32 @@ async function settleGuestRefund(
     );
   }
   const providerRef = payment.providerRef ?? payment.cartPayment?.providerRef ?? null;
-  if (award > 0n) {
+  // fix-sweep-2: bölünmüş ödeme (P1-2) → tek PSP işlemi yok; iade tahsil edilmiş paylara
+  // kalan kapasiteleriyle oransal dağıtılır (kapasite PSP'den önce ayrılır, anahtar pay başına).
+  const splitPlanId = providerRef
+    ? null
+    : await settledSplitPlanId(prisma, payment.cartPayment?.id);
+  if (splitPlanId) {
+    await reserveClaimShareRefunds({
+      claimId: claim.id,
+      bookingId: booking.id,
+      planId: splitPlanId,
+      amountMinor: award,
+      currency: booking.currency,
+    });
+    if (award > 0n) {
+      try {
+        await executeClaimShareRefunds(claim.id);
+      } catch (error) {
+        if (error instanceof PaymentProviderError) {
+          throw new ClaimError(502, "CLAIM_REFUND_FAILED", "Ödeme sağlayıcısı iadeyi reddetti", {
+            code: error.code,
+          });
+        }
+        throw error;
+      }
+    }
+  } else if (award > 0n) {
     if (!providerRef) throw new ClaimError(409, "CLAIM_NO_PAYMENT", "Ödeme referansı yok");
     try {
       await getPaymentProvider().refund(

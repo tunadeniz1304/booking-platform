@@ -62,7 +62,7 @@
     "authorizeAfter": "Provizyon zamanı",
     "authorizedAt": "Provizyon alındı",
     "voidAfter": "Serbest bırakılma",
-    "note": "Depozito kartınızdan çekilmez; yalnızca provizyon alınır. Onaylanmış bir hasar talebi yoksa süre sonunda serbest bırakılır.",
+    "note": "Depozito kartınızdan çekilmez; yalnızca provizyon alınır. Onaylanmış bir hasar talebi yoksa süre sonunda serbest bırakılır. Bölünmüş ödemede provizyon organizatörün (rezervasyon sahibinin) kartından alınır; katılımcı kartları kullanılmaz.",
     "statuses": {
       "SCHEDULED": "Planlandı",
       "AUTHORIZED": "Provizyon alındı",
@@ -170,7 +170,8 @@
     "CLAIM_AMOUNT_EXCEEDS_REFUNDABLE": "Tutar iade edilebilir üst sınırı aşıyor (en fazla {amount}).",
     "CLAIM_BOOKING_NOT_ELIGIBLE": "Bu rezervasyon için talep açılamaz.",
     "CLAIM_TRANSFERRED_BOOKING": "Devredilmiş rezervasyonda iade talebi açılamaz.",
-    "CLAIM_SPLIT_PAYMENT_UNSUPPORTED": "Bölünmüş ödemeli rezervasyonda iade talebi çözüm merkezinden açılamaz; iptal akışını kullanın.",
+    "CLAIM_REFUND_IN_PROGRESS": "Bu talebin iadesi farklı bir tutarla kısmen yapılmış; lütfen destek ekibiyle inceleyin.",
+    "CLAIM_SPLIT_CAPACITY": "Bölünmüş ödemenin paylarında iade edilebilir tutar kalmadı.",
     "CLAIM_EVIDENCE_LIMIT": "Bu talep için kanıt sınırına ulaşıldı.",
     "CLAIM_PSP_MANAGED": "Bu talep ödeme sağlayıcısı tarafından yönetiliyor.",
     "CLAIM_CLOSED": "Talep kapanmış; işlem yapılamaz.",

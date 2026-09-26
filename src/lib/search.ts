@@ -25,6 +25,7 @@ import { breakers, BreakerOpenError } from "@/lib/resilience/circuit-breaker";
 import { taxRulesFor } from "@/lib/pricing/tax";
 import { SearchParamsSchema, type SearchInput, type SearchParams } from "@/lib/search/params";
 import { LISTABLE_PROPERTY } from "@/lib/compliance/listing";
+import { accessibilityWhere } from "@/lib/search/accessibility-filter";
 
 export { SearchParamsSchema, searchParamsFromUrl } from "@/lib/search/params";
 export type { SearchParams, SearchInput } from "@/lib/search/params";
@@ -202,6 +203,9 @@ function structuralWhere(params: SearchParams, ids?: string[]): Prisma.PropertyW
   }
   // Seçilen TÜM olanaklar bulunmalı (v2'de "herhangi biri" yeterliydi).
   for (const name of params.amenities ?? []) and.push({ amenities: { some: { name } } });
+  // P1-13(e): yalnız doğrulanmış erişilebilirlik özellikleri (AND, aynı oda tipinde).
+  const a11y = accessibilityWhere([...(params.accessibility ?? [])].sort(), params.guests);
+  if (a11y) and.push(a11y);
   and.push({
     rooms: {
       some: {
@@ -220,6 +224,7 @@ async function loadCatalog(params: SearchParams, ids?: string[]): Promise<Catalo
     country: (params.country ?? "").trim().toLowerCase(),
     type: params.propertyType ?? "",
     amenities: [...(params.amenities ?? [])].sort(),
+    ...(params.accessibility?.length ? { a11y: [...params.accessibility].sort() } : {}),
     guests: params.guests ?? 0,
     ids: ids ? [...ids].sort() : null,
   };

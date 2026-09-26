@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { CURRENCIES } from "@/lib/money/money";
 import { isIsoDate } from "@/lib/time/nights";
+import { ACCESSIBILITY_CODES } from "@/lib/compliance/accessibility-codes";
 
 /**
  * Arama parametreleri (v3#7) — sınırda tek zod şeması. v2'de `new Date(checkIn)` ve
@@ -57,6 +58,8 @@ export const SearchParamsSchema = z
       .regex(/^[A-Za-z0-9_-]{1,64}$/, "Geçersiz fotoğraf kimliği")
       .optional(),
     userId: z.string().max(64).optional(),
+    /** P1-13(e): yalnız doğrulanmış erişilebilirlik özellikleri; seçilen HER kod gerekir (AND). */
+    accessibility: z.array(z.enum(ACCESSIBILITY_CODES)).max(ACCESSIBILITY_CODES.length).optional(),
   })
   .superRefine((v, ctx) => {
     if (Boolean(v.checkIn) !== Boolean(v.checkOut)) {
@@ -90,6 +93,11 @@ export type SearchInput = z.input<typeof SearchParamsSchema>;
 export function searchParamsFromUrl(sp: URLSearchParams): Record<string, unknown> {
   const flag = (k: string) => sp.get(k) === "1" || sp.get(k) === "true";
   const amenities = sp.get("amenities")?.split(",").filter(Boolean);
+  const accessibility = sp
+    .get("accessibility")
+    ?.split(",")
+    .map((v) => v.trim().toUpperCase())
+    .filter(Boolean);
   return {
     query: sp.get("destination") ?? sp.get("query") ?? undefined,
     city: sp.get("city") ?? undefined,
@@ -106,5 +114,6 @@ export function searchParamsFromUrl(sp: URLSearchParams): Record<string, unknown
     sort: sp.get("sort") || undefined,
     semantic: flag("semantic") || undefined,
     similarToPhotoId: sp.get("similarToPhotoId") || undefined,
+    accessibility: accessibility && accessibility.length > 0 ? accessibility : undefined,
   };
 }

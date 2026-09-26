@@ -39,6 +39,10 @@ import * as hostPhoto from "@/app/api/host/properties/[id]/photos/[photoId]/rout
 import * as accountSessions from "@/app/api/account/sessions/route";
 import * as adminTakedowns from "@/app/api/admin/takedowns/route";
 import * as adminTakedown from "@/app/api/admin/takedowns/[id]/route";
+import * as hostA11y from "@/app/api/host/properties/[id]/accessibility/route";
+import * as hostA11yFeature from "@/app/api/host/properties/[id]/accessibility/[featureId]/route";
+import * as adminA11y from "@/app/api/admin/accessibility/route";
+import * as adminA11yVerify from "@/app/api/admin/accessibility/[id]/route";
 import * as adminNotices from "@/app/api/admin/notices/route";
 import * as adminNotice from "@/app/api/admin/notices/[id]/route";
 import * as adminTransparency from "@/app/api/admin/compliance/transparency/route";
@@ -113,6 +117,37 @@ const MATRIX: Array<[string, string, Handler, Role[]]> = [
   ["GET /api/admin/takedowns", "GET", adminTakedowns.GET as unknown as Handler, ["ADMIN"]],
   ["POST /api/admin/takedowns", "POST", adminTakedowns.POST as unknown as Handler, ["ADMIN"]],
   ["POST /api/admin/takedowns/[id]", "POST", adminTakedown.POST as unknown as Handler, ["ADMIN"]],
+  ["GET /api/admin/accessibility", "GET", adminA11y.GET as unknown as Handler, ["ADMIN"]],
+  [
+    "POST /api/admin/accessibility/[id]",
+    "POST",
+    adminA11yVerify.POST as unknown as Handler,
+    ["ADMIN"],
+  ],
+  [
+    "GET /api/host/properties/[id]/accessibility",
+    "GET",
+    hostA11y.GET as unknown as Handler,
+    HOST_ADMIN,
+  ],
+  [
+    "POST /api/host/properties/[id]/accessibility",
+    "POST",
+    hostA11y.POST as unknown as Handler,
+    HOST_ADMIN,
+  ],
+  [
+    "PATCH /api/host/properties/[id]/accessibility/[featureId]",
+    "PATCH",
+    hostA11yFeature.PATCH as unknown as Handler,
+    HOST_ADMIN,
+  ],
+  [
+    "DELETE /api/host/properties/[id]/accessibility/[featureId]",
+    "DELETE",
+    hostA11yFeature.DELETE as unknown as Handler,
+    HOST_ADMIN,
+  ],
   ["GET /api/admin/notices", "GET", adminNotices.GET as unknown as Handler, ["ADMIN"]],
   ["POST /api/admin/notices/[id]", "POST", adminNotice.POST as unknown as Handler, ["ADMIN"]],
   [

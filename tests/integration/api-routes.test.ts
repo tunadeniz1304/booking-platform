@@ -674,14 +674,17 @@ describeInt("API route handler'ları (integration)", () => {
     }
     const now = () => Math.floor(Date.now() / 1000);
 
-    it("imza yok / yanlış / süresi geçmiş / gövde geçersiz → 400 INVALID_SIGNATURE", async () => {
+    it("imza yok → 401; yanlış / süresi geçmiş / gövde geçersiz → 400 INVALID_SIGNATURE", async () => {
       const raw = JSON.stringify({
         id: `evt_bad_${stamp}`,
         type: "payment.failed",
         data: { providerRef: "pi_x" },
       });
+      // v4#16: aktif sağlayıcının (mock) imza başlığı hiç yoksa 401.
+      const unsigned = await webhookPost(webhookRequest(raw, null));
+      expect(unsigned.status).toBe(401);
+      expect((await unsigned.json()).code).toBe("WRONG_PROVIDER_SIGNATURE");
       const cases = [
-        webhookRequest(raw, null),
         webhookRequest(raw, `t=${now()},v1=${"0".repeat(64)}`),
         webhookRequest(raw, signWebhook(raw, now() - 3600)),
         webhookRequest("bu json değil", signWebhook("bu json değil", now())),

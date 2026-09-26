@@ -392,6 +392,19 @@ const schema = z.object({
   DB_SERIALIZABLE_RETRY_ATTEMPTS: int(6, 1, 20),
   /** Üstel geri çekilme tabanı (ms); gecikme = taban·2^(n−1) + aynı büyüklükte rastgele pay. */
   DB_SERIALIZABLE_RETRY_BASE_MS: int(15, 1, 1000),
+  /**
+   * fix-sweep-3: ödeme ONAY adımının (capture sonrası pivot) ayrı deneme bütçesi. Capture alındıktan
+   * sonra geçici serileştirme çakışması iadeye yol açmasın diye global bütçeden uzun; her bekleme
+   * `CONFIRM_RETRY_MAX_BACKOFF_MS` ile sınırlı (varsayılanlarla en kötü ≈ 4 s).
+   */
+  CONFIRM_SERIALIZABLE_RETRY_ATTEMPTS: int(12, 1, 30),
+  CONFIRM_RETRY_MAX_BACKOFF_MS: int(500, 10, 5000),
+  /** Onay bütçesi tükenince BullMQ `confirm-retry` işi: deneme sayısı ve üstel gecikme tabanı (ms). */
+  CONFIRM_RETRY_JOB_ATTEMPTS: int(8, 1, 50),
+  CONFIRM_RETRY_JOB_BASE_DELAY_MS: int(2000, 10, 600_000),
+  /** Başarısız saga telafisi: BullMQ `saga-compensation-retry` deneme sayısı ve gecikme tabanı (ms). */
+  SAGA_COMPENSATION_RETRY_MAX_ATTEMPTS: int(8, 1, 50),
+  SAGA_COMPENSATION_RETRY_BASE_DELAY_MS: int(10_000, 10, 3_600_000),
 
   // P1-1 hibrit arama (RRF)
   SEARCH_RRF_K: int(60, 1, 1000),

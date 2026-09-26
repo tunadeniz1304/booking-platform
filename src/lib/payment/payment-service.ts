@@ -19,7 +19,7 @@ import { PAYMENT_SAGA, SAGA_STEPS } from "@/lib/saga/booking-saga";
 import { invalidatePropertySearchCache } from "@/lib/search";
 import { money, toDecimalString, toMinor, assertCurrency, type Money } from "@/lib/money/money";
 import { clockOf, fromDate } from "@/lib/time/nights";
-import { commitHeld } from "@/lib/booking/inventory";
+import { commitHeld, holdUnits, InventoryUnavailableError } from "@/lib/booking/inventory";
 import { logger, errorFields } from "@/lib/observability/logger";
 import { counter } from "@/lib/observability/metrics";
 import { audit } from "@/lib/admin/audit";
@@ -63,6 +63,9 @@ export const captureRaceTotal = counter(
 );
 
 const redlock = createRedlock(redis);
+
+/** Mutabakatta yeniden açılan tutmanın ömrü: aynı işlemde onaylanır, yalnızca güvenlik payı. */
+const LATE_SUCCESS_HOLD_MS = 60_000;
 
 /** Tahsil hakkı alınabilecek (henüz para çekilmemiş) ödeme durumları. */
 const OPEN_STATUSES: PaymentStatus[] = [
@@ -840,7 +843,19 @@ export async function handleWebhookEvent(
         return { duplicate: false };
       } catch (error) {
         if (!(error instanceof ConflictError) || isUniqueViolation(error)) throw error;
-        // Tahsil edilmiş para onaylanamıyor → otomatik iade + olay kaydı.
+        // v4#8: önce mutabakat — envanter hâlâ uygunsa tutmayı yeniden al + onayla.
+        if (await reconcileLateSuccess(payment.bookingId, event.data.providerRef, record)) {
+          latePaymentSuccessTotal.inc({ outcome: "reconfirmed" });
+          await audit("system:webhook", "payment.late_success", "Booking", payment.bookingId, {
+            outcome: "reconfirmed",
+            eventId: event.id,
+            providerRef: event.data.providerRef,
+            reason: error.code,
+          });
+          await afterBookingWrite(payment.booking.propertyId, payment.bookingId);
+          return { duplicate: false };
+        }
+        // Onaylanamıyor (iptal, envanter doldu, başka ödeme kazandı) → otomatik iade + olay kaydı.
         const currency = assertCurrency(payment.currency);
         const amount = money(toMinor(payment.amount.toString(), currency), currency);
         await refundLoser(payment.bookingId, event.data.providerRef, amount, error.code);
@@ -859,6 +874,13 @@ export async function handleWebhookEvent(
               failureCode: error.code,
             },
           });
+        });
+        latePaymentSuccessTotal.inc({ outcome: "refunded" });
+        await audit("system:webhook", "payment.late_success", "Booking", payment.bookingId, {
+          outcome: "refunded",
+          eventId: event.id,
+          providerRef: event.data.providerRef,
+          reason: error.code,
         });
         return { duplicate: false, compensated: true };
       }
@@ -881,6 +903,80 @@ export async function handleWebhookEvent(
     return { duplicate: false };
   } catch (error) {
     if (isUniqueViolation(error)) return { duplicate: true };
+    throw error;
+  }
+}
+
+export const latePaymentSuccessTotal = counter(
+  "payment_late_success_total",
+  "Onay penceresi kapandıktan sonra gelen başarılı ödeme olayları (v4#8)",
+  ["outcome"] as const
+);
+
+/**
+ * Geç gelen başarılı ödeme için mutabakat (v4#8). Rezervasyon süresi dolmuş (EXPIRED) ya da
+ * tutma süresi geçmiş HELD ise ve envanter hâlâ uygunsa: tutma yeniden alınır, rezervasyon
+ * HELD'e döner ve AYNI işlemde onaylanır (defter + outbox dahil). İptal edilmiş, başka
+ * ödemeyle onaylanmış ya da envanteri dolmuş rezervasyon → `false` (çağıran iade eder).
+ */
+async function reconcileLateSuccess(
+  bookingId: string,
+  providerRef: string,
+  record: (tx: Prisma.TransactionClient) => Promise<unknown>
+): Promise<boolean> {
+  try {
+    return await withSerializableRetry(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "Booking" WHERE id = ${bookingId} FOR UPDATE`;
+      const booking = await tx.booking.findUnique({
+        where: { id: bookingId },
+        select: {
+          id: true,
+          status: true,
+          version: true,
+          roomId: true,
+          checkIn: true,
+          checkOut: true,
+          units: true,
+          payment: { select: { status: true } },
+        },
+      });
+      if (!booking || (booking.payment && SETTLED_STATUSES.includes(booking.payment.status))) {
+        return false;
+      }
+      if (booking.status === "EXPIRED") {
+        // Süre dolunca tutulan birimler bırakıldı → yer varsa yeniden tut (yoksa fırlatır).
+        await holdUnits(tx, {
+          roomTypeId: booking.roomId,
+          checkIn: booking.checkIn,
+          checkOut: booking.checkOut,
+          units: booking.units,
+        });
+      } else if (booking.status !== "HELD") {
+        return false;
+      }
+      const reopened = await tx.booking.updateMany({
+        where: { id: booking.id, status: booking.status, version: booking.version },
+        data: {
+          status: "HELD",
+          expiredAt: null,
+          holdExpiresAt: new Date(Date.now() + LATE_SUCCESS_HOLD_MS),
+          version: { increment: 1 },
+        },
+      });
+      if (reopened.count !== 1) {
+        throw new ConflictError("Rezervasyon eşzamanlı olarak değişti", "CONCURRENT_UPDATE");
+      }
+      // Bu providerRef'in ödeme satırı (süresi dolunca açık kalmış) tahsil hakkını alır.
+      await tx.payment.updateMany({
+        where: { bookingId: booking.id, providerRef, status: { in: OPEN_STATUSES } },
+        data: { status: PaymentStatus.AUTHORIZED, failureCode: null },
+      });
+      await record(tx);
+      await confirmInTransaction(tx, booking.id, providerRef);
+      return true;
+    });
+  } catch (error) {
+    if (error instanceof ConflictError || error instanceof InventoryUnavailableError) return false;
     throw error;
   }
 }

@@ -10,6 +10,8 @@ import Footer from "@/components/layout/Footer";
 import PropertyGallery from "@/components/property/PropertyGallery";
 import BookingWidget, { BookingWidgetRoom } from "@/components/booking/BookingWidget";
 import ReviewsSection from "@/components/property/ReviewsSection";
+import AccessibilitySection from "@/components/property/AccessibilitySection";
+import { listPublicFeatures } from "@/lib/compliance/accessibility";
 
 interface PropertyPageProps {
   params: Promise<{ id: string }>;
@@ -117,6 +119,8 @@ export default async function PropertyPage({ params, searchParams }: PropertyPag
   if (!property) {
     notFound();
   }
+  // P1-13(e): yalnız doğrulanmış erişilebilirlik özellikleri.
+  const accessibility = await listPublicFeatures(property.id);
 
   return (
     <div className="min-h-screen bg-white">
@@ -161,6 +165,8 @@ export default async function PropertyPage({ params, searchParams }: PropertyPag
                 </ul>
               </div>
             )}
+
+            {accessibility.length > 0 && <AccessibilitySection features={accessibility} />}
 
             <ReviewsSection propertyId={property.id} />
 

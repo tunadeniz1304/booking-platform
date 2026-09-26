@@ -70,5 +70,30 @@
     "transparency": "Şeffaflık raporu",
     "exportCsv": "CSV indir (bu yıl)",
     "exportJson": "JSON görüntüle (bu yıl)"
+  },
+  "accessibility": {
+    "title": "Erişilebilirlik",
+    "verified": "Doğrulanmış",
+    "verifiedHint": "Platform ekibi bu özelliği ev sahibinin gönderdiği fotoğraf kanıtıyla doğruladı.",
+    "wholeProperty": "Tüm tesis",
+    "roomType": "Oda: {name}",
+    "width": "{width} cm net genişlik",
+    "evidence": "Kanıt fotoğrafı",
+    "disclosure": "Yalnızca kanıtla doğrulanmış özellikler gösterilir. Özel bir ihtiyacınız varsa rezervasyondan önce ev sahibine mesaj gönderin.",
+    "filterTitle": "Erişilebilirlik (doğrulanmış)",
+    "filterHint": "Seçilen tüm özellikler aynı odada doğrulanmış olmalı.",
+    "codes": {
+      "STEP_FREE_ENTRANCE": "Basamaksız giriş",
+      "STEP_FREE_PATH_TO_ROOM": "Odaya basamaksız yol",
+      "ROLL_IN_SHOWER": "Tekerlekli sandalyeyle girilebilen duş",
+      "GRAB_BARS": "Tutunma barları",
+      "SHOWER_CHAIR": "Duş sandalyesi",
+      "ACCESSIBLE_PARKING": "Erişilebilir otopark",
+      "WIDE_DOORWAY": "Geniş kapı",
+      "ELEVATOR": "Asansör",
+      "VISUAL_ALARM": "Görsel yangın alarmı",
+      "LOWERED_BED": "Alçak yatak",
+      "ACCESSIBLE_TOILET": "Erişilebilir tuvalet"
+    }
   }
 }

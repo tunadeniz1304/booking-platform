@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
@@ -12,6 +12,8 @@ import RankingWhy from "@/components/search/RankingWhy";
 import SmartFilter, { type SmartFilters } from "@/components/search/SmartFilter";
 import CompareToggle from "@/components/compare/CompareToggle";
 import CompareBar from "@/components/compare/CompareBar";
+import AccessibilityFilter from "@/components/search/AccessibilityFilter";
+import { parseAccessibilityParam } from "@/lib/compliance/accessibility-codes";
 import type { MapPoint } from "@/components/search/ResultsMap";
 import { apiFetch } from "@/lib/api-client";
 import { useFormat } from "@/i18n/use-format";
@@ -112,6 +114,17 @@ function SearchPageContent() {
   const checkOut = searchParams.get("checkOut") || "";
   const guests = Number(searchParams.get("guests")) || 2;
   const similarToPhotoId = searchParams.get("similarToPhotoId") || "";
+  const router = useRouter();
+  // P1-13(e): doğrulanmış erişilebilirlik filtresi URL'de tutulur (paylaşılabilir bağlantı).
+  const accessibilityParam = parseAccessibilityParam(searchParams.get("accessibility")).codes.join(
+    ","
+  );
+  const setAccessibility = (codes: string[]) => {
+    const next = new URLSearchParams(searchParams.toString());
+    if (codes.length > 0) next.set("accessibility", codes.join(","));
+    else next.delete("accessibility");
+    router.replace(`/search?${next.toString()}`, { scroll: false });
+  };
   /** Mevcut aramayı koruyarak görsel kNN kaynağını değiştiren bağlantı (boş → kaldır). */
   const similarHref = (photoId: string) => {
     const next = new URLSearchParams(searchParams.toString());
@@ -160,6 +173,7 @@ function SearchPageContent() {
         if (sortBy && sortBy !== "recommended") params.set("sort", sortBy);
       }
       if (similarToPhotoId) params.set("similarToPhotoId", similarToPhotoId);
+      if (accessibilityParam) params.set("accessibility", accessibilityParam);
       params.set("page", "1");
       params.set("pageSize", "24");
 
@@ -175,7 +189,17 @@ function SearchPageContent() {
     } finally {
       setLoading(false);
     }
-  }, [destination, checkIn, checkOut, guests, sortBy, smartFilters, similarToPhotoId, t]);
+  }, [
+    destination,
+    checkIn,
+    checkOut,
+    guests,
+    sortBy,
+    smartFilters,
+    similarToPhotoId,
+    accessibilityParam,
+    t,
+  ]);
 
   useEffect(() => {
     const timer = setTimeout(() => void load(), 0);
@@ -322,6 +346,11 @@ function SearchPageContent() {
                   ))}
                 </div>
               </fieldset>
+
+              <AccessibilityFilter
+                selected={parseAccessibilityParam(accessibilityParam).codes}
+                onChange={setAccessibility}
+              />
 
               <div className="mt-4">
                 <label htmlFor="sort-by" className="text-sm font-medium text-gray-800">

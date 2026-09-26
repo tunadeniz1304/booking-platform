@@ -70,5 +70,30 @@
     "transparency": "Transparency report",
     "exportCsv": "Download CSV (this year)",
     "exportJson": "View JSON (this year)"
+  },
+  "accessibility": {
+    "title": "Accessibility",
+    "verified": "Verified",
+    "verifiedHint": "Our team verified this feature against photo evidence provided by the host.",
+    "wholeProperty": "Whole property",
+    "roomType": "Room: {name}",
+    "width": "{width} cm clear width",
+    "evidence": "Evidence photo",
+    "disclosure": "Only features verified with evidence are shown. If you have a specific need, message the host before booking.",
+    "filterTitle": "Accessibility (verified)",
+    "filterHint": "All selected features must be verified in the same room.",
+    "codes": {
+      "STEP_FREE_ENTRANCE": "Step-free entrance",
+      "STEP_FREE_PATH_TO_ROOM": "Step-free path to room",
+      "ROLL_IN_SHOWER": "Roll-in shower",
+      "GRAB_BARS": "Grab bars",
+      "SHOWER_CHAIR": "Shower chair",
+      "ACCESSIBLE_PARKING": "Accessible parking",
+      "WIDE_DOORWAY": "Wide doorway",
+      "ELEVATOR": "Elevator",
+      "VISUAL_ALARM": "Visual fire alarm",
+      "LOWERED_BED": "Lowered bed",
+      "ACCESSIBLE_TOILET": "Accessible toilet"
+    }
   }
 }

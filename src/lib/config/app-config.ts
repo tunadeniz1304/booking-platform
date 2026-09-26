@@ -35,6 +35,11 @@ const schema = z.object({
   SERVICE_FEE_BPS: int(0, 0, 3000),
   /** Geçmiş envanter günleri bu kadar gün sonra budanır (P0-11). */
   INVENTORY_RETENTION_DAYS: int(400, 30, 3650),
+  /** Rezervasyon detay önbelleği (sn); durum değişiminde outbox tüketicisi siler (v4#14). */
+  BOOKING_CACHE_TTL_SECONDS: int(600, 0, 3600),
+  /** GET /api/bookings sayfa boyutu: varsayılan ve üst sınır (cursor pagination, v4#14). */
+  BOOKINGS_PAGE_SIZE_DEFAULT: int(50, 1, 500),
+  BOOKINGS_PAGE_SIZE_MAX: int(100, 1, 500),
 
   // Kur (P0-5)
   /** Sırayla denenecek kur kaynakları ("tcmb,ecb"); "none" → ağ yok, yalnızca statik tablo. */

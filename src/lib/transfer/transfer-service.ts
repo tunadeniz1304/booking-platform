@@ -1,7 +1,7 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from "crypto";
 import { Prisma, BookingStatus, TransferStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { redis } from "@/lib/redis";
+import { invalidateBookingCache } from "@/lib/booking/booking-cache";
 import { HttpError } from "@/lib/http/errors";
 import { getConfig } from "@/lib/config/app-config";
 import { withSerializableRetry } from "@/lib/db/transactions";
@@ -487,7 +487,7 @@ export async function claimTransfer(input: {
     );
   }
 
-  await redis.del(`booking:${bookingId}`).catch(() => 0);
+  await invalidateBookingCache(bookingId);
   return {
     transferId: transfer.id,
     bookingId,

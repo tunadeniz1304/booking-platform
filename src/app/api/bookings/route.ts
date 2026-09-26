@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { createBooking, listUserBookings } from "@/lib/booking-service";
+import { createBooking, listUserBookingsPage } from "@/lib/booking-service";
 import { requireAuth } from "@/lib/auth";
 import { toErrorResponse } from "@/lib/http/errors";
 import { observed } from "@/lib/http/observed";
@@ -37,10 +37,32 @@ export const POST = observed("bookings", async function postHandler(req: NextReq
   }
 });
 
+const listQuerySchema = z.object({
+  cursor: z.string().min(1).max(256).optional(),
+  limit: z.coerce.number().int().min(1).max(500).optional(),
+});
+
+/**
+ * Cursor pagination (v4#14). Gövde geriye uyumlu olarak DİZİ kalır; sonraki sayfa
+ * `X-Next-Cursor` başlığı ve `Link: <…?cursor=…>; rel="next"` ile bildirilir.
+ */
 export const GET = observed("bookings", async function getHandler(req: NextRequest) {
   try {
     const { userId } = await requireAuth(req);
-    return NextResponse.json(await listUserBookings(userId));
+    const url = new URL(req.url);
+    const query = listQuerySchema.parse({
+      cursor: url.searchParams.get("cursor") ?? undefined,
+      limit: url.searchParams.get("limit") ?? undefined,
+    });
+    const page = await listUserBookingsPage(userId, query);
+    const res = NextResponse.json(page.items);
+    if (page.nextCursor) {
+      const next = new URL(url);
+      next.searchParams.set("cursor", page.nextCursor);
+      res.headers.set("X-Next-Cursor", page.nextCursor);
+      res.headers.set("Link", `<${next.pathname}${next.search}>; rel="next"`);
+    }
+    return res;
   } catch (error) {
     return toErrorResponse(error, "bookings.list");
   }

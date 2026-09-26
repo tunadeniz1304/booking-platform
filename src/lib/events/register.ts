@@ -19,6 +19,7 @@ import {
   notifyBookingExpired,
 } from "@/lib/notifications/booking-notifications";
 import { startBookingFulfilment } from "@/lib/saga/booking-saga";
+import { invalidateBookingCache } from "@/lib/booking/booking-cache";
 
 /**
  * Outbox'tan yayınlanan domain olaylarının tüketicileri (worker sürecinde).
@@ -26,6 +27,15 @@ import { startBookingFulfilment } from "@/lib/saga/booking-saga";
  * (önbellek silme doğal olarak idempotent; e-postalar dedupeKey ile tekil).
  */
 let registered = false;
+
+/** Rezervasyon durumunu/sahipliğini değiştiren olaylar (v4#14 önbellek silme). */
+export const BOOKING_STATE_EVENTS = [
+  EventTypes.BookingCreated,
+  EventTypes.BookingConfirmed,
+  EventTypes.BookingCancelled,
+  EventTypes.BookingExpired,
+  EventTypes.BookingTransferred,
+] as const;
 
 type WithRoom = { propertyId: string; roomId: string; checkIn: string; checkOut: string };
 
@@ -67,4 +77,9 @@ export function registerEventHandlers(): void {
     await invalidateStay(p);
     await notifyBookingExpired(p);
   });
+  // v4#14: her rezervasyon durum/sahiplik değişiminde detay önbelleği silinir → getBooking
+  // bayat durumu TTL boyunca göstermez (yazan tarafın silmesi düşse bile).
+  for (const type of BOOKING_STATE_EVENTS) {
+    on<{ bookingId: string }>(type, (p) => invalidateBookingCache(p.bookingId));
+  }
 }

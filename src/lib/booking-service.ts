@@ -12,7 +12,8 @@ import {
   type BookingExpiredPayload,
 } from "@/lib/events/events";
 import { requireOwnership } from "@/lib/security/ownership";
-import { HttpError } from "@/lib/http/errors";
+import { HttpError, ValidationError } from "@/lib/http/errors";
+import { bookingCacheKey, invalidateBookingCache } from "@/lib/booking/booking-cache";
 import { hashIdempotentRequest } from "@/lib/http/idempotency";
 import { getConfig } from "@/lib/config/app-config";
 import { withSerializableRetry } from "@/lib/db/transactions";
@@ -73,8 +74,6 @@ import { LISTABLE_PROPERTY } from "@/lib/compliance/listing";
  * Para birimi DAİMA mülkün para birimidir (istemci seçemez).
  */
 
-const BOOKING_CACHE_PREFIX = "booking:";
-const BOOKING_CACHE_TTL = 60 * 10;
 const redlock = createRedlock(redis);
 
 const bookingsCreated = counter("booking_created_total", "Oluşturulan rezervasyonlar", [
@@ -549,11 +548,7 @@ async function reserveInTransaction(
 
 async function afterWrite(propertyId: string, bookingId: string): Promise<void> {
   await invalidatePropertySearchCache(propertyId);
-  try {
-    await redis.del(`${BOOKING_CACHE_PREFIX}${bookingId}`);
-  } catch (error) {
-    logger.warn(errorFields(error), "booking cache delete failed");
-  }
+  await invalidateBookingCache(bookingId);
 }
 
 /**
@@ -806,13 +801,30 @@ export async function releaseHold(bookingId: string): Promise<boolean> {
   return true;
 }
 
-export async function getBooking(bookingId: string, userId: string) {
-  const cacheKey = `${BOOKING_CACHE_PREFIX}${bookingId}`;
+/**
+ * Rezervasyon detayı (sahibine). Değişken olmayan kısım `BOOKING_CACHE_TTL_SECONDS` kadar
+ * önbelleklenir ve durum olaylarında outbox tüketicisi siler; ödeme durumu (iade/capture
+ * commit sonrası değişebilir) önbelleğe ALINMAZ, her okumada taze okunur (v4#14).
+ */
+const bookingDetailInclude = {
+  property: { include: { location: true } },
+  room: true,
+  payment: true,
+} satisfies Prisma.BookingInclude;
+
+export type BookingDetail = Prisma.BookingGetPayload<{ include: typeof bookingDetailInclude }>;
+
+export async function getBooking(bookingId: string, userId: string): Promise<BookingDetail> {
+  const cacheKey = bookingCacheKey(bookingId);
   try {
     const cached = await redis.get(cacheKey);
     if (cached) {
-      const parsed = JSON.parse(cached) as { id: string; userId: string };
-      if (parsed.id === bookingId && parsed.userId === userId) return parsed;
+      // Önbellekteki JSON'da tarih/Decimal alanları serileştirilmiş hâldedir (yanıt JSON'u ile aynı).
+      const parsed = JSON.parse(cached) as BookingDetail;
+      if (parsed.id === bookingId && parsed.userId === userId) {
+        const payment = await prisma.payment.findUnique({ where: { bookingId } });
+        return { ...parsed, payment };
+      }
     }
   } catch (error) {
     logger.warn(errorFields(error), "booking cache read failed");
@@ -820,32 +832,96 @@ export async function getBooking(bookingId: string, userId: string) {
 
   const booking = await prisma.booking.findUnique({
     where: { id: bookingId },
-    include: {
-      property: { include: { location: true } },
-      room: true,
-      payment: true,
-    },
+    include: bookingDetailInclude,
   });
   if (!booking) throw new BookingNotFoundError();
 
   // BOLA: kaynağa yalnız sahibi erişebilir; başkasına 404 (varlık sızdırılmaz).
   requireOwnership(booking.userId, userId, () => new BookingNotFoundError());
 
-  try {
-    await redis.set(cacheKey, JSON.stringify(booking), { ex: BOOKING_CACHE_TTL });
-  } catch (error) {
-    logger.warn(errorFields(error), "booking cache write failed");
+  const ttl = getConfig().BOOKING_CACHE_TTL_SECONDS;
+  if (ttl > 0) {
+    try {
+      await redis.set(cacheKey, JSON.stringify({ ...booking, payment: null }), { ex: ttl });
+    } catch (error) {
+      logger.warn(errorFields(error), "booking cache write failed");
+    }
   }
   return booking;
 }
 
-export async function listUserBookings(userId: string) {
-  return prisma.booking.findMany({
-    where: { userId },
-    orderBy: { createdAt: "desc" },
-    include: {
-      property: { include: { location: true } },
-      room: { select: { name: true } },
+const bookingListInclude = {
+  property: { include: { location: true } },
+  room: { select: { name: true } },
+} satisfies Prisma.BookingInclude;
+
+export type UserBookingRow = Prisma.BookingGetPayload<{ include: typeof bookingListInclude }>;
+
+export interface UserBookingsPage {
+  items: UserBookingRow[];
+  /** Sonraki sayfanın opak imleci; son sayfada `null`. */
+  nextCursor: string | null;
+}
+
+interface CursorPosition {
+  createdAt: Date;
+  id: string;
+}
+
+function encodeCursor(row: { createdAt: Date; id: string }): string {
+  return Buffer.from(JSON.stringify([row.createdAt.toISOString(), row.id])).toString("base64url");
+}
+
+function decodeCursor(cursor: string): CursorPosition {
+  try {
+    const [at, id] = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")) as unknown[];
+    const createdAt = new Date(String(at));
+    if (typeof id !== "string" || !id || id.length > 64 || Number.isNaN(createdAt.getTime())) {
+      throw new Error("bad cursor");
+    }
+    return { createdAt, id };
+  } catch {
+    throw new ValidationError("Geçersiz sayfa imleci");
+  }
+}
+
+/**
+ * Kullanıcının rezervasyonları, en yeniden eskiye; (createdAt, id) üzerinden keyset (cursor)
+ * sayfalama (v4#14). İmleç satırın konumunu taşır, kimliği değil → başka kullanıcının
+ * kaydını işaret etse bile yalnızca `userId` filtresindeki satırlar döner.
+ */
+export async function listUserBookingsPage(
+  userId: string,
+  opts: { cursor?: string | null; limit?: number } = {}
+): Promise<UserBookingsPage> {
+  const config = getConfig();
+  const limit = Math.min(
+    Math.max(1, Math.trunc(opts.limit ?? config.BOOKINGS_PAGE_SIZE_DEFAULT)),
+    config.BOOKINGS_PAGE_SIZE_MAX
+  );
+  const after = opts.cursor ? decodeCursor(opts.cursor) : null;
+  const rows = await prisma.booking.findMany({
+    where: {
+      userId,
+      ...(after
+        ? {
+            OR: [
+              { createdAt: { lt: after.createdAt } },
+              { createdAt: after.createdAt, id: { lt: after.id } },
+            ],
+          }
+        : {}),
     },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    take: limit + 1,
+    include: bookingListInclude,
   });
+  const items = rows.slice(0, limit);
+  const last = items[items.length - 1];
+  return { items, nextCursor: rows.length > limit && last ? encodeCursor(last) : null };
+}
+
+/** Geriye uyum: ilk sayfanın satırları (varsayılan sayfa boyutu). */
+export async function listUserBookings(userId: string): Promise<UserBookingRow[]> {
+  return (await listUserBookingsPage(userId)).items;
 }

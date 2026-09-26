@@ -26,18 +26,21 @@ export interface AccessClaims {
   tv: number;
 }
 
+/** Test dışındaki HER ortamda (development dahil) zayıf anahtar reddedilir (v4#5). */
+export function isWeakJwtSecret(secret: string): boolean {
+  return secret.length < 32 || WEAK_DEFAULTS.includes(secret);
+}
+
 /**
- * JWT imza anahtarı. Yoksa hata; production'da 32 karakterden kısa veya bilinen
- * varsayılan bir değerse uygulama açılmaz (fail-closed).
+ * JWT imza anahtarı. Yoksa hata; test dışındaki her ortamda 32 karakterden kısa
+ * veya bilinen varsayılan bir değerse uygulama açılmaz (fail-closed, v4#5 — önceden
+ * yalnızca production'da kontrol ediliyordu; demo/dev ortamları da internete açılabilir).
  */
 export function getJwtSecret(): Uint8Array {
   const secret = process.env.JWT_SECRET ?? "";
   if (!secret) throw new Error("JWT_SECRET tanımlı değil");
-  if (
-    process.env.NODE_ENV === "production" &&
-    (secret.length < 32 || WEAK_DEFAULTS.includes(secret))
-  ) {
-    throw new Error("JWT_SECRET production için zayıf (en az 32 karakter, varsayılan olmayan)");
+  if (process.env.NODE_ENV !== "test" && isWeakJwtSecret(secret)) {
+    throw new Error("JWT_SECRET zayıf (en az 32 karakter, varsayılan olmayan)");
   }
   return new TextEncoder().encode(secret);
 }

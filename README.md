@@ -113,10 +113,12 @@ Görüntüler compose demo yığınından (seed'li, LLM demo modu) `npm run docs
 Gereksinim: Docker (Compose v2).
 
 ```bash
-cp .env.example .env && docker compose up
+cp .env.example .env && docker compose -f docker-compose.yml -f docker-compose.demo.yml up
 ```
 
-→ <http://localhost:3000> (ilk açılışta imajlar derlenir; kod değiştirdiyseniz `docker compose up --build`)
+→ <http://localhost:3000> (ilk açılışta imajlar derlenir; kod değiştirdiyseniz sona `--build` ekleyin)
+
+- **Demo override'ı:** `docker-compose.demo.yml` demo modunu (demo seed, `/dev/mailbox`, MockPsp, kalıcı "DEMO" şeridi) ve http çerezini açar. Tek başına `docker compose up` güvenli varsayılanlarla (Secure çerez, `DEMO_MODE=false`) production gibi davranır.
 
 - **Sırlar otomatik üretilir.** `secrets-init` servisi ilk açılışta JWT, iç API, transfer imza, webhook, metrik, Postgres ve Redis sırlarını rastgele üretip `booking_secrets` volume'una yazar. İmajlarda sır yoktur.
 - **Demo verisi:** `migrate` servisi `prisma migrate deploy` çalıştırır, ardından `DEMO_SEED` açıksa ve veritabanı boşsa seed yükler. `DEMO_MODE` kapalıyken demo seed reddedilir ve `/dev/mailbox` 404 döner (`src/lib/config/seed-guard.ts`).
@@ -255,4 +257,4 @@ Lisans: [MIT](LICENSE)
 
 Search fuses lexical, vector, trigram and phrase channels with RRF and can re-rank with an ONNX LightGBM model (trained on **synthetic** clicks) behind an OpenFeature A/B flag. Agents can book through a Bearer-protected streamable-HTTP MCP endpoint (`/api/mcp`, with a `ui://stay-card` widget) or ACP-style `checkout_sessions`, which run the same saga as the web checkout. The LLM only explains and summarises; without a key it runs a deterministic demo mode and falls back per call on errors. Still mock by default: payment (`MockPsp`), license registry, e-Arşiv invoices, payouts; embeddings default to feature hashing.
 
-Run it: `cp .env.example .env && docker compose up`, then open <http://localhost:3000>. Demo accounts (`guest@`, `host@`, `admin@booking.test`, password `Password123!`) are **demo only**. No real payments are taken and no real stays are sold.
+Run it: `cp .env.example .env && docker compose -f docker-compose.yml -f docker-compose.demo.yml up`, then open <http://localhost:3000>. Demo accounts (`guest@`, `host@`, `admin@booking.test`, password `Password123!`) are **demo only**. No real payments are taken and no real stays are sold.

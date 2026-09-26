@@ -1301,7 +1301,7 @@ describeInt("API route handler'ları (integration)", () => {
       expect(await verified.json()).toEqual({ alreadyVerified: true });
     });
 
-    it("dev/mailbox: demo modunda kullanıcı yalnız kendi e-postasını, ADMIN tümünü görür; prod'da 404", async () => {
+    it("regression: v4#5 dev/mailbox: demo modunda herkes (ADMIN dahil) yalnız kendi e-postasını görür; prod'da 404", async () => {
       const user = await makeUser("mail");
       const token = await tokenFor(user.id, "USER");
       const note = await prisma.notification.create({
@@ -1321,8 +1321,9 @@ describeInt("API route handler'ları (integration)", () => {
         await mailboxGet(call("/api/dev/mailbox", { token: strangerToken }))
       ).json();
       expect(others.map((n: { id: string }) => n.id)).not.toContain(note.id);
+      // ADMIN başkasının (ör. parola sıfırlama) e-postasını okuyamaz.
       const all = await (await mailboxGet(call("/api/dev/mailbox", { token: adminToken }))).json();
-      expect(all.map((n: { id: string }) => n.id)).toContain(note.id);
+      expect(all.map((n: { id: string }) => n.id)).not.toContain(note.id);
 
       process.env.DEMO_MODE = "false";
       try {

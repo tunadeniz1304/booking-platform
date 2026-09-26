@@ -1,4 +1,9 @@
-# Tek komutla tam demo: `cp .env.example .env && docker compose up --build`
+# Güvenli varsayılan (v4#5): `docker compose up` production gibi davranır —
+# Secure çerez, DEMO_MODE kapalı (demo seed yok, /dev/mailbox 404, MockPsp yok).
+#
+# Tek komutla tam demo (demo seed + MockPsp + http çerez + "DEMO" şeridi):
+#   cp .env.example .env
+#   docker compose -f docker-compose.yml -f docker-compose.demo.yml up --build
 #
 # - Postgres ve Redis host'a AÇILMAZ (yalnızca iç ağ). Yerel geliştirme için
 #   `docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d db redis`.
@@ -24,9 +29,10 @@ x-common-env: &common-env
   METRICS_TOKEN: ""
   CHANNEL_FEED_SECRET: ""
   GRPC_HOST: grpc
-  COOKIE_SECURE: ${COOKIE_SECURE:-false}
+  # v4#5: güvenli varsayılanlar; demo ayarları yalnızca docker-compose.demo.yml'de.
+  COOKIE_SECURE: ${COOKIE_SECURE:-true}
   # v3#11: açık demo bayrağı (false → demo seed reddedilir, /dev/mailbox 404).
-  DEMO_MODE: ${DEMO_MODE:-true}
+  DEMO_MODE: ${DEMO_MODE:-false}
 
 x-app-env: &app-env
   env_file:

@@ -1,6 +1,6 @@
 # Demo akışı (3 dakika)
 
-Ön koşul: `cp .env.example .env && docker compose up --build`, <http://localhost:3000> açık, seed yüklü. LLM anahtarı yoksa her şey **DEMO** modunda çalışır ve yanıtlarda `llmMode: "demo"` görünür.
+Ön koşul: `cp .env.example .env && docker compose -f docker-compose.yml -f docker-compose.demo.yml up --build`, <http://localhost:3000> açık, seed yüklü. LLM anahtarı yoksa her şey **DEMO** modunda çalışır ve yanıtlarda `llmMode: "demo"` görünür.
 
 Demo hesapları (**yalnızca demo**, parola `Password123!`): `guest@booking.test`, `host@booking.test`, `admin@booking.test`.
 

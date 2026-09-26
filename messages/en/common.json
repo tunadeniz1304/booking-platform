@@ -5,7 +5,8 @@
   },
   "demo": {
     "tag": "DEMO",
-    "banner": "Demo environment — no real payments are taken, no real stays are sold."
+    "banner": "Demo environment — no real payments are taken, no real stays are sold.",
+    "ariaLabel": "Demo mode notice"
   },
   "loading": "Loading…",
   "unexpectedError": "An unexpected error occurred",

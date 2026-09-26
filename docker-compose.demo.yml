@@ -1,0 +1,21 @@
+# Demo override'ı (v4#5) — YALNIZCA yerel/portföy demosu için:
+#
+#   cp .env.example .env
+#   docker compose -f docker-compose.yml -f docker-compose.demo.yml up --build
+#
+# Açar: DEMO_MODE (demo seed, /dev/mailbox, varsayılan MockPsp, kalıcı "DEMO"
+# şeridi) ve düz http üzerinden çerez (COOKIE_SECURE=false). İnternete açık bir
+# ortamda KULLANMAYIN; temel docker-compose.yml güvenli varsayılanlarla gelir.
+x-demo-env: &demo-env
+  DEMO_MODE: "true"
+  COOKIE_SECURE: "false"
+
+services:
+  migrate:
+    environment: *demo-env
+  app:
+    environment: *demo-env
+  worker:
+    environment: *demo-env
+  grpc:
+    environment: *demo-env

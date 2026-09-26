@@ -5,7 +5,8 @@
   },
   "demo": {
     "tag": "DEMO",
-    "banner": "Demo ortamı — gerçek ödeme alınmaz, gerçek konaklama satılmaz."
+    "banner": "Demo ortamı — gerçek ödeme alınmaz, gerçek konaklama satılmaz.",
+    "ariaLabel": "Demo modu uyarısı"
   },
   "loading": "Yükleniyor…",
   "unexpectedError": "Beklenmeyen bir hata oluştu",

@@ -1,7 +1,7 @@
 /**
  * README ekran görüntüleri: `npm run docs:screenshots`
  *
- * Çalışan demo yığınına karşı (`docker compose up -d --build`, seed'li, LLM demo modu)
+ * Çalışan demo yığınına karşı (`docker compose -f docker-compose.yml -f docker-compose.demo.yml up -d --build`, seed'li, LLM demo modu)
  * Playwright ile `docs/img/*.png` üretir. `SCREENSHOT_BASE_URL` varsayılanı http://localhost:3000.
  * Yalnızca demo seed hesaplarını kullanır.
  */

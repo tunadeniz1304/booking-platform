@@ -6,15 +6,16 @@ import { isDemoMode } from "@/lib/config/demo";
 
 /**
  * Dev mailbox: SMTP yapılandırılmadığında gönderilen e-postalar burada görünür.
- * Kullanıcı yalnızca kendi e-postalarını, ADMIN tümünü görür. Demo modu dışında
- * uç yoktur (404, v3#11).
+ * Herkes (ADMIN dahil) YALNIZCA kendi e-postalarını görür — başkasının parola
+ * sıfırlama / doğrulama bağlantısı okunamaz (v4#5). Demo modu dışında uç yoktur
+ * (404, v3#11).
  */
 export async function GET(req: NextRequest) {
   try {
     if (!isDemoMode()) throw new NotFoundError();
     const claims = await requireAuth(req);
     const rows = await prisma.notification.findMany({
-      where: claims.role === "ADMIN" ? {} : { userId: claims.userId },
+      where: { userId: claims.userId },
       orderBy: { createdAt: "desc" },
       take: 50,
       select: {

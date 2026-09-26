@@ -6,6 +6,7 @@ import { getConfig } from "@/lib/config/app-config";
 import { NotFoundError, ValidationError } from "@/lib/http/errors";
 import { logger, errorFields } from "@/lib/observability/logger";
 import { assertFetchableUrl, isPrivateAddress } from "@/lib/security/url";
+import { mapLimit } from "@/lib/resilience/limit";
 import { importCalendar, type ImportResult } from "./channel";
 
 /**
@@ -13,8 +14,9 @@ import { importCalendar, type ImportResult } from "./channel";
  * koşullu GET (ETag / If-Modified-Since) ile çeker ve `importCalendar` ile uzlaştırır.
  *
  * SSRF: yalnızca https; bağlanılacak IP DNS çözümlemesinden sonra doğrulanır (özel/iç
- * ağ → ret), yönlendirme izlenmez, gövde `ICAL_MAX_BYTES` ile, süre `ICAL_FETCH_TIMEOUT_MS`
- * ile sınırlıdır. Ağ hatası aboneliği düşürmez; durum satıra yazılır, sonraki turda denenir.
+ * ağ → ret), yönlendirme izlenmez, gövde `ICAL_MAX_BYTES` ile sınırlıdır. Süre iki katmanlı:
+ * `ICAL_FETCH_TIMEOUT_MS` boşta kalma, `ICAL_FETCH_DEADLINE_MS` TOPLAM süre (v4#11 —
+ * baytları damla damla gönderen sunucu boşta sayılmaz ama toplam sınıra takılır). Ağ hatası aboneliği düşürmez; durum satıra yazılır, sonraki turda denenir.
  */
 
 export interface ConditionalHeaders {
@@ -42,53 +44,75 @@ const guardedLookup: LookupFunction = (hostname, options, callback) => {
   });
 };
 
-/** Varsayılan fetcher: SSRF korumalı, zaman aşımlı, boyut sınırlı https GET. */
-export const safeIcalFetch: IcalFetcher = (raw, cond) => {
-  const url = assertFetchableUrl(raw);
-  const { ICAL_FETCH_TIMEOUT_MS, ICAL_MAX_BYTES } = getConfig();
-  const headers: Record<string, string> = { accept: "text/calendar, text/plain;q=0.5" };
-  if (cond.etag) headers["if-none-match"] = cond.etag;
-  if (cond.lastModified) headers["if-modified-since"] = cond.lastModified;
-  return new Promise<FetchOutcome>((resolve, reject) => {
-    const req = https.request(
-      url,
-      { method: "GET", headers, lookup: guardedLookup, timeout: ICAL_FETCH_TIMEOUT_MS },
-      (res) => {
-        const code = res.statusCode ?? 0;
-        if (code === 304) {
-          res.resume();
-          return resolve({ status: "not_modified" });
-        }
-        if (code !== 200) {
-          res.resume();
-          return reject(new Error(`Uzak takvim HTTP ${code} döndü`));
-        }
-        const chunks: Buffer[] = [];
-        let size = 0;
-        res.on("data", (chunk: Buffer) => {
-          size += chunk.length;
-          if (size > ICAL_MAX_BYTES) {
-            req.destroy(new Error("Uzak takvim boyut sınırını aştı"));
-            return;
+export interface IcalFetcherDeps {
+  /** Testler için: `https.request` yerine geçen fabrika. */
+  request?: typeof https.request;
+  /** Toplam süre sınırı (ms); verilmezse `ICAL_FETCH_DEADLINE_MS`. */
+  deadlineMs?: number;
+}
+
+/** SSRF korumalı, boşta + toplam süre sınırlı, boyut sınırlı https GET üretir. */
+export function createIcalFetcher(deps: IcalFetcherDeps = {}): IcalFetcher {
+  const request = deps.request ?? https.request;
+  return (raw, cond) => {
+    const url = assertFetchableUrl(raw);
+    const { ICAL_FETCH_TIMEOUT_MS, ICAL_FETCH_DEADLINE_MS, ICAL_MAX_BYTES } = getConfig();
+    const deadline = AbortSignal.timeout(deps.deadlineMs ?? ICAL_FETCH_DEADLINE_MS);
+    const headers: Record<string, string> = { accept: "text/calendar, text/plain;q=0.5" };
+    if (cond.etag) headers["if-none-match"] = cond.etag;
+    if (cond.lastModified) headers["if-modified-since"] = cond.lastModified;
+    return new Promise<FetchOutcome>((resolve, reject) => {
+      const req = request(
+        url,
+        { method: "GET", headers, lookup: guardedLookup, timeout: ICAL_FETCH_TIMEOUT_MS },
+        (res) => {
+          const code = res.statusCode ?? 0;
+          if (code === 304) {
+            res.resume();
+            return resolve({ status: "not_modified" });
           }
-          chunks.push(chunk);
-        });
-        res.on("end", () =>
-          resolve({
-            status: "ok",
-            body: Buffer.concat(chunks).toString("utf8"),
-            etag: typeof res.headers.etag === "string" ? res.headers.etag : null,
-            lastModified: res.headers["last-modified"] ?? null,
-          })
-        );
-        res.on("error", reject);
-      }
-    );
-    req.on("timeout", () => req.destroy(new Error("Uzak takvim zaman aşımı")));
-    req.on("error", reject);
-    req.end();
-  });
-};
+          if (code !== 200) {
+            res.resume();
+            return reject(new Error(`Uzak takvim HTTP ${code} döndü`));
+          }
+          const chunks: Buffer[] = [];
+          let size = 0;
+          res.on("data", (chunk: Buffer) => {
+            size += chunk.length;
+            if (size > ICAL_MAX_BYTES) {
+              req.destroy(new Error("Uzak takvim boyut sınırını aştı"));
+              return;
+            }
+            chunks.push(chunk);
+          });
+          res.on("end", () =>
+            resolve({
+              status: "ok",
+              body: Buffer.concat(chunks).toString("utf8"),
+              etag: typeof res.headers.etag === "string" ? res.headers.etag : null,
+              lastModified: res.headers["last-modified"] ?? null,
+            })
+          );
+          res.on("error", reject);
+        }
+      );
+      const onDeadline = () => req.destroy(new Error("Uzak takvim toplam süre sınırını aştı"));
+      if (deadline.aborted) onDeadline();
+      else deadline.addEventListener("abort", onDeadline, { once: true });
+      const settle = () => deadline.removeEventListener("abort", onDeadline);
+      req.on("timeout", () => req.destroy(new Error("Uzak takvim zaman aşımı")));
+      req.on("error", (error) => {
+        settle();
+        reject(error);
+      });
+      req.on("close", settle);
+      req.end();
+    });
+  };
+}
+
+/** Varsayılan fetcher: SSRF korumalı, zaman aşımlı, boyut sınırlı https GET. */
+export const safeIcalFetch: IcalFetcher = createIcalFetcher();
 
 export interface PollableSubscription {
   id: string;
@@ -142,12 +166,15 @@ export async function pollSubscription(
   }
 }
 
-/** Vadesi gelen (hiç yoklanmamış veya aralığı dolmuş) abonelikleri sırayla yoklar. */
+/**
+ * Vadesi gelen (hiç yoklanmamış veya aralığı dolmuş) abonelikleri yoklar; aynı anda en
+ * fazla `ICAL_POLL_CONCURRENCY` çekim (v4#11 — tek yavaş besleme turu kilitlemez).
+ */
 export async function pollDueSubscriptions(
   fetcher: IcalFetcher = safeIcalFetch,
   now = new Date()
 ): Promise<{ polled: number; ok: number; notModified: number; failed: number }> {
-  const { ICAL_POLL_MINUTES, ICAL_POLL_BATCH } = getConfig();
+  const { ICAL_POLL_MINUTES, ICAL_POLL_BATCH, ICAL_POLL_CONCURRENCY } = getConfig();
   const cutoff = new Date(now.getTime() - ICAL_POLL_MINUTES * 60_000);
   const due = await prisma.icalSubscription.findMany({
     where: { active: true, OR: [{ lastPolledAt: null }, { lastPolledAt: { lte: cutoff } }] },
@@ -156,8 +183,10 @@ export async function pollDueSubscriptions(
     select: { id: true, roomTypeId: true, source: true, url: true, etag: true, lastModified: true },
   });
   const summary = { polled: due.length, ok: 0, notModified: 0, failed: 0 };
-  for (const sub of due) {
-    const r = await pollSubscription(sub, fetcher);
+  const results = await mapLimit(due, ICAL_POLL_CONCURRENCY, (sub) =>
+    pollSubscription(sub, fetcher)
+  );
+  for (const r of results) {
     if (r.status === "ok") summary.ok += 1;
     else if (r.status === "not_modified") summary.notModified += 1;
     else summary.failed += 1;

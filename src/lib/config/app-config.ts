@@ -351,6 +351,57 @@ const schema = z.object({
   /** DSA herkese açık bildirim formu: istemci başına pencere içinde en fazla bildirim. */
   DSA_NOTICE_MAX_PER_WINDOW: int(5, 1, 1000),
   DSA_NOTICE_WINDOW_SECONDS: int(3600, 60, 86_400),
+
+  // P1-6 KYC ve güven-emniyet (karar kodda; LLM yalnızca ek sinyal)
+  /** Kimlik doğrulama sağlayıcısı: auto → Stripe anahtarı + STRIPE_IDENTITY_WEBHOOK_SECRET varsa stripe, yoksa mock. */
+  KYC_PROVIDER: z.enum(["auto", "mock", "stripe"]).default("auto"),
+  /** Ev sahibi yeni ilan oluşturmadan önce kimliğini doğrulamış olmalı. */
+  KYC_REQUIRED_FOR_HOSTS: bool(false),
+  /** Misafir rezervasyon oluşturmadan önce kimliğini doğrulamış olmalı. */
+  KYC_REQUIRED_FOR_GUESTS: bool(false),
+  /** Kullanıcı başına 24 saatte en fazla kimlik doğrulama başlatma. */
+  KYC_MAX_STARTS_PER_DAY: int(5, 1, 100),
+  /** Mesaj dolandırıcılık taraması (regex + alan adı listeleri). */
+  MESSAGE_SCAN_ENABLED: bool(true),
+  /** Bu skordan itibaren alıcıya uyarı bandı gösterilir (0–100). */
+  MESSAGE_SCAN_WARN_SCORE: int(30, 1, 100),
+  /** Bu skordan itibaren mesaj "yüksek riskli" sayılır (0–100). */
+  MESSAGE_SCAN_HIGH_SCORE: int(60, 1, 100),
+  /** Yüksek riskli mesajlar gönderilmez (422 MESSAGE_BLOCKED); kapalıysa yalnızca uyarı bandı. */
+  MESSAGE_SCAN_BLOCK_HIGH_RISK: bool(false),
+  /** Opsiyonel LLM sınıflandırması — yalnızca ek sinyal (denetim kaydı), kararı değiştirmez. */
+  MESSAGE_SCAN_LLM_ENABLED: bool(false),
+  /** Link kısaltıcı alan adları (virgülle ayrılmış). */
+  MESSAGE_SCAN_SHORTENER_DOMAINS: z
+    .string()
+    .default(
+      "bit.ly,tinyurl.com,t.co,goo.gl,is.gd,ow.ly,cutt.ly,rebrand.ly,shorturl.at,t.ly,tiny.cc,rb.gy,s.id,buff.ly"
+    ),
+  /** Platform dışı ödeme/para transferi alan adları (virgülle ayrılmış). */
+  MESSAGE_SCAN_PAYMENT_DOMAINS: z
+    .string()
+    .default(
+      "paypal.me,paypal.com,wise.com,revolut.me,papara.com,ininal.com,westernunion.com,moneygram.com,buy.stripe.com,iyzi.link,shopier.com,payoneer.com,cash.app,venmo.com,binance.com"
+    ),
+  /** Platform dışı mesajlaşma alan adları (virgülle ayrılmış). */
+  MESSAGE_SCAN_MESSENGER_DOMAINS: z
+    .string()
+    .default("wa.me,whatsapp.com,api.whatsapp.com,t.me,telegram.me,m.me,signal.me,viber.com"),
+  /** Parti riski skoru (0–100); eşik ve üstünde ev sahibine uyarı + host panelinde gösterim. */
+  PARTY_RISK_ENABLED: bool(true),
+  PARTY_RISK_THRESHOLD: int(60, 1, 100),
+  /** Genç hesap: hesap yaşı bu günden azsa. */
+  PARTY_RISK_YOUNG_ACCOUNT_DAYS: int(30, 1, 3650),
+  PARTY_RISK_WEIGHT_YOUNG_ACCOUNT: int(20, 0, 100),
+  PARTY_RISK_WEIGHT_SINGLE_NIGHT: int(20, 0, 100),
+  /** Büyük grup: misafir sayısı bu değer ve üstündeyse. */
+  PARTY_RISK_LARGE_GROUP_MIN: int(6, 2, 50),
+  PARTY_RISK_WEIGHT_LARGE_GROUP: int(30, 0, 100),
+  /** Yakın tarih: rezervasyon ile giriş arası bu günden azsa. */
+  PARTY_RISK_NEAR_DATE_DAYS: int(2, 0, 60),
+  PARTY_RISK_WEIGHT_NEAR_DATE: int(20, 0, 100),
+  /** Hafta sonu: konaklama bir cuma veya cumartesi gecesini içeriyorsa. */
+  PARTY_RISK_WEIGHT_WEEKEND: int(10, 0, 100),
 });
 
 export type AppConfig = z.infer<typeof schema> & { invalidKeys: string[] };

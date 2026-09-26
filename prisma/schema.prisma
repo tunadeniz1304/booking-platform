@@ -1194,3 +1194,67 @@ model MinPriceByDate {
   @@id([propertyId, date])
   @@index([date])
 }
+
+// --- P1-6 KYC ve güven-emniyet -------------------------------------------------------
+// İlişki alanı YOK (User/Booking/Message modellerine dokunulmaz); kimlikler düz string + index.
+
+enum IdentityVerificationStatus {
+  PENDING
+  VERIFIED
+  REQUIRES_INPUT
+  FAILED
+}
+
+/// Kimlik doğrulama oturumu (P1-6). Belge görüntüsü / kimlik numarası SAKLANMAZ: yalnızca
+/// sağlayıcı oturum kimliği, durum ve (varsa) sağlayıcının kısa hata kodu tutulur.
+model IdentityVerification {
+  id          String                     @id @default(cuid())
+  userId      String
+  /// mock | stripe
+  provider    String
+  status      IdentityVerificationStatus @default(PENDING)
+  providerRef String
+  /// Sağlayıcının makine kodu (ör. document_unverified_other); kişisel veri içermez.
+  lastError   String?
+  verifiedAt  DateTime?
+  createdAt   DateTime                   @default(now())
+  updatedAt   DateTime                   @updatedAt
+
+  @@unique([provider, providerRef])
+  @@index([userId, createdAt])
+}
+
+/// Mesaj dolandırıcılık taraması sonucu (P1-6). Engellenen mesajda `messageId` boştur
+/// (mesaj kaydedilmez). Karar yalnızca kural skorundan; `llmSignal` ek bilgidir.
+model MessageRiskFlag {
+  id        String   @id @default(cuid())
+  messageId String?  @unique
+  bookingId String
+  senderId  String
+  /// NONE (yalnızca LLM sinyali) | WARN | HIGH
+  level     String
+  score     Int
+  reasons   String[]
+  llmSignal String?
+  blocked   Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([bookingId, createdAt])
+}
+
+/// Parti riski değerlendirmesi (P1-6): rezervasyon başına tek satır, açıklanabilir gerekçe kodlarıyla.
+model PartyRiskAssessment {
+  id         String    @id @default(cuid())
+  bookingId  String    @unique
+  propertyId String
+  hostId     String
+  guestId    String
+  score      Int
+  reasons    String[]
+  flagged    Boolean
+  notifiedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([hostId, flagged, createdAt])
+}

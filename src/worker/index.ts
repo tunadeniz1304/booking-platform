@@ -36,6 +36,10 @@ import {
   runPushReminders,
   schedulePushReminders,
 } from "./jobs/push-reminders";
+import {
+  processPriceCalendarJob,
+  schedulePriceCalendarRefresh,
+} from "@/lib/pricing/price-calendar-jobs";
 import { runOutboxRelay } from "@/lib/cqrs";
 import { registerEventHandlers } from "@/lib/events/register";
 import { updateAvailabilityPrices } from "@/lib/pricing-service";
@@ -135,6 +139,20 @@ async function main(): Promise<void> {
     )
   );
   workers.push(compliance);
+
+  // P1-3: fiyat takvimi (MinPriceByDate) — artımlı olay işleri + tekrarlayan tam hesaplama.
+  const priceCalendar = new Worker(
+    QUEUE_NAMES.priceCalendar,
+    async (job: Job) => processPriceCalendarJob(job),
+    { connection }
+  );
+  priceCalendar.on("failed", (job, err) =>
+    logger.error(
+      { jobId: job?.id, queue: QUEUE_NAMES.priceCalendar, ...errorFields(err) },
+      "job failed"
+    )
+  );
+  workers.push(priceCalendar);
   await scheduleExpireHolds(getQueue(QUEUE_NAMES.maintenance));
   await scheduleFxRefresh(getQueue(QUEUE_NAMES.maintenance));
   await schedulePriceAlerts(getQueue(QUEUE_NAMES.maintenance));
@@ -144,6 +162,7 @@ async function main(): Promise<void> {
   await scheduleLedgerReconcile(getQueue(QUEUE_NAMES.maintenance));
   await scheduleTakedownSlaSweep(getQueue(QUEUE_NAMES.compliance));
   await schedulePushReminders(getQueue(QUEUE_NAMES.maintenance));
+  await schedulePriceCalendarRefresh(getQueue(QUEUE_NAMES.priceCalendar));
 
   // Prometheus için işçi metrikleri (outbox, expire, bildirim sayaçları).
   const metricsPort = Number(process.env.WORKER_METRICS_PORT ?? 9464);

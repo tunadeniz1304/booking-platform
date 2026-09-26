@@ -10,6 +10,7 @@ import {
   type AuthEmailRequestedPayload,
   type SecurityAlertPayload,
   type PriceDroppedPayload,
+  type PropertyAvailabilityChangedPayload,
 } from "./events";
 import { notifyAuthEmail, notifyPriceDrop } from "@/lib/notifications/auth-notifications";
 import { upsertPropertyEmbedding } from "@/lib/embedding/backfill";
@@ -28,6 +29,10 @@ import {
 } from "@/lib/notifications/compliance-notifications";
 import type { NoticeEventPayload } from "@/lib/compliance/dsa";
 import { pushPriceDrop } from "@/lib/push/notifications";
+import {
+  onAvailabilityChanged,
+  onBookingInventoryChanged,
+} from "@/lib/pricing/price-calendar-jobs";
 
 /**
  * Outbox'tan yayınlanan domain olaylarının tüketicileri (worker sürecinde).
@@ -43,6 +48,13 @@ export const BOOKING_STATE_EVENTS = [
   EventTypes.BookingCancelled,
   EventTypes.BookingExpired,
   EventTypes.BookingTransferred,
+] as const;
+
+/** Boş birim sayısını değiştiren rezervasyon olayları (onay held→sold, boşluk değişmez). */
+export const CALENDAR_BOOKING_EVENTS = [
+  EventTypes.BookingCreated,
+  EventTypes.BookingCancelled,
+  EventTypes.BookingExpired,
 ] as const;
 
 type WithRoom = { propertyId: string; roomId: string; checkIn: string; checkOut: string };
@@ -94,5 +106,13 @@ export function registerEventHandlers(): void {
   // bayat durumu TTL boyunca göstermez (yazan tarafın silmesi düşse bile).
   for (const type of BOOKING_STATE_EVENTS) {
     on<{ bookingId: string }>(type, (p) => invalidateBookingCache(p.bookingId));
+  }
+  // P1-3: fiyat takvimi (MinPriceByDate) artımlı yenileme — envanteri değiştiren olaylar.
+  on<PropertyAvailabilityChangedPayload>(
+    EventTypes.PropertyAvailabilityChanged,
+    onAvailabilityChanged
+  );
+  for (const type of CALENDAR_BOOKING_EVENTS) {
+    on<WithRoom>(type, onBookingInventoryChanged);
   }
 }

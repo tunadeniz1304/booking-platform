@@ -16,6 +16,7 @@ import { addDays, diffDays, fromDate, toDbDate, todayIn, type IsoDate } from "@/
 import { assertPropertyAccess, assertRoomAccess } from "@/lib/host/host-service";
 import { invalidatePriceCache } from "@/lib/pricing-service";
 import { invalidatePropertySearchCache } from "@/lib/search";
+import { noteAvailabilityChanged } from "@/lib/pricing/price-calendar-jobs";
 import type { AccessClaims } from "@/lib/auth";
 import {
   demoRevenueExplanation,
@@ -494,6 +495,14 @@ export async function acceptSuggestion(actor: AccessClaims, id: string): Promise
       },
     });
     if (day.count !== 1) throw new NotFoundError("Gece envanteri bulunamadı");
+    const night = fromDate(suggestion.date);
+    await noteAvailabilityChanged(tx, {
+      propertyId,
+      roomId: suggestion.roomTypeId,
+      from: night,
+      to: night,
+      reason: "revenue",
+    });
   });
   const date = fromDate(suggestion.date);
   await invalidatePriceCache(suggestion.roomTypeId, date);

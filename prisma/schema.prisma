@@ -1165,3 +1165,32 @@ model AccessibilityFeature {
   @@index([roomTypeId])
   @@index([evidencePhotoId])
 }
+
+/// P1-3 esnek tarih fiyat takvimi: tesis × gece için en ucuz 1 gecelik fiyatın materyalize
+/// görünümü (türetilmiş veri; `src/lib/pricing/price-calendar.ts` yeniden hesaplar). Fiyat
+/// teklif motorunun (`priceStay`) 1 gece + `PRICE_CALENDAR_GUESTS` kişi sonucudur. Satılabilir
+/// oda yoksa `availableRoomTypes = 0` ve fiyat alanları NULL. İlişki alanı yok (Property'ye
+/// dokunulmadı); ilan pasife alınınca satırlar hesaplamada silinir.
+model MinPriceByDate {
+  propertyId         String
+  date               DateTime @db.Date
+  /// Vergiler hariç gecelik fiyat (oda farkı + plan farkı dahil), minor-unit.
+  minNightlyMinor    BigInt?
+  /// Vergiler/ücretler dahil 1 gecelik toplam ("all-in" gösterim), minor-unit.
+  minTotalMinor      BigInt?
+  currency           String
+  /// O gece satılabilir (boş birimi olan, satışı kapalı olmayan) oda tipi sayısı.
+  availableRoomTypes Int
+  /// En ucuz seçeneğin oda tipi ve fiyat planı.
+  roomTypeId         String?
+  ratePlanId         String?
+  /// En ucuz seçeneğin varış kısıtları (UI'da "en az N gece" / "girişe kapalı").
+  minStay            Int?
+  closedToArrival    Boolean  @default(false)
+  /// Hesaplamada kullanılan kişi sayısı (kişi başı vergiler için).
+  guests             Int
+  updatedAt          DateTime @updatedAt
+
+  @@id([propertyId, date])
+  @@index([date])
+}

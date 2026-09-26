@@ -22,6 +22,7 @@ import {
   type IsoDate,
 } from "@/lib/time/nights";
 import { invalidatePropertySearchCache } from "@/lib/search";
+import { noteAvailabilityChanged } from "@/lib/pricing/price-calendar-jobs";
 
 /**
  * Kanal yöneticisi (P1-9): iCal dışa/içe aktarım ve sıra numaralı ARI mesajları.
@@ -215,6 +216,14 @@ export async function importCalendar(
       });
       added += 1;
     }
+    if (added + removed > 0) {
+      await noteAvailabilityChanged(tx, {
+        propertyId: room.propertyId,
+        roomId,
+        from: today,
+        reason: "ical",
+      });
+    }
     return { nights: wanted.length, added, removed, conflicts };
   });
   if (result.added + result.removed > 0) await invalidatePropertySearchCache(room.propertyId);
@@ -333,6 +342,16 @@ export async function applyAriMessage(input: AriMessage) {
       where: { roomId: msg.roomId },
       data: { lastSequence: msg.sequence, lastKey: msg.idempotencyKey },
     });
+    if (msg.updates.length > 0) {
+      const dates = msg.updates.map((u) => u.date).sort();
+      await noteAvailabilityChanged(tx, {
+        propertyId: room.propertyId,
+        roomId: msg.roomId,
+        from: dates[0],
+        to: dates[dates.length - 1],
+        reason: "channel_ari",
+      });
+    }
     return { status: "applied" as const, applied };
   });
   if (result.status === "applied") await invalidatePropertySearchCache(room.propertyId);

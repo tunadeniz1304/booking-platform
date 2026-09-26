@@ -308,6 +308,20 @@ const schema = z.object({
   COMPARE_MIN_LISTINGS: int(2, 2, 4),
   COMPARE_MAX_LISTINGS: int(4, 2, 6),
 
+  // v4 P1-3: esnek tarih fiyat takvimi (MinPriceByDate) + arama ±N gün
+  /** Takvimin hesaplandığı ufuk (tesisin yerel bugününden itibaren gün). */
+  PRICE_CALENDAR_HORIZON_DAYS: int(365, 30, 730),
+  /** Kişi başı vergiler için takvim fiyatının varsaydığı misafir sayısı. */
+  PRICE_CALENDAR_GUESTS: int(1, 1, 30),
+  /** Tam yeniden hesaplama zamanlaması (UTC cron). */
+  PRICE_CALENDAR_REFRESH_CRON: z.string().min(1).default("20 3 * * *"),
+  /** Artımlı yenileme işinin gecikmesi (ms): aynı aralıktaki olay patlamaları tek işe iner. */
+  PRICE_CALENDAR_DEBOUNCE_MS: int(2000, 0, 60_000),
+  /** Ay ızgarasında "ucuz" sayılan eşik: ayın en ucuz gecesinin en fazla bu kadar bps üstü. */
+  PRICE_CALENDAR_CHEAP_BAND_BPS: int(1000, 0, 10_000),
+  /** Arama `flexDays` üst sınırı (±gün). */
+  SEARCH_FLEX_MAX_DAYS: int(3, 0, 7),
+
   // P1-3 deneyler: anonim bucket çerezi ömrü (gün)
   EXPERIMENT_COOKIE_DAYS: int(90, 1, 730),
 

@@ -4,6 +4,7 @@ import { redis } from "@/lib/redis";
 import { priceNights, type PriceExplanation } from "@/lib/pricing/event-signals";
 import { money, toDecimalString, minorToDb } from "@/lib/money/money";
 import { logger, errorFields } from "@/lib/observability/logger";
+import { noteAvailabilityChanged } from "@/lib/pricing/price-calendar-jobs";
 
 const PRICE_CACHE_PREFIX = "price:";
 const PRICE_CACHE_TTL = 60 * 30; // 30 dakika
@@ -44,7 +45,7 @@ export async function updateAvailabilityPrices(
 ): Promise<PricingResult[]> {
   const room = await prisma.roomType.findUnique({
     where: { id: roomId },
-    select: { units: true, property: { select: { locationId: true } } },
+    select: { units: true, propertyId: true, property: { select: { locationId: true } } },
   });
   const explained = await priceNights({
     locationId: room?.property.locationId ?? null,
@@ -94,6 +95,17 @@ export async function updateAvailabilityPrices(
             priceExplanation,
             total: room?.units ?? 1,
           },
+        });
+      }
+      // P1-3: fiyat takvimi artımlı yenilemesi.
+      if (room && writable.length > 0) {
+        const written = writable.map((r) => r.date).sort();
+        await noteAvailabilityChanged(tx, {
+          propertyId: room.propertyId,
+          roomId,
+          from: written[0],
+          to: written[written.length - 1],
+          reason: "dynamic_pricing",
         });
       }
     },

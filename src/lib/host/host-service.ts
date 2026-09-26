@@ -15,6 +15,7 @@ import {
 import type { AccessClaims } from "@/lib/auth";
 import { LICENSE_RE, isLicenseFormatValid, verifyLicense } from "@/lib/compliance/license-registry";
 import { assertNoOpenTakedown } from "@/lib/compliance/takedown";
+import { noteAvailabilityChanged } from "@/lib/pricing/price-calendar-jobs";
 
 /**
  * Host extranet (P1-7). Tüm işlemler sahiplik kontrollüdür: HOST yalnızca kendi
@@ -241,6 +242,13 @@ export async function updateRoom(
       });
       skipped = all - applied;
     }
+    // P1-3: oda farkı / adet / satış durumu / kapasite takvim fiyatını etkiler.
+    await noteAvailabilityChanged(tx, {
+      propertyId: access.propertyId,
+      roomId,
+      from: fromDate(new Date()),
+      reason: "room_update",
+    });
     return { ...updated, skippedNights: skipped };
   });
   await invalidatePropertySearchCache(access.propertyId);
@@ -352,6 +360,13 @@ export async function bulkUpdateAvailability(
       }
       updated = Math.max(updated, nights.length);
     }
+    await noteAvailabilityChanged(tx, {
+      propertyId: room.propertyId,
+      roomId,
+      from,
+      to,
+      reason: "host_ari",
+    });
     await invalidatePropertySearchCache(room.propertyId);
     return { updated, created: created.count, skippedLocked };
   });

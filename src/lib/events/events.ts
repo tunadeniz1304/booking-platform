@@ -120,10 +120,17 @@ export interface PropertyCreatedPayload {
   hostId: string;
 }
 
+/**
+ * Envanter/fiyat/kısıt değişti (P1-3: fiyat takvimi artımlı yenilemesi). Aralık [from, to]
+ * gece olarak dahil; `to` yoksa ufkun sonuna kadar (oda farkı/adet değişimi gibi).
+ */
 export interface PropertyAvailabilityChangedPayload {
   propertyId: string;
-  roomId: string;
-  date: string;
+  roomId?: string;
+  from: string;
+  to?: string;
+  /** Kaynak: "host_ari", "room_update", "channel_ari", "ical", "dynamic_pricing", "revenue". */
+  reason?: string;
 }
 
 export interface DemandSignalChangedPayload {

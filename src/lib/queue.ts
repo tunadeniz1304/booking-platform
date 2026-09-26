@@ -17,6 +17,8 @@ export const QUEUE_NAMES = {
   refundRetry: "refund-retry",
   /** Uyum otomasyonu (P1-13): 7565 kaldırma SLA kontrolü (gecikmeli iş). */
   compliance: "compliance",
+  /** P1-3 fiyat takvimi (MinPriceByDate): artımlı + tam yeniden hesaplama. */
+  priceCalendar: "price-calendar",
 } as const;
 
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];

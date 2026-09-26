@@ -73,8 +73,10 @@ export interface AuthEmailRequestedPayload {
   to: string;
   name: string;
   kind: "EMAIL_VERIFY" | "PASSWORD_RESET";
-  /** Tek kullanımlık ham token (yalnızca e-posta bağlantısı için; DB'de özeti tutulur). */
-  token: string;
+  /** Token'ın SHA-256 özeti (ham token outbox'a yazılmaz, v4#12). */
+  tokenHash: string;
+  /** AES-256-GCM ile şifreli bağlantı yolu (`link-crypto.ts`); yalnızca e-posta tüketicisi çözer. */
+  sealedLink: string;
 }
 
 export interface PriceDroppedPayload {

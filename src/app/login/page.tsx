@@ -7,10 +7,17 @@ import { useTranslations } from "next-intl";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import PasskeyLoginButton from "@/components/auth/PasskeyLoginButton";
+import { solvePow, type PowChallenge, type PowSolution } from "@/lib/auth/pow-solver";
 
 interface LoginResponse {
   user: { id: string; firstName: string; lastName: string; email: string; role: string };
   token: string;
+}
+
+interface LoginError {
+  error?: string;
+  code?: string;
+  details?: { pow?: PowChallenge; retryAfterSeconds?: number };
 }
 
 export default function LoginPage() {
@@ -20,18 +27,36 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+
+  const attempt = async (pow?: PowSolution) => {
+    const res = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password, ...(pow ? { pow } : {}) }),
+    });
+    return { res, data: (await res.json()) as LoginResponse & LoginError };
+  };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
     setSubmitting(true);
     try {
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-      const data = (await res.json()) as LoginResponse & { error?: string };
+      let { res, data } = await attempt();
+      // v4#12: çok deneme sonrası sunucu hesabı kilitlemez, iş kanıtı ister —
+      // tarayıcı bulmacayı otomatik çözüp bir kez yeniden dener.
+      if (data.code === "POW_REQUIRED" && data.details?.pow) {
+        setVerifying(true);
+        try {
+          ({ res, data } = await attempt(await solvePow(data.details.pow)));
+        } finally {
+          setVerifying(false);
+        }
+      }
+      if (data.code === "LOGIN_DELAYED") {
+        throw new Error(t("login.delayed", { seconds: data.details?.retryAfterSeconds ?? 1 }));
+      }
       if (!res.ok) {
         throw new Error(data.error ?? t("login.failed"));
       }
@@ -103,7 +128,11 @@ export default function LoginPage() {
               disabled={submitting}
               className="w-full rounded-lg bg-[#003580] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#002b66] disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-700"
             >
-              {submitting ? t("login.submitting") : t("login.submit")}
+              {verifying
+                ? t("login.verifying")
+                : submitting
+                  ? t("login.submitting")
+                  : t("login.submit")}
             </button>
           </form>
 

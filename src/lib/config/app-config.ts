@@ -170,6 +170,19 @@ const schema = z.object({
   AUTH_LOCKOUT_MINUTES: int(15, 1, 24 * 60),
   AUTH_RESET_TOKEN_TTL_MINUTES: int(30, 5, 24 * 60),
   AUTH_VERIFY_TOKEN_TTL_HOURS: int(24, 1, 24 * 14),
+  // v4#12: kilit yerine (istemci, e-posta) kademeli gecikme + iş kanıtı (PoW).
+  /** Çift başına gecikmesiz başarısız deneme sayısı. */
+  AUTH_LOGIN_FREE_FAILURES: int(3, 0, 100),
+  AUTH_LOGIN_DELAY_BASE_MS: int(1000, 0, 60_000),
+  AUTH_LOGIN_DELAY_MAX_MS: int(30_000, 0, 15 * 60_000),
+  /** PoW zorluğu (baştaki sıfır bit; ~2^bit SHA-256). */
+  AUTH_POW_DIFFICULTY_BITS: int(16, 1, 28),
+  AUTH_POW_TTL_SECONDS: int(300, 30, 3600),
+  /** Giriş / şifre sıfırlama yanıtlarının asgari süresi (zamanlama ile hesap keşfi yok). */
+  AUTH_MIN_RESPONSE_MS: int(300, 0, 5000),
+  /** E-posta başına pencerede en çok şifre sıfırlama e-postası. */
+  AUTH_RESET_PER_EMAIL_MAX: int(3, 1, 100),
+  AUTH_RESET_WINDOW_SECONDS: int(3600, 60, 86_400),
   /** WebAuthn: tarayıcıdaki alan adı (RP ID) ve beklenen origin. */
   WEBAUTHN_RP_ID: z.string().min(1).default("localhost"),
   WEBAUTHN_RP_NAME: z.string().min(1).default("booking-platform"),

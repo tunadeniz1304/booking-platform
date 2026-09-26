@@ -17,6 +17,7 @@ import { deleteAccount } from "@/lib/privacy/privacy-service";
 import { payForBooking } from "@/lib/payment/payment-service";
 import { redis } from "@/lib/redis";
 import { resetConfigForTests } from "@/lib/config/app-config";
+import { openLink } from "@/lib/auth/link-crypto";
 
 function post(path: string, body: unknown, headers: Record<string, string> = {}) {
   return new NextRequest(`http://localhost:3000${path}`, {
@@ -26,15 +27,18 @@ function post(path: string, body: unknown, headers: Record<string, string> = {})
   });
 }
 
-/** Outbox'taki son kimlik e-postası isteğinin ham token'ı (dev mailbox bağlantısıyla aynı). */
+/**
+ * Outbox'taki son kimlik e-postası isteğinin ham token'ı (dev mailbox bağlantısıyla aynı).
+ * v4#12: payload'da ham token yok; şifreli bağlantı çözülür.
+ */
 async function lastAuthToken(prisma: PrismaClient, userId: string, kind: string) {
   const msg = await prisma.outboxMessage.findFirst({
     where: { eventType: "auth.email_requested", payload: { path: ["userId"], equals: userId } },
     orderBy: { createdAt: "desc" },
   });
-  const payload = msg?.payload as { kind: string; token: string } | undefined;
+  const payload = msg?.payload as { kind: string; sealedLink: string } | undefined;
   expect(payload?.kind).toBe(kind);
-  return payload!.token;
+  return new URL(openLink(payload!.sealedLink), "http://x").searchParams.get("token")!;
 }
 
 describeInt("v3 auth sertleştirme (integration)", () => {
@@ -65,32 +69,8 @@ describeInt("v3 auth sertleştirme (integration)", () => {
     });
   }
 
-  it("regression: v3#14 hesap kilidi: eşik kadar yanlış parola → doğru parola da 423", async () => {
-    const user = await makeUser("lock");
-    for (let i = 0; i < 3; i++) {
-      const res = await login(
-        post("/api/auth/login", { email: user.email, password: "yanlis1" }),
-        undefined
-      );
-      expect(res.status).toBe(401);
-    }
-    const locked = await login(
-      post("/api/auth/login", { email: user.email, password: "Password123!" }),
-      undefined
-    );
-    expect(locked.status).toBe(423);
-    expect((await locked.json()).code).toBe("ACCOUNT_LOCKED");
-    // Kilit süresi geçince giriş açılır ve sayaç sıfırlanır.
-    await prisma.user.update({ where: { id: user.id }, data: { lockedUntil: new Date(0) } });
-    const ok = await login(
-      post("/api/auth/login", { email: user.email, password: "Password123!" }),
-      undefined
-    );
-    expect(ok.status).toBe(200);
-    expect((await prisma.user.findUniqueOrThrow({ where: { id: user.id } })).failedLoginCount).toBe(
-      0
-    );
-  });
+  // v3#14 (hesap kilidi) v4#12 ile değişti: hesap kilitlenmez; kademeli gecikme + PoW
+  // (tests/integration/v4-login-hardening.test.ts).
 
   it("regression: v3#3 hesap bazlı giriş limiti IP'den bağımsız", async () => {
     process.env.RATE_LIMIT_LOGIN_PER_ACCOUNT_MAX = "2";

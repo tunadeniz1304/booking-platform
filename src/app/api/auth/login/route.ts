@@ -5,26 +5,41 @@ import { verifyPasswordConstantTime } from "@/lib/auth";
 import { issueSession } from "@/lib/auth/session";
 import { setSessionCookies } from "@/lib/auth/cookies";
 import {
-  AccountLockedError,
-  checkLoginAttemptLimit,
-  lockRemainingSeconds,
-  recordFailedLogin,
+  assertLoginAttemptAllowed,
+  clearLoginFailures,
+  padResponseTime,
+  recordLoginFailure,
   recordSuccessfulLogin,
 } from "@/lib/auth/account";
 import { UnauthorizedError, toErrorResponse } from "@/lib/http/errors";
 import { observed } from "@/lib/http/observed";
+import { getConfig } from "@/lib/config/app-config";
+import { clientKey } from "@/lib/security/ip";
 import { LOCALE_COOKIE, resolveLocale } from "@/i18n/config";
 
 const loginSchema = z.object({
   email: z.string().trim().email("Geçerli bir e-posta girin").max(254),
   password: z.string().min(1, "Parola boş olamaz").max(200),
+  /** Şüpheli denemelerde istenen iş kanıtı çözümü (v4#12; form otomatik çözer). */
+  pow: z.object({ challenge: z.string().max(200), nonce: z.string().max(32) }).nullish(),
 });
 
+/**
+ * Parola ile giriş (v4#12): hesap kilitlenmez; (istemci, e-posta) başına kademeli
+ * gecikme + eşikten sonra iş kanıtı. Yanıt süresi `AUTH_MIN_RESPONSE_MS`'e sabitlenir.
+ */
 export const POST = observed("auth.login", async function postHandler(req: NextRequest) {
+  const startedAt = Date.now();
   try {
-    const { email, password } = loginSchema.parse(await req.json());
-    // Hesap bazlı limit (IP'den bağımsız; parmak izi değiştirerek aşılamaz) — v3#3.
-    await checkLoginAttemptLimit(email);
+    const { email, password, pow } = loginSchema.parse(await req.json());
+    const config = getConfig();
+    const client = clientKey(req.headers, {
+      trustedProxyHops: config.TRUSTED_PROXY_HOPS,
+      trustRealIpHeader: config.TRUST_REAL_IP_HEADER,
+      socketIp: (req as unknown as { ip?: string }).ip,
+    });
+    // Gecikme / PoW / e-posta başına limit (IP'den bağımsız, v3#3) — parola kontrolünden önce.
+    await assertLoginAttemptAllowed({ email, client, pow });
 
     const user = await prisma.user.findUnique({
       where: { email: email.toLowerCase() },
@@ -36,7 +51,6 @@ export const POST = observed("auth.login", async function postHandler(req: NextR
         role: true,
         passwordHash: true,
         tokenVersion: true,
-        lockedUntil: true,
         deletedAt: true,
         emailVerifiedAt: true,
       },
@@ -44,13 +58,12 @@ export const POST = observed("auth.login", async function postHandler(req: NextR
 
     // Kullanıcı yoksa da bcrypt karşılaştırması yapılır (zamanlama e-posta varlığını ele vermez).
     const valid = await verifyPasswordConstantTime(password, user?.passwordHash);
-    const locked = lockRemainingSeconds(user?.lockedUntil ?? null);
-    // Kilitliyken doğru parola da kabul edilmez (kaba kuvvet kilit süresince durur).
-    if (user && locked > 0) throw new AccountLockedError(locked);
     if (!user || user.deletedAt || !valid) {
-      if (user && !user.deletedAt) await recordFailedLogin(user.id);
+      // Var olan / olmayan e-posta aynı sayaçları artırır (hesap keşfi yok).
+      await recordLoginFailure({ email, client });
       throw new UnauthorizedError("E-posta veya parola hatalı");
     }
+    await clearLoginFailures(email, client);
     const cookieLocale = req.cookies.get(LOCALE_COOKIE)?.value;
     await recordSuccessfulLogin(user.id, cookieLocale ? resolveLocale(cookieLocale) : undefined);
 
@@ -69,8 +82,10 @@ export const POST = observed("auth.login", async function postHandler(req: NextR
       accessExpiresAt: session.accessExpiresAt.toISOString(),
     });
     setSessionCookies(response, session);
+    await padResponseTime(startedAt);
     return response;
   } catch (error) {
+    await padResponseTime(startedAt);
     return toErrorResponse(error, "auth.login");
   }
 });

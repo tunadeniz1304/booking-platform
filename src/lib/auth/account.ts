@@ -9,11 +9,23 @@ import { HttpError, ValidationError } from "@/lib/http/errors";
 import { withSerializableRetry } from "@/lib/db/transactions";
 import { hashPassword } from "./password";
 import { bumpTokenVersion, publishTokenVersion } from "./token-version";
+import { sealLink } from "./link-crypto";
+import { issuePowChallenge, PowRequiredError, verifyPow } from "./pow";
+import type { PowSolution } from "./pow-solver";
 
 /**
- * Hesap güvenliği (P0-8): giriş kilidi, hesap bazlı deneme limiti, e-posta doğrulama
- * ve şifre sıfırlama. Tek kullanımlık token'lar yalnızca SHA-256 özetiyle saklanır;
- * e-postalar outbox üzerinden (at-least-once, dedupe'lu) gönderilir.
+ * Hesap güvenliği (P0-8, v4#12): giriş denemesi koruması, e-posta doğrulama ve şifre
+ * sıfırlama. Tek kullanımlık token'lar yalnızca SHA-256 özetiyle saklanır; outbox'a
+ * ham token değil yalnızca özet + şifreli bağlantı yazılır; e-postalar outbox
+ * üzerinden (at-least-once, dedupe'lu) gönderilir.
+ *
+ * v4#12: Hesap artık kilitlenmez (bilinen bir e-postayı kilitleyerek sahibini dışarıda
+ * bırakma DoS'u). Onun yerine:
+ *  - (istemci, e-posta) çifti başına kademeli gecikme — saldırganın başarısızlıkları
+ *    başka ağdaki gerçek kullanıcıyı yavaşlatmaz;
+ *  - eşik aşılınca (çift ya da e-posta genelinde, dağıtık saldırı) iş kanıtı (PoW);
+ *    gerçek kullanıcı tarayıcıda küçük bir bulmaca çözerek her zaman girebilir.
+ * Sayaçlar e-posta özetiyle tutulur; var olan/olmayan hesap aynı yolu izler.
  */
 
 export class AccountLockedError extends HttpError {
@@ -43,51 +55,133 @@ function sha256Hex(value: string): string {
   return createHash("sha256").update(value).digest("hex");
 }
 
+export class LoginDelayedError extends HttpError {
+  constructor(retryAfterSeconds: number) {
+    super(429, "LOGIN_DELAYED", "Çok fazla başarısız deneme. Lütfen biraz bekleyin.", {
+      retryAfterSeconds,
+    });
+    this.name = "LoginDelayedError";
+  }
+}
+
+function emailKey(email: string): string {
+  return sha256Hex(email.trim().toLowerCase()).slice(0, 32);
+}
+
+function pairKey(email: string, client: string): string {
+  return sha256Hex(`${client}|${email.trim().toLowerCase()}`).slice(0, 32);
+}
+
+const loginKeys = (email: string, client: string) => ({
+  pairFails: `auth:login:fail:pair:${pairKey(email, client)}`,
+  pairNext: `auth:login:next:${pairKey(email, client)}`,
+  acctFails: `auth:login:fail:acct:${emailKey(email)}`,
+});
+
+/** n. başarısızlıktan sonraki bekleme (ms): serbest denemelerden sonra üstel, tavanlı. */
+export function loginDelayMs(failures: number, config = getConfig()): number {
+  const over = failures - config.AUTH_LOGIN_FREE_FAILURES;
+  if (over <= 0) return 0;
+  return Math.min(
+    config.AUTH_LOGIN_DELAY_MAX_MS,
+    config.AUTH_LOGIN_DELAY_BASE_MS * 2 ** (over - 1)
+  );
+}
+
 /**
- * Hesap (e-posta) bazlı deneme limiti — IP'den bağımsız (v3#3). Anahtar e-postanın
- * özetidir (log/Redis'te açık e-posta yok). Redis yoksa fail-closed.
+ * Giriş denemesinden ÖNCE çağrılır (parola kontrolünden önce, v4#12).
+ *  - Çiftin bekleme süresi dolmadıysa → 429 `LOGIN_DELAYED` (Retry-After).
+ *  - Çift ya da e-posta genelindeki başarısızlıklar `AUTH_LOCKOUT_THRESHOLD`'a ulaştıysa
+ *    veya e-posta başına pencere limiti (`RATE_LIMIT_LOGIN_PER_ACCOUNT_MAX`, v3#3)
+ *    aşıldıysa → geçerli bir PoW çözümü gerekir; yoksa 429 `POW_REQUIRED` + bulmaca.
+ * Redis yoksa fail-closed (429).
  */
-export async function checkLoginAttemptLimit(email: string, now = Date.now()): Promise<void> {
+export async function assertLoginAttemptAllowed(input: {
+  email: string;
+  client: string;
+  pow?: PowSolution | null;
+  now?: number;
+}): Promise<void> {
   const config = getConfig();
+  const now = input.now ?? Date.now();
+  const keys = loginKeys(input.email, input.client);
   const window = config.RATE_LIMIT_WINDOW_SECONDS;
-  const bucket = Math.floor(now / 1000 / window);
-  const key = `rl:login-acct:${sha256Hex(email.toLowerCase()).slice(0, 32)}:${bucket}`;
-  let count: number;
+  const rateKey = `rl:login-acct:${emailKey(input.email)}:${Math.floor(now / 1000 / window)}`;
+  let next: string | null;
+  let pairFails: number;
+  let acctFails: number;
+  let attempts: number;
   try {
-    count = await redis.incrWithTtl(key, window);
+    const [nextRaw, pairRaw, acctRaw] = await redis.mget([
+      keys.pairNext,
+      keys.pairFails,
+      keys.acctFails,
+    ]);
+    next = nextRaw;
+    pairFails = Number(pairRaw ?? 0);
+    acctFails = Number(acctRaw ?? 0);
+    attempts = await redis.incrWithTtl(rateKey, window);
   } catch {
     throw new LoginRateLimitedError();
   }
-  if (count > config.RATE_LIMIT_LOGIN_PER_ACCOUNT_MAX) throw new LoginRateLimitedError();
+  const waitMs = Number(next ?? 0) - now;
+  if (waitMs > 0) throw new LoginDelayedError(Math.ceil(waitMs / 1000));
+  const needsPow =
+    pairFails >= config.AUTH_LOCKOUT_THRESHOLD ||
+    acctFails >= config.AUTH_LOCKOUT_THRESHOLD ||
+    attempts > config.RATE_LIMIT_LOGIN_PER_ACCOUNT_MAX;
+  if (needsPow && !(await verifyPow(input.pow, now))) {
+    throw new PowRequiredError(issuePowChallenge(now));
+  }
+}
+
+/**
+ * Başarısız girişi (var olan/olmayan e-posta için aynı biçimde) kaydeder: çift ve
+ * e-posta sayaçlarını artırır, çiftin bir sonraki deneme zamanını ileri iter.
+ * Hesap kilitlenmez (v4#12).
+ */
+export async function recordLoginFailure(input: {
+  email: string;
+  client: string;
+  now?: number;
+}): Promise<void> {
+  const config = getConfig();
+  const now = input.now ?? Date.now();
+  const keys = loginKeys(input.email, input.client);
+  const windowSeconds = config.AUTH_LOCKOUT_MINUTES * 60;
+  try {
+    const [pairFails] = await Promise.all([
+      redis.incrWithTtl(keys.pairFails, windowSeconds),
+      redis.incrWithTtl(keys.acctFails, windowSeconds),
+    ]);
+    const delay = loginDelayMs(pairFails, config);
+    if (delay > 0) {
+      await redis.set(keys.pairNext, String(now + delay), { ex: Math.ceil(delay / 1000) });
+    }
+  } catch {
+    // Sayaç yazılamazsa bir sonraki denemede `assertLoginAttemptAllowed` fail-closed olur.
+  }
+}
+
+/** Başarılı girişte çiftin sayaçları sıfırlanır (e-posta geneli dağıtık sayaç kalır). */
+export async function clearLoginFailures(email: string, client: string): Promise<void> {
+  const keys = loginKeys(email, client);
+  await redis.del(keys.pairFails, keys.pairNext).catch(() => 0);
+}
+
+/** Yanıtı en az `minMs` sürdürür (bilinen/bilinmeyen e-posta zamanlama farkı, v4#12). */
+export async function padResponseTime(
+  startedAt: number,
+  minMs = getConfig().AUTH_MIN_RESPONSE_MS
+): Promise<void> {
+  const remaining = startedAt + minMs - Date.now();
+  if (remaining > 0) await new Promise((r) => setTimeout(r, remaining));
 }
 
 /** Kilit durumu: kilitliyse kalan saniye, değilse 0. */
 export function lockRemainingSeconds(lockedUntil: Date | null, now = new Date()): number {
   if (!lockedUntil) return 0;
   return Math.max(0, Math.ceil((lockedUntil.getTime() - now.getTime()) / 1000));
-}
-
-/**
- * Başarısız girişi kaydeder; eşik aşılınca hesabı `AUTH_LOCKOUT_MINUTES` kilitler.
- * Atomik artış (eşzamanlı denemeler sayacı kaçırmaz).
- * @returns bu denemeyle hesap kilitlendiyse `true`
- */
-export async function recordFailedLogin(userId: string, now = new Date()): Promise<boolean> {
-  const config = getConfig();
-  const user = await prisma.user.update({
-    where: { id: userId },
-    data: { failedLoginCount: { increment: 1 } },
-    select: { failedLoginCount: true },
-  });
-  if (user.failedLoginCount < config.AUTH_LOCKOUT_THRESHOLD) return false;
-  await prisma.user.update({
-    where: { id: userId },
-    data: {
-      failedLoginCount: 0,
-      lockedUntil: new Date(now.getTime() + config.AUTH_LOCKOUT_MINUTES * 60_000),
-    },
-  });
-  return true;
 }
 
 export async function recordSuccessfulLogin(userId: string, locale?: string): Promise<void> {
@@ -109,9 +203,16 @@ function ttlMs(kind: AuthTokenKind): number {
     : config.AUTH_VERIFY_TOKEN_TTL_HOURS * 3_600_000;
 }
 
+/** E-postadaki bağlantının yolu (kök adres tüketicide eklenir). */
+export function authLinkPath(kind: AuthTokenKind, raw: string): string {
+  const path = kind === AuthTokenKind.EMAIL_VERIFY ? "/verify-email" : "/reset-password";
+  return `${path}?token=${encodeURIComponent(raw)}`;
+}
+
 /**
  * Tek kullanımlık token oluşturur ve e-posta isteğini outbox'a yazar (aynı işlem).
- * Aynı türden önceki kullanılmamış token'lar geçersizleşir.
+ * Aynı türden önceki kullanılmamış token'lar geçersizleşir. Outbox payload'ında ham
+ * token YOKTUR: yalnızca özeti ve şifreli bağlantı (v4#12).
  */
 export async function issueEmailToken(
   user: { id: string; email: string; firstName: string },
@@ -141,7 +242,8 @@ export async function issueEmailToken(
         to: user.email,
         name: user.firstName,
         kind,
-        token: raw,
+        tokenHash: sha256Hex(raw),
+        sealedLink: sealLink(authLinkPath(kind, raw)),
       })
     );
   });
@@ -176,8 +278,30 @@ export async function verifyEmail(raw: string, now = new Date()): Promise<{ user
   return { userId };
 }
 
-/** Şifre sıfırlama isteği. Kullanıcı yoksa sessizce hiçbir şey yapmaz (e-posta sızdırmaz). */
+/**
+ * E-posta başına sıfırlama isteği sınırı (v4#12): pencere başına en çok
+ * `AUTH_RESET_PER_EMAIL_MAX` e-posta; aşılırsa (veya Redis yoksa) sessizce gönderilmez.
+ * Sayaç e-posta özetiyle tutulur ve hesap var olsun olmasın artar.
+ */
+async function allowResetEmail(email: string): Promise<boolean> {
+  const config = getConfig();
+  try {
+    const count = await redis.incrWithTtl(
+      `auth:reset:${emailKey(email)}`,
+      config.AUTH_RESET_WINDOW_SECONDS
+    );
+    return count <= config.AUTH_RESET_PER_EMAIL_MAX;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Şifre sıfırlama isteği. Kullanıcı yoksa sessizce hiçbir şey yapmaz (e-posta sızdırmaz);
+ * yanıt süresi çağıran route'ta sabitlenir (`padResponseTime`).
+ */
 export async function requestPasswordReset(email: string): Promise<void> {
+  if (!(await allowResetEmail(email))) return;
   const user = await prisma.user.findUnique({
     where: { email: email.toLowerCase() },
     select: { id: true, email: true, firstName: true, deletedAt: true },

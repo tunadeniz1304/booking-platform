@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { toErrorResponse } from "@/lib/http/errors";
 import { observed } from "@/lib/http/observed";
-import { releaseCart } from "@/lib/cart";
+import { releaseCartWithSplit } from "@/lib/cart";
 
 /** Tutmayı bırakır (tüm kalem rezervasyonları düşer); sepet yeniden düzenlenebilir. */
 export const POST = observed(
@@ -11,7 +11,7 @@ export const POST = observed(
     try {
       const { id } = await params;
       const { userId } = await requireAuth(req);
-      return NextResponse.json({ cart: await releaseCart(userId, id) });
+      return NextResponse.json({ cart: await releaseCartWithSplit(userId, id) });
     } catch (error) {
       return toErrorResponse(error, "cart.release");
     }

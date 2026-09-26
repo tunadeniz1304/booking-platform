@@ -69,12 +69,16 @@ import * as cartRelease from "@/app/api/cart/[id]/release/route";
 import * as cartPay from "@/app/api/cart/[id]/pay/route";
 import * as cartPayConfirm from "@/app/api/cart/[id]/pay/confirm/route";
 import * as cartReopen from "@/app/api/cart/reopen/route";
+import * as cartSplit from "@/app/api/cart/[id]/split/route";
+import * as cartSplitInvite from "@/app/api/cart/[id]/split/shares/[shareId]/invite/route";
+import * as payShare from "@/app/api/pay/share/[token]/route";
+import * as payShareConfirm from "@/app/api/pay/share/[token]/confirm/route";
 
 type Handler = (
   req: NextRequest,
   ctx: { params: Promise<Record<string, string>> }
 ) => Promise<Response>;
-const ctx = { params: Promise.resolve({ id: "x", roomId: "x" }) };
+const ctx = { params: Promise.resolve({ id: "x", roomId: "x", shareId: "x", token: "x" }) };
 const ALL: Role[] = ["USER", "HOST", "ADMIN"];
 const HOST_ADMIN: Role[] = ["HOST", "ADMIN"];
 
@@ -218,6 +222,18 @@ const MATRIX: Array<[string, string, Handler, Role[]]> = [
   ["POST /api/cart/[id]/pay", "POST", cartPay.POST as unknown as Handler, ALL],
   ["POST /api/cart/[id]/pay/confirm", "POST", cartPayConfirm.POST as unknown as Handler, ALL],
   ["POST /api/cart/reopen", "POST", cartReopen.POST as unknown as Handler, ALL],
+  // P1-2 bölünmüş ödeme: organizatör + katılımcı uçları oturum ister (link tek başına yetmez).
+  ["GET /api/cart/[id]/split", "GET", cartSplit.GET as unknown as Handler, ALL],
+  ["POST /api/cart/[id]/split", "POST", cartSplit.POST as unknown as Handler, ALL],
+  [
+    "POST /api/cart/[id]/split/shares/[shareId]/invite",
+    "POST",
+    cartSplitInvite.POST as unknown as Handler,
+    ALL,
+  ],
+  ["GET /api/pay/share/[token]", "GET", payShare.GET as unknown as Handler, ALL],
+  ["POST /api/pay/share/[token]", "POST", payShare.POST as unknown as Handler, ALL],
+  ["POST /api/pay/share/[token]/confirm", "POST", payShareConfirm.POST as unknown as Handler, ALL],
 ];
 
 async function call(h: Handler, method: string, role: Role | null): Promise<number> {

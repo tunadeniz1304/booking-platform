@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { toErrorResponse } from "@/lib/http/errors";
 import { observed } from "@/lib/http/observed";
-import { cancelCart, loadOwnedCart, presentCart } from "@/lib/cart";
+import { cancelCartWithSplit, loadOwnedCart, presentCart } from "@/lib/cart";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -17,12 +17,12 @@ export const GET = observed("cart.id", async function getHandler(req: NextReques
   }
 });
 
-/** Sepeti iptal eder; tutma varsa tüm kalemler serbest bırakılır. */
+/** Sepeti iptal eder; tutma varsa kalemler serbest, bölünmüş ödeme payları void/iade. */
 export const DELETE = observed("cart.id", async function deleteHandler(req: NextRequest, ctx: Ctx) {
   try {
     const { id } = await ctx.params;
     const { userId } = await requireAuth(req);
-    await cancelCart(userId, id);
+    await cancelCartWithSplit(userId, id);
     return NextResponse.json({ cancelled: true });
   } catch (error) {
     return toErrorResponse(error, "cart.cancel");

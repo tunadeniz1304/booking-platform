@@ -3,8 +3,9 @@ node_modules/
 
 # Environment
 .env
-.env.local
-.env.*.local
+# v4#20: tüm .env varyantları (.env.production, .env.staging …); yalnızca örnek dosya izlenir
+.env.*
+!.env.example
 
 # Database
 *.db

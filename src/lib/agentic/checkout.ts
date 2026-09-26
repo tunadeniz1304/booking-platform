@@ -68,7 +68,8 @@ export function sptToCardToken(spt: string): string {
   return `tok_mock_${match[1]}_0000`;
 }
 
-function hashRequest(input: CreateInput): string {
+/** İstek gövdesinin kanonik özeti (idempotency anahtarı ↔ gövde bağı; booking-service de kullanır). */
+export function hashRequest(input: CreateInput): string {
   const canonical = JSON.stringify([input.room_id, input.check_in, input.check_out, input.guests]);
   return createHash("sha256").update(canonical).digest("hex");
 }
@@ -153,25 +154,48 @@ function expiryFrom(now: Date): Date {
   return new Date(now.getTime() + getConfig().CHECKOUT_SESSION_TTL_MINUTES * 60_000);
 }
 
+/**
+ * Oturum ↔ rezervasyon uzlaştırması (v4#10): her okumada bağlı rezervasyonun GÜNCEL
+ * durumuna bakılır — yalnızca `in_progress`'te değil. Ödeme reddi sonrası
+ * `ready_for_payment` kalan oturumun hold'u düşmüşse (EXPIRED/CANCELLED ya da HELD ama
+ * `holdExpiresAt` geçmiş) oturum `canceled` olur; ajan yeni oturum açar. Aksi hâlde
+ * oturum TTL'e kadar ölü bir rezervasyona kilitli kalırdı.
+ */
+export function reconcileCheckoutStatus(
+  status: CheckoutStatus,
+  booking: { status: string; holdExpiresAt: Date | null } | null,
+  now: Date
+): CheckoutStatus | null {
+  if (status === "completed" || status === "canceled") return null;
+  if (!booking) return "canceled";
+  if (booking.status === "CONFIRMED" || booking.status === "COMPLETED") return "completed";
+  if (booking.status === "EXPIRED" || booking.status === "CANCELLED") return "canceled";
+  if (booking.status === "HELD" && booking.holdExpiresAt && booking.holdExpiresAt <= now) {
+    return "canceled";
+  }
+  return null;
+}
+
 /** Sahiplik kontrollü okuma; süresi dolmuş açık oturumu iptal eder, rezervasyon durumunu yansıtır. */
 async function loadOwned(userId: string, id: string, now = new Date()): Promise<CheckoutSession> {
   const session = await prisma.checkoutSession.findFirst({ where: { id, userId } });
   if (!session) throw new NotFoundError("Checkout oturumu bulunamadı");
-  if (session.status === "ready_for_payment" && session.expiresAt <= now) {
-    return prisma.checkoutSession.update({ where: { id }, data: { status: "canceled" } });
-  }
-  if (session.status === "in_progress" && session.bookingId) {
+  if (session.bookingId) {
     const booking = await prisma.booking.findUnique({
       where: { id: session.bookingId },
-      select: { status: true },
+      select: { status: true, holdExpiresAt: true },
     });
-    const next =
-      booking?.status === "CONFIRMED"
-        ? "completed"
-        : booking && ["EXPIRED", "CANCELLED"].includes(booking.status)
-          ? "canceled"
-          : null;
-    if (next) return prisma.checkoutSession.update({ where: { id }, data: { status: next } });
+    const next = reconcileCheckoutStatus(session.status as CheckoutStatus, booking, now);
+    if (next) {
+      logger.info(
+        { checkoutSessionId: id, bookingId: session.bookingId, from: session.status, to: next },
+        "agentic checkout reconciled"
+      );
+      return prisma.checkoutSession.update({ where: { id }, data: { status: next } });
+    }
+  }
+  if (session.status === "ready_for_payment" && session.expiresAt <= now) {
+    return prisma.checkoutSession.update({ where: { id }, data: { status: "canceled" } });
   }
   return session;
 }

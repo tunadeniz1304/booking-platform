@@ -1,19 +1,20 @@
 import { describe, it, expect } from "vitest";
-import { createElement } from "react";
+import { createElement, type ComponentProps } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { NextIntlClientProvider } from "next-intl";
 import QuoteBreakdown from "@/components/booking/QuoteBreakdown";
 import type { QuoteView } from "@/components/booking/useQuote";
 import quoteTr from "../../../messages/tr/quote.json";
 
+type ProviderProps = ComponentProps<typeof NextIntlClientProvider>;
+
 function render(quote: QuoteView): string {
   return renderToStaticMarkup(
-    createElement(NextIntlClientProvider, {
-      locale: "tr",
-      messages: { quote: quoteTr },
-      timeZone: "UTC",
-      children: createElement(QuoteBreakdown, { quote }),
-    })
+    createElement(
+      NextIntlClientProvider,
+      { locale: "tr", messages: { quote: quoteTr }, timeZone: "UTC" } as unknown as ProviderProps,
+      createElement(QuoteBreakdown, { quote })
+    )
   );
 }
 

@@ -61,7 +61,7 @@ Her faz sonunda kalite kapısı: `npm run lint` · `npm run typecheck` · `npm r
 
 ## v3 F9 — Dokümanlar + release
 
-- [ ] §7 dokümanlar, CI, FINAL_REPORT v3 + dürüstlük notu, CHANGELOG, `v3.0.0` tag
+- [x] §7 dokümanlar, CI, FINAL_REPORT v3 + dürüstlük notu, CHANGELOG, `v3.0.0` tag
 
 ---
 

@@ -5,7 +5,124 @@
 
 # v3
 
-## §3 LLM sözleşmesi — doğrulama tablosu
+## 1. Özet (v3.0.0, 2026-09-26)
+
+v2.0.0'dan sonra 61 commit. v2'nin bilinen 22 hatası (`booking.md` §1) kapatıldı ve her biri
+`regression: v3#N` etiketli testle korunuyor (`grep -rho "regression: v3#[0-9]*" tests | sort -u`
+→ 25 benzersiz etiket; #23–#25 v3 sırasında bulunan ek hatalar). Başlıca eklemeler:
+
+- **Envanter v2:** oda tipi başına sayaç (`InventoryDay{total, sold, held}`, `CHECK sold+held<=total`),
+  rate plan, kısıtlar, tesis saat dilimi (ADR 0010, 0011).
+- **Para:** veri tabanlı vergi/ücret motoru, kalıcı FX + teklif başına kur anlık görüntüsü,
+  conformal fiyat içgörüsü ve fiyat alarmı (ADR 0012).
+- **Ödeme:** gerçek Stripe SDK sağlayıcısı + imzalı webhook + Payment Element (varsayılan hâlâ
+  MockPsp), telafili ödeme sagası, devir sonrası alıcıya iade + payout, mock e-Arşiv fatura (ADR 0013).
+- **Arama:** hibrit RRF (tsvector + pgvector + trigram + tam ifade), opsiyonel ONNX LTR,
+  OpenFeature deneyi (ADR 0014).
+- **Güven:** mesajlaşma (PII maskeleme), yorum moderasyonu, fraud v2 + passkey step-up,
+  kayıt no doğrulaması + SDEP dışa aktarımı (ADR 0017).
+- **Kanal/ajan/gelir:** MCP streamable HTTP + ACP checkout, iCal yoklama + belirteç döndürme,
+  sınırlı fiyat önerili gelir paneli (ADR 0015).
+- **i18n:** next-intl ile tr/en, `Intl` biçimleme, iki dilli e-postalar (ADR 0018).
+- **Güvenlik:** tokenVersion, hesap kilidi, fail-closed denylist, login CSRF, proxy-hop'suz
+  istemci anahtarı, `DEMO_MODE`, transport seviyesinde MCP kimliği, gRPC TLS + hız sınırı.
+
+## 2. Faz faz yapılanlar
+
+| Faz                             | İçerik                                                                                    | Başlıca commit'ler                                                                     |
+| ------------------------------- | ----------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| **F0/F1** — Kapı + güvenlik     | Kapsam genişletme, CI'da Docker zorunlu; #1, #2, #3, #5, #8, #11–#14, #22; LLM bütçesi    | `2ad1213`, `1c01e6c`, `2d54277`, `a63db8d`, `898bd93`, `b5e874a`, `6bec085`, `6aa520d` |
+| **F2** — Envanter + saat dilimi | Sayaçlı envanter, rate plan, kısıtlar, Temporal; #6, #7, #15, #18                         | `9f29d57`, `b4b4363`, `76f3619`                                                        |
+| **F3** — Vergi + FX + içgörü    | Vergi motoru, her yerde aynı toplam (#9), kalıcı FX (#23), conformal içgörü, fiyat alarmı | `1f7fb79`, `7beea1c`, `6248123`, `060687c`, `71005f4`                                  |
+| **F4** — Ödeme                  | Stripe (#10), saga, devir iadesi (#4) + payout, e-Arşiv, FX saklama                       | `25bf1a7`, `db29919`, `cfe8391`, `cdc21e4`, `c127d02`                                  |
+| **F5** — Arama                  | Hibrit RRF + LTR (#19), deneyler                                                          | `89d0566`, `6c90f4f`, `74679ff`                                                        |
+| **F6** — Güven                  | Mesajlaşma, moderasyon (#24), fraud v2 + step-up, passkey UI, kayıt no (#25)              | `a4227c0`, `1f3fc26`, `579d674`, `4884afd`, `5cd41ee`                                  |
+| **F7** — Kanal + ajan + gelir   | Ölü kod (#17), iCal yoklama (#21), MCP HTTP + ACP, gelir paneli                           | `7fc8409`, `cfaf0fe`, `87b26d2`, `651367d`                                             |
+| **F8** — i18n + UI + yük        | tr/en (#20), axe, demo senaryoları, k6 + kaos; yükte bulunan 4 hatanın düzeltmesi         | `a020bec`, `294a643`, `ca2b216`, `5c7e9a0`, `3da026f`, `b66172b`, `3178ed1`, `041bc45` |
+| **F9** — Dokümanlar + release   | §7 dokümanları, CI (i18n:check, mcp:smoke), bu rapor, CHANGELOG 3.0.0, `v3.0.0` etiketi   | bu sürümün commit'leri                                                                 |
+
+## 3. Metrikler
+
+Tüm sayılar 2026-09-25/26 tarihlerinde gerçekten çalıştırılan komutlardan alınmıştır.
+
+| Ölçüm                                                                               | Değer                                                                                      |
+| ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Unit + entegrasyon (`npm run test:coverage`)                                        | 679 test, 92 dosya, tamamı geçti (unit + testcontainers entegrasyon)                       |
+| Kapsam (`src/lib`, `src/app/api`, `services`, `src/worker`; eşik satır 80 / dal 70) | satır %87.66, dal %78.72, fonksiyon %86.38, ifade %86.02                                   |
+| e2e (Playwright + axe, `npm run test:e2e`)                                          | 18 test, tamamı geçti (Chromium, axe dahil; v3.0.0 imajlı Docker yığını, LLM demo modu)    |
+| Regresyon etiketleri                                                                | 25 benzersiz `regression: v3#N` (şart ≥22)                                                 |
+| k6 `search.js` (50 rps)                                                             | p95 29 ms, %0 hata; Redis kapalıyken p95 232.4 ms, %0 hata                                 |
+| k6 `hold-spike.js`, sakin koşu                                                      | 201=1767, 409=2237, 5xx=0, p95 434 ms, p99 792 ms (**F8 düzeltmelerinden önceki imaj**)    |
+| k6 `hold-spike.js`, yeni imaj                                                       | 201=931, 409=446, 5xx=0, p95 **41.9 s**, 2647 düşen iterasyon (gürültülü host)             |
+| k6 `payment-race.js`                                                                | 20/20 CONFIRMED, çift tahsilat 0, p95 1.98 s (düzeltme öncesi koşu: 4 × 500)               |
+| k6 `llm-fallback.js`                                                                | demo p95 49 ms; 1 sn timeout → %100 fallback, p95 1.13 s; canlı p95 15.1 s, %71.3 fallback |
+| Değişmezler (tüm koşulardan sonra)                                                  | overbooking SQL 0, ledger çift CHARGE 0; Redis geri dönüşü ≈1.7 s                          |
+| Arama nDCG@10 (30 sorguluk altın küme)                                              | v2 0.2377 → v3 hibrit RRF 0.8733 → hibrit + LTR 0.9126                                     |
+| LTR (sentetik tıklama, test bölümü)                                                 | nDCG@10 ağırlıklı 0.7343 → LTR 0.8130 (+%10.71)                                            |
+
+Kaynaklar: `docs/perf/k6-results.md`, `load/chaos.md`, `docs/perf/ltr.md`.
+
+## 4. Dürüstlük notu
+
+### v2 raporundaki abartılar (düzeltme)
+
+Aşağıdaki v2 ifadeleri yazıldıkları anda koda göre fazla iddialıydı. v2 bölümü arşiv olarak
+değiştirilmeden bırakıldı; düzeltme burada:
+
+- **"Stripe sağlayıcısı opsiyonel":** v2'de UI her zaman mock `tokenizeCard` kullanıyordu,
+  `confirmChallenge` kodu yok sayıyordu ve webhook gerçek `Stripe-Signature` /
+  `payment_intent.*` olaylarını çözemiyordu (v3#10). Stripe yolu uçtan uca hiç çalışmadı.
+  v3'te gerçek SDK + imzalı webhook + Payment Element var; varsayılan sağlayıcı yine MockPsp'dir.
+- **"next-intl" / i18n:** v2'de yalnızca 3 dosya next-intl kullanıyordu, mesaj dosyaları ~900
+  bayttı ve UI metinlerinin neredeyse tamamı sabit Türkçeydi (v3#20). Gerçek tr/en v3 F8'de geldi.
+- **"Tek `computeTotal()` (kart = PDP = checkout = tahsilat)":** gRPC `estimated_total` oda
+  çarpanını ve vergiyi atlıyordu, gRPC `Charge` float dönüyordu, legacy `pricing/engine.ts` ve
+  `/api/negotiate` float hesaplıyordu (v3#9). v3'te tek fiyat kaynağı `priceStay`; pazarlık
+  kaldırıldı, legacy motor `event-signals`'a katlandı (ADR 0016).
+- **"Semantik sıralama":** varsayılan embedder FNV bag-of-words hash'iydi, UI hiç `semantic=1`
+  göndermiyordu ve keyword yolunda `personal` + `semantic` bileşenleri (ağırlığın %25'i) daima
+  0'dı (v3#19). Altın kümede v2 nDCG@10 yalnızca 0.2377'ydi.
+- **"%80 kapsam":** v2'de kapsam yalnızca `src/lib/**` üzerinden ölçülüyordu (satır %83.31, dal
+  %71.15); route handler'lar, gRPC/MCP ve worker ölçüm dışındaydı. v3'te bu dizinler de dahil.
+
+### v3'ün açık riskleri
+
+- **hold-spike p95:** yeni imajla ölçülen p95 41.9 s gürültülü (başka projelerin konteynerleriyle
+  paylaşılan) bir host'ta alındı; p95 434 ms'lik sakin koşu F8 düzeltmelerinden **önceki** imajla
+  yapıldı. Yeni imaj sakin bir host'ta yeniden koşulmalı; o zamana kadar gecikme hedefinin
+  karşılandığı iddia edilmez. Doğruluk tarafı (5xx=0, overbooking 0) iki koşuda da tuttu.
+- **Canlı LLM:** canlı modda p95 15.1 s ve isteklerin %71.3'ü fallback'e düştü. Demo modu (p95
+  49 ms) sorunsuz; canlı mod demo sunumu için güvenilir değil.
+- **Passkey mesajları yalnız Türkçe:** arayüz bileşenleri çevrili, ancak sunucunun döndürdüğü
+  passkey hata metinleri (`src/lib/auth/passkey.ts`, ör. "Passkey doğrulanamadı") yalnız Türkçe;
+  `en` arayüzde bu metinler Türkçe görünür.
+- **Altın küme nDCG iyimser:** 30 sorguluk küme ve alaka etiketleri bu projede, sistemi bilen
+  kişi tarafından yazıldı; LTR verisi sentetik tıklamalardır. 0.87 / 0.91 gerçek kullanıcı alaka
+  düzeyini temsil etmez.
+- **Step-up/passkey UI tarayıcıda test edilmedi:** WebAuthn akışı yalnızca birim/entegrasyon
+  testleriyle (sahte doğrulayıcı) sınandı; Playwright e2e passkey girişi, passkey yönetimi ve
+  ödeme step-up penceresini kapsamıyor (sanal authenticator ile e2e eklenmeli).
+- **npm audit:** 4 orta (moderate), 0 yüksek/kritik. Hepsi `@prisma/instrumentation` 5.x
+  üzerinden gelen `@opentelemetry/core` <2.8.0 (GHSA-8988-4f7v-96qf, W3C Baggage bellek ayırma);
+  düzeltme Prisma 7.x major yükseltmesi gerektirir.
+- **Stripe tarayıcıda doğrulanmadı:** CSP Stripe modunda gerekli alan adlarını içeriyor, ancak
+  Payment Element gerçek Stripe test anahtarıyla tarayıcıda uçtan uca koşulmadı.
+
+### Hâlâ mock / sentetik olanlar
+
+MockPsp (varsayılan ödeme sağlayıcısı), mock TR/AB kayıt doğrulaması, mock e-Arşiv fatura ("DEMO —
+mali değeri yoktur"), mock payout, sentetik LTR tıklama verisi, embedding anahtarı yokken hash
+embedding yedeği ve deterministik LLM demo yanıtları.
+
+## 5. Bilinen sınırlamalar
+
+- Tek bölge, tek Postgres; yatay ölçekleme ve okuma replikası yok.
+- iCal yalnız yoklama (push yok); fiyat eşitliği kontrolü yalnız uyarır.
+- Gelir önerisi kural tabanlı ve açıklanabilir; talep tahmini modeli yok.
+- Fraud v2 kural tabanlıdır; öğrenilmiş model ve gerçek BIN/IP veritabanı yok.
+- Yük testleri tek makinede, uygulama ile aynı host'ta koşuldu.
+
+## 6. §3 LLM sözleşmesi — doğrulama tablosu
 
 Her madde koda karşı yeniden doğrulandı; "Test" sütunundaki testler ağa çıkmaz
 (sahte `fetch` / bellek içi bütçe).

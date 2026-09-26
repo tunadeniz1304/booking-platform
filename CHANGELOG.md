@@ -4,9 +4,13 @@ Bu dosyadaki tüm önemli değişiklikler burada belgelenir. Biçim [Keep a Chan
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-09-26
+
+v2'nin bilinen 22 hatası (`regression: v3#N` etiketli testlerle) kapatıldı; envanter, vergi/FX, ödeme sagası, hibrit arama + LTR, mesajlaşma/moderasyon, ajan rezervasyonu, gelir paneli ve gerçek i18n eklendi. Ayrıntı ve dürüstlük notu: `docs/FINAL_REPORT.md`.
+
 ### Added
 
-- **v3 F0/F1:** genişletilmiş kapsam (route handler, gRPC/MCP, worker; satır 80 / dal 70), CI'da Docker zorunlu entegrasyon testleri; LLM bütçeleri, redakte prompt logu, `ai_generated` etiketi; auth sertleştirme (tokenVersion, lockout, e-posta doğrulama, şifre sıfırlama, passkey), `DEMO_MODE`.
+- **v3 F0/F1:** genişletilmiş kapsam (route handler, gRPC/MCP, worker; satır 80 / dal 70), CI'da Docker zorunlu entegrasyon testleri; LLM kullanıcı başına token/maliyet bütçeleri (v3#22), redakte prompt logu, `ai_generated` etiketi; e-posta doğrulama, şifre sıfırlama ve passkey (WebAuthn) girişi.
 - **v3 F2 — Envanter v2 (ADR 0010):** `RoomType{units}`, `RatePlan` (iade edilemez / kahvaltılı), `Restriction` (minStay/maxStay/CTA/CTD/stopSell), `InventoryDay{total, sold, held}` (`CHECK sold+held<=total`), `ExternalBlock`; `Availability` verisi tek migration'da taşındı. units=3 odada 100 paralel istek → tam 3 başarı.
 - **v3 F2 — Tesis saat dilimi (ADR 0011):** `Property.timeZone/checkInTime/checkOutTime`, Temporal yardımcıları; iCal içe aktarma ve `complete-stays` job'ı tesisin yerel gününde çalışır.
 - **v3 F2 — Arama doğruluğu:** tek zod arama şeması (`src/lib/search/params.ts`), geçersiz girdi 400; fiyat filtresi toplam fiyat üzerinden; `pageSize` 50'ye kırpılır.
@@ -52,6 +56,19 @@ Bu dosyadaki tüm önemli değişiklikler burada belgelenir. Biçim [Keep a Chan
 - `demo:scenarios` betiğinin okuduğu `BASE_URL` ve `DAY_OFFSET` `.env.example`'da belgelenmemişti (regression #21 kırmızıydı).
 - Serbest metin araması kök ekleri, yazım hataları ve eş anlamlıları kaçırıyordu; hibrit RRF araması ile düzeltildi (v3#19).
 - Devredilen rezervasyonun iptal iadesi yeni sahibe değil ödemeyi yapan alıcıya gider (v3#4).
+
+### Security
+
+- Çift tahsilat yarışı (v3#1): rezervasyon başına ödeme kilidi ve `Payment` üzerinde koşullu durum geçişi; kaybeden capture void/iade edilir.
+- Webhook olayı işleme ile aynı transaction'da kaydedilir; tutar/para birimi uyuşmazlığı 400 + denetim kaydı, HOLD_EXPIRED otomatik iade (v3#2). Stripe webhook'u `Stripe-Signature` ile doğrulanır (v3#10).
+- Rate-limit anahtarı `TRUSTED_PROXY_HOPS=0` iken tek global kovaya düşmez; güvenilmeyen başlıklar yok sayılır, bilinmeyen IP için parmak izi kovası (v3#3).
+- `User.tokenVersion`: hesap silme ve rol değişikliği tüm oturumları geçersiz kılar (v3#5); hesap kilitleme (`AUTH_LOCKOUT_THRESHOLD`, `AUTH_LOCKOUT_MINUTES`), access-token denylist Redis yokken fail-closed, `/api/auth/*` için oturum çerezi yokken de Origin kontrolü (login CSRF) (v3#14).
+- `POST /api/properties` girdisi sınırlandı (para birimi, uzunluklar, iptal politikası varlığı); istemcinin gönderdiği pazarlık turu değerine güvenen uç kaldırıldı (v3#8).
+- `DEMO_MODE` açık bayrağı: kapalıyken demo seed reddedilir ve `/dev/mailbox` 404 döner; arayüzde DEMO rozeti (v3#11).
+- MCP kimliği araç argümanından transport'a taşındı (stdio'da `MCP_ACCESS_TOKEN`, HTTP'de bearer) (v3#12); gRPC opsiyonel TLS/mTLS (`GRPC_TLS_*`) ve interceptor tabanlı hız sınırı (v3#13).
+- iCal URL yoklaması SSRF korumalı (yalnız https, özel ağ adresleri reddedilir, boyut/süre sınırı) (v3#21).
+- Doğrulanmamış (`PENDING`/`REJECTED`) ilanlar arama dışında da kapalı: `GET /api/properties/[id]`, ilan sayfası, teklif ve `createBooking` ortak `LISTABLE_PROPERTY` koşuluyla 404 döner (v3#26).
+- CSP, `PAYMENT_PROVIDER=stripe` iken Stripe.js'in gerektirdiği alan adlarını içerir (`script-src`/`frame-src` `js.stripe.com`, `frame-src` `hooks.stripe.com`, `connect-src` `api.stripe.com`); mock modunda eklenmez.
 
 ### Removed
 

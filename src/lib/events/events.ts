@@ -65,8 +65,11 @@ export interface BookingCancelledPayload extends BookingRef {
 }
 
 export interface BookingExpiredPayload extends BookingRef {
-  /** hold_timeout: TTL doldu; payment_failed: ödeme sagası telafisi (P0-7). */
-  reason: "hold_timeout" | "payment_failed";
+  /**
+   * hold_timeout: TTL doldu; payment_failed: ödeme sagası telafisi (P0-7);
+   * cart_released: grup sepetinin tutması kullanıcı tarafından bırakıldı / sepet iptal (P1-1).
+   */
+  reason: "hold_timeout" | "payment_failed" | "cart_released";
 }
 
 export interface BookingTransferredPayload extends BookingRef {

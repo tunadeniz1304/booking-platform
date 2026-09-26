@@ -365,186 +365,203 @@ async function reserveInTransaction(
   quote: Quote | null,
   fx: FxTable
 ): Promise<BookingDTO> {
+  return withSerializableRetry((tx) =>
+    reserveBookingInTx(tx, input, checkIn, checkOut, nights, quote, fx)
+  );
+}
+
+/** Sepet (P1-1) gibi dış işlemden çağrılan tutmalar için ek seçenekler. */
+export interface ReserveOptions {
+  /** Rezervasyonun bağlandığı sepet (grup kimliği). */
+  cartId?: string;
+  /** Tüm sepet kalemleri için ortak tutma bitişi (verilmezse şimdi + TTL). */
+  holdExpiresAt?: Date;
+}
+
+/**
+ * Tek rezervasyonun kilitli fiyatlaması + HELD kaydı + koşullu sayaç (`holdUnits`) + outbox.
+ * ÇAĞIRANIN SERIALIZABLE işlemi içinde çalışır ve oda tipi Redlock'unu çağıran tutar;
+ * herhangi bir hata tüm işlemi (diğer sepet kalemleri dahil) geri aldırır.
+ */
+export async function reserveBookingInTx(
+  tx: Prisma.TransactionClient,
+  input: CreateBookingInput & { units: number; requestHash: string },
+  checkIn: IsoDate,
+  checkOut: IsoDate,
+  nights: IsoDate[],
+  quote: Quote | null,
+  fx: FxTable,
+  options: ReserveOptions = {}
+): Promise<BookingDTO> {
   const config = getConfig();
-  return withSerializableRetry(async (tx) => {
-    const policySelect = { select: { kind: true, version: true, rules: true } } as const;
-    const room = await tx.roomType.findFirst({
-      // Önceden alınmış teklif olsa bile doğrulanmamış ilan satılamaz (v3#26).
-      where: { id: input.roomId, propertyId: input.propertyId, property: LISTABLE_PROPERTY },
-      select: {
-        id: true,
-        maxOccupancy: true,
-        units: true,
-        available: true,
-        priceModifierMinor: true,
-        ratePlans: {
-          select: {
-            id: true,
-            code: true,
-            name: true,
-            mealPlan: true,
-            refundable: true,
-            priceModifierBps: true,
-            isDefault: true,
-            active: true,
-            cancellationPolicy: policySelect,
-          },
-        },
-        property: {
-          select: {
-            currency: true,
-            cancellationPolicy: policySelect,
-            location: { select: { country: true } },
-          },
+  const policySelect = { select: { kind: true, version: true, rules: true } } as const;
+  const room = await tx.roomType.findFirst({
+    // Önceden alınmış teklif olsa bile doğrulanmamış ilan satılamaz (v3#26).
+    where: { id: input.roomId, propertyId: input.propertyId, property: LISTABLE_PROPERTY },
+    select: {
+      id: true,
+      maxOccupancy: true,
+      units: true,
+      available: true,
+      priceModifierMinor: true,
+      ratePlans: {
+        select: {
+          id: true,
+          code: true,
+          name: true,
+          mealPlan: true,
+          refundable: true,
+          priceModifierBps: true,
+          isDefault: true,
+          active: true,
+          cancellationPolicy: policySelect,
         },
       },
-    });
-    if (!room) throw new BookingNotFoundError("Oda veya mülk bulunamadı");
-    if (input.guestCount > room.maxOccupancy * input.units) {
-      throw new BookingValidationError(`Bu oda en fazla ${room.maxOccupancy} kişiliktir`);
-    }
-    if (!room.available || input.units > room.units) throw new SoldOutError();
-    let plan;
-    try {
-      plan = pickRatePlan(room.ratePlans, input.ratePlanId);
-    } catch (error) {
-      if (error instanceof SoldOutError) throw error;
-      throw new BookingValidationError((error as Error).message);
-    }
-    const currency = assertCurrency(room.property.currency);
+      property: {
+        select: {
+          currency: true,
+          cancellationPolicy: policySelect,
+          location: { select: { country: true } },
+        },
+      },
+    },
+  });
+  if (!room) throw new BookingNotFoundError("Oda veya mülk bulunamadı");
+  if (input.guestCount > room.maxOccupancy * input.units) {
+    throw new BookingValidationError(`Bu oda en fazla ${room.maxOccupancy} kişiliktir`);
+  }
+  if (!room.available || input.units > room.units) throw new SoldOutError();
+  let plan;
+  try {
+    plan = pickRatePlan(room.ratePlans, input.ratePlanId);
+  } catch (error) {
+    if (error instanceof SoldOutError) throw error;
+    throw new BookingValidationError((error as Error).message);
+  }
+  const currency = assertCurrency(room.property.currency);
 
-    const rows = await tx.$queryRaw<
-      Array<{
-        id: string;
-        date: Date;
-        priceMinor: bigint;
-        total: number;
-        sold: number;
-        held: number;
-      }>
-    >`
-      SELECT id, date, "priceMinor", total, sold, held
-      FROM "InventoryDay"
-      WHERE "roomTypeId" = ${room.id}
-        AND date >= ${toDbDate(checkIn)}
-        AND date < ${toDbDate(checkOut)}
-      ORDER BY date
-      FOR UPDATE
-    `;
-    const restrictions = await tx.restriction.findMany({
-      where: { roomTypeId: room.id, date: { gte: toDbDate(checkIn), lte: toDbDate(checkOut) } },
-    });
-    const violation = checkRestrictions({ checkIn, checkOut, nights }, restrictions);
-    if (violation) throw new RestrictionError(describeViolation(violation), violation.code);
-    const nightInputs = nightsFromInventory(rows, nights, currency, input.units);
-    if (!nightInputs) throw new SoldOutError();
+  const rows = await tx.$queryRaw<
+    Array<{
+      id: string;
+      date: Date;
+      priceMinor: bigint;
+      total: number;
+      sold: number;
+      held: number;
+    }>
+  >`
+    SELECT id, date, "priceMinor", total, sold, held
+    FROM "InventoryDay"
+    WHERE "roomTypeId" = ${room.id}
+      AND date >= ${toDbDate(checkIn)}
+      AND date < ${toDbDate(checkOut)}
+    ORDER BY date
+    FOR UPDATE
+  `;
+  const restrictions = await tx.restriction.findMany({
+    where: { roomTypeId: room.id, date: { gte: toDbDate(checkIn), lte: toDbDate(checkOut) } },
+  });
+  const violation = checkRestrictions({ checkIn, checkOut, nights }, restrictions);
+  if (violation) throw new RestrictionError(describeViolation(violation), violation.code);
+  const nightInputs = nightsFromInventory(rows, nights, currency, input.units);
+  if (!nightInputs) throw new SoldOutError();
 
-    const priced = priceStay({
-      nights: nightInputs,
-      modifierMinor: minorFromDb(room.priceModifierMinor),
-      planModifierBps: plan.priceModifierBps,
+  const priced = priceStay({
+    nights: nightInputs,
+    modifierMinor: minorFromDb(room.priceModifierMinor),
+    planModifierBps: plan.priceModifierBps,
+    units: input.units,
+    currency,
+    taxRules: taxRulesFor(room.property.location.country),
+    guests: input.guestCount,
+  });
+  // İade edilemez plan → NON_REFUNDABLE; değilse planın (yoksa mülkün) politikası.
+  const policy = plan.refundable
+    ? toSnapshot(plan.cancellationPolicy ?? room.property.cancellationPolicy)
+    : DEFAULT_POLICIES.NON_REFUNDABLE;
+  if (quote && !samePrice(quote, priced)) {
+    throw new BookingConflictError("Fiyat değişti, lütfen yeni fiyatı onaylayın", "PRICE_CHANGED", {
+      previousTotal: quote.total,
+      currentTotal: priced.total,
+      currency,
+    });
+  }
+
+  const chargeCurrency = resolveChargeCurrency(currency, input.currency ?? quote?.charge?.currency);
+  const charge = chargeAmount(money(priced.total, currency), chargeCurrency, fx);
+  if (
+    quote?.charge &&
+    quote.charge.currency === charge.currency &&
+    quote.charge.total !== charge.total
+  ) {
+    throw new BookingConflictError("Fiyat değişti, lütfen yeni fiyatı onaylayın", "PRICE_CHANGED", {
+      previousTotal: quote.charge.total,
+      currentTotal: charge.total,
+      currency: charge.currency,
+    });
+  }
+
+  const status = transition("PENDING", "HOLD");
+  const holdExpiresAt =
+    options.holdExpiresAt ?? new Date(Date.now() + config.BOOKING_HOLD_TTL_MINUTES * 60_000);
+  const booking = await tx.booking.create({
+    data: {
+      userId: input.userId,
+      propertyId: input.propertyId,
+      roomId: room.id,
+      ratePlanId: plan.id,
       units: input.units,
-      currency,
-      taxRules: taxRulesFor(room.property.location.country),
-      guests: input.guestCount,
-    });
-    // İade edilemez plan → NON_REFUNDABLE; değilse planın (yoksa mülkün) politikası.
-    const policy = plan.refundable
-      ? toSnapshot(plan.cancellationPolicy ?? room.property.cancellationPolicy)
-      : DEFAULT_POLICIES.NON_REFUNDABLE;
-    if (quote && !samePrice(quote, priced)) {
-      throw new BookingConflictError(
-        "Fiyat değişti, lütfen yeni fiyatı onaylayın",
-        "PRICE_CHANGED",
-        {
-          previousTotal: quote.total,
-          currentTotal: priced.total,
-          currency,
-        }
-      );
-    }
+      checkIn: toDbDate(checkIn),
+      checkOut: toDbDate(checkOut),
+      guestCount: input.guestCount,
+      totalPriceMinor: minorToDb(charge.total),
+      currency: charge.currency,
+      status,
+      holdExpiresAt,
+      priceBreakdown: priced as unknown as Prisma.InputJsonValue,
+      quoteId: quote?.quoteId ?? null,
+      policySnapshot: policy as unknown as Prisma.InputJsonValue,
+      fxSnapshotId: fx.id,
+      fxSnapshot: fx as unknown as Prisma.InputJsonValue,
+      idempotencyKey: input.idempotencyKey ?? null,
+      idempotencyRequestHash: input.idempotencyKey ? input.requestHash : null,
+      cartId: options.cartId ?? null,
+    },
+    select: bookingSelect,
+  });
 
-    const chargeCurrency = resolveChargeCurrency(
-      currency,
-      input.currency ?? quote?.charge?.currency
-    );
-    const charge = chargeAmount(money(priced.total, currency), chargeCurrency, fx);
-    if (
-      quote?.charge &&
-      quote.charge.currency === charge.currency &&
-      quote.charge.total !== charge.total
-    ) {
-      throw new BookingConflictError(
-        "Fiyat değişti, lütfen yeni fiyatı onaylayın",
-        "PRICE_CHANGED",
-        {
-          previousTotal: quote.charge.total,
-          currentTotal: charge.total,
-          currency: charge.currency,
-        }
-      );
-    }
+  // Koşullu sayaç: yer yoksa (0 satır / eksik gece) işlem geri alınır → SOLD_OUT.
+  try {
+    await holdUnits(tx, { roomTypeId: room.id, checkIn, checkOut, units: input.units });
+  } catch (error) {
+    if (error instanceof InventoryUnavailableError) throw new SoldOutError();
+    throw error;
+  }
 
-    const status = transition("PENDING", "HOLD");
-    const holdExpiresAt = new Date(Date.now() + config.BOOKING_HOLD_TTL_MINUTES * 60_000);
-    const booking = await tx.booking.create({
-      data: {
-        userId: input.userId,
+  await appendOutbox(
+    tx,
+    makeEvent<BookingCreatedPayload>(
+      EventTypes.BookingCreated,
+      booking.id,
+      "booking",
+      {
+        bookingId: booking.id,
         propertyId: input.propertyId,
         roomId: room.id,
-        ratePlanId: plan.id,
-        units: input.units,
-        checkIn: toDbDate(checkIn),
-        checkOut: toDbDate(checkOut),
+        checkIn,
+        checkOut,
+        userId: input.userId,
+        status: "HELD",
         guestCount: input.guestCount,
-        totalPriceMinor: minorToDb(charge.total),
-        currency: charge.currency,
-        status,
-        holdExpiresAt,
-        priceBreakdown: priced as unknown as Prisma.InputJsonValue,
-        quoteId: quote?.quoteId ?? null,
-        policySnapshot: policy as unknown as Prisma.InputJsonValue,
-        fxSnapshotId: fx.id,
-        fxSnapshot: fx as unknown as Prisma.InputJsonValue,
-        idempotencyKey: input.idempotencyKey ?? null,
-        idempotencyRequestHash: input.idempotencyKey ? input.requestHash : null,
+        totalMinor: priced.total,
+        currency,
+        holdExpiresAt: holdExpiresAt.toISOString(),
       },
-      select: bookingSelect,
-    });
+      input.idempotencyKey
+    )
+  );
 
-    // Koşullu sayaç: yer yoksa (0 satır / eksik gece) işlem geri alınır → SOLD_OUT.
-    try {
-      await holdUnits(tx, { roomTypeId: room.id, checkIn, checkOut, units: input.units });
-    } catch (error) {
-      if (error instanceof InventoryUnavailableError) throw new SoldOutError();
-      throw error;
-    }
-
-    await appendOutbox(
-      tx,
-      makeEvent<BookingCreatedPayload>(
-        EventTypes.BookingCreated,
-        booking.id,
-        "booking",
-        {
-          bookingId: booking.id,
-          propertyId: input.propertyId,
-          roomId: room.id,
-          checkIn,
-          checkOut,
-          userId: input.userId,
-          status: "HELD",
-          guestCount: input.guestCount,
-          totalMinor: priced.total,
-          currency,
-          holdExpiresAt: holdExpiresAt.toISOString(),
-        },
-        input.idempotencyKey
-      )
-    );
-
-    return toDto(booking);
-  });
+  return toDto(booking);
 }
 
 async function afterWrite(propertyId: string, bookingId: string): Promise<void> {

@@ -131,6 +131,8 @@ interface PayableBooking {
   totalPriceMinor: bigint;
   currency: string;
   payment: { id: string; status: PaymentStatus; providerRef: string | null } | null;
+  /** P1-1: sepet kalemi → ödeme yalnızca sepet üzerinden (`/api/cart/pay`). */
+  cartId: string | null;
 }
 
 async function loadPayable(bookingId: string, userId: string): Promise<PayableBooking> {
@@ -149,6 +151,7 @@ async function loadPayable(bookingId: string, userId: string): Promise<PayableBo
       totalPriceMinor: true,
       currency: true,
       payment: { select: { id: true, status: true, providerRef: true } },
+      cartId: true,
     },
   });
   // IDOR: başkasının rezervasyonu "bulunamadı"
@@ -462,19 +465,7 @@ export async function confirmInTransaction(
   const booking = await tx.booking.findUnique({
     where: { id: bookingId },
     select: {
-      id: true,
-      userId: true,
-      status: true,
-      version: true,
-      propertyId: true,
-      roomId: true,
-      checkIn: true,
-      checkOut: true,
-      holdExpiresAt: true,
-      totalPriceMinor: true,
-      currency: true,
-      units: true,
-      priceBreakdown: true,
+      ...confirmableBookingSelect,
       payment: { select: { id: true, status: true, providerRef: true } },
     },
   });
@@ -483,15 +474,7 @@ export async function confirmInTransaction(
     if (booking.payment.providerRef === providerRef) return booking.payment.id; // idempotent
     throw new CaptureRaceLostError();
   }
-  let next: BookingState;
-  try {
-    next = transition(booking.status as BookingState, "CONFIRM");
-  } catch {
-    throw new ConflictError("Rezervasyon artık onaylanamaz", "BOOKING_NOT_CONFIRMABLE");
-  }
-  if (booking.holdExpiresAt && booking.holdExpiresAt.getTime() < Date.now()) {
-    throw new ConflictError("Rezervasyon tutma süresi doldu", "HOLD_EXPIRED");
-  }
+  const next = nextConfirmedState(booking);
   // Tahsil hakkı bu providerRef'te olmalı (başka yetkilendirme satırı almışsa yarış kaybı).
   const paid = await tx.payment.updateMany({
     where: {
@@ -502,6 +485,61 @@ export async function confirmInTransaction(
     data: { status: PaymentStatus.PAID, paidAt: new Date(), failureCode: null },
   });
   if (paid.count !== 1) throw new CaptureRaceLostError();
+  const payment = await tx.payment.findUniqueOrThrow({
+    where: { bookingId: booking.id },
+    select: { id: true, amountMinor: true },
+  });
+  await applyConfirmation(tx, booking, next, payment, providerRef);
+  return payment.id;
+}
+
+/** Onaylanacak rezervasyonun okunması gereken alanları (tek ve sepet onayı ortak). */
+export const confirmableBookingSelect = {
+  id: true,
+  userId: true,
+  status: true,
+  version: true,
+  propertyId: true,
+  roomId: true,
+  checkIn: true,
+  checkOut: true,
+  holdExpiresAt: true,
+  totalPriceMinor: true,
+  currency: true,
+  units: true,
+  priceBreakdown: true,
+} satisfies Prisma.BookingSelect;
+
+export type ConfirmableBooking = Prisma.BookingGetPayload<{
+  select: typeof confirmableBookingSelect;
+}>;
+
+/** HELD → CONFIRMED geçişi mümkün mü (durum + tutma süresi); değilse 409. */
+export function nextConfirmedState(booking: ConfirmableBooking): BookingState {
+  let next: BookingState;
+  try {
+    next = transition(booking.status as BookingState, "CONFIRM");
+  } catch {
+    throw new ConflictError("Rezervasyon artık onaylanamaz", "BOOKING_NOT_CONFIRMABLE");
+  }
+  if (booking.holdExpiresAt && booking.holdExpiresAt.getTime() < Date.now()) {
+    throw new ConflictError("Rezervasyon tutma süresi doldu", "HOLD_EXPIRED");
+  }
+  return next;
+}
+
+/**
+ * Ödeme satırı PAID yazıldıktan sonra: durum geçişi (sürüm koşullu) + envanter held→sold +
+ * eski defter (dual-write) + çift girişli jurnal + outbox. Tek rezervasyon ödemesi ve sepet
+ * (P1-1) onayı bu adımı AYNI işlem içinde paylaşır.
+ */
+export async function applyConfirmation(
+  tx: Prisma.TransactionClient,
+  booking: ConfirmableBooking,
+  next: BookingState,
+  payment: { id: string; amountMinor: bigint },
+  providerRef: string
+): Promise<void> {
   const updated = await tx.booking.updateMany({
     where: { id: booking.id, status: booking.status, version: booking.version },
     data: {
@@ -522,10 +560,6 @@ export async function confirmInTransaction(
     units: booking.units,
   });
   const amount = amountOf(booking);
-  const payment = await tx.payment.findUniqueOrThrow({
-    where: { bookingId: booking.id },
-    select: { id: true, amountMinor: true },
-  });
   await tx.ledgerEntry.create({
     data: {
       bookingId: booking.id,
@@ -558,7 +592,6 @@ export async function confirmInTransaction(
       paymentId: payment.id,
     })
   );
-  return payment.id;
 }
 
 async function afterBookingWrite(propertyId: string, bookingId: string): Promise<void> {
@@ -567,6 +600,9 @@ async function afterBookingWrite(propertyId: string, bookingId: string): Promise
 }
 
 function assertPayable(booking: PayableBooking): void {
+  if (booking.cartId) {
+    throw new ConflictError("Bu rezervasyon sepetle birlikte ödenir", "CART_BOOKING");
+  }
   if (booking.status !== "HELD") {
     throw new ConflictError("Bu rezervasyon ödeme beklemiyor", "INVALID_STATE");
   }
@@ -1084,7 +1120,12 @@ export interface CancellationOutcome {
 function refundTarget(
   booking: {
     userId: string;
-    payment: { amountMinor: bigint; providerRef: string | null } | null;
+    payment: {
+      amountMinor: bigint;
+      providerRef: string | null;
+      /** P1-1: sepet payı → PSP işlemi sepetin tek tahsilatıdır. */
+      cartPayment?: { providerRef: string | null } | null;
+    } | null;
     transfers: Array<{
       askPriceMinor: bigint;
       currency: string;
@@ -1104,7 +1145,17 @@ function refundTarget(
     const ask = minorFromDb(transfer.askPriceMinor);
     return { providerRef: transfer.buyerPaymentRef, refundableMinor: Math.min(ask, paid) };
   }
-  return { providerRef: booking.payment?.providerRef ?? null, refundableMinor: paid };
+  return { providerRef: pspRefOf(booking.payment), refundableMinor: paid };
+}
+
+/** Ödemenin PSP işlem kimliği: kendi `providerRef`'i ya da (sepet payıysa) sepet tahsilatınınki. */
+function pspRefOf(
+  payment: {
+    providerRef: string | null;
+    cartPayment?: { providerRef: string | null } | null;
+  } | null
+): string | null {
+  return payment?.providerRef ?? payment?.cartPayment?.providerRef ?? null;
 }
 
 /**
@@ -1152,7 +1203,15 @@ async function cancelLocked(
         policySnapshot: true,
         priceBreakdown: true,
         property: { select: { timeZone: true, checkInTime: true, checkOutTime: true } },
-        payment: { select: { id: true, status: true, amountMinor: true, providerRef: true } },
+        payment: {
+          select: {
+            id: true,
+            status: true,
+            amountMinor: true,
+            providerRef: true,
+            cartPayment: { select: { providerRef: true } },
+          },
+        },
         transfers: {
           where: { status: "COMPLETED" },
           orderBy: { completedAt: "desc" },
@@ -1261,7 +1320,7 @@ async function cancelLocked(
 
   const { booking, decision, currency, target } = result;
   const provider = getPaymentProvider();
-  if (booking.payment?.providerRef) {
+  if (pspRefOf(booking.payment)) {
     try {
       if (decision.refundMinor > 0 && target.providerRef) {
         await provider.refund(
@@ -1270,9 +1329,11 @@ async function cancelLocked(
           `refund:${booking.id}`
         );
       } else if (
+        booking.payment?.providerRef &&
         booking.payment.status !== PaymentStatus.PAID &&
         booking.payment.status !== PaymentStatus.FAILED
       ) {
+        // Yalnızca kendi yetkilendirmesi: sepet payında paylaşılan işlem void EDİLMEZ.
         await provider.void(booking.payment.providerRef);
       }
     } catch (error) {
@@ -1374,6 +1435,7 @@ export async function retryFailedRefund(bookingId: string): Promise<RefundRetryR
             providerRef: true,
             refundedAmountMinor: true,
             failureCode: true,
+            cartPayment: { select: { providerRef: true } },
           },
         },
         transfers: {

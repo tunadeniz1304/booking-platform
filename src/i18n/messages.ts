@@ -10,6 +10,7 @@ export const NAMESPACES = [
   "admin",
   "auth",
   "booking",
+  "cart",
   "chat",
   "checkout",
   "common",

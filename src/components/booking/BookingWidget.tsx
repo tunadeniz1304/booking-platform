@@ -9,6 +9,7 @@ import QuoteBreakdown from "./QuoteBreakdown";
 import PriceInsight from "./PriceInsight";
 import { useQuote } from "./useQuote";
 import { subscribeStaySelection } from "./stay-selection";
+import AddToCartButton from "@/components/cart/AddToCartButton";
 
 export interface BookingWidgetRatePlan {
   id: string;
@@ -250,6 +251,15 @@ export default function BookingWidget({ propertyId, rooms, initial }: BookingWid
       >
         {t("widget.submit")}
       </button>
+      <AddToCartButton
+        propertyId={propertyId}
+        roomTypeId={selectedRoom?.id}
+        ratePlanId={selectedPlan?.id}
+        checkIn={checkIn}
+        checkOut={checkOut}
+        adults={guestCount}
+        disabled={!quote}
+      />
     </form>
   );
 }

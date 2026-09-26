@@ -958,6 +958,9 @@ enum LedgerAccountKind {
   ESCROW
   /// P1-4: ev sahibi rezervi (`host_reserve:<userId>`) — RESERVE_RELEASE_DAYS sonra host_payable'a.
   HOST_RESERVE
+  /// fix-sweep-2: platform zararı (gider, borç-doğal) — kaybedilen itirazda ev sahibinden
+  /// tahsil edilemeyen kısım (`platform_loss`).
+  PLATFORM_LOSS
 }
 
 enum JournalSide {

@@ -12,6 +12,7 @@ import { minorFromDb, money } from "@/lib/money/money";
 import { errorFields, logger } from "@/lib/observability/logger";
 import { counter } from "@/lib/observability/metrics";
 import { getPaymentProvider, PaymentProviderError } from "@/lib/payment";
+import { lostChargebackMinor } from "@/lib/payment/refundable";
 import { prisma } from "@/lib/prisma";
 import { getQueue, QUEUE_NAMES } from "@/lib/queue";
 import { redis } from "@/lib/redis";
@@ -132,10 +133,11 @@ async function loadBooking(bookingId: string): Promise<BookingRow | null> {
   return prisma.booking.findUnique({ where: { id: bookingId }, select: bookingSelect });
 }
 
-function refundableMinor(b: BookingRow): bigint {
+/** Kalan iade edilebilir tutar: tahsilat − iadeler (kümülatif) − kaybedilen itirazlar. */
+async function refundableMinor(b: BookingRow): Promise<bigint> {
   const p = b.payment;
   if (!p || !["PAID", "PARTIALLY_REFUNDED"].includes(p.status)) return 0n;
-  const rest = p.amountMinor - p.refundedAmountMinor;
+  const rest = p.amountMinor - p.refundedAmountMinor - (await lostChargebackMinor(prisma, b.id));
   return rest > 0n ? rest : 0n;
 }
 
@@ -244,7 +246,7 @@ export async function openClaim(
         "Devredilmiş rezervasyonda iade talebi açılamaz"
       );
     }
-    const refundable = refundableMinor(booking);
+    const refundable = await refundableMinor(booking);
     if (amount > refundable) {
       throw new ClaimError(
         422,
@@ -541,7 +543,7 @@ export async function getClaimDetail(actor: AccessClaims, claimId: string) {
           checkIn: fromDate(booking.checkIn),
           checkOut: fromDate(booking.checkOut),
           status: booking.status,
-          refundableMinor: minorFromDb(refundableMinor(booking)),
+          refundableMinor: minorFromDb(await refundableMinor(booking)),
         }
       : null,
     deposit: deposit ? toDepositView(deposit) : null,
@@ -791,7 +793,7 @@ async function settleGuestRefund(
   if (!booking?.payment)
     throw new ClaimError(409, "CLAIM_NO_PAYMENT", "Rezervasyonun tahsilatı yok");
   const payment = booking.payment;
-  const refundable = refundableMinor(booking);
+  const refundable = await refundableMinor(booking);
   if (award > refundable) {
     throw new ClaimError(
       422,

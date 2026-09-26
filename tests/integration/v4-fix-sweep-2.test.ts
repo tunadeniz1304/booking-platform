@@ -19,8 +19,11 @@ import { PaymentProviderError, setPaymentProviderForTests } from "@/lib/payment"
 import { signAccessToken } from "@/lib/auth/tokens";
 import { POST as payPost } from "@/app/api/bookings/[id]/pay/route";
 import type { Money } from "@/lib/money/money";
-import { isTrialBalanced, reconcile, trialBalance } from "@/lib/ledger";
-import { releaseAt } from "@/lib/payout/escrow";
+import { account, getAccountBalance, isTrialBalanced, reconcile, trialBalance } from "@/lib/ledger";
+import { releaseAt, runEscrowRelease } from "@/lib/payout/escrow";
+import { getConfig } from "@/lib/config/app-config";
+import { handleDisputeEvent } from "@/lib/resolution/disputes";
+import type { WebhookEvent } from "@/lib/payment/webhook";
 import type { AccessClaims } from "@/lib/auth";
 import { decideClaim, openClaim } from "@/lib/resolution/claims";
 
@@ -281,6 +284,133 @@ describeInt("fix-sweep-2: ödeme düzeltmeleri", () => {
     const paid = await prisma.payment.findUniqueOrThrow({ where: { bookingId: g.id } });
     expect(paid).toMatchObject({ status: "PAID", failureCode: null });
     touchedBookings.add(g.id);
+    await assertBooksClean();
+  });
+
+  async function loseDispute(providerRef: string, amountMinor: number, now = new Date()) {
+    const disputeId = `dp_fs2_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const event = (type: string, n: number, status: string) =>
+      ({
+        id: `evt_${disputeId}_${n}`,
+        type,
+        data: {
+          providerRef,
+          amount: amountMinor,
+          currency: "TRY",
+          disputeId,
+          disputeStatus: status,
+          reason: "fraudulent",
+        },
+      }) as unknown as WebhookEvent;
+    await handleDisputeEvent(event("dispute.created", 1, "needs_response"), now);
+    await handleDisputeEvent(event("dispute.closed", 2, "lost"), now);
+    // Tekrar (replay) ikinci jurnal üretmez.
+    expect((await handleDisputeEvent(event("dispute.closed", 2, "lost"), now)).duplicate).toBe(
+      true
+    );
+    const claim = await prisma.claim.findUniqueOrThrow({ where: { externalRef: disputeId } });
+    const entry = await prisma.journalEntry.findUnique({
+      where: { idempotencyKey: `chargeback-lost:${claim.id}` },
+      include: { lines: { include: { account: true } } },
+    });
+    const debit = (kind: string) =>
+      (entry?.lines ?? [])
+        .filter((l) => l.account.kind === kind && l.side === "DEBIT")
+        .reduce((sum, l) => sum + l.amountMinor, 0n);
+    const pspOut = (entry?.lines ?? [])
+      .filter((l) => l.account.kind === "PSP_CLEARING" && l.side === "CREDIT")
+      .reduce((sum, l) => sum + l.amountMinor, 0n);
+    return { claim, entry, debit, pspOut };
+  }
+
+  it("kaybedilen itiraz (serbest bırakma öncesi): para emanetten karta döner; talep tutarları; sonraki talep/iptal kalanla sınırlı", async () => {
+    const g = await fx.hold({ nights: 2 });
+    const payment = await pay(g.id);
+    const half = Number(payment.amountMinor) / 2;
+    const { claim, entry, debit, pspOut } = await loseDispute(payment.providerRef!, half);
+    expect(claim).toMatchObject({
+      status: "RESOLVED_APPROVED",
+      awardedMinor: BigInt(half),
+      settledMinor: BigInt(half),
+      platformCoveredMinor: 0n,
+      uncollectedMinor: 0n,
+    });
+    expect(entry?.kind).toBe("CHARGEBACK_LOST");
+    expect(pspOut).toBe(BigInt(half));
+    expect(debit("ESCROW")).toBeGreaterThan(0n);
+    expect(debit("PLATFORM_LOSS")).toBe(0n);
+    await assertBooksClean();
+
+    // Misafir talebi artık yalnız kalan tutar kadar olabilir.
+    const checkInAt = await checkInOf(g.id);
+    await expect(
+      openClaim(
+        claims(fx.userId, "USER"),
+        {
+          bookingId: g.id,
+          type: "GUEST_REFUND",
+          amountMinor: half + 1,
+          description: "itirazdan sonra fazla talep",
+        },
+        new Date(checkInAt.getTime() + HOUR)
+      )
+    ).rejects.toMatchObject({ code: "CLAIM_AMOUNT_EXCEEDS_REFUNDABLE" });
+
+    // İptal (tam iade döneminde) itirazla dönen parayı ikinci kez iade etmez.
+    psp.refunds = [];
+    const out = await cancelAndRefund(g.id, fx.userId, new Date(Date.now() + 60_000));
+    expect(out.refund.refundMinor).toBe(Number(payment.amountMinor) - half);
+    expect(psp.refunds.map((r) => r.amount)).toEqual([Number(payment.amountMinor) - half]);
+    await assertBooksClean();
+  });
+
+  it("kaybedilen itiraz (serbest bırakma sonrası): ev sahibinden rezerv → bakiye, yetmezse platform_loss; host eksiye düşmez", async () => {
+    const fx2 = await createStayFixture(prisma, {
+      tag: "v4-fs2-chargeback",
+      days: 60,
+      country: "Türkiye",
+      policyId: "policy_flexible_v1",
+    });
+    const g = await fx2.hold({ nights: 2 });
+    const payment = await pay(g.id, fx2.userId);
+    const checkInAt = await checkInOf(g.id);
+    const releasedAt = new Date(
+      checkInAt.getTime() + getConfig().PAYOUT_RELEASE_HOURS * HOUR + HOUR
+    );
+    expect((await runEscrowRelease(releasedAt, { bookingIds: [g.id] })).released).toBe(1);
+    const bal = async (ref: ReturnType<typeof account.hostPayable>) =>
+      (await getAccountBalance(prisma, ref, "TRY")).balanceMinor;
+    const reserve0 = await bal(account.hostReserve(fx2.hostId));
+    const payable0 = await bal(account.hostPayable(fx2.hostId));
+    expect(reserve0).toBeGreaterThan(0n);
+    // Kullanılabilir bakiyenin tamamı bekleyen payout'ta → yalnız rezerv kullanılabilir.
+    await prisma.hostPayout.create({
+      data: { userId: fx2.hostId, amountMinor: payable0, currency: "TRY", provider: "mock" },
+    });
+
+    const amount = Number(payment.amountMinor);
+    const { claim, debit, pspOut } = await loseDispute(
+      payment.providerRef!,
+      amount,
+      new Date(releasedAt.getTime() + HOUR)
+    );
+    expect(pspOut).toBe(BigInt(amount));
+    expect(debit("HOST_RESERVE")).toBe(reserve0);
+    expect(debit("HOST_PAYABLE")).toBe(0n);
+    const loss = debit("PLATFORM_LOSS");
+    expect(loss).toBeGreaterThan(0n);
+    expect(claim).toMatchObject({
+      awardedMinor: BigInt(amount),
+      platformCoveredMinor: loss,
+      settledMinor: BigInt(amount) - loss,
+      uncollectedMinor: 0n,
+    });
+    expect(await bal(account.hostReserve(fx2.hostId))).toBe(0n);
+    expect(await bal(account.hostPayable(fx2.hostId))).toBe(payable0);
+    expect(
+      (await getAccountBalance(prisma, account.platformLoss(), "TRY")).balanceMinor
+    ).toBeGreaterThanOrEqual(loss);
+    await prisma.hostPayout.deleteMany({ where: { userId: fx2.hostId } });
     await assertBooksClean();
   });
 });

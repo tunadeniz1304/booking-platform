@@ -1,4 +1,5 @@
-import type { ClaimStatus } from "@prisma/client";
+import type { ClaimStatus, Prisma } from "@prisma/client";
+import { postChargebackLost } from "@/lib/ledger";
 import { appendOutbox } from "@/lib/cqrs/outbox";
 import { withSerializableRetry } from "@/lib/db/transactions";
 import { EventTypes, makeEvent, type ClaimEventPayload } from "@/lib/events/events";
@@ -18,6 +19,11 @@ import { prisma } from "@/lib/prisma";
  * Kapanış eşlemesi: `won` → RESOLVED_REJECTED (itiraz reddedildi, para platformda kaldı),
  * `lost` → RESOLVED_APPROVED (para karta döndü; tutar `awardedMinor`), diğer (`warning_closed`
  * vb.) → CLOSED. Açılışta ESCALATED + yönetici bildirimi (itiraz kanıt süresi PSP'dedir).
+ *
+ * fix-sweep-2: `lost` kapanışında AYNI tx'te `chargeback-lost:<claimId>` jurnali (para karta
+ * döner; ev sahibinden rezerv → bakiye sırasıyla tahsil, yetmezse `platform_loss`). Tutar
+ * rezervasyonun kalan tahsilatıyla sınırlanır; aşan kısım `uncollectedMinor` (mutabakat farkı
+ * olarak görünür → elle inceleme).
  */
 
 export const chargebackEventsTotal = counter(
@@ -72,6 +78,75 @@ async function bookingForRef(
     : null;
 }
 
+/**
+ * Kaybedilen itirazın defter kaydı + talep tutarları. `settledMinor` = ev sahibinden (emanet,
+ * rezerv, bakiye; vergi/komisyon payı dahil) karşılanan, `platformCoveredMinor` = platform
+ * zararı, `uncollectedMinor` = rezervasyonun kalan tahsilatını aşan (deftere yazılmayan) kısım.
+ */
+async function settleLostChargeback(
+  tx: Prisma.TransactionClient,
+  claimId: string,
+  bookingId: string,
+  amount: bigint,
+  now: Date
+): Promise<void> {
+  const payment = await tx.payment.findUnique({
+    where: { bookingId },
+    select: {
+      id: true,
+      status: true,
+      amountMinor: true,
+      refundedAmountMinor: true,
+      currency: true,
+      booking: { select: { priceBreakdown: true } },
+    },
+  });
+  const settledStatuses = ["PAID", "PARTIALLY_REFUNDED", "REFUNDED"];
+  let journaled = 0n;
+  let loss = 0n;
+  if (payment && settledStatuses.includes(payment.status) && amount > 0n) {
+    const prior = await tx.claim.aggregate({
+      where: {
+        bookingId,
+        type: "CHARGEBACK",
+        status: "RESOLVED_APPROVED",
+        id: { not: claimId },
+      },
+      _sum: { awardedMinor: true },
+    });
+    const out = payment.refundedAmountMinor + (prior._sum.awardedMinor ?? 0n);
+    const rest = payment.amountMinor - out;
+    journaled = amount < rest ? amount : rest > 0n ? rest : 0n;
+    const res = await postChargebackLost(tx, {
+      claimId,
+      bookingId,
+      paymentId: payment.id,
+      currency: payment.currency,
+      grossMinor: payment.amountMinor,
+      priceBreakdown: payment.booking.priceBreakdown,
+      amountMinor: journaled,
+      refundedBeforeMinor: out,
+      occurredAt: now,
+    });
+    loss = res?.recovery?.platformCoverMinor ?? 0n;
+  }
+  if (journaled < amount) {
+    logger.warn(
+      { claimId, bookingId, amount: amount.toString(), journaled: journaled.toString() },
+      "lost chargeback exceeds remaining captured amount"
+    );
+  }
+  await tx.claim.update({
+    where: { id: claimId },
+    data: {
+      awardedMinor: amount,
+      settledMinor: journaled - loss,
+      platformCoveredMinor: loss,
+      uncollectedMinor: amount - journaled,
+    },
+  });
+}
+
 export function isDisputeEvent(event: WebhookEvent): boolean {
   return event.type.startsWith("dispute.");
 }
@@ -105,6 +180,7 @@ export async function handleDisputeEvent(
     const existing = await tx.claim.findUnique({ where: { externalRef: disputeId } });
     let id: string;
     let created = false;
+    let settleLost = false;
     if (!existing) {
       const row = await tx.claim.create({
         data: {
@@ -128,9 +204,11 @@ export async function handleDisputeEvent(
       });
       id = row.id;
       created = true;
+      settleLost = closing && closedStatus === "RESOLVED_APPROVED";
     } else {
       id = existing.id;
       const alreadyClosed = !["OPEN", "AWAITING_RESPONSE", "ESCALATED"].includes(existing.status);
+      settleLost = closing && !alreadyClosed && closedStatus === "RESOLVED_APPROVED";
       await tx.claim.update({
         where: { id },
         data: {
@@ -149,6 +227,10 @@ export async function handleDisputeEvent(
             : {}),
         },
       });
+    }
+    if (settleLost) {
+      const lost = amount || existing?.amountRequestedMinor || 0n;
+      await settleLostChargeback(tx, id, target.bookingId, lost, now);
     }
     await tx.claimMessage.create({
       data: {

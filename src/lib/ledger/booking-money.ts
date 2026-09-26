@@ -2,7 +2,7 @@ import type { Prisma } from "@prisma/client";
 import { account } from "./accounts";
 import { getAccountBalance } from "./balance";
 import { postJournal, type PostResult } from "./journal";
-import { bookingCaptured, refundIssued } from "./templates";
+import { bookingCaptured, chargebackLost, refundIssued } from "./templates";
 
 /**
  * Servis bağlama yardımcıları (F2c). Para hareketinin jurnal girdisini iş kaydından
@@ -233,6 +233,76 @@ export async function postRefundFromEscrow(
       platformFeeMinor: fee,
       hostReserveMinor: recovery.reserveMinor,
       platformCoverMinor: recovery.platformCoverMinor,
+    })
+  );
+  return { ...res, recovery };
+}
+
+export interface ChargebackJournalInput {
+  claimId: string;
+  bookingId: string;
+  paymentId: string;
+  currency: string;
+  /** Asıl tahsilat (vergi payı oransal). */
+  grossMinor: bigint;
+  priceBreakdown: unknown;
+  /** Kart sahibine itirazla dönen tutar. */
+  amountMinor: bigint;
+  /** Bu itirazdan önce aynı ödemeden çıkmış toplam (iadeler + önceki itirazlar). */
+  refundedBeforeMinor?: bigint;
+  occurredAt?: Date;
+}
+
+/**
+ * Kaybedilen itiraz jurnali (fix-sweep-2): Cr psp_clearing; borç tarafı iadeyle aynı tahsil
+ * sırası, fakat ev sahibinden alınamayan kısım platform_revenue yerine `platform_loss`
+ * (gider) hesabına yazılır → kayıp gelirden ayrı raporlanır. İdempotent (`chargeback-lost:<id>`).
+ */
+export async function postChargebackLost(
+  tx: Tx,
+  i: ChargebackJournalInput
+): Promise<(PostResult & { recovery?: HostRecoverySplit }) | null> {
+  if (i.amountMinor <= 0n) return null;
+  const existing = await tx.journalEntry.findUnique({
+    where: { idempotencyKey: `chargeback-lost:${i.claimId}` },
+    select: { id: true },
+  });
+  if (existing) return { entryId: existing.id, created: false };
+  const taxMinor = refundTaxMinor(
+    taxShareMinor(i.priceBreakdown, i.grossMinor),
+    i.grossMinor,
+    i.refundedBeforeMinor ?? 0n,
+    i.amountMinor
+  );
+  const base = {
+    claimId: i.claimId,
+    bookingId: i.bookingId,
+    paymentId: i.paymentId,
+    currency: i.currency,
+    amountMinor: i.amountMinor,
+    taxMinor,
+    occurredAt: i.occurredAt,
+  };
+  const released = await releasedSplitOf(tx, i.bookingId);
+  if (!released) return postJournal(tx, chargebackLost({ ...base, from: "escrow" }));
+  const net = i.amountMinor - taxMinor;
+  const rawFee =
+    released.amountMinor > 0n ? mulDivHalfUp(net, released.feeMinor, released.amountMinor) : 0n;
+  const fee = rawFee > net ? net : rawFee;
+  const recovery = splitHostRecovery(
+    net - fee,
+    (await getAccountBalance(tx, account.hostReserve(released.hostId), i.currency)).balanceMinor,
+    await availablePayableMinor(tx, released.hostId, i.currency)
+  );
+  const res = await postJournal(
+    tx,
+    chargebackLost({
+      ...base,
+      from: "released",
+      hostId: released.hostId,
+      platformFeeMinor: fee,
+      hostReserveMinor: recovery.reserveMinor,
+      platformLossMinor: recovery.platformCoverMinor,
     })
   );
   return { ...res, recovery };

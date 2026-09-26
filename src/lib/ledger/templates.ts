@@ -28,6 +28,7 @@ export const JournalKinds = {
   CreditSpent: "CREDIT_SPENT",
   CreditExpired: "CREDIT_EXPIRED",
   DepositCaptured: "DEPOSIT_CAPTURED",
+  ChargebackLost: "CHARGEBACK_LOST",
 } as const;
 
 interface Common {
@@ -260,6 +261,68 @@ export function refundIssued(i: RefundIssuedInput): JournalInput {
       paymentId: i.paymentId,
     },
     [...debits, cr(target, amount, i.currency)]
+  );
+}
+
+export interface ChargebackLostInput extends Common {
+  /** CHARGEBACK talebi (itiraz başına tek jurnal: `chargeback-lost:<claimId>`). */
+  claimId: string;
+  bookingId: string;
+  paymentId?: string;
+  /** Kart sahibine itirazla dönen tutar (psp_clearing'den çıkar). */
+  amountMinor: bigint;
+  taxMinor?: bigint;
+  /** `escrow`: emanet serbest bırakılmadı (ev sahibi payı emanetten); `released`: sonra. */
+  from: "escrow" | "released";
+  hostId?: string;
+  platformFeeMinor?: bigint;
+  /** Ev sahibi payının rezervden (host_reserve) tahsil edilen kısmı. */
+  hostReserveMinor?: bigint;
+  /** Rezerv + kullanılabilir bakiye yetmeyince platform zararına (platform_loss) yazılan kısım. */
+  platformLossMinor?: bigint;
+}
+
+/**
+ * Kaybedilen itiraz (fix-sweep-2, ADR 0021 ek): para karta PSP'den döner (Cr psp_clearing,
+ * misafir iadesi yönü). Borç tarafı iadeyle aynı sırayla ev sahibinden tahsildir: serbest
+ * bırakılmadıysa emanet + vergi; bırakıldıysa vergi, komisyon payı (platform_revenue),
+ * ev sahibi payı önce host_reserve → host_payable → kalan platform_loss (gider).
+ */
+export function chargebackLost(i: ChargebackLostInput): JournalInput {
+  const amount = positive("amountMinor", i.amountMinor);
+  const tax = i.taxMinor ?? 0n;
+  const debits: JournalLineInput[] = [dr(account.taxPayable(), tax, i.currency)];
+  if (i.from === "escrow") {
+    debits.push(dr(account.escrow(), remainder(amount, { taxMinor: tax }), i.currency));
+  } else {
+    if (!i.hostId) {
+      throw new LedgerError(422, "LEDGER_INVALID_SPLIT", "Serbest bırakılmış itiraz hostId ister");
+    }
+    const fee = i.platformFeeMinor ?? 0n;
+    const reserve = i.hostReserveMinor ?? 0n;
+    const loss = i.platformLossMinor ?? 0n;
+    const hostPart = remainder(amount, {
+      taxMinor: tax,
+      platformFeeMinor: fee,
+      hostReserveMinor: reserve,
+      platformCoverMinor: loss,
+    });
+    debits.push(
+      dr(account.hostReserve(i.hostId), reserve, i.currency),
+      dr(account.hostPayable(i.hostId), hostPart, i.currency),
+      dr(account.platformRevenue(), fee, i.currency),
+      dr(account.platformLoss(), loss, i.currency)
+    );
+  }
+  return entry(
+    i,
+    {
+      idempotencyKey: `chargeback-lost:${i.claimId}`,
+      kind: JournalKinds.ChargebackLost,
+      bookingId: i.bookingId,
+      paymentId: i.paymentId,
+    },
+    [...debits, cr(account.pspClearing(), amount, i.currency)]
   );
 }
 

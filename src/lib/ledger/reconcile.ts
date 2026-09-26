@@ -12,10 +12,10 @@ export const reconciliationRunsTotal = counter(
   ["outcome"] as const
 );
 
-export type ReconKind = "capture" | "refund" | "transfer" | "deposit";
+export type ReconKind = "capture" | "refund" | "transfer" | "deposit" | "chargeback";
 
 export interface ReconDiffRow {
-  subject: "payment" | "transfer" | "deposit";
+  subject: "payment" | "transfer" | "deposit" | "claim";
   subjectId: string;
   bookingId: string | null;
   kind: ReconKind;
@@ -61,6 +61,8 @@ export function dayWindow(date: string | Date): { date: string; from: Date; to: 
  * - refund:  Payment.refundedAmountMinor ↔ REFUND_ISSUED Cr psp_clearing (krediye iade hariç)
  * - transfer: COMPLETED devrin askPriceMinor'ı ↔ TRANSFER_SETTLED Dr psp_clearing
  * - deposit: hasar depozitosunun capturedMinor'ı ↔ DEPOSIT_CAPTURED Dr psp_clearing (P1-5)
+ * - chargeback: kaybedilen itirazın (CHARGEBACK talebi) awardedMinor'ı ↔ CHARGEBACK_LOST
+ *   Cr psp_clearing (fix-sweep-2)
  */
 export async function reconcile(
   date: string | Date,
@@ -163,6 +165,7 @@ export async function reconcile(
   }
 
   checked += await reconcileDeposits(db, inDay, differences);
+  checked += await reconcileChargebacks(db, inDay, differences);
 
   const imbalanced = await db.$queryRaw<Array<{ n: bigint }>>`
     SELECT count(*)::bigint AS n FROM (
@@ -270,6 +273,57 @@ async function reconcileDeposits(
     );
   }
   return deposits.length;
+}
+
+/** Kaybedilen itirazlar: PSP'nin geri çektiği tutar ↔ `chargeback-lost:<claimId>` jurnali. */
+async function reconcileChargebacks(
+  db: Db,
+  inDay: { gte: Date; lt: Date },
+  out: ReconDiffRow[]
+): Promise<number> {
+  const PREFIX = "chargeback-lost:";
+  const [decided, entries] = await Promise.all([
+    db.claim.findMany({
+      where: { type: "CHARGEBACK", status: "RESOLVED_APPROVED", decidedAt: inDay },
+      select: { id: true },
+    }),
+    db.journalEntry.findMany({
+      where: { occurredAt: inDay, kind: JournalKinds.ChargebackLost },
+      select: { idempotencyKey: true },
+    }),
+  ]);
+  const ids = unique([
+    ...decided.map((c) => c.id),
+    ...entries.map((e) => e.idempotencyKey.slice(PREFIX.length)),
+  ]);
+  if (ids.length === 0) return 0;
+  const [claims, lines] = await Promise.all([
+    db.claim.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, bookingId: true, currency: true, status: true, awardedMinor: true },
+    }),
+    db.journalLine.findMany({
+      where: {
+        side: "CREDIT",
+        account: { kind: "PSP_CLEARING" },
+        entry: {
+          kind: JournalKinds.ChargebackLost,
+          idempotencyKey: { in: ids.map((id) => `${PREFIX}${id}`) },
+        },
+      },
+      select: { amountMinor: true, entry: { select: { idempotencyKey: true } } },
+    }),
+  ]);
+  const journal = new Map<string, bigint>();
+  for (const l of lines) {
+    const id = l.entry.idempotencyKey.slice(PREFIX.length);
+    journal.set(id, (journal.get(id) ?? 0n) + l.amountMinor);
+  }
+  for (const c of claims) {
+    const lost = c.status === "RESOLVED_APPROVED" ? (c.awardedMinor ?? 0n) : 0n;
+    push(out, "claim", c.id, c.bookingId, "chargeback", c.currency, lost, journal.get(c.id) ?? 0n);
+  }
+  return claims.length;
 }
 
 function unique(values: ReadonlyArray<string | null | undefined>): string[] {

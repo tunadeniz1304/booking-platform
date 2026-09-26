@@ -55,7 +55,21 @@ interface SearchResultItem {
   explain?: Record<string, number>;
   /** P1-10: "benzerlerini göster" kaynağı (görsel arama açıksa). */
   coverPhotoId?: string;
+  /** P1-3: ±N gün içinde teklif motoruyla doğrulanmış daha ucuz tarih (minor-unit). */
+  flexSuggestion?: {
+    checkIn: string;
+    checkOut: string;
+    shiftDays: number;
+    roomId: string;
+    ratePlanId: string;
+    total: number;
+    savings: number;
+    currency: string;
+  };
 }
+
+/** Arama `flexDays` seçenekleri (0 = tam tarihler). */
+const FLEX_OPTIONS = [0, 1, 2, 3] as const;
 
 type VisualReason =
   "FLAG_OFF" | "MODULE_MISSING" | "MODEL_MISSING" | "LOAD_FAILED" | "VECTOR_UNAVAILABLE";
@@ -125,6 +139,7 @@ function SearchPageContent() {
     else next.delete("accessibility");
     router.replace(`/search?${next.toString()}`, { scroll: false });
   };
+  const initialFlex = Number(searchParams.get("flexDays"));
   /** Mevcut aramayı koruyarak görsel kNN kaynağını değiştiren bağlantı (boş → kaldır). */
   const similarHref = (photoId: string) => {
     const next = new URLSearchParams(searchParams.toString());
@@ -143,6 +158,9 @@ function SearchPageContent() {
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 20000]);
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState("recommended");
+  const [flexDays, setFlexDays] = useState<number>(
+    FLEX_OPTIONS.includes(initialFlex as (typeof FLEX_OPTIONS)[number]) ? initialFlex : 0
+  );
 
   const [smartFilters, setSmartFilters] = useState<SmartFilters | null>(null);
   const [llmMode, setLlmMode] = useState<string | null>(null);
@@ -174,6 +192,9 @@ function SearchPageContent() {
       }
       if (similarToPhotoId) params.set("similarToPhotoId", similarToPhotoId);
       if (accessibilityParam) params.set("accessibility", accessibilityParam);
+      if (flexDays > 0 && params.get("checkIn") && params.get("checkOut")) {
+        params.set("flexDays", String(flexDays));
+      }
       params.set("page", "1");
       params.set("pageSize", "24");
 
@@ -198,6 +219,7 @@ function SearchPageContent() {
     smartFilters,
     similarToPhotoId,
     accessibilityParam,
+    flexDays,
     t,
   ]);
 
@@ -368,6 +390,31 @@ function SearchPageContent() {
                   <option value="rating">{t("sort.rating")}</option>
                 </select>
               </div>
+
+              <div className="mt-4">
+                <label htmlFor="flex-days" className="text-sm font-medium text-gray-800">
+                  {t("flex.label")}
+                </label>
+                <select
+                  id="flex-days"
+                  value={flexDays}
+                  onChange={(e) => setFlexDays(Number(e.target.value))}
+                  disabled={!checkIn || !checkOut}
+                  aria-describedby={!checkIn || !checkOut ? "flex-days-hint" : undefined}
+                  className={`mt-2 ${smallInput} disabled:bg-gray-100`}
+                >
+                  {FLEX_OPTIONS.map((d) => (
+                    <option key={d} value={d}>
+                      {d === 0 ? t("flex.exact") : t("flex.plusMinus", { days: d })}
+                    </option>
+                  ))}
+                </select>
+                {(!checkIn || !checkOut) && (
+                  <p id="flex-days-hint" className="mt-1 text-xs text-gray-600">
+                    {t("flex.needsDates")}
+                  </p>
+                )}
+              </div>
             </div>
           </aside>
 
@@ -482,6 +529,13 @@ function SearchPageContent() {
                           : undefined
                       }
                     />
+                    {property.flexSuggestion && (
+                      <FlexSuggestionNote
+                        propertyId={property.id}
+                        suggestion={property.flexSuggestion}
+                        guests={guests}
+                      />
+                    )}
                     <RankingWhy score={property.score} explain={property.explain} />
                     <CompareToggle propertyId={property.id} />
                     {property.coverPhotoId && (
@@ -563,5 +617,43 @@ export default function SearchPage() {
     <Suspense fallback={<div className="min-h-screen bg-gray-50" />}>
       <SearchPageContent />
     </Suspense>
+  );
+}
+
+/** P1-3: ±N gün önerisi — tutar metinle verilir (renk tek sinyal değil). */
+function FlexSuggestionNote({
+  propertyId,
+  suggestion,
+  guests,
+}: {
+  propertyId: string;
+  suggestion: NonNullable<SearchResultItem["flexSuggestion"]>;
+  guests: number;
+}) {
+  const t = useTranslations("search");
+  const f = useFormat();
+  const href = `/property/${propertyId}?${new URLSearchParams({
+    checkIn: suggestion.checkIn,
+    checkOut: suggestion.checkOut,
+    guests: String(guests),
+    roomId: suggestion.roomId,
+    ratePlanId: suggestion.ratePlanId,
+  }).toString()}`;
+  const dates = `${f.date(suggestion.checkIn, "medium")} – ${f.date(suggestion.checkOut, "medium")}`;
+  return (
+    <p className="mt-2 rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-gray-900">
+      <span>
+        {t("flex.suggestion", {
+          dates,
+          savings: f.money(suggestion.savings, suggestion.currency),
+        })}
+      </span>{" "}
+      <span className="text-gray-700">
+        ({t("flex.total", { total: f.money(suggestion.total, suggestion.currency) })})
+      </span>{" "}
+      <Link href={href} className={`font-medium text-blue-700 underline ${focusRing}`}>
+        {t("flex.view")}
+      </Link>
+    </p>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useFormat } from "@/i18n/use-format";
@@ -8,6 +8,7 @@ import DateRangePicker, { toISODate } from "@/components/search/DateRangePicker"
 import QuoteBreakdown from "./QuoteBreakdown";
 import PriceInsight from "./PriceInsight";
 import { useQuote } from "./useQuote";
+import { subscribeStaySelection } from "./stay-selection";
 
 export interface BookingWidgetRatePlan {
   id: string;
@@ -90,6 +91,16 @@ export default function BookingWidget({ propertyId, rooms, initial }: BookingWid
     checkOut,
     guests: guestCount,
   });
+
+  // P1-3: fiyat takviminden seçilen tarihler formu doldurur.
+  useEffect(
+    () =>
+      subscribeStaySelection((s) => {
+        setCheckIn(s.checkIn);
+        setCheckOut(s.checkOut);
+      }),
+    []
+  );
 
   const handleDateChange = (v: { checkIn: string; checkOut: string }) => {
     setCheckIn(v.checkIn);

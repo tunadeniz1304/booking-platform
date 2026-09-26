@@ -12,6 +12,7 @@ import BookingWidget, { BookingWidgetRoom } from "@/components/booking/BookingWi
 import ReviewsSection from "@/components/property/ReviewsSection";
 import AccessibilitySection from "@/components/property/AccessibilitySection";
 import { listPublicFeatures } from "@/lib/compliance/accessibility";
+import PriceCalendar from "@/components/property/PriceCalendar";
 
 interface PropertyPageProps {
   params: Promise<{ id: string }>;
@@ -167,6 +168,8 @@ export default async function PropertyPage({ params, searchParams }: PropertyPag
             )}
 
             {accessibility.length > 0 && <AccessibilitySection features={accessibility} />}
+
+            <PriceCalendar propertyId={property.id} initialCheckIn={initial.checkIn} />
 
             <ReviewsSection propertyId={property.id} />
 

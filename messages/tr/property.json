@@ -7,5 +7,41 @@
   "gallery": {
     "imageAlt": "{title} - görsel {index}",
     "thumbnailAlt": "{title} - küçük görsel {index}"
+  },
+  "calendar": {
+    "title": "Fiyat takvimi",
+    "subtitleIncluded": "1 gece, {guests} misafir için en düşük fiyat — vergi ve ücretler dahil",
+    "subtitleExcluded": "1 gece, {guests} misafir için en düşük gecelik fiyat — vergi ve ücretler hariç",
+    "taxesToggle": "Vergi ve ücretleri dahil göster",
+    "prevMonth": "Önceki ay",
+    "nextMonth": "Sonraki ay",
+    "prevMonthShort": "Önceki",
+    "nextMonthShort": "Sonraki",
+    "caption": "{month} fiyat takvimi",
+    "loading": "Fiyatlar yükleniyor…",
+    "error": "Fiyat takvimi yüklenemedi",
+    "unavailable": "Müsait değil",
+    "noPrices": "Bu ayda müsait gece yok.",
+    "cheapest": "En ucuz",
+    "cheapestAria": "ayın en ucuz gecesi",
+    "minStay": "en az {count} gece",
+    "minStayShort": "min {count} gece",
+    "closedToArrival": "girişe kapalı",
+    "closedToArrivalHint": "{date} tarihinde giriş yapılamıyor; başka bir gün seçin.",
+    "dayAria": "{date}: {price}, fiyat seviyesi {level}{extras}",
+    "dayAriaUnavailable": "{date}: müsait değil",
+    "dayAriaPast": "{date}: geçmiş tarih",
+    "selectHint": "Giriş için bir gün seçin; ikinci seçim çıkış tarihini belirler. Seçim rezervasyon formunu doldurur.",
+    "selectCheckOut": "Giriş: {date}. Şimdi çıkış tarihini seçin.",
+    "selected": "Seçildi: {checkIn} – {checkOut}. Rezervasyon formu güncellendi.",
+    "estimateNote": "Takvim, o gece için en ucuz oda ve fiyat planını gösterir; kesin tutar rezervasyon formundaki tekliftir.",
+    "legend": {
+      "title": "Fiyat seviyesi",
+      "band0": "Çok uygun",
+      "band1": "Uygun",
+      "band2": "Orta",
+      "band3": "Yüksek",
+      "band4": "Çok yüksek"
+    }
   }
 }

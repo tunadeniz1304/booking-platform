@@ -123,5 +123,14 @@
       "LOAD_FAILED": "The visual search model could not be loaded.",
       "VECTOR_UNAVAILABLE": "No vector database is available for visual search."
     }
+  },
+  "flex": {
+    "label": "Date flexibility",
+    "exact": "Exact dates",
+    "plusMinus": "±{days} days",
+    "suggestion": "{savings} cheaper on {dates}",
+    "total": "Total {total}",
+    "view": "See these dates",
+    "needsDates": "Pick check-in and check-out dates to use flexible dates."
   }
 }

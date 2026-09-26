@@ -123,5 +123,14 @@
       "LOAD_FAILED": "Görsel arama modeli yüklenemedi.",
       "VECTOR_UNAVAILABLE": "Görsel arama için vektör veritabanı yok."
     }
+  },
+  "flex": {
+    "label": "Tarih esnekliği",
+    "exact": "Tam tarihler",
+    "plusMinus": "±{days} gün",
+    "suggestion": "{dates} tarihlerinde {savings} daha ucuz",
+    "total": "Toplam {total}",
+    "view": "Bu tarihleri gör",
+    "needsDates": "Esnek tarih için önce giriş ve çıkış tarihi seçin."
   }
 }

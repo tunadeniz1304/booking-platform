@@ -7,5 +7,41 @@
   "gallery": {
     "imageAlt": "{title} - image {index}",
     "thumbnailAlt": "{title} - thumbnail {index}"
+  },
+  "calendar": {
+    "title": "Price calendar",
+    "subtitleIncluded": "Lowest price for 1 night, {guests} guest(s) — taxes and fees included",
+    "subtitleExcluded": "Lowest nightly price for 1 night, {guests} guest(s) — taxes and fees excluded",
+    "taxesToggle": "Include taxes and fees",
+    "prevMonth": "Previous month",
+    "nextMonth": "Next month",
+    "prevMonthShort": "Previous",
+    "nextMonthShort": "Next",
+    "caption": "Price calendar for {month}",
+    "loading": "Loading prices…",
+    "error": "Could not load the price calendar",
+    "unavailable": "Unavailable",
+    "noPrices": "No available nights this month.",
+    "cheapest": "Cheapest",
+    "cheapestAria": "cheapest night of the month",
+    "minStay": "minimum {count} nights",
+    "minStayShort": "min {count} nights",
+    "closedToArrival": "closed to arrival",
+    "closedToArrivalHint": "Check-in is not possible on {date}; please pick another day.",
+    "dayAria": "{date}: {price}, price level {level}{extras}",
+    "dayAriaUnavailable": "{date}: unavailable",
+    "dayAriaPast": "{date}: past date",
+    "selectHint": "Pick a check-in day; the second pick sets check-out. Your selection fills in the booking form.",
+    "selectCheckOut": "Check-in: {date}. Now pick your check-out date.",
+    "selected": "Selected: {checkIn} – {checkOut}. The booking form has been updated.",
+    "estimateNote": "The calendar shows the cheapest room and rate plan for each night; the exact amount is the quote in the booking form.",
+    "legend": {
+      "title": "Price level",
+      "band0": "Very low",
+      "band1": "Low",
+      "band2": "Medium",
+      "band3": "High",
+      "band4": "Very high"
+    }
   }
 }

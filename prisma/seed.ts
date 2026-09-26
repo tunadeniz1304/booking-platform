@@ -1028,6 +1028,8 @@ async function main() {
     // Defter yalnızca eklenir (UPDATE/DELETE tetikle reddedilir); sıfırlama TRUNCATE ile.
     await prisma.$executeRawUnsafe(`TRUNCATE "JournalLine", "JournalEntry"`);
     await prisma.invoice.deleteMany();
+    // P1-1: sepetler (kalemler + sepet ödemesi kaskadla silinir).
+    await prisma.cart.deleteMany();
     await prisma.payout.deleteMany();
     await prisma.payment.deleteMany();
     await prisma.review.deleteMany();

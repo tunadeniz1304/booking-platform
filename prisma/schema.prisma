@@ -42,6 +42,8 @@ model User {
   pushSubscriptions   PushSubscription[]
   messages            Message[]
   reviewReports       ReviewReport[]
+  /// P1-1 grup sepeti
+  carts               Cart[]
 }
 
 /// Oturum (yenileme token ailesi) kaydı — P0-4 oturum listesi + uzaktan çıkış.
@@ -220,6 +222,7 @@ model RoomType {
   restrictions     Restriction[]
   externalBlocks   ExternalBlock[]
   bookings         Booking[]
+  cartItems        CartItem[]
   priceAlerts      PriceAlert[]
   priceSuggestions PriceSuggestion[]
   accessibilityFeatures AccessibilityFeature[]
@@ -346,6 +349,9 @@ model Booking {
   idempotencyKey         String?
   /// v4#9: Idempotency-Key'in bağlı olduğu istek gövdesinin sha256 özeti (farklıysa 409).
   idempotencyRequestHash String?
+  /// P1-1: sepetten doğan rezervasyon (grup kimliği = sepet); tek rezervasyonda null.
+  cartId                 String?
+  cart                   Cart?             @relation(fields: [cartId], references: [id], onDelete: SetNull)
   payment                Payment?
   reviews                Review[]
   transfers              BookingTransfer[]
@@ -361,6 +367,7 @@ model Booking {
   @@index([roomId, checkIn, checkOut])
   @@index([status, checkIn])
   @@index([status, holdExpiresAt])
+  @@index([cartId])
 }
 
 /// Kalıcı kur tablosu (P0-5): her `fx-refresh` çalışması bir satır. Oranlar "1 TRY = x".
@@ -410,6 +417,9 @@ model Payment {
   authorizedAt   DateTime?
   paidAt         DateTime?
   refundedAt     DateTime?
+  /// P1-1: sepetin tek PSP tahsilatından bu rezervasyona düşen pay (providerRef sepet ödemesinde).
+  cartPaymentId  String?
+  cartPayment    CartPayment?  @relation(fields: [cartPaymentId], references: [id])
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @default(now()) @updatedAt
 
@@ -1257,4 +1267,98 @@ model PartyRiskAssessment {
   updatedAt  DateTime  @updatedAt
 
   @@index([hostId, flagged, createdAt])
+}
+
+// ───────────────────────── P1-1: çok odalı / grup sepeti ─────────────────────────
+
+enum CartStatus {
+  OPEN
+  HELD
+  CHECKED_OUT
+  EXPIRED
+  CANCELLED
+}
+
+/// Grup sepeti: N oda tipi × N doluluk; tutma tümü-ya-hiç (tek SERIALIZABLE işlem).
+/// Kullanıcı başına en fazla bir aktif (OPEN/HELD) sepet — kısmi benzersiz indeks (migration).
+model Cart {
+  id                 String       @id @default(cuid())
+  userId             String
+  user               User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status             CartStatus   @default(OPEN)
+  /// Tahsilat para birimi (ilk kalemin teklifinden; tüm kalemler bu birimde fiyatlanır).
+  currency           String
+  /// HELD iken tüm kalem rezervasyonlarının ortak tutma bitişi.
+  holdExpiresAt      DateTime?
+  /// Tutma isteğinin Idempotency-Key'i ve gövde özeti (farklı gövde → 409).
+  holdIdempotencyKey String?
+  holdRequestHash    String?
+  /// İyimser eşzamanlılık sürümü (her durum geçişinde +1).
+  version            Int          @default(0)
+  checkedOutAt       DateTime?
+  expiredAt          DateTime?
+  cancelledAt        DateTime?
+  items              CartItem[]
+  bookings           Booking[]
+  payment            CartPayment?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  @@unique([userId, holdIdempotencyKey])
+  @@index([userId, status])
+  @@index([status, holdExpiresAt])
+}
+
+model CartItem {
+  id                       String   @id @default(cuid())
+  cartId                   String
+  cart                     Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  propertyId               String
+  roomTypeId               String
+  roomType                 RoomType @relation(fields: [roomTypeId], references: [id], onDelete: Cascade)
+  ratePlanId               String?
+  checkIn                  DateTime @db.Date
+  checkOut                 DateTime @db.Date
+  adults                   Int
+  children                 Int      @default(0)
+  /// Oda adedi (sayaçtan bu kadar düşülür).
+  quantity                 Int      @default(1)
+  /// Teklif anlık görüntüsü: tahsilat (sepet) biriminde toplam + tesis biriminde toplam.
+  quotedTotalMinor         BigInt
+  quotedPropertyTotalMinor BigInt
+  propertyCurrency         String
+  quoteSnapshot            Json?
+  fxSnapshotId             String?
+  /// Son tutmada oluşan rezervasyon (yeniden tutmada güncellenir).
+  bookingId                String?  @unique
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  @@index([cartId])
+}
+
+/// Sepetin TEK PSP tahsilatı. Onayda her kalem rezervasyonuna bir `Payment` (payı) yazılır;
+/// PSP gerçeği ve jurnaller rezervasyon/Payment düzeyinde kalır (mutabakat değişmeden çalışır).
+/// P1-2 (bölünmüş ödeme) bu kaydın altına pay (share) tahsilatları ekler.
+model CartPayment {
+  id                  String        @id @default(cuid())
+  cartId              String        @unique
+  cart                Cart          @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  userId              String
+  amountMinor         BigInt
+  currency            String
+  provider            String
+  providerRef         String?       @unique
+  status              PaymentStatus @default(PENDING)
+  refundedAmountMinor BigInt        @default(0)
+  failureCode         String?
+  authorizedAt        DateTime?
+  paidAt              DateTime?
+  refundedAt          DateTime?
+  payments            Payment[]
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  @@index([userId])
+  @@index([status])
 }

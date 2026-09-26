@@ -339,6 +339,12 @@ const schema = z.object({
   RATE_LIMIT_AGENTIC_MAX: int(30, 1),
   /** IP bilinmeyen anonimlerin paylaştığı `anon` kovasının limit çarpanı (v4#4). */
   RATE_LIMIT_ANON_SHARED_MULTIPLIER: int(20, 1, 1000),
+  /**
+   * Yalnızca demo/E2E ortamında (`isDemoMode`) tüm rate-limit eşiklerine uygulanan gevşetme
+   * çarpanı (tam e2e koşusu tek IP'den art arda istek atar → 429). Üretimde (DEMO_MODE=false
+   * veya NODE_ENV=production + DEMO_MODE yok) YOK SAYILIR; varsayılan 1 = değişiklik yok.
+   */
+  RATE_LIMIT_DEMO_RELAX_MULTIPLIER: int(1, 1, 1000),
 
   // Canlı ısı haritası (SSE)
   LIVE_MAX_RANGE_DAYS: int(60, 1, 366),

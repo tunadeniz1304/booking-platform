@@ -1,5 +1,6 @@
 import type { RedisClient } from "@/lib/redis";
 import type { AppConfig } from "@/lib/config/app-config";
+import { isDemoMode } from "@/lib/config/demo";
 
 /**
  * Sabit pencereli rate-limit (Redis `INCR` + `EXPIRE`, tek Lua çağrısı).
@@ -83,6 +84,17 @@ export function limitFor(category: RateLimitCategory, config: AppConfig): number
   }
 }
 
+/**
+ * Demo/E2E gevşetme çarpanı: yalnızca demo modunda `RATE_LIMIT_DEMO_RELAX_MULTIPLIER`,
+ * aksi halde (üretim) her zaman 1 — üretim limitleri env ile yanlışlıkla gevşetilemez.
+ */
+export function rateLimitRelaxFactor(
+  config: Pick<AppConfig, "RATE_LIMIT_DEMO_RELAX_MULTIPLIER">,
+  env: Record<string, string | undefined> = process.env
+): number {
+  return isDemoMode(env) ? Math.max(1, config.RATE_LIMIT_DEMO_RELAX_MULTIPLIER) : 1;
+}
+
 export interface RateLimitDecision {
   allowed: boolean;
   limit: number;
@@ -104,7 +116,10 @@ export async function checkRateLimit(
   }
 ): Promise<RateLimitDecision> {
   const { category, identity, config } = input;
-  const limit = limitFor(category, config) * Math.max(1, input.limitMultiplier ?? 1);
+  const limit =
+    limitFor(category, config) *
+    Math.max(1, input.limitMultiplier ?? 1) *
+    rateLimitRelaxFactor(config);
   const window = config.RATE_LIMIT_WINDOW_SECONDS;
   const nowSeconds = Math.floor((input.now ?? Date.now()) / 1000);
   const bucket = Math.floor(nowSeconds / window);

@@ -9,6 +9,9 @@
 x-demo-env: &demo-env
   DEMO_MODE: "true"
   COOKIE_SECURE: "false"
+  # Tam e2e koşusu tek IP'den art arda istek atar; yalnız demo modunda etkin gevşetme çarpanı
+  # (ör. `RATE_LIMIT_DEMO_RELAX_MULTIPLIER=20 docker compose ... up`). Varsayılan 1 = kapalı.
+  RATE_LIMIT_DEMO_RELAX_MULTIPLIER: "${RATE_LIMIT_DEMO_RELAX_MULTIPLIER:-1}"
 
 services:
   migrate:

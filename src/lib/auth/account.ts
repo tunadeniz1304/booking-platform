@@ -12,6 +12,7 @@ import { bumpTokenVersion, publishTokenVersion } from "./token-version";
 import { sealLink } from "./link-crypto";
 import { issuePowChallenge, PowRequiredError, verifyPow } from "./pow";
 import type { PowSolution } from "./pow-solver";
+import { rateLimitRelaxFactor } from "@/lib/security/rate-limit";
 
 /**
  * Hesap güvenliği (P0-8, v4#12): giriş denemesi koruması, e-posta doğrulama ve şifre
@@ -129,7 +130,7 @@ export async function assertLoginAttemptAllowed(input: {
   const needsPow =
     pairFails >= config.AUTH_LOCKOUT_THRESHOLD ||
     acctFails >= config.AUTH_LOCKOUT_THRESHOLD ||
-    attempts > config.RATE_LIMIT_LOGIN_PER_ACCOUNT_MAX;
+    attempts > config.RATE_LIMIT_LOGIN_PER_ACCOUNT_MAX * rateLimitRelaxFactor(config);
   if (needsPow && !(await verifyPow(input.pow, now))) {
     throw new PowRequiredError(issuePowChallenge(now));
   }

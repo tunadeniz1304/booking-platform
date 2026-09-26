@@ -347,6 +347,7 @@ export default function CartCheckoutPage() {
       {held && challenge && (
         <form
           onSubmit={confirm3ds}
+          aria-label={tp("threeDsTitle")}
           className="mt-6 space-y-3 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm"
         >
           <h2 className="text-lg font-semibold text-gray-900">{tp("threeDsTitle")}</h2>

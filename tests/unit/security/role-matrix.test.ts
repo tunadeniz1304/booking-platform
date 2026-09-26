@@ -54,6 +54,15 @@ import * as bookings from "@/app/api/bookings/route";
 import * as account from "@/app/api/account/route";
 import * as listingCopy from "@/app/api/ai/listing-copy/route";
 import * as mailbox from "@/app/api/dev/mailbox/route";
+import * as cart from "@/app/api/cart/route";
+import * as cartItems from "@/app/api/cart/items/route";
+import * as cartItem from "@/app/api/cart/items/[itemId]/route";
+import * as cartById from "@/app/api/cart/[id]/route";
+import * as cartHold from "@/app/api/cart/[id]/hold/route";
+import * as cartRelease from "@/app/api/cart/[id]/release/route";
+import * as cartPay from "@/app/api/cart/[id]/pay/route";
+import * as cartPayConfirm from "@/app/api/cart/[id]/pay/confirm/route";
+import * as cartReopen from "@/app/api/cart/reopen/route";
 
 type Handler = (
   req: NextRequest,
@@ -167,6 +176,18 @@ const MATRIX: Array<[string, string, Handler, Role[]]> = [
   ["GET /api/bookings", "GET", bookings.GET as unknown as Handler, ALL],
   ["GET /api/account", "GET", account.GET as unknown as Handler, ALL],
   ["GET /api/dev/mailbox", "GET", mailbox.GET as unknown as Handler, ALL],
+  // P1-1 grup sepeti: tüm uçlar oturum ister (sahiplik servis katmanında → 404).
+  ["GET /api/cart", "GET", cart.GET as unknown as Handler, ALL],
+  ["POST /api/cart/items", "POST", cartItems.POST as unknown as Handler, ALL],
+  ["PATCH /api/cart/items/[itemId]", "PATCH", cartItem.PATCH as unknown as Handler, ALL],
+  ["DELETE /api/cart/items/[itemId]", "DELETE", cartItem.DELETE as unknown as Handler, ALL],
+  ["GET /api/cart/[id]", "GET", cartById.GET as unknown as Handler, ALL],
+  ["DELETE /api/cart/[id]", "DELETE", cartById.DELETE as unknown as Handler, ALL],
+  ["POST /api/cart/[id]/hold", "POST", cartHold.POST as unknown as Handler, ALL],
+  ["POST /api/cart/[id]/release", "POST", cartRelease.POST as unknown as Handler, ALL],
+  ["POST /api/cart/[id]/pay", "POST", cartPay.POST as unknown as Handler, ALL],
+  ["POST /api/cart/[id]/pay/confirm", "POST", cartPayConfirm.POST as unknown as Handler, ALL],
+  ["POST /api/cart/reopen", "POST", cartReopen.POST as unknown as Handler, ALL],
 ];
 
 async function call(h: Handler, method: string, role: Role | null): Promise<number> {

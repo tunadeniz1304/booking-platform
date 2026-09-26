@@ -95,9 +95,12 @@ describeInt("P1-1 grup sepeti: tümü-ya-hiç tutma + tek ödeme", () => {
     const NIGHTS = 3;
     const users = await Promise.all(Array.from({ length: 100 }, (_, i) => newUser(`par${i}`)));
     // Yarısı A→B, yarısı B→A sırasıyla ekler: kilit sırası kalem sırasından bağımsız olmalı.
-    for (let i = 0; i < users.length; i += 20) {
+    // Kurulum (test edilen değil): 20'li eşzamanlı addCartItem, küçük CartItem tablosunda
+    // SERIALIZABLE sahte çakışmalarla yük altında 6 denemeyi tüketip P2034 ile düşüyordu.
+    // Yarışın asıl test edildiği yer aşağıdaki 100 paralel holdCart'tır; kurulum 5'li gruplarla.
+    for (let i = 0; i < users.length; i += 5) {
       await Promise.all(
-        users.slice(i, i + 20).map(async (u, j) => {
+        users.slice(i, i + 5).map(async (u, j) => {
           const [first, second] = (i + j) % 2 === 0 ? [a, b] : [b, a];
           await addCartItem(u, item(first, START, NIGHTS));
           await addCartItem(u, item(second, START, NIGHTS));
@@ -303,7 +306,8 @@ describeInt("P1-1 grup sepeti: tümü-ya-hiç tutma + tek ödeme", () => {
     await addCartItem(user, item(b, 60));
     const held = await holdCart(user);
 
-    expect(await expireCarts(new Date(Date.now() + 60 * 60_000))).toBeGreaterThanOrEqual(1);
+    // Paylaşımlı DB: limit, önceki testlerin tutulan sepetlerine takılmasın.
+    expect(await expireCarts(new Date(Date.now() + 60 * 60_000), 10_000)).toBeGreaterThanOrEqual(1);
     await expectReleased(held, [a, b], 60, "EXPIRED");
 
     const reopened = await reopenCart(user);

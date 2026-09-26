@@ -1,7 +1,7 @@
 import { beforeAll, afterAll, beforeEach, it, expect } from "vitest";
 import { NextRequest } from "next/server";
 import { PrismaClient } from "@prisma/client";
-import { describeInt } from "./helpers";
+import { awayFromWindowEdge, describeInt } from "./helpers";
 import { createStayFixture } from "./fixtures";
 import { POST as login } from "@/app/api/auth/login/route";
 import { POST as register } from "@/app/api/auth/register/route";
@@ -16,7 +16,7 @@ import { getAuth } from "@/lib/auth";
 import { deleteAccount } from "@/lib/privacy/privacy-service";
 import { payForBooking } from "@/lib/payment/payment-service";
 import { redis } from "@/lib/redis";
-import { resetConfigForTests } from "@/lib/config/app-config";
+import { getConfig, resetConfigForTests } from "@/lib/config/app-config";
 import { openLink } from "@/lib/auth/link-crypto";
 
 function post(path: string, body: unknown, headers: Record<string, string> = {}) {
@@ -77,6 +77,8 @@ describeInt("v3 auth sertleştirme (integration)", () => {
     process.env.AUTH_LOCKOUT_THRESHOLD = "100";
     resetConfigForTests();
     const user = await makeUser("acct");
+    // Hesap limiti sabit pencereli kova kullanır: 3 deneme pencere sınırını kesmesin.
+    await awayFromWindowEdge(getConfig().RATE_LIMIT_WINDOW_SECONDS);
     const statuses: number[] = [];
     for (let i = 0; i < 3; i++) {
       const res = await login(

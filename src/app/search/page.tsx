@@ -10,6 +10,8 @@ import Footer from "@/components/layout/Footer";
 import PropertyCard from "@/components/property/PropertyCard";
 import RankingWhy from "@/components/search/RankingWhy";
 import SmartFilter, { type SmartFilters } from "@/components/search/SmartFilter";
+import CompareToggle from "@/components/compare/CompareToggle";
+import CompareBar from "@/components/compare/CompareBar";
 import type { MapPoint } from "@/components/search/ResultsMap";
 import { apiFetch } from "@/lib/api-client";
 import { useFormat } from "@/i18n/use-format";
@@ -452,6 +454,7 @@ function SearchPageContent() {
                       }
                     />
                     <RankingWhy score={property.score} explain={property.explain} />
+                    <CompareToggle propertyId={property.id} />
                     {property.coverPhotoId && (
                       <Link
                         href={similarHref(property.coverPhotoId)}
@@ -467,6 +470,7 @@ function SearchPageContent() {
           </div>
         </div>
       </main>
+      <CompareBar checkIn={checkIn || undefined} checkOut={checkOut || undefined} guests={guests} />
       <Footer />
     </div>
   );

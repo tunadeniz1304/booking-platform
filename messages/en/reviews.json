@@ -36,5 +36,17 @@
       "PRIVACY": "Contains personal information",
       "OTHER": "Other"
     }
+  },
+  "highlights": {
+    "title": "Highlighted themes",
+    "basedOn": "Clustered from {count} reviews; every claim is a verbatim quote from a review.",
+    "mentions": "Mentioned in {count, plural, one {# review} other {# reviews}}",
+    "quoteLabel": "Show quote in review",
+    "sentiment": {
+      "positive": "Positive",
+      "mixed": "Mixed",
+      "negative": "Negative"
+    },
+    "unavailable": "Highlights are unavailable right now."
   }
 }

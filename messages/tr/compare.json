@@ -1,0 +1,44 @@
+{
+  "title": "İlan karşılaştırma",
+  "intro": "En fazla 4 ilanı yan yana karşılaştırın. Toplam fiyatlar teklif motorundan gelir.",
+  "add": "Karşılaştırmaya ekle",
+  "remove": "Karşılaştırmadan çıkar",
+  "full": "En fazla 4 ilan karşılaştırılabilir",
+  "bar": "{count} ilan seçildi",
+  "open": "Karşılaştır",
+  "clear": "Temizle",
+  "needMore": "Karşılaştırmak için en az 2 ilan seçin.",
+  "backToSearch": "Aramaya dön",
+  "loading": "Karşılaştırma yükleniyor…",
+  "dates": "{checkIn} – {checkOut} · {guests} misafir",
+  "noDates": "Toplam fiyat için arama sayfasında tarih seçin.",
+  "rows": {
+    "location": "Konum",
+    "rating": "Puan",
+    "cancellation": "İptal politikası",
+    "amenities": "Olanaklar",
+    "total": "Toplam fiyat"
+  },
+  "ratingValue": "{avg}/5 ({count} yorum)",
+  "noRating": "Henüz puan yok",
+  "freeCancel": "Girişten {hours} saat öncesine kadar ücretsiz iptal",
+  "policy": {
+    "FLEXIBLE": "Esnek",
+    "MODERATE": "Orta",
+    "STRICT": "Katı",
+    "NON_REFUNDABLE": "İade edilemez"
+  },
+  "nights": "{count, plural, one {# gece} other {# gece}}",
+  "unavailable": {
+    "NO_DATES": "Tarih seçilmedi",
+    "NO_ROOM_FOR_GUESTS": "Bu misafir sayısına uygun oda yok",
+    "UNAVAILABLE": "Bu tarihlerde müsait değil"
+  },
+  "badges": {
+    "cheapest": "En uygun fiyat",
+    "bestRated": "En yüksek puan",
+    "mostFlexible": "En esnek iptal"
+  },
+  "onlyHere": "Yalnızca bu ilanda",
+  "commentary": "Yorum"
+}

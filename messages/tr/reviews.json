@@ -36,5 +36,17 @@
       "PRIVACY": "Kişisel bilgi içeriyor",
       "OTHER": "Diğer"
     }
+  },
+  "highlights": {
+    "title": "Öne çıkan temalar",
+    "basedOn": "{count} yorumdan kümelendi; her iddia bir yorumdan birebir alıntıdır.",
+    "mentions": "{count, plural, one {# yorumda} other {# yorumda}} geçiyor",
+    "quoteLabel": "Alıntıyı yorumda göster",
+    "sentiment": {
+      "positive": "Olumlu",
+      "mixed": "Karışık",
+      "negative": "Olumsuz"
+    },
+    "unavailable": "Öne çıkanlar şu an kullanılamıyor."
   }
 }

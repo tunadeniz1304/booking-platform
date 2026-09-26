@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { ApiError, apiFetch } from "@/lib/api-client";
 import { useFormat } from "@/i18n/use-format";
 import { LlmBadge, focusRing, useLoader } from "@/components/ui/ui";
+import ReviewHighlights, { type HighlightQuote } from "./ReviewHighlights";
 
 interface ReviewItem {
   id: string;
@@ -146,6 +147,22 @@ function withCitations(
   return out;
 }
 
+/** Yorum metni; öne çıkanlardan seçilen alıntı aralığı `<mark>` ile vurgulanır. */
+function CommentText({ text, quote }: { text: string; quote: HighlightQuote | null }) {
+  if (!quote || quote.start < 0 || quote.end > text.length || quote.start >= quote.end) {
+    return <>{text}</>;
+  }
+  return (
+    <>
+      {text.slice(0, quote.start)}
+      <mark className="rounded bg-yellow-200 px-0.5 text-gray-900">
+        {text.slice(quote.start, quote.end)}
+      </mark>
+      {text.slice(quote.end)}
+    </>
+  );
+}
+
 function Stars({ rating }: { rating: number }) {
   const t = useTranslations("reviews");
   return (
@@ -172,6 +189,7 @@ export default function ReviewsSection({ propertyId }: { propertyId: string }) {
     [propertyId]
   );
 
+  const [activeQuote, setActiveQuote] = useState<HighlightQuote | null>(null);
   const citationOrder = new Map<string, number>();
   for (const id of summary.data?.citations ?? []) {
     if (!citationOrder.has(id)) citationOrder.set(id, citationOrder.size + 1);
@@ -237,6 +255,8 @@ export default function ReviewsSection({ propertyId }: { propertyId: string }) {
         {summary.error && <p className="mt-2 text-sm text-gray-700">{t("summary.unavailable")}</p>}
       </div>
 
+      <ReviewHighlights propertyId={propertyId} onQuote={setActiveQuote} />
+
       {reviews.error && (
         <p role="alert" className="mt-3 text-sm text-red-700">
           {reviews.error}
@@ -278,7 +298,14 @@ export default function ReviewsSection({ propertyId }: { propertyId: string }) {
                   ))}
                 </dl>
               )}
-              {r.comment && <p className="mt-2 text-gray-800">{r.comment}</p>}
+              {r.comment && (
+                <p className="mt-2 text-gray-800">
+                  <CommentText
+                    text={r.comment}
+                    quote={activeQuote?.reviewId === r.id ? activeQuote : null}
+                  />
+                </p>
+              )}
               {r.hostReply && (
                 <div className="mt-3 border-l-4 border-[#003580] bg-gray-50 p-3">
                   <p className="text-xs font-semibold text-gray-900">{t("hostReply")}</p>

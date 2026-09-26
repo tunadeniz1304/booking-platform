@@ -1,0 +1,44 @@
+{
+  "title": "Compare listings",
+  "intro": "Compare up to 4 listings side by side. Totals come from the quote engine.",
+  "add": "Add to compare",
+  "remove": "Remove from compare",
+  "full": "You can compare up to 4 listings",
+  "bar": "{count} listings selected",
+  "open": "Compare",
+  "clear": "Clear",
+  "needMore": "Select at least 2 listings to compare.",
+  "backToSearch": "Back to search",
+  "loading": "Loading comparison…",
+  "dates": "{checkIn} – {checkOut} · {guests} guests",
+  "noDates": "Pick dates on the search page to see total prices.",
+  "rows": {
+    "location": "Location",
+    "rating": "Rating",
+    "cancellation": "Cancellation policy",
+    "amenities": "Amenities",
+    "total": "Total price"
+  },
+  "ratingValue": "{avg}/5 ({count} reviews)",
+  "noRating": "No ratings yet",
+  "freeCancel": "Free cancellation up to {hours} hours before check-in",
+  "policy": {
+    "FLEXIBLE": "Flexible",
+    "MODERATE": "Moderate",
+    "STRICT": "Strict",
+    "NON_REFUNDABLE": "Non-refundable"
+  },
+  "nights": "{count, plural, one {# night} other {# nights}}",
+  "unavailable": {
+    "NO_DATES": "No dates selected",
+    "NO_ROOM_FOR_GUESTS": "No room fits this many guests",
+    "UNAVAILABLE": "Not available for these dates"
+  },
+  "badges": {
+    "cheapest": "Lowest price",
+    "bestRated": "Top rated",
+    "mostFlexible": "Most flexible"
+  },
+  "onlyHere": "Only here",
+  "commentary": "Commentary"
+}

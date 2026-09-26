@@ -34,6 +34,9 @@ import * as adminFraud from "@/app/api/admin/fraud/route";
 import * as adminRole from "@/app/api/admin/users/[id]/role/route";
 import * as adminRefunds from "@/app/api/admin/refunds/route";
 import * as adminReconciliation from "@/app/api/admin/reconciliation/route";
+import * as hostPayouts from "@/app/api/host/payouts/route";
+import * as adminPayouts from "@/app/api/admin/payouts/route";
+import * as adminPayoutPause from "@/app/api/admin/payouts/[userId]/route";
 import * as hostPhotos from "@/app/api/host/properties/[id]/photos/route";
 import * as hostPhoto from "@/app/api/host/properties/[id]/photos/[photoId]/route";
 import * as accountSessions from "@/app/api/account/sessions/route";
@@ -125,6 +128,15 @@ const MATRIX: Array<[string, string, Handler, Role[]]> = [
     "GET /api/admin/reconciliation",
     "GET",
     adminReconciliation.GET as unknown as Handler,
+    ["ADMIN"],
+  ],
+  ["GET /api/host/payouts", "GET", hostPayouts.GET as unknown as Handler, HOST_ADMIN],
+  ["POST /api/host/payouts", "POST", hostPayouts.POST as unknown as Handler, HOST_ADMIN],
+  ["GET /api/admin/payouts", "GET", adminPayouts.GET as unknown as Handler, ["ADMIN"]],
+  [
+    "POST /api/admin/payouts/[userId]",
+    "POST",
+    adminPayoutPause.POST as unknown as Handler,
     ["ADMIN"],
   ],
   ["GET /api/account/sessions", "GET", accountSessions.GET as unknown as Handler, ALL],

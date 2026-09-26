@@ -259,3 +259,51 @@ Bu modülün ilk sürümü "quantum-inspired" olarak adlandırılmıştı; ancak
 - **Demo/fallback:** başlık kümenin en sık anlamlı sözcüğünden, iddialar merkeze en yakın ve farklı yorumlardan gelen **gerçek cümlelerden** seçilir (alıntı = cümle). Yanıttaki `start/end` aralığı UI'da yoruma kaydırma ve vurgulama için kullanılır.
 - **Önbellek:** anahtar = yorum setinin SHA-256 karması (id + puan + metin) + dil + LLM modu/modeli + embedder + ayarlar; `fallback` sonuçlar önbelleğe girmez.
 - **Karşılaştırma (`src/lib/ai/listing-compare.ts`):** toplam fiyat yalnızca `createQuote` (`/api/quote` ile aynı fonksiyon) çıktısıdır; fark tablosu deterministik koddur. LLM yorumundaki her sayı yapılandırılmış veride (toplamlar minor/major/biçimli, puan, yorum sayısı, gece, iptal saati, ilan başlıkları) bulunmalıdır; aksi hâlde şablon yoruma düşülür.
+
+## 11. Parti riski skoru (`src/lib/trust/party-risk.ts`, P1-6)
+
+Amaç: ev sahibini, izinsiz parti riski taşıyabilecek rezervasyonlar hakkında **önceden
+bilgilendirmek**. Skor rezervasyonu reddetmez, iptal etmez ve fiyatı değiştirmez; yalnızca
+ev sahibine e-posta (outbox `trust.party_risk_flagged`) ve host panelinde gerekçeli bir satır
+üretir. LLM kullanılmaz; aynı girdi her zaman aynı skoru verir.
+
+**Hesap.** `booking.created` olayının outbox tüketicisi (booking-service değişmeden) beş ikili
+sinyali değerlendirir; skor, tetiklenen sinyallerin ağırlık toplamıdır (üst sınır 100):
+
+| Gerekçe kodu    | Koşul (varsayılan)                       | Ağırlık (varsayılan) | Config                                                             |
+| --------------- | ---------------------------------------- | -------------------- | ------------------------------------------------------------------ |
+| `LARGE_GROUP`   | misafir sayısı ≥ 6                       | 30                   | `PARTY_RISK_LARGE_GROUP_MIN`, `PARTY_RISK_WEIGHT_LARGE_GROUP`      |
+| `YOUNG_ACCOUNT` | hesap yaşı < 30 gün (rezervasyon anında) | 20                   | `PARTY_RISK_YOUNG_ACCOUNT_DAYS`, `PARTY_RISK_WEIGHT_YOUNG_ACCOUNT` |
+| `SINGLE_NIGHT`  | tek gece                                 | 20                   | `PARTY_RISK_WEIGHT_SINGLE_NIGHT`                                   |
+| `NEAR_DATE`     | girişe < 2 takvim günü                   | 20                   | `PARTY_RISK_NEAR_DATE_DAYS`, `PARTY_RISK_WEIGHT_NEAR_DATE`         |
+| `WEEKEND`       | cuma veya cumartesi gecesi içeriyor      | 10                   | `PARTY_RISK_WEIGHT_WEEKEND`                                        |
+
+Skor ≥ `PARTY_RISK_THRESHOLD` (60) → işaretli. Varsayılanlarla tek bir sinyal eşiği geçemez;
+ör. "genç hesap + tek gece + yakın tarih" (60) veya "kalabalık grup + tek gece + hafta sonu"
+(60) işaretlenir. Her satır `PartyRiskAssessment` tablosunda gerekçe kodlarıyla saklanır
+(rezervasyon başına tek satır → outbox yeniden teslimi idempotent); işaretlemede
+`booking.party_risk_flagged` denetim kaydı katkı dökümünü (`contributions`) içerir.
+
+**Host onay adımı neden yok.** Mevcut durum makinesi HELD → CONFIRMED (ödeme sagası) üzerine
+kurulu; araya "host onayı bekliyor" durumu eklemek hold süresini, ödeme yakalama zamanını ve
+iade akışını etkiler. Bu fazda yalnızca uyarı + panel uygulandı; ev sahibi mevcut iptal
+politikalarıyla hareket eder.
+
+**Sınırlamalar ve önyargı.**
+
+- Ağırlıklar uzman sezgisiyle seçilmiş **el ayarı** değerlerdir; etiketli parti/hasar verisiyle
+  kalibre edilmemiştir. Skor bir olasılık değildir; "60" "%60 risk" anlamına gelmez.
+- Sinyaller dolaylıdır ve masum davranışla örtüşür: aile ziyaretleri kalabalık, iş seyahatleri
+  tek gecelik, son dakika rezervasyonları acil durumlarda yaygındır. Yanlış pozitif oranı
+  ölçülmemiştir; bu yüzden skor **engellemez**, yalnızca bilgilendirir.
+- `YOUNG_ACCOUNT` platforma yeni katılanları (ör. gençler, ilk kez seyahat edenler, göçmenler)
+  orantısız etkileyebilir; yaş, uyruk, konum gibi korunan/vekil özellikler bilinçli olarak
+  **kullanılmaz** (misafirin ilanla aynı şehirde oturması gibi sektörde yaygın sinyal de
+  konum ayrımcılığı riski nedeniyle dışarıda bırakıldı).
+- Hafta sonu tanımı UTC gece tarihine göredir; ülke/tatil takvimleri (bayram arifesi, yılbaşı)
+  dikkate alınmaz.
+- Tek başına kötü niyetli bir misafir sinyalleri kolayca atlatabilir (ör. 2 gece ve 5 kişi
+  yazmak). Skor caydırıcı değil, ev sahibinin dikkatini yönlendiren bir araçtır.
+- İzleme önerisi: `party_risk_assessments_total{outcome}` oranı ve işaretli rezervasyonların
+  iptal/şikâyet oranı izlenmeli; ağırlıklar veriye dayalı yeniden ayarlanmadan önce bu
+  bölümdeki varsayılanlar gerekçesiyle birlikte güncellenmelidir.

@@ -23,6 +23,7 @@ import { FX_REFRESH_JOB, runFxRefresh, scheduleFxRefresh } from "./jobs/fx-refre
 import { PRICE_ALERT_JOB, runPriceAlertsJob, schedulePriceAlerts } from "./jobs/price-alerts";
 import { PAYOUT_JOB, runPayouts, schedulePayouts } from "./jobs/payouts";
 import { ICAL_POLL_JOB, runIcalPoll, scheduleIcalPoll } from "./jobs/ical-poll";
+import { onRefundRetryFailed, processRefundRetry } from "./jobs/refund-retry";
 import { runOutboxRelay } from "@/lib/cqrs";
 import { registerEventHandlers } from "@/lib/events/register";
 import { updateAvailabilityPrices } from "@/lib/pricing-service";
@@ -104,6 +105,11 @@ async function main(): Promise<void> {
     logger.error({ jobId: job?.id, queue: QUEUE_NAMES.saga, ...errorFields(err) }, "job failed")
   );
   workers.push(saga);
+
+  // v4#7: başarısız PSP iadelerinin üstel geri çekilmeli yeniden denemesi.
+  const refundRetry = new Worker(QUEUE_NAMES.refundRetry, processRefundRetry, { connection });
+  refundRetry.on("failed", onRefundRetryFailed);
+  workers.push(refundRetry);
   await scheduleExpireHolds(getQueue(QUEUE_NAMES.maintenance));
   await scheduleFxRefresh(getQueue(QUEUE_NAMES.maintenance));
   await schedulePriceAlerts(getQueue(QUEUE_NAMES.maintenance));

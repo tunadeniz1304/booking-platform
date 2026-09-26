@@ -13,6 +13,8 @@ export const QUEUE_NAMES = {
   pricing: "pricing",
   maintenance: "maintenance",
   saga: "saga",
+  /** Başarısız PSP iadelerinin üstel geri çekilmeli yeniden denemesi (v4#7). */
+  refundRetry: "refund-retry",
 } as const;
 
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];

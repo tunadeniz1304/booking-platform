@@ -29,6 +29,10 @@ import type { PaymentChallenge } from "./provider";
 import { assessPayment, type FraudDecision } from "@/lib/risk/fraud";
 import { consumeStepUp, hasPasskey } from "@/lib/auth/passkey";
 import { getConfig } from "@/lib/config/app-config";
+import { getQueue, QUEUE_NAMES } from "@/lib/queue";
+
+/** BullMQ `refund-retry` kuyruğundaki iş adı (v4#7). */
+export const REFUND_RETRY_JOB = "refund-retry";
 
 /**
  * Ödeme orkestrasyonu (P0-5, v3 P0-6).
@@ -924,12 +928,34 @@ function refundTarget(
   return { providerRef: booking.payment?.providerRef ?? null, refundableMinor: paid };
 }
 
+/**
+ * v4#7: iptal, ödeme ile AYNI `pay:<bookingId>` kilidini alır (capture ile yarışamaz) ve
+ * işlem içinde rezervasyon satırını `FOR UPDATE` ile kilitler. PSP iadesi düşerse
+ * `REFUND_FAILED` + BullMQ `refund-retry` (üstel geri çekilme); tükenirse yönetici kuyruğu
+ * (`/api/admin/refunds`).
+ */
 export async function cancelAndRefund(
   bookingId: string,
   userId: string,
   now = new Date()
 ): Promise<CancellationOutcome> {
+  // IDOR kontrolü kilitten önce (başkasının rezervasyonuna kilit bile alınmaz).
+  const owner = await prisma.booking.findUnique({
+    where: { id: bookingId },
+    select: { userId: true },
+  });
+  if (!owner || owner.userId !== userId) throw new BookingNotFoundError();
+  return withPaymentLock(bookingId, () => cancelLocked(bookingId, userId, now));
+}
+
+async function cancelLocked(
+  bookingId: string,
+  userId: string,
+  now: Date
+): Promise<CancellationOutcome> {
   const result = await withSerializableRetry(async (tx) => {
+    // Satır kilidi: kilit (Redlock) kaybolsa bile eşzamanlı onay/iptal bu satırda sıralanır.
+    await tx.$queryRaw`SELECT id FROM "Booking" WHERE id = ${bookingId} FOR UPDATE`;
     const booking = await tx.booking.findUnique({
       where: { id: bookingId },
       select: {
@@ -1061,8 +1087,9 @@ export async function cancelAndRefund(
       logger.error({ bookingId: booking.id, ...errorFields(error) }, "psp refund failed");
       await prisma.payment.update({
         where: { bookingId: booking.id },
-        data: { failureCode: "REFUND_FAILED" },
+        data: { failureCode: REFUND_FAILED },
       });
+      await scheduleRefundRetry(booking.id);
     }
   }
   await afterBookingWrite(booking.propertyId, booking.id);
@@ -1071,4 +1098,107 @@ export async function cancelAndRefund(
     status: result.next as BookingStatus,
     refund: { ...decision, currency },
   };
+}
+
+export const REFUND_FAILED = "REFUND_FAILED";
+
+export const refundRetryTotal = counter(
+  "refund_retry_total",
+  "Başarısız PSP iadelerinin yeniden denemeleri",
+  ["outcome"] as const
+);
+
+/**
+ * Başarısız iadeyi `refund-retry` kuyruğuna koyar (rezervasyon başına tek iş; üstel geri
+ * çekilme, deneme sayısı config). Kuyruk erişilemezse iş kaybolmaz: satır `REFUND_FAILED`
+ * kalır ve yönetici kuyruğunda görünür.
+ */
+export async function scheduleRefundRetry(bookingId: string): Promise<void> {
+  const { REFUND_RETRY_MAX_ATTEMPTS, REFUND_RETRY_BASE_DELAY_MS } = getConfig();
+  try {
+    await getQueue(QUEUE_NAMES.refundRetry).add(
+      REFUND_RETRY_JOB,
+      { bookingId },
+      {
+        jobId: `refund-${bookingId}`,
+        attempts: REFUND_RETRY_MAX_ATTEMPTS,
+        backoff: { type: "exponential", delay: REFUND_RETRY_BASE_DELAY_MS },
+        removeOnComplete: true,
+        removeOnFail: 1000,
+      }
+    );
+    refundRetryTotal.inc({ outcome: "scheduled" });
+  } catch (error) {
+    logger.error({ bookingId, ...errorFields(error) }, "refund retry could not be scheduled");
+  }
+}
+
+export type RefundRetryResult = "refunded" | "voided" | "noop";
+
+/**
+ * `REFUND_FAILED` ödemenin PSP işlemini yeniden dener (worker ve yönetici uç noktası).
+ * İade anahtarı ilk denemeyle aynıdır (`refund:<bookingId>`) → PSP en fazla bir kez iade
+ * eder. Başarılıysa `failureCode` temizlenir; hata yukarı fırlatılır (BullMQ yeniden dener).
+ */
+export async function retryFailedRefund(bookingId: string): Promise<RefundRetryResult> {
+  return withPaymentLock(bookingId, async () => {
+    const booking = await prisma.booking.findUnique({
+      where: { id: bookingId },
+      select: {
+        id: true,
+        userId: true,
+        currency: true,
+        payment: {
+          select: {
+            status: true,
+            amount: true,
+            providerRef: true,
+            refundedAmount: true,
+            failureCode: true,
+          },
+        },
+        transfers: {
+          where: { status: "COMPLETED" },
+          orderBy: { completedAt: "desc" },
+          take: 1,
+          select: { askPrice: true, currency: true, claimedById: true, buyerPaymentRef: true },
+        },
+      },
+    });
+    const payment = booking?.payment;
+    if (!booking || !payment || payment.failureCode !== REFUND_FAILED) return "noop";
+    const currency = assertCurrency(booking.currency);
+    const refundMinor = payment.refundedAmount
+      ? toMinor(payment.refundedAmount.toString(), currency)
+      : 0;
+    const target = refundTarget(booking, currency);
+    const provider = getPaymentProvider();
+    let result: RefundRetryResult = "noop";
+    try {
+      if (refundMinor > 0 && target.providerRef) {
+        await provider.refund(
+          target.providerRef,
+          money(refundMinor, currency),
+          `refund:${booking.id}`
+        );
+        result = "refunded";
+      } else if (payment.providerRef && payment.status === PaymentStatus.VOIDED) {
+        await provider.void(payment.providerRef);
+        result = "voided";
+      }
+    } catch (error) {
+      refundRetryTotal.inc({ outcome: "failed" });
+      throw error;
+    }
+    await prisma.payment.updateMany({
+      where: { bookingId: booking.id, failureCode: REFUND_FAILED },
+      data: { failureCode: null },
+    });
+    refundRetryTotal.inc({ outcome: "succeeded" });
+    await audit("system:refund-retry", "payment.refund_retried", "Booking", booking.id, {
+      result,
+      refundMinor,
+    });
+    return result;
+  });
 }

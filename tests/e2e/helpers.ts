@@ -9,6 +9,15 @@ export const TEST_CARD_3DS = "4000 0000 0000 3220";
 export const TEST_CARD_DECLINE = "4000 0000 0000 0002";
 export const MOCK_3DS_CODE = "123456";
 
+/**
+ * Uygulamanın kendi hata/uyarı kutuları. Next.js'in sayfa geçişlerini okuyan
+ * `__next-route-announcer__` da role="alert" taşır; `getByRole("alert")` onu da yakalayıp
+ * strict-mode çakışması üretir → burada dışlanır.
+ */
+export function appAlert(page: Page) {
+  return page.locator('[role="alert"]:not(#__next-route-announcer__)');
+}
+
 /** Çerez bandını kapatır (akış testlerinde tıklamaları örtmesin). */
 export async function acceptNecessaryCookies(context: BrowserContext, baseURL: string) {
   await context.addCookies([{ name: "cookie_consent", value: "necessary", url: baseURL }]);

@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import {
+  appAlert,
   GUEST_EMAIL,
   MOCK_3DS_CODE,
   TEST_CARD_3DS,
@@ -82,7 +83,7 @@ test.describe("rezervasyon akışı (misafir)", () => {
     const bookingId = await completeCheckout(page);
 
     await payWithCard(page, TEST_CARD_DECLINE);
-    await expect(page.getByRole("alert")).toBeVisible();
+    await expect(appAlert(page)).toBeVisible();
     await expect(
       page.getByRole("heading", { name: "Oda sizin için tutuluyor — ödemeyi tamamlayın" })
     ).toBeVisible();

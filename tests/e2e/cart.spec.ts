@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import {
+  appAlert,
   GUEST_EMAIL,
   MOCK_3DS_CODE,
   TEST_CARD_DECLINE,
@@ -108,7 +109,7 @@ test.describe("grup sepeti (P1-1)", () => {
     await page.goto("/checkout/cart");
     await page.getByRole("button", { name: "Odaları tut" }).click();
     await payCartWithCard(page, TEST_CARD_DECLINE);
-    await expect(page.getByRole("alert")).toContainText("Ödeme reddedildi");
+    await expect(appAlert(page)).toContainText("Ödeme reddedildi");
     await expect(page.getByRole("button", { name: "Odaları tut" })).toBeVisible();
 
     const res = await page.request.get("/api/cart");

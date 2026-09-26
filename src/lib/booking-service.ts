@@ -50,6 +50,9 @@ import {
   type Quote,
 } from "@/lib/pricing/quote";
 import { checkRestrictions, describeViolation } from "@/lib/booking/restrictions";
+import { normalizeCouponCode, type SalesChannel } from "@/lib/pricing/promotions";
+import { loadPromotionRules } from "@/lib/pricing/promotion-rules";
+import { redeemPromotions, releasePromotionRedemptions } from "@/lib/pricing/promotion-redemption";
 import { holdUnits, InventoryUnavailableError, releaseForStatus } from "@/lib/booking/inventory";
 import { logger, errorFields } from "@/lib/observability/logger";
 import { counter } from "@/lib/observability/metrics";
@@ -130,6 +133,10 @@ export interface CreateBookingInput {
   quoteId?: string;
   /** Tahsilat para birimi (yoksa teklifinki, o da yoksa tesisinki; P0-5). */
   currency?: string;
+  /** P1-8: kupon kodu (yoksa teklifinki). */
+  couponCode?: string;
+  /** P1-8: satış kanalı (teklif varsa teklifinki geçerlidir). */
+  channel?: SalesChannel;
 }
 
 export interface BookingDTO {
@@ -268,6 +275,8 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingR
     units,
     input.ratePlanId,
     input.currency,
+    // P1-8: kupon yalnız verildiğinde karmaya girer (eski anahtarların karması değişmesin).
+    ...(input.couponCode ? [normalizeCouponCode(input.couponCode)] : []),
   ]);
   if (input.idempotencyKey) {
     const existing = await findByIdempotencyKey(input.userId, input.idempotencyKey, requestHash);
@@ -419,6 +428,8 @@ export async function reserveBookingInTx(
       },
       property: {
         select: {
+          hostId: true,
+          timeZone: true,
           currency: true,
           cancellationPolicy: policySelect,
           location: { select: { country: true } },
@@ -466,6 +477,14 @@ export async function reserveBookingInTx(
   const nightInputs = nightsFromInventory(rows, nights, currency, input.units);
   if (!nightInputs) throw new SoldOutError();
 
+  // P1-8: teklifle aynı promosyon bağlamı (kanal ve kupon teklifinkiyle aynı).
+  const couponCode = input.couponCode ?? quote?.couponCode ?? null;
+  const now = new Date();
+  const rules = await loadPromotionRules(tx, {
+    hostId: room.property.hostId,
+    propertyId: input.propertyId,
+    couponCode,
+  });
   const priced = priceStay({
     nights: nightInputs,
     modifierMinor: minorFromDb(room.priceModifierMinor),
@@ -474,7 +493,27 @@ export async function reserveBookingInTx(
     currency,
     taxRules: taxRulesFor(room.property.location.country),
     guests: input.guestCount,
+    promotions: {
+      rules,
+      context: {
+        now,
+        today: todayIn(clockOf(room.property).timeZone, now),
+        checkIn,
+        nights: nights.length,
+        channel: quote?.channel ?? input.channel ?? "web",
+        couponCode,
+        maxDiscountBps: config.PROMOTION_MAX_DISCOUNT_BPS,
+      },
+    },
   });
+  // Girilen kupon uygulanamıyorsa (tükenmiş, süresi geçmiş, koşul dışı) rezervasyon yapılmaz.
+  if (priced.coupon && priced.coupon.status !== "APPLIED") {
+    throw new BookingConflictError(
+      "Kupon bu rezervasyona uygulanamıyor",
+      priced.coupon.status === "USAGE_LIMIT_REACHED" ? "COUPON_EXHAUSTED" : "COUPON_NOT_APPLICABLE",
+      { coupon: priced.coupon }
+    );
+  }
   // İade edilemez plan → NON_REFUNDABLE; değilse planın (yoksa mülkün) politikası.
   const policy = plan.refundable
     ? toSnapshot(plan.cancellationPolicy ?? room.property.cancellationPolicy)
@@ -530,6 +569,9 @@ export async function reserveBookingInTx(
     select: bookingSelect,
   });
 
+  // P1-8: limitli promosyon kullanımı aynı işlemde, koşullu artırımla (limit yarışında aşım yok).
+  await redeemPromotions(tx, booking.id, priced.discounts ?? [], currency);
+
   // Koşullu sayaç: yer yoksa (0 satır / eksik gece) işlem geri alınır → SOLD_OUT.
   try {
     await holdUnits(tx, { roomTypeId: room.id, checkIn, checkOut, units: input.units });
@@ -576,8 +618,19 @@ async function afterWrite(propertyId: string, bookingId: string): Promise<void> 
  */
 export async function releaseInventory(
   tx: Prisma.TransactionClient,
-  booking: { roomId: string; checkIn: Date; checkOut: Date; units: number; status: string }
+  booking: {
+    id: string;
+    roomId: string;
+    checkIn: Date;
+    checkOut: Date;
+    units: number;
+    status: string;
+  }
 ): Promise<void> {
+  // P1-8: onaylanmamış tutma düşerse limitli promosyon kullanımı iade edilir.
+  if (booking.status === "HELD" || booking.status === "PENDING") {
+    await releasePromotionRedemptions(tx, booking.id);
+  }
   await releaseForStatus(tx, booking.status, {
     roomTypeId: booking.roomId,
     checkIn: booking.checkIn,

@@ -5,6 +5,7 @@ import { requireAuth, requireVerifiedEmail } from "@/lib/auth";
 import { toErrorResponse } from "@/lib/http/errors";
 import { observed } from "@/lib/http/observed";
 import { assertIdentityRequirement } from "@/lib/trust/kyc";
+import { channelFromHeaders } from "@/lib/pricing/promotions";
 
 const createBookingSchema = z.object({
   propertyId: z.string().min(1).max(64),
@@ -23,6 +24,8 @@ const createBookingSchema = z.object({
     .regex(/^[A-Za-z]{3}$/)
     .transform((c) => c.toUpperCase())
     .optional(),
+  /** P1-8: kupon kodu; kullanım limiti rezervasyonla aynı işlemde atomik sayılır. */
+  couponCode: z.string().trim().min(1).max(40).optional(),
 });
 
 export const POST = observed("bookings", async function postHandler(req: NextRequest) {
@@ -33,7 +36,12 @@ export const POST = observed("bookings", async function postHandler(req: NextReq
     const parsed = createBookingSchema.parse(await req.json());
     const idempotencyKey = req.headers.get("idempotency-key")?.slice(0, 128) || undefined;
 
-    const booking = await createBooking({ userId, ...parsed, idempotencyKey });
+    const booking = await createBooking({
+      userId,
+      ...parsed,
+      idempotencyKey,
+      channel: channelFromHeaders(req.headers),
+    });
     return NextResponse.json(booking, { status: 201 });
   } catch (error) {
     return toErrorResponse(error, "bookings.create");

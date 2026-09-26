@@ -104,6 +104,12 @@ const schema = z.object({
   /** Kullanıcı başına azami aktif fiyat alarmı. */
   PRICE_ALERT_MAX_PER_USER: int(20, 1, 1000),
 
+  // Promosyon motoru (P1-8)
+  /** Toplam promosyon indiriminin konaklama ara toplamına oranı üst sınırı (bps; taban fiyat). */
+  PROMOTION_MAX_DISCOUNT_BPS: int(9000, 0, 10_000),
+  /** Ev sahibi başına azami promosyon sayısı. */
+  PROMOTION_MAX_PER_HOST: int(100, 1, 10_000),
+
   // Transfer
   FEATURE_TRANSFER: bool(true),
   /** Devir sonrası satıcıya (mock) payout işinin cron'u (UTC). */

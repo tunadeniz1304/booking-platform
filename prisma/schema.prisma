@@ -40,6 +40,8 @@ model User {
   claimedTransfers    BookingTransfer[]    @relation("transferBuyer")
   priceAlerts         PriceAlert[]
   pushSubscriptions   PushSubscription[]
+  /// P1-8: ev sahibinin tanımladığı promosyonlar.
+  promotions          Promotion[]
   messages            Message[]
   reviewReports       ReviewReport[]
   /// P1-1 grup sepeti
@@ -126,6 +128,8 @@ model Property {
   photos               PropertyPhoto[]
   /// P1-13(e): erişilebilirlik özellikleri (yalnız admin doğrulamalılar herkese gösterilir).
   accessibilityFeatures AccessibilityFeature[]
+  /// P1-8: yalnız bu ilana özel promosyonlar (ev sahibi geneli olanlar propertyId=null).
+  promotions            Promotion[]
   /// İptal politikası (yoksa varsayılan MODERATE); rezervasyonda snapshot'ı alınır.
   /// Turizm İşletme Belgesi / 7464 izin belgesi no (ör. 34-12345); boşsa ilan yayınlanmaz.
   licenseNumber        String?
@@ -356,6 +360,8 @@ model Booking {
   reviews                Review[]
   transfers              BookingTransfer[]
   payouts                Payout[]
+  /// P1-8: bu rezervasyonda kullanılan (limitli) promosyonlar.
+  promotionRedemptions   PromotionRedemption[]
   invoice                Invoice?
   messageThread          MessageThread?
   createdAt              DateTime          @default(now())
@@ -1361,4 +1367,85 @@ model CartPayment {
 
   @@index([userId])
   @@index([status])
+}
+
+/// P1-8: promosyon türü. Uygunluk koşulları tesisin yerel "bugün"üne göre değerlendirilir.
+enum PromotionType {
+  /// Varışa en az `minDaysBefore` gün kala yapılan rezervasyon.
+  EARLY_BIRD
+  /// Varışa en çok `maxDaysBefore` gün kala yapılan rezervasyon.
+  LAST_MINUTE
+  /// En az `minNights` gecelik konaklama.
+  LONG_STAY
+  /// Mobil kanaldan (mobil tarayıcı/uygulama) alınan teklif.
+  MOBILE_RATE
+  /// Kod ile; `usageLimit` checkout'ta atomik sayılır.
+  COUPON
+}
+
+/// P1-8: promosyon kuralı. İndirim ya yüzde (`discountBps`) ya sabit tutardır (`discountMinor`,
+/// `currency` biriminde, konaklama başına). Seçim: öncelik → en büyük indirim → id (deterministik).
+model Promotion {
+  id            String                @id @default(cuid())
+  hostId        String
+  host          User                  @relation(fields: [hostId], references: [id], onDelete: Cascade)
+  /// null → ev sahibinin tüm ilanları.
+  propertyId    String?
+  property      Property?             @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  name          String
+  type          PromotionType
+  discountBps   Int?
+  discountMinor BigInt?
+  currency      String?
+  minDaysBefore Int?
+  maxDaysBefore Int?
+  minNights     Int?
+  /// Büyük harfe normalize edilir; ev sahibi başına tekil.
+  couponCode    String?
+  usageLimit    Int?
+  usageCount    Int                   @default(0)
+  /// Rezervasyon (teklif) anı geçerlilik aralığı; null → sınırsız.
+  startsAt      DateTime?
+  endsAt        DateTime?
+  priority      Int                   @default(0)
+  stackable     Boolean               @default(false)
+  /// Birleşebilir promosyonlarda aynı gruptan yalnız biri uygulanır.
+  stackGroup    String?
+  active        Boolean               @default(true)
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+  redemptions   PromotionRedemption[]
+
+  @@unique([hostId, couponCode])
+  @@index([hostId, active])
+  @@index([propertyId, active])
+}
+
+/// P1-8: limitli promosyonun bir rezervasyonda kullanımı. Tutma düşerse (süre dolumu/ödeme
+/// hatası/onay öncesi iptal) satır silinir ve `usageCount` geri alınır.
+model PromotionRedemption {
+  id          String    @id @default(cuid())
+  promotionId String
+  promotion   Promotion @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+  bookingId   String
+  booking     Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  amountMinor BigInt
+  currency    String
+  createdAt   DateTime  @default(now())
+
+  @@unique([promotionId, bookingId])
+  @@index([bookingId])
+}
+
+/// P1-8 Omnibus: oda tipinin gece fiyatı değişim geçmişi. `InventoryDay.priceMinor` her
+/// değiştiğinde (INSERT/UPDATE) veritabanı tetiği yazar → uygulama yazıcılarından bağımsız.
+/// Aylık ortalamayı tutan `PriceHistory` bu iş için uygun değil (gece/an çözünürlüğü yok).
+model InventoryPriceHistory {
+  id          BigInt   @id @default(autoincrement())
+  roomTypeId  String
+  date        DateTime @db.Date
+  priceMinor  BigInt
+  effectiveAt DateTime @default(now())
+
+  @@index([roomTypeId, date, effectiveAt])
 }

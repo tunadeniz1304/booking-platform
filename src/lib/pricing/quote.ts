@@ -26,6 +26,18 @@ import { checkRestrictions, describeViolation } from "@/lib/booking/restrictions
 import { chargeAmount, getCurrentFx, resolveChargeCurrency } from "@/lib/fx/store";
 import { computeTaxes, taxRulesFor, type TaxLine, type TaxRule } from "@/lib/pricing/tax";
 import { isListable } from "@/lib/compliance/listing";
+import {
+  allocateDiscount,
+  evaluatePromotions,
+  type CouponStatus,
+  type PromotionContext,
+  type PromotionDecision,
+  type PromotionLine,
+  type PromotionRule,
+  type SalesChannel,
+} from "@/lib/pricing/promotions";
+import { loadPromotionRules } from "@/lib/pricing/promotion-rules";
+import { lowestNightInputs } from "@/lib/pricing/price-history";
 
 /**
  * Fiyatın TEK kaynağı.
@@ -56,11 +68,27 @@ export type QuoteTax = TaxLine;
 
 export interface PricedStay {
   currency: CurrencyCode;
+  /** Gece tutarları promosyon ÖNCESİ (brüt). */
   nights: QuoteNight[];
+  /** Brüt gece toplamı. */
   subtotal: number;
   fees: QuoteFee[];
   taxes: QuoteTax[];
+  /** total = subtotal − discountTotal + ücretler + hariç vergiler (P1-8). */
   total: number;
+  /** P1-8: uygulanan promosyon satırları (tutar pozitif = indirim). Promosyon değerlendirildiyse var. */
+  discounts?: PromotionLine[];
+  discountTotal?: number;
+  /** Her promosyonun gerekçe kodu (uygulanan/uygulanmayan). */
+  promotionDecisions?: PromotionDecision[];
+  /** Girilen kuponun sonucu; kupon yoksa null. */
+  coupon?: { code: string; status: CouponStatus } | null;
+}
+
+/** priceStay'e verilen promosyon girdisi (ara toplam ve para birimi priceStay'de doldurulur). */
+export interface PromotionInput {
+  rules: readonly PromotionRule[];
+  context: Omit<PromotionContext, "subtotalMinor" | "currency">;
 }
 
 export interface QuoteRatePlan {
@@ -87,6 +115,16 @@ export interface Quote extends PricedStay {
   fxSnapshotId: string | null;
   /** Tahsil edilecek tutar: tesis para biriminde ya da izin verilen seçili birimde. */
   charge: { currency: CurrencyCode; total: number };
+  /** P1-8: promosyon değerlendirmesinin kanalı ve kuponu (rezervasyon aynısını kullanır). */
+  channel: SalesChannel;
+  couponCode: string | null;
+  /**
+   * P1-8 Omnibus: son `omnibusDays` günde uygulanmış en düşük gece fiyatlarıyla aynı konaklamanın
+   * promosyonsuz, vergi dahil toplamı (tesis para birimi, minor). İndirim gösterilirken
+   * üstü çizili referans fiyat BUDUR.
+   */
+  lowestPrice30dMinor: number;
+  omnibusDays: number;
 }
 
 /** Saf fiyatlama: geceler + oda farkı + plan farkı + vergi → kırılım. Deterministik. */
@@ -102,6 +140,8 @@ export function priceStay(input: {
   taxRules: readonly TaxRule[];
   /** Kişi başı sabit vergiler için misafir sayısı. */
   guests?: number;
+  /** P1-8: promosyonlar (verilmezse değerlendirme yapılmaz, çıktı eski biçimdedir). */
+  promotions?: PromotionInput;
 }): PricedStay {
   const currency = assertCurrency(input.currency);
   const units = input.units ?? 1;
@@ -119,15 +159,41 @@ export function priceStay(input: {
     nights.map((n) => money(n.amount, currency)),
     currency
   );
+  const promo = input.promotions
+    ? evaluatePromotions(input.promotions.rules, {
+        ...input.promotions.context,
+        currency,
+        subtotalMinor: subtotal.amount,
+      })
+    : null;
+  // Vergi/ücret matrahı indirimli gece tutarlarıdır (indirim gecelere orantılı bölüştürülür).
+  const shares = allocateDiscount(
+    nights.map((n) => n.amount),
+    promo?.discountTotal ?? 0,
+    currency
+  );
   const { taxes, fees, addOn } = computeTaxes({
-    nights,
+    nights: nights.map((n, i) => ({ date: n.date, amount: n.amount - shares[i] })),
     rules: input.taxRules,
     currency,
     guests: input.guests,
     units,
   });
-  const total = add(subtotal, money(addOn, currency));
-  return { currency, nights, subtotal: subtotal.amount, fees, taxes, total: total.amount };
+  const total = add(
+    money(subtotal.amount - (promo?.discountTotal ?? 0), currency),
+    money(addOn, currency)
+  );
+  const base = { currency, nights, subtotal: subtotal.amount, fees, taxes, total: total.amount };
+  if (!promo) return base;
+  return {
+    ...base,
+    discounts: promo.lines,
+    discountTotal: promo.discountTotal,
+    promotionDecisions: promo.decisions,
+    coupon: promo.couponCode
+      ? { code: promo.couponCode, status: promo.couponStatus ?? "NOT_FOUND" }
+      : null,
+  };
 }
 
 /**
@@ -181,6 +247,10 @@ export interface QuoteRequest {
   units?: number;
   /** Tahsilat para birimi (`FX_CHARGE_CURRENCIES` ile izinli); yoksa tesisinki. */
   currency?: string;
+  /** P1-8: kupon kodu (büyük/küçük harf duyarsız). */
+  couponCode?: string;
+  /** P1-8: satış kanalı (MOBILE_RATE için); yoksa "web". */
+  channel?: SalesChannel;
 }
 
 const ratePlanSelect = {
@@ -239,6 +309,7 @@ export async function computeTotal(req: QuoteRequest, now: Date = new Date()): P
       propertyId: true,
       property: {
         select: {
+          hostId: true,
           currency: true,
           isActive: true,
           licenseStatus: true,
@@ -296,15 +367,39 @@ export async function computeTotal(req: QuoteRequest, now: Date = new Date()): P
   const nights = nightsFromInventory(rows, stay.nights, currency, units);
   if (!nights) throw new SoldOutError();
 
-  const priced = priceStay({
-    nights,
+  const channel: SalesChannel = req.channel ?? "web";
+  const rules = await loadPromotionRules(prisma, {
+    hostId: room.property.hostId,
+    propertyId: room.propertyId,
+    couponCode: req.couponCode,
+  });
+  const stayPricing = {
     modifierMinor: minorFromDb(room.priceModifierMinor),
     planModifierBps: plan.priceModifierBps,
     units,
     currency,
     taxRules: taxRulesFor(room.property.location.country),
     guests: req.guests,
+  };
+  const priced = priceStay({
+    ...stayPricing,
+    nights,
+    promotions: {
+      rules,
+      context: {
+        now,
+        today: todayIn(clockOf(room.property).timeZone, now),
+        checkIn: stay.checkIn,
+        nights: stay.nights.length,
+        channel,
+        couponCode: req.couponCode ?? null,
+        maxDiscountBps: config.PROMOTION_MAX_DISCOUNT_BPS,
+      },
+    },
   });
+  // Omnibus referansı: her gece için pencerede uygulanmış en düşük taban fiyat, promosyonsuz.
+  const lowestNights = await lowestNightInputs(room.id, nights, now, config.PRICE_OMNIBUS_DAYS);
+  const lowestPrice30dMinor = priceStay({ ...stayPricing, nights: lowestNights }).total;
   const chargeCurrency = resolveChargeCurrency(currency, req.currency);
   const fx = await getCurrentFx(now);
   const charge = chargeAmount(money(priced.total, currency), chargeCurrency, fx);
@@ -321,6 +416,10 @@ export async function computeTotal(req: QuoteRequest, now: Date = new Date()): P
     checkOut: stay.checkOut,
     guests: req.guests,
     units,
+    channel,
+    couponCode: priced.coupon?.code ?? null,
+    lowestPrice30dMinor,
+    omnibusDays: config.PRICE_OMNIBUS_DAYS,
     createdAt: now.toISOString(),
     expiresAt: expiresAt.toISOString(),
   };

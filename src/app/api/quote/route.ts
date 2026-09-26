@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createQuote } from "@/lib/pricing/quote";
+import { channelFromHeaders } from "@/lib/pricing/promotions";
 import { toErrorResponse } from "@/lib/http/errors";
 import { observed } from "@/lib/http/observed";
 
@@ -18,6 +19,8 @@ const querySchema = z.object({
     .regex(/^[A-Za-z]{3}$/)
     .transform((c) => c.toUpperCase())
     .optional(),
+  /** P1-8: kupon kodu (büyük/küçük harf duyarsız). */
+  couponCode: z.string().trim().min(1).max(40).optional(),
 });
 
 /**
@@ -27,7 +30,9 @@ const querySchema = z.object({
 export const GET = observed("quote", async function getHandler(req: NextRequest) {
   try {
     const params = querySchema.parse(Object.fromEntries(req.nextUrl.searchParams));
-    return NextResponse.json(await createQuote(params));
+    return NextResponse.json(
+      await createQuote({ ...params, channel: channelFromHeaders(req.headers) })
+    );
   } catch (error) {
     return toErrorResponse(error, "quote");
   }

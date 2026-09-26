@@ -6,6 +6,8 @@ import { createQuote } from "@/lib/pricing/quote";
 import { claimBatch, relayOutbox } from "@/lib/cqrs/outbox";
 import { eventBus } from "@/lib/cqrs";
 
+/** Paylaşımlı DB: önceki dosyaların birikmiş tutmaları varsayılan 100 limitini doldurabilir. */
+const EXPIRE_ALL = 10_000;
 describeInt("rezervasyon çekirdeği (integration)", () => {
   const prisma = new PrismaClient();
   const stamp = Date.now();
@@ -109,11 +111,17 @@ describeInt("rezervasyon çekirdeği (integration)", () => {
       .map((r) => (r.reason as { code?: string }).code);
     expect(ok).toHaveLength(1);
     expect(codes).toHaveLength(99);
-    expect(new Set(codes)).toEqual(new Set(["SOLD_OUT"]));
+    // Reddedilenler SOLD_OUT; makine yükü altında 99 ardışık kilit sahibi oda kilidinin sabit
+    // bekleme bütçesini (200×~37 ms, booking-service) aşarsa bir kısmı ROOM_BUSY alır — ikisi
+    // de 409, fazla satış değil. Asıl değişmez aşağıda: tam 1 başarı + SQL'de fazla satış 0.
+    expect(codes.filter((c) => c !== "SOLD_OUT" && c !== "ROOM_BUSY")).toEqual([]);
+    expect(codes).toContain("SOLD_OUT");
 
-    // SQL ile doğrulanmış overbooking = 0: hiçbir gecede sold + held > total yok
+    // SQL ile doğrulanmış overbooking = 0: bu odanın hiçbir gecesinde sold + held > total yok
+    // (paylaşımlı test DB'si: başka dosyaların kasıtlı sapma fixture'larını saymamak için scope'lu).
     const overbooked = await prisma.$queryRaw<Array<{ n: bigint }>>`
-      SELECT COUNT(*)::bigint AS n FROM "InventoryDay" WHERE sold + held > total`;
+      SELECT COUNT(*)::bigint AS n FROM "InventoryDay"
+      WHERE "roomTypeId" = ${tryProperty.roomId} AND sold + held > total`;
     expect(Number(overbooked[0].n)).toBe(0);
     // ...ve aktif rezervasyonlar sayaçlarla birebir: her gece tam 1 birim tutuldu
     expect(await counters(tryProperty.roomId, 10, 12)).toEqual([
@@ -138,11 +146,17 @@ describeInt("rezervasyon çekirdeği (integration)", () => {
     expect(booking.status).toBe("HELD");
     expect(booking.holdExpiresAt).not.toBeNull();
 
-    // Süre dolmadan: hiçbir şey olmaz
-    expect(await expireHolds(new Date())).toBe(0);
+    // Süre dolmadan: bu tutma dokunulmaz. (Paylaşımlı DB: dönüş değeri başka dosyaların
+    // süresi dolmuş tutmalarını da sayar — global sayım yerine kendi kaydımızı doğrula.)
+    await expireHolds(new Date(), EXPIRE_ALL);
+    expect((await prisma.booking.findUniqueOrThrow({ where: { id: booking.id } })).status).toBe(
+      "HELD"
+    );
 
+    // `later` (şimdi+16 dk) önceki dosyaların tüm taze tutmalarını da kapsar; varsayılan
+    // limit (100, holdExpiresAt artan) bizim en yeni tutmamıza ulaşmayabilir.
     const later = new Date(Date.now() + 16 * 60_000);
-    expect(await expireHolds(later)).toBeGreaterThanOrEqual(1);
+    expect(await expireHolds(later, EXPIRE_ALL)).toBeGreaterThanOrEqual(1);
     const after = await prisma.booking.findUniqueOrThrow({ where: { id: booking.id } });
     expect(after.status).toBe("EXPIRED");
     // Tutulan birimler iade edildi (held 1 → 0)
@@ -176,7 +190,7 @@ describeInt("rezervasyon çekirdeği (integration)", () => {
       where: { id: booking.id },
       data: { status: "PENDING", holdExpiresAt: null, createdAt: new Date(Date.now() - 3_600_000) },
     });
-    await expireHolds(new Date());
+    await expireHolds(new Date(), EXPIRE_ALL);
     expect((await prisma.booking.findUniqueOrThrow({ where: { id: booking.id } })).status).toBe(
       "EXPIRED"
     );
@@ -204,7 +218,7 @@ describeInt("rezervasyon çekirdeği (integration)", () => {
       data: { holdExpiresAt: new Date(Date.now() - 60_000) },
     });
 
-    expect(await expireHolds(new Date())).toBeGreaterThanOrEqual(2);
+    expect(await expireHolds(new Date(), EXPIRE_ALL)).toBeGreaterThanOrEqual(2);
     for (const id of [drifted.id, normal.id]) {
       expect((await prisma.booking.findUniqueOrThrow({ where: { id } })).status).toBe("EXPIRED");
     }

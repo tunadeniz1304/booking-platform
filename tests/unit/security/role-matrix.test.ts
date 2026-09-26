@@ -57,6 +57,11 @@ import * as adminTransparency from "@/app/api/admin/compliance/transparency/rout
 import * as itinerary from "@/app/api/itinerary/route";
 import * as pushSubscription from "@/app/api/push/subscription/route";
 import * as bookings from "@/app/api/bookings/route";
+import * as claimsRoute from "@/app/api/claims/route";
+import * as claimById from "@/app/api/claims/[id]/route";
+import * as adminClaims from "@/app/api/admin/claims/route";
+import * as adminClaimDecision from "@/app/api/admin/claims/[id]/decision/route";
+import * as hostDeposit from "@/app/api/host/properties/[id]/deposit/route";
 import * as account from "@/app/api/account/route";
 import * as listingCopy from "@/app/api/ai/listing-copy/route";
 import * as mailbox from "@/app/api/dev/mailbox/route";
@@ -234,6 +239,29 @@ const MATRIX: Array<[string, string, Handler, Role[]]> = [
   ["GET /api/pay/share/[token]", "GET", payShare.GET as unknown as Handler, ALL],
   ["POST /api/pay/share/[token]", "POST", payShare.POST as unknown as Handler, ALL],
   ["POST /api/pay/share/[token]/confirm", "POST", payShareConfirm.POST as unknown as Handler, ALL],
+  // P1-5 çözüm merkezi: taraf kontrolü servis katmanında (404); karar yalnız yönetici.
+  ["GET /api/claims", "GET", claimsRoute.GET as unknown as Handler, ALL],
+  ["POST /api/claims", "POST", claimsRoute.POST as unknown as Handler, ALL],
+  ["GET /api/claims/[id]", "GET", claimById.GET as unknown as Handler, ALL],
+  ["GET /api/admin/claims", "GET", adminClaims.GET as unknown as Handler, ["ADMIN"]],
+  [
+    "POST /api/admin/claims/[id]/decision",
+    "POST",
+    adminClaimDecision.POST as unknown as Handler,
+    ["ADMIN"],
+  ],
+  [
+    "GET /api/host/properties/[id]/deposit",
+    "GET",
+    hostDeposit.GET as unknown as Handler,
+    HOST_ADMIN,
+  ],
+  [
+    "PUT /api/host/properties/[id]/deposit",
+    "PUT",
+    hostDeposit.PUT as unknown as Handler,
+    HOST_ADMIN,
+  ],
 ];
 
 async function call(h: Handler, method: string, role: Role | null): Promise<number> {

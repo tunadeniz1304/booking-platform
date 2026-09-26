@@ -82,8 +82,12 @@ export function visionFlagEnabled(): boolean {
 /** Model dizini (`VISION_MODEL_DIR/<model id>`); indirme betiği de bunu kullanır. */
 export function modelDirectory(): { root: string; model: string } {
   const cfg = getConfig();
-  const root = path.resolve(process.cwd(), cfg.VISION_MODEL_DIR);
-  return { root, model: path.join(root, ...cfg.VISION_CLIP_MODEL.split("/")) };
+  // Çalışma zamanı yolu: paket izlemesine (output tracing) girmesin, model imaja kopyalanmaz.
+  const root = path.resolve(/* turbopackIgnore: true */ process.cwd(), cfg.VISION_MODEL_DIR);
+  return {
+    root,
+    model: path.join(/* turbopackIgnore: true */ root, ...cfg.VISION_CLIP_MODEL.split("/")),
+  };
 }
 
 export function normalizeVector(values: ArrayLike<number>): number[] {

@@ -20,10 +20,18 @@ const completedTotal = counter("booking_completed_total", "COMPLETED yapılan ko
  * Envanter değişmez (satılan gece zaten geçmişte kaldı). P1-7: geçişle AYNI işlemde outbox
  * `booking.completed` yazılır (sadakat seviyesi + cashback tüketicisi).
  */
-export async function completeStays(now: Date = new Date(), limit = 500): Promise<number> {
+export async function completeStays(
+  now: Date = new Date(),
+  limit = 500,
+  opts: { bookingIds?: string[] } = {}
+): Promise<number> {
   const horizon = new Date(now.getTime() + 36 * 3_600_000);
   const candidates = await prisma.booking.findMany({
-    where: { status: BookingStatus.CONFIRMED, checkOut: { lte: horizon } },
+    where: {
+      status: BookingStatus.CONFIRMED,
+      checkOut: { lte: horizon },
+      ...(opts.bookingIds ? { id: { in: opts.bookingIds } } : {}),
+    },
     select: {
       id: true,
       version: true,

@@ -32,6 +32,8 @@ import * as adminEvents from "@/app/api/admin/events/route";
 import * as adminOutbox from "@/app/api/admin/outbox/route";
 import * as adminFraud from "@/app/api/admin/fraud/route";
 import * as adminRole from "@/app/api/admin/users/[id]/role/route";
+import * as adminRefunds from "@/app/api/admin/refunds/route";
+import * as accountSessions from "@/app/api/account/sessions/route";
 import * as bookings from "@/app/api/bookings/route";
 import * as account from "@/app/api/account/route";
 import * as listingCopy from "@/app/api/ai/listing-copy/route";
@@ -76,6 +78,9 @@ const MATRIX: Array<[string, string, Handler, Role[]]> = [
   ["GET /api/admin/outbox", "GET", adminOutbox.GET as unknown as Handler, ["ADMIN"]],
   ["GET /api/admin/fraud", "GET", adminFraud.GET as unknown as Handler, ["ADMIN"]],
   ["PATCH /api/admin/users/[id]/role", "PATCH", adminRole.PATCH as unknown as Handler, ["ADMIN"]],
+  ["GET /api/admin/refunds", "GET", adminRefunds.GET as unknown as Handler, ["ADMIN"]],
+  ["POST /api/admin/refunds", "POST", adminRefunds.POST as unknown as Handler, ["ADMIN"]],
+  ["GET /api/account/sessions", "GET", accountSessions.GET as unknown as Handler, ALL],
   ["GET /api/bookings", "GET", bookings.GET as unknown as Handler, ALL],
   ["GET /api/account", "GET", account.GET as unknown as Handler, ALL],
   ["GET /api/dev/mailbox", "GET", mailbox.GET as unknown as Handler, ALL],

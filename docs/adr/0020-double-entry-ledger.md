@@ -21,8 +21,8 @@ tutarsızlıkları (eksik iade kaydı, çift tahsilat) fark edilmez kılar.
   `host_payable:<userId>`, `tax_payable`, `guest_credit:<userId>`, `platform_revenue`
   (alacak-doğal). Kişi alt hesapları ilk kullanımda açılır; kod kuralı DB CHECK'iyle korunur.
 - **Akış:** capture → `Dr psp_clearing / Cr escrow + tax_payable`; konaklama sonrası
-  release → `Dr escrow / Cr host_payable + platform_revenue`; payout → `Dr host_payable /
-Cr psp_clearing`. İade paranın o an bulunduğu hesaptan düşer, karta ya da
+  release → `Dr escrow / Cr host_payable + platform_revenue`; payout →
+  `Dr host_payable / Cr psp_clearing`. İade paranın o an bulunduğu hesaptan düşer, karta ya da
   `guest_credit`'e gider. Devir: `Dr psp_clearing / Cr host_payable(satıcı) + komisyon`.
 - **Denge iki katmanda:** uygulamada `assertBalanced` (para birimi başına Σborç = Σalacak,
   ≥2 satır, pozitif bigint); DB'de `DEFERRABLE INITIALLY DEFERRED` constraint trigger
@@ -30,8 +30,7 @@ Cr psp_clearing`. İade paranın o an bulunduğu hesaptan düşer, karta ya da
   ters kayıt). Prisma 5 etkileşimli işlemde COMMIT hatasını çağırana iletmediği
   (işlem geri alınır ama `$transaction` başarılı döner) için `postJournal` yazdıktan sonra
   `SET CONSTRAINTS … IMMEDIATE` ile kontrolü işlem içinde tetikler, sonra yeniden erteler.
-- **Idempotency:** doğal anahtar (`booking-captured:<paymentId>` vb.), `INSERT … ON
-CONFLICT DO NOTHING`; aynı anahtar + farklı içerik (`linesHash`) → 409. `tx` dışarıdan
+- **Idempotency:** doğal anahtar (`booking-captured:<paymentId>` vb.), `INSERT … ON CONFLICT DO NOTHING`; aynı anahtar + farklı içerik (`linesHash`) → 409. `tx` dışarıdan
   verilir, iş durumu ile defter aynı `withSerializableRetry` işleminde yazılır.
 - **Mutabakat:** `reconcile(date)` o gün PSP hareketi (paidAt/refundedAt, tamamlanan
   devir) ya da jurnali olan her özne için PSP toplamını jurnaldeki `psp_clearing` toplamıyla

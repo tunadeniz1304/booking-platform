@@ -7,9 +7,18 @@ import { getConfig } from "@/lib/config/app-config";
 import { withSerializableRetry } from "@/lib/db/transactions";
 import { appendOutbox } from "@/lib/cqrs";
 import { EventTypes, makeEvent, type BookingTransferredPayload } from "@/lib/events/events";
-import { money, multiplyRate, toDecimalString, toMinor, assertCurrency } from "@/lib/money/money";
+import {
+  money,
+  multiplyRate,
+  toDecimalString,
+  toMinor,
+  assertCurrency,
+  type Money,
+} from "@/lib/money/money";
 import { fromDate } from "@/lib/time/nights";
 import { getPaymentProvider } from "@/lib/payment";
+import type { PaymentProvider } from "@/lib/payment/provider";
+import { runSaga, type SagaStep } from "@/lib/saga/saga";
 import { logger, errorFields } from "@/lib/observability/logger";
 
 /**
@@ -20,9 +29,10 @@ import { logger, errorFields } from "@/lib/observability/logger";
  *     veritabanında yalnızca sha256(token) tutulur (token sızdırılamaz).
  *  2. Alıcı linki açar → imza (timing-safe) + süre + özet eşleşmesi doğrulanır.
  *  3. `askPrice` alıcıdan PSP ile yetkilendirilir; reddedilirse hiçbir şey değişmez.
- *  4. Tek SERIALIZABLE işlemde (P2034'te retry): ilan LISTED→COMPLETED (nonce tüketilir),
- *     rezervasyon + ödeme sahipliği alıcıya geçer, defter kayıtları yazılır (escrow).
- *     İşlem başarısızsa alıcının yetkilendirmesi iptal edilir.
+ *  4. İlan LISTED→CAPTURE_PENDING (nonce tüketilir), ardından PSP capture; YALNIZCA capture
+ *     başarılıysa tek SERIALIZABLE işlemde ilan COMPLETED, rezervasyon sahipliği alıcıya geçer,
+ *     payout + defter yazılır (v4#1). Capture/commit düşerse ilan FAILED, sahiplik değişmez,
+ *     yetkilendirme void edilir ya da tahsilat iade edilir (saga telafisi).
  *
  * Karaborsa önleme: askPrice ≤ TRANSFER_MAX_ASK_RATIO × ödenen tutar.
  * Yalnızca check-in'e TRANSFER_MIN_HOURS_BEFORE_CHECKIN saatten fazla kalan rezervasyonlar.
@@ -142,6 +152,14 @@ export async function listBookingForTransfer(
       );
     }
 
+    // v4#1: tahsilatı süren bir devir varken yeniden listeleme yok (çift satış önlenir).
+    const pending = await tx.bookingTransfer.count({
+      where: { bookingId, status: TransferStatus.CAPTURE_PENDING },
+    });
+    if (pending > 0) {
+      throw new TransferError("Bu rezervasyon için devir ödemesi sürüyor", 409, "TRANSFER_PENDING");
+    }
+
     await tx.bookingTransfer.updateMany({
       where: { bookingId, status: TransferStatus.LISTED },
       data: { status: TransferStatus.CANCELLED, cancelledAt: now },
@@ -192,6 +210,227 @@ export interface ClaimResult {
   currency: string;
 }
 
+/** Devir sagası adları (v4#1) — test hata enjeksiyonu `injectSagaFaultForTests` ile. */
+export const TRANSFER_SAGA = "booking_transfer";
+export const TRANSFER_SAGA_STEPS = {
+  authorize: "authorize",
+  reserve: "reserve",
+  capture: "capture",
+  commit: "commit",
+} as const;
+
+interface ClaimContext {
+  transfer: { id: string; bookingId: string; sellerId: string };
+  buyerId: string;
+  cardToken: string;
+  ask: Money;
+  now: Date;
+  providerRef?: string;
+  reserved: boolean;
+  captured: boolean;
+  failureCode: string;
+}
+
+/** Rezervasyon hâlâ devredilebilir mi (satıcıda, CONFIRMED, girişe yeterli süre)? */
+async function loadTransferableBooking(
+  tx: Prisma.TransactionClient,
+  bookingId: string,
+  sellerId: string,
+  now: Date
+) {
+  const booking = await tx.booking.findUnique({
+    where: { id: bookingId },
+    select: {
+      id: true,
+      userId: true,
+      status: true,
+      checkIn: true,
+      checkOut: true,
+      propertyId: true,
+      roomId: true,
+    },
+  });
+  const config = getConfig();
+  if (
+    !booking ||
+    booking.userId !== sellerId ||
+    booking.status !== BookingStatus.CONFIRMED ||
+    (booking.checkIn.getTime() - now.getTime()) / 3_600_000 <=
+      config.TRANSFER_MIN_HOURS_BEFORE_CHECKIN
+  ) {
+    throw new TransferError("Rezervasyon artık devredilemez", 409, "BOOKING_CHANGED");
+  }
+  return booking;
+}
+
+/**
+ * Devir sagası (v4#1). Sahiplik, payout ve defter YALNIZCA capture başarılı olduktan sonra
+ * yazılır; öncesinde ilan `CAPTURE_PENDING` ara durumunda tutulur (ikinci alıcı giremez).
+ *
+ *   authorize → reserve (LISTED→CAPTURE_PENDING) → capture → commit (pivot, tek SERIALIZABLE tx)
+ *
+ * Telafiler ters sırada: capture yapıldıysa iade, ilan FAILED, yetkilendirme void.
+ */
+function claimSteps(provider: PaymentProvider): SagaStep<ClaimContext, string>[] {
+  return [
+    {
+      name: TRANSFER_SAGA_STEPS.authorize,
+      async run(ctx) {
+        const auth = await provider.authorize({
+          amount: ctx.ask,
+          cardToken: ctx.cardToken,
+          idempotencyKey: `transfer:${ctx.transfer.id}:${ctx.buyerId}`,
+        });
+        if (auth.status !== "authorized") {
+          throw new HttpError(402, "PAYMENT_DECLINED", "Ödeme onaylanmadı; devir gerçekleşmedi");
+        }
+        ctx.providerRef = auth.providerRef;
+      },
+      async compensate(ctx) {
+        if (!ctx.providerRef || ctx.captured) return false;
+        await provider.void(ctx.providerRef);
+      },
+    },
+    {
+      name: TRANSFER_SAGA_STEPS.reserve,
+      async run(ctx) {
+        await withSerializableRetry(async (tx) => {
+          const claimed = await tx.bookingTransfer.updateMany({
+            where: {
+              id: ctx.transfer.id,
+              status: TransferStatus.LISTED,
+              expiresAt: { gt: ctx.now },
+            },
+            data: {
+              status: TransferStatus.CAPTURE_PENDING,
+              claimedById: ctx.buyerId,
+              claimedAt: ctx.now,
+              buyerPaymentRef: ctx.providerRef,
+            },
+          });
+          if (claimed.count !== 1)
+            throw new TransferError("Bu devir artık mevcut değil", 409, "ALREADY_CLAIMED");
+          await loadTransferableBooking(tx, ctx.transfer.bookingId, ctx.transfer.sellerId, ctx.now);
+        });
+        ctx.reserved = true;
+        ctx.failureCode = "CAPTURE_FAILED";
+      },
+      async compensate(ctx) {
+        if (!ctx.reserved) return false;
+        // Sahiplik hiç değişmedi; ilan kalıcı olarak FAILED (satıcı yeniden listeleyebilir).
+        await prisma.bookingTransfer.updateMany({
+          where: { id: ctx.transfer.id, status: TransferStatus.CAPTURE_PENDING },
+          data: {
+            status: TransferStatus.FAILED,
+            failedAt: new Date(),
+            failureCode: ctx.failureCode,
+          },
+        });
+      },
+    },
+    {
+      name: TRANSFER_SAGA_STEPS.capture,
+      async run(ctx) {
+        await provider.capture(ctx.providerRef!, ctx.ask);
+        ctx.captured = true;
+        ctx.failureCode = "COMMIT_FAILED";
+      },
+      async compensate(ctx) {
+        if (!ctx.captured || !ctx.providerRef) return false;
+        await provider.refund(ctx.providerRef, ctx.ask, `transfer-refund:${ctx.transfer.id}`);
+      },
+    },
+    {
+      name: TRANSFER_SAGA_STEPS.commit,
+      pivot: true,
+      async run(ctx) {
+        const { transfer, buyerId, now, ask } = ctx;
+        const currency = ask.currency;
+        const bookingId = await withSerializableRetry(async (tx) => {
+          const done = await tx.bookingTransfer.updateMany({
+            where: {
+              id: transfer.id,
+              status: TransferStatus.CAPTURE_PENDING,
+              claimedById: buyerId,
+            },
+            data: { status: TransferStatus.COMPLETED, completedAt: now },
+          });
+          if (done.count !== 1)
+            throw new TransferError("Bu devir artık mevcut değil", 409, "ALREADY_CLAIMED");
+
+          const booking = await loadTransferableBooking(
+            tx,
+            transfer.bookingId,
+            transfer.sellerId,
+            now
+          );
+          const owned = await tx.booking.updateMany({
+            where: { id: booking.id, userId: transfer.sellerId, status: BookingStatus.CONFIRMED },
+            data: { userId: buyerId, version: { increment: 1 } },
+          });
+          if (owned.count !== 1)
+            throw new TransferError("Rezervasyon sahipliği değişti", 409, "BOOKING_CHANGED");
+
+          // Asıl ödeme (satıcının kartı) satıcıda kalır; satıcı bedelini payout ile alır.
+          // İptal iadesi alıcının devir ödemesine (buyerPaymentRef) yapılır — yalnızca COMPLETED
+          // devir iade hedefi olur, yani capture'ı kesinleşmiş ödeme (bkz. cancelAndRefund).
+          const amount = new Prisma.Decimal(toDecimalString(ask));
+          await tx.payout.create({
+            data: {
+              userId: transfer.sellerId,
+              bookingId: booking.id,
+              transferId: transfer.id,
+              amount,
+              currency,
+            },
+          });
+          await tx.ledgerEntry.createMany({
+            data: [
+              {
+                bookingId: booking.id,
+                userId: buyerId,
+                kind: "TRANSFER_PAYMENT",
+                amount,
+                currency,
+                reference: ctx.providerRef,
+              },
+              {
+                bookingId: booking.id,
+                userId: transfer.sellerId,
+                kind: "TRANSFER_PAYOUT",
+                amount,
+                currency,
+                reference: transfer.id,
+              },
+            ],
+          });
+          await appendOutbox(
+            tx,
+            makeEvent<BookingTransferredPayload>(
+              EventTypes.BookingTransferred,
+              booking.id,
+              "booking",
+              {
+                bookingId: booking.id,
+                propertyId: booking.propertyId,
+                roomId: booking.roomId,
+                checkIn: fromDate(booking.checkIn),
+                checkOut: fromDate(booking.checkOut),
+                userId: buyerId,
+                fromUserId: transfer.sellerId,
+                toUserId: buyerId,
+                transferId: transfer.id,
+              }
+            )
+          );
+          return booking.id;
+        });
+        return { done: bookingId };
+      },
+    },
+  ];
+}
+
 export async function claimTransfer(input: {
   token: string;
   buyerId: string;
@@ -221,127 +460,41 @@ export async function claimTransfer(input: {
 
   const currency = assertCurrency(transfer.currency);
   const ask = money(toMinor(transfer.askPrice.toString(), currency), currency);
-  const provider = getPaymentProvider();
-
-  // Ödeme önce yetkilendirilir: reddedilirse sahiplik ASLA değişmez.
-  const auth = await provider.authorize({
-    amount: ask,
+  const ctx: ClaimContext = {
+    transfer: { id: transfer.id, bookingId: transfer.bookingId, sellerId: transfer.sellerId },
+    buyerId: input.buyerId,
     cardToken: input.cardToken,
-    idempotencyKey: `transfer:${transfer.id}:${input.buyerId}`,
-  });
-  if (auth.status !== "authorized") {
-    throw new HttpError(402, "PAYMENT_DECLINED", "Ödeme onaylanmadı; devir gerçekleşmedi");
-  }
+    ask,
+    now,
+    reserved: false,
+    captured: false,
+    failureCode: "RESERVE_FAILED",
+  };
 
+  let bookingId: string;
   try {
-    const result = await withSerializableRetry(async (tx) => {
-      const claimed = await tx.bookingTransfer.updateMany({
-        where: { id: transfer.id, status: TransferStatus.LISTED, expiresAt: { gt: now } },
-        data: {
-          status: TransferStatus.COMPLETED,
-          claimedById: input.buyerId,
-          claimedAt: now,
-          completedAt: now,
-          buyerPaymentRef: auth.providerRef,
-        },
-      });
-      if (claimed.count !== 1)
-        throw new TransferError("Bu devir artık mevcut değil", 409, "ALREADY_CLAIMED");
-
-      const booking = await tx.booking.findUnique({
-        where: { id: transfer.bookingId },
-        select: {
-          id: true,
-          userId: true,
-          status: true,
-          checkIn: true,
-          checkOut: true,
-          propertyId: true,
-          roomId: true,
-          guestCount: true,
-        },
-      });
-      const config = getConfig();
-      if (
-        !booking ||
-        booking.userId !== transfer.sellerId ||
-        booking.status !== BookingStatus.CONFIRMED ||
-        (booking.checkIn.getTime() - now.getTime()) / 3_600_000 <=
-          config.TRANSFER_MIN_HOURS_BEFORE_CHECKIN
-      ) {
-        throw new TransferError("Rezervasyon artık devredilemez", 409, "BOOKING_CHANGED");
-      }
-      const owned = await tx.booking.updateMany({
-        where: { id: booking.id, userId: transfer.sellerId, status: BookingStatus.CONFIRMED },
-        data: { userId: input.buyerId, version: { increment: 1 } },
-      });
-      if (owned.count !== 1)
-        throw new TransferError("Rezervasyon sahipliği değişti", 409, "BOOKING_CHANGED");
-
-      // Asıl ödeme (satıcının kartı) satıcıda kalır; satıcı bedelini payout ile alır.
-      // İptal iadesi alıcının devir ödemesine (buyerPaymentRef) yapılır — bkz. cancelAndRefund (#4).
-      const amount = new Prisma.Decimal(toDecimalString(ask));
-      await tx.payout.create({
-        data: {
-          userId: transfer.sellerId,
-          bookingId: booking.id,
-          transferId: transfer.id,
-          amount,
-          currency,
-        },
-      });
-      await tx.ledgerEntry.createMany({
-        data: [
-          {
-            bookingId: booking.id,
-            userId: input.buyerId,
-            kind: "TRANSFER_PAYMENT",
-            amount,
-            currency,
-            reference: auth.providerRef,
-          },
-          {
-            bookingId: booking.id,
-            userId: transfer.sellerId,
-            kind: "TRANSFER_PAYOUT",
-            amount,
-            currency,
-            reference: transfer.id,
-          },
-        ],
-      });
-      await appendOutbox(
-        tx,
-        makeEvent<BookingTransferredPayload>(EventTypes.BookingTransferred, booking.id, "booking", {
-          bookingId: booking.id,
-          propertyId: booking.propertyId,
-          roomId: booking.roomId,
-          checkIn: fromDate(booking.checkIn),
-          checkOut: fromDate(booking.checkOut),
-          userId: input.buyerId,
-          fromUserId: transfer.sellerId,
-          toUserId: input.buyerId,
-          transferId: transfer.id,
-        })
-      );
-      return booking.id;
+    bookingId = await runSaga(TRANSFER_SAGA, claimSteps(getPaymentProvider()), ctx, {
+      // Kart reddi iş sonucudur: yetkilendirme yok → telafi edilecek bir şey yok.
+      isOutcome: (e) => e instanceof HttpError && e.code === "PAYMENT_DECLINED",
     });
-
-    await provider.capture(auth.providerRef, ask);
-    await redis.del(`booking:${result}`).catch(() => 0);
-    return {
-      transferId: transfer.id,
-      bookingId: result,
-      status: TransferStatus.COMPLETED,
-      paidMinor: ask.amount,
-      currency,
-    };
   } catch (error) {
-    await provider
-      .void(auth.providerRef)
-      .catch((e) => logger.error(errorFields(e), "transfer auth void failed"));
-    throw error;
+    if (error instanceof HttpError) throw error;
+    logger.error({ transferId: transfer.id, ...errorFields(error) }, "transfer saga failed");
+    throw new TransferError(
+      "Ödeme tahsil edilemedi; devir gerçekleşmedi",
+      502,
+      "TRANSFER_PAYMENT_FAILED"
+    );
   }
+
+  await redis.del(`booking:${bookingId}`).catch(() => 0);
+  return {
+    transferId: transfer.id,
+    bookingId,
+    status: TransferStatus.COMPLETED,
+    paidMinor: ask.amount,
+    currency,
+  };
 }
 
 export async function cancelTransferListing(transferId: string, sellerId: string): Promise<void> {

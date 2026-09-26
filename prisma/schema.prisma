@@ -621,11 +621,14 @@ model PriceAlert {
   @@index([active, checkIn])
 }
 
+/// LISTED → CAPTURE_PENDING → COMPLETED | FAILED (v4#1: sahiplik yalnızca capture sonrası geçer)
 enum TransferStatus {
   LISTED
   CLAIMED
+  CAPTURE_PENDING
   COMPLETED
   CANCELLED
+  FAILED
 }
 
 model BookingTransfer {
@@ -646,6 +649,9 @@ model BookingTransfer {
   claimedAt       DateTime?
   completedAt     DateTime?
   cancelledAt     DateTime?
+  /// v4#1: capture/commit başarısız → FAILED; sahiplik değişmez, yetkilendirme iptal/iade edilir.
+  failedAt        DateTime?
+  failureCode     String?
   buyerPaymentRef String?
 
   @@index([status, bookingId])

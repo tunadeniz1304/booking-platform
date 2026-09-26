@@ -7,6 +7,8 @@ import { ApiError, apiFetch } from "@/lib/api-client";
 import { CardValidationError, TEST_CARDS, tokenizeCard } from "@/lib/payment/card-token";
 import { useFormat } from "@/i18n/use-format";
 import { useCart, type CartDTO } from "@/components/cart/useCart";
+import { SplitPayPanel } from "@/components/cart/SplitPayPanel";
+import type { SplitPlanDTO } from "@/lib/cart/split-payment";
 
 type PayOutcome =
   | { status: "confirmed"; cartId: string; bookingIds: string[]; amount: number; currency: string }
@@ -33,6 +35,7 @@ export default function CartCheckoutPage() {
   const [card, setCard] = useState({ number: "", exp: "12/30", cvc: "" });
   const [challenge, setChallenge] = useState<string | null>(null);
   const [code, setCode] = useState("");
+  const [splitPlan, setSplitPlan] = useState<SplitPlanDTO | null>(null);
   const [done, setDone] = useState<{
     outcome: PayOutcome & { status: "confirmed" };
     cart: CartDTO;
@@ -215,6 +218,8 @@ export default function CartCheckoutPage() {
 
   const field = "mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm";
   const held = cart.status === "HELD";
+  // P1-2: aktif bölünmüş ödeme varken tek ödeme formu gizlenir (paylar ayrı ödenir).
+  const splitActive = !!splitPlan && splitPlan.status !== "ABORTED";
 
   return (
     <main id="main" className="mx-auto max-w-3xl px-4 py-8">
@@ -270,7 +275,7 @@ export default function CartCheckoutPage() {
         </section>
       )}
 
-      {held && !challenge && (
+      {held && !challenge && !splitActive && (
         <form
           onSubmit={pay}
           className="mt-6 space-y-3 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm"
@@ -342,6 +347,26 @@ export default function CartCheckoutPage() {
             {t("release")}
           </button>
         </form>
+      )}
+
+      {held && !challenge && (
+        <SplitPayPanel
+          cartId={cart.id}
+          totalMinor={cart.totalMinor}
+          currency={cart.currency}
+          allowCreate
+          onPlan={setSplitPlan}
+        />
+      )}
+      {held && splitActive && (
+        <button
+          type="button"
+          onClick={release}
+          disabled={busy}
+          className="mt-3 w-full rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-800"
+        >
+          {t("release")}
+        </button>
       )}
 
       {held && challenge && (

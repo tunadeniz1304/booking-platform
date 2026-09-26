@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 import { ApiError, apiFetch } from "@/lib/api-client";
 import { useFormat } from "@/i18n/use-format";
 import { useCart, type CartDTO, type CartItemDTO } from "@/components/cart/useCart";
+import { SplitPayPanel } from "@/components/cart/SplitPayPanel";
 
 const input =
   "mt-1 w-20 rounded-lg border border-gray-300 px-2 py-1 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003580]";
@@ -192,6 +193,16 @@ export default function CartPage() {
               </li>
             ))}
           </ul>
+
+          {locked && (
+            // P1-2: bölünmüş ödeme varsa pay durum listesi (plan checkout'ta kurulur).
+            <SplitPayPanel
+              cartId={cart.id}
+              totalMinor={cart.totalMinor}
+              currency={cart.currency}
+              allowCreate={false}
+            />
+          )}
 
           <section className="mt-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
             <div className="flex items-center justify-between">

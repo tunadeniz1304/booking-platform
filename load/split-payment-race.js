@@ -18,7 +18,8 @@
  *
  * Ortam: BASE_URL, LOAD_ACCOUNTS (load-NNN@load.test hesap sayısı, ≥ 60), PASSWORD, LOAD_ROOMS,
  *   DAY_OFFSET (varsayılan 30), RACE_VUS (10), RACE_ITERATIONS (5, VU başına), RACERS (4),
- *   DEADLINE_PLANS (20; 0 → senaryo kapalı), OFFSET_MS (4000), SETTLE_WAIT_S (75).
+ *   DEADLINE_PLANS (20; 0 → senaryo kapalı), OFFSET_MS (4000), SETTLE_WAIT_S (75),
+ *   CONFIRM_POLL_S (60; ertelenen onay için plan COLLECTING iken bekleme, fix-sweep-3).
  */
 import http from "k6/http";
 import exec from "k6/execution";
@@ -39,6 +40,7 @@ const RACERS = Math.max(2, Number(__ENV.RACERS || 4));
 const DEADLINE_PLANS = Number(__ENV.DEADLINE_PLANS || 20);
 const OFFSET_MS = Number(__ENV.OFFSET_MS || 4000);
 const SETTLE_WAIT_S = Number(__ENV.SETTLE_WAIT_S || 75);
+const CONFIRM_POLL_S = Number(__ENV.CONFIRM_POLL_S || 60);
 const CARD = "tok_mock_ok_424242_4242";
 
 // Hesap bölümleri: [0, RACE_VUS) yarış organizatörleri, sonra deadline organizatörleri +
@@ -51,6 +53,7 @@ const doubleAuth = new Counter("split_double_authorized");
 const raceWinners = new Counter("split_race_winner");
 const raceLosers = new Counter("split_race_loser");
 const settled = new Counter("split_settled");
+const settledAfterRetry = new Counter("split_settled_after_confirm_retry");
 const notSettled = new Counter("split_not_settled");
 const serverErrors = new Counter("split_5xx");
 const dlPaid = new Counter("deadline_paid_200");
@@ -292,8 +295,20 @@ export function shareRace(data) {
   // Kalan pay (farklı hesap) + organizatör payı → son ödeme tümünü tahsil eder.
   payShare(racers[(winner + 1) % RACERS], tokenFromUrl(other.inviteUrl), `k6-o-${made.plan.id}`);
   const last = payShare(org, tokenFromUrl(own.inviteUrl), `k6-org-${made.plan.id}`);
-  const final = note(http.get(`${BASE}/api/cart/${made.cartId}/split`, { headers: hdr(org) }));
-  const status = final.status === 200 ? final.json("plan.status") : null;
+  const readStatus = () => {
+    const res = note(http.get(`${BASE}/api/cart/${made.cartId}/split`, { headers: hdr(org) }));
+    return res.status === 200 ? res.json("plan.status") : null;
+  };
+  let status = readStatus();
+  // fix-sweep-3: onay SERIALIZABLE çakışmada kalırsa iade edilmez; `confirm-retry` işi birkaç
+  // saniye içinde onaylar (plan bu sürede COLLECTING görünür) → CONFIRM_POLL_S kadar bekle.
+  let waited = 0;
+  while (status === "COLLECTING" && waited < CONFIRM_POLL_S) {
+    sleep(1);
+    waited++;
+    status = readStatus();
+  }
+  if (status === "SETTLED" && waited > 0) settledAfterRetry.add(1);
   if (status === "SETTLED") settled.add(1);
   else {
     notSettled.add(1);

@@ -474,6 +474,14 @@ const schema = z.object({
   PAYMENT_MAX_ATTEMPTS: int(5, 1, 50),
   /** Deneme sayacının ömrü (sn). */
   PAYMENT_ATTEMPTS_WINDOW_SECONDS: int(86_400, 60, 30 * 86_400),
+  /**
+   * P2-3 kaos (yalnız MockPsp; Stripe'a hiçbir etkisi yok): her PSP çağrısına sabit gecikme +
+   * [0, jitter) rastgele ek gecikme (ms) ve verilen işlemlerde `psp_unavailable` hatası oranı.
+   */
+  MOCK_PSP_LATENCY_MS: int(0, 0, 30_000),
+  MOCK_PSP_JITTER_MS: int(0, 0, 30_000),
+  MOCK_PSP_FAILURE_RATE: num(0, 0, 1),
+  MOCK_PSP_FAILURE_OPS: z.string().max(200).default("authorize,capture,refund,void"),
   /** Sunucu imzalı cihaz kimliği çerezinin ömrü (gün). */
   DEVICE_COOKIE_DAYS: int(365, 1, 730),
   /** Başarısız PSP iadesinin otomatik yeniden deneme sayısı ve üstel gecikme tabanı (ms). */

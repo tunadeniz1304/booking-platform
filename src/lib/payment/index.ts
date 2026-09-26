@@ -2,6 +2,8 @@ import { MockPsp } from "./mock-psp";
 import { StripeProvider } from "./stripe-provider";
 import type { PaymentProvider } from "./provider";
 import { isDemoMode } from "@/lib/config/demo";
+import { getConfig } from "@/lib/config/app-config";
+import { parseChaosOps, withChaos } from "./chaos-psp";
 
 let override: PaymentProvider | null = null;
 let cached: PaymentProvider | null = null;
@@ -35,9 +37,20 @@ export function getPaymentProvider(): PaymentProvider {
     cached =
       selectPaymentProvider() === "stripe"
         ? new StripeProvider(process.env.STRIPE_SECRET_KEY ?? "")
-        : new MockPsp();
+        : mockWithChaos();
   }
   return cached;
+}
+
+/** P2-3: MockPsp'ye env ile açılan gecikme/hata enjeksiyonu (varsayılan kapalı; Stripe'a uygulanmaz). */
+function mockWithChaos(): PaymentProvider {
+  const c = getConfig();
+  return withChaos(new MockPsp(), {
+    latencyMs: c.MOCK_PSP_LATENCY_MS,
+    jitterMs: c.MOCK_PSP_JITTER_MS,
+    failureRate: c.MOCK_PSP_FAILURE_RATE,
+    failureOps: parseChaosOps(c.MOCK_PSP_FAILURE_OPS),
+  });
 }
 
 /** Yalnızca testler için. */

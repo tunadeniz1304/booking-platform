@@ -155,7 +155,7 @@ describe("§3 v3-e LLM SDK'sı yalnızca src/lib/llm içinde", () => {
     const config = readFileSync(path.resolve(__dirname, "../../../eslint.config.mjs"), "utf8");
     expect(config).toMatch(/no-restricted-imports/);
     expect(config).toMatch(/name: "openai"/);
-    expect(config).toMatch(/ignores: \["src\/lib\/llm\/\*\*"/);
+    expect(config).toMatch(/ignores: \["src\/lib\/llm\/client\.ts"/);
   });
 });
 

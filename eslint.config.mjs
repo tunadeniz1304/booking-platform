@@ -3,7 +3,8 @@ import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
 
 /**
- * §3 v3-e: LLM sağlayıcı SDK'ları yalnızca `src/lib/llm/**` içinden kullanılabilir.
+ * §3 v3-e / v4#3: LLM sağlayıcı SDK'ları YALNIZCA `src/lib/llm/client.ts` içinden
+ * kullanılabilir (embeddings dahil; `src/lib/llm`'in diğer dosyaları da kısıtlı).
  * Diğer her yer (yeni AI özellikleri dahil) redaksiyon, bütçe, guard ve demo/fallback
  * sözleşmesini uygulayan `@/lib/llm` istemcisini kullanmak zorundadır.
  */
@@ -28,7 +29,7 @@ const eslintConfig = defineConfig([
   ...nextTs,
   {
     files: ["**/*.{ts,tsx,js,mjs}"],
-    ignores: ["src/lib/llm/**", "tests/**"],
+    ignores: ["src/lib/llm/client.ts", "tests/**"],
     rules: { "no-restricted-imports": ["error", LLM_SDK_RESTRICTION] },
   },
   globalIgnores([

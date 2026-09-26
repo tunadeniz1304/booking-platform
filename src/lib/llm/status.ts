@@ -7,6 +7,10 @@ export interface LlmStatus {
   model: string;
   baseUrlHost: string;
   hasKey: boolean;
+  /** Süreç başına eşzamanlı istek üst sınırı (LLM_MAX_CONCURRENCY). */
+  maxConcurrency: number;
+  /** LLM_VISION_MODEL tanımlı mı (değer/anahtar değil). */
+  visionEnabled: boolean;
   jsonModeSupported: boolean | null;
   lastError: string | null;
 }
@@ -21,6 +25,8 @@ export function getLlmStatus(): LlmStatus {
     model: settings.model,
     baseUrlHost: settings.baseUrlHost,
     hasKey: settings.hasKey,
+    maxConcurrency: settings.maxConcurrency,
+    visionEnabled: settings.effectiveMode === "live" && Boolean(settings.visionModel),
     jsonModeSupported: runtime.jsonModeSupported,
     lastError: runtime.lastError,
   };

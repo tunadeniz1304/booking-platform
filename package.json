@@ -29,7 +29,7 @@
     "mcp:server": "cross-env LOG_TO_STDERR=true SERVICE_NAME=booking-mcp tsx --conditions=react-server services/mcp/main.ts",
     "mcp:smoke": "cross-env LOG_TO_STDERR=true tsx --conditions=react-server scripts/mcp-smoke.ts",
     "docs:screenshots": "tsx scripts/screenshots.ts",
-    "embeddings:backfill": "tsx scripts/backfill-embeddings.ts",
+    "embeddings:backfill": "tsx --conditions=react-server scripts/backfill-embeddings.ts",
     "ltr:clicks": "tsx scripts/ltr/generate-clicks.ts",
     "ltr:train": "python scripts/ltr/train.py",
     "llm:smoke": "tsx --conditions=react-server scripts/llm-smoke.ts",

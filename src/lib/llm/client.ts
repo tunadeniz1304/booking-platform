@@ -15,7 +15,7 @@ import type { ZodType } from "zod";
 import { logger, errorFields } from "@/lib/observability/logger";
 import { getLlmSettings, type LlmSettings } from "./settings";
 import { LlmJsonError, parseJsonWithSchema } from "./json";
-import { Redactor } from "./redaction";
+import { Redactor, redactText } from "./redaction";
 import { GuardError } from "./guards";
 import { llmLatencySeconds, llmRequestsTotal, llmTokensTotal } from "./metrics";
 import {
@@ -25,6 +25,7 @@ import {
   type LlmBudget,
 } from "./budget";
 import { redis } from "@/lib/redis";
+import { createLimiter, type Limiter } from "@/lib/resilience/limit";
 
 /**
  * LLM Sözleşmesi — tüm GenAI özellikleri LLM'e YALNIZCA bu istemci üzerinden erişir.
@@ -38,6 +39,9 @@ import { redis } from "@/lib/redis";
  * - Yalnızca `message.content` kullanılır (`reasoning_content` vb. yok sayılır).
  * - LLM'e giden her mesaj KVKK redaksiyonundan geçer (`Redactor`).
  * - LLM bağlayıcı karar VERMEZ: çıktılar öneri/açıklama/çeviridir.
+ * - Süreç başına en fazla `LLM_MAX_CONCURRENCY` istek aynı anda uçuştadır (v4#3);
+ *   fazlası sırada bekler (sağlayıcıya ani yük/harcama patlaması gitmez).
+ * - `openai` SDK'sı YALNIZCA bu dosyada içe aktarılır (ESLint kısıtı; embeddings dahil).
  */
 
 export type LlmTask =
@@ -166,6 +170,20 @@ export function resetLlmRuntimeForTests(): void {
   jsonModeUnsupported.clear();
 }
 
+// --- Eşzamanlılık (v4#3) --------------------------------------------------------
+
+const processLimiters = new Map<number, Limiter>();
+
+/** Aynı sınır değeri için süreç-çapı tek sınırlayıcı (chat + embeddings ortak havuz). */
+export function getLlmLimiter(concurrency: number): Limiter {
+  let limiter = processLimiters.get(concurrency);
+  if (!limiter) {
+    limiter = createLimiter(concurrency);
+    processLimiters.set(concurrency, limiter);
+  }
+  return limiter;
+}
+
 // --- Hata sınıflandırma --------------------------------------------------------
 
 class EmptyResponseError extends Error {
@@ -209,6 +227,8 @@ export interface CreateLlmClientOptions {
   fetch?: typeof fetch;
   /** Günlük token bütçesi (varsayılan: Redis sayaçlı, `LLM_DAILY_TOKEN_BUDGET_PER_USER`). */
   budget?: LlmBudget;
+  /** Eşzamanlılık sınırlayıcı (varsayılan: `LLM_MAX_CONCURRENCY` süreç havuzu). */
+  limiter?: Limiter;
 }
 
 type Completion = Pick<ChatCompletion, "choices" | "usage" | "model">;
@@ -217,6 +237,7 @@ export function createLlmClient(options: CreateLlmClientOptions = {}): LlmClient
   const settings = options.settings ?? getLlmSettings();
   const jsonKey = `${settings.baseUrlHost}|${settings.model}`;
   const budget = options.budget ?? createRedisBudget(redis, settings.dailyTokenBudgetPerUser);
+  const limit = options.limiter ?? getLlmLimiter(settings.maxConcurrency);
 
   /** Canlı çağrı öncesi: özne bütçesini doldurduysa `true` (→ demo, reason "budget"). */
   async function overBudget(task: LlmTask, subject: string | undefined): Promise<boolean> {
@@ -291,9 +312,11 @@ export function createLlmClient(options: CreateLlmClientOptions = {}): LlmClient
     const useJsonMode = wantJson && !jsonModeUnsupported.has(jsonKey);
     if (useJsonMode) {
       try {
-        const res = await getSdk().chat.completions.create(
-          { ...base, response_format: { type: "json_object" } },
-          { signal }
+        const res = await limit(() =>
+          getSdk().chat.completions.create(
+            { ...base, response_format: { type: "json_object" } },
+            { signal }
+          )
         );
         runtimeStatus.jsonModeSupported = true;
         return res;
@@ -307,7 +330,7 @@ export function createLlmClient(options: CreateLlmClientOptions = {}): LlmClient
         }
       }
     }
-    return getSdk().chat.completions.create(base, { signal });
+    return limit(() => getSdk().chat.completions.create(base, { signal }));
   }
 
   function usageOf(res: Completion): LlmUsage | undefined {
@@ -581,4 +604,57 @@ let defaultClient: LlmClient | null = null;
 export function getLlmClient(): LlmClient {
   if (!defaultClient) defaultClient = createLlmClient();
   return defaultClient;
+}
+
+// --- Embeddings (§3: redaksiyon + bütçe + eşzamanlılık tüm yollarda) -----------------
+
+/** OpenAI-uyumlu `/embeddings` çağrısı: metinler → vektörler. */
+export type EmbedFn = (texts: string[], dimensions: number) => Promise<number[][]>;
+
+export class LlmBudgetExceededError extends Error {
+  constructor() {
+    super("Günlük LLM token bütçesi aşıldı");
+    this.name = "LlmBudgetExceededError";
+  }
+}
+
+export interface RemoteEmbedOptions {
+  settings?: LlmSettings;
+  fetch?: typeof fetch;
+  budget?: LlmBudget;
+  limiter?: Limiter;
+}
+
+/**
+ * Canlı mod + `EMBEDDING_MODEL` varsa uzak embedding fonksiyonu, yoksa `null`
+ * (çağıran ağsız hash-embedder'a düşer). Giden her metin KVKK redaksiyonundan geçer;
+ * istek bağlamında bir özne varsa günlük bütçe kontrol edilir/faturalanır (aşımda
+ * `LlmBudgetExceededError` → çağıran deterministik yola düşer).
+ */
+export function createRemoteEmbedFn(
+  model: string | undefined,
+  options: RemoteEmbedOptions = {}
+): EmbedFn | null {
+  const llm = options.settings ?? getLlmSettings();
+  if (!model || llm.effectiveMode !== "live" || !llm.apiKey) return null;
+  const budget = options.budget ?? createRedisBudget(redis, llm.dailyTokenBudgetPerUser);
+  const limit = options.limiter ?? getLlmLimiter(llm.maxConcurrency);
+  const client = new OpenAI({
+    apiKey: llm.apiKey,
+    baseURL: llm.baseUrl,
+    timeout: llm.timeoutSeconds * 1000,
+    maxRetries: llm.maxRetries,
+    ...(options.fetch ? { fetch: options.fetch } : {}),
+  });
+  return async (texts, dimensions) => {
+    const subject = currentLlmSubject();
+    if (subject && (await budget.exceeded(subject))) {
+      llmBudgetExceededTotal.inc({ task: "embedding" });
+      throw new LlmBudgetExceededError();
+    }
+    const input = texts.map((t) => redactText(t));
+    const res = await limit(() => client.embeddings.create({ model, input, dimensions }));
+    if (subject && res.usage) await budget.consume(subject, res.usage.total_tokens ?? 0);
+    return res.data.map((d) => d.embedding);
+  };
 }

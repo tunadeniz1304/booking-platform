@@ -8,6 +8,7 @@ import { loadEnv } from "@/lib/config/load-env";
  *  - Anahtar:  LLM_API_KEY → DEEPSEEK_API_KEY → EVREN_API_KEY → OPENAI_API_KEY
  *  - Base URL: LLM_BASE_URL → DEEPSEEK_BASE_URL → EVREN_BASE_URL → OPENAI_BASE_URL
  *  - Model:    LLM_MODEL → DEEPSEEK_MODEL
+ *  - v4: LLM_MAX_CONCURRENCY (varsayılan 4), LLM_VISION_MODEL (opsiyonel)
  *
  * Anahtarın kendisi yalnızca istemci oluşturulurken kullanılır; log, hata
  * mesajı, durum yanıtı veya telemetride asla yer almaz (yalnızca `hasKey`).
@@ -24,6 +25,8 @@ export const LLM_DEFAULTS = {
   maxToolSteps: 5,
   /** Kullanıcı (özne) başına günlük token bütçesi; 0 = sınırsız. */
   dailyTokenBudgetPerUser: 50_000,
+  /** Süreç başına aynı anda uçuşta olabilecek azami LLM/embedding isteği (v4#3). */
+  maxConcurrency: 4,
 } as const;
 
 const KEY_VARS = ["LLM_API_KEY", "DEEPSEEK_API_KEY", "EVREN_API_KEY", "OPENAI_API_KEY"] as const;
@@ -51,6 +54,9 @@ const settingsSchema = z.object({
     .min(0)
     .max(10_000_000)
     .default(LLM_DEFAULTS.dailyTokenBudgetPerUser),
+  maxConcurrency: z.coerce.number().int().min(1).max(64).default(LLM_DEFAULTS.maxConcurrency),
+  /** Opsiyonel görsel (vision) model; yoksa görsel özellikler deterministik yola düşer. */
+  visionModel: z.string().min(1).optional(),
   logPrompts: z.boolean().default(false),
 });
 
@@ -98,6 +104,8 @@ export function parseLlmSettings(env: Env): LlmSettings {
     maxTokens: env.LLM_MAX_TOKENS || undefined,
     maxToolSteps: env.LLM_MAX_TOOL_STEPS || undefined,
     dailyTokenBudgetPerUser: env.LLM_DAILY_TOKEN_BUDGET_PER_USER || undefined,
+    maxConcurrency: env.LLM_MAX_CONCURRENCY || undefined,
+    visionModel: env.LLM_VISION_MODEL?.trim() || undefined,
     logPrompts: env.LLM_LOG_PROMPTS === "true" && env.NODE_ENV !== "production",
   };
 

@@ -1948,3 +1948,16 @@ model ClaimShareRefund {
   @@unique([claimId, shareId])
   @@index([bookingId])
 }
+
+/// fix-sweep-2: kullanıcının PSP müşteri kaydı (Stripe Customer `cus_…`). Hasar depozitosu
+/// gereken rezervasyonda ödeme bu müşteriye bağlanır ve kart `setup_future_usage=off_session`
+/// ile kaydedilir → depozito ön provizyonu off-session alınabilir. Kart verisi tutulmaz.
+model PaymentCustomer {
+  id          String   @id @default(cuid())
+  userId      String
+  provider    String
+  customerRef String   @unique
+  createdAt   DateTime @default(now())
+
+  @@unique([userId, provider])
+}

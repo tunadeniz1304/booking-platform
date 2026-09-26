@@ -47,6 +47,7 @@ import {
 } from "@/lib/wallet/wallet-service";
 import { splitRefund as splitCardCreditRefund } from "@/lib/wallet/rules";
 import { lostChargebackMinor } from "./refundable";
+import { offSessionSetupFor } from "./psp-customer";
 
 /** BullMQ `refund-retry` kuyruğundaki iş adı (v4#7). */
 export const REFUND_RETRY_JOB = "refund-retry";
@@ -877,7 +878,13 @@ async function payLocked(input: Parameters<typeof payForBooking>[0]): Promise<Pa
 
   let result: AuthorizeResult;
   try {
-    result = await getPaymentProvider().authorize({
+    const provider = getPaymentProvider();
+    // fix-sweep-2: depozito gereken rezervasyonda kart müşteriye kaydedilir (Stripe).
+    const offSession = await offSessionSetupFor(provider, booking.userId, [
+      { propertyId: booking.propertyId, roomTypeId: booking.roomId },
+    ]);
+    result = await provider.authorize({
+      ...offSession,
       amount: chargeOf(booking),
       cardToken: input.cardToken,
       idempotencyKey: `auth:${booking.id}:${input.idempotencyKey}:${booking.creditMinor}`,

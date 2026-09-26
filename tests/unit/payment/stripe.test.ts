@@ -151,3 +151,54 @@ describe("regression: v3#10 Stripe-Signature webhook doğrulaması", () => {
     expect(mapStripeEvent(evt("customer.created", { id: "cus_1" }) as never)).toBeNull();
   });
 });
+
+describe("fix-sweep-2: depozito için müşteri + kart kaydı", () => {
+  it("authorize: customerRef + setupFutureUsage → customer ve setup_future_usage=off_session", async () => {
+    const { fetchImpl, calls } = stripeFake(() => intent("pi_1", "requires_capture"));
+    const stripe = new StripeProvider("sk_test_x", fetchImpl);
+    await stripe.authorize({
+      amount,
+      cardToken: "pm_card_visa",
+      idempotencyKey: "k1",
+      customerRef: "cus_1",
+      setupFutureUsage: "off_session",
+    });
+    expect(calls[0].body.get("customer")).toBe("cus_1");
+    expect(calls[0].body.get("setup_future_usage")).toBe("off_session");
+    await stripe.authorize({ amount, cardToken: "pm_card_visa", idempotencyKey: "k2" });
+    expect(calls[1].body.get("customer")).toBeNull();
+    expect(calls[1].body.get("setup_future_usage")).toBeNull();
+  });
+
+  it("ajan token'ı (SPT) kaydedilemez → müşteri/kayıt parametresi eklenmez", async () => {
+    const { fetchImpl, calls } = stripeFake(() => intent("pi_2", "requires_capture"));
+    const stripe = new StripeProvider("sk_test_x", fetchImpl);
+    await stripe.authorize({
+      amount,
+      cardToken: "spt_ABCDEF123",
+      idempotencyKey: "k3",
+      customerRef: "cus_1",
+      setupFutureUsage: "off_session",
+    });
+    expect(calls[0].body.get("shared_payment_granted_token")).toBe("spt_ABCDEF123");
+    expect(calls[0].body.get("customer")).toBeNull();
+    expect(calls[0].body.get("setup_future_usage")).toBeNull();
+  });
+
+  it("createCustomer: yalnız iç kullanıcı kimliği metadata'sı + idempotency anahtarı", async () => {
+    const { fetchImpl, calls } = stripeFake((call) =>
+      call.path === "/v1/customers" ? { body: { id: "cus_9", object: "customer" } } : undefined
+    );
+    const stripe = new StripeProvider("sk_test_x", fetchImpl);
+    await expect(
+      stripe.createCustomer({ userId: "u1", idempotencyKey: "customer:stripe:u1" })
+    ).resolves.toEqual({ customerRef: "cus_9" });
+    expect(calls[0].body.get("metadata[userId]")).toBe("u1");
+    expect(calls[0].body.get("email")).toBeNull();
+    expect(calls[0].idempotencyKey).toBe("customer:stripe:u1");
+  });
+
+  it("MockPsp müşteri desteklemez (mock depozito akışı değişmez)", () => {
+    expect((new MockPsp() as { createCustomer?: unknown }).createCustomer).toBeUndefined();
+  });
+});

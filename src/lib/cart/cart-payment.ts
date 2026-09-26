@@ -25,6 +25,7 @@ import { counter } from "@/lib/observability/metrics";
 import { errorFields, logger } from "@/lib/observability/logger";
 import { audit } from "@/lib/admin/audit";
 import { CartNotFoundError, releaseCartHolds } from "./cart-service";
+import { offSessionSetupFor } from "@/lib/payment/psp-customer";
 
 /**
  * Sepetin TEK ödemesi (P1-1): toplam tutar tek PSP yetkilendirmesi → capture → tek işlemde
@@ -281,7 +282,17 @@ async function payLocked(input: Parameters<typeof payCart>[0]): Promise<CartPayO
     },
   });
 
+  // fix-sweep-2: sepette depozito gereken kalem varsa kart müşteriye kaydedilir (Stripe).
+  const offSession = await offSessionSetupFor(
+    provider,
+    input.userId,
+    await prisma.cartItem.findMany({
+      where: { cartId: cart.id },
+      select: { propertyId: true, roomTypeId: true },
+    })
+  );
   const result: AuthorizeResult = await provider.authorize({
+    ...offSession,
     amount: cart.amount,
     cardToken: input.cardToken,
     idempotencyKey: `auth:cart:${cart.id}:${input.idempotencyKey}`,

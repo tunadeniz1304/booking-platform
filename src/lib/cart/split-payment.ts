@@ -46,6 +46,7 @@ import {
   withCartPaymentLock,
 } from "./cart-payment";
 import { ShareLinkInvalidError, shareUrl, signShareToken, verifyShareToken } from "./split-token";
+import { offSessionSetupFor } from "@/lib/payment/psp-customer";
 
 /**
  * Bölünmüş ödeme (P1-2). Organizatör sepeti HELD'e alınca payları tanımlar (eşit ya da özel
@@ -679,7 +680,21 @@ export async function payShare(input: {
       // Yarım kalan 3DS yetkilendirmesi yenisiyle değişir.
       await provider.void(share.providerRef).catch(() => undefined);
     }
+    // fix-sweep-2: depozitonun kaynağı organizatörün payıdır (asıl ya da yedek pay) → yalnız
+    // onun kartı, depozito gereken kalem varsa müşteriye kaydedilir (Stripe).
+    const organizerShare = share.position === 0 || share.isFallback;
+    const offSession = organizerShare
+      ? await offSessionSetupFor(
+          provider,
+          input.userId,
+          await prisma.cartItem.findMany({
+            where: { cartId: share.cartId },
+            select: { propertyId: true, roomTypeId: true },
+          })
+        )
+      : {};
     const result = await provider.authorize({
+      ...offSession,
       amount,
       cardToken: input.cardToken,
       idempotencyKey: `auth:share:${share.id}:${input.idempotencyKey}`,

@@ -97,16 +97,25 @@ export class StripeProvider implements PaymentProvider {
     cardToken: string;
     idempotencyKey: string;
     metadata?: Record<string, string>;
+    customerRef?: string;
+    setupFutureUsage?: "off_session";
   }): Promise<AuthorizeResult> {
     try {
+      const spt = isSharedPaymentToken(input.cardToken);
       // P1-11: ajan ödemesinde token, Stripe Shared Payment Token'dır (`spt_…`); SDK tipinde
       // henüz yok → parametre elle eklenir. Kart verisi yine sunucuya gelmez.
       const params: Stripe.PaymentIntentCreateParams & { shared_payment_granted_token?: string } = {
         amount: input.amount.amount,
         currency: input.amount.currency.toLowerCase(),
-        ...(isSharedPaymentToken(input.cardToken)
+        ...(spt
           ? { shared_payment_granted_token: input.cardToken }
           : { payment_method: input.cardToken }),
+        // fix-sweep-2: depozito gereken ödemede kart müşteriye kaydedilir (ajan token'ı hariç:
+        // SPT tek kullanımlık yetkidir, kaydedilemez).
+        ...(!spt && input.customerRef ? { customer: input.customerRef } : {}),
+        ...(!spt && input.customerRef && input.setupFutureUsage
+          ? { setup_future_usage: input.setupFutureUsage }
+          : {}),
         confirm: true,
         capture_method: "manual",
         automatic_payment_methods: { enabled: true, allow_redirects: "never" },
@@ -150,6 +159,17 @@ export class StripeProvider implements PaymentProvider {
       maxAmountMinor: typeof usage.max_amount === "number" ? usage.max_amount : null,
       expiresAt: typeof usage.expires_at === "number" ? new Date(usage.expires_at * 1000) : null,
     };
+  }
+
+  /** fix-sweep-2: depozito için PSP müşterisi (kart verisi yok; yalnız iç kullanıcı kimliği). */
+  async createCustomer(input: { userId: string; idempotencyKey: string }) {
+    const customer = await this.call(() =>
+      this.stripe.customers.create(
+        { metadata: { userId: input.userId } },
+        { idempotencyKey: input.idempotencyKey }
+      )
+    );
+    return { customerRef: customer.id };
   }
 
   /** 3DS istemcide tamamlanır; sunucu yalnızca intent'in son durumunu okur (kod kullanılmaz). */

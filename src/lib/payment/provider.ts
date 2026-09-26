@@ -34,7 +34,18 @@ export interface PaymentProvider {
     cardToken: string;
     idempotencyKey: string;
     metadata?: Record<string, string>;
+    /** fix-sweep-2: ödemenin bağlanacağı PSP müşterisi (`createCustomer`). */
+    customerRef?: string;
+    /** fix-sweep-2: kart sonraki off-session kullanım (depozito) için kaydedilsin. */
+    setupFutureUsage?: "off_session";
   }): Promise<AuthorizeResult>;
+  /**
+   * fix-sweep-2: PSP müşterisi (Stripe Customer) açar; hasar depozitosunun kartı off-session
+   * kullanabilmesi için. Desteklemeyen sağlayıcı → metot yok (MockPsp).
+   */
+  createCustomer?(input: { userId: string; idempotencyKey: string }): Promise<{
+    customerRef: string;
+  }>;
   /** 3DS doğrulamasını tamamlar. */
   confirmChallenge(providerRef: string, code: string): Promise<AuthorizeResult>;
   capture(providerRef: string, amount: Money): Promise<{ status: "captured" }>;

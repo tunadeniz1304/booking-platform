@@ -104,6 +104,14 @@ function fakeDeps(): McpDeps & { [K in keyof McpDeps]: ReturnType<typeof vi.fn> 
       status: "CANCELLED",
       refund: { amount: 151500, currency: "TRY" },
     })),
+    isEmailVerified: vi.fn(async () => true),
+    checkout: vi.fn(async (input: { roomId: string }) => ({
+      id: "cs1",
+      status: "completed",
+      currency: "TRY",
+      stay: { room_id: input.roomId },
+      order: { id: "b1" },
+    })),
   } as never;
 }
 
@@ -136,11 +144,12 @@ describe("MCP sunucusu (P1-12)", () => {
     vi.unstubAllEnvs();
   });
 
-  it("araç listesi: 6 araç (arama, teklif, hold, içgörü, rezervasyonlarım, iptal)", async () => {
+  it("araç listesi: 7 araç (arama, teklif, hold, içgörü, rezervasyonlarım, iptal, checkout)", async () => {
     const client = await connect(fakeDeps());
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual([
       "cancel_booking",
+      "checkout_stay",
       "create_hold",
       "get_price_insight",
       "get_quote",
@@ -215,6 +224,71 @@ describe("MCP sunucusu (P1-12)", () => {
       expect.objectContaining({ userId: "u-mcp", guestCount: 2, roomId: "r1" })
     );
     expect(payload(res)).toMatchObject({ paymentRequired: true, booking: { status: "HELD" } });
+  });
+
+  it("regression: v4#6 create_hold doğrulanmamış e-postada EMAIL_NOT_VERIFIED, servise ulaşmaz", async () => {
+    const deps = fakeDeps();
+    deps.isEmailVerified.mockResolvedValue(false);
+    const client = await connect(deps);
+    const { token } = await signAccessToken("u-unverified", "USER", 900);
+    vi.stubEnv("MCP_ACCESS_TOKEN", token);
+    const res = await client.callTool({ name: "create_hold", arguments: holdArgs });
+    expect(res.isError).toBe(true);
+    expect(payload(res)).toMatchObject({ code: "EMAIL_NOT_VERIFIED" });
+    expect(deps.hold).not.toHaveBeenCalled();
+    expect(deps.isEmailVerified).toHaveBeenCalledWith("u-unverified");
+  });
+
+  it("checkout_stay: kimlik token'dan, SPT + mandate servise iletilir; doğrulanmamış hesap reddedilir", async () => {
+    const deps = fakeDeps();
+    const client = await connect(deps);
+    const args = {
+      roomId: "r1",
+      checkIn: "2026-10-01",
+      checkOut: "2026-10-02",
+      guests: 1,
+      spt: "spt_mock_ok",
+      mandate: "m.jws.x",
+      idempotencyKey: "k1",
+    };
+    const anon = await client.callTool({ name: "checkout_stay", arguments: args });
+    expect(payload(anon)).toMatchObject({ code: "UNAUTHORIZED" });
+
+    const { token } = await signAccessToken("u-agent", "USER", 900);
+    vi.stubEnv("MCP_ACCESS_TOKEN", token);
+    const res = await client.callTool({ name: "checkout_stay", arguments: args });
+    expect(res.isError).toBeFalsy();
+    expect(deps.checkout).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: "u-agent", spt: "spt_mock_ok", mandate: "m.jws.x" })
+    );
+    expect(payload(res)).toMatchObject({ status: "completed" });
+
+    deps.isEmailVerified.mockResolvedValue(false);
+    const blocked = await client.callTool({ name: "checkout_stay", arguments: args });
+    expect(payload(blocked)).toMatchObject({ code: "EMAIL_NOT_VERIFIED" });
+    expect(deps.checkout).toHaveBeenCalledTimes(1);
+  });
+
+  it("checkout_stay: mandate reddi (HttpError) araç hatası olarak döner", async () => {
+    const deps = fakeDeps();
+    const { MandateError } = await import("@/lib/agentic/mandate");
+    deps.checkout.mockRejectedValue(new MandateError("MANDATE_AMOUNT_EXCEEDED"));
+    const client = await connect(deps);
+    const { token } = await signAccessToken("u-agent", "USER", 900);
+    vi.stubEnv("MCP_ACCESS_TOKEN", token);
+    const res = await client.callTool({
+      name: "checkout_stay",
+      arguments: {
+        roomId: "r1",
+        checkIn: "2026-10-01",
+        checkOut: "2026-10-02",
+        guests: 1,
+        spt: "spt_mock_ok",
+        idempotencyKey: "k2",
+      },
+    });
+    expect(res.isError).toBe(true);
+    expect(payload(res)).toMatchObject({ code: "MANDATE_AMOUNT_EXCEEDED" });
   });
 
   it("MCP_ACCESS_TOKEN ortam değişkeni varsayılan token olarak kullanılır", async () => {
@@ -395,7 +469,7 @@ describe("MCP streamable HTTP (P1-11)", () => {
     );
     expect(list.status).toBe(200);
     const listed = (await list.json()) as { result: { tools: { name: string }[] } };
-    expect(listed.result.tools).toHaveLength(6);
+    expect(listed.result.tools).toHaveLength(7);
     const held = await handleMcpHttp(rpc(callHold, auth), deps);
     expect(held.status).toBe(200);
     expect(deps.hold).toHaveBeenCalledWith(expect.objectContaining({ userId: "u-http" }));

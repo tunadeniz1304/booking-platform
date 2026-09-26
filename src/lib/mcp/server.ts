@@ -12,6 +12,9 @@
  *  - `get_price_insight` — fiyat aralığı/olay içgörüsü; anonim, deterministik, bilgi amaçlı.
  *  - `list_my_bookings`  — oturumdaki kullanıcının rezervasyonları.
  *  - `cancel_booking`    — iptal + politika iadesi; `confirm: true` ZORUNLU (geri alınamaz).
+ *  - `checkout_stay`     — ACP checkout (teklif → HELD → ödeme) SPT + kullanıcının imzaladığı
+ *    AP2 intent mandate ile (P1-11). Mandate yok/dolmuş/aşan tutar → reddedilir.
+ *  `create_hold` ve `checkout_stay` doğrulanmış e-posta ister (v4#6, F7).
  *
  * Kaynak: `ui://stay-card` — `search_stays` sonucunu kart olarak çizen HTML şablonu
  * (MCP Apps `ui.resourceUri` / Apps SDK `outputTemplate`). Şablon veri üretmez.
@@ -43,7 +46,13 @@ import { minorFromDb } from "@/lib/money/money";
 import { verifyAccessToken, type AccessClaims } from "@/lib/auth/tokens";
 import { isAccessTokenDenied } from "@/lib/auth/denylist";
 import { isTokenVersionCurrent } from "@/lib/auth/token-version";
-import { HttpError } from "@/lib/http/errors";
+import { EmailNotVerifiedError, HttpError } from "@/lib/http/errors";
+import { prisma } from "@/lib/prisma";
+import {
+  completeCheckoutSession,
+  createCheckoutSession,
+  type CheckoutSessionView,
+} from "@/lib/agentic/checkout";
 import { logger, errorFields } from "@/lib/observability/logger";
 
 export interface BookingSummary {
@@ -66,6 +75,22 @@ export interface McpDeps {
   insight(input: { roomId: string; checkIn: string; checkOut: string }): Promise<PriceInsight>;
   listBookings(userId: string): Promise<BookingSummary[]>;
   cancel(bookingId: string, userId: string): Promise<CancellationOutcome>;
+  /** v4#6: e-posta doğrulaması DB'den (token'a gömülmez). */
+  isEmailVerified(userId: string): Promise<boolean>;
+  checkout(input: AgentCheckoutInput): Promise<CheckoutSessionView>;
+}
+
+export interface AgentCheckoutInput {
+  userId: string;
+  roomId: string;
+  checkIn: string;
+  checkOut: string;
+  guests: number;
+  /** Paylaşılan ödeme token'ı (SPT). */
+  spt: string;
+  /** AP2 intent mandate (JWS). */
+  mandate: string | null;
+  idempotencyKey: string;
 }
 
 export interface McpServerOptions {
@@ -100,6 +125,28 @@ async function listBookingSummaries(userId: string): Promise<BookingSummary[]> {
   }));
 }
 
+async function isEmailVerified(userId: string): Promise<boolean> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { emailVerifiedAt: true },
+  });
+  return Boolean(user?.emailVerifiedAt);
+}
+
+/** ACP servisleri üzerinden tek adımda checkout: oturum (idempotent) + tamamlama. */
+async function agentCheckout(input: AgentCheckoutInput): Promise<CheckoutSessionView> {
+  const { session } = await createCheckoutSession(input.userId, `mcp:${input.idempotencyKey}`, {
+    room_id: input.roomId,
+    check_in: input.checkIn,
+    check_out: input.checkOut,
+    guests: input.guests,
+  });
+  return completeCheckoutSession(input.userId, session.id, input.idempotencyKey, {
+    token: input.spt,
+    mandate: input.mandate,
+  });
+}
+
 export const defaultDeps: McpDeps = {
   search: searchProperties,
   quote: (req) => computeTotal(req),
@@ -108,6 +155,8 @@ export const defaultDeps: McpDeps = {
   insight: getPriceInsight,
   listBookings: listBookingSummaries,
   cancel: (bookingId, userId) => cancelAndRefund(bookingId, userId),
+  isEmailVerified,
+  checkout: agentCheckout,
 };
 
 export const STAY_CARD_URI = "ui://stay-card";
@@ -188,6 +237,23 @@ export function createMcpServer(
     if (!token) return null;
     const claims = await deps.authenticate(token);
     return claims?.userId ?? null;
+  }
+
+  /** Para etkili araçlar: kimlik + doğrulanmış e-posta; değilse hata sonucu. */
+  async function verifiedUser(
+    tool: string,
+    extra: { authInfo?: { token?: string } }
+  ): Promise<{ userId: string } | { error: CallToolResult }> {
+    const token = transportToken(extra, envFallback);
+    if (!token)
+      return { error: fail("UNAUTHORIZED", `${tool} için oturum (bearer token) gerekli`) };
+    const claims = await deps.authenticate(token);
+    if (!claims) return { error: fail("UNAUTHORIZED", "Geçersiz veya süresi dolmuş token") };
+    if (!(await deps.isEmailVerified(claims.userId))) {
+      const e = new EmailNotVerifiedError();
+      return { error: fail(e.code, e.message) };
+    }
+    return { userId: claims.userId };
   }
 
   server.registerResource(
@@ -276,14 +342,12 @@ export function createMcpServer(
     },
     ({ guests, ...rest }, extra) =>
       guarded("create_hold", async () => {
-        const token = transportToken(extra, envFallback);
-        if (!token) return fail("UNAUTHORIZED", "create_hold için oturum (bearer token) gerekli");
-        const claims = await deps.authenticate(token);
-        if (!claims) return fail("UNAUTHORIZED", "Geçersiz veya süresi dolmuş token");
+        const who = await verifiedUser("create_hold", extra);
+        if ("error" in who) return who.error;
         const { booking, paymentRequired } = await deps.hold({
           ...rest,
           guestCount: guests,
-          userId: claims.userId,
+          userId: who.userId,
         });
         return ok({ booking, paymentRequired });
       })
@@ -337,6 +401,36 @@ export function createMcpServer(
         const userId = await userFrom(extra);
         if (!userId) return fail("UNAUTHORIZED", "cancel_booking için oturum gerekli");
         return ok(await deps.cancel(bookingId, userId));
+      })
+  );
+
+  server.registerTool(
+    "checkout_stay",
+    {
+      title: "Mandate'li ödeme (ajan checkout)",
+      description:
+        "Kullanıcının imzaladığı AP2 intent mandate'i ve paylaşılan ödeme token'ı (SPT) ile odayı rezerve edip öder. Tutar, para birimi, ilan ve süre mandate'e karşı sunucuda doğrulanır; mandate yok/süresi dolmuş/tutar limiti aşıyorsa reddedilir (aşımda kullanıcı daha yüksek limitli yeni mandate onaylamalı). Platform merchant-of-record'dur; fiyatı ajan belirlemez.",
+      inputSchema: {
+        roomId: id,
+        checkIn: isoDate,
+        checkOut: isoDate,
+        guests: z.number().int().min(1).max(20),
+        spt: z.string().min(1).max(200),
+        mandate: z.string().min(1).max(4096).optional(),
+        idempotencyKey: z.string().min(1).max(128),
+      },
+      annotations: { destructiveHint: false, idempotentHint: true },
+    },
+    (args, extra) =>
+      guarded("checkout_stay", async () => {
+        const who = await verifiedUser("checkout_stay", extra);
+        if ("error" in who) return who.error;
+        const view = await deps.checkout({
+          ...args,
+          mandate: args.mandate ?? null,
+          userId: who.userId,
+        });
+        return ok(view);
       })
   );
 

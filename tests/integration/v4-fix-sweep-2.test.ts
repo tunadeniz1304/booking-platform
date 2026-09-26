@@ -3,6 +3,7 @@
 // PSP provizyon hatasının 502 + yeniden denenebilir durumu. Her adımda mizan dengede +
 // dokunulan günlerde mutabakat farkı 0 (yalnız bu dosyanın ödemeleri).
 import { afterAll, afterEach, beforeAll, expect, it } from "vitest";
+import { NextRequest } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { describeInt } from "./helpers";
 import { createStayFixture, type StayFixture } from "./fixtures";
@@ -14,7 +15,9 @@ import {
 } from "@/lib/payment/payment-service";
 import { MOCK_3DS_CODE } from "@/lib/payment/card-token";
 import { MockPsp } from "@/lib/payment/mock-psp";
-import { setPaymentProviderForTests } from "@/lib/payment";
+import { PaymentProviderError, setPaymentProviderForTests } from "@/lib/payment";
+import { signAccessToken } from "@/lib/auth/tokens";
+import { POST as payPost } from "@/app/api/bookings/[id]/pay/route";
 import type { Money } from "@/lib/money/money";
 import { isTrialBalanced, reconcile, trialBalance } from "@/lib/ledger";
 import { releaseAt } from "@/lib/payout/escrow";
@@ -34,9 +37,17 @@ const claims = (userId: string, role: AccessClaims["role"]): AccessClaims => ({
 class RecordingPsp extends MockPsp {
   refunds: Array<{ ref: string; amount: number; key: string }> = [];
   failRefundKeys = new Set<string>();
+  /** Sonraki provizyonlar sağlayıcı hatasıyla düşer (P2-3: 5xx/zaman aşımı taklidi). */
+  failAuthorize = 0;
+  override async authorize(input: Parameters<MockPsp["authorize"]>[0]) {
+    if (this.failAuthorize > 0) {
+      this.failAuthorize--;
+      throw new PaymentProviderError("api_connection_error", "sahte bağlantı hatası");
+    }
+    return super.authorize(input);
+  }
   override async refund(providerRef: string, amount: Money, idempotencyKey: string) {
     if (this.failRefundKeys.delete(idempotencyKey)) {
-      const { PaymentProviderError } = await import("@/lib/payment/provider");
       throw new PaymentProviderError("processing_error", "sahte iade hatası");
     }
     this.refunds.push({ ref: providerRef, amount: amount.amount, key: idempotencyKey });
@@ -75,6 +86,7 @@ describeInt("fix-sweep-2: ödeme düzeltmeleri", () => {
   });
   afterEach(() => {
     psp.failRefundKeys.clear();
+    psp.failAuthorize = 0;
   });
   afterAll(async () => {
     setPaymentProviderForTests(null);
@@ -129,7 +141,9 @@ describeInt("fix-sweep-2: ödeme düzeltmeleri", () => {
       const report = await reconcile(day, prisma);
       expect(report.imbalancedEntries).toBe(0);
       expect(
-        report.differences.filter((d) => paymentIds.has(d.subjectId) || ids.includes(d.bookingId))
+        report.differences.filter(
+          (d) => paymentIds.has(d.subjectId) || (d.bookingId !== null && ids.includes(d.bookingId))
+        )
       ).toEqual([]);
     }
   }
@@ -220,6 +234,53 @@ describeInt("fix-sweep-2: ödeme düzeltmeleri", () => {
     ]);
     const done = await prisma.payment.findUniqueOrThrow({ where: { id: payment.id } });
     expect(done).toMatchObject({ failureCode: null, refundedAmountMinor: payment.amountMinor });
+    await assertBooksClean();
+  });
+
+  it("P2-3: PSP provizyon hatası → 502 PAYMENT_PROVIDER_ERROR; ödeme FAILED ve yeniden denenebilir", async () => {
+    const g = await fx.hold({ nights: 1 });
+    const { token } = await signAccessToken(fx.userId, "USER", 900);
+    const call = (idem: string) =>
+      payPost(
+        new NextRequest(`http://localhost/api/bookings/${g.id}/pay`, {
+          method: "POST",
+          headers: {
+            authorization: `Bearer ${token}`,
+            "content-type": "application/json",
+            "idempotency-key": idem,
+          },
+          body: JSON.stringify({ cardToken: "tok_mock_ok_4242" }),
+        }),
+        { params: Promise.resolve({ id: g.id }) }
+      );
+    psp.failAuthorize = 1;
+    const res = await call(`fs2-p23-${Date.now()}`);
+    expect(res.status).toBe(502);
+    expect(await res.json()).toMatchObject({
+      code: "PAYMENT_PROVIDER_ERROR",
+      details: { providerCode: "api_connection_error" },
+    });
+    expect(res.headers.get("retry-after")).toBe("5");
+    const failed = await prisma.payment.findUniqueOrThrow({ where: { bookingId: g.id } });
+    expect(failed).toMatchObject({
+      status: "FAILED",
+      failureCode: "provider_error:api_connection_error",
+      providerRef: null,
+    });
+    expect(
+      (await prisma.booking.findUniqueOrThrow({ where: { id: g.id }, select: { status: true } }))
+        .status
+    ).toBe("HELD");
+
+    // Aynı rezervasyon yeniden denenir → onay (3DS gerekirse tamamlanır).
+    const retry = await call(`fs2-p23b-${Date.now()}`);
+    expect([200, 202]).toContain(retry.status);
+    if (retry.status === 202) {
+      await confirmPaymentChallenge({ bookingId: g.id, userId: fx.userId, code: MOCK_3DS_CODE });
+    }
+    const paid = await prisma.payment.findUniqueOrThrow({ where: { bookingId: g.id } });
+    expect(paid).toMatchObject({ status: "PAID", failureCode: null });
+    touchedBookings.add(g.id);
     await assertBooksClean();
   });
 });

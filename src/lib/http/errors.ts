@@ -3,6 +3,7 @@ import { ZodError } from "zod";
 import { Prisma } from "@prisma/client";
 import { logger, errorFields } from "@/lib/observability/logger";
 import { isSerializationFailure } from "@/lib/db/serialization";
+import { PaymentProviderError } from "@/lib/payment/provider";
 
 /**
  * HTTP'ye eşlenen alan hataları. Route handler'lar ince kalır: iş mantığı bu
@@ -100,6 +101,25 @@ export function toErrorResponse(error: unknown, context = "request"): NextRespon
     return NextResponse.json(
       { error: "Eşzamanlı işlem çakışması, lütfen tekrar deneyin", code: "TRANSACTION_CONFLICT" },
       { status: 409, headers: { "Retry-After": "1" } }
+    );
+  }
+  // P2-3 bulgusu: ödeme sağlayıcısı (PSP) hatası sunucu hatası değil, üst akış (upstream)
+  // hatasıdır → 502 + sağlayıcı kodu; ödeme yeniden denenebilir. Geçersiz token istemci hatası.
+  if (error instanceof PaymentProviderError) {
+    if (error.code === "invalid_token") {
+      return NextResponse.json(
+        { error: "Kart bilgisi geçersiz", code: "INVALID_CARD_TOKEN" },
+        { status: 422 }
+      );
+    }
+    logger.warn({ context, providerCode: error.code }, "payment provider error");
+    return NextResponse.json(
+      {
+        error: "Ödeme sağlayıcısına şu an ulaşılamıyor, lütfen tekrar deneyin",
+        code: "PAYMENT_PROVIDER_ERROR",
+        details: { providerCode: error.code },
+      },
+      { status: 502, headers: { "Retry-After": "5" } }
     );
   }
   if (error instanceof SyntaxError) {

@@ -30,7 +30,7 @@ import {
 } from "@/lib/cart/split-refund";
 import { getPaymentProvider, type AuthorizeResult } from "./index";
 import type { WebhookEvent } from "./webhook";
-import type { PaymentChallenge } from "./provider";
+import { PaymentProviderError, type PaymentChallenge } from "./provider";
 import { assessPayment, type FraudDecision } from "@/lib/risk/fraud";
 import { consumeStepUp, hasStepUpPasskey, type StepUpBinding } from "@/lib/auth/passkey";
 import { getConfig } from "@/lib/config/app-config";
@@ -83,6 +83,8 @@ const redlock = createRedlock(redis);
 
 /** Mutabakatta yeniden açılan tutmanın ömrü: aynı işlemde onaylanır, yalnızca güvenlik payı. */
 const LATE_SUCCESS_HOLD_MS = 60_000;
+/** PSP altyapı hatasıyla düşen denemenin `failureCode` öneki (ret sayılmaz). */
+export const PROVIDER_ERROR_PREFIX = "provider_error:";
 
 /** Tahsil hakkı alınabilecek (henüz para çekilmemiş) ödeme durumları. */
 const OPEN_STATUSES: PaymentStatus[] = [
@@ -802,6 +804,11 @@ async function payLocked(input: Parameters<typeof payForBooking>[0]): Promise<Pa
         userId: input.userId,
         status: PaymentStatus.FAILED,
         updatedAt: { gte: new Date(Date.now() - 86_400_000) },
+        // PSP kesintisi kullanıcının risk puanını artırmaz.
+        OR: [
+          { failureCode: null },
+          { NOT: { failureCode: { startsWith: PROVIDER_ERROR_PREFIX } } },
+        ],
       },
     }),
   ]);
@@ -881,6 +888,15 @@ async function payLocked(input: Parameters<typeof payForBooking>[0]): Promise<Pa
     });
   } catch (error) {
     await releaseBookingCredit(booking.id, "authorize_failed");
+    if (error instanceof PaymentProviderError) {
+      // Sağlayıcı hatası (ret değil): satır FAILED + `provider_error:<kod>` → açık durum,
+      // aynı rezervasyon yeniden ödenebilir; deneme hakkından DÜŞMEZ (kullanıcı hatası değil).
+      await transitionPayment(booking, OPEN_STATUSES, {
+        status: PaymentStatus.FAILED,
+        failureCode: `${PROVIDER_ERROR_PREFIX}${error.code}`.slice(0, 64),
+      });
+      paymentsTotal.inc({ outcome: "provider_error" });
+    }
     throw error;
   }
 

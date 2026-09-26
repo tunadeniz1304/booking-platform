@@ -2,17 +2,28 @@
  * Para — tamsayı minor-unit (kuruş/cent) aritmetiği.
  *
  * Kayan nokta toplaması YOKTUR: her tutar `Number.isSafeInteger` olan minor-unit'tir.
- * Veritabanındaki `Decimal` alanlar yalnızca sınırda (okuma/yazma) dönüştürülür;
- * dönüşüm string üzerinden yapılır (float'a hiç düşmez). Oran çarpımı tek bir
+ * Veritabanında para `BigInt *Minor` kolonlarında saklanır (ADR 0019); sınırda
+ * `minorFromDb`/`minorToDb` ile dönüştürülür. Ondalık basamak sayısı ISO 4217 üs
+ * tablosundan (`currencies.ts`) gelir. Oran çarpımı tek bir
  * yuvarlama noktasında (half-up) yapılır; bölüştürme (`allocate`) kalan kuruşları
  * en büyük kalan yöntemiyle dağıtır → parçaların toplamı her zaman bütüne eşittir.
  */
 
+import {
+  currencyExponent,
+  isIsoCurrency,
+  minorToDecimalString,
+  roundHalfUp,
+  type IsoCurrencyCode,
+} from "./currencies";
+
+/** Tesis/tahsilat için işletmede desteklenen birimler (ilan oluşturma, kur kaynakları). */
 export const CURRENCIES = ["TRY", "USD", "EUR", "GBP"] as const;
-export type CurrencyCode = (typeof CURRENCIES)[number];
+/** `Money` her ISO 4217 birimini taşıyabilir (üs tablosu: `currencies.ts`, ADR 0019). */
+export type CurrencyCode = IsoCurrencyCode;
 
 /** Para birimi başına ondalık basamak (ISO 4217 minor unit). */
-const EXPONENT: Record<CurrencyCode, number> = { TRY: 2, USD: 2, EUR: 2, GBP: 2 };
+const exponentOf = (currency: CurrencyCode): number => currencyExponent(currency);
 
 export interface Money {
   /** Minor-unit tamsayı (ör. 1234,56 TRY → 123456). */
@@ -28,7 +39,7 @@ export class MoneyError extends Error {
 }
 
 export function isCurrencyCode(value: string): value is CurrencyCode {
-  return (CURRENCIES as readonly string[]).includes(value);
+  return isIsoCurrency(value);
 }
 
 export function assertCurrency(value: string): CurrencyCode {
@@ -75,27 +86,15 @@ export function multiplyRate(m: Money, rate: number): Money {
   const SCALE = 1_000_000;
   const scaledRate = Math.round(rate * SCALE);
   const product = BigInt(m.amount) * BigInt(scaledRate);
-  const scale = BigInt(SCALE);
-  const negative = product < 0n;
-  const abs = negative ? -product : product;
-  let q = abs / scale;
-  if ((abs % scale) * 2n >= scale) q += 1n;
-  return money(Number(negative ? -q : q), m.currency);
+  return money(Number(roundHalfUp(product, BigInt(SCALE))), m.currency);
 }
 
 /**
  * Tutarı oranlara göre bölüştürür (en büyük kalan yöntemi).
  * Parçaların toplamı daima `m.amount`'a eşittir.
  */
-/** Tamsayı bölme, yarım yukarı (half-up, sıfırdan uzağa) — BigInt ile taşmasız. */
-function divHalfUp(numerator: bigint, denominator: bigint): bigint {
-  const negative = numerator < 0n !== denominator < 0n;
-  const n = numerator < 0n ? -numerator : numerator;
-  const d = denominator < 0n ? -denominator : denominator;
-  let q = n / d;
-  if ((n % d) * 2n >= d) q += 1n;
-  return negative ? -q : q;
-}
+/** Tamsayı bölme, yarım yukarı — tek yuvarlama noktası `roundHalfUp` (currencies.ts). */
+const divHalfUp = roundHalfUp;
 
 /**
  * Tutarın baz puan (bps, 1/10.000) oranı: `bpsOf(1000 kuruş, 1000)` = 100 kuruş (%10).
@@ -149,7 +148,7 @@ export function toMinor(
   value: string | number | { toString(): string },
   currency: CurrencyCode | string = "TRY"
 ): number {
-  const exp = EXPONENT[assertCurrency(currency)];
+  const exp = exponentOf(assertCurrency(currency));
   const text = typeof value === "number" ? value.toFixed(exp) : value.toString().trim();
   const match = /^(-)?(\d+)(?:\.(\d+))?$/.exec(text);
   if (!match) throw new MoneyError(`Geçersiz ondalık tutar: ${text}`);
@@ -178,7 +177,7 @@ export function fromDecimal(
 export function parseMoney(value: string, currency: CurrencyCode | string): Money {
   if (typeof value !== "string") throw new MoneyError("Tutar ondalık string olmalı");
   const text = value.trim();
-  const exp = EXPONENT[assertCurrency(currency)];
+  const exp = exponentOf(assertCurrency(currency));
   const match = /^(\d+)(?:\.(\d+))?$/.exec(text);
   if (!match) throw new MoneyError(`Geçersiz tutar: ${text}`);
   if ((match[2] ?? "").length > exp) {
@@ -187,16 +186,32 @@ export function parseMoney(value: string, currency: CurrencyCode | string): Mone
   return money(toMinor(text, currency), currency);
 }
 
-/** Minor-unit → ondalık string ("123450" → "1234.50"); Prisma Decimal'e yazmak için. */
+/** Minor-unit → ondalık string ("123450" → "1234.50"; JPY 1500 → "1500"; KWD → 3 hane). */
 export function toDecimalString(m: Money): string {
-  const exp = EXPONENT[m.currency];
-  const negative = m.amount < 0;
-  const abs = Math.abs(m.amount)
-    .toString()
-    .padStart(exp + 1, "0");
-  const int = abs.slice(0, abs.length - exp);
-  const frac = abs.slice(abs.length - exp);
-  return `${negative ? "-" : ""}${int}.${frac}`;
+  return minorToDecimalString(m.amount, m.currency);
+}
+
+/**
+ * Veritabanı `BigInt *Minor` kolonu → `number` minor-unit. Güvenli tamsayı sınırını (2⁵³)
+ * aşan değer sessizce kesilmez, hata fırlatır (ADR 0019).
+ */
+export function minorFromDb(value: bigint | number): number {
+  const n = typeof value === "bigint" ? Number(value) : value;
+  if (!Number.isSafeInteger(n) || (typeof value === "bigint" && BigInt(n) !== value)) {
+    throw new MoneyError(`Minor-unit güvenli tamsayı aralığı dışında: ${value}`);
+  }
+  return n;
+}
+
+/** `number` minor-unit → veritabanı `BigInt *Minor` kolonu. */
+export function minorToDb(amount: number): bigint {
+  assertInt(amount);
+  return BigInt(amount);
+}
+
+/** Veritabanı satırından (`*Minor` + `currency`) `Money`. */
+export function moneyFromDb(amountMinor: bigint | number, currency: string): Money {
+  return money(minorFromDb(amountMinor), currency);
 }
 
 /** Görüntüleme için (yalnızca biçimlendirme; aritmetikte kullanılmaz). */
@@ -204,4 +219,29 @@ export function formatMoney(m: Money, locale = "tr-TR"): string {
   return new Intl.NumberFormat(locale, { style: "currency", currency: m.currency }).format(
     Number(toDecimalString(m))
   );
+}
+
+/**
+ * Güvenlik ağı (ADR 0019): `BigInt *Minor` kolonlarını taşıyan bir Prisma satırı gözden kaçıp
+ * doğrudan `JSON.stringify`/`NextResponse.json`'a verilirse "Do not know how to serialize a
+ * BigInt" ile 500 dönmesin diye BigInt JSON'da güvenli tamsayıya çevrilir; aralık dışı değer
+ * sessizce kesilmez (hata). API'ler yine de açık DTO eşlemesi yapar.
+ */
+const bigintProto = BigInt.prototype as unknown as { toJSON?: () => number };
+if (typeof bigintProto.toJSON !== "function") {
+  Object.defineProperty(BigInt.prototype, "toJSON", {
+    value: function toJSON(this: bigint): number {
+      return minorFromDb(this);
+    },
+    writable: true,
+    configurable: true,
+  });
+}
+
+/**
+ * Görüntüleme DTO'ları için ana birim sayısı (ör. 1234.5). Hesaplamada KULLANILMAZ; API'lerin
+ * geriye uyumlu `basePrice`/`totalPrice` alanları bunu, hesap yapanlar `*Minor`'u okur.
+ */
+export function toMajorNumber(amountMinor: bigint | number, currency: string): number {
+  return Number(toDecimalString(moneyFromDb(amountMinor, currency)));
 }

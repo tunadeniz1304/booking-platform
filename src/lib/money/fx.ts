@@ -1,6 +1,7 @@
 import { z } from "zod";
 import staticRates from "../../../data/fx-rates.json";
-import { money, multiplyRate, type CurrencyCode, type Money, assertCurrency } from "./money";
+import { currencyExponent, roundHalfUp } from "./currencies";
+import { money, type CurrencyCode, type Money, assertCurrency } from "./money";
 
 /**
  * Kur dönüşümü — YALNIZCA görüntüleme içindir; tahsilat daima mülkün para biriminde.
@@ -33,5 +34,10 @@ export function convert(m: Money, to: CurrencyCode | string, table = getFxTable(
   const fromRate = table.rates[m.currency];
   const toRate = table.rates[target];
   if (!fromRate || !toRate) throw new Error(`Kur bulunamadı: ${m.currency}→${target}`);
-  return money(multiplyRate(m, toRate / fromRate).amount, target);
+  // Üs farkı (ör. TRY 2 → JPY 0) minor-unit ölçeğinde uygulanır; tek yuvarlama (half-up).
+  const scaledRate = BigInt(Math.round((toRate / fromRate) * 1_000_000));
+  const diff = currencyExponent(target) - currencyExponent(m.currency);
+  const numerator = BigInt(m.amount) * scaledRate * 10n ** BigInt(Math.max(0, diff));
+  const denominator = 1_000_000n * 10n ** BigInt(Math.max(0, -diff));
+  return money(Number(roundHalfUp(numerator, denominator)), target);
 }

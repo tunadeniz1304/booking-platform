@@ -9,7 +9,7 @@ import { toMinor } from "@/lib/money/money";
  *
  * Gerçek "Son 1 oda" yerine çok-bileşenli canlı sinyal:
  *  - scarcity: oda için aralıkta dolu gece oranı (stok)
- *  - views: Redis'teki son dakika görüntülenme sayacı (ilgi)
+ *  - views: son pencerelerdeki tekil izleyici tahmini (HyperLogLog, ilgi)
  *  - booked: Redis'teki son 24 saatteki rezervasyon sayacı
  *  - demandSignal: olay sinyali (tek fiyat motoru) + doluluk kıtlığı ortalaması
  *
@@ -18,7 +18,19 @@ import { toMinor } from "@/lib/money/money";
 
 const VIEWS_PREFIX = "live:room:";
 const BOOKED_PREFIX = "live:room:";
-const VIEW_WINDOW_TTL = 60 * 10; // 10 dk
+
+/** PFADD + TTL (atomik). 1 → HLL değişti (büyük olasılıkla yeni izleyici). */
+const PFADD_WITH_TTL = `local a = redis.call('PFADD', KEYS[1], ARGV[1])
+redis.call('EXPIRE', KEYS[1], ARGV[2])
+return a`;
+const PFCOUNT = `return redis.call('PFCOUNT', unpack(KEYS))`;
+
+/** Görüntülenme penceresi anahtarları: [şimdiki, önceki] (kayan ~2 pencere). */
+function viewKeys(roomId: string, now: number): [string, string] {
+  const window = getConfig().LIVE_VIEW_DEDUPE_SECONDS;
+  const bucket = Math.floor(now / 1000 / window);
+  return [`${VIEWS_PREFIX}${roomId}:hll:${bucket}`, `${VIEWS_PREFIX}${roomId}:hll:${bucket - 1}`];
+}
 
 export interface RoomHeat {
   roomId: string;
@@ -40,21 +52,30 @@ function parseDate(value: string): Date {
 }
 
 /**
- * Görüntülenme kaydı — atomik (`INCR` + TTL) ve IP başına tekil: aynı IP'nin
- * tekrar bağlanması LIVE_VIEW_DEDUPE_SECONDS boyunca sayacı şişiremez.
+ * Görüntülenme kaydı (v4#18): izleyici kimliği (imzalı oturum `u:` / imzalı cihaz
+ * çerezi `d:`, bkz. `live/viewer.ts`) HyperLogLog'a `PFADD` ile eklenir. Aynı
+ * izleyicinin yeniden bağlanması sayacı şişiremez; bellek oda başına sabittir.
  */
-export async function recordRoomView(roomId: string, ip: string): Promise<boolean> {
+export async function recordRoomView(
+  roomId: string,
+  viewerId: string,
+  now = Date.now()
+): Promise<boolean> {
   try {
-    const dedupe = getConfig().LIVE_VIEW_DEDUPE_SECONDS;
-    const first = await redis.set(`${VIEWS_PREFIX}${roomId}:seen:${ip}`, "1", {
-      nx: true,
-      ex: dedupe,
-    });
-    if (!first) return false;
-    await redis.incrWithTtl(`${VIEWS_PREFIX}${roomId}:views`, VIEW_WINDOW_TTL);
-    return true;
+    const [current] = viewKeys(roomId, now);
+    const ttl = String(getConfig().LIVE_VIEW_DEDUPE_SECONDS * 2);
+    return Number(await redis.eval(PFADD_WITH_TTL, [current], [viewerId, ttl])) === 1;
   } catch {
     return false; // sayaç arızası zararsız
+  }
+}
+
+/** Son iki penceredeki tekil izleyici tahmini (`PFCOUNT` birleşimi). */
+export async function countRoomViewers(roomId: string, now = Date.now()): Promise<number> {
+  try {
+    return Number(await redis.eval(PFCOUNT, viewKeys(roomId, now), [])) || 0;
+  } catch {
+    return 0;
   }
 }
 
@@ -99,11 +120,10 @@ export async function getRoomHeat(
   const availableNights = totalNights - bookedNights;
   const scarcity = totalNights > 0 ? bookedNights / totalNights : 0;
 
-  const [viewsRaw, bookedRaw] = await Promise.all([
-    redis.get(`${VIEWS_PREFIX}${roomId}:views`).catch(() => null),
+  const [views, bookedRaw] = await Promise.all([
+    countRoomViewers(roomId),
     redis.get(`${BOOKED_PREFIX}${roomId}:booked`).catch(() => null),
   ]);
-  const views = Number(viewsRaw ?? "0");
   const bookedRecent = Number(bookedRaw ?? "0");
 
   // Güncel fiyat = envanterdeki (tek motorla yazılmış) fiyat; çarpan tekrar uygulanmaz (v3#9).

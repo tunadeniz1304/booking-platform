@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getRoomHeat, recordRoomView } from "@/lib/live/stats";
 import { acquireConnectionSlot, subscribeHeat } from "@/lib/live/hub";
+import { resolveViewer } from "@/lib/live/viewer";
 import { getConfig } from "@/lib/config/app-config";
 import { clientKey } from "@/lib/security/ip";
 import { addDays, diffDays, parseIsoDate, todayUtc } from "@/lib/time/nights";
@@ -20,7 +21,7 @@ const querySchema = z.object({
 /**
  * Canlı talep ısı haritası (SSE). Hata #11 düzeltmeleri: aralık ≤ LIVE_MAX_RANGE_DAYS,
  * IP başına bağlantı sınırı, bağlantı başına poll yerine paylaşılan poller + pub/sub,
- * IP-tekil atomik görüntülenme sayacı.
+ * görüntülenme sayımı yalnızca imzalı oturum/cihaz başına HyperLogLog ile (v4#18).
  */
 export async function GET(req: NextRequest, { params }: { params: Promise<{ roomId: string }> }) {
   const { roomId } = await params;
@@ -61,7 +62,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ room
       { status: 429 }
     );
   }
-  await recordRoomView(roomId, ip);
+  const viewer = await resolveViewer(req);
+  if (viewer.viewerId) await recordRoomView(roomId, viewer.viewerId);
 
   const encoder = new TextEncoder();
   let unsubscribe: (() => void) | null = null;
@@ -98,6 +100,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ room
       "Cache-Control": "no-cache, no-transform",
       Connection: "keep-alive",
       "X-Accel-Buffering": "no",
+      ...(viewer.setCookie ? { "Set-Cookie": viewer.setCookie } : {}),
     },
   });
 }

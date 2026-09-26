@@ -182,6 +182,8 @@ const schema = z.object({
   LIVE_MAX_CONNECTIONS_PER_IP: int(3, 1, 100),
   LIVE_POLL_INTERVAL_MS: int(3000, 500, 60000),
   LIVE_VIEW_DEDUPE_SECONDS: int(600, 1, 86400),
+  /** İstemci anahtarı başına pencerede basılabilecek yeni izleyici çerezi (v4#18). */
+  LIVE_VIEWER_MINT_MAX: int(20, 1, 10_000),
 
   // Rota optimizasyonu
   ROUTING_MAX_CITIES: int(12, 2, 16),

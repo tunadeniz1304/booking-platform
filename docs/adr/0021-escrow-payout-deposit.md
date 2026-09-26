@@ -194,8 +194,7 @@ RESOLVED_REJECTED`; açanın geri çekmesi `CLOSED`.
   yönetici bildirimi; kapanış `won → RESOLVED_REJECTED`, `lost → RESOLVED_APPROVED` (tutar
   `awardedMinor`), diğer → `CLOSED`. Yönetici karar veremez (`CLAIM_PSP_MANAGED`). Sepet
   (P1-1) tahsilatında itiraz sepetin ilk rezervasyonuna bağlanır.
-- Kaybedilen itirazın jurnali (PSP'nin geri çektiği para) bu adımda yazılmaz; chargeback
-  jurnali ve ev sahibinden geri alım sonraki iş.
+- Kaybedilen itirazın jurnali ve ev sahibinden geri alım: bkz. aşağıda "fix-sweep-2 eki".
 
 ### Serbest bırakma sonrası iade: rezerv önce (P1-4 açığının kapatılması)
 
@@ -217,8 +216,73 @@ rezerv eksiye düşmez, tüketilen rezerv ikinci kez açılmaz.
 - Yeni env `DEPOSIT_*`, `CLAIM_*` (`.env.example`); yeni kuyruk `resolution`.
 - UI: rezervasyon sayfasında depozito + talep açma, `/resolution` (liste, ayrıntı, mesaj,
   kanıt), `/admin/claims` karar ekranı, ev sahibi panelinde depozito tutarı (TR/EN).
-- Bilinen sınırlar: Stripe'ta kartın off-session yeniden kullanımı için ödeme akışında
-  Customer + `setup_future_usage=off_session` gerekir (şu an yok → Stripe'ta depozito
-  `FAILED`, mock'ta çalışır). PSP capture başarılı olup DB yazımı düşerse (çok nadir) tekrar
+- Bilinen sınırlar: Stripe'ta kartın off-session yeniden kullanımı fix-sweep-2'de eklendi
+  (Customer + `setup_future_usage=off_session`, aşağıya bakın). PSP capture başarılı olup DB yazımı düşerse (çok nadir) tekrar
   denemede Stripe "already captured" döner — elle mutabakat gerekir. Devredilmiş
   rezervasyonda misafir iade talebi kapalı.
+
+## fix-sweep-2 eki — iade toplamı, bölünmüş ödeme, kaybedilen itiraz, Stripe depozito
+
+### Kümülatif iade toplamı
+
+`Payment.refundedAmountMinor` her iade yolunda KÜMÜLATİFTİR (mutabakat onu REFUND_ISSUED
+`Cr psp_clearing` toplamıyla karşılaştırır). İptal (`cancelAndRefund`) eskiden alanı kendi
+tutarıyla eziyordu → talep iadesinden sonra iptalde toplam küçülüyor, durum PAID'e dönüyor ve
+mutabakat farkı doğuyordu. Artık iptal iadesi politikası yalnız KALAN tutar üzerinden
+hesaplanır: kart = tahsilat − önceki iadeler − kaybedilen itirazlar; kredi payı (P1-7)
+`CreditSpend.refundedMinor` ile zaten ayrı izlenir. İptal jurnaline `refundedBeforeMinor`
+verilir (vergi payı kümülatif oransal). `refund-retry` iptal tutarını alan yerine
+`refund-issued:cancel:<id>` jurnalinden okur (defter öncesi satırlarda eski davranış).
+Diğer yollar (saga telafisi, geç başarı, sepet/pay telafisi, pay iadeleri, talep iadesi)
+tahsil edilmemiş/kalan tutar üzerinden yazar; kümülatif değişmezle uyumlu.
+
+### Bölünmüş ödemede (P1-2) misafir talebi ve depozito
+
+- Talep iadesi tahsil edilmiş paylara kalan kapasiteleriyle oransal dağıtılır (`allocateCapped`;
+  kalan kuruş organizatöre). Dağılım `ClaimShareRefund` (talep × pay tekil) — kalem iptalinin
+  `PaymentShareRefund`'ından (rezervasyon × pay tekil) ayrı, çünkü aynı rezervasyonda talep +
+  iptal birlikte olabilir. Kapasite PSP çağrısından ÖNCE, pay satırları `FOR UPDATE` altında
+  ayrılır (eşzamanlı kalem iptali aynı payı aşamaz); PSP iadesi pay başına
+  `claim-refund:<claimId>:<shareId>`. PSP hatasında karar 502 döner, talep açık kalır;
+  yeniden karar aynı dağılımı kullanır ve yalnız eksik payı iade eder. Ret/geri çekmede
+  bekleyen ayrım serbest kalır. Jurnal ve `Payment` toplamı tek ödemeli yol ile aynı.
+- Depozito kaynağı ORGANİZATÖRÜN payıdır (asıl pay ödenmediyse yedek payı). Gerekçe:
+  rezervasyonların sahibi ve konaklamadan sorumlu taraf organizatördür; katılımcılar yalnız
+  kendi payları için kart yetkisi verdi. 409 ile reddetmek yerine desteklendi, çünkü depozito
+  ev sahibinin güvencesidir ve ödeme biçimine göre kaybolmamalıdır. UI notu: "bölünmüş ödemede
+  provizyon organizatörün kartından alınır".
+
+### Kaybedilen itiraz (dispute `closed=lost`)
+
+`chargebackLost` (anahtar `chargeback-lost:<claimId>`, tür CHARGEBACK_LOST), itiraz kapanışıyla
+AYNI tx'te: `Cr psp_clearing` (para karta döner, misafir iadesi yönü). Borç tarafı iadeyle aynı
+tahsil sırası: serbest bırakma öncesi `escrow` + `tax_payable`; sonrası vergi, komisyon payı
+(`platform_revenue`), ev sahibi payı önce `host_reserve`, sonra kullanılabilir `host_payable`
+(bekleyen payout'lar düşülür), yetmezse yeni `platform_loss` gider hesabı (borç-doğal). İade
+yolundaki "platform üstlenir" gelirden (kontra-gelir) düşerken itiraz kaybı ayrı gider olarak
+raporlanır. Talep: `awardedMinor` = itiraz tutarı, `settledMinor` = ev sahibi/emanetten
+karşılanan, `platformCoveredMinor` = zarar, `uncollectedMinor` = rezervasyonun kalan
+tahsilatını aşan (deftere yazılmaz). Mutabakat yeni `chargeback` öznesiyle `awardedMinor` ↔
+jurnal karşılaştırır (aşan kısım fark olarak görünür → elle inceleme). Sonraki iptal/talep
+iadesi kaybedilen itirazı "kalan"dan düşer. Sınır: sepet tahsilatında itiraz ilk rezervasyona
+bağlanır (tutar o rezervasyonla sınırlı); itiraz ücreti ve `won` sonrası geri dönüş (Stripe
+`funds_reinstated`) modellenmedi — jurnal yalnız kesin kayıpta yazılır; DAC7 dökümü itiraz
+kaybını düşmez.
+
+### Stripe depozito: müşteri + kayıtlı kart
+
+Depozito ayarı olan ilanın (ya da sepette/bölünmüş ödemede depozitolu kalemi olan) ödemesi
+kullanıcının Stripe Customer'ına bağlanır (`PaymentCustomer`, kullanıcı × sağlayıcı tekil;
+`customers.create` yalnız iç kullanıcı kimliği metadata'sıyla, anahtar
+`customer:stripe:<userId>`) ve `setup_future_usage=off_session` ile kart kaydedilir.
+Depozito ön provizyonu (`authorizeHold`) kaynak PaymentIntent'in müşterisi + kayıtlı ödeme
+yöntemiyle off-session alınır. Bölünmüş ödemede yalnız organizatör payı kaydedilir; ajan
+ödemesinde (SPT) kayıt yapılmaz. Depozitosuz ödemelerde müşteri açılmaz (gereksiz kart
+saklama yok). MockPsp değişmedi (`createCustomer` yok).
+
+### PSP hatası HTTP eşlemesi
+
+`PaymentProviderError` artık 500 değil `502 PAYMENT_PROVIDER_ERROR` (+ `Retry-After`,
+`details.providerCode`; geçersiz token 422 `INVALID_CARD_TOKEN`). Provizyon hatasında ödeme
+satırı `FAILED` + `provider_error:<kod>` (açık durum → yeniden ödenebilir); deneme hakkından
+düşmez ve fraud hız kuralındaki "son 24 saatte başarısız ödeme" sayısına girmez.

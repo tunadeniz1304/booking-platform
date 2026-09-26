@@ -244,6 +244,7 @@ describeInt("fix-sweep-3: onay dayanıklılığı, PSP 502, telafi yeniden denem
     injectSerializationFaultsForTests("split_payment.confirm", 0);
     injectSerializationFaultsForTests("confirm-retry.cart", 0);
     injectSerializationFaultsForTests("confirm-retry.split", 0);
+    injectSerializationFaultsForTests("split.claim_share", 0);
     resetConfigForTests();
   });
   afterAll(async () => {
@@ -563,6 +564,30 @@ describeInt("fix-sweep-3: onay dayanıklılığı, PSP 502, telafi yeniden denem
     // İkinci çalıştırma: yapılacak iş yok, ikinci iade yok.
     await runCompensationRetry({ saga: "split_payment", planId: plan.id });
     expect(psp.refunded).toHaveLength(1);
+    await expectLedgerClean(cart.id);
+  });
+
+  it("pay sahiplenme işlemi çakışmada tükenirse yetkilendirme void edilir, pay ödenebilir kalır", async () => {
+    psp = new FaultyPsp();
+    setPaymentProviderForTests(psp);
+    const { owner, cart } = await heldCart("claim", 85);
+    const p1 = await newUser("claim-p1");
+    const plan = await createSplitPlan({
+      cartId: cart.id,
+      userId: owner.id,
+      mode: "equal",
+      participants: [{ email: p1.email }],
+    });
+    injectSerializationFaultsForTests("split.claim_share", 6);
+    await expect(payShareOf(tokenOf(plan, 1), p1)).rejects.toThrow();
+    injectSerializationFaultsForTests("split.claim_share", 0);
+    const share = await prisma.paymentShare.findFirstOrThrow({
+      where: { planId: plan.id, position: 1 },
+    });
+    expect(share.status).toBe("INVITED");
+    expect(psp.voided).toHaveLength(1); // yük testinde bulunan açık yetkilendirme sızıntısı
+    expect((await payShareOf(tokenOf(plan, 0), owner)).status).toBe("authorized");
+    expect((await payShareOf(tokenOf(plan, 1), p1)).status).toBe("confirmed");
     await expectLedgerClean(cart.id);
   });
 

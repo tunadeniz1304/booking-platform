@@ -812,37 +812,47 @@ async function claimAuthorizedShare(
   providerName: string,
   from: readonly PaymentShareStatus[]
 ): Promise<void> {
-  const verdict = await withSerializableRetry(async (tx) => {
-    const share = await tx.paymentShare.findUnique({
-      where: { id: shareId },
-      select: { cartId: true, planId: true },
-    });
-    if (!share) return "missing" as const;
-    await tx.$queryRaw`SELECT id FROM "Cart" WHERE id = ${share.cartId} FOR UPDATE`;
-    await tx.$queryRaw`SELECT id FROM "PaymentShare" WHERE id = ${shareId} FOR UPDATE`;
-    const [cart, plan] = await Promise.all([
-      tx.cart.findUnique({ where: { id: share.cartId }, select: { status: true } }),
-      tx.splitPlan.findUnique({
-        where: { id: share.planId },
-        select: { status: true, deadlineAt: true },
-      }),
-    ]);
-    if (!plan || !ACTIVE_PLAN.includes(plan.status) || cart?.status !== CartStatus.HELD) {
-      return "closed" as const;
-    }
-    if (plan.deadlineAt.getTime() <= Date.now()) return "deadline" as const;
-    const claimed = await tx.paymentShare.updateMany({
-      where: { id: shareId, status: { in: [...from] } },
-      data: {
-        status: PaymentShareStatus.AUTHORIZED,
-        providerRef,
-        provider: providerName,
-        payerUserId: userId,
-        authorizedAt: new Date(),
-        failureCode: null,
-      },
-    });
-    return claimed.count === 1 ? ("ok" as const) : ("taken" as const);
+  const verdict = await withSerializableRetry(
+    async (tx) => {
+      const share = await tx.paymentShare.findUnique({
+        where: { id: shareId },
+        select: { cartId: true, planId: true },
+      });
+      if (!share) return "missing" as const;
+      await tx.$queryRaw`SELECT id FROM "Cart" WHERE id = ${share.cartId} FOR UPDATE`;
+      await tx.$queryRaw`SELECT id FROM "PaymentShare" WHERE id = ${shareId} FOR UPDATE`;
+      const [cart, plan] = await Promise.all([
+        tx.cart.findUnique({ where: { id: share.cartId }, select: { status: true } }),
+        tx.splitPlan.findUnique({
+          where: { id: share.planId },
+          select: { status: true, deadlineAt: true },
+        }),
+      ]);
+      if (!plan || !ACTIVE_PLAN.includes(plan.status) || cart?.status !== CartStatus.HELD) {
+        return "closed" as const;
+      }
+      if (plan.deadlineAt.getTime() <= Date.now()) return "deadline" as const;
+      const claimed = await tx.paymentShare.updateMany({
+        where: { id: shareId, status: { in: [...from] } },
+        data: {
+          status: PaymentShareStatus.AUTHORIZED,
+          providerRef,
+          provider: providerName,
+          payerUserId: userId,
+          authorizedAt: new Date(),
+          failureCode: null,
+        },
+      });
+      return claimed.count === 1 ? ("ok" as const) : ("taken" as const);
+    },
+    { label: "split.claim_share" }
+  ).catch(async (error: unknown) => {
+    // fix-sweep-3 (yük testi): sahiplenme işlemi çakışmada tükenirse yetkilendirme PSP'de açık
+    // kalmasın → void, hata (409 TRANSACTION_CONFLICT) çağırana; pay ödenebilir kalır.
+    await getPaymentProvider()
+      .void(providerRef)
+      .catch((e) => logger.warn({ providerRef, ...errorFields(e) }, "share void failed"));
+    throw error;
   });
   if (verdict === "ok") {
     splitShareTotal.inc({ outcome: "authorized" });

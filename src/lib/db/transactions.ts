@@ -19,7 +19,7 @@ export { isSerializationFailure };
  */
 export async function withSerializableRetry<T>(
   fn: (tx: Prisma.TransactionClient) => Promise<T>,
-  opts: { attempts?: number; maxWait?: number; timeout?: number } = {}
+  opts: { attempts?: number; maxWait?: number; timeout?: number; label?: string } = {}
 ): Promise<T> {
   const { DB_SERIALIZABLE_RETRY_ATTEMPTS, DB_SERIALIZABLE_RETRY_BASE_MS } = getConfig();
   return retryLoop(fn, {

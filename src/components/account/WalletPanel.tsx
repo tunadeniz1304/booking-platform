@@ -27,7 +27,7 @@ export interface WalletData {
 
 const TIER_STYLE = [
   "bg-gray-100 text-gray-800",
-  "bg-slate-200 text-slate-900",
+  "bg-gray-200 text-gray-900",
   "bg-amber-100 text-amber-900",
   "bg-indigo-100 text-indigo-900",
 ];

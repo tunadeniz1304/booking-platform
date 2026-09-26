@@ -37,7 +37,7 @@ export async function listBookingLedger(db: Db, bookingId: string): Promise<Ledg
     bookingId: r.bookingId,
     userId: r.userId,
     kind: r.kind,
-    amountMinor: toMinorBigint(r.amount, r.currency),
+    amountMinor: r.amountMinor,
     currency: r.currency,
     reference: r.reference,
     createdAt: r.createdAt,

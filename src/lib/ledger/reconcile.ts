@@ -2,7 +2,6 @@ import type { Prisma, PrismaClient } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { counter } from "@/lib/observability/metrics";
 import { ledgerImbalanceTotal } from "./journal";
-import { toMinorBigint } from "./legacy";
 import { JournalKinds } from "./templates";
 
 type Db = PrismaClient | Prisma.TransactionClient;
@@ -58,9 +57,9 @@ export function dayWindow(date: string | Date): { date: string; from: Date; to: 
  * jurnali oluşmuş her ödeme/devir için PSP kaydındaki TOPLAM tutar ile jurnaldeki
  * psp_clearing tutarını (tüm zamanlar) karşılaştırır. Fark satırları raporlanır.
  *
- * - capture: Payment.amount (paidAt doluysa) ↔ BOOKING_CAPTURED Dr psp_clearing
- * - refund:  Payment.refundedAmount ↔ REFUND_ISSUED Cr psp_clearing (krediye iade hariç)
- * - transfer: COMPLETED devrin askPrice'ı ↔ TRANSFER_SETTLED Dr psp_clearing
+ * - capture: Payment.amountMinor (paidAt doluysa) ↔ BOOKING_CAPTURED Dr psp_clearing
+ * - refund:  Payment.refundedAmountMinor ↔ REFUND_ISSUED Cr psp_clearing (krediye iade hariç)
+ * - transfer: COMPLETED devrin askPriceMinor'ı ↔ TRANSFER_SETTLED Dr psp_clearing
  */
 export async function reconcile(
   date: string | Date,
@@ -106,15 +105,15 @@ export async function reconcile(
         id: true,
         bookingId: true,
         currency: true,
-        amount: true,
-        refundedAmount: true,
+        amountMinor: true,
+        refundedAmountMinor: true,
         paidAt: true,
       },
     });
     const journal = await pspSums(db, "paymentId", paymentIds);
     for (const p of payments) {
-      const captured = p.paidAt ? toMinorBigint(p.amount, p.currency) : 0n;
-      const refunded = toMinorBigint(p.refundedAmount ?? 0, p.currency);
+      const captured = p.paidAt ? p.amountMinor : 0n;
+      const refunded = p.refundedAmountMinor;
       const j = journal.get(p.id);
       checked += 2;
       push(
@@ -143,11 +142,11 @@ export async function reconcile(
   if (transferIds.length > 0) {
     const transfers = await db.bookingTransfer.findMany({
       where: { id: { in: transferIds } },
-      select: { id: true, bookingId: true, currency: true, askPrice: true, status: true },
+      select: { id: true, bookingId: true, currency: true, askPriceMinor: true, status: true },
     });
     const journal = await pspSums(db, "transferId", transferIds);
     for (const t of transfers) {
-      const settled = t.status === "COMPLETED" ? toMinorBigint(t.askPrice, t.currency) : 0n;
+      const settled = t.status === "COMPLETED" ? t.askPriceMinor : 0n;
       checked += 1;
       push(
         differences,

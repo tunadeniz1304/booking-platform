@@ -4,6 +4,7 @@ import { NextRequest } from "next/server";
 import { Prisma, PrismaClient } from "@prisma/client";
 import { describeInt } from "./helpers";
 import { createStayFixture, type StayFixture } from "./fixtures";
+import { toMinor } from "@/lib/money/money";
 import { withSerializableRetry } from "@/lib/db/transactions";
 import {
   account,
@@ -51,13 +52,13 @@ describeInt("P0-3 çift girişli defter (jurnal, tetik, idempotency, mutabakat)"
       data: {
         bookingId: b.id,
         userId: fx.userId,
-        amount: new Prisma.Decimal(opts.amount),
+        amountMinor: BigInt(toMinor(opts.amount, "TRY")),
         currency: "TRY",
         provider: "mock",
         providerRef: `pi_ledger_${randomUUID()}`,
         status: opts.refunded ? "PARTIALLY_REFUNDED" : "PAID",
         paidAt: opts.paidAt,
-        refundedAmount: new Prisma.Decimal(opts.refunded ?? "0"),
+        refundedAmountMinor: BigInt(toMinor(opts.refunded ?? "0", "TRY")),
         refundedAt: opts.refundedAt ?? null,
       },
     });
@@ -240,7 +241,7 @@ describeInt("P0-3 çift girişli defter (jurnal, tetik, idempotency, mutabakat)"
         bookingId: tb.id,
         sellerId: fx.userId,
         status: "COMPLETED",
-        askPrice: new Prisma.Decimal("80.00"),
+        askPriceMinor: 8_000n,
         currency: "TRY",
         tokenHash: `th_${randomUUID()}`,
         expiresAt: at(CLEAN_DAY, "23"),
@@ -384,7 +385,7 @@ describeInt("P0-3 çift girişli defter (jurnal, tetik, idempotency, mutabakat)"
         bookingId: p.bookingId,
         userId: fx.userId,
         kind: "CHARGE",
-        amount: new Prisma.Decimal("300.00"),
+        amountMinor: 30_000n,
         currency: "TRY",
         reference: p.providerRef,
       },
@@ -424,7 +425,7 @@ describeInt("P0-3 çift girişli defter (jurnal, tetik, idempotency, mutabakat)"
         sellerId: fx.userId,
         claimedById: fx.hostId,
         status: "COMPLETED",
-        askPrice: new Prisma.Decimal("60.00"),
+        askPriceMinor: 6_000n,
         tokenHash: `th_${randomUUID()}`,
         expiresAt: at("2031-04-05"),
         completedAt: at("2031-04-03"),

@@ -1,0 +1,86 @@
+# Prometheus alarm kuralları (P0-6). Eşikler ve gerekçeler: docs/observability/SLO.md.
+# `promtool check rules docker/observability/alerts.yml` ile doğrulanır.
+groups:
+  - name: booking-slo
+    rules:
+      # SLO-1: rezervasyon oluşturma p99 < 1 s (5 dk pencere, 10 dk sürerse sayfa).
+      - record: booking:create_latency_seconds:p99_5m
+        expr: >
+          histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket{route=~"bookings|cart.hold",method="POST"}[5m])))
+      - alert: BookingLatencyP99High
+        expr: booking:create_latency_seconds:p99_5m > 1
+        for: 10m
+        labels: { severity: page, slo: booking-latency }
+        annotations:
+          summary: "Rezervasyon/tutma p99 gecikmesi 1 s üstünde"
+          description: "p99 = {{ $value | humanizeDuration }} (SLO: < 1 s). Kilit çekişmesi, DB havuzu veya Redis gecikmesini kontrol edin."
+
+      # SLO-2: ödeme başarı oranı ≥ %97 (kullanıcı kaynaklı ret ve 3DS hariç, 30 dk pencere).
+      - record: payment:success_ratio:30m
+        expr: >
+          sum(increase(payment_attempts_total{outcome="confirmed"}[30m]) + increase(cart_payment_total{outcome="confirmed"}[30m]))
+          /
+          clamp_min(sum(increase(payment_attempts_total{outcome=~"confirmed|capture_failed|compensated"}[30m]) + increase(cart_payment_total{outcome=~"confirmed|capture_failed|compensated"}[30m])), 1)
+      - alert: PaymentSuccessRatioLow
+        expr: payment:success_ratio:30m < 0.97 and sum(increase(payment_attempts_total[30m])) > 20
+        for: 15m
+        labels: { severity: page, slo: payment-success }
+        annotations:
+          summary: "Ödeme başarı oranı %97 altında"
+          description: "Oran {{ $value | humanizePercentage }}. PSP durumu, saga telafileri (saga_compensation_total) ve refund_retry_total'a bakın."
+
+      # SLO-3: defter dengesizliği = 0 (tek olay bile sayfa atar; beklemesiz).
+      - alert: LedgerImbalanceDetected
+        expr: sum by (source) (increase(ledger_imbalance_total[15m])) > 0
+        labels: { severity: page, slo: ledger-balance }
+        annotations:
+          summary: "Çift girişli defterde dengesizlik ({{ $labels.source }})"
+          description: "ledger_imbalance_total arttı. Ödemeleri durdurmayı değerlendirin; docs/observability/SLO.md runbook."
+      - alert: LedgerReconciliationNotRunning
+        expr: sum(increase(ledger_reconciliation_runs_total[26h])) == 0
+        for: 1h
+        labels: { severity: ticket, slo: ledger-balance }
+        annotations:
+          summary: "Günlük defter mutabakatı 26 saattir koşmadı"
+
+      # SLO-4: 7565 kaldırma talepleri 24 saat içinde (ihlal sayısı 0).
+      - alert: TakedownSlaBreached
+        expr: sum by (source) (increase(takedown_sla_breach_total[1h])) > 0
+        labels: { severity: page, slo: takedown-sla }
+        annotations:
+          summary: "Kaldırma talebi SLA'sı aşıldı ({{ $labels.source }})"
+          description: "Yasal süre (varsayılan 24 saat) doldu; /admin/compliance kuyruğunu işleyin."
+
+  - name: booking-money-hygiene
+    rules:
+      - alert: RefundRetryFailing
+        expr: sum(increase(refund_retry_total{outcome=~"failed|exhausted"}[30m])) > 5
+        for: 10m
+        labels: { severity: ticket }
+        annotations:
+          summary: "Başarısız iade yeniden denemeleri birikiyor"
+      - alert: LatePaymentRefundSpike
+        expr: sum(increase(payment_late_success_total{outcome="refunded"}[1h])) + sum(increase(cart_late_success_total{outcome="refunded"}[1h])) > 10
+        labels: { severity: ticket }
+        annotations:
+          summary: "Geç gelen başarılı ödemeler topluca iade ediliyor (tutma TTL'i / PSP gecikmesi?)"
+      - alert: CaptureRaceCompensations
+        expr: sum(increase(payment_capture_race_total[15m])) > 20
+        labels: { severity: ticket }
+        annotations:
+          summary: "Çok sayıda yarış kaybı telafisi (çift ödeme denemesi) — istemci yeniden denemelerini inceleyin"
+      - alert: SplitPlansAborting
+        expr: sum(increase(split_plan_total{outcome="aborted"}[1h])) > 5
+        labels: { severity: ticket }
+        annotations:
+          summary: "Bölünmüş ödeme planları süre sonunda iptal oluyor"
+      - alert: PayoutFailures
+        expr: sum(increase(payouts_total{outcome=~"failed|error"}[1h])) > 0
+        labels: { severity: ticket }
+        annotations:
+          summary: "Ev sahibi / devir payout hatası"
+      - alert: LlmTokenBurnHigh
+        expr: sum by (route) (increase(llm_tokens_total[1h])) > 2e6
+        labels: { severity: ticket }
+        annotations:
+          summary: "LLM token tüketimi {{ $labels.route }} rotasında saatlik 2M üstünde"

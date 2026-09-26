@@ -142,6 +142,7 @@ services:
     profiles: ["observability"]
     volumes:
       - ./docker/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./docker/observability/alerts.yml:/etc/prometheus/alerts.yml:ro
       - booking_secrets:/run/booking-secrets:ro
     ports:
       # Başka projelerle çakışmasın diye host portu ayarlanabilir (v3#16).

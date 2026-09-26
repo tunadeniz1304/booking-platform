@@ -1,5 +1,9 @@
 global:
   scrape_interval: 15s
+  evaluation_interval: 30s
+# P0-6 SLO alarmları (docs/observability/SLO.md).
+rule_files:
+  - /etc/prometheus/alerts.yml
 scrape_configs:
   - job_name: booking-web
     metrics_path: /api/metrics

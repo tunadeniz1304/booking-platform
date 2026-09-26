@@ -7,6 +7,12 @@ import { getLlmClient } from "@/lib/llm/client";
 import { demoMessageDraft } from "@/lib/llm/demo";
 import { maskMessage } from "./mask";
 import { publishMessage, type MessageEvent } from "./hub";
+import {
+  enforceMessageScan,
+  loadMessageRisks,
+  recordMessageRisk,
+  scanOutgoingMessage,
+} from "@/lib/trust/message-risk";
 
 /**
  * P1-6 misafir ↔ ev sahibi mesajlaşması. Yetki: yalnızca rezervasyonun misafiri ve
@@ -85,10 +91,11 @@ export async function listMessages(bookingId: string, userId: string) {
         take: getConfig().MESSAGE_PAGE_SIZE,
       })
     : [];
+  const risks = await loadMessageRisks(messages.map((m) => m.id));
   return {
     role: access.role,
     canWrite: WRITABLE.has(access.status),
-    messages: messages.reverse().map(toEvent),
+    messages: messages.reverse().map((m) => ({ ...toEvent(m), risk: risks.get(m.id) ?? null })),
   };
 }
 
@@ -112,6 +119,9 @@ export async function sendMessage(
   if (input.fromAiDraft && access.role !== "HOST") {
     throw new ValidationError("Yapay zekâ taslağı yalnızca ev sahibi tarafından gönderilebilir");
   }
+  // P1-6: dolandırıcılık taraması ham metinde (maskeleme IBAN/link'i gizlemeden önce).
+  const scan = await scanOutgoingMessage(input.body);
+  await enforceMessageScan(scan, { bookingId, senderId: userId });
   const masked = maskMessage(input.body);
   const thread = await prisma.messageThread.upsert({
     where: { bookingId },
@@ -129,7 +139,8 @@ export async function sendMessage(
     },
   });
   await prisma.messageThread.update({ where: { id: thread.id }, data: { updatedAt: new Date() } });
-  const event = toEvent(msg);
+  const risk = await recordMessageRisk(scan, { bookingId, senderId: userId, messageId: msg.id });
+  const event: MessageEvent = { ...toEvent(msg), risk };
   await publishMessage(bookingId, event);
   return event;
 }

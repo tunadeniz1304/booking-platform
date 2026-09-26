@@ -17,6 +17,8 @@ export interface MessageEvent {
   maskedKinds: string[];
   fromAiDraft: boolean;
   createdAt: string;
+  /** P1-6 dolandırıcılık taraması: alıcıya uyarı bandı (yoksa null/eksik). */
+  risk?: { level: "WARN" | "HIGH"; reasons: string[] } | null;
 }
 
 type Listener = (event: MessageEvent) => void;

@@ -13,6 +13,8 @@ interface Msg {
   maskedKinds: string[];
   fromAiDraft: boolean;
   createdAt: string;
+  /** P1-6 dolandırıcılık taraması (yalnızca alıcıya bant olarak gösterilir). */
+  risk?: { level: "WARN" | "HIGH"; reasons: string[] } | null;
 }
 
 interface ThreadResponse {
@@ -28,6 +30,7 @@ interface ThreadResponse {
  */
 export default function BookingMessages({ bookingId }: { bookingId: string }) {
   const t = useTranslations("chat");
+  const tt = useTranslations("trust");
   const f = useFormat();
   const [thread, setThread] = useState<ThreadResponse | null>(null);
   const [text, setText] = useState("");
@@ -85,7 +88,9 @@ export default function BookingMessages({ bookingId }: { bookingId: string }) {
       setText("");
       setFromDraft(false);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t("sendFailed"));
+      if (err instanceof ApiError && err.code === "MESSAGE_BLOCKED")
+        setError(tt("message.blocked"));
+      else setError(err instanceof ApiError ? err.message : t("sendFailed"));
     } finally {
       setBusy(false);
     }
@@ -130,6 +135,27 @@ export default function BookingMessages({ bookingId }: { bookingId: string }) {
           const mine = m.senderRole === thread.role;
           return (
             <li key={m.id} className={mine ? "text-right" : "text-left"}>
+              {!mine && m.risk && (
+                <div
+                  role="alert"
+                  className={`mb-1 max-w-[80%] rounded-md border px-3 py-2 text-left text-xs ${
+                    m.risk.level === "HIGH"
+                      ? "border-red-300 bg-red-50 text-red-900"
+                      : "border-amber-300 bg-amber-50 text-amber-900"
+                  }`}
+                >
+                  <p className="font-semibold">
+                    {m.risk.level === "HIGH" ? tt("message.highTitle") : tt("message.warnTitle")}
+                  </p>
+                  <p>{tt("message.advice")}</p>
+                  <p className="mt-1">
+                    {tt("message.reasonsLabel")}{" "}
+                    {m.risk.reasons
+                      .map((r) => (tt.has(`reasons.${r}`) ? tt(`reasons.${r}`) : r))
+                      .join(", ")}
+                  </p>
+                </div>
+              )}
               <div
                 className={`inline-block max-w-[80%] rounded-lg px-3 py-2 text-sm ${
                   mine ? "bg-[#003580] text-white" : "bg-gray-100 text-gray-900"

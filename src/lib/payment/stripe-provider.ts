@@ -13,6 +13,19 @@ import { PaymentProviderError, type AuthorizeResult, type PaymentProvider } from
  * aksi hâlde MockPsp devrededir (çevrimdışı yedek).
  */
 
+/** Stripe Shared Payment Token kimliği (`spt_…`; demo `spt_mock_…` değil). */
+export function isSharedPaymentToken(token: string): boolean {
+  return /^spt_[A-Za-z0-9]{6,}$/.test(token) && !token.startsWith("spt_mock");
+}
+
+export interface SharedPaymentTokenGrant {
+  id: string;
+  active: boolean;
+  currency: string | null;
+  maxAmountMinor: number | null;
+  expiresAt: Date | null;
+}
+
 /** SDK'nın kendi yeniden denemesi kapalı: idempotency anahtarları üst katmanda yönetilir. */
 const STRIPE_MAX_NETWORK_RETRIES = 0;
 
@@ -77,18 +90,22 @@ export class StripeProvider implements PaymentProvider {
     metadata?: Record<string, string>;
   }): Promise<AuthorizeResult> {
     try {
-      const intent = await this.stripe.paymentIntents.create(
-        {
-          amount: input.amount.amount,
-          currency: input.amount.currency.toLowerCase(),
-          payment_method: input.cardToken,
-          confirm: true,
-          capture_method: "manual",
-          automatic_payment_methods: { enabled: true, allow_redirects: "never" },
-          metadata: input.metadata,
-        },
-        { idempotencyKey: input.idempotencyKey }
-      );
+      // P1-11: ajan ödemesinde token, Stripe Shared Payment Token'dır (`spt_…`); SDK tipinde
+      // henüz yok → parametre elle eklenir. Kart verisi yine sunucuya gelmez.
+      const params: Stripe.PaymentIntentCreateParams & { shared_payment_granted_token?: string } = {
+        amount: input.amount.amount,
+        currency: input.amount.currency.toLowerCase(),
+        ...(isSharedPaymentToken(input.cardToken)
+          ? { shared_payment_granted_token: input.cardToken }
+          : { payment_method: input.cardToken }),
+        confirm: true,
+        capture_method: "manual",
+        automatic_payment_methods: { enabled: true, allow_redirects: "never" },
+        metadata: input.metadata,
+      };
+      const intent = await this.stripe.paymentIntents.create(params, {
+        idempotencyKey: input.idempotencyKey,
+      });
       return this.toResult(intent);
     } catch (error) {
       // confirm=true ile kart reddi 402 StripeCardError olarak gelir; bu bir "ret" sonucudur.
@@ -102,6 +119,28 @@ export class StripeProvider implements PaymentProvider {
       }
       return this.call(() => Promise.reject(error));
     }
+  }
+
+  /**
+   * Shared Payment Token kaydı (ACP/P1-11): kullanım limitleri (para birimi, azami tutar,
+   * son geçerlilik) ve devre dışı olup olmadığı. Kart verisi dönmez.
+   */
+  async retrieveSharedPaymentToken(id: string): Promise<SharedPaymentTokenGrant> {
+    const raw = (await this.call(() =>
+      this.stripe.rawRequest("GET", `/v1/shared_payment/granted_tokens/${encodeURIComponent(id)}`)
+    )) as {
+      id?: string;
+      deactivated_at?: number | null;
+      usage_limits?: { currency?: string; max_amount?: number; expires_at?: number } | null;
+    };
+    const usage = raw.usage_limits ?? {};
+    return {
+      id: raw.id ?? id,
+      active: !raw.deactivated_at,
+      currency: usage.currency ? usage.currency.toUpperCase() : null,
+      maxAmountMinor: typeof usage.max_amount === "number" ? usage.max_amount : null,
+      expiresAt: typeof usage.expires_at === "number" ? new Date(usage.expires_at * 1000) : null,
+    };
   }
 
   /** 3DS istemcide tamamlanır; sunucu yalnızca intent'in son durumunu okur (kod kullanılmaz). */

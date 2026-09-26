@@ -36,7 +36,8 @@ describeInt("P0-8 passkey (WebAuthn) kayıt ve giriş (integration)", () => {
         lastName: "Key",
       },
     });
-    const { token } = await signAccessToken(user.id, "USER", 300);
+    // Yeni giriş yapmış oturum (auth_time = şimdi): passkey ekleme/silme recent-auth ister (v4#2).
+    const { token } = await signAccessToken(user.id, "USER", 300, 0, Math.floor(Date.now() / 1000));
     const auth = new SoftAuthenticator();
 
     // Kayıt
@@ -139,7 +140,13 @@ describeInt("P0-8 passkey (WebAuthn) kayıt ve giriş (integration)", () => {
     expect(locked.status).toBe(401);
 
     // Silme: başkasının passkey'i 404, kendi passkey'i silinir.
-    const other = await signAccessToken("baska-kullanici", "USER", 300);
+    const other = await signAccessToken(
+      "baska-kullanici",
+      "USER",
+      300,
+      0,
+      Math.floor(Date.now() / 1000)
+    );
     expect(
       (
         await deleteKey(

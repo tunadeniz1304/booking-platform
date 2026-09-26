@@ -11,10 +11,13 @@ import { passkeyErrorMessage, performStepUp } from "@/lib/auth/passkey-client";
  * bileşen yalnızca WebAuthn törenini yürütür.
  */
 export default function StepUpDialog({
+  bookingId,
   onVerified,
   onCancel,
 }: {
-  onVerified: () => void;
+  bookingId: string;
+  /** Doğrulama bu rezervasyon + tutara bağlı tek kullanımlık token üretir (v4#2). */
+  onVerified: (stepUpToken: string) => void;
   onCancel: () => void;
 }) {
   const t = useTranslations("payment.stepUp");
@@ -35,8 +38,8 @@ export default function StepUpDialog({
     setBusy(true);
     setError(null);
     try {
-      await performStepUp();
-      onVerified();
+      const { stepUpToken } = await performStepUp(bookingId);
+      onVerified(stepUpToken);
     } catch (err) {
       setError(passkeyErrorMessage(err, t("failed")));
       setBusy(false);

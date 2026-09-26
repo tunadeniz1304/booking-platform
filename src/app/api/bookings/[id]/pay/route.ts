@@ -11,6 +11,8 @@ import { resolveDeviceId, setDeviceCookie } from "@/lib/risk/device-cookie";
 const bodySchema = z.object({
   /** PSP hosted-field token'ı (kart numarası sunucuya gelmez). */
   cardToken: z.string().min(8).max(200),
+  /** Passkey step-up token'ı (v4#2): bu rezervasyon + tutara bağlı, tek kullanımlık. */
+  stepUpToken: z.string().min(16).max(64).optional(),
   // v4#13: `cardBin` / `deviceId` artık istemciden ALINMAZ (gönderilirse yok sayılır):
   // BIN PSP token metadata'sından, cihaz kimliği sunucu imzalı `did` çerezinden gelir.
 });
@@ -28,7 +30,7 @@ export const POST = observed(
     try {
       const { id } = await params;
       const { userId } = await requireAuth(req);
-      const { cardToken } = bodySchema.parse(await req.json());
+      const { cardToken, stepUpToken } = bodySchema.parse(await req.json());
       const idempotencyKey = req.headers.get("idempotency-key")?.slice(0, 128);
       if (!idempotencyKey) throw new ValidationError("Idempotency-Key başlığı zorunludur");
       const config = getConfig();
@@ -38,6 +40,7 @@ export const POST = observed(
         userId,
         cardToken,
         idempotencyKey,
+        stepUpToken: stepUpToken ?? null,
         context: {
           // Hız kuralı istemci anahtarıyla sayılır (IP ya da parmak izi; tek "unknown" kovası yok).
           ip: clientKey(req.headers, {

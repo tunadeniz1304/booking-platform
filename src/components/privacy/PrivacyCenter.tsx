@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { apiFetch } from "@/lib/api-client";
 import { Button, Card, Status, errorMessage, focusRing } from "@/components/ui/ui";
+import { useReauth } from "@/components/account/ReauthDialog";
 
 /** KVKK self-servis (P2-5): veri dışa aktarımı ve hesap silme. */
 export default function PrivacyCenter() {
@@ -15,6 +16,8 @@ export default function PrivacyCenter() {
   const [confirming, setConfirming] = useState(false);
   const [acknowledged, setAcknowledged] = useState(false);
   const [busy, setBusy] = useState(false);
+  // v4#2: hesap silme yakın zamanda yeniden doğrulama ister.
+  const reauth = useReauth();
 
   async function download() {
     setFeedback({});
@@ -40,7 +43,7 @@ export default function PrivacyCenter() {
     setBusy(true);
     setFeedback({});
     try {
-      await apiFetch("/api/account", { method: "DELETE" });
+      await reauth.run(() => apiFetch("/api/account", { method: "DELETE" }));
       setFeedback({ message: t("deleted") });
       router.push("/");
       router.refresh();
@@ -112,6 +115,7 @@ export default function PrivacyCenter() {
           ),
         })}
       </p>
+      {reauth.dialog}
     </div>
   );
 }

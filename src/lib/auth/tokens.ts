@@ -24,6 +24,12 @@ export interface AccessClaims {
   exp: number;
   /** Üretildiği andaki `User.tokenVersion`. */
   tv: number;
+  /**
+   * Son birincil kimlik doğrulamanın zamanı (Unix sn, OIDC `auth_time`). Yenilemede
+   * korunur, yalnızca parola/passkey ile giriş veya yeniden doğrulamada güncellenir (v4#2).
+   * Claim yoksa 0 (hassas işlemler için "yakın zamanda doğrulanmamış").
+   */
+  authTime?: number;
 }
 
 /** Test dışındaki HER ortamda (development dahil) zayıf anahtar reddedilir (v4#5). */
@@ -49,12 +55,19 @@ export async function signAccessToken(
   userId: string,
   role: Role,
   ttlSeconds: number,
-  tokenVersion = 0
+  tokenVersion = 0,
+  /** Son birincil doğrulama (Unix sn); verilmezse claim yazılmaz (v4#2). */
+  authTime?: number
 ): Promise<{ token: string; jti: string; expiresAt: Date }> {
   const jti = randomUUID();
   const now = Math.floor(Date.now() / 1000);
   const exp = now + ttlSeconds;
-  const token = await new SignJWT({ role, typ: "access", tv: tokenVersion })
+  const token = await new SignJWT({
+    role,
+    typ: "access",
+    tv: tokenVersion,
+    ...(authTime !== undefined ? { auth_time: authTime } : {}),
+  })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(userId)
     .setJti(jti)
@@ -83,6 +96,7 @@ export async function verifyAccessToken(token: string): Promise<AccessClaims | n
       jti: payload.jti,
       exp: payload.exp ?? 0,
       tv: typeof payload.tv === "number" ? payload.tv : 0,
+      authTime: typeof payload.auth_time === "number" ? payload.auth_time : 0,
     };
   } catch {
     return null;

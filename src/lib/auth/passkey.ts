@@ -1,4 +1,4 @@
-import { randomUUID } from "crypto";
+import { randomBytes, randomUUID } from "crypto";
 import {
   generateAuthenticationOptions,
   generateRegistrationOptions,
@@ -15,6 +15,8 @@ import { redis } from "@/lib/redis";
 import { getConfig } from "@/lib/config/app-config";
 import { UnauthorizedError, ValidationError } from "@/lib/http/errors";
 import { logger, errorFields } from "@/lib/observability/logger";
+import { appendOutbox } from "@/lib/cqrs";
+import { EventTypes, makeEvent, type SecurityAlertPayload } from "@/lib/events/events";
 
 /**
  * Passkey (WebAuthn) kaydı ve girişi (P0-8) — `@simplewebauthn/server`.
@@ -28,7 +30,9 @@ import { logger, errorFields } from "@/lib/observability/logger";
 const REG_PREFIX = "webauthn:reg:";
 const AUTH_PREFIX = "webauthn:auth:";
 const STEP_UP_PREFIX = "webauthn:stepup:";
+const REAUTH_PREFIX = "webauthn:reauth:";
 const STEP_UP_OK_PREFIX = "stepup:ok:";
+const NONCE_BYTES = 24;
 
 function rp() {
   const c = getConfig();
@@ -98,15 +102,32 @@ export async function verifyPasskeyRegistration(
   }
   if (!verification.verified) throw new ValidationError("Passkey doğrulanamadı");
   const { credential } = verification.registrationInfo;
-  await prisma.webAuthnCredential.create({
-    data: {
-      id: credential.id,
-      userId,
-      publicKey: Buffer.from(credential.publicKey),
-      counter: credential.counter,
-      transports: credential.transports ?? [],
-      name: name?.slice(0, 60) ?? null,
-    },
+  const label = name?.slice(0, 60) ?? null;
+  // Kayıt + güvenlik e-postası isteği aynı işlemde (outbox): e-posta kaybolmaz (v4#2).
+  await prisma.$transaction(async (tx) => {
+    const created = await tx.webAuthnCredential.create({
+      data: {
+        id: credential.id,
+        userId,
+        publicKey: Buffer.from(credential.publicKey),
+        counter: credential.counter,
+        transports: credential.transports ?? [],
+        name: label,
+      },
+      select: { createdAt: true, user: { select: { email: true, firstName: true } } },
+    });
+    await appendOutbox(
+      tx,
+      makeEvent<SecurityAlertPayload>(EventTypes.SecurityAlert, userId, "user", {
+        alertId: randomUUID(),
+        userId,
+        to: created.user.email,
+        name: created.user.firstName,
+        kind: "PASSKEY_ADDED",
+        detail: label,
+        occurredAt: created.createdAt.toISOString(),
+      })
+    );
   });
   return { credentialId: credential.id };
 }
@@ -207,21 +228,39 @@ async function verifyAssertion(
   if (updated.count !== 1) throw new UnauthorizedError("Passkey doğrulanamadı");
 }
 
-/**
- * P1-8 risk bazlı step-up: oturum açık kullanıcıdan yalnızca KENDİ passkey'leriyle
- * (allowCredentials) yeni bir doğrulama istenir. Başarılı doğrulama STEP_UP_TTL_SECONDS
- * ömürlü, tek kullanımlık bir işaret bırakır; ödeme bu işareti consumeStepUp ile tüketir.
- */
-export async function stepUpOptions(
-  userId: string
+/** Step-up'a bağlanan işlem: rezervasyon + sunucuda hesaplanan tutar (v4#2). */
+export interface StepUpBinding {
+  bookingId: string;
+  amountMinor: number;
+}
+
+interface StepUpChallenge extends StepUpBinding {
+  challenge: string;
+}
+
+/** Bu andan önce oluşturulmuş passkey'ler step-up için uygundur (yeni passkey soğuması). */
+function stepUpEligibleBefore(now: Date): Date {
+  return new Date(now.getTime() - getConfig().PASSKEY_STEP_UP_COOLDOWN_HOURS * 3_600_000);
+}
+
+/** Oturumdaki kullanıcının KENDİ passkey'leriyle `get()` seçenekleri (step-up ve re-auth). */
+async function ownAssertionOptions(
+  userId: string,
+  createdBefore?: Date
 ): Promise<PublicKeyCredentialRequestOptionsJSON> {
   const creds = await prisma.webAuthnCredential.findMany({
-    where: { userId },
+    where: { userId, ...(createdBefore ? { createdAt: { lte: createdBefore } } : {}) },
     select: { id: true, transports: true },
   });
-  if (creds.length === 0) throw new ValidationError("Hesapta kayıtlı passkey yok");
+  if (creds.length === 0) {
+    throw new ValidationError(
+      createdBefore
+        ? "Ödeme doğrulaması için kullanılabilir passkey yok (yeni passkey'ler 24 saat bekler)"
+        : "Hesapta kayıtlı passkey yok"
+    );
+  }
   const { rpID } = rp();
-  const options = await generateAuthenticationOptions({
+  return generateAuthenticationOptions({
     rpID,
     userVerification: "required",
     allowCredentials: creds.map((c) => ({
@@ -229,31 +268,125 @@ export async function stepUpOptions(
       transports: c.transports as AuthenticatorTransportFuture[],
     })),
   });
-  await storeChallenge(`${STEP_UP_PREFIX}${userId}`, options.challenge);
+}
+
+/** Kullanıcının kendi passkey'iyle yapılan doğrulamayı denetler (başkasınınki reddedilir). */
+async function verifyOwnAssertion(
+  userId: string,
+  response: AuthenticationResponseJSON,
+  expectedChallenge: string,
+  now: Date,
+  logMessage: string,
+  createdBefore?: Date
+): Promise<void> {
+  const stored = await prisma.webAuthnCredential.findUnique({
+    where: { id: response.id },
+    select: {
+      id: true,
+      userId: true,
+      publicKey: true,
+      counter: true,
+      transports: true,
+      createdAt: true,
+    },
+  });
+  // Başka kullanıcının passkey'i ile doğrulama yapılamaz (aynı hata; varlık sızdırılmaz).
+  if (!stored || stored.userId !== userId) throw new UnauthorizedError("Passkey tanınmadı");
+  if (createdBefore && stored.createdAt > createdBefore) {
+    throw new UnauthorizedError("Yeni eklenen passkey henüz ödeme doğrulamasında kullanılamaz");
+  }
+  await verifyAssertion(stored, response, expectedChallenge, now, logMessage, true);
+}
+
+/**
+ * P1-8 risk bazlı step-up (v4#2 ile sıkılaştırıldı): doğrulama belirli bir rezervasyona ve
+ * SUNUCUDA hesaplanan tutara bağlanır; yalnızca soğuma süresini (varsayılan 24 saat)
+ * doldurmuş passkey'ler kabul edilir — çalınan oturumla eklenen passkey ödemeyi onaylayamaz.
+ */
+export async function stepUpOptions(
+  userId: string,
+  binding: StepUpBinding,
+  now = new Date()
+): Promise<PublicKeyCredentialRequestOptionsJSON> {
+  const options = await ownAssertionOptions(userId, stepUpEligibleBefore(now));
+  const record: StepUpChallenge = { ...binding, challenge: options.challenge };
+  await storeChallenge(`${STEP_UP_PREFIX}${userId}`, JSON.stringify(record));
   return options;
 }
 
+/**
+ * Başarılıysa tek kullanımlık step-up token'ı döner: `stepup:ok:<userId>:<bookingId>:<nonce>`
+ * anahtarında tutar saklanır; ödeme bunu `consumeStepUp` ile (GETDEL) tüketir.
+ */
 export async function verifyStepUp(
   userId: string,
   response: AuthenticationResponseJSON,
   now = new Date()
-): Promise<{ validForSeconds: number }> {
-  const expectedChallenge = await takeChallenge(`${STEP_UP_PREFIX}${userId}`);
-  const stored = await prisma.webAuthnCredential.findUnique({
-    where: { id: response.id },
-    select: { id: true, userId: true, publicKey: true, counter: true, transports: true },
-  });
-  // Başka kullanıcının passkey'i ile step-up yapılamaz (aynı hata; varlık sızdırılmaz).
-  if (!stored || stored.userId !== userId) throw new UnauthorizedError("Passkey tanınmadı");
-  await verifyAssertion(stored, response, expectedChallenge, now, "passkey step-up rejected", true);
+): Promise<{ stepUpToken: string; bookingId: string; validForSeconds: number }> {
+  const raw = await takeChallenge(`${STEP_UP_PREFIX}${userId}`);
+  let record: StepUpChallenge;
+  try {
+    record = JSON.parse(raw) as StepUpChallenge;
+  } catch {
+    throw new ValidationError("Passkey isteğinin süresi doldu, tekrar deneyin");
+  }
+  await verifyOwnAssertion(
+    userId,
+    response,
+    record.challenge,
+    now,
+    "passkey step-up rejected",
+    stepUpEligibleBefore(now)
+  );
   const ttl = getConfig().STEP_UP_TTL_SECONDS;
-  await redis.set(`${STEP_UP_OK_PREFIX}${userId}`, now.toISOString(), { ex: ttl });
-  return { validForSeconds: ttl };
+  const nonce = randomBytes(NONCE_BYTES).toString("base64url");
+  await redis.set(
+    `${STEP_UP_OK_PREFIX}${userId}:${record.bookingId}:${nonce}`,
+    String(record.amountMinor),
+    { ex: ttl }
+  );
+  return { stepUpToken: nonce, bookingId: record.bookingId, validForSeconds: ttl };
 }
 
-/** Geçerli step-up işareti varsa tüketir (tek kullanımlık). */
-export async function consumeStepUp(userId: string): Promise<boolean> {
-  return Boolean(await redis.getdel(`${STEP_UP_OK_PREFIX}${userId}`));
+/**
+ * Step-up token'ını tüketir (GETDEL, tek kullanımlık). Yalnızca aynı kullanıcı + rezervasyon
+ * + tutar için geçerlidir; tutar değiştiyse token yanar ve `false` döner.
+ */
+export async function consumeStepUp(
+  userId: string,
+  binding: StepUpBinding,
+  token: string | null | undefined
+): Promise<boolean> {
+  if (!token || !/^[A-Za-z0-9_-]{16,64}$/.test(token)) return false;
+  const stored = await redis.getdel(`${STEP_UP_OK_PREFIX}${userId}:${binding.bookingId}:${token}`);
+  return stored !== null && stored === String(binding.amountMinor);
+}
+
+/** Step-up'a uygun (soğuma süresini doldurmuş) passkey var mı? */
+export async function hasStepUpPasskey(userId: string, now = new Date()): Promise<boolean> {
+  return (
+    (await prisma.webAuthnCredential.count({
+      where: { userId, createdAt: { lte: stepUpEligibleBefore(now) } },
+    })) > 0
+  );
+}
+
+/** Yeniden doğrulama (recent-auth, v4#2) için kendi passkey'iyle `get()` seçenekleri. */
+export async function reauthPasskeyOptions(
+  userId: string
+): Promise<PublicKeyCredentialRequestOptionsJSON> {
+  const options = await ownAssertionOptions(userId);
+  await storeChallenge(`${REAUTH_PREFIX}${userId}`, options.challenge);
+  return options;
+}
+
+export async function verifyReauthPasskey(
+  userId: string,
+  response: AuthenticationResponseJSON,
+  now = new Date()
+): Promise<void> {
+  const expectedChallenge = await takeChallenge(`${REAUTH_PREFIX}${userId}`);
+  await verifyOwnAssertion(userId, response, expectedChallenge, now, "passkey re-auth rejected");
 }
 
 export async function hasPasskey(userId: string): Promise<boolean> {

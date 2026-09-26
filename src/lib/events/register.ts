@@ -8,6 +8,7 @@ import {
   type BookingExpiredPayload,
   type PropertyCreatedPayload,
   type AuthEmailRequestedPayload,
+  type SecurityAlertPayload,
   type PriceDroppedPayload,
 } from "./events";
 import { notifyAuthEmail, notifyPriceDrop } from "@/lib/notifications/auth-notifications";
@@ -20,6 +21,7 @@ import {
 } from "@/lib/notifications/booking-notifications";
 import { startBookingFulfilment } from "@/lib/saga/booking-saga";
 import { invalidateBookingCache } from "@/lib/booking/booking-cache";
+import { notifySecurityAlert } from "@/lib/notifications/security-notifications";
 
 /**
  * Outbox'tan yayınlanan domain olaylarının tüketicileri (worker sürecinde).
@@ -73,6 +75,7 @@ export function registerEventHandlers(): void {
   );
   on<AuthEmailRequestedPayload>(EventTypes.AuthEmailRequested, notifyAuthEmail);
   on<PriceDroppedPayload>(EventTypes.PriceDropped, notifyPriceDrop);
+  on<SecurityAlertPayload>(EventTypes.SecurityAlert, notifySecurityAlert);
   on<BookingExpiredPayload>(EventTypes.BookingExpired, async (p) => {
     await invalidateStay(p);
     await notifyBookingExpired(p);

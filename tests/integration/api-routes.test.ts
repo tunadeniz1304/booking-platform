@@ -89,7 +89,8 @@ function ctx<T>(params: T): { params: Promise<T> } {
 }
 
 async function tokenFor(userId: string, role: Role): Promise<string> {
-  return (await signAccessToken(userId, role, 300)).token;
+  // auth_time = şimdi: hassas uçlar (v4#2 recent-auth) için yeni giriş yapmış oturum.
+  return (await signAccessToken(userId, role, 300, 0, Math.floor(Date.now() / 1000))).token;
 }
 
 /** Test içi sahte sır (≥ 32 karakter; gerçek değer değildir). */

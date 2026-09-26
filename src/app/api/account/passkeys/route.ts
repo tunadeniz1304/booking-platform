@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
+import { requireRecentAuth } from "@/lib/auth/recent-auth";
 import { deletePasskey, listPasskeys } from "@/lib/auth/passkey";
 import { NotFoundError, ValidationError, toErrorResponse } from "@/lib/http/errors";
 import { observed } from "@/lib/http/observed";
@@ -19,7 +20,8 @@ export const DELETE = observed(
   "account.passkeys.delete",
   async function deleteHandler(req: NextRequest) {
     try {
-      const { userId } = await requireAuth(req);
+      // v4#2: passkey silme hassas işlemdir (yakın zamanda yeniden doğrulama).
+      const { userId } = await requireRecentAuth(req);
       const id = req.nextUrl.searchParams.get("id");
       if (!id || id.length > 1024) throw new ValidationError("Passkey kimliği gerekli");
       if (!(await deletePasskey(userId, id))) throw new NotFoundError("Passkey bulunamadı");

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
+import { requireRecentAuth } from "@/lib/auth/recent-auth";
 import { toErrorResponse } from "@/lib/http/errors";
 import { deleteAccount, exportUserData } from "@/lib/privacy/privacy-service";
 import { revokeSession } from "@/lib/auth/session";
@@ -26,7 +27,8 @@ export async function GET(req: NextRequest) {
  */
 export async function DELETE(req: NextRequest) {
   try {
-    const claims = await requireAuth(req);
+    // v4#2: hesap silme yalnızca yakın zamanda yeniden doğrulanmış oturumla.
+    const claims = await requireRecentAuth(req);
     const result = await deleteAccount(claims.userId);
     await revokeSession({
       refreshToken: req.cookies.get(REFRESH_COOKIE)?.value,

@@ -34,6 +34,8 @@ interface RefreshRecord {
   secretHash: string;
   /** Oturum dönemi; `User.tokenVersion` artarsa bu aile geçersizdir (v3#5). */
   tv?: number;
+  /** Son birincil doğrulama (Unix sn); yenilemede taşınır, yenilenmez (v4#2). */
+  authTime?: number;
 }
 
 function sha256(value: string): string {
@@ -53,12 +55,13 @@ function toRole(value: string): Role {
 async function createRefreshToken(
   userId: string,
   family: string,
-  tv: number
+  tv: number,
+  authTime: number
 ): Promise<{ token: string; expiresAt: Date }> {
   const { REFRESH_TOKEN_TTL_SECONDS } = getConfig();
   const jti = randomUUID();
   const secret = randomBytes(32).toString("base64url");
-  const record: RefreshRecord = { userId, family, secretHash: sha256(secret), tv };
+  const record: RefreshRecord = { userId, family, secretHash: sha256(secret), tv, authTime };
   await redis.set(`${REFRESH_PREFIX}${jti}`, JSON.stringify(record), {
     ex: REFRESH_TOKEN_TTL_SECONDS,
   });
@@ -75,16 +78,18 @@ async function revokeFamily(family: string): Promise<void> {
 
 async function buildSession(
   user: { id: string; role: Role; tokenVersion: number },
-  family: string
+  family: string,
+  authTime: number
 ): Promise<SessionTokens> {
   const { ACCESS_TOKEN_TTL_SECONDS } = getConfig();
   const access = await signAccessToken(
     user.id,
     user.role,
     ACCESS_TOKEN_TTL_SECONDS,
-    user.tokenVersion
+    user.tokenVersion,
+    authTime
   );
-  const refresh = await createRefreshToken(user.id, family, user.tokenVersion);
+  const refresh = await createRefreshToken(user.id, family, user.tokenVersion, authTime);
   return {
     accessToken: access.token,
     accessExpiresAt: access.expiresAt,
@@ -96,18 +101,26 @@ async function buildSession(
 
 /**
  * Başarılı girişte yeni oturum (yeni aile). `tokenVersion` verilmezse veritabanından okunur.
+ * `authTime` (Unix sn) varsayılan olarak şimdi: oturum bir birincil doğrulamayla açılır.
  */
-export async function issueSession(user: {
-  id: string;
-  role: string;
-  tokenVersion?: number;
-}): Promise<SessionTokens> {
+export async function issueSession(
+  user: {
+    id: string;
+    role: string;
+    tokenVersion?: number;
+  },
+  opts: { authTime?: number } = {}
+): Promise<SessionTokens> {
   const tokenVersion =
     user.tokenVersion ??
     (await prisma.user.findUnique({ where: { id: user.id }, select: { tokenVersion: true } }))
       ?.tokenVersion ??
     0;
-  return buildSession({ id: user.id, role: toRole(user.role), tokenVersion }, randomUUID());
+  return buildSession(
+    { id: user.id, role: toRole(user.role), tokenVersion },
+    randomUUID(),
+    opts.authTime ?? Math.floor(Date.now() / 1000)
+  );
 }
 
 /**
@@ -151,9 +164,12 @@ export async function rotateRefreshToken(raw: string): Promise<SessionTokens> {
     throw new UnauthorizedError("Oturum iptal edildi");
   }
 
+  // auth_time yenilemede TAŞINIR: çalınan yenileme token'ı "yakın zamanda doğrulandı"
+  // durumunu tazeleyemez (v4#2). Eski kayıtlarda alan yoksa 0.
   return buildSession(
     { id: user.id, role: toRole(user.role), tokenVersion: user.tokenVersion },
-    record.family
+    record.family,
+    record.authTime ?? 0
   );
 }
 

@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { apiFetch } from "@/lib/api-client";
 import { useFormat } from "@/i18n/use-format";
 import { passkeyErrorMessage, passkeySupported, registerPasskey } from "@/lib/auth/passkey-client";
+import { ReauthCancelledError, useReauth } from "./ReauthDialog";
 
 interface Passkey {
   id: string;
@@ -26,6 +27,8 @@ export default function PasskeyManager() {
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
+  // v4#2: ekleme/silme yakın zamanda yeniden doğrulama ister (403 REAUTH_REQUIRED → pencere).
+  const reauth = useReauth();
 
   // WebAuthn hata adları çeviri anahtarına eşlenir; API hataları olduğu gibi gösterilir.
   const errorText = useCallback(
@@ -33,6 +36,7 @@ export default function PasskeyManager() {
       if (err instanceof Error && err.name === "NotAllowedError") return t("passkeys.cancelled");
       if (err instanceof Error && err.name === "InvalidStateError")
         return t("passkeys.alreadyRegistered");
+      if (err instanceof ReauthCancelledError) return t("reauth.cancelled");
       return passkeyErrorMessage(err, fallback);
     },
     [t]
@@ -68,7 +72,7 @@ export default function PasskeyManager() {
     setBusy(true);
     setStatus(null);
     try {
-      await registerPasskey(name.trim() || undefined);
+      await reauth.run(() => registerPasskey(name.trim() || undefined));
       setName("");
       setStatus({ kind: "ok", text: t("passkeys.addedOk") });
       await load();
@@ -84,7 +88,9 @@ export default function PasskeyManager() {
     setBusy(true);
     setStatus(null);
     try {
-      await apiFetch(`/api/account/passkeys?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+      await reauth.run(() =>
+        apiFetch(`/api/account/passkeys?id=${encodeURIComponent(id)}`, { method: "DELETE" })
+      );
       setStatus({ kind: "ok", text: t("passkeys.deletedOk") });
       await load();
     } catch (err) {
@@ -159,6 +165,7 @@ export default function PasskeyManager() {
       ) : (
         <p className="mt-4 text-sm text-gray-600">{t("passkeys.unsupported")}</p>
       )}
+      {reauth.dialog}
     </section>
   );
 }

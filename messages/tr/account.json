@@ -66,5 +66,17 @@
     "deleteFailed": "Passkey silinemedi",
     "cancelled": "Passkey işlemi iptal edildi veya zaman aşımına uğradı",
     "alreadyRegistered": "Bu cihazdaki passkey zaten kayıtlı"
+  },
+  "reauth": {
+    "title": "Kimliğinizi doğrulayın",
+    "description": "Güvenliğiniz için bu işlemden önce parolanızı ya da passkey'inizi yeniden doğrulamanız gerekiyor.",
+    "password": "Parola",
+    "verify": "Doğrula",
+    "verifying": "Doğrulanıyor...",
+    "withPasskey": "Passkey ile doğrula",
+    "cancel": "Vazgeç",
+    "failed": "Doğrulama başarısız",
+    "rateLimited": "Çok fazla hatalı deneme. Lütfen daha sonra tekrar deneyin.",
+    "cancelled": "Yeniden doğrulama iptal edildi"
   }
 }

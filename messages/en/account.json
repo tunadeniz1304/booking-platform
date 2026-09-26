@@ -66,5 +66,17 @@
     "deleteFailed": "Could not delete passkey",
     "cancelled": "The passkey operation was cancelled or timed out",
     "alreadyRegistered": "A passkey on this device is already registered"
+  },
+  "reauth": {
+    "title": "Confirm it's you",
+    "description": "For your security, please re-enter your password or use your passkey before continuing.",
+    "password": "Password",
+    "verify": "Verify",
+    "verifying": "Verifying...",
+    "withPasskey": "Use passkey",
+    "cancel": "Cancel",
+    "failed": "Verification failed",
+    "rateLimited": "Too many failed attempts. Please try again later.",
+    "cancelled": "Re-authentication was cancelled"
   }
 }

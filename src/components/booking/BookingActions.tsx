@@ -53,6 +53,8 @@ export default function BookingActions({
   const [message, setMessage] = useState<{ kind: "error" | "info"; text: string } | null>(null);
   /** Step-up bekleyen ödeme (mock formda doğrulamadan sonra otomatik yeniden denenir). */
   const [stepUp, setStepUp] = useState<{ cardToken: string } | null>(null);
+  /** Stripe akışı: doğrulama token'ı sonraki gönderimde kullanılır (tek kullanımlık, v4#2). */
+  const [stepUpToken, setStepUpToken] = useState<string | null>(null);
   const [idemKey] = useState(() =>
     typeof crypto !== "undefined" ? crypto.randomUUID() : String(Date.now())
   );
@@ -72,26 +74,28 @@ export default function BookingActions({
   }
 
   // BIN ve cihaz kimliği gönderilmez (v4#13): sunucu token metadata'sı ve imzalı çerezden okur.
-  function submitToken(cardToken: string) {
+  function submitToken(cardToken: string, verifiedToken: string | null = stepUpToken) {
+    if (verifiedToken) setStepUpToken(null);
     return apiFetch<PayResponse>(`/api/bookings/${bookingId}/pay`, {
       method: "POST",
       headers: { "Idempotency-Key": idemKey },
-      body: JSON.stringify({ cardToken }),
+      body: JSON.stringify({ cardToken, ...(verifiedToken ? { stepUpToken: verifiedToken } : {}) }),
     });
   }
 
   const isStepUp = (err: unknown) => err instanceof ApiError && err.code === "STEP_UP_REQUIRED";
 
-  async function afterStepUp() {
+  async function afterStepUp(token: string) {
     const pending = stepUp;
     setStepUp(null);
     if (!pending?.cardToken) {
+      setStepUpToken(token);
       setMessage({ kind: "info", text: t("verifiedRetry") });
       return;
     }
     setBusy(true);
     try {
-      const out = await submitToken(pending.cardToken);
+      const out = await submitToken(pending.cardToken, token);
       if (out.status === "requires_action")
         setChallenge(out.challenge?.hint ?? t("verificationRequired"));
       else onChanged();
@@ -327,7 +331,11 @@ export default function BookingActions({
       )}
 
       {stepUp && (
-        <StepUpDialog onVerified={() => void afterStepUp()} onCancel={() => setStepUp(null)} />
+        <StepUpDialog
+          bookingId={bookingId}
+          onVerified={(token) => void afterStepUp(token)}
+          onCancel={() => setStepUp(null)}
+        />
       )}
 
       {message && (

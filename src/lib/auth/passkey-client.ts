@@ -41,16 +41,40 @@ export async function registerPasskey(name?: string) {
   });
 }
 
-/** Risk bazlı step-up (P1-8): başarılıysa sunucu kısa ömürlü, tek kullanımlık izin bırakır. */
-export async function performStepUp() {
+/**
+ * Risk bazlı step-up (P1-8): başarılıysa sunucu bu rezervasyon + tutara bağlı, kısa ömürlü ve
+ * tek kullanımlık `stepUpToken` döner (v4#2); ödeme isteğinde gönderilir.
+ */
+export async function performStepUp(bookingId: string) {
   const options = await apiFetch<PublicKeyCredentialRequestOptionsJSON>(
     "/api/auth/step-up/options",
+    { method: "POST", body: JSON.stringify({ bookingId }) }
+  );
+  const response = await startAuthentication({ optionsJSON: options });
+  return apiFetch<{ stepUpToken: string; bookingId: string; validForSeconds: number }>(
+    "/api/auth/step-up/verify",
+    { method: "POST", body: JSON.stringify({ response }) }
+  );
+}
+
+/** Yeniden doğrulama (v4#2): parola ile. Başarılıysa oturum çerezleri tazelenir. */
+export function reauthWithPassword(password: string) {
+  return apiFetch<{ reauthenticated: true }>("/api/auth/reauth", {
+    method: "POST",
+    body: JSON.stringify({ method: "password", password }),
+  });
+}
+
+/** Yeniden doğrulama (v4#2): hesaptaki passkey ile. */
+export async function reauthWithPasskey() {
+  const options = await apiFetch<PublicKeyCredentialRequestOptionsJSON>(
+    "/api/auth/reauth/options",
     { method: "POST", body: "{}" }
   );
   const response = await startAuthentication({ optionsJSON: options });
-  return apiFetch<{ validForSeconds: number }>("/api/auth/step-up/verify", {
+  return apiFetch<{ reauthenticated: true }>("/api/auth/reauth", {
     method: "POST",
-    body: JSON.stringify({ response }),
+    body: JSON.stringify({ method: "passkey", response }),
   });
 }
 

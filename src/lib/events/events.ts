@@ -21,6 +21,8 @@ export const EventTypes = {
   PriceDropped: "price.dropped",
   /** Kullanıcı/oturum bir deney koluna ilk kez maruz kaldı (P1-3). */
   ExperimentExposure: "experiment.exposure",
+  /** Hesapta güvenlik açısından önemli değişiklik (yeni passkey vb.) → e-posta (v4#2). */
+  SecurityAlert: "auth.security_alert",
 } as const;
 
 export type EventType = (typeof EventTypes)[keyof typeof EventTypes];
@@ -77,6 +79,18 @@ export interface AuthEmailRequestedPayload {
   tokenHash: string;
   /** AES-256-GCM ile şifreli bağlantı yolu (`link-crypto.ts`); yalnızca e-posta tüketicisi çözer. */
   sealedLink: string;
+}
+
+export interface SecurityAlertPayload {
+  /** Olay başına tekil kimlik (e-posta tekilliği). */
+  alertId: string;
+  userId: string;
+  to: string;
+  name: string;
+  kind: "PASSKEY_ADDED";
+  /** Kullanıcının verdiği passkey adı (varsa). */
+  detail: string | null;
+  occurredAt: string;
 }
 
 export interface PriceDroppedPayload {

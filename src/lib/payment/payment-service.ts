@@ -27,7 +27,7 @@ import { getPaymentProvider, type AuthorizeResult } from "./index";
 import type { WebhookEvent } from "./webhook";
 import type { PaymentChallenge } from "./provider";
 import { assessPayment, type FraudDecision } from "@/lib/risk/fraud";
-import { consumeStepUp, hasPasskey } from "@/lib/auth/passkey";
+import { consumeStepUp, hasStepUpPasskey, type StepUpBinding } from "@/lib/auth/passkey";
 import { getConfig } from "@/lib/config/app-config";
 import { getQueue, QUEUE_NAMES } from "@/lib/queue";
 
@@ -598,6 +598,8 @@ export async function payForBooking(input: {
   userId: string;
   cardToken: string;
   idempotencyKey: string;
+  /** Passkey step-up token'ı (v4#2): bu rezervasyon + tutara bağlı, tek kullanımlık. */
+  stepUpToken?: string | null;
   /** Risk sinyalleri (route'tan): istemci anahtarı ve ülke bilgisi. */
   context?: {
     ip?: string;
@@ -655,12 +657,17 @@ async function payLocked(input: Parameters<typeof payForBooking>[0]): Promise<Pa
     cardBin: await tokenBin(input.cardToken),
     deviceId: input.context?.deviceId,
   });
-  const gate = await resolveStepUp(input.userId, risk.decision);
+  const gate = await resolveStepUp(
+    input.userId,
+    { bookingId: booking.id, amountMinor: amountOf(booking).amount },
+    input.stepUpToken,
+    risk.decision
+  );
   if (gate === "fallback_3ds") {
     risk.hits.push({
       rule: "step_up_unavailable_3ds",
       points: 0,
-      detail: "Hesapta passkey yok; step-up yerine 3DS istendi",
+      detail: "Step-up'a uygun passkey yok (yok ya da yeni eklendi); 3DS istendi",
     });
   }
   await prisma.fraudCheck.create({
@@ -729,14 +736,30 @@ async function payLocked(input: Parameters<typeof payForBooking>[0]): Promise<Pa
 type StepUpGate = "proceed" | "force_3ds" | "fallback_3ds" | "required";
 
 /**
- * Karar → ödeme kapısı. step_up_passkey: geçerli (tek kullanımlık) step-up işareti varsa
- * devam; yoksa passkey'i olan kullanıcıdan step-up istenir, olmayandan 3DS.
+ * Karar → ödeme kapısı. step_up_passkey: bu rezervasyon + tutara bağlı geçerli step-up
+ * token'ı varsa (GETDEL, tek kullanımlık) devam; yoksa step-up'a uygun (soğuma süresini
+ * doldurmuş) passkey'i olan kullanıcıdan step-up istenir, olmayandan 3DS (v4#2).
  */
-async function resolveStepUp(userId: string, decision: FraudDecision): Promise<StepUpGate> {
+async function resolveStepUp(
+  userId: string,
+  binding: StepUpBinding,
+  token: string | null | undefined,
+  decision: FraudDecision
+): Promise<StepUpGate> {
   if (decision === "challenge_3ds" || decision === "review") return "force_3ds";
   if (decision !== "step_up_passkey") return "proceed";
-  if (await consumeStepUp(userId)) return "proceed";
-  return (await hasPasskey(userId)) ? "required" : "fallback_3ds";
+  if (await consumeStepUp(userId, binding, token)) return "proceed";
+  return (await hasStepUpPasskey(userId)) ? "required" : "fallback_3ds";
+}
+
+/**
+ * Step-up'ın bağlanacağı işlem (v4#2): rezervasyon sahibi ve ödenebilir olmalı; tutar
+ * istemciden değil kayıtlı rezervasyondan hesaplanır.
+ */
+export async function stepUpBindingFor(bookingId: string, userId: string): Promise<StepUpBinding> {
+  const booking = await loadPayable(bookingId, userId);
+  assertPayable(booking);
+  return { bookingId: booking.id, amountMinor: amountOf(booking).amount };
 }
 
 /** 3DS doğrulamasını tamamlar. */

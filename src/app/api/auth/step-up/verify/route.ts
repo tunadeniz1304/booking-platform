@@ -10,7 +10,10 @@ const bodySchema = z.object({
   response: z.object({ id: z.string().min(1).max(1024) }).passthrough(),
 });
 
-/** Step-up doğrulaması: başarılıysa kısa ömürlü, tek kullanımlık ödeme izni bırakır. */
+/**
+ * Step-up doğrulaması: başarılıysa rezervasyon + tutara bağlı, kısa ömürlü ve tek kullanımlık
+ * `stepUpToken` döner; istemci bunu ödeme isteğinde gönderir (v4#2).
+ */
 export const POST = observed("auth.stepup.verify", async function postHandler(req: NextRequest) {
   try {
     const { userId } = await requireAuth(req);

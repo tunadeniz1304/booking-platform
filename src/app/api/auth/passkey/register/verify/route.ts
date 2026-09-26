@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import type { RegistrationResponseJSON } from "@simplewebauthn/server";
-import { requireAuth } from "@/lib/auth";
+import { requireRecentAuth } from "@/lib/auth/recent-auth";
 import { verifyPasskeyRegistration } from "@/lib/auth/passkey";
 import { toErrorResponse } from "@/lib/http/errors";
 import { observed } from "@/lib/http/observed";
@@ -15,7 +15,8 @@ export const POST = observed(
   "auth.passkey.register.verify",
   async function postHandler(req: NextRequest) {
     try {
-      const { userId } = await requireAuth(req);
+      // v4#2: yeni passkey yalnızca yakın zamanda yeniden doğrulanmış oturumla eklenir.
+      const { userId } = await requireRecentAuth(req);
       const body = bodySchema.parse(await req.json());
       const result = await verifyPasskeyRegistration(
         userId,

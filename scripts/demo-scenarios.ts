@@ -2,9 +2,9 @@
  * P2-2 demo senaryoları.
  *
  *  - v3 (1–7): ÇALIŞAN yığına HTTP ile karşı uçtan uca doğrulama.
- *  - v4 (8–13): süreç içi servis çağrıları (`scripts/demo/v4-scenarios.ts`) — grup sepeti +
+ *  - v4 (8–14): süreç içi servis çağrıları (`scripts/demo/v4-scenarios.ts`) — grup sepeti +
  *    bölünmüş ödeme, hasar talebi + depozito, 7565 kaldırma + SLA, ajan mandate'i, devir
- *    capture hatası; her biri sonunda mizan + mutabakat denetimi. `DATABASE_URL`,
+ *    capture hatası, cüzdan (cashback → kredi → iptal); her biri sonunda mizan + mutabakat denetimi. `DATABASE_URL`,
  *    `REDIS_URL` ve `DEMO_MODE=true` gerekir (MockPsp, LLM yok → anahtarsız).
  *
  *   npm run demo:scenarios                 # hepsi
@@ -68,8 +68,8 @@ const ONLY: Set<number> | null = (() => {
     .slice("--only=".length)
     .split(",")
     .map((s) => Number(s.trim()))
-    .filter((n) => Number.isInteger(n) && n >= 1 && n <= 13);
-  if (ids.length === 0) throw new Error(`Geçersiz --only değeri: ${arg} (1..13)`);
+    .filter((n) => Number.isInteger(n) && n >= 1 && n <= 14);
+  if (ids.length === 0) throw new Error(`Geçersiz --only değeri: ${arg} (1..14)`);
   return new Set(ids);
 })();
 
@@ -852,7 +852,7 @@ async function main(): Promise<void> {
   const wanted = (id: number) =>
     (!ONLY || ONLY.has(id)) && (!SUITE || (SUITE === "v3" ? id <= 7 : id >= 8));
   const v3 = SCENARIOS.filter((s) => wanted(s.id));
-  const v4Wanted = [8, 9, 10, 11, 12, 13].some(wanted);
+  const v4Wanted = [8, 9, 10, 11, 12, 13, 14].some(wanted);
   console.log(
     `Demo senaryoları — BASE_URL=${BASE_URL}, DAY_OFFSET=${DAY_OFFSET}, çalıştırma=${RUN_ID}`
   );

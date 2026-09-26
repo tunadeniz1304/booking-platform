@@ -203,7 +203,7 @@ npm run test:e2e       # Playwright + axe, çalışan demo yığınına karşı
 | `grpc:server`                                    | gRPC `BookingService` + `AriService`                                                |
 | `mcp:server` / `mcp:smoke`                       | stdio MCP sunucusu / duman testi                                                    |
 | `llm:smoke`                                      | Canlı LLM için 1 JSON + 1 metin çağrısı (anahtar yoksa atlanır)                     |
-| `demo:reset` / `demo:scenarios`                  | Demo verisini sıfırlar / 13 senaryoyu koşar (7 HTTP + 6 v4 süreç içi, özet tablo)   |
+| `demo:reset` / `demo:scenarios`                  | Demo verisini sıfırlar / 14 senaryoyu koşar (7 HTTP + 7 v4 süreç içi, özet tablo)   |
 | `import:insideairbnb`                            | Inside Airbnb İstanbul alt kümesi + opsiyonel OSM POI içe aktarımı (ağ yoksa atlar) |
 | `docs:screenshots`                               | README ekran görüntülerini üretir                                                   |
 | `embeddings:backfill`                            | Mülk embedding'lerini yeniden üretir                                                |

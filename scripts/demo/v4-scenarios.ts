@@ -41,6 +41,11 @@ import { isTrialBalanced, reconcile, trialBalance } from "@/lib/ledger";
 import { depositWindow, setDepositSetting, sweepDeposits } from "@/lib/resolution/deposit";
 import { decideClaim, openClaim } from "@/lib/resolution/claims";
 import { releaseAt } from "@/lib/payout/escrow";
+import { cancelAndRefund } from "@/lib/payment/payment-service";
+import { completeStays } from "@/lib/booking/complete-stays";
+import type { BookingCompletedPayload } from "@/lib/events/events";
+import { account, getAccountBalance } from "@/lib/ledger";
+import { issueDueCashbacks, onStayCompleted } from "@/lib/wallet/wallet-service";
 
 export interface V4Outcome {
   ok: boolean;
@@ -256,7 +261,13 @@ const claimsOf = (userId: string, role: AccessClaims["role"]): AccessClaims => (
 const card = () => `tok_mock_ok_${String(1000 + Math.floor(Math.random() * 9000))}`;
 const ctx = () => ({ ip: `10.77.${seq % 250}.${++seq % 250}` });
 
-async function holdAndPay(userId: string, stay: DemoStay, start: number, nights = 2) {
+async function holdAndPay(
+  userId: string,
+  stay: DemoStay,
+  start: number,
+  nights = 2,
+  creditMinor?: number
+) {
   const { booking } = await createBooking({
     userId,
     propertyId: stay.propertyId,
@@ -271,6 +282,7 @@ async function holdAndPay(userId: string, stay: DemoStay, start: number, nights 
     cardToken: card(),
     idempotencyKey: `demo-v4-pay-${RUN}-${booking.id}`,
     context: ctx(),
+    creditMinor,
   });
   if (out.status === "requires_action") {
     out = await confirmPaymentChallenge({ bookingId: booking.id, userId, code: MOCK_3DS_CODE });
@@ -720,6 +732,108 @@ async function scenarioTransferCaptureFailure(): Promise<V4Outcome> {
 }
 
 // ---------------------------------------------------------------------------
+// (g) Sadakat & cüzdan: cashback → krediyle kısmi ödeme → iptal → kredi simetrik geri
+// ---------------------------------------------------------------------------
+
+async function guestCredit(userId: string): Promise<bigint> {
+  return (await getAccountBalance(db(), account.guestCredit(userId), "TRY")).balanceMinor;
+}
+
+/** Değişmez: guest_credit bakiyesi = Σ lot kalanı + Σ RESERVED harcama. */
+async function assertWalletInvariant(userId: string): Promise<void> {
+  const prisma = db();
+  const [lots, reserved] = await Promise.all([
+    prisma.walletCredit.aggregate({
+      where: { userId, currency: "TRY" },
+      _sum: { remainingMinor: true },
+    }),
+    prisma.creditSpend.aggregate({
+      where: { userId, currency: "TRY", status: "RESERVED" },
+      _sum: { amountMinor: true },
+    }),
+  ]);
+  const expected = (lots._sum.remainingMinor ?? 0n) + (reserved._sum.amountMinor ?? 0n);
+  const actual = await guestCredit(userId);
+  check(actual === expected, `cüzdan değişmezi bozuk: defter ${actual} ≠ lot+rezerv ${expected}`);
+}
+
+async function scenarioWallet(): Promise<V4Outcome> {
+  const t = touched();
+  const prisma = db();
+  const stay = await demoStay("cuzdan");
+  const guest = await demoUser("cuzdan-misafir");
+
+  // 1) Konaklama tamamlanır → iade penceresi sonrası cashback kredisi.
+  const first = await holdAndPay(guest.id, stay, 2, 1);
+  t.payments.add(first.payment.id);
+  const later = new Date(new Date(`${first.booking.checkOut}T00:00:00.000Z`).getTime() + 2 * DAY);
+  check(
+    (await completeStays(later, 10, { bookingIds: [first.booking.id] })) === 1,
+    "konaklama tamamlanmadı"
+  );
+  const msg = await prisma.outboxMessage.findFirstOrThrow({
+    where: { aggregateId: first.booking.id, eventType: "booking.completed" },
+  });
+  await onStayCompleted(msg.payload as unknown as BookingCompletedPayload);
+  const pending = await prisma.loyaltyCashback.findUniqueOrThrow({
+    where: { bookingId: first.booking.id },
+  });
+  await issueDueCashbacks(new Date(pending.dueAt.getTime() + 1000));
+  const cb = await prisma.loyaltyCashback.findUniqueOrThrow({
+    where: { bookingId: first.booking.id },
+  });
+  check(cb.status === "ISSUED" && (cb.amountMinor ?? 0n) > 0n, `cashback ${cb.status}`);
+  const cashback = cb.amountMinor!;
+  const before = await guestCredit(guest.id);
+  check(before === cashback, `kredi bakiyesi ${before} ≠ cashback ${cashback}`);
+  await assertWalletInvariant(guest.id);
+
+  // 2) Krediyle kısmi ödeme: kart + kredi = toplam.
+  const credit = Number(cashback);
+  const second = await holdAndPay(guest.id, stay, 12, 2, credit);
+  t.payments.add(second.payment.id);
+  check(
+    second.payment.amountMinor === BigInt(second.booking.totalMinor - credit),
+    `kart payı ${second.payment.amountMinor} ≠ toplam − kredi`
+  );
+  const spend = await prisma.creditSpend.findFirstOrThrow({
+    where: { bookingId: second.booking.id },
+  });
+  check(
+    spend.status === "SPENT" && spend.amountMinor === cashback,
+    `kredi harcaması ${spend.status}`
+  );
+  check((await guestCredit(guest.id)) === 0n, "kredi harcandıktan sonra bakiye 0 olmalı");
+  await assertWalletInvariant(guest.id);
+
+  // 3) Tam iptal: kart payı karta, kredi payı krediye (simetrik).
+  const cancel = await cancelAndRefund(second.booking.id, guest.id);
+  check(
+    cancel.refund.refundMinor === second.booking.totalMinor,
+    `iade ${cancel.refund.refundMinor}`
+  );
+  const refunded = await prisma.payment.findUniqueOrThrow({
+    where: { bookingId: second.booking.id },
+  });
+  check(
+    refunded.refundedAmountMinor === BigInt(second.booking.totalMinor - credit),
+    `karta iade ${refunded.refundedAmountMinor}`
+  );
+  const after = await guestCredit(guest.id);
+  check(after === before, `iptal sonrası kredi ${after} ≠ başlangıç ${before}`);
+  await assertWalletInvariant(guest.id);
+  return {
+    ok: true,
+    detail:
+      `konaklama tamamlandı → cashback ${cashback} minor (bps ${cb.bps}) ISSUED; ` +
+      `ikinci rezervasyon ${second.booking.totalMinor} = kart ${refunded.amountMinor} + kredi ${credit}; ` +
+      `iptal → karta ${refunded.refundedAmountMinor}, kredi ${after} (başlangıca eşit); ` +
+      `cüzdan değişmezi (defter = lot + rezerv) her adımda ✓`,
+    books: await assertBooks(t),
+  };
+}
+
+// ---------------------------------------------------------------------------
 
 export const V4_SCENARIOS: V4Scenario[] = [
   {
@@ -752,6 +866,12 @@ export const V4_SCENARIOS: V4Scenario[] = [
     key: "e",
     title: "Devir capture hatası (v4#1) → sahiplik değişmez",
     run: scenarioTransferCaptureFailure,
+  },
+  {
+    id: 14,
+    key: "g",
+    title: "Cüzdan: cashback → krediyle kısmi ödeme → iptal → kredi simetrik geri",
+    run: scenarioWallet,
   },
 ];
 

@@ -143,9 +143,9 @@ docker compose -f docker-compose.yml -f docker-compose.demo.yml up -d
 | 6   | Fiyat önerisi kabulü                     | Host, İstanbul Galata Loft Suites / "Loft" için öneri üretir (`POST /api/host/revenue/suggestions`, yarından itibaren 14 gece). Fiyatı değiştiren ilk öneri seçilir: aynı gecenin teklifi alınır, öneri kabul edilir, teklif yeniden alınır. Gece tutarı değişmeli ve fark `önerilen − mevcut` ile aynı yönde olmalı. Varsayılan planın `priceModifierBps` değeri 0 ise fark birebir eşit olmalı.                                                                                            |
 | 7   | Belgesiz ilan                            | Seed, **Kadıköy Moda Sahil Dairesi (belge bekliyor)** ilanını ekler: `isActive=true`, `licenseStatus=PENDING`, belge no yok (v3#25 regresyonunun aynası). Bu ilan `GET /api/host/properties` içinde görünmeli; `/api/search`'te "Moda", "Kadıköy" (tarihli) ve "İstanbul" sorgularının hiçbirinde görünmemeli.                                                                                                                                                                               |
 
-### v4 senaryoları (8–13, süreç içi)
+### v4 senaryoları (8–14, süreç içi)
 
-Bu altı senaryo HTTP yerine servisleri doğrudan çağırır (zaman ileri sarma ve PSP hata enjeksiyonu HTTP'den yapılamaz). `DATABASE_URL`, `REDIS_URL` ve `DEMO_MODE=true` gerekir; ödeme her zaman MockPsp, LLM yok (anahtarsız). Her senaryo kendi "Demo v4 …" ilanını kurar ve bitince pasife alır.
+Bu yedi senaryo HTTP yerine servisleri doğrudan çağırır (zaman ileri sarma ve PSP hata enjeksiyonu HTTP'den yapılamaz). `DATABASE_URL`, `REDIS_URL` ve `DEMO_MODE=true` gerekir; ödeme her zaman MockPsp, LLM yok (anahtarsız). Her senaryo kendi "Demo v4 …" ilanını kurar ve bitince pasife alır.
 
 ```bash
 npm run demo:scenarios -- --suite=v4      # yalnız v4 (çalışan web sunucusu gerekmez)

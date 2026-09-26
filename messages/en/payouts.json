@@ -1,0 +1,88 @@
+{
+  "link": "Payouts and balance",
+  "loading": "Loading…",
+  "page": {
+    "title": "Payouts",
+    "intro": "Track the amounts held in escrow, released, held in reserve and paid out, plus your payout history."
+  },
+  "provider": {
+    "mock": "Demo payment provider (no real money)",
+    "stripe": "Stripe Connect"
+  },
+  "kyc": {
+    "NOT_STARTED": "Verification not started",
+    "PENDING": "Verification in progress",
+    "VERIFIED": "Verified",
+    "REJECTED": "Rejected"
+  },
+  "schedule": {
+    "DAILY": "Daily",
+    "WEEKLY": "Weekly",
+    "MONTHLY": "Monthly"
+  },
+  "blocked": {
+    "NO_ACCOUNT": "No payout account",
+    "PAUSED": "Payouts paused by an administrator",
+    "PROVIDER_DISABLED": "The provider does not allow payouts yet",
+    "IDENTITY_UNVERIFIED": "Identity verification required"
+  },
+  "account": {
+    "title": "Payout account",
+    "none": "You have not connected a payout account yet. Once connected, your released balance is paid on your schedule.",
+    "provider": "Provider",
+    "kyc": "Account verification",
+    "schedule": "Payout schedule",
+    "status": "Status",
+    "active": "Active",
+    "scheduleLabel": "Payout schedule",
+    "keepSchedule": "Keep current",
+    "connect": "Connect payout account",
+    "refresh": "Refresh status / save",
+    "saved": "Payout account updated."
+  },
+  "policy": "Funds are released from escrow {hours} hours after check-in; a {commission}% platform commission is deducted and {reserve}% of your share is held in reserve for {days} days.",
+  "identityRequired": "Identity verification is required for payouts.",
+  "balances": {
+    "title": "Balance",
+    "caption": "Balances by currency",
+    "empty": "No balance yet.",
+    "currency": "Currency",
+    "escrowMinor": "In escrow",
+    "availableMinor": "Released",
+    "reserveMinor": "In reserve",
+    "paidMinor": "Paid out",
+    "hint": "Escrowed funds are held on the guest's behalf until the stay starts; only the released balance is paid out."
+  },
+  "history": {
+    "title": "Payout history",
+    "caption": "Recent payouts",
+    "empty": "No payouts yet.",
+    "date": "Date",
+    "kind": "Type",
+    "amount": "Amount",
+    "status": "Status",
+    "kinds": {
+      "host": "Stay earnings",
+      "transfer": "Booking transfer"
+    },
+    "statuses": {
+      "PENDING": "Pending",
+      "PAID": "Paid",
+      "FAILED": "Failed"
+    }
+  },
+  "disclaimer": "This is a portfolio project; it is not a real payment service.",
+  "admin": {
+    "link": "Payout controls",
+    "pageTitle": "Payout controls",
+    "pageIntro": "Pause or resume host payouts. Every action is written to the audit log.",
+    "title": "Payout accounts",
+    "empty": "No payout accounts.",
+    "pending": "Pending payouts: {count}",
+    "reason": "Reason for pausing (optional)",
+    "pause": "Pause payouts",
+    "resume": "Resume payouts",
+    "paused": "Payouts paused.",
+    "resumed": "Payouts resumed."
+  }
+}

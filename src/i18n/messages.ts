@@ -24,6 +24,7 @@ export const NAMESPACES = [
   "mailbox",
   "nav",
   "payment",
+  "payouts",
   "plan",
   "privacy",
   "property",

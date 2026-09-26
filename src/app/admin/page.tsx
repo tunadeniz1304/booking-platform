@@ -9,11 +9,16 @@ import { PageShell, RoleGate } from "@/components/ui/ui";
 export default function AdminPage() {
   const t = useTranslations("admin");
   const tc = useTranslations("compliance.admin");
+  const tp = useTranslations("payouts");
   return (
     <PageShell title={t("page.title")} intro={t("page.intro")}>
       <p className="text-sm">
         <Link href="/admin/compliance" className="font-semibold text-[#003580] underline">
           {tc("open")}
+        </Link>
+        {" · "}
+        <Link href="/admin/payouts" className="font-semibold text-[#003580] underline">
+          {tp("admin.link")}
         </Link>
       </p>
       <RoleGate roles={["ADMIN"]}>{() => <AdminDashboard />}</RoleGate>

@@ -1,0 +1,88 @@
+{
+  "link": "Ödemeler ve bakiye",
+  "loading": "Yükleniyor…",
+  "page": {
+    "title": "Ödemeler",
+    "intro": "Emanetteki, serbest bırakılmış, rezervdeki ve ödenmiş tutarlarınızı ve payout geçmişinizi izleyin."
+  },
+  "provider": {
+    "mock": "Demo ödeme sağlayıcısı (gerçek para yok)",
+    "stripe": "Stripe Connect"
+  },
+  "kyc": {
+    "NOT_STARTED": "Doğrulama başlamadı",
+    "PENDING": "Doğrulama sürüyor",
+    "VERIFIED": "Doğrulandı",
+    "REJECTED": "Reddedildi"
+  },
+  "schedule": {
+    "DAILY": "Günlük",
+    "WEEKLY": "Haftalık",
+    "MONTHLY": "Aylık"
+  },
+  "blocked": {
+    "NO_ACCOUNT": "Ödeme hesabı yok",
+    "PAUSED": "Ödemeler yönetici tarafından durduruldu",
+    "PROVIDER_DISABLED": "Sağlayıcı ödemelere henüz izin vermiyor",
+    "IDENTITY_UNVERIFIED": "Kimlik doğrulaması gerekli"
+  },
+  "account": {
+    "title": "Ödeme hesabı",
+    "none": "Henüz bir ödeme hesabı bağlamadınız. Bağladığınızda serbest bırakılan bakiyeniz takviminize göre ödenir.",
+    "provider": "Sağlayıcı",
+    "kyc": "Hesap doğrulaması",
+    "schedule": "Ödeme takvimi",
+    "status": "Durum",
+    "active": "Etkin",
+    "scheduleLabel": "Ödeme takvimi",
+    "keepSchedule": "Değiştirme",
+    "connect": "Ödeme hesabını bağla",
+    "refresh": "Durumu yenile / kaydet",
+    "saved": "Ödeme hesabı güncellendi."
+  },
+  "policy": "Tutar, girişten {hours} saat sonra emanetten serbest bırakılır; %{commission} platform komisyonu düşülür ve payınızın %{reserve}'i {days} gün rezervde tutulur.",
+  "identityRequired": "Ödeme için kimlik doğrulaması gereklidir.",
+  "balances": {
+    "title": "Bakiye",
+    "caption": "Para birimine göre bakiyeler",
+    "empty": "Henüz bakiye yok.",
+    "currency": "Para birimi",
+    "escrowMinor": "Emanette",
+    "availableMinor": "Serbest",
+    "reserveMinor": "Rezervde",
+    "paidMinor": "Ödenen",
+    "hint": "Emanetteki tutar konaklama başlayana kadar misafir adına tutulur; yalnızca serbest bakiye ödenir."
+  },
+  "history": {
+    "title": "Ödeme geçmişi",
+    "caption": "Son ödemeler",
+    "empty": "Henüz ödeme yok.",
+    "date": "Tarih",
+    "kind": "Tür",
+    "amount": "Tutar",
+    "status": "Durum",
+    "kinds": {
+      "host": "Konaklama geliri",
+      "transfer": "Rezervasyon devri"
+    },
+    "statuses": {
+      "PENDING": "Bekliyor",
+      "PAID": "Ödendi",
+      "FAILED": "Başarısız"
+    }
+  },
+  "disclaimer": "Portföy projesidir; gerçek ödeme hizmeti değildir.",
+  "admin": {
+    "link": "Ödeme kontrolü",
+    "pageTitle": "Ödeme kontrolü",
+    "pageIntro": "Ev sahibi ödemelerini durdurun veya devam ettirin. Her işlem denetim kaydına yazılır.",
+    "title": "Ödeme hesapları",
+    "empty": "Ödeme hesabı yok.",
+    "pending": "Bekleyen ödeme: {count}",
+    "reason": "Durdurma gerekçesi (isteğe bağlı)",
+    "pause": "Ödemeleri durdur",
+    "resume": "Ödemelere devam et",
+    "paused": "Ödemeler durduruldu.",
+    "resumed": "Ödemeler yeniden etkin."
+  }
+}

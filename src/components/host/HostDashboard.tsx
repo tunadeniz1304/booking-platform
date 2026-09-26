@@ -62,6 +62,7 @@ const BOOKING_STATUSES = [
 
 export default function HostDashboard() {
   const t = useTranslations("host");
+  const tp = useTranslations("payouts");
   const f = useFormat();
   const statusLabel = (s: string) =>
     (BOOKING_STATUSES as readonly string[]).includes(s)
@@ -87,6 +88,13 @@ export default function HostDashboard() {
           className={`text-sm font-semibold text-[#003580] hover:underline ${focusRing}`}
         >
           {t("dashboard.revenueLink")}
+        </Link>
+        {" · "}
+        <Link
+          href="/host/payouts"
+          className={`text-sm font-semibold text-[#003580] hover:underline ${focusRing}`}
+        >
+          {tp("link")}
         </Link>
       </p>
       <Status error={error} />

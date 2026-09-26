@@ -1,0 +1,39 @@
+# Yük & kaos testi override'ı (P2-3) — YALNIZCA demo yığınının ÜSTÜNE, yerelde:
+#
+#   docker compose -p p23 -f docker-compose.yml -f docker-compose.demo.yml \
+#     -f docker-compose.load.yml up -d --build
+#
+# Tüm k6 trafiği tek konteyner IP'sinden ve ~100 hesaptan gelir; bu yüzden rate-limit ve
+# fraud hız sınırları yükseltilir, bölünmüş ödeme süresi deadline yarışı ölçülebilsin diye
+# en kısa değere (5 dk) indirilir. MockPsp kaos ayarları (gecikme/hata) host ortamından
+# geçirilir; varsayılanları 0'dır. Prod varsayılanları (docker-compose.yml, app-config) DEĞİŞMEZ;
+# bu dosya DEMO_MODE'u da açık tutar (MockPsp yalnız demo/mock'ta).
+x-load-env: &load-env
+  DEMO_MODE: "true"
+  COOKIE_SECURE: "false"
+  PAYMENT_PROVIDER: "mock"
+  RATE_LIMIT_SEARCH_MAX: "100000"
+  RATE_LIMIT_BOOKING_MAX: "100000"
+  RATE_LIMIT_AUTH_MAX: "100000"
+  RATE_LIMIT_DEFAULT_MAX: "100000"
+  RATE_LIMIT_AI_MAX: "100000"
+  RATE_LIMIT_LOGIN_PER_ACCOUNT_MAX: "1000"
+  FRAUD_VELOCITY_USER_MAX: "1000"
+  FRAUD_VELOCITY_IP_MAX: "10000"
+  FRAUD_VELOCITY_CARD_MAX: "1000"
+  SPLIT_PAY_DEADLINE_MINUTES: "5"
+  SPLIT_PAY_FALLBACK: "${SPLIT_PAY_FALLBACK:-refund}"
+  MOCK_PSP_LATENCY_MS: "${MOCK_PSP_LATENCY_MS:-0}"
+  MOCK_PSP_JITTER_MS: "${MOCK_PSP_JITTER_MS:-0}"
+  MOCK_PSP_FAILURE_RATE: "${MOCK_PSP_FAILURE_RATE:-0}"
+  MOCK_PSP_FAILURE_OPS: "${MOCK_PSP_FAILURE_OPS:-capture,refund}"
+
+services:
+  migrate:
+    environment: *load-env
+  app:
+    environment: *load-env
+  worker:
+    environment: *load-env
+  grpc:
+    environment: *load-env

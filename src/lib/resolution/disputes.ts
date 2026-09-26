@@ -51,9 +51,14 @@ async function bookingForRef(
       currency: payment.booking.currency,
     };
   }
-  // P1-1 sepet: tek PSP tahsilatı → itiraz sepetin ilk rezervasyonuna bağlanır.
-  const cart = await prisma.cartPayment.findFirst({
+  // P1-1 sepet: tek PSP tahsilatı → itiraz sepetin ilk rezervasyonuna bağlanır. P1-2 bölünmüş
+  // ödemede her pay ayrı PSP işlemidir → payın sepetine bağlanır.
+  const share = await prisma.paymentShare.findUnique({
     where: { providerRef },
+    select: { cartPaymentId: true },
+  });
+  const cart = await prisma.cartPayment.findFirst({
+    where: share ? { id: share.cartPaymentId } : { providerRef },
     select: { cartId: true },
   });
   if (!cart) return null;

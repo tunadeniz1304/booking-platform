@@ -226,6 +226,14 @@ export async function openClaim(
     if (now.getTime() > deadline) {
       throw new ClaimError(409, "CLAIM_WINDOW_CLOSED", "İade talebi süresi doldu");
     }
+    if (!booking.payment?.providerRef && !booking.payment?.cartPayment?.providerRef) {
+      // P1-2 bölünmüş ödeme: tek PSP işlemi yok (paylar); talep iadesi pay dağıtımı gerektirir.
+      throw new ClaimError(
+        409,
+        "CLAIM_SPLIT_PAYMENT_UNSUPPORTED",
+        "Bölünmüş ödemeli rezervasyonda iade talebi çözüm merkezinden açılamaz"
+      );
+    }
     const transferred = await prisma.bookingTransfer.count({
       where: { bookingId: booking.id, status: "COMPLETED" },
     });

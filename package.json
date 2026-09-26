@@ -41,7 +41,8 @@
     "sdep:export": "tsx scripts/sdep-export.ts",
     "dac7:export": "tsx scripts/dac7-export.ts",
     "i18n:check": "tsx scripts/i18n-check.ts",
-    "demo:scenarios": "tsx scripts/demo-scenarios.ts"
+    "demo:scenarios": "tsx --conditions=react-server scripts/demo-scenarios.ts",
+    "import:insideairbnb": "tsx scripts/import-insideairbnb.ts"
   },
   "dependencies": {
     "@grpc/grpc-js": "^1.14.5",

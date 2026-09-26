@@ -194,22 +194,23 @@ npm run test:coverage  # unit + integration, kapsam eşiği (Docker gerekir)
 npm run test:e2e       # Playwright + axe, çalışan demo yığınına karşı
 ```
 
-| Script                                           | Ne yapar                                                                     |
-| ------------------------------------------------ | ---------------------------------------------------------------------------- |
-| `dev` / `build` / `start`                        | Next.js geliştirme / derleme / çalıştırma                                    |
-| `lint` / `typecheck` / `format` / `format:check` | ESLint (0 uyarı), `tsc --noEmit`, Prettier                                   |
-| `db:up` / `db:migrate` / `db:seed`               | Dev compose (Postgres + Redis), `prisma migrate deploy`, seed                |
-| `worker`                                         | BullMQ worker (maintenance, pricing, saga kuyrukları + outbox relay)         |
-| `grpc:server`                                    | gRPC `BookingService` + `AriService`                                         |
-| `mcp:server` / `mcp:smoke`                       | stdio MCP sunucusu / duman testi                                             |
-| `llm:smoke`                                      | Canlı LLM için 1 JSON + 1 metin çağrısı (anahtar yoksa atlanır)              |
-| `demo:reset` / `demo:scenarios`                  | Demo verisini sıfırlar / 7 uçtan uca senaryoyu koşar                         |
-| `docs:screenshots`                               | README ekran görüntülerini üretir                                            |
-| `embeddings:backfill`                            | Mülk embedding'lerini yeniden üretir                                         |
-| `ltr:clicks` / `ltr:train`                       | Sentetik tıklama günlüğü üretir / LightGBM lambdarank → ONNX eğitir (Python) |
-| `availability:rollover`                          | Envanter ufkunu ileri taşır                                                  |
-| `sdep:export`                                    | AB 2024/1028 SDEP CSV dışa aktarımı                                          |
-| `i18n:check`                                     | tr/en mesaj anahtarı eşitliği                                                |
+| Script                                           | Ne yapar                                                                            |
+| ------------------------------------------------ | ----------------------------------------------------------------------------------- |
+| `dev` / `build` / `start`                        | Next.js geliştirme / derleme / çalıştırma                                           |
+| `lint` / `typecheck` / `format` / `format:check` | ESLint (0 uyarı), `tsc --noEmit`, Prettier                                          |
+| `db:up` / `db:migrate` / `db:seed`               | Dev compose (Postgres + Redis), `prisma migrate deploy`, seed                       |
+| `worker`                                         | BullMQ worker (maintenance, pricing, saga kuyrukları + outbox relay)                |
+| `grpc:server`                                    | gRPC `BookingService` + `AriService`                                                |
+| `mcp:server` / `mcp:smoke`                       | stdio MCP sunucusu / duman testi                                                    |
+| `llm:smoke`                                      | Canlı LLM için 1 JSON + 1 metin çağrısı (anahtar yoksa atlanır)                     |
+| `demo:reset` / `demo:scenarios`                  | Demo verisini sıfırlar / 13 senaryoyu koşar (7 HTTP + 6 v4 süreç içi, özet tablo)   |
+| `import:insideairbnb`                            | Inside Airbnb İstanbul alt kümesi + opsiyonel OSM POI içe aktarımı (ağ yoksa atlar) |
+| `docs:screenshots`                               | README ekran görüntülerini üretir                                                   |
+| `embeddings:backfill`                            | Mülk embedding'lerini yeniden üretir                                                |
+| `ltr:clicks` / `ltr:train`                       | Sentetik tıklama günlüğü üretir / LightGBM lambdarank → ONNX eğitir (Python)        |
+| `availability:rollover`                          | Envanter ufkunu ileri taşır                                                         |
+| `sdep:export`                                    | AB 2024/1028 SDEP CSV dışa aktarımı                                                 |
+| `i18n:check`                                     | tr/en mesaj anahtarı eşitliği                                                       |
 
 Entegrasyon testleri hiçbir zaman `DATABASE_URL`'e yazmaz; container'ın URL'ini kullanır. Testler ağa çıkmaz (`tests/setup.ts` global `fetch`'i engeller). CI: [.github/workflows/ci.yml](.github/workflows/ci.yml).
 
@@ -246,6 +247,10 @@ ADR'ler: [0001 modüler monolit](docs/adr/0001-modular-monolith.md) · [0002 iki
 - Harita/konum verisi: © OpenStreetMap katkıda bulunanları, [ODbL](https://opendatacommons.org/licenses/odbl/) lisansıyla.
 - Görseller: [Unsplash](https://unsplash.com) (Unsplash License); fotoğraflar sahiplerine aittir.
 - Seed verisi (kullanıcılar, yorumlar, fiyat geçmişi) ve LTR tıklama günlüğü deterministik olarak üretilmiş kurgusal veridir.
+
+### Veri atfı (Inside Airbnb)
+
+`npm run import:insideairbnb` ile isteğe bağlı içe aktarılan İstanbul ilanları [Inside Airbnb](https://insideairbnb.com/get-the-data/) verisinden uyarlanmıştır ve [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) lisansına tabidir: alt küme alınır, alanlar platform modeline eşlenir, ev sahibi adı/kimliği gibi kişisel alanlar içe alınmaz; her ilanın açıklamasında kaynak belirtilir. Veri repoya eklenmez (betik dosya/URL ile çalışır). `--osm` ile eklenen "yakındaki yerler" bilgisi © OpenStreetMap katkıda bulunanları, ODbL.
 
 Lisans: [MIT](LICENSE)
 

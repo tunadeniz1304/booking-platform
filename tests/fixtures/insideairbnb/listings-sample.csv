@@ -1,0 +1,7 @@
+id,name,description,neighbourhood_cleansed,latitude,longitude,property_type,room_type,accommodates,price,minimum_nights,license,picture_url
+1001,"Galata'da manzaralı daire, 2+1","Kuleye yürüme mesafesinde.<br /><b>Balkon</b> var ve ""deniz"" görüyor.",Beyoglu,41.02560,28.97410,Entire rental unit,Entire home/apt,4,"$1,850.00",2,34-ABC-1234,https://a0.muscache.com/pictures/demo-1001.jpg
+1002,Kadıköy özel oda,"Çok satırlı
+açıklama",Kadikoy,40.99020,29.02870,Private room in home,Private room,2,$950.00,1,,http://insecure.example/x.jpg
+1003,Fiyatsız ilan,,Fatih,41.0086,28.9802,Entire rental unit,Entire home/apt,3,,1,,
+abc,Geçersiz id,,Fatih,41.0,28.9,Hotel,Hotel room,2,$500.00,1,,
+1004,Boutique hostel yatak,,Fatih,41.0055,28.9769,Room in hostel,Shared room,1,$320,3,,

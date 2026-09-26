@@ -1303,8 +1303,9 @@ async function cancelLocked(
             currency,
             occurredAt: now,
           });
-          // P1-2: bölünmüş ödemeli sepet kalemi → iade tahsil edilmiş paylara dağıtılır.
-          if (booking.payment.cartPayment && !booking.payment.cartPayment.providerRef) {
+          // P1-2: bölünmüş ödemeli sepet kalemi → iade tahsil edilmiş paylara dağıtılır
+          // (tamamlanmış plan varsa; CartPayment'ta eski tek-ödeme ref'i kalmış olabilir).
+          if (booking.payment.cartPayment) {
             splitRefund = await allocateSplitRefundInTx(tx, {
               cartPaymentId: booking.payment.cartPayment.id,
               bookingId: booking.id,

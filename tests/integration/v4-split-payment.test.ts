@@ -20,6 +20,7 @@ import {
   processSplitDeadline,
   releaseCartWithSplit,
   signShareToken,
+  sweepSplitDeadlines,
   SPLIT_PAYMENT_SAGA,
   type CartDTO,
   type ShareOutcome,
@@ -278,6 +279,42 @@ describeInt("P1-2 bölünmüş ödeme: paylar, süre sonu, yarışlar, geç webh
     await expectLedgerClean(cart.id);
   });
 
+  it("regression: önce reddedilen tek ödeme, sonra bölünmüş ödeme → kalem iadesi eski PSP ref'ine değil paylara", async () => {
+    psp = new SpyPsp();
+    setPaymentProviderForTests(psp);
+    const { organizer, cart: first } = await heldCart("stale", 110);
+    const declined = await payCart({
+      cartId: first.id,
+      userId: organizer.id,
+      cardToken: "tok_mock_decline_0002",
+      idempotencyKey: "stale-decline",
+    }).catch((e: unknown) => e);
+    expect((declined as HttpError).code).toBe("PAYMENT_DECLINED");
+    const staleRef = (await prisma.cartPayment.findUniqueOrThrow({ where: { cartId: first.id } }))
+      .providerRef;
+    expect(staleRef).toBeTruthy();
+    const cart = await holdCart(organizer.id);
+    const p1 = await newUser("stale-p1");
+    const plan = await createSplitPlan({
+      cartId: cart.id,
+      userId: organizer.id,
+      mode: "equal",
+      participants: [{ email: p1.email }],
+    });
+    await pay(tokenOf(plan, 1), p1);
+    expect((await pay(tokenOf(plan, 0), organizer)).status).toBe("confirmed");
+    const booking = await prisma.booking.findFirstOrThrow({
+      where: { cartId: cart.id, status: "CONFIRMED" },
+    });
+    const out = await cancelAndRefund(booking.id, organizer.id);
+    if (out.refund.refundMinor > 0) {
+      expect(psp.refunded.some((r) => r.ref === staleRef)).toBe(false);
+      const parts = await prisma.paymentShareRefund.findMany({ where: { bookingId: booking.id } });
+      expect(parts.reduce((s, r) => s + Number(r.amountMinor), 0)).toBe(out.refund.refundMinor);
+    }
+    await expectLedgerClean(cart.id);
+  });
+
   it("(a) 1 kişi ödemez → süre sonunda kalan organizatörün yedek payına düşer, organizatör öder → onay", async () => {
     const { organizer, cart } = await heldCart("fb", 20);
     const [p1, p2] = [await newUser("fb-p1"), await newUser("fb-p2")];
@@ -362,7 +399,8 @@ describeInt("P1-2 bölünmüş ödeme: paylar, süre sonu, yarışlar, geç webh
     expect(authorized).toHaveLength(2);
 
     await forceDeadline(plan.id);
-    expect(await processSplitDeadline(plan.id)).toBe("aborted");
+    // Gecikmeli iş kaybolsa da dakikalık süpürücü (expire-holds) planı kapatır.
+    expect(await sweepSplitDeadlines(new Date(), 500)).toBeGreaterThanOrEqual(1);
     expect(await processSplitDeadline(plan.id)).toBe("noop");
 
     const shares = await prisma.paymentShare.findMany({

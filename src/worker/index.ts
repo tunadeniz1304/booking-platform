@@ -56,6 +56,7 @@ import { logLlmStartup } from "@/lib/llm/startup";
 import { registerTracing } from "@/lib/observability/tracing";
 import { createServer } from "http";
 import { registry } from "@/lib/observability/metrics";
+import { primeBusinessMetrics } from "@/lib/observability/business-metrics";
 import { metricsAuthorized } from "@/lib/observability/metrics-auth";
 import { DATA_RETENTION_JOB, runDataRetention, scheduleDataRetention } from "./jobs/data-retention";
 
@@ -193,6 +194,7 @@ async function main(): Promise<void> {
 
   // Prometheus için işçi metrikleri (outbox, expire, bildirim sayaçları).
   const metricsPort = Number(process.env.WORKER_METRICS_PORT ?? 9464);
+  primeBusinessMetrics();
   createServer(async (req, res) => {
     const auth = metricsAuthorized(req.headers.authorization ?? null);
     if (req.url !== "/metrics" || auth !== "ok") {

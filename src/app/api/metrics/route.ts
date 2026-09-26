@@ -5,6 +5,16 @@ import { metricsAuthorized } from "@/lib/observability/metrics-auth";
 import "@/lib/booking-service";
 import "@/lib/llm/metrics";
 import "@/lib/http/observed";
+// P0-6: para/uyum iş metrikleri (defter, iade, geç ödeme, sepet, bölünmüş ödeme, payout, depozito).
+import "@/lib/payment/payment-service";
+import "@/lib/ledger";
+import "@/lib/compliance/takedown";
+import "@/lib/cart";
+import "@/lib/cart/cart-webhook";
+import "@/lib/payout/payout-engine";
+import "@/lib/payout/escrow";
+import "@/lib/resolution/deposit";
+import { primeBusinessMetrics } from "@/lib/observability/business-metrics";
 
 /** Prometheus metrikleri — `Authorization: Bearer <METRICS_TOKEN>`. */
 export async function GET(req: NextRequest) {
@@ -15,6 +25,7 @@ export async function GET(req: NextRequest) {
   if (auth === "unauthorized") {
     return NextResponse.json({ error: "Yetkisiz" }, { status: 401 });
   }
+  primeBusinessMetrics();
   return new NextResponse(await registry.metrics(), {
     headers: { "content-type": registry.contentType },
   });

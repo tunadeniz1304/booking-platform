@@ -24,7 +24,7 @@ import { assertCurrency, minorFromDb, minorToDb, money } from "@/lib/money/money
 import { resolveSplitAmounts, SplitAmountError } from "@/lib/money/split";
 import { invalidateBookingCache } from "@/lib/booking/booking-cache";
 import { invalidatePropertySearchCache } from "@/lib/search";
-import { counter } from "@/lib/observability/metrics";
+import { counter, histogram } from "@/lib/observability/metrics";
 import { errorFields, logger } from "@/lib/observability/logger";
 import { audit } from "@/lib/admin/audit";
 import { getQueue, QUEUE_NAMES } from "@/lib/queue";
@@ -84,6 +84,14 @@ export const splitPlanTotal = counter(
   "split_plan_total",
   "Bölünmüş ödeme planları (sonuç: created|settled|fallback|aborted)",
   ["outcome"] as const
+);
+
+/** P0-6: plan kuruluşundan tüm payların tahsil edilip sepetin onaylanmasına kadar geçen süre. */
+export const splitSettlementSeconds = histogram(
+  "split_settlement_duration_seconds",
+  "Bölünmüş ödeme planının kuruluştan onaya süresi (saniye)",
+  [],
+  [5, 15, 30, 60, 120, 300, 600, 1800, 3600, 7200, 14400]
 );
 
 export class SplitNotFoundError extends NotFoundError {
@@ -1029,6 +1037,7 @@ const SPLIT_SAGA_STEPS: SagaStep<SplitSagaCtx, true>[] = [
         maxWait: 10_000,
       });
       splitPlanTotal.inc({ outcome: "settled" });
+      splitSettlementSeconds.observe((Date.now() - ctx.plan.createdAt.getTime()) / 1000);
       await afterCartConfirmed(ctx.plan.cartId);
       return { done: true };
     },

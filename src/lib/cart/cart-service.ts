@@ -16,7 +16,7 @@ import { computeTotal, SoldOutError, type Quote } from "@/lib/pricing/quote";
 import { getCurrentFx, getFxById, type FxTable } from "@/lib/fx/store";
 import { minorFromDb, minorToDb } from "@/lib/money/money";
 import { fromDate, toDbDate } from "@/lib/time/nights";
-import { counter } from "@/lib/observability/metrics";
+import { counter, histogram } from "@/lib/observability/metrics";
 import { logger } from "@/lib/observability/logger";
 import { withOrderedLocks } from "./locks";
 
@@ -38,6 +38,13 @@ const redlock = createRedlock(redis);
 const cartHoldTotal = counter("cart_hold_total", "Sepet tutma denemeleri (sonuç)", [
   "outcome",
 ] as const);
+/** P0-6: tutulan sepetin kalem sayısı (grup rezervasyonu büyüklüğü dağılımı). */
+const cartHoldItems = histogram(
+  "cart_hold_items",
+  "Başarılı sepet tutmasındaki kalem sayısı",
+  [],
+  [1, 2, 3, 4, 5, 6, 8, 10, 20, 50]
+);
 const cartReleaseTotal = counter("cart_release_total", "Sepet tutmasının bırakılması", [
   "reason",
 ] as const);
@@ -584,6 +591,7 @@ export async function holdCart(
       { ttlMs: 15_000, retryDelayMs: 25, waitMs: config.LOCK_WAIT_BUDGET_MS }
     );
     cartHoldTotal.inc({ outcome: "held" });
+    cartHoldItems.observe(bookings.length);
     await afterBookingsWrite(bookings);
   } catch (error) {
     if (error instanceof LockError) {

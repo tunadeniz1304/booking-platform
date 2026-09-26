@@ -17,7 +17,7 @@ import { getLlmSettings, type LlmSettings } from "./settings";
 import { LlmJsonError, parseJsonWithSchema } from "./json";
 import { Redactor, redactText } from "./redaction";
 import { GuardError } from "./guards";
-import { llmLatencySeconds, llmRequestsTotal, llmTokensTotal } from "./metrics";
+import { llmLatencySeconds, llmRequestsTotal, llmRouteFor, llmTokensTotal } from "./metrics";
 import {
   createRedisBudget,
   currentLlmSubject,
@@ -289,8 +289,9 @@ export function createLlmClient(options: CreateLlmClientOptions = {}): LlmClient
     llmRequestsTotal.inc({ task, mode, outcome });
     llmLatencySeconds.observe({ task, mode }, latencyMs / 1000);
     if (usage) {
-      llmTokensTotal.inc({ task, kind: "prompt" }, usage.promptTokens);
-      llmTokensTotal.inc({ task, kind: "completion" }, usage.completionTokens);
+      const route = llmRouteFor(task);
+      llmTokensTotal.inc({ route, task, kind: "prompt" }, usage.promptTokens);
+      llmTokensTotal.inc({ route, task, kind: "completion" }, usage.completionTokens);
     }
     logger.info(
       {

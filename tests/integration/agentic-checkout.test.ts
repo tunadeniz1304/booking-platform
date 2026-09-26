@@ -11,6 +11,7 @@ import {
 import { registerEventHandlers } from "@/lib/events/register";
 import { inlineFlow, setFulfilmentFlowForTests } from "@/lib/saga/booking-saga";
 import { redis } from "@/lib/redis";
+import { mandated } from "../support/mandate";
 
 describeInt("ajan checkout oturumları (P1-11, integration)", () => {
   const prisma = new PrismaClient();
@@ -88,7 +89,12 @@ describeInt("ajan checkout oturumları (P1-11, integration)", () => {
       updateCheckoutSession(strangerId, session.id, { guests: 2 })
     ).rejects.toMatchObject({ status: 404 });
     await expect(
-      completeCheckoutSession(strangerId, session.id, key(), "spt_mock_ok")
+      completeCheckoutSession(
+        strangerId,
+        session.id,
+        key(),
+        await mandated(fx.userId, session, "spt_mock_ok")
+      )
     ).rejects.toMatchObject({ status: 404 });
   });
 
@@ -102,21 +108,36 @@ describeInt("ajan checkout oturumları (P1-11, integration)", () => {
   it("regression: v3#11 spt_mock_ok aynı saga ile CONFIRMED; tekrar tamamlama idempotent", async () => {
     const { session } = await createCheckoutSession(fx.userId, key(), stay());
     const payKey = key();
-    const done = await completeCheckoutSession(fx.userId, session.id, payKey, "spt_mock_ok");
+    const done = await completeCheckoutSession(
+      fx.userId,
+      session.id,
+      payKey,
+      await mandated(fx.userId, session, "spt_mock_ok")
+    );
     expect(done.status).toBe("completed");
     expect(done.order).not.toBeNull();
     const booking = await prisma.booking.findUniqueOrThrow({ where: { id: done.order!.id } });
     expect(booking.status).toBe("CONFIRMED");
     expect(booking.userId).toBe(fx.userId);
 
-    const again = await completeCheckoutSession(fx.userId, session.id, payKey, "spt_mock_ok");
+    const again = await completeCheckoutSession(
+      fx.userId,
+      session.id,
+      payKey,
+      await mandated(fx.userId, session, "spt_mock_ok")
+    );
     expect(again.order).toEqual(done.order);
     expect(await prisma.payment.count({ where: { bookingId: booking.id } })).toBe(1);
   });
 
   it("3DS gerektiren SPT oturumu in_progress + next_action yapar", async () => {
     const { session } = await createCheckoutSession(fx.userId, key(), stay());
-    const res = await completeCheckoutSession(fx.userId, session.id, key(), "spt_mock_3ds");
+    const res = await completeCheckoutSession(
+      fx.userId,
+      session.id,
+      key(),
+      await mandated(fx.userId, session, "spt_mock_3ds")
+    );
     expect(res.status).toBe("in_progress");
     expect(res.next_action?.type).toBe("three_ds");
     const booking = await prisma.booking.findUniqueOrThrow({ where: { id: res.order!.id } });
@@ -126,7 +147,12 @@ describeInt("ajan checkout oturumları (P1-11, integration)", () => {
   it("red 402 döner, oturum açık kalır", async () => {
     const { session } = await createCheckoutSession(fx.userId, key(), stay());
     await expect(
-      completeCheckoutSession(fx.userId, session.id, key(), "spt_mock_decline")
+      completeCheckoutSession(
+        fx.userId,
+        session.id,
+        key(),
+        await mandated(fx.userId, session, "spt_mock_decline")
+      )
     ).rejects.toMatchObject({ status: 402 });
     const after = await getCheckoutSession(fx.userId, session.id);
     expect(after.status).toBe("ready_for_payment");
@@ -135,7 +161,12 @@ describeInt("ajan checkout oturumları (P1-11, integration)", () => {
   it("tanınmayan SPT 400 ve PSP'ye gitmez", async () => {
     const { session } = await createCheckoutSession(fx.userId, key(), stay());
     await expect(
-      completeCheckoutSession(fx.userId, session.id, key(), "tok_mock_ok_4242")
+      completeCheckoutSession(
+        fx.userId,
+        session.id,
+        key(),
+        await mandated(fx.userId, session, "tok_mock_ok_4242")
+      )
     ).rejects.toMatchObject({ status: 400 });
     expect((await getCheckoutSession(fx.userId, session.id)).order).toBeNull();
   });
@@ -148,7 +179,12 @@ describeInt("ajan checkout oturumları (P1-11, integration)", () => {
       data: { priceMinor: 432100n },
     });
     await expect(
-      completeCheckoutSession(fx.userId, session.id, key(), "spt_mock_ok")
+      completeCheckoutSession(
+        fx.userId,
+        session.id,
+        key(),
+        await mandated(fx.userId, session, "spt_mock_ok")
+      )
     ).rejects.toMatchObject({ status: 409, code: "PRICE_CHANGED" });
     const after = await getCheckoutSession(fx.userId, session.id);
     expect(after.order).toBeNull();
@@ -163,7 +199,12 @@ describeInt("ajan checkout oturumları (P1-11, integration)", () => {
     });
     expect((await getCheckoutSession(fx.userId, session.id)).status).toBe("canceled");
     await expect(
-      completeCheckoutSession(fx.userId, session.id, key(), "spt_mock_ok")
+      completeCheckoutSession(
+        fx.userId,
+        session.id,
+        key(),
+        await mandated(fx.userId, session, "spt_mock_ok")
+      )
     ).rejects.toMatchObject({ status: 409 });
   });
 });

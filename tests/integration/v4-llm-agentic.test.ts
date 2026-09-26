@@ -14,6 +14,7 @@ import { Redactor } from "@/lib/llm/redaction";
 import { registerEventHandlers } from "@/lib/events/register";
 import { inlineFlow, setFulfilmentFlowForTests } from "@/lib/saga/booking-saga";
 import { redis } from "@/lib/redis";
+import { mandated } from "../support/mandate";
 import type { AccessClaims } from "@/lib/auth";
 
 /**
@@ -119,7 +120,12 @@ describeInt("v4 LLM harcaması + ajan checkout (integration)", () => {
   it("regression: v4#10 red sonrası hold süresi dolan oturum okunurken iptal edilir, tamamlanamaz", async () => {
     const { session } = await createCheckoutSession(fx.userId, key(), stay());
     await expect(
-      completeCheckoutSession(fx.userId, session.id, key(), "spt_mock_decline")
+      completeCheckoutSession(
+        fx.userId,
+        session.id,
+        key(),
+        await mandated(fx.userId, session, "spt_mock_decline")
+      )
     ).rejects.toMatchObject({ status: 402 });
     const open = await getCheckoutSession(fx.userId, session.id);
     expect(open.status).toBe("ready_for_payment");
@@ -132,14 +138,24 @@ describeInt("v4 LLM harcaması + ajan checkout (integration)", () => {
     });
     expect((await getCheckoutSession(fx.userId, session.id)).status).toBe("canceled");
     await expect(
-      completeCheckoutSession(fx.userId, session.id, key(), "spt_mock_ok")
+      completeCheckoutSession(
+        fx.userId,
+        session.id,
+        key(),
+        await mandated(fx.userId, session, "spt_mock_ok")
+      )
     ).rejects.toMatchObject({ status: 409, code: "CHECKOUT_CANCELED" });
   });
 
   it("regression: v4#10 rezervasyon EXPIRED ise ready_for_payment oturum da iptal olur", async () => {
     const { session } = await createCheckoutSession(fx.userId, key(), stay());
     await expect(
-      completeCheckoutSession(fx.userId, session.id, key(), "spt_mock_decline")
+      completeCheckoutSession(
+        fx.userId,
+        session.id,
+        key(),
+        await mandated(fx.userId, session, "spt_mock_decline")
+      )
     ).rejects.toMatchObject({ status: 402 });
     const open = await getCheckoutSession(fx.userId, session.id);
     await prisma.booking.update({ where: { id: open.order!.id }, data: { status: "EXPIRED" } });

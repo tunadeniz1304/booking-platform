@@ -3,12 +3,16 @@ import { Prisma, type CheckoutSession } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getConfig } from "@/lib/config/app-config";
-import { ConflictError, NotFoundError, ValidationError } from "@/lib/http/errors";
+import { ConflictError, NotFoundError } from "@/lib/http/errors";
 import { createQuote, type Quote } from "@/lib/pricing/quote";
 import { createBooking } from "@/lib/booking-service";
 import { payForBooking, type PayOutcome } from "@/lib/payment/payment-service";
 import type { PaymentChallenge } from "@/lib/payment/provider";
 import { logger } from "@/lib/observability/logger";
+import { authorizeMandate, type AuthorizeMandateDeps } from "./mandate";
+import { activeSptProvider, sptToCardToken } from "./spt";
+
+export { sptToCardToken } from "./spt";
 
 /**
  * Ajan checkout oturumları (P1-11, Agentic Commerce Protocol benzeri).
@@ -21,8 +25,10 @@ import { logger } from "@/lib/observability/logger";
  * Güvenlik:
  *  - Oturum yalnızca sahibine görünür (başkası için 404, varlık sızdırılmaz).
  *  - Oluşturma `Idempotency-Key` ile tekildir; aynı anahtar + farklı gövde → 409.
- *  - Ödeme verisi yalnızca paylaşılan ödeme token'ı (SPT). Demo: `spt_mock_<ok|decline|3ds>`
- *    MockPsp kart token'ına eşlenir; gerçek SPT sağlayıcısı kapsam dışıdır (ADR 0015).
+ *  - Ödeme verisi yalnızca paylaşılan ödeme token'ı (SPT): Stripe aktifse gerçek Stripe
+ *    Shared Payment Token (`spt.ts`), değilse demo `spt_mock_<ok|decline|3ds>` (ADR 0023).
+ *  - Tamamlama, kullanıcının imzaladığı AP2 intent mandate'i ister (`mandate.ts`): tutar,
+ *    para birimi, ilan ve süre mandate'e karşı doğrulanır; platform merchant-of-record kalır.
  */
 
 export type CheckoutStatus = "ready_for_payment" | "in_progress" | "completed" | "canceled";
@@ -44,8 +50,10 @@ export const completeCheckoutSchema = z
   .object({
     payment_data: z.object({
       token: z.string().min(1).max(200),
-      provider: z.literal("mock"),
+      provider: z.enum(["mock", "stripe"]),
     }),
+    /** AP2 intent mandate (kompakt JWS). */
+    mandate: z.string().min(1).max(4096).optional(),
   })
   .strict();
 
@@ -57,15 +65,6 @@ interface Totals {
   fees: number;
   taxes: number;
   total: number;
-}
-
-const SPT_PATTERN = /^spt_mock_(ok|decline|3ds)$/;
-
-/** Mock SPT → MockPsp kart token'ı. Tanınmayan token 400 (asla PSP'ye gitmez). */
-export function sptToCardToken(spt: string): string {
-  const match = SPT_PATTERN.exec(spt);
-  if (!match) throw new ValidationError("Geçersiz paylaşılan ödeme token'ı (SPT)");
-  return `tok_mock_${match[1]}_0000`;
 }
 
 /** İstek gövdesinin kanonik özeti (idempotency anahtarı ↔ gövde bağı; booking-service de kullanır). */
@@ -111,7 +110,7 @@ export interface CheckoutSessionView {
     total: number;
   }>;
   totals: Array<{ type: "subtotal" | "fees" | "tax" | "total"; amount: number }>;
-  payment_provider: { provider: "mock"; supported_payment_methods: ["card"] };
+  payment_provider: { provider: "mock" | "stripe"; supported_payment_methods: ["card"] };
   order: { id: string } | null;
   expires_at: string;
   messages: Array<{ type: "info" | "error"; code: string; content: string }>;
@@ -143,7 +142,7 @@ export function toView(
       { type: "tax", amount: t.taxes },
       { type: "total", amount: t.total },
     ],
-    payment_provider: { provider: "mock", supported_payment_methods: ["card"] },
+    payment_provider: { provider: activeSptProvider(), supported_payment_methods: ["card"] },
     order: s.bookingId ? { id: s.bookingId } : null,
     expires_at: s.expiresAt.toISOString(),
     ...extra,
@@ -301,20 +300,44 @@ export async function updateCheckoutSession(
  * kullanıcı yeni tutarı onaylamalı) → HELD rezervasyon (idempotent) → ödeme.
  * Aynı `Idempotency-Key` ile tekrar → aynı ödeme sonucu; tamamlanmış oturum aynen döner.
  */
+export interface CompletePayment {
+  /** Paylaşılan ödeme token'ı (SPT). */
+  token: string;
+  /** AP2 intent mandate (JWS); `AGENT_MANDATE_REQUIRED` iken zorunlu. */
+  mandate?: string | null;
+}
+
 export async function completeCheckoutSession(
   userId: string,
   id: string,
   idempotencyKey: string,
-  paymentToken: string,
+  payment: CompletePayment,
   context: Parameters<typeof payForBooking>[0]["context"] = {},
-  now = new Date()
+  now = new Date(),
+  mandateDeps: AuthorizeMandateDeps = {}
 ): Promise<CheckoutSessionView> {
   let session = await loadOwned(userId, id, now);
   if (session.status === "completed") return toView(session);
   if (session.status === "canceled") {
     throw new ConflictError("Oturum iptal edilmiş veya süresi dolmuş", "CHECKOUT_CANCELED");
   }
-  const cardToken = sptToCardToken(paymentToken);
+  // Mandate kapısı PSP'ye gitmeden önce: tutar/para birimi/ilan oturumun GÜNCEL teklifinden.
+  const amountMinor = (session.totals as unknown as Totals).total;
+  await authorizeMandate(
+    payment.mandate,
+    {
+      userId,
+      checkoutSessionId: session.id,
+      amountMinor,
+      currency: session.currency,
+      propertyId: session.propertyId,
+    },
+    { now, ...mandateDeps }
+  );
+  const cardToken = await sptToCardToken(payment.token, {
+    amountMinor,
+    currency: session.currency,
+  });
 
   if (!session.bookingId) {
     const quote = await quoteFor(session);

@@ -22,3 +22,8 @@ export function riskContext(req: NextRequest) {
     ipCountry: hops > 0 ? req.headers.get("cf-ipcountry") : null,
   };
 }
+
+/** AP2 mandate başlıkta da taşınabilir (`AP2-Mandate: <jws>`); gövdedeki alan önceliklidir. */
+export function mandateHeader(req: NextRequest): string | null {
+  return req.headers.get("ap2-mandate")?.trim() || null;
+}

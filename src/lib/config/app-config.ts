@@ -190,6 +190,13 @@ const schema = z.object({
   CHANNEL_PARITY_TOLERANCE_BPS: int(100, 0, 10_000),
   /** Ajan checkout oturumu (ACP) geçerlilik süresi (dk); dolunca oturum iptal sayılır. */
   CHECKOUT_SESSION_TTL_MINUTES: int(30, 5, 1440),
+  /** P1-11 AP2: ajan checkout tamamlaması imzalı intent mandate ister (kapatmak yalnız geliştirme içindir). */
+  AGENT_MANDATE_REQUIRED: bool(true),
+  /** Mandate `aud` claim'i: yalnızca bu hedef için imzalanmış mandate kabul edilir. */
+  AGENT_MANDATE_AUDIENCE: z.string().default("booking-platform:agentic-checkout"),
+  /** Yeni mandate'in varsayılan ve azami geçerlilik süresi (dk). */
+  AGENT_MANDATE_DEFAULT_TTL_MINUTES: int(60, 1, 43_200),
+  AGENT_MANDATE_MAX_TTL_MINUTES: int(10_080, 5, 43_200),
 
   // Güvenlik / ağ
   TRUSTED_PROXY_HOPS: int(0, 0, 10),

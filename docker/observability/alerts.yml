@@ -73,7 +73,14 @@ groups:
         expr: sum(increase(split_plan_total{outcome="aborted"}[1h])) > 5
         labels: { severity: ticket }
         annotations:
-          summary: "Bölünmüş ödeme planları süre sonunda iptal oluyor"
+          summary: "Bölünmüş ödeme planları iptal oluyor (süre sonu ya da onay adımında serileştirme çakışması — abortReason'a bakın)"
+      - alert: SagaCompensationFailed
+        # Telafi adımı başarısız (ör. PSP iadesi/void'i düştü) → para PSP'de kalmış olabilir;
+        # saga kendiliğinden yeniden denemez, elle müdahale gerekir (P2-3 kaos koşusu).
+        expr: sum by (saga, step) (increase(saga_compensation_total{outcome="failed"}[15m])) > 0
+        labels: { severity: page }
+        annotations:
+          summary: "Saga telafisi başarısız ({{ $labels.saga }}/{{ $labels.step }}) — PSP'de askıda tutar olabilir, elle iade/void"
       - alert: PayoutFailures
         expr: sum(increase(payouts_total{outcome=~"failed|error"}[1h])) > 0
         labels: { severity: ticket }

@@ -98,16 +98,27 @@ sum by (source) (increase(takedown_sla_breach_total[1h])) > 0
 **İlk müdahale:** `/admin/compliance` kuyruğundaki açık talebi işleyin; ihlal kaydı denetim
 izine (AuditLog) yazılmıştır.
 
+## Saga telafisi (page)
+
+`SagaCompensationFailed` — 15 dk içinde herhangi bir `saga_compensation_total{outcome="failed"}`.
+Telafi adımı (PSP iadesi/void'i, tutma serbest bırakma) düştüğünde saga yeniden denemez; PSP'de
+yetkilendirilmiş ya da tahsil edilmiş tutar askıda kalabilir (P2-3 kaos koşusunda 2 sepet
+`CANCELLED` + `CartPayment AUTHORIZED` kaldı).
+
+**İlk müdahale:** logda `saga compensation failed` satırının `saga`/`step`'i → ilgili sepet/
+rezervasyonun `CartPayment`/`Payment` durumu → PSP panelinden void/iade; ardından
+`scripts/load-assert.ts` benzeri mutabakat.
+
 ## Para hijyeni alarmları (ticket)
 
-| Alarm                      | Koşul                                           | Anlamı                                                        |
-| -------------------------- | ----------------------------------------------- | ------------------------------------------------------------- |
-| `RefundRetryFailing`       | 30 dk'da > 5 başarısız/tükenmiş iade denemesi   | PSP iade uç noktası sorunlu; müşteri parası bekliyor          |
-| `LatePaymentRefundSpike`   | 1 saatte > 10 geç başarı iadesi (tekil + sepet) | Tutma TTL'i PSP gecikmesine göre kısa kalıyor olabilir        |
-| `CaptureRaceCompensations` | 15 dk'da > 20 yarış telafisi                    | İstemci/ajan agresif yeniden deniyor (çift ödeme girişimi)    |
-| `SplitPlansAborting`       | 1 saatte > 5 iptal edilen bölünmüş ödeme planı  | Katılımcılar süreyi kaçırıyor / pay sayfası sorunu            |
-| `PayoutFailures`           | 1 saatte payout hatası                          | Ev sahibi/devir ödemesi başarısız                             |
-| `LlmTokenBurnHigh`         | bir rotada saatlik > 2M token                   | Bütçe sızıntısı / kötüye kullanım (`llm_tokens_total{route}`) |
+| Alarm                      | Koşul                                           | Anlamı                                                                                                                             |
+| -------------------------- | ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `RefundRetryFailing`       | 30 dk'da > 5 başarısız/tükenmiş iade denemesi   | PSP iade uç noktası sorunlu; müşteri parası bekliyor                                                                               |
+| `LatePaymentRefundSpike`   | 1 saatte > 10 geç başarı iadesi (tekil + sepet) | Tutma TTL'i PSP gecikmesine göre kısa kalıyor olabilir                                                                             |
+| `CaptureRaceCompensations` | 15 dk'da > 20 yarış telafisi                    | İstemci/ajan agresif yeniden deniyor (çift ödeme girişimi)                                                                         |
+| `SplitPlansAborting`       | 1 saatte > 5 iptal edilen bölünmüş ödeme planı  | Süre kaçırılıyor ya da onay adımı serileştirme çakışmasında düşüyor (`abortReason`; bkz. [yük raporu](../perf/p2-3-load-chaos.md)) |
+| `PayoutFailures`           | 1 saatte payout hatası                          | Ev sahibi/devir ödemesi başarısız                                                                                                  |
+| `LlmTokenBurnHigh`         | bir rotada saatlik > 2M token                   | Bütçe sızıntısı / kötüye kullanım (`llm_tokens_total{route}`)                                                                      |
 
 ## Metrik kataloğu (P0-6)
 

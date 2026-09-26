@@ -1,44 +1,53 @@
 # Mimari
 
-> Bu doküman v3'te **gerçekten uygulanmış** durumu anlatır; v2'deki `Availability` satır modeli, partisyonlama (ADR 0006), pazarlık motoru ve eski float fiyat motoru kaldırılmıştır. Kararların gerekçeleri [docs/adr/](adr/) altındadır (v3: [0010](adr/0010-room-type-inventory-counters.md)–[0018](adr/0018-i18n-namespaces-and-formatting.md)).
+> Bu doküman **gerçekten uygulanmış** durumu anlatır (v4). v2'deki `Availability` satır modeli, partisyonlama (ADR 0006), pazarlık motoru ve eski float fiyat motoru kaldırılmıştır. v4 ekleri: çift girişli defter (§13), grup sepeti ve bölünmüş ödeme (§14), escrow/payout/depozito (§15), ajan mandate akışı (§16). Kararların gerekçeleri [docs/adr/](adr/) altındadır; tam liste §17.
 
 ## 1. Genel bakış
 
 booking-platform bir **modüler monolittir** ([ADR 0001](adr/0001-modular-monolith.md)): tek Next.js 16 uygulaması, aynı kod tabanından çalışan bir BullMQ worker'ı ve bir iç gRPC servisi. İş mantığı `src/lib/<context>/` altındaki bounded context'lerde yaşar; route handler'lar (`src/app/api/**`) incedir. Girdiyi `zod` ile doğrular, kimliği çözer, servisi çağırır ve hatayı `src/lib/http/errors.ts` ile HTTP'ye çevirir.
 
-| Süreç          | Giriş noktası                        | Görev                                                                                         |
-| -------------- | ------------------------------------ | --------------------------------------------------------------------------------------------- |
-| `app`          | Next.js (`src/proxy.ts` + `src/app`) | Sayfalar, REST API, MCP HTTP (`/api/mcp`), ACP (`/api/agentic/*`), SSE akışları               |
-| `worker`       | `src/worker/index.ts`                | BullMQ kuyrukları (`pricing`, `maintenance`, `saga`), outbox relay, metrik sunucusu (bkz. §9) |
-| `grpc`         | `services/grpc/main.ts`              | `BookingService` + `AriService` (kanal ARI push); yalnızca compose iç ağında                  |
-| `mcp` (stdio)  | `services/mcp/main.ts`               | Yerel MCP sunucusu (stdio); HTTP taşıması uygulamanın içindedir (§7)                          |
-| `migrate`      | `scripts/migrate-and-seed.ts`        | `prisma migrate deploy` + (`DEMO_SEED` ve boş DB ise) seed                                    |
-| `secrets-init` | `scripts/gen-secrets.mjs`            | Eksik sırları rastgele üretip `booking_secrets` volume'una yazar                              |
+| Süreç          | Giriş noktası                        | Görev                                                                                                                                                       |
+| -------------- | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `app`          | Next.js (`src/proxy.ts` + `src/app`) | Sayfalar, REST API, MCP HTTP (`/api/mcp`), ACP (`/api/agentic/*`), UCP (`/.well-known/ucp`, `/api/ucp/*`), SSE akışları, PWA manifest + `public/sw.js`      |
+| `worker`       | `src/worker/index.ts`                | BullMQ kuyrukları (`pricing`, `maintenance`, `saga`, `refund-retry`, `compliance`, `resolution`, `price-calendar`), outbox relay, metrik sunucusu (bkz. §9) |
+| `grpc`         | `services/grpc/main.ts`              | `BookingService` + `AriService` (kanal ARI push); yalnızca compose iç ağında                                                                                |
+| `mcp` (stdio)  | `services/mcp/main.ts`               | Yerel MCP sunucusu (stdio); HTTP taşıması uygulamanın içindedir (§7)                                                                                        |
+| `migrate`      | `scripts/migrate-and-seed.ts`        | `prisma migrate deploy` + (`DEMO_SEED` ve boş DB ise) seed                                                                                                  |
+| `secrets-init` | `scripts/gen-secrets.mjs`            | Eksik sırları rastgele üretip `booking_secrets` volume'una yazar                                                                                            |
 
 Altyapı: PostgreSQL 16 + pgvector + `pg_trgm` (`pgvector/pgvector:pg16`), Redis 7 (`requirepass`, host'a kapalı). Opsiyonel compose profili: `observability` (Prometheus, Tempo, Grafana). `onnxruntime-node` opsiyoneldir; Alpine imajında yoktur (§6.3).
 
 ## 2. Bounded context'ler
 
-| Context            | Klasör / dosyalar                                                                                                         | Sorumluluk                                                                                                                |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| Identity & Access  | `src/lib/auth/*`, `src/lib/security/*`, `src/proxy.ts`                                                                    | JWT, refresh rotasyonu, passkey (WebAuthn) ve step-up, RBAC, CSRF, rate-limit                                             |
-| Catalog            | `src/app/api/properties/**`, `src/lib/host/host-service.ts`                                                               | Mülk, oda tipi, rate plan, kısıt; lisans durumu (`licenseStatus`)                                                         |
-| Inventory          | `src/lib/booking/{inventory,restrictions,availability-rollover}.ts`, `src/lib/channel/{channel,ical-poller}.ts`           | `InventoryDay` sayaçları, 365 gün rollover + budama, iCal import/export ve polling, `ExternalBlock`                       |
-| Booking            | `src/lib/booking-service.ts`, `src/lib/booking/{state-machine,cancellation,complete-stays}.ts`                            | Hold, durum makinesi, iptal politikası snapshot'ı, iade hesabı                                                            |
-| Time               | `src/lib/time/nights.ts`                                                                                                  | Mülk saat dilimine göre gece ve check-in/out anları (Temporal)                                                            |
-| Pricing            | `src/lib/pricing/{quote,tax,event-signals,insight,price-alerts,revenue-engine,revenue,tr-holidays}.ts`, `src/lib/money/*` | Quote, vergi motoru, olay sinyalleri, fiyat aralığı (conformal), Omnibus, gelir önerisi                                   |
-| FX                 | `src/lib/fx/store.ts`                                                                                                     | TCMB/ECB kur snapshot'ları (`FxRate`), statik fallback                                                                    |
-| Payment & Saga     | `src/lib/payment/*`, `src/lib/saga/{saga,booking-saga}.ts`, `src/lib/invoice/*`                                           | `PaymentProvider` (`MockPsp` varsayılan, opsiyonel Stripe), saga, ledger, fatura, payout                                  |
-| Transfer           | `src/lib/transfer/transfer-service.ts`                                                                                    | İmzalı claim linki + escrow ([ADR 0007](adr/0007-transfer-claim-link-escrow.md))                                          |
-| Search & Discovery | `src/lib/search.ts`, `src/lib/search/{hybrid,ltr,ranking,vector,fuzzy,map-cluster}.ts`, `src/lib/embedding/*`             | Hibrit arama (RRF), LTR, açıklanabilir sıralama, harita kümeleme, A/B deneyi                                              |
-| Messaging          | `src/lib/messaging/{message-service,mask,hub}.ts`                                                                         | Misafir–host mesajlaşma, PII maskeleme, Redis pub/sub + SSE                                                               |
-| Reviews            | `src/lib/reviews/*`                                                                                                       | Doğrulanmış yorum, raporlama, moderasyon kuyruğu                                                                          |
-| AI (LLM)           | `src/lib/ai/*`, `src/lib/llm/*`                                                                                           | LLM görevleri; karar yetkisi yok ([ADR 0005](adr/0005-llm-contract.md), [0017](adr/0017-messaging-moderation-step-up.md)) |
-| Agentic            | `src/lib/mcp/{http,server}.ts`, `src/lib/agentic/checkout.ts`                                                             | MCP araçları, ACP `checkout_sessions` ([ADR 0015](adr/0015-agentic-booking-channel-revenue.md))                           |
-| Risk               | `src/lib/risk/{fraud,bin-table,device-fingerprint}.ts`                                                                    | Fraud v2 skoru, cihaz parmak izi                                                                                          |
-| Events / outbox    | `src/lib/cqrs/{outbox,event-bus}.ts`, `src/lib/queue.ts`                                                                  | Transactional outbox, olay yayını, BullMQ kuyruk tanımları                                                                |
-| Admin & Privacy    | `src/lib/admin/*`, `src/lib/privacy/*`, `src/lib/compliance/*`                                                            | Audit log, kuyruklar, KVKK dışa aktarım/anonimleştirme                                                                    |
-| Observability      | `src/lib/observability/*`, `src/instrumentation.ts`                                                                       | pino, OpenTelemetry, Prometheus, readiness                                                                                |
+| Context            | Klasör / dosyalar                                                                                                         | Sorumluluk                                                                                                                                                            |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Identity & Access  | `src/lib/auth/*`, `src/lib/security/*`, `src/proxy.ts`                                                                    | JWT, refresh rotasyonu, passkey (WebAuthn) ve step-up, RBAC, CSRF, rate-limit                                                                                         |
+| Catalog            | `src/app/api/properties/**`, `src/lib/host/host-service.ts`                                                               | Mülk, oda tipi, rate plan, kısıt; lisans durumu (`licenseStatus`)                                                                                                     |
+| Inventory          | `src/lib/booking/{inventory,restrictions,availability-rollover}.ts`, `src/lib/channel/{channel,ical-poller}.ts`           | `InventoryDay` sayaçları, 365 gün rollover + budama, iCal import/export ve polling, `ExternalBlock`                                                                   |
+| Booking            | `src/lib/booking-service.ts`, `src/lib/booking/{state-machine,cancellation,complete-stays}.ts`                            | Hold, durum makinesi, iptal politikası snapshot'ı, iade hesabı                                                                                                        |
+| Time               | `src/lib/time/nights.ts`                                                                                                  | Mülk saat dilimine göre gece ve check-in/out anları (Temporal)                                                                                                        |
+| Pricing            | `src/lib/pricing/{quote,tax,event-signals,insight,price-alerts,revenue-engine,revenue,tr-holidays}.ts`, `src/lib/money/*` | Quote, vergi motoru, olay sinyalleri, fiyat aralığı (conformal), Omnibus, gelir önerisi                                                                               |
+| FX                 | `src/lib/fx/store.ts`                                                                                                     | TCMB/ECB kur snapshot'ları (`FxRate`), statik fallback                                                                                                                |
+| Payment & Saga     | `src/lib/payment/*`, `src/lib/saga/{saga,booking-saga}.ts`, `src/lib/invoice/*`                                           | `PaymentProvider` (`MockPsp` varsayılan, opsiyonel Stripe), saga, ledger, fatura, payout                                                                              |
+| Transfer           | `src/lib/transfer/transfer-service.ts`                                                                                    | İmzalı claim linki + escrow ([ADR 0007](adr/0007-transfer-claim-link-escrow.md))                                                                                      |
+| Search & Discovery | `src/lib/search.ts`, `src/lib/search/{hybrid,ltr,ranking,vector,fuzzy,map-cluster}.ts`, `src/lib/embedding/*`             | Hibrit arama (RRF), LTR, açıklanabilir sıralama, harita kümeleme, A/B deneyi                                                                                          |
+| Messaging          | `src/lib/messaging/{message-service,mask,hub}.ts`                                                                         | Misafir–host mesajlaşma, PII maskeleme, Redis pub/sub + SSE                                                                                                           |
+| Reviews            | `src/lib/reviews/*`                                                                                                       | Doğrulanmış yorum, raporlama, moderasyon kuyruğu                                                                                                                      |
+| AI (LLM)           | `src/lib/ai/*`, `src/lib/llm/*`                                                                                           | LLM görevleri; karar yetkisi yok ([ADR 0005](adr/0005-llm-contract.md), [0017](adr/0017-messaging-moderation-step-up.md))                                             |
+| Agentic            | `src/lib/mcp/{http,server}.ts`, `src/lib/agentic/{checkout,spt,mandate,ucp}.ts`                                           | MCP araçları, ACP `checkout_sessions`, SPT, AP2 mandate, UCP ([ADR 0015](adr/0015-agentic-booking-channel-revenue.md), [0023](adr/0023-agentic-commerce-mandates.md)) |
+| Risk               | `src/lib/risk/{fraud,bin-table,device-fingerprint}.ts`                                                                    | Fraud v2 skoru, cihaz parmak izi                                                                                                                                      |
+| Ledger             | `src/lib/ledger/*`                                                                                                        | Çift girişli jurnal, şablonlar, bakiye/mizan, mutabakat (§13, [ADR 0020](adr/0020-double-entry-ledger.md))                                                            |
+| Cart & Split       | `src/lib/cart/*`, `src/lib/money/split.ts`                                                                                | Grup sepeti, tümü-ya-hiç tutma, sepet ödemesi, bölünmüş ödeme, geç webhook (§14)                                                                                      |
+| Payout & Escrow    | `src/lib/payout/*`                                                                                                        | Escrow serbest bırakma, komisyon, rezerv, host payout motoru, DAC7 ([ADR 0021](adr/0021-escrow-payout-deposit.md))                                                    |
+| Resolution         | `src/lib/resolution/*`                                                                                                    | Hasar depozitosu, talepler, kanıt, SLA, chargeback senkronu (§15)                                                                                                     |
+| Trust & Safety     | `src/lib/trust/*`                                                                                                         | KYC sağlayıcıları, mesaj dolandırıcılık taraması, parti riski                                                                                                         |
+| Wallet & Loyalty   | `src/lib/wallet/*`                                                                                                        | Seviyeler, cashback kredisi, FIFO lot, kredi ile kısmi ödeme                                                                                                          |
+| Promotions         | `src/lib/pricing/{promotions,promotion-service,promotion-redemption,omnibus,price-calendar}.ts`                           | Promosyon motoru, kupon, Omnibus 30 gün referansı, esnek tarih fiyat takvimi                                                                                          |
+| Vision             | `src/lib/vision/*`                                                                                                        | Fotoğraf kalite skoru, pHash, CLIP embedding, görsel arama ([ADR 0022](adr/0022-multimodal-search.md))                                                                |
+| PWA & Push         | `src/lib/pwa/*`, `src/lib/push/*`, `public/sw.js`                                                                         | Manifest, offline seyahat planı, Web Push                                                                                                                             |
+| Events / outbox    | `src/lib/cqrs/{outbox,event-bus}.ts`, `src/lib/queue.ts`                                                                  | Transactional outbox, olay yayını, BullMQ kuyruk tanımları                                                                                                            |
+| Admin & Privacy    | `src/lib/admin/*`, `src/lib/privacy/*`, `src/lib/compliance/*`                                                            | Audit log, kuyruklar, KVKK dışa aktarım/anonimleştirme, saklama işi, 7565/DSA iş akışları, erişilebilirlik özellikleri                                                |
+| Observability      | `src/lib/observability/*`, `src/instrumentation.ts`                                                                       | pino, OpenTelemetry, Prometheus, readiness                                                                                                                            |
 
 Diğer: `resilience/circuit-breaker.ts`, `routing/optimizer.ts` (çok şehirli rota), `live/hub.ts` (canlı ısı haritası SSE'si ve bağlantı yuvaları), `flags/*` (OpenFeature), `i18n/*` ([ADR 0018](adr/0018-i18n-namespaces-and-formatting.md)).
 
@@ -177,7 +186,7 @@ sequenceDiagram
   API->>DB: confirm (SERIALIZABLE): Payment PAID + Booking CONFIRMED + held−/sold+ + ledger + outbox
   alt confirm başarısız (ör. hold süresi doldu)
     API->>PSP: refund (compensate:<providerRef>) → Payment REFUNDED
-    API->>PSP: void (authorize telafisi; capture yapıldıysa atlanır) → Payment VOIDED
+    API->>PSP: void (authorize telafisi, capture yapıldıysa atlanır) → Payment VOIDED
     API->>DB: releaseHold → Booking EXPIRED, held −u
     API-->>G: 409
   end
@@ -276,16 +285,19 @@ RRF adayları `src/lib/search/ranking.ts` ile açıklanabilir ağırlıklı skor
 
 `models/ranker.onnx`, `onnxruntime-node` ile tembel (lazy) yüklenir. Model dosyası yoksa, yükleme başarısız olursa, çıktı boyutu yanlışsa veya sonlu değilse ağırlıklı sıralamaya düşülür (`mode: "weighted"`). Alpine Docker imajı onnxruntime'ı içermez (`next.config.ts` → `outputFileTracingExcludes`); orada `ltr` kolu fiilen ağırlıklı sıralama gibi davranır. Ayrıntı: [MODEL_CARD](MODEL_CARD.md).
 
-## 7. Ajan kanalı: MCP HTTP + ACP ([ADR 0015](adr/0015-agentic-booking-channel-revenue.md))
+## 7. Ajan kanalı: MCP HTTP + ACP + UCP ([ADR 0015](adr/0015-agentic-booking-channel-revenue.md), [ADR 0023](adr/0023-agentic-commerce-mandates.md))
 
 - **MCP HTTP:** `/api/mcp` (`src/app/api/mcp/route.ts` → `src/lib/mcp/http.ts`). Durumsuz `WebStandardStreamableHTTPServerTransport`, JSON yanıt; yalnızca `POST` (diğerleri 405). `Authorization: Bearer <JWT>` zorunludur; yoksa 401 + `WWW-Authenticate: Bearer realm="booking-mcp"`. stdio'daki `MCP_ACCESS_TOKEN` ortam fallback'i HTTP'de kapalıdır.
-- **Araçlar** (`src/lib/mcp/server.ts`, sunucu `booking-platform` 3.0.0): `search_stays`, `get_quote`, `create_hold`, `get_price_insight`, `list_my_bookings`, `cancel_booking` (`confirm: true` zorunlu). `ui://stay-card` kaynağı yalnızca görüntüleme içindir.
+- **Araçlar** (`src/lib/mcp/server.ts`): `search_stays`, `get_quote`, `create_hold`, `checkout_stay` (SPT + mandate, v4), `get_price_insight`, `list_my_bookings`, `cancel_booking` (`confirm: true` zorunlu). `create_hold` ve `checkout_stay` doğrulanmış e-posta ister. `ui://stay-card` kaynağı yalnızca görüntüleme içindir.
 - **ACP** (`src/lib/agentic/checkout.ts`):
   - `POST /api/agentic/checkout_sessions`, `GET`/`POST /api/agentic/checkout_sessions/[id]`, `POST /api/agentic/checkout_sessions/[id]/complete`.
   - Durumlar: `ready_for_payment`, `in_progress`, `completed`, `canceled`. Oturum ömrü `CHECKOUT_SESSION_TTL_MINUTES` (30).
   - `Idempotency-Key` zorunlu; aynı anahtar farklı gövdeyle gelirse 409 (`requestHash`). Oturumu yalnızca sahibi görür, başkasına 404.
   - `complete`: `createQuote` → `createBooking` (idempotency `acs:<id>`) → `payForBooking`, yani aynı saga.
-  - **Mock:** ödeme token'ları `spt_mock_<ok|decline|3ds>` biçimindedir ve MockPsp senaryolarına eşlenir (`provider: "mock"`); gerçek bir ajan ödeme ağı entegrasyonu yoktur.
+  - **Ödeme token'ı:** Stripe aktifken `spt_…` Stripe Shared Payment Token'ı olarak doğrulanır (`src/lib/agentic/spt.ts`; etkinlik, para birimi, `max_amount` → 402 `SPT_*`); Stripe yoksa `spt_mock_<ok|decline|3ds>` MockPsp senaryolarına eşlenir. SPT yolu yalnız ağsız fake ile test edildi.
+  - **Mandate (v4):** `complete` PSP'den önce AP2 intent mandate'ini doğrular (`AGENT_MANDATE_REQUIRED`, varsayılan açık); akış §16.
+  - Her okumada oturum rezervasyon durumuyla uzlaştırılır; süresi dolmuş tutmada oturum `canceled` olur (v4#10).
+- **UCP** (`src/lib/agentic/ucp.ts`): `GET /.well-known/ucp` profil belgesi; `/api/ucp/checkout-sessions` (POST, `[id]` GET/PUT, `[id]/complete` POST) yalnız UCP lodging şemasını ACP servislerine eşler.
 - Rate-limit: `agentic` kategorisi (`RATE_LIMIT_AGENTIC_MAX`, 30), Redis hatasında fail-closed (`src/lib/security/rate-limit.ts`).
 - **Kanal yöneticisi:** `ical-poll` işi ETag / `If-Modified-Since` kullanır; yalnızca https ve SSRF korumalıdır (`ICAL_MAX_BYTES` 1e6, `ICAL_FETCH_TIMEOUT_MS` 10000, `ICAL_POLL_BATCH` 50). Feed token'ları `ChannelFeed.tokenVersion` ile iptal edilebilir. Fiyat paritesi (`CHANNEL_PARITY_TOLERANCE_BPS`, 100) yalnızca uyarı üretir.
 
@@ -298,18 +310,29 @@ RRF adayları `src/lib/search/ranking.ts` ile açıklanabilir ağırlıklı skor
 
 ## 9. Worker işleri (`src/worker/index.ts`)
 
-| Kuyruk / döngü | İş                      | Zamanlama                         | Görev                                                                                  |
-| -------------- | ----------------------- | --------------------------------- | -------------------------------------------------------------------------------------- |
-| `pricing`      | fiyat işi               | olay/istek ile                    | `updateAvailabilityPrices` (`src/lib/pricing-service.ts`, `priceNights`)               |
-| `maintenance`  | `expire-holds`          | 60 sn                             | Süresi dolan hold'lar, 100'lük partiler (en fazla 10 parti); `held` sayacı geri alınır |
-| `maintenance`  | `complete-stays`        | 15 dk                             | `checkOutInstant` geçmiş CONFIRMED → COMPLETED                                         |
-| `maintenance`  | `availability-rollover` | `30 2 * * *` (UTC)                | `rollAvailabilityForward(365)` + `pruneInventory` (`INVENTORY_RETENTION_DAYS`)         |
-| `maintenance`  | `fx-refresh`            | `FX_REFRESH_CRON` (`45 12 * * *`) | TCMB/ECB kur snapshot'ı + eski FX satırlarının budanması                               |
-| `maintenance`  | `price-alerts`          | `PRICE_ALERT_CRON` (`15 6 * * *`) | Fiyat gözlemi, Omnibus referansının altına düşüşte `price.dropped` outbox olayı        |
-| `maintenance`  | `payouts`               | `PAYOUT_CRON` (`*/15 * * * *`)    | Host payout (mock)                                                                     |
-| `maintenance`  | `ical-poll`             | `ICAL_POLL_MINUTES` (30)          | iCal abonelikleri → `ExternalBlock`                                                    |
-| `saga`         | fulfilment              | FlowProducer                      | `processFulfilmentJob`: `invoice` → `notify`                                           |
-| döngü          | outbox relay            | 5000 ms, parti 100                | `OutboxMessage` → olay işleyicileri (`registerEventHandlers`)                          |
+| Kuyruk / döngü   | İş                                               | Zamanlama                                                    | Görev                                                                                           |
+| ---------------- | ------------------------------------------------ | ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| `pricing`        | fiyat işi                                        | olay/istek ile                                               | `updateAvailabilityPrices` (`src/lib/pricing-service.ts`, `priceNights`)                        |
+| `maintenance`    | `expire-holds`                                   | 60 sn                                                        | Süresi dolan hold'lar, 100'lük partiler (en fazla 10 parti); `held` sayacı geri alınır          |
+| `maintenance`    | `complete-stays`                                 | 15 dk                                                        | `checkOutInstant` geçmiş CONFIRMED → COMPLETED                                                  |
+| `maintenance`    | `availability-rollover`                          | `30 2 * * *` (UTC)                                           | `rollAvailabilityForward(365)` + `pruneInventory` (`INVENTORY_RETENTION_DAYS`)                  |
+| `maintenance`    | `fx-refresh`                                     | `FX_REFRESH_CRON` (`45 12 * * *`)                            | TCMB/ECB kur snapshot'ı + eski FX satırlarının budanması                                        |
+| `maintenance`    | `price-alerts`                                   | `PRICE_ALERT_CRON` (`15 6 * * *`)                            | Fiyat gözlemi, Omnibus referansının altına düşüşte `price.dropped` outbox olayı                 |
+| `maintenance`    | `payouts`                                        | `PAYOUT_CRON` (`*/15 * * * *`)                               | Payout motoru: devir payout'ları + `HostPayout` (mock / Stripe Connect), `payoutReleased`       |
+| `maintenance`    | `escrow-release`                                 | `ESCROW_RELEASE_CRON` (`*/30 * * * *`)                       | Check-in + `PAYOUT_RELEASE_HOURS` sonrası `escrowReleased` (komisyon + rezerv), rezerv açılması |
+| `maintenance`    | `ledger-reconcile`                               | `LEDGER_RECONCILE_CRON` (`45 2 * * *`)                       | Dünün mutabakatı, `ledger.reconciliation` audit'i                                               |
+| `maintenance`    | `transfer-sweep`                                 | `TRANSFER_SWEEP_CRON` (`*/5 * * * *`)                        | `CAPTURE_PENDING`'de takılan devirleri FAILED + void/iade (v4#1)                                |
+| `maintenance`    | `split-pay-deadline`                             | gecikmeli iş + `expire-holds` süpürmesi                      | Bölünmüş ödeme süre sonu: organizatör yedeği veya tam iade                                      |
+| `maintenance`    | `wallet-sweep`                                   | `WALLET_SWEEP_CRON` (`*/30 * * * *`)                         | Vadesi gelen cashback, kredi süre dolumu, bayat rezervler                                       |
+| `maintenance`    | `push-checkin-reminders`                         | `PUSH_CHECKIN_REMINDER_CRON` (`0 7 * * *`)                   | Check-in hatırlatma push'u (VAPID varsa)                                                        |
+| `maintenance`    | `data-retention`                                 | `RETENTION_CRON` (`15 3 * * *`)                              | Saklama politikası budaması ([COMPLIANCE §7](COMPLIANCE.md))                                    |
+| `refund-retry`   | `refund-<bookingId>`                             | üstel geri çekilme                                           | `REFUND_FAILED` iadeleri yeniden dener (v4#7); admin kuyruğu `/api/admin/refunds`               |
+| `compliance`     | `takedown-sla-check` / `takedown-sla-sweep`      | gecikmeli iş + `TAKEDOWN_SLA_SWEEP_CRON`                     | 7565 kaldırma talebi 24 saat SLA denetimi                                                       |
+| `resolution`     | `claim-sla-check`, `deposit-void`, süpürücüler   | gecikmeli iş + `CLAIM_SLA_SWEEP_CRON` / `DEPOSIT_SWEEP_CRON` | Talep yanıt SLA'sı, depozito provizyon/void                                                     |
+| `price-calendar` | `price-calendar-refresh` / `price-calendar-full` | olay (debounce) + `PRICE_CALENDAR_REFRESH_CRON`              | `MinPriceByDate` yenileme                                                                       |
+| `maintenance`    | `ical-poll`                                      | `ICAL_POLL_MINUTES` (30)                                     | iCal abonelikleri → `ExternalBlock`                                                             |
+| `saga`           | fulfilment                                       | FlowProducer                                                 | `processFulfilmentJob`: `invoice` → `notify`                                                    |
+| döngü            | outbox relay                                     | 5000 ms, parti 100                                           | `OutboxMessage` → olay işleyicileri (`registerEventHandlers`)                                   |
 
 Worker ayrıca `WORKER_METRICS_PORT` (9464) üzerinde yetkili (`metricsAuthorized`) bir Prometheus uç noktası açar ve `registerTracing("booking-worker")` ile trace üretir.
 
@@ -323,19 +346,20 @@ Worker ayrıca `WORKER_METRICS_PORT` (9464) üzerinde yetkili (`metricsAuthorize
 
 ## 11. Güvenlik modeli
 
-| Katman        | Uygulama                                                                                                                                                                                                                       |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Kimlik        | `jose` HS256 access JWT (`ACCESS_TOKEN_TTL_SECONDS`, varsayılan 300 sn); opak rotating refresh token (`REFRESH_TOKEN_TTL_SECONDS`, 7 gün), Redis'te yalnızca SHA-256 özeti, yeniden kullanımda tüm aile iptal. httpOnly çerez. |
-| Passkey       | WebAuthn kayıt/giriş (`/api/auth/passkey/*`) ve ödeme için step-up (`/api/auth/step-up/*`, `STEP_UP_TTL_SECONDS` 300) ([ADR 0017](adr/0017-messaging-moderation-step-up.md))                                                   |
-| Başlık güveni | `src/proxy.ts` gelen `x-user-id`/`x-user-role` başlıklarını siler, yalnızca doğrulanmış token'dan yeniden yazar                                                                                                                |
-| RBAC          | `requireRole()`; sahiplik kontrolleri (`security/ownership.ts`) başkasının kaynağında 404                                                                                                                                      |
-| CSRF          | Çerezle kimliği doğrulanan durum değiştiren isteklerde `Origin`/`Referer` kontrolü (`src/lib/security/csrf.ts`); `Bearer` ile gelen istekler (MCP, ACP) muaf                                                                   |
-| Rate-limit    | Redis sabit pencere (Lua). Kategoriler: `auth`, `booking`, `payment`, `agentic`, `ai`, `search`, `default`. Redis hatasında `auth`/`booking`/`payment`/`agentic` fail-closed                                                   |
-| İç uçlar      | `/api/internal/*`: `x-internal-secret` timing-safe karşılaştırma veya ADMIN JWT                                                                                                                                                |
-| gRPC          | `authorization: Bearer <JWT>` zorunlu; kullanıcı token'dan türetilir; compose'da host'a port açılmaz                                                                                                                           |
-| Ödeme verisi  | Kart numarası sunucuya gelmez (`tok_mock_*` / `spt_mock_*`); webhook HMAC (`PSP_WEBHOOK_SECRET`), olay id'si ile idempotent                                                                                                    |
-| Fraud         | Ödeme öncesi fraud v2: `challenge_3ds`/`review` → 3DS zorunlu, `step_up_passkey` → passkey step-up, `deny` → 403 ([METHODOLOGY §5](METHODOLOGY.md))                                                                            |
-| Mesaj PII     | Kaydetmeden önce maskeleme (§8)                                                                                                                                                                                                |
+| Katman        | Uygulama                                                                                                                                                                                                                                                                                                                                                                |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Kimlik        | `jose` HS256 access JWT (`ACCESS_TOKEN_TTL_SECONDS`, varsayılan 300 sn); opak rotating refresh token (`REFRESH_TOKEN_TTL_SECONDS`, 7 gün), Redis'te yalnızca SHA-256 özeti, yeniden kullanımda tüm aile iptal. httpOnly çerez.                                                                                                                                          |
+| Passkey       | WebAuthn kayıt/giriş (`/api/auth/passkey/*`) ve ödeme için step-up (`/api/auth/step-up/*`, `STEP_UP_TTL_SECONDS` 300) ([ADR 0017](adr/0017-messaging-moderation-step-up.md)); v4: step-up token'ı rezervasyon + tutar + nonce'a bağlı, `GETDEL` ile tek kullanımlık; yeni passkey 24 saat step-up'ta kullanılamaz ([ADR 0024](adr/0024-recent-auth-step-up-binding.md)) |
+| Recent-auth   | `auth_time` claim'i; passkey ekleme/silme, hesap silme, uzaktan çıkış ve mandate verme `requireRecentAuth` ister (5 dk), aksi 403 `REAUTH_REQUIRED` → `POST /api/auth/reauth`; `UserSession` + `sid` claim'i ile oturum listesi ve uzaktan çıkış ([ADR 0024](adr/0024-recent-auth-step-up-binding.md))                                                                  |
+| Başlık güveni | `src/proxy.ts` gelen `x-user-id`/`x-user-role` başlıklarını siler, yalnızca doğrulanmış token'dan yeniden yazar                                                                                                                                                                                                                                                         |
+| RBAC          | `requireRole()`; sahiplik kontrolleri (`security/ownership.ts`) başkasının kaynağında 404                                                                                                                                                                                                                                                                               |
+| CSRF          | Çerezle kimliği doğrulanan durum değiştiren isteklerde `Origin`/`Referer` kontrolü (`src/lib/security/csrf.ts`); `Bearer` ile gelen istekler (MCP, ACP) muaf                                                                                                                                                                                                            |
+| Rate-limit    | Redis sabit pencere (Lua). Kategoriler: `auth`, `booking`, `payment`, `agentic`, `ai`, `search`, `default`. Redis hatasında `auth`/`booking`/`payment`/`agentic` fail-closed                                                                                                                                                                                            |
+| İç uçlar      | `/api/internal/*`: `x-internal-secret` timing-safe karşılaştırma veya ADMIN JWT                                                                                                                                                                                                                                                                                         |
+| gRPC          | `authorization: Bearer <JWT>` zorunlu; kullanıcı token'dan türetilir; compose'da host'a port açılmaz                                                                                                                                                                                                                                                                    |
+| Ödeme verisi  | Kart numarası sunucuya gelmez (`tok_mock_*` / `spt_mock_*`); webhook HMAC (`PSP_WEBHOOK_SECRET`), olay id'si ile idempotent                                                                                                                                                                                                                                             |
+| Fraud         | Ödeme öncesi fraud v2: `challenge_3ds`/`review` → 3DS zorunlu, `step_up_passkey` → passkey step-up, `deny` → 403 ([METHODOLOGY §5](METHODOLOGY.md))                                                                                                                                                                                                                     |
+| Mesaj PII     | Kaydetmeden önce maskeleme (§8)                                                                                                                                                                                                                                                                                                                                         |
 
 ## 12. Gözlemlenebilirlik
 
@@ -345,8 +369,191 @@ Worker ayrıca `WORKER_METRICS_PORT` (9464) üzerinde yetkili (`metricsAuthorize
 - **Sağlık:** `/api/health` (liveness), `/api/ready` (DB + Redis ping).
 - **Dashboard:** `docs/observability/grafana-dashboard.json`; `docker compose --profile observability up`.
 
-## 13. Bilinen sınırlamalar
+## 13. Çift girişli defter ([ADR 0020](adr/0020-double-entry-ledger.md))
 
-- Ödeme sağlayıcısı, e-Arşiv faturası, payout ve ACP ödeme token'ları mock/demo'dur (§5.2, §7).
-- LTR modeli sentetik tıklamalarla eğitilmiştir; embedding varsayılanı hash tabanlıdır ([MODEL_CARD](MODEL_CARD.md)).
+v4'te para hareketi yapan her iş kaydı, **aynı** `withSerializableRetry` işleminde `src/lib/ledger` üzerinden bir jurnal girişi yazar (`postJournal` / `post.<şablon>`; ham `journalEntry.create` yasak). `JournalEntry.idempotencyKey` iş anahtarından türer (`booking-captured:<paymentId>`, `refund-issued:cancel:<bookingId>`, `escrow-released:<bookingId>` …); aynı anahtar farklı içerikle 409 `LEDGER_IDEMPOTENCY_CONFLICT`. Tutarlar `BigInt` minor-unit ([ADR 0019](adr/0019-minor-unit-bigint-money.md)).
+
+- **DB güvenceleri:** DEFERRED constraint trigger para birimi başına Σ borç = Σ alacak ve ≥ 2 satır ister; ayrı tetik `JournalLine`/`JournalEntry` üzerinde UPDATE/DELETE'i reddeder (append-only). `postJournal` sonunda kısıtları IMMEDIATE'e çekerek ihlali çağırana iletir.
+- **Hesap planı** (`src/lib/ledger/accounts.ts`): `psp_clearing` (varlık), `escrow`, `tax_payable`, `host_payable:<id>`, `host_reserve:<id>`, `guest_credit:<id>` (yükümlülük), `platform_revenue` (gelir), `platform_loss` (gider).
+- **Mutabakat:** `reconcile(date)` jurnali PSP gerçeği sayılan `Payment`/`CartPayment`/`PaymentShare`/devir/payout/depozito/itiraz kayıtlarıyla karşılaştırır; `GET /api/admin/reconciliation?date=` ve gece `ledger-reconcile` işi (`LEDGER_RECONCILE_CRON`), metrik `ledger_imbalance_total{source}`.
+
+```mermaid
+flowchart LR
+  PSP[(psp_clearing)]
+  ESC[(escrow)]
+  TAX[(tax_payable)]
+  HP[(host_payable)]
+  HR[(host_reserve)]
+  REV[(platform_revenue)]
+  GC[(guest_credit)]
+  LOSS[(platform_loss)]
+
+  PSP -- "bookingCaptured: brüt − vergi" --> ESC
+  PSP -- "bookingCaptured: vergi" --> TAX
+  ESC -- "escrowReleased: net" --> HP
+  ESC -- "escrowReleased: komisyon" --> REV
+  ESC -- "escrowReleased: rezerv" --> HR
+  HR -- "reserveReleased" --> HP
+  HP -- "payoutReleased" --> PSP
+  ESC -- "refundIssued (serbest bırakma öncesi)" --> PSP
+  PSP -- "depositCaptured" --> HP
+  PSP -- "transferSettled" --> HP
+  REV -- "creditIssued (cashback)" --> GC
+  GC -- "creditSpent" --> ESC
+  GC -- "creditExpired" --> REV
+  LOSS -- "chargebackLost (host'tan alınamayan)" --> PSP
+```
+
+Oklar borç → alacak yönündedir (kaynak hesap borçlanır). Serbest bırakma sonrası iade (`refundIssued` `from: "released"`) önce `host_reserve`, sonra ödenmemiş `host_payable`, kalan için `platform_revenue` kullanır; ev sahibi bakiyesi eksiye düşmez. Kaybedilen itiraz (`chargebackLost`) aynı sırayı izler, kalan `platform_loss`'a yazılır. Kanıt: `tests/unit/ledger/ledger-templates.test.ts` (fast-check), `tests/integration/v4-ledger-flows.test.ts`.
+
+## 14. Grup sepeti ve bölünmüş ödeme
+
+`src/lib/cart/*`. `Cart` (kullanıcı başına tek aktif OPEN/HELD, kısmi unique indeks), `CartItem` (oda tipi × plan × tarih × doluluk), `CartPayment` (sepetin tek tahsilatı). Tutma, tekil rezervasyonla **aynı** kilit anahtarlarını (`booking:lock:room:<id>`) artan sırada alır (`withOrderedLocks`; ters sıralı eşzamanlı sepetlerde kilitlenme yok) ve tüm kalemleri tek SERIALIZABLE işlemde `reserveBookingInTx` ile tutar: biri sığmazsa hiçbiri tutulmaz (409, `details.itemId`).
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor O as Organizatör
+  actor P as Katılımcı
+  participant C as cart-service / split-payment
+  participant R as Redis (Redlock)
+  participant DB as PostgreSQL
+  participant PSP as PaymentProvider
+
+  O->>C: POST /api/cart/items (×N)
+  O->>C: POST /api/cart/{id}/hold
+  C->>C: kilitsiz yeniden fiyat (fark → 409 PRICE_CHANGED)
+  C->>R: withOrderedLocks(oda anahtarları, artan sıra)
+  C->>DB: tek tx: reserveBookingInTx × N (HELD + holdUnits + outbox)
+  O->>C: POST /api/cart/{id}/split (eşit/özel paylar, e-postalar)
+  C->>DB: SplitPlan + PaymentShare, tutma = deadline + yedek + pay kadar uzar
+  C-->>P: HMAC imzalı davet linki (/pay/share/{token})
+  P->>C: POST /api/pay/share/{token} (doğrulanmış e-posta)
+  C->>R: pay:cart:<id> kilidi + Cart FOR UPDATE
+  C->>PSP: authorize(pay tutarı)
+  Note over C: tüm paylar AUTHORIZED olunca
+  C->>PSP: capture × pay
+  C->>DB: pivot confirmSplitInTransaction: CONFIRMED × N + pay Payment'ları + bookingCaptured jurnali
+  alt capture sonrası hata
+    C->>PSP: iade / void (telafi), tutmalar serbest, sepet OPEN
+  end
+  alt süre sonu (split-pay-deadline işi / sweepSplitDeadlines)
+    C->>DB: ödenmemiş paylar EXPIRED
+    C-->>O: SPLIT_PAY_FALLBACK=organizer → kalan tutar için yedek pay
+    C->>PSP: refund → tüm yetkiler void/iade, tutmalar serbest
+  end
+```
+
+- Tek ödeme yolunda `POST /api/cart/{id}/pay` aynı saga adımlarını (hold → authorize → capture → confirm) sepet toplamı için bir kez koşar; kalem bazlı `Payment` satırları `cartPaymentId` ile bağlanır. Sepet kalemi `/api/bookings/[id]/pay` ile ödenemez (409 `CART_BOOKING`).
+- Kalem iptali iadeyi sepetin PSP işleminden ya da (bölünmüş ödemede) paylara `allocateCapped` ile dağıtarak yapar (`PaymentShareRefund`, anahtar `refund:<bookingId>:<shareId>`).
+- Geç gelen başarılı webhook (`src/lib/cart/cart-webhook.ts`): sepet/pay hâlâ onaylanabiliyorsa yeniden tutup onaylar, değilse iade eder (`cart_late_success_total`).
+- Kanıt: `tests/integration/v4-cart.test.ts`, `tests/integration/v4-split-payment.test.ts`, `tests/unit/money/split.test.ts`.
+
+## 15. Escrow, payout, rezerv ve hasar depozitosu ([ADR 0021](adr/0021-escrow-payout-deposit.md))
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant W as worker
+  participant E as payout/escrow.ts
+  participant L as ledger
+  participant PE as payout-engine
+  participant PP as PayoutProvider (mock / Stripe Connect)
+  participant D as resolution/deposit.ts
+  participant PSP as PaymentProvider
+
+  Note over W,E: escrow-release (ESCROW_RELEASE_CRON)
+  W->>E: runEscrowRelease(now)
+  E->>L: escrow bakiyesi (jurnalden), yerel check-in + PAYOUT_RELEASE_HOURS geçti mi?
+  E->>L: escrowReleased: host_payable + komisyon (PLATFORM_COMMISSION_BPS) + rezerv (PAYOUT_RESERVE_BPS)
+  Note over W,PE: payouts (PAYOUT_CRON) — takvim DAILY/WEEKLY/MONTHLY
+  W->>PE: kullanılabilir = host_payable − bekleyen, durdurma/KYC kapısı
+  PE->>PP: transfer (idempotency anahtarı)
+  PE->>L: payoutReleased (her payout kendi tx'inde)
+  Note over E,L: RESERVE_RELEASE_DAYS sonra reserveReleased
+  Note over D,PSP: depozito (DEPOSIT_PREAUTH_HOURS_BEFORE check-in öncesi)
+  W->>D: authorizeHold (off-session, kaynak ödemenin kartı)
+  alt HOST_DAMAGE talebi onaylanır
+    D->>PSP: capture ≤ provizyon
+    D->>L: depositCaptured (psp_clearing → host_payable), aşan kısım uncollectedMinor
+  else talep yok (check-out + DEPOSIT_HOLD_DAYS)
+    D->>PSP: void
+  end
+```
+
+- Çözüm merkezi (`src/lib/resolution/claims.ts`): `GUEST_REFUND` / `HOST_DAMAGE` / `CHARGEBACK` talepleri, mesaj ve kanıt (magic-byte kontrolü, WebP'ye yeniden kodlama, metadata yok), yanıt SLA'sı (`CLAIM_RESPONSE_SLA_HOURS`, gecikmeli `claim-sla-check` + süpürücü), admin kararı `POST /api/admin/claims/[id]/decision` (`pay:<bookingId>` kilidi altında).
+- PSP itirazları `dispute.*` olaylarıyla `src/lib/resolution/disputes.ts`'e gelir; kaybedilen itiraz `chargebackLost` jurnali yazar.
+- Kanıt: `tests/integration/v4-payouts.test.ts`, `tests/integration/v4-resolution.test.ts`, `tests/integration/v4-fix-sweep-2.test.ts`, `tests/integration/v4-stripe-deposit.test.ts`.
+
+## 16. Ajan mandate akışı ([ADR 0023](adr/0023-agentic-commerce-mandates.md))
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor U as Kullanıcı
+  participant A as Ajan (MCP / ACP / UCP istemcisi)
+  participant API as /api/account/agent-mandates
+  participant CO as agentic/checkout.ts
+  participant M as agentic/mandate.ts
+  participant R as Redis
+  participant S as Ödeme sagası
+
+  U->>API: POST (doğrulanmış e-posta + recent-auth, aksi 403 REAUTH_REQUIRED)
+  API-->>U: AP2 intent mandate (JWS: sub, aud, maxAmountMinor, currency, expiresAt, propertyId[]?, nonce)
+  U-->>A: mandate'i ajana verir
+  A->>CO: checkout oluştur/güncelle (Idempotency-Key)
+  A->>CO: complete {payment_data: spt_…, mandate}
+  CO->>M: authorizeMandate(mandate, oturumun güncel toplamı)
+  M->>M: imza · süre · sub · para birimi · ilan · tutar
+  M->>R: iptal listesi + nonce SET NX (ilk checkout oturumuna bağla)
+  alt geçersiz / süresi dolmuş / başka kullanıcı / iptal
+    M-->>A: 403 MANDATE_*
+  else tutar > limit
+    M-->>A: 402 MANDATE_AMOUNT_EXCEEDED (+ details.stepUp)
+  else nonce başka oturumda kullanılmış
+    M-->>A: 409 MANDATE_REPLAYED
+  else kabul
+    CO->>S: createBooking → payForBooking (SPT) — insan checkout'uyla aynı saga
+    S-->>A: completed (CONFIRMED, bookingCaptured jurnali)
+  end
+```
+
+UCP uçları (`/api/ucp/checkout-sessions/*`) yalnız şema eşler ve ACP servislerini çağırır; MCP `checkout_stay` aynı `completeCheckoutSession` yolunu kullanır. Kullanıcı `GET /api/account/agent-mandates` ile verdiği mandate'leri görür, `DELETE …/[nonce]` ile iptal eder (sonrasında 403 `MANDATE_REVOKED`). Kanıt: `tests/integration/p1-11-agentic-mandates.test.ts`, `tests/unit/agentic/mandate.test.ts`, `npm run mcp:smoke`.
+
+## 17. Mimari karar kayıtları
+
+| ADR                                                 | Konu                                               |
+| --------------------------------------------------- | -------------------------------------------------- |
+| [0001](adr/0001-modular-monolith.md)                | Modüler monolit                                    |
+| [0002](adr/0002-two-layer-locking.md)               | İki katmanlı kilit (Redlock + SERIALIZABLE)        |
+| [0003](adr/0003-transactional-outbox.md)            | Transactional outbox                               |
+| [0004](adr/0004-minor-unit-money-quote.md)          | Minor-unit para ve quote                           |
+| [0005](adr/0005-llm-contract.md)                    | LLM sözleşmesi                                     |
+| [0006](adr/0006-availability-partitioning.md)       | Availability partisyonu (v3'te kaldırıldı)         |
+| [0007](adr/0007-transfer-claim-link-escrow.md)      | Devir claim linki ve escrow                        |
+| [0008](adr/0008-hash-vs-real-embedding.md)          | Hash vs gerçek embedding                           |
+| [0009](adr/0009-framework-upgrade-next16.md)        | Next.js 16 yükseltmesi                             |
+| [0010](adr/0010-room-type-inventory-counters.md)    | Oda tipi envanter sayaçları                        |
+| [0011](adr/0011-property-time-zone-temporal.md)     | Tesis saat dilimi (Temporal)                       |
+| [0012](adr/0012-tax-engine-and-persistent-fx.md)    | Vergi motoru ve kalıcı FX                          |
+| [0013](adr/0013-payment-saga.md)                    | Ödeme sagası                                       |
+| [0014](adr/0014-hybrid-search-ltr-experiments.md)   | Hibrit arama, LTR, deneyler                        |
+| [0015](adr/0015-agentic-booking-channel-revenue.md) | Ajan rezervasyon kanalı ve gelir paneli            |
+| [0016](adr/0016-legacy-pricing-and-negotiation.md)  | Legacy fiyat ve pazarlık                           |
+| [0017](adr/0017-messaging-moderation-step-up.md)    | Mesajlaşma, moderasyon, step-up                    |
+| [0018](adr/0018-i18n-namespaces-and-formatting.md)  | i18n ad alanları ve biçimlendirme                  |
+| [0019](adr/0019-minor-unit-bigint-money.md)         | `BigInt` minor-unit para ve ISO 4217 üs tablosu    |
+| [0020](adr/0020-double-entry-ledger.md)             | Çift girişli defter ve günlük mutabakat            |
+| [0021](adr/0021-escrow-payout-deposit.md)           | Escrow, payout, rezerv, hasar depozitosu           |
+| [0022](adr/0022-multimodal-search.md)               | Görsel zekâ ve çok-modlu arama                     |
+| [0023](adr/0023-agentic-commerce-mandates.md)       | Ajan ticareti: ACP SPT, UCP, AP2 mandate           |
+| [0024](adr/0024-recent-auth-step-up-binding.md)     | Recent-auth, işleme bağlı step-up, oturum yönetimi |
+
+## 18. Bilinen sınırlamalar
+
+- Ödeme sağlayıcısı (MockPsp), payout sağlayıcısı, KYC, e-Arşiv entegratörü ve lisans/kayıt servisleri varsayılan olarak mock/demo'dur; Stripe SPT, Connect ve depozito (Customer + `setup_future_usage`) yolları yalnız ağsız fake ile test edildi (§5.2, §7, §15).
+- Sepet ve bölünmüş ödemede Stripe Payment Element, passkey step-up ve cüzdan kredisi yoktur; sepette kupon yoktur.
+- Sepet tahsilatında itiraz ilk rezervasyona bağlanır; aşan tutar `uncollectedMinor` olarak elle işlenir.
+- AP2 mandate HS256 ile imzalanır (yalnız platform doğrular); mandate kaydı ayrı tablo değil, `AuditLog` + Redis nonce'tur.
+- LTR modeli sentetik tıklamalarla eğitilmiştir; embedding varsayılanı hash tabanlıdır; CLIP opsiyoneldir ([MODEL_CARD](MODEL_CARD.md)).
 - Yük ve kaos testleri tek makinede koşuldu; sonuçlar [docs/perf/](perf/) ve `load/chaos.md` altında.

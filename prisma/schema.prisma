@@ -261,51 +261,53 @@ model ExternalBlock {
 }
 
 model Booking {
-  id             String            @id @default(cuid())
-  userId         String
-  user           User              @relation(fields: [userId], references: [id])
-  propertyId     String
-  property       Property          @relation(fields: [propertyId], references: [id])
+  id                     String            @id @default(cuid())
+  userId                 String
+  user                   User              @relation(fields: [userId], references: [id])
+  propertyId             String
+  property               Property          @relation(fields: [propertyId], references: [id])
   /// Oda tipi kimliği (geriye uyum için alan adı `roomId`).
-  roomId         String
-  room           RoomType          @relation(fields: [roomId], references: [id])
-  ratePlanId     String?
-  ratePlan       RatePlan?         @relation(fields: [ratePlanId], references: [id])
+  roomId                 String
+  room                   RoomType          @relation(fields: [roomId], references: [id])
+  ratePlanId             String?
+  ratePlan               RatePlan?         @relation(fields: [ratePlanId], references: [id])
   /// Rezerve edilen oda adedi (sayaçlardan bu kadar düşülür).
-  units          Int               @default(1)
-  checkIn        DateTime          @db.Date
-  checkOut       DateTime          @db.Date
-  guestCount     Int
-  totalPrice     Decimal           @db.Decimal(10, 2)
-  currency       String            @default("TRY")
-  status         BookingStatus     @default(PENDING)
+  units                  Int               @default(1)
+  checkIn                DateTime          @db.Date
+  checkOut               DateTime          @db.Date
+  guestCount             Int
+  totalPrice             Decimal           @db.Decimal(10, 2)
+  currency               String            @default("TRY")
+  status                 BookingStatus     @default(PENDING)
   /// HELD durumundaki geçici tutma süresi; dolunca expire-holds işi envanteri iade eder.
-  holdExpiresAt  DateTime?
+  holdExpiresAt          DateTime?
   /// İyimser eşzamanlılık sürümü: her durum geçişinde +1 (koşullu güncelleme).
-  version        Int               @default(0)
+  version                Int               @default(0)
   /// computeTotal() kırılımının anlık görüntüsü (geceler, ara toplam, vergiler, toplam; minor-unit).
-  priceBreakdown Json?
-  quoteId        String?
+  priceBreakdown         Json?
+  quoteId                String?
   /// Rezervasyon anındaki iptal politikası (sonradan değişse de bu geçerlidir).
-  policySnapshot Json?
+  policySnapshot         Json?
   /// Rezervasyon anındaki kur tablosu (görüntüleme ve misafir para biriminde tahsilat).
-  fxSnapshot     Json?
+  fxSnapshot             Json?
   /// Kullanılan kalıcı kur tablosu (P0-5); statik yedek tablo kullanıldıysa null.
-  fxSnapshotId   String?
-  fxRate         FxRate?           @relation(fields: [fxSnapshotId], references: [id], onDelete: SetNull)
-  ledgerEntries  LedgerEntry[]
-  confirmedAt    DateTime?
-  cancelledAt    DateTime?
-  expiredAt      DateTime?
-  idempotencyKey String?
-  payment        Payment?
-  reviews        Review[]
-  transfers      BookingTransfer[]
-  payouts        Payout[]
-  invoice        Invoice?
-  messageThread  MessageThread?
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
+  fxSnapshotId           String?
+  fxRate                 FxRate?           @relation(fields: [fxSnapshotId], references: [id], onDelete: SetNull)
+  ledgerEntries          LedgerEntry[]
+  confirmedAt            DateTime?
+  cancelledAt            DateTime?
+  expiredAt              DateTime?
+  idempotencyKey         String?
+  /// v4#9: Idempotency-Key'in bağlı olduğu istek gövdesinin sha256 özeti (farklıysa 409).
+  idempotencyRequestHash String?
+  payment                Payment?
+  reviews                Review[]
+  transfers              BookingTransfer[]
+  payouts                Payout[]
+  invoice                Invoice?
+  messageThread          MessageThread?
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
 
   @@unique([userId, idempotencyKey])
   @@index([propertyId, checkIn, checkOut])

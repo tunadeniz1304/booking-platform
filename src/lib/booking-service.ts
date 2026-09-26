@@ -13,6 +13,7 @@ import {
 } from "@/lib/events/events";
 import { requireOwnership } from "@/lib/security/ownership";
 import { HttpError } from "@/lib/http/errors";
+import { hashIdempotentRequest } from "@/lib/http/idempotency";
 import { getConfig } from "@/lib/config/app-config";
 import { withSerializableRetry } from "@/lib/db/transactions";
 import { transition, type BookingState } from "@/lib/booking/state-machine";
@@ -193,12 +194,28 @@ function toDto(row: BookingRow): BookingDTO {
   };
 }
 
-async function findByIdempotencyKey(userId: string, key: string): Promise<BookingDTO | null> {
+/**
+ * Aynı kullanıcı + Idempotency-Key ile önceki rezervasyon. Gövde özeti farklıysa 409
+ * `IDEMPOTENCY_KEY_REUSED` (v4#9) — eski kayıt sessizce döndürülmez. Özeti olmayan (v4 öncesi)
+ * satırlar geriye uyum için olduğu gibi döner.
+ */
+async function findByIdempotencyKey(
+  userId: string,
+  key: string,
+  requestHash: string
+): Promise<BookingDTO | null> {
   const row = await prisma.booking.findUnique({
     where: { userId_idempotencyKey: { userId, idempotencyKey: key } },
-    select: bookingSelect,
+    select: { ...bookingSelect, idempotencyRequestHash: true },
   });
-  return row ? toDto(row) : null;
+  if (!row) return null;
+  if (row.idempotencyRequestHash && row.idempotencyRequestHash !== requestHash) {
+    throw new BookingConflictError(
+      "Bu Idempotency-Key farklı bir istekle kullanılmış",
+      "IDEMPOTENCY_KEY_REUSED"
+    );
+  }
+  return toDto(row);
 }
 
 async function loadQuoteSafe(quoteId: string): Promise<Quote | null> {
@@ -241,8 +258,19 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingR
     throw new BookingValidationError("Misafir sayısı en az 1 olmalıdır");
   }
 
+  // v4#9: anahtar, doğrulanmış gövdeye bağlanır (checkout `hashRequest` deseni).
+  const requestHash = hashIdempotentRequest([
+    input.propertyId,
+    input.roomId,
+    stay.checkIn,
+    stay.checkOut,
+    input.guestCount,
+    units,
+    input.ratePlanId,
+    input.currency,
+  ]);
   if (input.idempotencyKey) {
-    const existing = await findByIdempotencyKey(input.userId, input.idempotencyKey);
+    const existing = await findByIdempotencyKey(input.userId, input.idempotencyKey, requestHash);
     if (existing) return { booking: existing, paymentRequired: existing.status === "HELD" };
   }
 
@@ -293,7 +321,7 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingR
       roomLockKey(input.roomId),
       () =>
         reserveInTransaction(
-          { ...input, ratePlanId, units },
+          { ...input, ratePlanId, units, requestHash },
           stay.checkIn,
           stay.checkOut,
           stay.nights,
@@ -319,7 +347,7 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingR
       error instanceof Prisma.PrismaClientKnownRequestError &&
       error.code === "P2002"
     ) {
-      const existing = await findByIdempotencyKey(input.userId, input.idempotencyKey);
+      const existing = await findByIdempotencyKey(input.userId, input.idempotencyKey, requestHash);
       if (existing) return { booking: existing, paymentRequired: existing.status === "HELD" };
     }
     if (error instanceof SoldOutError || error instanceof RestrictionError) {
@@ -330,7 +358,7 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingR
 }
 
 async function reserveInTransaction(
-  input: CreateBookingInput & { units: number },
+  input: CreateBookingInput & { units: number; requestHash: string },
   checkIn: IsoDate,
   checkOut: IsoDate,
   nights: IsoDate[],
@@ -479,6 +507,7 @@ async function reserveInTransaction(
         fxSnapshotId: fx.id,
         fxSnapshot: fx as unknown as Prisma.InputJsonValue,
         idempotencyKey: input.idempotencyKey ?? null,
+        idempotencyRequestHash: input.idempotencyKey ? input.requestHash : null,
       },
       select: bookingSelect,
     });

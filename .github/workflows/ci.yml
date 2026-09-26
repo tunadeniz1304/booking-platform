@@ -20,7 +20,7 @@ env:
 
 jobs:
   quality:
-    name: Lint · Typecheck · Format · Unit
+    name: Lint · Typecheck · Format · i18n · MCP smoke · Unit
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -32,6 +32,10 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run format:check
+      # tr/en anahtar eşitliği (P1-12); eksik/fazla anahtar → çıkış 1.
+      - run: npm run i18n:check
+      # MCP stdio + streamable HTTP duman testi (P1-11); DB gerektirmez.
+      - run: npm run mcp:smoke
       - run: npm run test:unit
 
   integration:
@@ -45,8 +49,11 @@ jobs:
           cache: npm
       - run: npm ci
       # Container imajları: pgvector/pgvector:pg16 ve redis:7-alpine (testcontainers ile).
-      # Docker burada mevcut → unit + integration birlikte koşar ve %80 satır
-      # kapsam eşiği (vitest.config.mts) burada zorlanır.
+      # Docker burada mevcut → unit + integration birlikte koşar; kapsam
+      # (src/lib, src/app/api, services, src/worker) eşikleri vitest.config.mts'te:
+      # satır ≥ %80, dal ≥ %70. GitHub Actions `CI=true` ayarlar: Docker yoksa
+      # entegrasyon suite'i sessizce atlanmaz, global-setup hata verir (v3 F0).
+      - run: docker info --format '{{.ServerVersion}}'
       - run: npm run test:coverage
       - uses: actions/upload-artifact@v4
         if: always()

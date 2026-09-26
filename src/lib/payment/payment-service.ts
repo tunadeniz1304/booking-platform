@@ -46,6 +46,7 @@ import {
   settleBookingCreditInTx,
 } from "@/lib/wallet/wallet-service";
 import { splitRefund as splitCardCreditRefund } from "@/lib/wallet/rules";
+import { lostChargebackMinor } from "./refundable";
 
 /** BullMQ `refund-retry` kuyruğundaki iş adı (v4#7). */
 export const REFUND_RETRY_JOB = "refund-retry";
@@ -422,7 +423,8 @@ const PAYMENT_SAGA_STEPS: SagaStep<PaymentSagaCtx, PayOutcome>[] = [
           data: {
             status: PaymentStatus.REFUNDED,
             paidAt: now,
-            refundedAmountMinor: minorToDb(ctx.amount.amount),
+            // Kümülatif alan: koşul (tahsil edilmemiş satır) önceki iadeyi 0 kılar.
+            refundedAmountMinor: { increment: minorToDb(ctx.amount.amount) },
             refundedAt: now,
             failureCode: "BOOKING_NOT_CONFIRMABLE",
           },
@@ -1076,7 +1078,7 @@ export async function handleWebhookEvent(
             data: {
               status: PaymentStatus.REFUNDED,
               paidAt: now,
-              refundedAmountMinor: payment.amountMinor,
+              refundedAmountMinor: { increment: payment.amountMinor },
               refundedAt: now,
               failureCode: error.code,
             },
@@ -1319,6 +1321,7 @@ async function cancelLocked(
             id: true,
             status: true,
             amountMinor: true,
+            refundedAmountMinor: true,
             providerRef: true,
             cartPayment: { select: { id: true, providerRef: true } },
           },
@@ -1341,14 +1344,27 @@ async function cancelLocked(
     }
     const currency = assertCurrency(booking.currency);
     const target = refundTarget(booking, currency);
-    const cardPaidMinor =
-      booking.payment?.status === PaymentStatus.PAID ? target.refundableMinor : 0;
+    // fix-sweep-2: iptal iadesi yalnız KALAN iade edilebilir tutar üzerinden hesaplanır —
+    // önceki kısmi iadeler (çözüm merkezi talebi vb.) ve kaybedilen itirazlar düşülür.
+    const refundedBeforeMinor = booking.payment
+      ? minorFromDb(booking.payment.refundedAmountMinor)
+      : 0;
+    const settledPayment =
+      booking.payment !== null && SETTLED_STATUSES.includes(booking.payment.status);
+    const cardPaidMinor = settledPayment
+      ? Math.max(
+          0,
+          target.refundableMinor -
+            refundedBeforeMinor -
+            minorFromDb(await lostChargebackMinor(tx, booking.id))
+        )
+      : 0;
     // P1-7: krediyle ödenen kısım da iade politikasına girer (devredilmiş rezervasyonda
     // iade alıcının kart ödemesine gider; satıcının kredisi devir bedeliyle karşılandı).
     const spend = await activeCreditSpend(tx, booking.id);
     const ownPayment = target.providerRef === pspRefOf(booking.payment);
     const creditPaidMinor =
-      spend?.status === "SPENT" && cardPaidMinor > 0 && ownPayment
+      spend?.status === "SPENT" && settledPayment && ownPayment
         ? minorFromDb(spend.amountMinor - spend.refundedMinor)
         : 0;
     const paidMinor = cardPaidMinor + creditPaidMinor;
@@ -1377,18 +1393,22 @@ async function cancelLocked(
     await releaseInventory(tx, booking);
 
     if (booking.payment) {
-      if (booking.payment.status === PaymentStatus.PAID) {
+      if (settledPayment) {
+        // Kümülatif: iade toplamı ÜZERİNE YAZILMAZ (talep iadesi + iptal çift/yanlış kalan olmasın).
+        const refundedTotal = refundedBeforeMinor + cardRefundMinor;
+        const fullyRefunded =
+          refundedTotal >= minorFromDb(booking.payment.amountMinor) ||
+          (cardRefundMinor > 0 && cardRefundMinor === cardPaidMinor);
         await tx.payment.update({
           where: { bookingId: booking.id },
           data: {
-            status:
-              cardRefundMinor === cardPaidMinor && cardPaidMinor > 0
-                ? PaymentStatus.REFUNDED
-                : cardRefundMinor > 0
-                  ? PaymentStatus.PARTIALLY_REFUNDED
-                  : PaymentStatus.PAID,
-            refundedAmountMinor: minorToDb(cardRefundMinor),
-            refundedAt: cardRefundMinor > 0 ? now : null,
+            status: fullyRefunded
+              ? PaymentStatus.REFUNDED
+              : refundedTotal > 0
+                ? PaymentStatus.PARTIALLY_REFUNDED
+                : PaymentStatus.PAID,
+            refundedAmountMinor: minorToDb(refundedTotal),
+            ...(cardRefundMinor > 0 ? { refundedAt: now } : {}),
           },
         });
         if (parts.creditMinor > 0) {
@@ -1420,11 +1440,9 @@ async function cancelLocked(
             bookingId: booking.id,
             userId: booking.userId,
             priceBreakdown: booking.priceBreakdown,
-            payment: {
-              id: booking.payment.id,
-              amountMinor: booking.payment.amountMinor,
-              refundedAmountMinor: minorToDb(cardRefundMinor),
-            },
+            payment: { id: booking.payment.id, amountMinor: booking.payment.amountMinor },
+            refundMinor: minorToDb(cardRefundMinor),
+            refundedBeforeMinor: minorToDb(refundedBeforeMinor),
             currency,
             occurredAt: now,
           });
@@ -1522,7 +1540,10 @@ function postCancellationRefund(
     bookingId: string;
     userId: string;
     priceBreakdown: Prisma.JsonValue;
-    payment: { id: string; amountMinor: bigint; refundedAmountMinor: bigint };
+    payment: { id: string; amountMinor: bigint };
+    /** Bu iptalin kart iadesi (Payment iade toplamı DEĞİL — kümülatif alan ayrı). */
+    refundMinor: bigint;
+    refundedBeforeMinor?: bigint;
     currency: string;
     occurredAt?: Date;
   }
@@ -1535,9 +1556,29 @@ function postCancellationRefund(
     currency: i.currency,
     grossMinor: i.payment.amountMinor,
     priceBreakdown: i.priceBreakdown,
-    refundMinor: i.payment.refundedAmountMinor,
+    refundMinor: i.refundMinor,
+    refundedBeforeMinor: i.refundedBeforeMinor,
     occurredAt: i.occurredAt,
   });
+}
+
+/**
+ * İptal iadesinin kart tutarı: iptalde yazılan `refund-issued:cancel:<id>` jurnalinin
+ * psp_clearing alacağı. `Payment.refundedAmountMinor` kümülatiftir (talep iadeleri dahil)
+ * → yeniden deneme onu KULLANMAZ. Jurnal yoksa (defter öncesi eski satır) eski davranış.
+ */
+async function cancelRefundMinorOf(bookingId: string, fallbackMinor: bigint): Promise<bigint> {
+  const entry = await prisma.journalEntry.findUnique({
+    where: { idempotencyKey: `refund-issued:cancel:${bookingId}` },
+    select: {
+      lines: {
+        where: { side: "CREDIT", account: { kind: "PSP_CLEARING" } },
+        select: { amountMinor: true },
+      },
+    },
+  });
+  if (!entry) return fallbackMinor;
+  return entry.lines.reduce((sum, l) => sum + l.amountMinor, 0n);
 }
 
 export const refundRetryTotal = counter(
@@ -1609,7 +1650,9 @@ export async function retryFailedRefund(bookingId: string): Promise<RefundRetryR
     const payment = booking?.payment;
     if (!booking || !payment || payment.failureCode !== REFUND_FAILED) return "noop";
     const currency = assertCurrency(booking.currency);
-    const refundMinor = minorFromDb(payment.refundedAmountMinor);
+    const refundMinor = minorFromDb(
+      await cancelRefundMinorOf(booking.id, payment.refundedAmountMinor)
+    );
     const target = refundTarget(booking, currency);
     const provider = getPaymentProvider();
     let result: RefundRetryResult = "noop";
@@ -1644,6 +1687,7 @@ export async function retryFailedRefund(bookingId: string): Promise<RefundRetryR
           userId: booking.userId,
           priceBreakdown: booking.priceBreakdown,
           payment,
+          refundMinor: minorToDb(refundMinor),
           currency,
         });
       }

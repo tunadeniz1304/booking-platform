@@ -148,7 +148,9 @@ export async function proxy(req: NextRequest) {
   }
 
   const nonce = Buffer.from(randomUUID()).toString("base64");
-  const csp = buildCsp(nonce, process.env.NODE_ENV === "development");
+  const csp = buildCsp(nonce, process.env.NODE_ENV === "development", {
+    stripe: process.env.PAYMENT_PROVIDER?.trim().toLowerCase() === "stripe",
+  });
   requestHeaders.set("x-nonce", nonce);
   requestHeaders.set("Content-Security-Policy", csp);
   const response = NextResponse.next({ request: { headers: requestHeaders } });

@@ -217,4 +217,19 @@ describe("proxy yetki ve CSRF", () => {
     expect(cspA).toContain("frame-ancestors 'none'");
     expect(cspA).not.toBe(b.headers.get("content-security-policy"));
   });
+
+  it("Stripe alan adları CSP'ye yalnızca PAYMENT_PROVIDER=stripe iken eklenir", async () => {
+    vi.stubEnv("PAYMENT_PROVIDER", "mock");
+    const mock = (await proxy(req("/search"))).headers.get("content-security-policy") ?? "";
+    expect(mock).not.toContain("stripe.com");
+    expect(mock).not.toContain("frame-src");
+
+    vi.stubEnv("PAYMENT_PROVIDER", "stripe");
+    const csp = (await proxy(req("/search"))).headers.get("content-security-policy") ?? "";
+    vi.unstubAllEnvs();
+    expect(csp).toMatch(/script-src [^;]*https:\/\/js\.stripe\.com/);
+    expect(csp).toMatch(/connect-src [^;]*https:\/\/api\.stripe\.com/);
+    expect(csp).toContain("frame-src https://js.stripe.com https://hooks.stripe.com");
+    expect(csp).toContain("frame-ancestors 'none'");
+  });
 });

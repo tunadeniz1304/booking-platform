@@ -26,7 +26,11 @@ const SENSITIVE: ReadonlySet<RateLimitCategory> = new Set([
 
 export function categorize(pathname: string): RateLimitCategory {
   if (pathname.startsWith("/api/auth")) return "auth";
-  if (pathname.startsWith("/api/bookings") || pathname.startsWith("/api/transfers")) {
+  if (
+    pathname.startsWith("/api/bookings") ||
+    pathname.startsWith("/api/transfers") ||
+    pathname.startsWith("/api/cart")
+  ) {
     return "booking";
   }
   if (pathname.startsWith("/api/payments")) return "payment";

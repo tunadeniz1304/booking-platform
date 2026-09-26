@@ -276,7 +276,7 @@ Aşağıdakiler gerçek bir dış servise **bağlı değildir** ya da yalnızca 
 | Parti riski                                                     | Yalnız uyarı + panel; ev sahibi onay adımı yok                                                                                                                             |
 | Harita, FX                                                      | İnternet yoksa statik `data/fx-rates.json`                                                                                                                                 |
 
-Bilinen sınırlamaların tamamı: [docs/ARCHITECTURE.md §13](docs/ARCHITECTURE.md), [docs/SECURITY.md](docs/SECURITY.md), [docs/COMPLIANCE.md](docs/COMPLIANCE.md).
+Bilinen sınırlamaların tamamı: [docs/ARCHITECTURE.md §18](docs/ARCHITECTURE.md#18-bilinen-sınırlamalar), [docs/SECURITY.md](docs/SECURITY.md), [docs/COMPLIANCE.md](docs/COMPLIANCE.md).
 
 ## Dokümantasyon
 

@@ -272,6 +272,13 @@ Bu modülün ilk sürümü "quantum-inspired" olarak adlandırılmıştı; ancak
 - **Demo/fallback:** başlık kümenin en sık anlamlı sözcüğünden, iddialar merkeze en yakın ve farklı yorumlardan gelen **gerçek cümlelerden** seçilir (alıntı = cümle). Yanıttaki `start/end` aralığı UI'da yoruma kaydırma ve vurgulama için kullanılır.
 - **Önbellek:** anahtar = yorum setinin SHA-256 karması (id + puan + metin) + dil + LLM modu/modeli + embedder + ayarlar; `fallback` sonuçlar önbelleğe girmez.
 - **Karşılaştırma (`src/lib/ai/listing-compare.ts`):** toplam fiyat yalnızca `createQuote` (`/api/quote` ile aynı fonksiyon) çıktısıdır; fark tablosu deterministik koddur. LLM yorumundaki her sayı yapılandırılmış veride (toplamlar minor/major/biçimli, puan, yorum sayısı, gece, iptal saati, ilan başlıkları) bulunmalıdır; aksi hâlde şablon yoruma düşülür.
+- **Sınırlamalar ve önyargı.**
+  - Guard **uydurma alıntıyı** yakalar, **yanlış genellemeyi** yakalamaz: tek bir yorumdan birebir alıntılanan olumsuz cümle "misafirler … diyor" gibi çoğul bir iddiaya dayanak yapılabilir. Küme başına `mentionCount` (temadan söz eden farklı yorum sayısı) yanıtta döner, ancak her iddia tek bir alıntıya dayanır; iddia başına destekleyen yorum sayısı ölçülmez.
+  - Kümeleme, embedding'e bağlıdır: varsayılan hash embedder anlamsal değil sözcüksel benzerlik yakalar (ADR 0008); aynı konuyu farklı sözcüklerle anlatan yorumlar ayrı kümelere düşebilir. Az yorumlu ilanlarda (`REVIEW_HIGHLIGHTS_MIN_REVIEWS` 2) kümeler tek yorumu temsil edebilir.
+  - Yalnız en yeni `REVIEW_HIGHLIGHTS_MAX_REVIEWS` (50) yorum kullanılır; eski dönemler temsil edilmez. Yorum dili karışıksa (tr/en) kümeler dile göre ayrışabilir; LLM başlığı istenen dilde yazar ama alıntılar özgün dildedir.
+  - Yorum yazanların kendisi seçilmiş bir örneklemdir (yalnız `COMPLETED` konaklama; memnun/çok memnuniyetsiz misafirler daha çok yazar); öne çıkanlar ilanın "gerçek" kalitesini değil yazılmış yorumların içeriğini özetler.
+  - Otomatik kalite ölçümü yalnız birim testlerdeki uydurma/alıntısız ret senaryolarıdır; insan değerlendirmesi veya etiketli bir özet veri kümesi yoktur.
+  - Karşılaştırmada "en esnek" rozeti yalnız iptal politikası anlık görüntüsüne, "en yüksek puan" ortalama puana dayanır; yorum sayısı düşük ilanın ortalaması gürültülüdür.
 
 ## 11. Parti riski skoru (`src/lib/trust/party-risk.ts`, P1-6)
 

@@ -15,6 +15,8 @@
  *
  * Ortam değişkenleri (hepsi opsiyonel):
  *   BASE_URL        hedef (varsayılan http://localhost:3000)
+ *   LOAD_ACCOUNTS   N → seed-load hesapları load-001..N@load.test (ACCOUNTS'u ezer)
+ *   LOAD_ROOMS      "<mülk>:<oda>,…" stok sınırlı yük odaları (verilirse arama atlanır)
  *   ACCOUNTS        virgülle e-postası DOĞRULANMIŞ hesaplar (kullanıcı başına tek aktif sepet
  *                   olduğundan gerçek 100 paralel sepet için ≥100 hesap; varsayılan seed misafiri)
  *   PASSWORD        hesap parolası (varsayılan seed demo parolası)
@@ -25,17 +27,31 @@
  *   VUS / DURATION  paralel sepet sayısı ve süre (varsayılan 100 / 30s)
  *   P95_MS          tutma p95 eşiği ms (varsayılan 2000)
  *
- * Önkoşul: RATE_LIMIT_BOOKING_MAX ve RATE_LIMIT_AUTH_MAX yükseltilmiş olmalı.
+ * Önkoşul: RATE_LIMIT_BOOKING_MAX ve RATE_LIMIT_AUTH_MAX yükseltilmiş olmalı
+ * (docker-compose.load.yml). Değişmez denetimi: scripts/load-assert.ts.
  */
 import http from "k6/http";
 import { check, fail } from "k6";
 import { Counter, Rate, Trend } from "k6/metrics";
 
 const BASE = __ENV.BASE_URL || "http://localhost:3000";
-const ACCOUNTS = (__ENV.ACCOUNTS || "guest@booking.test")
+// LOAD_ACCOUNTS=N → scripts/seed-load.ts hesapları (load-001@load.test …); yoksa ACCOUNTS listesi.
+const LOAD_ACCOUNTS = Number(__ENV.LOAD_ACCOUNTS || 0);
+const ACCOUNTS =
+  LOAD_ACCOUNTS > 0
+    ? Array.from(
+        { length: LOAD_ACCOUNTS },
+        (_, i) => `load-${String(i + 1).padStart(3, "0")}@load.test`
+      )
+    : (__ENV.ACCOUNTS || "guest@booking.test")
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+// LOAD_ROOMS="<mülk>:<oda tipi>,…" (seed-load çıktısı: stok sınırlı odalar) → arama atlanır.
+const LOAD_ROOMS = (__ENV.LOAD_ROOMS || "")
   .split(",")
-  .map((s) => s.trim())
-  .filter(Boolean);
+  .filter(Boolean)
+  .map((p) => ({ propertyId: p.split(":")[0], roomTypeId: p.split(":")[1] }));
 const loginPassword = __ENV.PASSWORD || "Password123!"; // seed demo parolası (README)
 const DESTINATION = __ENV.DESTINATION || "İstanbul";
 const ROOMS = Math.max(2, Number(__ENV.ROOMS || 4));
@@ -82,16 +98,27 @@ function record(res) {
 
 export function setup() {
   const tokens = [];
-  for (const email of ACCOUNTS) {
-    const login = http.post(
-      `${BASE}/api/auth/login`,
-      JSON.stringify({ email, password: loginPassword }),
-      { headers: { "content-type": "application/json" } }
+  // 20'lik paralel partiler: 100+ hesapta setup süresini kısaltır.
+  for (let start = 0; start < ACCOUNTS.length; start += 20) {
+    const batch = ACCOUNTS.slice(start, start + 20);
+    const responses = http.batch(
+      batch.map((email) => [
+        "POST",
+        `${BASE}/api/auth/login`,
+        JSON.stringify({ email, password: loginPassword }),
+        { headers: { "content-type": "application/json" } },
+      ])
     );
-    if (login.status !== 200) fail(`login başarısız (${email}): ${login.status}`);
-    tokens.push(login.json("accessToken"));
+    responses.forEach((login, i) => {
+      if (login.status !== 200) fail(`login başarısız (${batch[i]}): ${login.status}`);
+      tokens.push(login.json("accessToken"));
+    });
   }
 
+  if (LOAD_ROOMS.length >= ITEMS) {
+    console.log(`cart-spike: ${tokens.length} hesap, ${LOAD_ROOMS.length} yük odası, VUS=${VUS}`);
+    return { tokens, rooms: LOAD_ROOMS.slice(0, ROOMS) };
+  }
   const rooms = [];
   const s = http.get(`${BASE}/api/search?destination=${encodeURIComponent(DESTINATION)}`);
   if (s.status !== 200) fail(`arama başarısız: ${s.status}`);
@@ -184,7 +211,20 @@ export default function iteration(data) {
         }
       );
       record(pay);
-      if (pay.status === 200) paid.add(1);
+      let final = pay;
+      if (pay.status === 202) {
+        // Risk motoru 3DS isterse demo koduyla onayla.
+        final = http.post(
+          `${BASE}/api/cart/${cartId}/pay/confirm`,
+          JSON.stringify({ code: "123456" }),
+          {
+            headers: json(token),
+            tags: { name: "cart_pay_confirm" },
+          }
+        );
+        record(final);
+      }
+      if (final.status === 200) paid.add(1);
     } else {
       record(
         http.post(`${BASE}/api/cart/${cartId}/release`, "{}", {

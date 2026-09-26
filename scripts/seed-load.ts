@@ -51,6 +51,8 @@ async function main(): Promise<void> {
           firstName: "Yük",
           lastName: `Test ${i}`,
           role: UserRole.USER,
+          // Yerleşik hesap: risk motorunun "yeni hesap" sinyali her ödemeyi 3DS'e zorlamasın.
+          createdAt: emailVerifiedAt,
         },
       });
     }

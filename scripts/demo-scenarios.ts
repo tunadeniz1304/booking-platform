@@ -1,8 +1,15 @@
 /**
- * P2-2 demo senaryoları — ÇALIŞAN yığına HTTP ile karşı 7 uçtan uca doğrulama.
+ * P2-2 demo senaryoları.
+ *
+ *  - v3 (1–7): ÇALIŞAN yığına HTTP ile karşı uçtan uca doğrulama.
+ *  - v4 (8–13): süreç içi servis çağrıları (`scripts/demo/v4-scenarios.ts`) — grup sepeti +
+ *    bölünmüş ödeme, hasar talebi + depozito, 7565 kaldırma + SLA, ajan mandate'i, devir
+ *    capture hatası; her biri sonunda mizan + mutabakat denetimi. `DATABASE_URL`,
+ *    `REDIS_URL` ve `DEMO_MODE=true` gerekir (MockPsp, LLM yok → anahtarsız).
  *
  *   npm run demo:scenarios                 # hepsi
  *   npm run demo:scenarios -- --only=1     # tek senaryo (virgülle birden çok: --only=2,4)
+ *   npm run demo:scenarios -- --suite=v4   # yalnız v3 | v4
  *
  * Ortam: BASE_URL (varsayılan http://localhost:3000), DAY_OFFSET (bugünden kaç gün sonra;
  * yoksa 150–339 arası rastgele → tekrar çalıştırmalar birbirinin envanterine çarpmaz).
@@ -24,6 +31,9 @@ import {
 } from "../src/lib/booking/cancellation";
 import { assertCurrency, toMinor } from "../src/lib/money/money";
 import { clockOf, parseIsoDate } from "../src/lib/time/nights";
+import { loadEnv } from "../src/lib/config/load-env";
+
+loadEnv();
 
 // ---------------------------------------------------------------------------
 // Ayarlar
@@ -58,9 +68,17 @@ const ONLY: Set<number> | null = (() => {
     .slice("--only=".length)
     .split(",")
     .map((s) => Number(s.trim()))
-    .filter((n) => Number.isInteger(n) && n >= 1 && n <= 7);
-  if (ids.length === 0) throw new Error(`Geçersiz --only değeri: ${arg} (1..7)`);
+    .filter((n) => Number.isInteger(n) && n >= 1 && n <= 13);
+  if (ids.length === 0) throw new Error(`Geçersiz --only değeri: ${arg} (1..13)`);
   return new Set(ids);
+})();
+
+const SUITE: "v3" | "v4" | null = (() => {
+  const arg = process.argv.find((a) => a.startsWith("--suite="));
+  if (!arg) return null;
+  const v = arg.slice("--suite=".length);
+  if (v !== "v3" && v !== "v4") throw new Error(`Geçersiz --suite değeri: ${v} (v3|v4)`);
+  return v;
 })();
 
 // ---------------------------------------------------------------------------
@@ -804,13 +822,56 @@ const SCENARIOS: { id: number; title: string; run: () => Promise<Outcome> }[] = 
   { id: 7, title: "Belgesiz ilan aramada yok, ev sahibi panelinde var", run: scenario7 },
 ];
 
+interface Row {
+  id: number;
+  title: string;
+  ok: boolean;
+  ms: number;
+  books: string;
+}
+
+function printTable(rows: readonly Row[]): void {
+  const head = ["#", "Senaryo", "Sonuç", "ms", "Defter (f)"];
+  const body = rows.map((r) => [
+    String(r.id),
+    r.title,
+    r.ok ? "PASS" : "FAIL",
+    String(r.ms),
+    r.books,
+  ]);
+  const widths = head.map((h, i) => Math.max(h.length, ...body.map((b) => b[i]!.length)));
+  const line = (cells: string[]) => `| ${cells.map((c, i) => c.padEnd(widths[i]!)).join(" | ")} |`;
+  console.log("");
+  console.log("Özet:");
+  console.log(line(head));
+  console.log(`|${widths.map((w) => "-".repeat(w + 2)).join("|")}|`);
+  for (const b of body) console.log(line(b));
+}
+
 async function main(): Promise<void> {
+  const wanted = (id: number) =>
+    (!ONLY || ONLY.has(id)) && (!SUITE || (SUITE === "v3" ? id <= 7 : id >= 8));
+  const v3 = SCENARIOS.filter((s) => wanted(s.id));
+  const v4Wanted = [8, 9, 10, 11, 12, 13].some(wanted);
   console.log(
     `Demo senaryoları — BASE_URL=${BASE_URL}, DAY_OFFSET=${DAY_OFFSET}, çalıştırma=${RUN_ID}`
   );
-  const selected = SCENARIOS.filter((s) => !ONLY || ONLY.has(s.id));
-  let failures = 0;
-  for (const s of selected) {
+  const rows: Row[] = [];
+  const report = (
+    id: number,
+    title: string,
+    ok: boolean,
+    ms: number,
+    detail: string,
+    books = "—"
+  ) => {
+    rows.push({ id, title, ok, ms, books });
+    console.log(`[${ok ? "PASS" : "FAIL"}] Senaryo ${id} — ${title} (${ms} ms)`);
+    console.log(`       ${detail}`);
+    if (books !== "—") console.log(`       defter: ${books}`);
+  };
+
+  for (const s of v3) {
     const started = Date.now();
     let outcome: Outcome;
     try {
@@ -821,11 +882,26 @@ async function main(): Promise<void> {
         detail: `hata: ${describeError(error)}`,
       };
     }
-    if (!outcome.ok) failures++;
-    const ms = Date.now() - started;
-    console.log(`[${outcome.ok ? "PASS" : "FAIL"}] Senaryo ${s.id} — ${s.title} (${ms} ms)`);
-    console.log(`       ${outcome.detail}`);
+    report(s.id, s.title, outcome.ok, Date.now() - started, outcome.detail);
   }
+
+  if (v4Wanted) {
+    // Süreç içi modüller (Prisma/Redis) yalnız v4 istenince yüklenir.
+    const v4 = await import("./demo/v4-scenarios");
+    const problem = v4.prepareV4();
+    for (const s of v4.V4_SCENARIOS.filter((x) => wanted(x.id))) {
+      const title = `(${s.key}) ${s.title}`;
+      if (problem) {
+        report(s.id, title, false, 0, `atlandı: ${problem}`);
+        continue;
+      }
+      const started = Date.now();
+      const outcome = await v4.runV4Scenario(s);
+      report(s.id, title, outcome.ok, Date.now() - started, outcome.detail, outcome.books);
+    }
+    await v4.closeV4();
+  }
+
   if (networkRetries > 0) {
     console.log(
       `Not: ${networkRetries} istek ağ hatası (ECONNRESET vb.) sonrası güvenle yeniden denendi.`
@@ -837,10 +913,12 @@ async function main(): Promise<void> {
         `_AGENTIC_MAX / _DEFAULT_MAX değerlerini yükseltin (docs/DEMO_SCRIPT.md, P2-2).`
     );
   }
+  printTable(rows);
+  const failures = rows.filter((r) => !r.ok).length;
   console.log(
     failures === 0
-      ? `Sonuç: ${selected.length}/${selected.length} senaryo geçti.`
-      : `Sonuç: ${failures}/${selected.length} senaryo BAŞARISIZ.`
+      ? `Sonuç: ${rows.length}/${rows.length} senaryo geçti.`
+      : `Sonuç: ${failures}/${rows.length} senaryo BAŞARISIZ.`
   );
   process.exit(failures === 0 ? 0 : 1);
 }

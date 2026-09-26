@@ -92,7 +92,7 @@ curl -s localhost:3000/api/ai/trip-plan -H "authorization: Bearer $GUEST" -H 'co
 
 ## Demo senaryoları (P2-2)
 
-`scripts/demo-scenarios.ts`, **çalışan** yığına HTTP ile bağlanır ve aşağıdaki 7 iddiayı uçtan uca doğrular. Her senaryo için bir `[PASS]`/`[FAIL]` satırı ve temel sayılar yazılır. Herhangi bir senaryo başarısız olursa çıkış kodu `1` olur.
+`scripts/demo-scenarios.ts`, 1–7. senaryolarda **çalışan** yığına HTTP ile bağlanır ve aşağıdaki 7 iddiayı uçtan uca doğrular (8–13 için aşağıdaki "v4 senaryoları"). Her senaryo için bir `[PASS]`/`[FAIL]` satırı ve temel sayılar yazılır. Herhangi bir senaryo başarısız olursa çıkış kodu `1` olur.
 
 ```bash
 npm run demo:reset                         # seed (senaryo 7'nin belgesiz ilanı dahil)
@@ -142,6 +142,25 @@ docker compose -f docker-compose.yml -f docker-compose.demo.yml up -d
 | 5   | MCP → hold                               | `POST /api/mcp` kimliksiz çağrıldığında **401** ve JSON-RPC hata kodu `-32001` dönmeli. Guest belirteciyle `tools/call search_stays` (İstanbul) çağrılır; teklifli ilk uygun sonuç için `create_hold` → `HELD` beklenir. Önceki koşularda dolmuş 1 birimli odalar olabileceği için en çok 5 aday denenir.                                                                                                                                                                                    |
 | 6   | Fiyat önerisi kabulü                     | Host, İstanbul Galata Loft Suites / "Loft" için öneri üretir (`POST /api/host/revenue/suggestions`, yarından itibaren 14 gece). Fiyatı değiştiren ilk öneri seçilir: aynı gecenin teklifi alınır, öneri kabul edilir, teklif yeniden alınır. Gece tutarı değişmeli ve fark `önerilen − mevcut` ile aynı yönde olmalı. Varsayılan planın `priceModifierBps` değeri 0 ise fark birebir eşit olmalı.                                                                                            |
 | 7   | Belgesiz ilan                            | Seed, **Kadıköy Moda Sahil Dairesi (belge bekliyor)** ilanını ekler: `isActive=true`, `licenseStatus=PENDING`, belge no yok (v3#25 regresyonunun aynası). Bu ilan `GET /api/host/properties` içinde görünmeli; `/api/search`'te "Moda", "Kadıköy" (tarihli) ve "İstanbul" sorgularının hiçbirinde görünmemeli.                                                                                                                                                                               |
+
+### v4 senaryoları (8–13, süreç içi)
+
+Bu altı senaryo HTTP yerine servisleri doğrudan çağırır (zaman ileri sarma ve PSP hata enjeksiyonu HTTP'den yapılamaz). `DATABASE_URL`, `REDIS_URL` ve `DEMO_MODE=true` gerekir; ödeme her zaman MockPsp, LLM yok (anahtarsız). Her senaryo kendi "Demo v4 …" ilanını kurar ve bitince pasife alır.
+
+```bash
+npm run demo:scenarios -- --suite=v4      # yalnız v4 (çalışan web sunucusu gerekmez)
+```
+
+| #   | Senaryo                                        | Beklenen                                                                                                                         |
+| --- | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| 8   | (a1) Grup sepeti 3 oda + 3 kişi bölünmüş ödeme | Katılımcılar yalnız yetkiler, sepet HELD kalır; son pay → 3 pay CAPTURED, 3 rezervasyon CONFIRMED, sepet CHECKED_OUT             |
+| 9   | (a2) 1 kişi ödemez                             | Süre sonu → pay EXPIRED, kalan tutar organizatörün yedek payına; geç ödeme 409 `SPLIT_DEADLINE_PASSED`; organizatör öder → onay  |
+| 10  | (b) Hasar talebi → admin kararı                | 300 TL depozito AUTHORIZED; 450 TL talep onaylanır → 300 TL capture (CAPTURED) + 150 TL yalnız kayıt; `deposit-captured` jurnali |
+| 11  | (c) 7565 kaldırma                              | İlan pasif, ev sahibi yeniden yayın 409 `TAKEDOWN_ACTIVE`; SLA +25 s `ok`; ilan dışarıdan açılırsa `breached` → zorla pasif      |
+| 12  | (d) Ajan mandate'i                             | Mandate'li ACP ödemesi CONFIRMED; aşan mandate 402 `MANDATE_AMOUNT_EXCEEDED`; tekrar 409 `MANDATE_REPLAYED`                      |
+| 13  | (e) Devir capture hatası (v4#1)                | 502 `TRANSFER_PAYMENT_FAILED`, sahiplik/ödeme satıcıda, yetki void, payout 0; yeniden listeleme sağlıklı PSP ile COMPLETED       |
+
+(f) Her v4 senaryosunun sonunda: mizan dengede, dokunulan günlerde dengesiz jurnal 0 ve senaryonun ödeme/depozito/devir öznelerinde mutabakat farkı 0 (özet tablonun "Defter" sütunu).
 
 ### Beklenen çıktı biçimi
 

@@ -25,6 +25,7 @@ export {
   postBookingCapture,
   postRefundFromEscrow,
   refundTaxMinor,
+  releasedSplitOf,
   taxShareMinor,
   type CaptureJournalInput,
   type RefundJournalInput,

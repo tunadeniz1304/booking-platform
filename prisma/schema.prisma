@@ -948,6 +948,8 @@ enum LedgerAccountKind {
   TAX_PAYABLE
   GUEST_CREDIT
   ESCROW
+  /// P1-4: ev sahibi rezervi (`host_reserve:<userId>`) — RESERVE_RELEASE_DAYS sonra host_payable'a.
+  HOST_RESERVE
 }
 
 enum JournalSide {
@@ -1448,4 +1450,63 @@ model InventoryPriceHistory {
   effectiveAt DateTime @default(now())
 
   @@index([roomTypeId, date, effectiveAt])
+}
+
+/// P1-4 ev sahibi ödeme hesabı (ADR 0021). KYC durumu şimdilik burada tutulur (P1-4 kendi
+/// alanı; KYC/trust modeli IdentityVerification ile ileride bağlanır). İlişki alanı yok
+/// (User'a dokunulmadı); `userId` tekil.
+model HostAccount {
+  id                  String         @id @default(cuid())
+  userId              String         @unique
+  /// Ödeme sağlayıcısı: `mock` | `stripe` (Connect).
+  provider            String
+  /// Sağlayıcıdaki bağlı hesap kimliği (Stripe `acct_…`, mock `acct_mock_…`).
+  connectedAccountRef String?        @unique
+  kycStatus           HostKycStatus  @default(NOT_STARTED)
+  /// Sağlayıcı ödemeye izin veriyor mu (KYC tamam + hesap etkin).
+  payoutsEnabled      Boolean        @default(false)
+  /// Yönetici durdurması: true iken bu kullanıcıya hiçbir payout açılmaz/gönderilmez.
+  payoutsPaused       Boolean        @default(false)
+  pausedReason        String?
+  pausedAt            DateTime?
+  pausedById          String?
+  /// Rezerv oranı (bps); null → PAYOUT_RESERVE_BPS.
+  reservePercentBps   Int?
+  payoutSchedule      PayoutSchedule @default(DAILY)
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+}
+
+enum HostKycStatus {
+  NOT_STARTED
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum PayoutSchedule {
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
+/// P1-4 ev sahibi payout'u: serbest bırakılmış `host_payable:<userId>` bakiyesinden açılır;
+/// PAID olduğunda aynı tx'te `payoutReleased` jurnali yazılır. Devir payout'ları eski
+/// `Payout` tablosunda kalır (aynı motor öder).
+model HostPayout {
+  id          String       @id @default(cuid())
+  userId      String
+  amountMinor BigInt
+  currency    String
+  status      PayoutStatus @default(PENDING)
+  provider    String
+  reference   String?
+  failureCode String?
+  attempts    Int          @default(0)
+  createdAt   DateTime     @default(now())
+  paidAt      DateTime?
+  failedAt    DateTime?
+
+  @@index([status, createdAt])
+  @@index([userId, createdAt])
 }

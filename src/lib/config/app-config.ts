@@ -112,7 +112,7 @@ const schema = z.object({
 
   // Transfer
   FEATURE_TRANSFER: bool(true),
-  /** Devir sonrası satıcıya (mock) payout işinin cron'u (UTC). */
+  /** Payout motoru (devir + ev sahibi payout'ları) cron'u (UTC). */
   PAYOUT_CRON: z.string().min(1).default("*/15 * * * *"),
   TRANSFER_MAX_ASK_RATIO: num(1.0, 0.1, 2),
   TRANSFER_MIN_HOURS_BEFORE_CHECKIN: int(48, 0, 24 * 60),
@@ -124,6 +124,25 @@ const schema = z.object({
   // Defter (P0-3)
   /** Günlük PSP ↔ jurnal mutabakat işinin cron'u (UTC); dünün kayıtlarını karşılaştırır. */
   LEDGER_RECONCILE_CRON: z.string().min(1).default("45 2 * * *"),
+
+  // Ev sahibi ödemeleri + escrow (P1-4, ADR 0021)
+  /** Emanet, tesisin yerel giriş anından bu kadar saat sonra ev sahibine serbest bırakılır. */
+  PAYOUT_RELEASE_HOURS: int(24, 0, 24 * 30),
+  /** Serbest bırakmada platform komisyonu (bps; 1500 = %15), vergi hariç tutar üzerinden. */
+  PLATFORM_COMMISSION_BPS: int(1500, 0, 5000),
+  /** Varsayılan rezerv oranı (bps; ev sahibi payından), HostAccount.reservePercentBps ezer. */
+  PAYOUT_RESERVE_BPS: int(500, 0, 10_000),
+  /** Rezerv, serbest bırakmadan bu kadar gün sonra host_payable'a geçer. */
+  RESERVE_RELEASE_DAYS: int(30, 0, 365),
+  /** Bundan küçük kullanılabilir bakiye için payout açılmaz (minor-unit). */
+  PAYOUT_MIN_MINOR: int(100, 1, 100_000_000),
+  /**
+   * true → ev sahibi payout'u için P1-6 kimlik doğrulaması (IdentityVerification VERIFIED)
+   * şart. Varsayılan kapalı (seed/test kullanıcıları doğrulanmamış).
+   */
+  PAYOUT_REQUIRE_IDENTITY_VERIFIED: bool(false),
+  /** Escrow + rezerv serbest bırakma süpürme işinin cron'u (UTC). */
+  ESCROW_RELEASE_CRON: z.string().min(1).default("*/30 * * * *"),
 
   // PWA + Web Push (P1-12)
   /** VAPID anahtar çifti (base64url) ve iletişim (`mailto:` / `https:`); biri eksikse push kapalı. */

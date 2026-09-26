@@ -22,6 +22,7 @@ export const JournalKinds = {
   PayoutReleased: "PAYOUT_RELEASED",
   EscrowHeld: "ESCROW_HELD",
   EscrowReleased: "ESCROW_RELEASED",
+  ReserveReleased: "RESERVE_RELEASED",
   TransferSettled: "TRANSFER_SETTLED",
   CreditIssued: "CREDIT_ISSUED",
   CreditSpent: "CREDIT_SPENT",
@@ -138,13 +139,19 @@ export interface EscrowReleasedInput extends Common {
   /** Emanetten çıkan tutar (vergi hariç brüt = ev sahibi payı + platform komisyonu). */
   amountMinor: bigint;
   platformFeeMinor?: bigint;
+  /** Ev sahibi payından rezerve ayrılan kısım (P1-4) → host_reserve(host). */
+  reserveMinor?: bigint;
 }
 
-/** Konaklama sonrası serbest bırakma: Dr escrow / Cr host_payable(host) / Cr platform_revenue. */
+/**
+ * Konaklama sonrası serbest bırakma: Dr escrow / Cr host_payable(host) / Cr platform_revenue
+ * / Cr host_reserve(host).
+ */
 export function escrowReleased(i: EscrowReleasedInput): JournalInput {
   const amount = positive("amountMinor", i.amountMinor);
   const fee = i.platformFeeMinor ?? 0n;
-  const hostNet = remainder(amount, { platformFeeMinor: fee });
+  const reserve = i.reserveMinor ?? 0n;
+  const hostNet = remainder(amount, { platformFeeMinor: fee, reserveMinor: reserve });
   return entry(
     i,
     {
@@ -156,6 +163,30 @@ export function escrowReleased(i: EscrowReleasedInput): JournalInput {
       dr(account.escrow(), amount, i.currency),
       cr(account.hostPayable(i.hostId), hostNet, i.currency),
       cr(account.platformRevenue(), fee, i.currency),
+      cr(account.hostReserve(i.hostId), reserve, i.currency),
+    ]
+  );
+}
+
+export interface ReserveReleasedInput extends Common {
+  bookingId: string;
+  hostId: string;
+  amountMinor: bigint;
+}
+
+/** Rezerv süresi doldu (P1-4): Dr host_reserve(host) / Cr host_payable(host). */
+export function reserveReleased(i: ReserveReleasedInput): JournalInput {
+  const amount = positive("amountMinor", i.amountMinor);
+  return entry(
+    i,
+    {
+      idempotencyKey: `reserve-released:${i.bookingId}`,
+      kind: JournalKinds.ReserveReleased,
+      bookingId: i.bookingId,
+    },
+    [
+      dr(account.hostReserve(i.hostId), amount, i.currency),
+      cr(account.hostPayable(i.hostId), amount, i.currency),
     ]
   );
 }
@@ -328,6 +359,7 @@ export const post = {
     postJournal(tx, bookingCaptured(i)),
   escrowHeld: (tx: Tx, i: EscrowHeldInput) => postJournal(tx, escrowHeld(i)),
   escrowReleased: (tx: Tx, i: EscrowReleasedInput) => postJournal(tx, escrowReleased(i)),
+  reserveReleased: (tx: Tx, i: ReserveReleasedInput) => postJournal(tx, reserveReleased(i)),
   refundIssued: (tx: Tx, i: RefundIssuedInput) => postJournal(tx, refundIssued(i)),
   payoutReleased: (tx: Tx, i: PayoutReleasedInput) => postJournal(tx, payoutReleased(i)),
   transferSettled: (tx: Tx, i: TransferSettledInput) => postJournal(tx, transferSettled(i)),

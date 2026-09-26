@@ -22,6 +22,11 @@ import {
 import { FX_REFRESH_JOB, runFxRefresh, scheduleFxRefresh } from "./jobs/fx-refresh";
 import { PRICE_ALERT_JOB, runPriceAlertsJob, schedulePriceAlerts } from "./jobs/price-alerts";
 import { PAYOUT_JOB, runPayouts, schedulePayouts } from "./jobs/payouts";
+import {
+  ESCROW_RELEASE_JOB,
+  runEscrowReleaseJob,
+  scheduleEscrowRelease,
+} from "./jobs/escrow-release";
 import { ICAL_POLL_JOB, runIcalPoll, scheduleIcalPoll } from "./jobs/ical-poll";
 import { onRefundRetryFailed, processRefundRetry } from "./jobs/refund-retry";
 import { TRANSFER_SWEEP_JOB, runTransferSweep, scheduleTransferSweep } from "./jobs/transfer-sweep";
@@ -98,6 +103,7 @@ async function main(): Promise<void> {
       if (job.name === FX_REFRESH_JOB) return runFxRefresh();
       if (job.name === PRICE_ALERT_JOB) return runPriceAlertsJob();
       if (job.name === PAYOUT_JOB) return runPayouts();
+      if (job.name === ESCROW_RELEASE_JOB) return runEscrowReleaseJob();
       if (job.name === ICAL_POLL_JOB) return runIcalPoll();
       if (job.name === TRANSFER_SWEEP_JOB) return runTransferSweep();
       if (job.name === LEDGER_RECONCILE_JOB) return runLedgerReconcile();
@@ -157,6 +163,7 @@ async function main(): Promise<void> {
   await scheduleFxRefresh(getQueue(QUEUE_NAMES.maintenance));
   await schedulePriceAlerts(getQueue(QUEUE_NAMES.maintenance));
   await schedulePayouts(getQueue(QUEUE_NAMES.maintenance));
+  await scheduleEscrowRelease(getQueue(QUEUE_NAMES.maintenance));
   await scheduleIcalPoll(getQueue(QUEUE_NAMES.maintenance));
   await scheduleTransferSweep(getQueue(QUEUE_NAMES.maintenance));
   await scheduleLedgerReconcile(getQueue(QUEUE_NAMES.maintenance));

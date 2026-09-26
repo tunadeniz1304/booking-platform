@@ -95,33 +95,87 @@ export interface RefundJournalInput {
 }
 
 /**
- * Emanetten iade (konaklama serbest bırakılmadan önce; serbest bırakma F4):
- * Dr escrow + tax_payable / Cr psp_clearing. Tutar 0 ise jurnal yok.
+ * Serbest bırakılmış rezervasyonun jurnal özeti (P1-4 `escrow-released:<bookingId>`):
+ * emanetten çıkan tutar, komisyon ve ev sahibi. Serbest bırakılmadıysa null.
+ */
+export async function releasedSplitOf(
+  tx: Tx,
+  bookingId: string
+): Promise<{ hostId: string; amountMinor: bigint; feeMinor: bigint } | null> {
+  const entry = await tx.journalEntry.findUnique({
+    where: { idempotencyKey: `escrow-released:${bookingId}` },
+    select: {
+      lines: {
+        select: {
+          side: true,
+          amountMinor: true,
+          account: { select: { kind: true, ownerId: true } },
+        },
+      },
+    },
+  });
+  if (!entry) return null;
+  let amountMinor = 0n;
+  let feeMinor = 0n;
+  let hostId: string | null = null;
+  for (const l of entry.lines) {
+    if (l.account.kind === "ESCROW" && l.side === "DEBIT") amountMinor += l.amountMinor;
+    if (l.account.kind === "PLATFORM_REVENUE") feeMinor += l.amountMinor;
+    if (l.account.kind === "HOST_PAYABLE" || l.account.kind === "HOST_RESERVE")
+      hostId = l.account.ownerId;
+  }
+  return hostId ? { hostId, amountMinor, feeMinor } : null;
+}
+
+/**
+ * İade jurnali. Emanet serbest bırakılmadıysa: Dr escrow + tax_payable / Cr psp_clearing.
+ * Serbest bırakıldıysa (P1-4): vergi hariç tutar komisyon oranında platform_revenue'dan,
+ * kalanı host_payable'dan geri alınır (ev sahibi bakiyesi eksiye düşebilir → payout
+ * motoru yalnız pozitif kullanılabilir bakiyeyi öder). Aynı anahtarla jurnal zaten varsa
+ * (retry) yeniden hesaplanmaz — serbest bırakma araya girse bile içerik çakışması olmaz.
+ * Tutar 0 ise jurnal yok.
  */
 export async function postRefundFromEscrow(
   tx: Tx,
   i: RefundJournalInput
 ): Promise<PostResult | null> {
   if (i.refundMinor <= 0n) return null;
+  const key = `refund-issued:${i.refundRef}`;
+  const existing = await tx.journalEntry.findUnique({
+    where: { idempotencyKey: key },
+    select: { id: true },
+  });
+  if (existing) return { entryId: existing.id, created: false };
   const capturedTax = taxShareMinor(i.priceBreakdown, i.grossMinor);
+  const taxMinor = refundTaxMinor(
+    capturedTax,
+    i.grossMinor,
+    i.refundedBeforeMinor ?? 0n,
+    i.refundMinor
+  );
+  const released = await releasedSplitOf(tx, i.bookingId);
+  const base = {
+    refundRef: i.refundRef,
+    bookingId: i.bookingId,
+    paymentId: i.paymentId,
+    guestId: i.guestId,
+    currency: i.currency,
+    amountMinor: i.refundMinor,
+    taxMinor,
+    to: "psp" as const,
+    occurredAt: i.occurredAt,
+  };
+  if (!released) return postJournal(tx, refundIssued({ ...base, from: "escrow" }));
+  const net = i.refundMinor - taxMinor;
+  const fee =
+    released.amountMinor > 0n ? mulDivHalfUp(net, released.feeMinor, released.amountMinor) : 0n;
   return postJournal(
     tx,
     refundIssued({
-      refundRef: i.refundRef,
-      bookingId: i.bookingId,
-      paymentId: i.paymentId,
-      guestId: i.guestId,
-      currency: i.currency,
-      amountMinor: i.refundMinor,
-      taxMinor: refundTaxMinor(
-        capturedTax,
-        i.grossMinor,
-        i.refundedBeforeMinor ?? 0n,
-        i.refundMinor
-      ),
-      from: "escrow",
-      to: "psp",
-      occurredAt: i.occurredAt,
+      ...base,
+      from: "released",
+      hostId: released.hostId,
+      platformFeeMinor: fee > net ? net : fee,
     })
   );
 }

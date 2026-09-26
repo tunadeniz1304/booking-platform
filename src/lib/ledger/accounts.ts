@@ -13,6 +13,7 @@ import { type LedgerAccountKind, type Prisma } from "@prisma/client";
  * | platform_revenue  | gelir      | platform komisyonu (kredi ikramı bu hesaptan düşer)      |
  * | tax_payable       | yükümlülük | tahsil edilen, devlete ödenecek vergi                    |
  * | guest_credit:<id> | yükümlülük | misafirin harcanabilir kredisi                           |
+ * | host_reserve:<id> | yükümlülük | serbest bırakmada tutulan rezerv (P1-4, gün sonra açılır) |
  */
 export const DEBIT_NORMAL_KINDS: readonly LedgerAccountKind[] = [
   "PSP_CLEARING",
@@ -27,6 +28,7 @@ export const ACCOUNT_NAMES: Record<LedgerAccountKind, string> = {
   TAX_PAYABLE: "Ödenecek vergiler",
   GUEST_CREDIT: "Misafir kredileri",
   ESCROW: "Emanet (escrow)",
+  HOST_RESERVE: "Ev sahibi rezervi",
 };
 
 /** Hesap başvurusu: sistem hesabı (`ownerId` yok) ya da kişi alt hesabı. */
@@ -46,6 +48,7 @@ export const account = {
   platformRevenue: (): AccountRef => ({ kind: "PLATFORM_REVENUE" }),
   taxPayable: (): AccountRef => ({ kind: "TAX_PAYABLE" }),
   guestCredit: (userId: string): AccountRef => ({ kind: "GUEST_CREDIT", ownerId: userId }),
+  hostReserve: (userId: string): AccountRef => ({ kind: "HOST_RESERVE", ownerId: userId }),
 };
 
 /** Kanonik hesap kodu — DB'de `LedgerAccount_owner_code` CHECK'i ile aynı kural. */

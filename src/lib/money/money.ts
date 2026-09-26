@@ -169,6 +169,24 @@ export function fromDecimal(
   return money(toMinor(value, currency), currency);
 }
 
+/**
+ * Dış girişten (API/kanal) gelen tutarı KATI biçimde ayrıştırır (v4#19): yalnızca negatif
+ * olmayan ondalık STRING ("1234", "1234.5", "1234.50"); float/number, üs gösterimi ("1e3"),
+ * binlik ayırıcı, para biriminin basamağını aşan kesir (TRY'de "1.005") reddedilir.
+ * Float'a hiç düşmeden minor-unit `Money` döner.
+ */
+export function parseMoney(value: string, currency: CurrencyCode | string): Money {
+  if (typeof value !== "string") throw new MoneyError("Tutar ondalık string olmalı");
+  const text = value.trim();
+  const exp = EXPONENT[assertCurrency(currency)];
+  const match = /^(\d+)(?:\.(\d+))?$/.exec(text);
+  if (!match) throw new MoneyError(`Geçersiz tutar: ${text}`);
+  if ((match[2] ?? "").length > exp) {
+    throw new MoneyError(`Fazla ondalık basamak (${currency} için en fazla ${exp}): ${text}`);
+  }
+  return money(toMinor(text, currency), currency);
+}
+
 /** Minor-unit → ondalık string ("123450" → "1234.50"); Prisma Decimal'e yazmak için. */
 export function toDecimalString(m: Money): string {
   const exp = EXPONENT[m.currency];

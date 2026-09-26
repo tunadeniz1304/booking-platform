@@ -112,7 +112,7 @@ describeInt("F7 host / kanal / KVKK (integration)", () => {
       roomId: room.id,
       sequence: 7,
       idempotencyKey: "ari-1",
-      updates: [{ date: iso(utcDay(12)), price: 1234 }],
+      updates: [{ date: iso(utcDay(12)), price: "1234" }],
     };
     expect((await applyAriMessage(msg)).status).toBe("applied");
     expect((await applyAriMessage(msg)).status).toBe("duplicate");

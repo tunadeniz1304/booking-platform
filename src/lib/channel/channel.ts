@@ -3,7 +3,14 @@ import ical from "ical-generator";
 import * as nodeIcal from "node-ical";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { ConflictError, NotFoundError, ServiceUnavailableError } from "@/lib/http/errors";
+import { z } from "zod";
+import {
+  ConflictError,
+  NotFoundError,
+  ServiceUnavailableError,
+  ValidationError,
+} from "@/lib/http/errors";
+import { MoneyError, assertCurrency, money, parseMoney, toDecimalString } from "@/lib/money/money";
 import {
   addDays,
   clockOf,
@@ -214,10 +221,60 @@ export async function importCalendar(
   return result;
 }
 
-export interface AriUpdate {
-  date: string;
-  price?: number;
-  available?: boolean;
+/**
+ * `InventoryDay.price` kolonunun (Decimal(10,2)) taşıyabildiği en büyük tutar (minor-unit);
+ * iş eşiği değil, şema sınırı.
+ */
+const ARI_PRICE_MAX_MINOR = 9_999_999_999;
+
+/**
+ * ARI gece güncellemesi (v4#19): fiyat float DEĞİL — ya ondalık string (`price: "1234.50"`,
+ * mülkün para biriminde) ya da minor-unit tamsayı (`priceMinor: 123450`); ikisi birden olmaz.
+ */
+export const ariUpdateSchema = z
+  .object({
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    price: z
+      .string()
+      .trim()
+      .regex(/^\d{1,12}(\.\d{1,4})?$/, 'Fiyat ondalık string olmalı (ör. "1234.50")')
+      .optional(),
+    priceMinor: z.number().int().positive().max(ARI_PRICE_MAX_MINOR).optional(),
+    available: z.boolean().optional(),
+  })
+  .strict()
+  .refine((u) => !(u.price !== undefined && u.priceMinor !== undefined), {
+    message: "price ve priceMinor birlikte verilemez",
+  })
+  .refine((u) => u.price !== undefined || u.priceMinor !== undefined || u.available !== undefined, {
+    message: "En az bir alan (price, priceMinor, available) gerekli",
+  });
+
+export type AriUpdate = z.input<typeof ariUpdateSchema>;
+
+export const ariMessageSchema = z.object({
+  roomId: z.string().min(1).max(64),
+  sequence: z.number().int().nonnegative(),
+  idempotencyKey: z.string().min(1).max(128),
+  updates: z.array(ariUpdateSchema).min(1).max(366),
+});
+
+export type AriMessage = z.input<typeof ariMessageSchema>;
+
+/** Gece fiyatı → minor-unit; para birimi basamağına uymayan tutar 400. */
+function ariPriceMinor(u: z.output<typeof ariUpdateSchema>, currency: string): number | null {
+  if (u.priceMinor !== undefined) return u.priceMinor;
+  if (u.price === undefined) return null;
+  try {
+    const minor = parseMoney(u.price, currency).amount;
+    if (minor <= 0 || minor > ARI_PRICE_MAX_MINOR) throw new MoneyError("Fiyat aralık dışında");
+    return minor;
+  } catch (error) {
+    if (error instanceof MoneyError) {
+      throw new ValidationError(`Geçersiz fiyat (${u.date}): ${error.message}`);
+    }
+    throw error;
+  }
 }
 
 export class StaleSequenceError extends ConflictError {
@@ -231,12 +288,21 @@ export class StaleSequenceError extends ConflictError {
  * numarası reddedilir. Fiyat gece satırına, `available` satış durdurma kısıtına yazılır;
  * mevcut rezervasyonlar (sayaçlar) hiçbir koşulda değişmez. Tek işlemde.
  */
-export async function applyAriMessage(msg: {
-  roomId: string;
-  sequence: number;
-  idempotencyKey: string;
-  updates: AriUpdate[];
-}) {
+export async function applyAriMessage(input: AriMessage) {
+  const parsed = ariMessageSchema.safeParse(input);
+  if (!parsed.success) {
+    throw new ValidationError("Geçersiz ARI mesajı", parsed.error.flatten());
+  }
+  const msg = parsed.data;
+  const room = await prisma.roomType.findUnique({
+    where: { id: msg.roomId },
+    select: { propertyId: true, property: { select: { currency: true } } },
+  });
+  if (!room) throw new NotFoundError("Oda bulunamadı");
+  const currency = assertCurrency(room.property.currency);
+  // Tüm fiyatlar işlemden ÖNCE doğrulanır: tek geçersiz gece → hiçbir şey yazılmaz.
+  const prices = msg.updates.map((u) => ariPriceMinor(u, currency));
+
   const result = await prisma.$transaction(async (tx) => {
     await tx.$executeRaw`INSERT INTO "ChannelSequence" ("roomId", "lastSequence", "updatedAt") VALUES (${msg.roomId}, 0, now()) ON CONFLICT DO NOTHING`;
     const [seq] = await tx.$queryRaw<Array<{ lastSequence: number; lastKey: string | null }>>`
@@ -244,12 +310,13 @@ export async function applyAriMessage(msg: {
     if (seq.lastKey === msg.idempotencyKey) return { status: "duplicate" as const, applied: 0 };
     if (msg.sequence <= seq.lastSequence) throw new StaleSequenceError(seq.lastSequence);
     let applied = 0;
-    for (const u of msg.updates) {
+    for (const [i, u] of msg.updates.entries()) {
       const date = toDbDate(u.date as IsoDate);
-      if (u.price !== undefined) {
+      const priceMinor = prices[i];
+      if (priceMinor !== null) {
         const r = await tx.inventoryDay.updateMany({
           where: { roomTypeId: msg.roomId, date },
-          data: { price: new Prisma.Decimal(u.price) },
+          data: { price: new Prisma.Decimal(toDecimalString(money(priceMinor, currency))) },
         });
         applied += r.count;
       }
@@ -259,7 +326,7 @@ export async function applyAriMessage(msg: {
           update: { stopSell: !u.available },
           create: { roomTypeId: msg.roomId, date, stopSell: !u.available },
         });
-        if (u.price === undefined) applied += 1;
+        if (priceMinor === null) applied += 1;
       }
     }
     await tx.channelSequence.update({
@@ -268,13 +335,7 @@ export async function applyAriMessage(msg: {
     });
     return { status: "applied" as const, applied };
   });
-  if (result.status === "applied") {
-    const room = await prisma.roomType.findUnique({
-      where: { id: msg.roomId },
-      select: { propertyId: true },
-    });
-    if (room) await invalidatePropertySearchCache(room.propertyId);
-  }
+  if (result.status === "applied") await invalidatePropertySearchCache(room.propertyId);
   return result;
 }
 

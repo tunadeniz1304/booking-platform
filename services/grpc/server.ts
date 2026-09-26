@@ -261,7 +261,8 @@ const PushAvailability = authed(async (req: PushAvailabilityRequest, claims) => 
     idempotencyKey: req.idempotency_key,
     updates: (req.updates ?? []).map((u) => ({
       date: u.date,
-      ...(u.has_price ? { price: u.price } : {}),
+      // proto `double` → ondalık string; kesir basamağı fazla (float artığı) ise 400 (v4#19).
+      ...(u.has_price ? { price: String(u.price) } : {}),
       ...(u.has_available ? { available: u.available } : {}),
     })),
   });

@@ -42,3 +42,30 @@ export const cartConfirmSchema = z.object({
     .regex(/^\d{4,8}$/)
     .optional(),
 });
+
+/** P1-2: organizatör payları tanımlar (eşit bölme ya da katılımcı başına özel tutar). */
+export const splitPlanSchema = z.discriminatedUnion("mode", [
+  z.object({
+    mode: z.literal("equal"),
+    participants: z
+      .array(z.object({ email: z.string().trim().email().max(254).optional().nullable() }))
+      .min(1)
+      .max(19),
+  }),
+  z.object({
+    mode: z.literal("custom"),
+    participants: z
+      .array(
+        z.object({
+          email: z.string().trim().email().max(254).optional().nullable(),
+          amountMinor: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+        })
+      )
+      .min(1)
+      .max(19),
+  }),
+]);
+
+export const splitInviteSchema = z.object({
+  email: z.string().trim().email().max(254).optional().nullable(),
+});

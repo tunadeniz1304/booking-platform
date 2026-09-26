@@ -181,7 +181,7 @@ export async function reconcile(
   const refs = unique(events.map((e) => e.providerRef));
   const known = new Set<string>();
   if (refs.length > 0) {
-    const [pays, trs, carts] = await Promise.all([
+    const [pays, trs, carts, shares] = await Promise.all([
       db.payment.findMany({ where: { providerRef: { in: refs } }, select: { providerRef: true } }),
       db.bookingTransfer.findMany({
         where: { buyerPaymentRef: { in: refs } },
@@ -192,9 +192,15 @@ export async function reconcile(
         where: { providerRef: { in: refs } },
         select: { providerRef: true },
       }),
+      // P1-2: bölünmüş ödeme payları (her pay ayrı PSP işlemi).
+      db.paymentShare.findMany({
+        where: { providerRef: { in: refs } },
+        select: { providerRef: true },
+      }),
     ]);
     for (const p of pays) if (p.providerRef) known.add(p.providerRef);
     for (const c of carts) if (c.providerRef) known.add(c.providerRef);
+    for (const s of shares) if (s.providerRef) known.add(s.providerRef);
     for (const t of trs) if (t.buyerPaymentRef) known.add(t.buyerPaymentRef);
   }
   const orphanEvents = events.filter((e) => !known.has(e.providerRef!));

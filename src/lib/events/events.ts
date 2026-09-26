@@ -29,6 +29,8 @@ export const EventTypes = {
   NoticeDecided: "compliance.notice_decided",
   /** Parti riski skoru eşik üstünde → ev sahibine uyarı (P1-6). */
   PartyRiskFlagged: "trust.party_risk_flagged",
+  /** Bölünmüş ödeme: pay daveti / organizatöre yedek ödeme çağrısı → e-posta (P1-2). */
+  SplitShareInvited: "cart.split_share_invited",
 } as const;
 
 export type EventType = (typeof EventTypes)[keyof typeof EventTypes];
@@ -100,6 +102,15 @@ export interface SecurityAlertPayload {
   /** Passkey adı (PASSKEY_ADDED) veya cihaz/IP ipucu (NEW_DEVICE_LOGIN), varsa. */
   detail: string | null;
   occurredAt: string;
+}
+
+export interface SplitShareInvitedPayload {
+  shareId: string;
+  planId: string;
+  /** INVITE: katılımcıya davet; FALLBACK: süre doldu, kalan organizatörde. */
+  kind: "INVITE" | "FALLBACK";
+  /** Gönderim başına tekil kimlik (yeniden gönderim ayrı e-posta). */
+  sendId: string;
 }
 
 export interface PriceDroppedPayload {

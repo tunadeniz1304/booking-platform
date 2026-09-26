@@ -65,7 +65,7 @@ export type CartPayOutcome =
     }
   | { status: "requires_action"; cartId: string; challenge: PaymentChallenge };
 
-interface PayableCart {
+export interface PayableCart {
   id: string;
   userId: string;
   status: CartStatus;
@@ -76,7 +76,7 @@ interface PayableCart {
   payment: { status: PaymentStatus; providerRef: string | null } | null;
 }
 
-async function loadPayableCart(cartId: string, userId: string): Promise<PayableCart> {
+export async function loadPayableCart(cartId: string, userId: string): Promise<PayableCart> {
   const cart = await prisma.cart.findUnique({
     where: { id: cartId },
     select: {
@@ -130,7 +130,7 @@ function isCheckedOut(cart: PayableCart): boolean {
   return cart.status === CartStatus.CHECKED_OUT && cart.payment?.status === PaymentStatus.PAID;
 }
 
-async function assertPayableCart(cart: PayableCart): Promise<void> {
+export async function assertPayableCart(cart: PayableCart): Promise<void> {
   if (cart.status !== CartStatus.HELD) {
     throw new ConflictError("Sepet ödeme beklemiyor", "CART_NOT_HELD");
   }
@@ -144,6 +144,16 @@ async function assertPayableCart(cart: PayableCart): Promise<void> {
     // Bir kalem tekil olarak düştüyse (iptal/süre) sepet bütün olarak ödenemez → hepsini bırak.
     await releaseCartHolds(cart.id, CartStatus.OPEN, "payment_failed");
     throw new ConflictError("Sepetteki tutmalardan biri artık geçerli değil", "CART_INCOMPLETE");
+  }
+}
+
+/** P1-2: bölünmüş ödeme planı varken sepet tek ödemeyle ödenemez. */
+async function assertNoActiveSplit(cartId: string): Promise<void> {
+  const active = await prisma.splitPlan.count({
+    where: { cartId, status: { in: ["COLLECTING", "FALLBACK", "SETTLED"] } },
+  });
+  if (active > 0) {
+    throw new ConflictError("Bu sepet için bölünmüş ödeme başlatıldı", "SPLIT_ACTIVE");
   }
 }
 
@@ -166,7 +176,8 @@ async function recordFailedAttempt(cartId: string): Promise<void> {
   await redis.incrWithTtl(attemptsKey(cartId), PAYMENT_ATTEMPTS_WINDOW_SECONDS).catch(() => 0);
 }
 
-async function withCartPaymentLock<T>(cartId: string, fn: () => Promise<T>): Promise<T> {
+/** Sepet ödemesi / bölünmüş ödeme payları / süre sonu işi aynı kilitte sıralanır. */
+export async function withCartPaymentLock<T>(cartId: string, fn: () => Promise<T>): Promise<T> {
   try {
     return await redlock.withLock(`pay:cart:${cartId}`, fn, {
       ttlMs: 30_000,
@@ -208,6 +219,7 @@ async function payLocked(input: Parameters<typeof payCart>[0]): Promise<CartPayO
   if (isCheckedOut(cart)) return confirmedOutcome(cart);
   await assertPayableCart(cart);
   await assertAttemptsLeft(cart.id);
+  await assertNoActiveSplit(cart.id);
 
   // Fraud v2 kuralları (tek rezervasyonla aynı). Passkey step-up rezervasyona bağlı olduğundan
   // sepette step-up/challenge kararları 3DS'e düşer; deny → 403.
@@ -462,7 +474,6 @@ export async function confirmCartInTransaction(
     where: { id: cartId },
     select: {
       status: true,
-      items: { select: { bookingId: true } },
       payment: {
         select: { id: true, status: true, providerRef: true, amountMinor: true, provider: true },
       },
@@ -482,28 +493,57 @@ export async function confirmCartInTransaction(
   if (cart.status !== CartStatus.HELD) {
     throw new ConflictError("Sepet artık onaylanamaz", "CART_NOT_CONFIRMABLE");
   }
-  const bookingIds = cart.items.map((i) => i.bookingId).filter((id): id is string => !!id);
+  const bookings = await loadConfirmableCartBookings(tx, cartId, cart.payment.amountMinor);
+  const claimed = await tx.cartPayment.updateMany({
+    where: { id: cart.payment.id, providerRef, status: PaymentStatus.AUTHORIZED },
+    data: { status: PaymentStatus.PAID, paidAt: new Date(), failureCode: null },
+  });
+  if (claimed.count !== 1) throw new CaptureRaceLostError();
+  return confirmCartBookingsInTx(tx, cartId, bookings, cart.payment, providerRef);
+}
+
+type ConfirmableCartBooking = Prisma.BookingGetPayload<{ select: typeof confirmableBookingSelect }>;
+
+/**
+ * Sepetin onaylanacak kalem rezervasyonları (kimliğe göre sıralı). Kalem eksikse ya da toplam
+ * ödeme planıyla uyuşmuyorsa ConflictError → çağıran telafi eder (iade).
+ */
+export async function loadConfirmableCartBookings(
+  tx: Prisma.TransactionClient,
+  cartId: string,
+  expectedTotalMinor: bigint
+): Promise<ConfirmableCartBooking[]> {
+  const items = await tx.cartItem.findMany({ where: { cartId }, select: { bookingId: true } });
+  const bookingIds = items.map((i) => i.bookingId).filter((id): id is string => !!id);
   const bookings = await tx.booking.findMany({
     where: { id: { in: bookingIds }, cartId },
     select: confirmableBookingSelect,
     orderBy: { id: "asc" },
   });
-  if (bookings.length === 0 || bookings.length !== cart.items.length) {
+  if (bookings.length === 0 || bookings.length !== items.length) {
     throw new ConflictError("Sepet kalemleri eksik", "CART_INCOMPLETE");
   }
   const total = bookings.reduce((sum, b) => sum + b.totalPriceMinor, 0n);
-  if (total !== cart.payment.amountMinor) {
+  if (total !== expectedTotalMinor) {
     throw new ConflictError("Sepet tutarı değişti", "CART_AMOUNT_MISMATCH");
   }
+  return bookings;
+}
+
+/**
+ * Onay çekirdeği (tek sepet ödemesi ve bölünmüş ödeme ortak): HER kalem için pay `Payment`'ı
+ * + `applyConfirmation` (HELD→CONFIRMED, held→sold, defter, jurnal, outbox) ve sepet
+ * HELD→CHECKED_OUT. `ledgerRef` eski defter satırının referansıdır (PSP işlemi ya da plan).
+ */
+export async function confirmCartBookingsInTx(
+  tx: Prisma.TransactionClient,
+  cartId: string,
+  bookings: ConfirmableCartBooking[],
+  cartPayment: { id: string; provider: string },
+  ledgerRef: string
+): Promise<string[]> {
   const nexts = bookings.map((b) => nextConfirmedState(b));
-
   const now = new Date();
-  const claimed = await tx.cartPayment.updateMany({
-    where: { id: cart.payment.id, providerRef, status: PaymentStatus.AUTHORIZED },
-    data: { status: PaymentStatus.PAID, paidAt: now, failureCode: null },
-  });
-  if (claimed.count !== 1) throw new CaptureRaceLostError();
-
   const paymentIds: string[] = [];
   for (const [i, booking] of bookings.entries()) {
     const payment = await tx.payment.create({
@@ -512,16 +552,16 @@ export async function confirmCartInTransaction(
         userId: booking.userId,
         amountMinor: booking.totalPriceMinor,
         currency: booking.currency,
-        provider: cart.payment.provider,
+        provider: cartPayment.provider,
         providerRef: null,
         status: PaymentStatus.PAID,
         authorizedAt: now,
         paidAt: now,
-        cartPaymentId: cart.payment.id,
+        cartPaymentId: cartPayment.id,
       },
       select: { id: true, amountMinor: true },
     });
-    await applyConfirmation(tx, booking, nexts[i], payment, providerRef);
+    await applyConfirmation(tx, booking, nexts[i], payment, ledgerRef);
     paymentIds.push(payment.id);
   }
   const moved = await tx.cart.updateMany({

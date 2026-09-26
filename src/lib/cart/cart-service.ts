@@ -679,7 +679,14 @@ export async function cancelCart(userId: string, cartId: string): Promise<void> 
  */
 export async function expireCarts(now: Date = new Date(), limit = 100): Promise<number> {
   const due = await prisma.cart.findMany({
-    where: { status: CartStatus.HELD, holdExpiresAt: { lte: now } },
+    where: {
+      status: CartStatus.HELD,
+      holdExpiresAt: { lte: now },
+      // P1-2: aktif bölünmüş ödemeli sepeti süre sonu işi kapatır (void/iade + serbest bırakma).
+      NOT: {
+        payment: { is: { splitPlans: { some: { status: { in: ["COLLECTING", "FALLBACK"] } } } } },
+      },
+    },
     select: { id: true },
     orderBy: { holdExpiresAt: "asc" },
     take: limit,

@@ -34,7 +34,10 @@ export function categorize(pathname: string): RateLimitCategory {
   ) {
     return "booking";
   }
-  if (pathname.startsWith("/api/payments")) return "payment";
+  // P1-2 bölünmüş ödeme payları (katılımcı ödeme sayfası) ödeme kovasında.
+  if (pathname.startsWith("/api/payments") || pathname.startsWith("/api/pay/share")) {
+    return "payment";
+  }
   // Ajan uçları (P1-11): MCP HTTP + ACP checkout — ayrı kova, rezervasyon/ödeme yapabilir.
   if (pathname.startsWith("/api/mcp") || pathname.startsWith("/api/agentic")) return "agentic";
   // Tüm AI uçları (yorum özeti dahil) `ai` kategorisinde — §3 v3-b.

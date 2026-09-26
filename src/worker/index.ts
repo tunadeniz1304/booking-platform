@@ -29,6 +29,7 @@ import {
 } from "./jobs/escrow-release";
 import { ICAL_POLL_JOB, runIcalPoll, scheduleIcalPoll } from "./jobs/ical-poll";
 import { onRefundRetryFailed, processRefundRetry } from "./jobs/refund-retry";
+import { runSplitDeadlineJob, SPLIT_DEADLINE_JOB } from "@/lib/cart/split-payment";
 import { TRANSFER_SWEEP_JOB, runTransferSweep, scheduleTransferSweep } from "./jobs/transfer-sweep";
 import {
   LEDGER_RECONCILE_JOB,
@@ -98,6 +99,7 @@ async function main(): Promise<void> {
     QUEUE_NAMES.maintenance,
     async (job: Job) => {
       if (job.name === EXPIRE_HOLDS_JOB) return runExpireHolds();
+      if (job.name === SPLIT_DEADLINE_JOB) return runSplitDeadlineJob(job.data);
       if (job.name === ROLLOVER_JOB) return runRollover();
       if (job.name === COMPLETE_STAYS_JOB) return runCompleteStays();
       if (job.name === FX_REFRESH_JOB) return runFxRefresh();

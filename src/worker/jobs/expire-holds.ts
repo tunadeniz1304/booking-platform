@@ -3,6 +3,7 @@ import { expireHolds } from "@/lib/booking-service";
 import { pruneInventory, rollAvailabilityForward } from "@/lib/booking/availability-rollover";
 import { completeStays } from "@/lib/booking/complete-stays";
 import { expireCarts } from "@/lib/cart/cart-service";
+import { sweepSplitDeadlines } from "@/lib/cart/split-payment";
 
 export const EXPIRE_HOLDS_JOB = "expire-holds";
 export const ROLLOVER_JOB = "availability-rollover";
@@ -43,7 +44,9 @@ export async function runCompleteStays(): Promise<number> {
 /** Süresi dolan tutmaları EXPIRED yapar ve envanteri iade eder. */
 export async function runExpireHolds(): Promise<number> {
   // P1-1: önce sepetler bütün olarak (tüm kalemler tek işlemde) düşer; kalanlar tekil tutmalar.
-  let total = await expireCarts(new Date(), 100);
+  // P1-2: süresi geçmiş bölünmüş ödemeler (gecikmeli iş kaybolduysa) sepetlerden önce.
+  let total = await sweepSplitDeadlines(new Date(), 50);
+  total += await expireCarts(new Date(), 100);
   // Birikmiş iş varsa partiler hâlinde boşalt (tek çalıştırmada en fazla 10 parti).
   for (let i = 0; i < 10; i++) {
     const n = await expireHolds(new Date(), 100);

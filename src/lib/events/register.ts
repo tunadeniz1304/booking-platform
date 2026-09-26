@@ -9,6 +9,7 @@ import {
   type PropertyCreatedPayload,
   type AuthEmailRequestedPayload,
   type SecurityAlertPayload,
+  type SplitShareInvitedPayload,
   type PriceDroppedPayload,
   type PropertyAvailabilityChangedPayload,
   type PartyRiskFlaggedPayload,
@@ -24,6 +25,7 @@ import {
 import { startBookingFulfilment } from "@/lib/saga/booking-saga";
 import { invalidateBookingCache } from "@/lib/booking/booking-cache";
 import { notifySecurityAlert } from "@/lib/notifications/security-notifications";
+import { notifySplitShareInvited } from "@/lib/notifications/split-notifications";
 import {
   notifyNoticeDecided,
   notifyNoticeReceived,
@@ -102,6 +104,7 @@ export function registerEventHandlers(): void {
   // P1-12: aynı olay abone cihazlara push olarak da gider (ayrı tüketici; hata e-postayı etkilemez).
   on<PriceDroppedPayload>(EventTypes.PriceDropped, pushPriceDrop);
   on<SecurityAlertPayload>(EventTypes.SecurityAlert, notifySecurityAlert);
+  on<SplitShareInvitedPayload>(EventTypes.SplitShareInvited, notifySplitShareInvited);
   on<NoticeEventPayload>(EventTypes.NoticeReceived, notifyNoticeReceived);
   on<NoticeEventPayload>(EventTypes.NoticeDecided, notifyNoticeDecided);
   on<BookingExpiredPayload>(EventTypes.BookingExpired, async (p) => {

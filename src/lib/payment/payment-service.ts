@@ -23,6 +23,11 @@ import { commitHeld, holdUnits, InventoryUnavailableError } from "@/lib/booking/
 import { logger, errorFields } from "@/lib/observability/logger";
 import { counter } from "@/lib/observability/metrics";
 import { audit } from "@/lib/admin/audit";
+import {
+  allocateSplitRefundInTx,
+  executeSplitRefunds,
+  hasSplitRefunds,
+} from "@/lib/cart/split-refund";
 import { getPaymentProvider, type AuthorizeResult } from "./index";
 import type { WebhookEvent } from "./webhook";
 import type { PaymentChallenge } from "./provider";
@@ -933,6 +938,10 @@ export async function handleWebhookEvent(
 
   try {
     if (!payment) {
+      // P1-2: sepet tek ödemesi / bölünmüş ödeme payı (döngüsel import olmasın diye tembel).
+      const { handleCartWebhookEvent } = await import("@/lib/cart/cart-webhook");
+      const handled = await handleCartWebhookEvent(event);
+      if (handled) return handled;
       logger.warn({ eventId: event.id, type: event.type }, "webhook for unknown payment");
       await prisma.$transaction(async (tx) => record(tx));
       return { duplicate: false };
@@ -1183,7 +1192,9 @@ async function cancelLocked(
   userId: string,
   now: Date
 ): Promise<CancellationOutcome> {
+  let splitRefund = false;
   const result = await withSerializableRetry(async (tx) => {
+    splitRefund = false;
     // Satır kilidi: kilit (Redlock) kaybolsa bile eşzamanlı onay/iptal bu satırda sıralanır.
     await tx.$queryRaw`SELECT id FROM "Booking" WHERE id = ${bookingId} FOR UPDATE`;
     const booking = await tx.booking.findUnique({
@@ -1209,7 +1220,7 @@ async function cancelLocked(
             status: true,
             amountMinor: true,
             providerRef: true,
-            cartPayment: { select: { providerRef: true } },
+            cartPayment: { select: { id: true, providerRef: true } },
           },
         },
         transfers: {
@@ -1292,6 +1303,15 @@ async function cancelLocked(
             currency,
             occurredAt: now,
           });
+          // P1-2: bölünmüş ödemeli sepet kalemi → iade tahsil edilmiş paylara dağıtılır.
+          if (booking.payment.cartPayment && !booking.payment.cartPayment.providerRef) {
+            splitRefund = await allocateSplitRefundInTx(tx, {
+              cartPaymentId: booking.payment.cartPayment.id,
+              bookingId: booking.id,
+              refundMinor: decision.refundMinor,
+              currency,
+            });
+          }
         }
       } else if (booking.payment.status !== PaymentStatus.FAILED) {
         await tx.payment.update({
@@ -1320,7 +1340,18 @@ async function cancelLocked(
 
   const { booking, decision, currency, target } = result;
   const provider = getPaymentProvider();
-  if (pspRefOf(booking.payment)) {
+  if (splitRefund) {
+    try {
+      await executeSplitRefunds(booking.id);
+    } catch (error) {
+      logger.error({ bookingId: booking.id, ...errorFields(error) }, "split refund failed");
+      await prisma.payment.update({
+        where: { bookingId: booking.id },
+        data: { failureCode: REFUND_FAILED },
+      });
+      await scheduleRefundRetry(booking.id);
+    }
+  } else if (pspRefOf(booking.payment)) {
     try {
       if (decision.refundMinor > 0 && target.providerRef) {
         await provider.refund(
@@ -1454,7 +1485,10 @@ export async function retryFailedRefund(bookingId: string): Promise<RefundRetryR
     const provider = getPaymentProvider();
     let result: RefundRetryResult = "noop";
     try {
-      if (refundMinor > 0 && target.providerRef) {
+      if (refundMinor > 0 && (await hasSplitRefunds(booking.id))) {
+        await executeSplitRefunds(booking.id);
+        result = "refunded";
+      } else if (refundMinor > 0 && target.providerRef) {
         await provider.refund(
           target.providerRef,
           money(refundMinor, currency),

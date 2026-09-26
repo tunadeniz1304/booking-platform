@@ -31,6 +31,7 @@ export const NAMESPACES = [
   "pwa",
   "quote",
   "ranking",
+  "resolution",
   "revenue",
   "reviews",
   "search",

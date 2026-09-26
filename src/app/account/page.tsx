@@ -57,6 +57,7 @@ interface Favorite {
 export default function AccountPage() {
   const t = useTranslations("account");
   const tPwa = useTranslations("pwa.trips");
+  const tRes = useTranslations("resolution");
   const fmt = useFormat();
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
@@ -254,6 +255,10 @@ export default function AccountPage() {
           {" · "}
           <Link href="/trips" className="font-medium text-blue-700 hover:underline">
             {tPwa("accountLink")}
+          </Link>
+          {" · "}
+          <Link href="/resolution" className="font-medium text-blue-700 hover:underline">
+            {tRes("link")}
           </Link>
         </p>
 

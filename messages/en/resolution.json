@@ -1,0 +1,198 @@
+{
+  "link": "Resolution center",
+  "adminLink": "Damage and refund claims",
+  "hostLink": "Resolution center (damage claims)",
+  "loading": "Loading…",
+  "page": {
+    "title": "Resolution center",
+    "intro": "Track, reply to and add evidence to your refund and damage claims. If you cannot agree, the claim is escalated to an admin."
+  },
+  "detailPage": {
+    "title": "Claim details",
+    "back": "Back to all claims"
+  },
+  "admin": {
+    "pageTitle": "Damage and refund claims",
+    "pageIntro": "Review and decide claims the parties could not resolve. Chargebacks are handled by the payment provider.",
+    "title": "Claims",
+    "filter": "Filter by status",
+    "all": "All",
+    "select": "Show details",
+    "selected": "Selected claim",
+    "close": "Close details"
+  },
+  "type": {
+    "GUEST_REFUND": "Guest refund claim",
+    "HOST_DAMAGE": "Damage claim",
+    "CHARGEBACK": "Chargeback (card dispute)"
+  },
+  "status": {
+    "OPEN": "Open",
+    "AWAITING_RESPONSE": "Awaiting response",
+    "ESCALATED": "Escalated to admin",
+    "RESOLVED_APPROVED": "Approved",
+    "RESOLVED_PARTIAL": "Partially approved",
+    "RESOLVED_REJECTED": "Rejected",
+    "CLOSED": "Closed"
+  },
+  "role": {
+    "OPENER": "Claimant",
+    "RESPONDENT": "Respondent",
+    "ADMIN": "Admin",
+    "SYSTEM": "System"
+  },
+  "list": {
+    "title": "My claims",
+    "empty": "You have no claims yet.",
+    "requested": "Requested: {amount}",
+    "awarded": "Awarded: {amount}",
+    "slaDue": "Response due by: {date}",
+    "created": "Opened: {date}",
+    "yourRole": "Your role: {role}",
+    "bookingRef": "Booking {id}",
+    "open": "Open details"
+  },
+  "deposit": {
+    "title": "Damage deposit",
+    "none": "This booking has no damage deposit.",
+    "expected": "Expected deposit: {amount}. It is held on your card as a pre-authorization shortly before check-in.",
+    "amount": "Amount",
+    "captured": "Captured",
+    "status": "Status",
+    "authorizeAfter": "Pre-authorization time",
+    "authorizedAt": "Pre-authorized at",
+    "voidAfter": "Release time",
+    "note": "The deposit is not charged; only a pre-authorization is placed. It is released at the end of the period unless a damage claim is approved.",
+    "statuses": {
+      "SCHEDULED": "Scheduled",
+      "AUTHORIZED": "Pre-authorized",
+      "CAPTURED_PARTIAL": "Partially captured",
+      "CAPTURED": "Captured",
+      "VOIDED": "Released",
+      "EXPIRED": "Expired",
+      "FAILED": "Pre-authorization failed"
+    }
+  },
+  "panel": {
+    "title": "Damage deposit and resolution center",
+    "claimsTitle": "Claims for this booking",
+    "noClaims": "No claims have been opened for this booking.",
+    "allClaims": "Go to the resolution center"
+  },
+  "open": {
+    "titleGuest": "Request a refund",
+    "titleHost": "File a damage claim",
+    "infoGuest": "If you had a problem with your stay, request a refund. The host is given time to respond; if they do not, the claim is escalated to an admin.",
+    "infoHost": "File a claim for damage that occurred during the stay. An approved amount is captured only up to the damage deposit pre-authorization.",
+    "adminInfo": "Admins cannot open claims; review claims from the admin panel.",
+    "amount": "Amount ({currency})",
+    "amountHint": "In major units, for example 250.00.",
+    "description": "Description",
+    "descriptionHint": "Describe what happened (10 to 4000 characters). You can add evidence after the claim is opened.",
+    "submit": "Submit claim",
+    "submitting": "Submitting…",
+    "created": "Your claim has been opened.",
+    "viewCreated": "View the claim and add evidence",
+    "invalidAmount": "Enter a valid amount greater than zero."
+  },
+  "detail": {
+    "requested": "Requested",
+    "awarded": "Awarded",
+    "sla": "Response due by",
+    "created": "Opened",
+    "yourRole": "Your role",
+    "description": "Description",
+    "booking": "Booking",
+    "stay": "{checkIn} – {checkOut}",
+    "refundable": "Maximum refundable: {amount}",
+    "responded": "Responded: {date}",
+    "escalated": "Escalated: {date}",
+    "external": "Payment provider status: {status}",
+    "externalReason": "Reason: {reason}",
+    "withdraw": "Withdraw claim",
+    "withdrawConfirm": "Are you sure you want to withdraw this claim? This cannot be undone.",
+    "withdrawn": "The claim has been withdrawn."
+  },
+  "outcome": {
+    "title": "Decision",
+    "decidedAt": "Decided: {date}",
+    "awarded": "Awarded amount",
+    "settled": "Paid / captured",
+    "uncollected": "Uncollected",
+    "platformCovered": "Covered by the platform",
+    "note": "Decision note"
+  },
+  "messages": {
+    "title": "Messages",
+    "empty": "No messages yet.",
+    "you": "You",
+    "label": "Your message",
+    "send": "Send message",
+    "sending": "Sending…",
+    "sent": "Your message has been sent.",
+    "slaBreach": "The response deadline passed; the claim was escalated to an admin.",
+    "psp": "Payment provider update: {status}"
+  },
+  "evidence": {
+    "title": "Evidence",
+    "empty": "No evidence added yet.",
+    "upload": "Upload evidence (photo or PDF)",
+    "uploading": "Uploading…",
+    "uploaded": "Evidence uploaded.",
+    "privacy": "For your privacy, location (GPS), EXIF and all other metadata is removed from uploaded files on the server.",
+    "imageAlt": "Evidence photo: {role}, {date}",
+    "pdf": "PDF document ({size} KB)",
+    "by": "{role} · {date}"
+  },
+  "decision": {
+    "title": "Decide",
+    "decisionLabel": "Decision",
+    "APPROVE": "Approve (full requested amount)",
+    "PARTIAL": "Partial approval",
+    "REJECT": "Reject",
+    "amount": "Partial amount ({currency})",
+    "amountHint": "Must be less than the requested amount ({amount}).",
+    "note": "Decision note",
+    "noteHint": "3–4000 characters; shown to both parties.",
+    "submit": "Save decision",
+    "submitting": "Saving…",
+    "done": "Decision saved: {status}.",
+    "invalidAmount": "The partial amount must be greater than zero and less than the requested amount.",
+    "pspManaged": "Chargebacks are handled by the payment provider and cannot be decided here.",
+    "closed": "This claim is resolved; no further decision can be made.",
+    "explainRefund": "Approving a refund claim refunds the guest: from escrow if the funds are still held, otherwise from the host's reserve / balance after release; the platform covers any shortfall.",
+    "explainDamage": "Approving a damage claim captures at most the damage deposit pre-authorization; any excess is only recorded as \"uncollected\"."
+  },
+  "errors": {
+    "CLAIM_TOO_EARLY": "This type of claim cannot be opened yet (before the stay starts / ends).",
+    "CLAIM_WINDOW_CLOSED": "The window for opening a claim has closed.",
+    "CLAIM_ALREADY_OPEN": "You already have an open claim for this booking.",
+    "CLAIM_AMOUNT_EXCEEDS_REFUNDABLE": "The amount exceeds the refundable limit (at most {amount}).",
+    "CLAIM_BOOKING_NOT_ELIGIBLE": "A claim cannot be opened for this booking.",
+    "CLAIM_TRANSFERRED_BOOKING": "For transferred bookings only the current guest can open a claim.",
+    "CLAIM_EVIDENCE_LIMIT": "The evidence limit for this claim has been reached.",
+    "CLAIM_PSP_MANAGED": "This claim is managed by the payment provider.",
+    "CLAIM_CLOSED": "The claim is closed; no action is possible.",
+    "CLAIM_NO_PAYMENT": "No captured payment was found for this booking.",
+    "CLAIM_REFUND_FAILED": "The refund failed; please try again later.",
+    "PAYMENT_IN_PROGRESS": "Another payment operation is in progress for this booking; try again shortly.",
+    "EMAIL_NOT_VERIFIED": "Please verify your email address before doing this."
+  },
+  "host": {
+    "title": "Damage deposit",
+    "intro": "The amount held on the guest's card as a pre-authorization before check-in. If left empty for a room type, the listing-wide amount applies.",
+    "loading": "Loading deposit settings…",
+    "listingWide": "Listing-wide",
+    "roomLabel": "Room: {room}",
+    "amount": "{scope} amount ({currency})",
+    "current": "Current: {amount}",
+    "none": "Not set",
+    "max": "At most {amount}.",
+    "save": "Save",
+    "remove": "Remove",
+    "saved": "Deposit saved.",
+    "removed": "Deposit removed.",
+    "tooHigh": "The amount exceeds the limit (at most {amount}).",
+    "invalidAmount": "Enter a valid amount greater than zero."
+  }
+}

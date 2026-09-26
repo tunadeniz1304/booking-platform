@@ -10,6 +10,7 @@ export default function AdminPage() {
   const t = useTranslations("admin");
   const tc = useTranslations("compliance.admin");
   const tp = useTranslations("payouts");
+  const tr = useTranslations("resolution");
   return (
     <PageShell title={t("page.title")} intro={t("page.intro")}>
       <p className="text-sm">
@@ -19,6 +20,10 @@ export default function AdminPage() {
         {" · "}
         <Link href="/admin/payouts" className="font-semibold text-[#003580] underline">
           {tp("admin.link")}
+        </Link>
+        {" · "}
+        <Link href="/admin/claims" className="font-semibold text-[#003580] underline">
+          {tr("adminLink")}
         </Link>
       </p>
       <RoleGate roles={["ADMIN"]}>{() => <AdminDashboard />}</RoleGate>

@@ -1,0 +1,198 @@
+{
+  "link": "Çözüm merkezi",
+  "adminLink": "Hasar ve iade talepleri",
+  "hostLink": "Çözüm merkezi (hasar talepleri)",
+  "loading": "Yükleniyor…",
+  "page": {
+    "title": "Çözüm merkezi",
+    "intro": "İade ve hasar taleplerinizi izleyin, yanıtlayın ve kanıt ekleyin. Anlaşamazsanız talep yöneticiye aktarılır."
+  },
+  "detailPage": {
+    "title": "Talep ayrıntısı",
+    "back": "Tüm taleplere dön"
+  },
+  "admin": {
+    "pageTitle": "Hasar ve iade talepleri",
+    "pageIntro": "Taraflarca çözülemeyen talepleri inceleyin ve karar verin. Ters ibrazlar ödeme sağlayıcısında yürütülür.",
+    "title": "Talepler",
+    "filter": "Duruma göre filtrele",
+    "all": "Tümü",
+    "select": "Ayrıntıyı göster",
+    "selected": "Seçili talep",
+    "close": "Ayrıntıyı kapat"
+  },
+  "type": {
+    "GUEST_REFUND": "Misafir iade talebi",
+    "HOST_DAMAGE": "Hasar talebi",
+    "CHARGEBACK": "Ters ibraz (kart itirazı)"
+  },
+  "status": {
+    "OPEN": "Açık",
+    "AWAITING_RESPONSE": "Yanıt bekleniyor",
+    "ESCALATED": "Yöneticiye aktarıldı",
+    "RESOLVED_APPROVED": "Onaylandı",
+    "RESOLVED_PARTIAL": "Kısmen onaylandı",
+    "RESOLVED_REJECTED": "Reddedildi",
+    "CLOSED": "Kapandı"
+  },
+  "role": {
+    "OPENER": "Talebi açan",
+    "RESPONDENT": "Yanıtlayan taraf",
+    "ADMIN": "Yönetici",
+    "SYSTEM": "Sistem"
+  },
+  "list": {
+    "title": "Taleplerim",
+    "empty": "Henüz bir talebiniz yok.",
+    "requested": "Talep edilen: {amount}",
+    "awarded": "Karar tutarı: {amount}",
+    "slaDue": "Yanıt için son tarih: {date}",
+    "created": "Açılış: {date}",
+    "yourRole": "Rolünüz: {role}",
+    "bookingRef": "Rezervasyon {id}",
+    "open": "Ayrıntıyı aç"
+  },
+  "deposit": {
+    "title": "Hasar depozitosu",
+    "none": "Bu rezervasyonda hasar depozitosu yok.",
+    "expected": "Beklenen depozito: {amount}. Girişten kısa süre önce kartınızda provizyon olarak bloke edilir.",
+    "amount": "Tutar",
+    "captured": "Tahsil edilen",
+    "status": "Durum",
+    "authorizeAfter": "Provizyon zamanı",
+    "authorizedAt": "Provizyon alındı",
+    "voidAfter": "Serbest bırakılma",
+    "note": "Depozito kartınızdan çekilmez; yalnızca provizyon alınır. Onaylanmış bir hasar talebi yoksa süre sonunda serbest bırakılır.",
+    "statuses": {
+      "SCHEDULED": "Planlandı",
+      "AUTHORIZED": "Provizyon alındı",
+      "CAPTURED_PARTIAL": "Kısmen tahsil edildi",
+      "CAPTURED": "Tahsil edildi",
+      "VOIDED": "Serbest bırakıldı",
+      "EXPIRED": "Süresi doldu",
+      "FAILED": "Provizyon alınamadı"
+    }
+  },
+  "panel": {
+    "title": "Hasar depozitosu ve çözüm merkezi",
+    "claimsTitle": "Bu rezervasyondaki talepler",
+    "noClaims": "Bu rezervasyon için açılmış talep yok.",
+    "allClaims": "Çözüm merkezine git"
+  },
+  "open": {
+    "titleGuest": "İade talebi aç",
+    "titleHost": "Hasar talebi aç",
+    "infoGuest": "Konaklamanızla ilgili bir sorun yaşadıysanız iade talep edin. Ev sahibinin yanıt vermesi için süre tanınır; yanıt gelmezse talep yöneticiye aktarılır.",
+    "infoHost": "Konaklama sırasında oluşan hasar için talep açın. Onaylanan tutar en fazla hasar depozitosu provizyonundan tahsil edilir.",
+    "adminInfo": "Yöneticiler talep açamaz; talepleri yönetim panelinden inceleyebilirsiniz.",
+    "amount": "Tutar ({currency})",
+    "amountHint": "Ana para birimi cinsinden, örneğin 250,00.",
+    "description": "Açıklama",
+    "descriptionHint": "Ne olduğunu anlatın (en az 10, en fazla 4000 karakter). Kanıtları talep açıldıktan sonra ekleyebilirsiniz.",
+    "submit": "Talebi gönder",
+    "submitting": "Gönderiliyor…",
+    "created": "Talebiniz açıldı.",
+    "viewCreated": "Talebi görüntüle ve kanıt ekle",
+    "invalidAmount": "Geçerli, sıfırdan büyük bir tutar girin."
+  },
+  "detail": {
+    "requested": "Talep edilen",
+    "awarded": "Karar tutarı",
+    "sla": "Yanıt için son tarih",
+    "created": "Açılış",
+    "yourRole": "Rolünüz",
+    "description": "Açıklama",
+    "booking": "Rezervasyon",
+    "stay": "{checkIn} – {checkOut}",
+    "refundable": "İade edilebilir en fazla: {amount}",
+    "responded": "Yanıtlandı: {date}",
+    "escalated": "Yöneticiye aktarıldı: {date}",
+    "external": "Ödeme sağlayıcısı durumu: {status}",
+    "externalReason": "Gerekçe: {reason}",
+    "withdraw": "Talebi geri çek",
+    "withdrawConfirm": "Talebi geri çekmek istediğinize emin misiniz? Bu işlem geri alınamaz.",
+    "withdrawn": "Talep geri çekildi."
+  },
+  "outcome": {
+    "title": "Karar",
+    "decidedAt": "Karar tarihi: {date}",
+    "awarded": "Onaylanan tutar",
+    "settled": "Ödenen / tahsil edilen",
+    "uncollected": "Tahsil edilemeyen",
+    "platformCovered": "Platformun karşıladığı",
+    "note": "Karar notu"
+  },
+  "messages": {
+    "title": "Yazışmalar",
+    "empty": "Henüz mesaj yok.",
+    "you": "Siz",
+    "label": "Mesajınız",
+    "send": "Mesajı gönder",
+    "sending": "Gönderiliyor…",
+    "sent": "Mesajınız gönderildi.",
+    "slaBreach": "Yanıt süresi doldu; talep yöneticiye aktarıldı.",
+    "psp": "Ödeme sağlayıcısı güncellemesi: {status}"
+  },
+  "evidence": {
+    "title": "Kanıtlar",
+    "empty": "Henüz kanıt eklenmedi.",
+    "upload": "Kanıt yükle (fotoğraf veya PDF)",
+    "uploading": "Yükleniyor…",
+    "uploaded": "Kanıt yüklendi.",
+    "privacy": "Gizliliğiniz için yüklenen dosyalardaki konum (GPS), EXIF ve diğer tüm meta veriler sunucuda silinir.",
+    "imageAlt": "Kanıt fotoğrafı: {role}, {date}",
+    "pdf": "PDF belgesi ({size} KB)",
+    "by": "{role} · {date}"
+  },
+  "decision": {
+    "title": "Karar ver",
+    "decisionLabel": "Karar",
+    "APPROVE": "Onayla (talep edilen tutarın tamamı)",
+    "PARTIAL": "Kısmi onay",
+    "REJECT": "Reddet",
+    "amount": "Kısmi tutar ({currency})",
+    "amountHint": "Talep edilen tutardan ({amount}) küçük olmalı.",
+    "note": "Karar notu",
+    "noteHint": "3–4000 karakter; taraflara gösterilir.",
+    "submit": "Kararı kaydet",
+    "submitting": "Kaydediliyor…",
+    "done": "Karar kaydedildi: {status}.",
+    "invalidAmount": "Kısmi tutar sıfırdan büyük ve talep edilen tutardan küçük olmalı.",
+    "pspManaged": "Ters ibrazlar ödeme sağlayıcısı üzerinden yürütülür; buradan karar verilemez.",
+    "closed": "Bu talep sonuçlandı; yeni karar verilemez.",
+    "explainRefund": "İade talebi onaylanırsa misafire iade yapılır: tutar henüz emanetteyse emanetten, ev sahibine aktarıldıysa ev sahibinin rezervinden / bakiyesinden karşılanır; yetmeyen kısmı platform üstlenir.",
+    "explainDamage": "Hasar talebi onaylanırsa en fazla hasar depozitosu provizyonu kadar tahsil edilir; bunu aşan kısım yalnızca \"tahsil edilemeyen\" olarak kaydedilir."
+  },
+  "errors": {
+    "CLAIM_TOO_EARLY": "Bu talep türü henüz açılamaz (konaklama başlamadan / bitmeden önce).",
+    "CLAIM_WINDOW_CLOSED": "Talep açma süresi doldu.",
+    "CLAIM_ALREADY_OPEN": "Bu rezervasyon için zaten açık bir talebiniz var.",
+    "CLAIM_AMOUNT_EXCEEDS_REFUNDABLE": "Tutar iade edilebilir üst sınırı aşıyor (en fazla {amount}).",
+    "CLAIM_BOOKING_NOT_ELIGIBLE": "Bu rezervasyon için talep açılamaz.",
+    "CLAIM_TRANSFERRED_BOOKING": "Devredilmiş rezervasyonlarda talep yalnızca güncel misafir tarafından açılabilir.",
+    "CLAIM_EVIDENCE_LIMIT": "Bu talep için kanıt sınırına ulaşıldı.",
+    "CLAIM_PSP_MANAGED": "Bu talep ödeme sağlayıcısı tarafından yönetiliyor.",
+    "CLAIM_CLOSED": "Talep kapanmış; işlem yapılamaz.",
+    "CLAIM_NO_PAYMENT": "Bu rezervasyon için tahsil edilmiş bir ödeme bulunamadı.",
+    "CLAIM_REFUND_FAILED": "İade işlemi başarısız oldu; lütfen daha sonra tekrar deneyin.",
+    "PAYMENT_IN_PROGRESS": "Rezervasyonda başka bir ödeme işlemi sürüyor; biraz sonra tekrar deneyin.",
+    "EMAIL_NOT_VERIFIED": "Bu işlem için önce e-posta adresinizi doğrulamanız gerekir."
+  },
+  "host": {
+    "title": "Hasar depozitosu",
+    "intro": "Misafirin kartında girişten önce provizyon olarak tutulacak tutar. Oda tipi için boş bırakılırsa ilan geneli tutar geçerli olur.",
+    "loading": "Depozito ayarları yükleniyor…",
+    "listingWide": "İlan geneli",
+    "roomLabel": "Oda: {room}",
+    "amount": "{scope} tutarı ({currency})",
+    "current": "Geçerli: {amount}",
+    "none": "Tanımlı değil",
+    "max": "En fazla {amount}.",
+    "save": "Kaydet",
+    "remove": "Kaldır",
+    "saved": "Depozito kaydedildi.",
+    "removed": "Depozito kaldırıldı.",
+    "tooHigh": "Tutar üst sınırı aşıyor (en fazla {amount}).",
+    "invalidAmount": "Geçerli, sıfırdan büyük bir tutar girin."
+  }
+}

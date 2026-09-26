@@ -9,6 +9,7 @@ import Footer from "@/components/layout/Footer";
 import { ApiError, apiFetch } from "@/lib/api-client";
 import BookingActions from "@/components/booking/BookingActions";
 import BookingMessages from "@/components/booking/BookingMessages";
+import BookingResolutionPanel from "@/components/resolution/BookingResolutionPanel";
 import { toMinor } from "@/lib/money/money";
 import { useFormat } from "@/i18n/use-format";
 
@@ -166,6 +167,10 @@ export default function BookingConfirmationPage() {
 
               {["CONFIRMED", "COMPLETED"].includes(booking.status) && (
                 <BookingMessages bookingId={booking.id} />
+              )}
+
+              {["CONFIRMED", "COMPLETED"].includes(booking.status) && (
+                <BookingResolutionPanel bookingId={booking.id} />
               )}
 
               <div className="flex flex-wrap gap-3 border-t border-gray-100 pt-6">

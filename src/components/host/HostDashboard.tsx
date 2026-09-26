@@ -17,6 +17,7 @@ import {
   inputClass,
   useLoader,
 } from "@/components/ui/ui";
+import DepositSettings from "./DepositSettings";
 import PromotionsPanel from "./PromotionsPanel";
 
 interface HostRoom {
@@ -63,6 +64,7 @@ const BOOKING_STATUSES = [
 export default function HostDashboard() {
   const t = useTranslations("host");
   const tp = useTranslations("payouts");
+  const tr = useTranslations("resolution");
   const f = useFormat();
   const statusLabel = (s: string) =>
     (BOOKING_STATUSES as readonly string[]).includes(s)
@@ -95,6 +97,13 @@ export default function HostDashboard() {
           className={`text-sm font-semibold text-[#003580] hover:underline ${focusRing}`}
         >
           {tp("link")}
+        </Link>
+        {" · "}
+        <Link
+          href="/resolution"
+          className={`text-sm font-semibold text-[#003580] hover:underline ${focusRing}`}
+        >
+          {tr("hostLink")}
         </Link>
       </p>
       <Status error={error} />
@@ -308,6 +317,7 @@ function PropertyPanel({ property, onChanged }: { property: HostProperty; onChan
       {p.rooms.length > 0 && <CalendarForm rooms={p.rooms} propertyId={p.id} />}
       <PhotoUpload propertyId={p.id} onChanged={onChanged} />
       <ListingCopy propertyId={p.id} />
+      <DepositSettings propertyId={p.id} />
     </Card>
   );
 }

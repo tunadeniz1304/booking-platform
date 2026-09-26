@@ -1,5 +1,6 @@
 import { type PrismaClient } from "@prisma/client";
 import { createBooking } from "@/lib/booking-service";
+import { listBookingLedger, netChargedMinor } from "@/lib/ledger";
 import { iso, utcDay } from "./helpers";
 
 /**
@@ -125,11 +126,12 @@ export async function createStayFixture(
   };
 }
 
-/** Defter bakiyesi (CHARGE − REFUND), minor-unit (TRY: kuruş). */
+/**
+ * Defter bakiyesi (CHARGE − REFUND), minor-unit (TRY: kuruş). Eski `LedgerEntry` ∪ jurnal
+ * (dual-write) uyum görünümünden okunur → aynı olay iki kez sayılmaz (F2c).
+ */
 export async function ledgerNetMinor(prisma: PrismaClient, bookingId: string): Promise<number> {
-  const rows = await prisma.ledgerEntry.findMany({ where: { bookingId } });
-  return rows.reduce((sum, r) => {
-    const minor = Number(r.amountMinor);
-    return r.kind === "CHARGE" ? sum + minor : r.kind === "REFUND" ? sum - minor : sum;
-  }, 0);
+  const rows = await listBookingLedger(prisma, bookingId);
+  const currencies = [...new Set(rows.map((r) => r.currency))];
+  return currencies.reduce((sum, c) => sum + Number(netChargedMinor(rows, c)), 0);
 }

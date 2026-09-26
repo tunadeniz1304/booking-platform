@@ -30,6 +30,7 @@ import { assessPayment, type FraudDecision } from "@/lib/risk/fraud";
 import { consumeStepUp, hasStepUpPasskey, type StepUpBinding } from "@/lib/auth/passkey";
 import { getConfig } from "@/lib/config/app-config";
 import { getQueue, QUEUE_NAMES } from "@/lib/queue";
+import { postBookingCapture, postRefundFromEscrow } from "@/lib/ledger";
 
 /** BullMQ `refund-retry` kuyruğundaki iş adı (v4#7). */
 export const REFUND_RETRY_JOB = "refund-retry";
@@ -245,6 +246,46 @@ async function refundLoser(
     });
 }
 
+/**
+ * Onaylanamayan ama PSP'de tahsil edilip iade edilen ödemenin jurnali (F2c): tahsilat +
+ * aynı tutarın emanetten iadesi. Ödeme satırı `paidAt` (tahsil anı) + `refundedAmountMinor`
+ * taşır → mutabakatta PSP ile jurnal eşleşir. Anahtarlar providerRef'e bağlı (tek sefer).
+ */
+async function journalCompensation(
+  tx: Prisma.TransactionClient,
+  bookingId: string,
+  providerRef: string
+): Promise<void> {
+  const p = await tx.payment.findUnique({
+    where: { providerRef },
+    select: {
+      id: true,
+      amountMinor: true,
+      currency: true,
+      booking: { select: { userId: true, priceBreakdown: true } },
+    },
+  });
+  if (!p) return;
+  await postBookingCapture(tx, {
+    bookingId,
+    paymentId: p.id,
+    currency: p.currency,
+    grossMinor: p.amountMinor,
+    priceBreakdown: p.booking.priceBreakdown,
+    idempotencyKey: `booking-captured:compensate:${providerRef}`,
+  });
+  await postRefundFromEscrow(tx, {
+    refundRef: `compensate:${providerRef}`,
+    bookingId,
+    paymentId: p.id,
+    guestId: p.booking.userId,
+    currency: p.currency,
+    grossMinor: p.amountMinor,
+    priceBreakdown: p.booking.priceBreakdown,
+    refundMinor: p.amountMinor,
+  });
+}
+
 interface PaymentSagaCtx {
   booking: PayableBooking;
   providerRef: string;
@@ -318,18 +359,23 @@ const PAYMENT_SAGA_STEPS: SagaStep<PaymentSagaCtx, PayOutcome>[] = [
         ctx.amount,
         `compensate:${ctx.providerRef}`
       );
-      await prisma.payment.updateMany({
-        where: {
-          bookingId: ctx.booking.id,
-          providerRef: ctx.providerRef,
-          status: { notIn: SETTLED_STATUSES },
-        },
-        data: {
-          status: PaymentStatus.REFUNDED,
-          refundedAmountMinor: minorToDb(ctx.amount.amount),
-          refundedAt: new Date(),
-          failureCode: "BOOKING_NOT_CONFIRMABLE",
-        },
+      await withSerializableRetry(async (tx) => {
+        const now = new Date();
+        const marked = await tx.payment.updateMany({
+          where: {
+            bookingId: ctx.booking.id,
+            providerRef: ctx.providerRef,
+            status: { notIn: SETTLED_STATUSES },
+          },
+          data: {
+            status: PaymentStatus.REFUNDED,
+            paidAt: now,
+            refundedAmountMinor: minorToDb(ctx.amount.amount),
+            refundedAt: now,
+            failureCode: "BOOKING_NOT_CONFIRMABLE",
+          },
+        });
+        if (marked.count === 1) await journalCompensation(tx, ctx.booking.id, ctx.providerRef);
       });
       paymentsTotal.inc({ outcome: "compensated" });
     },
@@ -428,6 +474,7 @@ export async function confirmInTransaction(
       totalPriceMinor: true,
       currency: true,
       units: true,
+      priceBreakdown: true,
       payment: { select: { id: true, status: true, providerRef: true } },
     },
   });
@@ -477,7 +524,7 @@ export async function confirmInTransaction(
   const amount = amountOf(booking);
   const payment = await tx.payment.findUniqueOrThrow({
     where: { bookingId: booking.id },
-    select: { id: true },
+    select: { id: true, amountMinor: true },
   });
   await tx.ledgerEntry.create({
     data: {
@@ -488,6 +535,14 @@ export async function confirmInTransaction(
       currency: amount.currency,
       reference: providerRef,
     },
+  });
+  // Çift girişli defter (ADR 0020, dual-write): tahsilat emanete + vergi payı tax_payable'a.
+  await postBookingCapture(tx, {
+    bookingId: booking.id,
+    paymentId: payment.id,
+    currency: amount.currency,
+    grossMinor: payment.amountMinor,
+    priceBreakdown: booking.priceBreakdown,
   });
   await appendOutbox(
     tx,
@@ -882,9 +937,10 @@ export async function handleWebhookEvent(
         const currency = assertCurrency(payment.currency);
         const amount = money(minorFromDb(payment.amountMinor), currency);
         await refundLoser(payment.bookingId, event.data.providerRef, amount, error.code);
-        await prisma.$transaction(async (tx) => {
+        await withSerializableRetry(async (tx) => {
           await record(tx);
-          await tx.payment.updateMany({
+          const now = new Date();
+          const marked = await tx.payment.updateMany({
             where: {
               bookingId: payment.bookingId,
               providerRef: event.data.providerRef,
@@ -892,11 +948,15 @@ export async function handleWebhookEvent(
             },
             data: {
               status: PaymentStatus.REFUNDED,
+              paidAt: now,
               refundedAmountMinor: payment.amountMinor,
-              refundedAt: new Date(),
+              refundedAt: now,
               failureCode: error.code,
             },
           });
+          if (marked.count === 1) {
+            await journalCompensation(tx, payment.bookingId, event.data.providerRef);
+          }
         });
         latePaymentSuccessTotal.inc({ outcome: "refunded" });
         await audit("system:webhook", "payment.late_success", "Booking", payment.bookingId, {
@@ -1090,8 +1150,9 @@ async function cancelLocked(
         currency: true,
         units: true,
         policySnapshot: true,
+        priceBreakdown: true,
         property: { select: { timeZone: true, checkInTime: true, checkOutTime: true } },
-        payment: { select: { status: true, amountMinor: true, providerRef: true } },
+        payment: { select: { id: true, status: true, amountMinor: true, providerRef: true } },
         transfers: {
           where: { status: "COMPLETED" },
           orderBy: { completedAt: "desc" },
@@ -1158,6 +1219,20 @@ async function cancelLocked(
               reference: target.providerRef,
             },
           });
+          // Jurnal: iade yükümlülüğü iptal anında yazılır (PSP çağrısı düşse bile, retry
+          // aynı anahtarla tekrarlar). Devredilmiş rezervasyonda da para emanetten döner.
+          await postCancellationRefund(tx, {
+            bookingId: booking.id,
+            userId: booking.userId,
+            priceBreakdown: booking.priceBreakdown,
+            payment: {
+              id: booking.payment.id,
+              amountMinor: booking.payment.amountMinor,
+              refundedAmountMinor: minorToDb(decision.refundMinor),
+            },
+            currency,
+            occurredAt: now,
+          });
         }
       } else if (booking.payment.status !== PaymentStatus.FAILED) {
         await tx.payment.update({
@@ -1219,6 +1294,31 @@ async function cancelLocked(
 
 export const REFUND_FAILED = "REFUND_FAILED";
 
+/** İptal iadesinin jurnali (`refund-issued:cancel:<bookingId>`); iptal ve retry ortak. */
+function postCancellationRefund(
+  tx: Prisma.TransactionClient,
+  i: {
+    bookingId: string;
+    userId: string;
+    priceBreakdown: Prisma.JsonValue;
+    payment: { id: string; amountMinor: bigint; refundedAmountMinor: bigint };
+    currency: string;
+    occurredAt?: Date;
+  }
+) {
+  return postRefundFromEscrow(tx, {
+    refundRef: `cancel:${i.bookingId}`,
+    bookingId: i.bookingId,
+    paymentId: i.payment.id,
+    guestId: i.userId,
+    currency: i.currency,
+    grossMinor: i.payment.amountMinor,
+    priceBreakdown: i.priceBreakdown,
+    refundMinor: i.payment.refundedAmountMinor,
+    occurredAt: i.occurredAt,
+  });
+}
+
 export const refundRetryTotal = counter(
   "refund_retry_total",
   "Başarısız PSP iadelerinin yeniden denemeleri",
@@ -1265,8 +1365,10 @@ export async function retryFailedRefund(bookingId: string): Promise<RefundRetryR
         id: true,
         userId: true,
         currency: true,
+        priceBreakdown: true,
         payment: {
           select: {
+            id: true,
             status: true,
             amountMinor: true,
             providerRef: true,
@@ -1305,9 +1407,21 @@ export async function retryFailedRefund(bookingId: string): Promise<RefundRetryR
       refundRetryTotal.inc({ outcome: "failed" });
       throw error;
     }
-    await prisma.payment.updateMany({
-      where: { bookingId: booking.id, failureCode: REFUND_FAILED },
-      data: { failureCode: null },
+    await withSerializableRetry(async (tx) => {
+      await tx.payment.updateMany({
+        where: { bookingId: booking.id, failureCode: REFUND_FAILED },
+        data: { failureCode: null },
+      });
+      // İptalde yazılan iade jurnali — aynı anahtar + içerik → idempotent tekrar (no-op).
+      if (result === "refunded") {
+        await postCancellationRefund(tx, {
+          bookingId: booking.id,
+          userId: booking.userId,
+          priceBreakdown: booking.priceBreakdown,
+          payment,
+          currency,
+        });
+      }
     });
     refundRetryTotal.inc({ outcome: "succeeded" });
     await audit("system:refund-retry", "payment.refund_retried", "Booking", booking.id, {

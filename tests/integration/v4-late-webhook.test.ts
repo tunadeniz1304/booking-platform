@@ -1,7 +1,8 @@
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { PrismaClient } from "@prisma/client";
 import { describeInt } from "./helpers";
-import { createStayFixture, type StayFixture } from "./fixtures";
+import { createStayFixture, ledgerNetMinor, type StayFixture } from "./fixtures";
+import { reconcile } from "@/lib/ledger";
 import {
   handleWebhookEvent,
   latePaymentSuccessTotal,
@@ -122,5 +123,19 @@ describeInt("regression: v4#8 geç gelen başarılı webhook önce mutabakat", (
       where: { action: "payment.late_success", entityId: booking.id },
     });
     expect(log.meta).toMatchObject({ outcome: "refunded" });
+
+    // F2c: tahsil + iade jurnali (telafi anahtarlarıyla, tek sefer) → mutabakat farkı 0.
+    const entries = await prisma.journalEntry.findMany({
+      where: { bookingId: booking.id },
+      select: { idempotencyKey: true },
+    });
+    expect(entries.map((e) => e.idempotencyKey).sort()).toEqual([
+      `booking-captured:compensate:${providerRef}`,
+      `refund-issued:compensate:${providerRef}`,
+    ]);
+    const day = after.payment!.refundedAt!.toISOString().slice(0, 10);
+    const report = await reconcile(day, prisma);
+    expect(report.differences.filter((d) => d.subjectId === after.payment!.id)).toEqual([]);
+    expect(await ledgerNetMinor(prisma, booking.id)).toBe(0);
   });
 });

@@ -1,5 +1,6 @@
 import { beforeAll, beforeEach, afterAll, afterEach, it, expect } from "vitest";
 import { PrismaClient } from "@prisma/client";
+import { reconcile } from "@/lib/ledger";
 import { describeInt } from "./helpers";
 import { createStayFixture, ledgerNetMinor, type StayFixture } from "./fixtures";
 import { payForBooking } from "@/lib/payment/payment-service";
@@ -90,6 +91,14 @@ describeInt("P0-7 ödeme sagası: hata enjeksiyonu + telafi (integration)", () =
       expect(psp.voids).toHaveLength(c.voided);
       expect(psp.refunds).toHaveLength(c.refunded);
       expect(psp.captures.length - psp.refunds.length).toBe(0);
+      // F2c: confirm telafisinde tahsil + iade jurnali yazılır; ödeme mutabakatta fark 0.
+      const pay = await prisma.payment.findUnique({ where: { bookingId: b.id } });
+      const journals = await prisma.journalEntry.count({ where: { bookingId: b.id } });
+      expect(journals).toBe(c.refunded * 2);
+      if (pay?.refundedAt) {
+        const report = await reconcile(pay.refundedAt.toISOString().slice(0, 10), prisma);
+        expect(report.differences.filter((d) => d.subjectId === pay.id)).toEqual([]);
+      }
       const payment = await prisma.payment.findUnique({ where: { bookingId: b.id } });
       expect(payment?.status).not.toBe("PAID");
       expect(await compensations()).toBeGreaterThan(before);

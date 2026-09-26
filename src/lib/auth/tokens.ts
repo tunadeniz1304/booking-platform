@@ -30,6 +30,8 @@ export interface AccessClaims {
    * Claim yoksa 0 (hassas işlemler için "yakın zamanda doğrulanmamış").
    */
   authTime?: number;
+  /** Oturum (yenileme ailesi) kimliği — uzaktan çıkışta erişim token'ı da hemen düşer (P0-4). */
+  sessionId?: string;
 }
 
 /** Test dışındaki HER ortamda (development dahil) zayıf anahtar reddedilir (v4#5). */
@@ -57,7 +59,9 @@ export async function signAccessToken(
   ttlSeconds: number,
   tokenVersion = 0,
   /** Son birincil doğrulama (Unix sn); verilmezse claim yazılmaz (v4#2). */
-  authTime?: number
+  authTime?: number,
+  /** Oturum (yenileme ailesi) kimliği; `sid` claim'i olarak yazılır (P0-4). */
+  sessionId?: string
 ): Promise<{ token: string; jti: string; expiresAt: Date }> {
   const jti = randomUUID();
   const now = Math.floor(Date.now() / 1000);
@@ -67,6 +71,7 @@ export async function signAccessToken(
     typ: "access",
     tv: tokenVersion,
     ...(authTime !== undefined ? { auth_time: authTime } : {}),
+    ...(sessionId ? { sid: sessionId } : {}),
   })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(userId)
@@ -97,6 +102,7 @@ export async function verifyAccessToken(token: string): Promise<AccessClaims | n
       exp: payload.exp ?? 0,
       tv: typeof payload.tv === "number" ? payload.tv : 0,
       authTime: typeof payload.auth_time === "number" ? payload.auth_time : 0,
+      ...(typeof payload.sid === "string" ? { sessionId: payload.sid } : {}),
     };
   } catch {
     return null;

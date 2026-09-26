@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { verifyPasswordConstantTime } from "@/lib/auth";
-import { issueSession } from "@/lib/auth/session";
+import { applyDeviceCookie, startSession } from "@/lib/auth/user-sessions";
 import { setSessionCookies } from "@/lib/auth/cookies";
 import {
   assertLoginAttemptAllowed,
@@ -67,7 +67,9 @@ export const POST = observed("auth.login", async function postHandler(req: NextR
     const cookieLocale = req.cookies.get(LOCALE_COOKIE)?.value;
     await recordSuccessfulLogin(user.id, cookieLocale ? resolveLocale(cookieLocale) : undefined);
 
-    const session = await issueSession(user);
+    // Yeni cihazdan giriş → güvenlik e-postası (P0-4).
+    const started = await startSession(req, user, { alertNewDevice: true });
+    const session = started.session;
     const response = NextResponse.json({
       user: {
         id: user.id,
@@ -82,6 +84,7 @@ export const POST = observed("auth.login", async function postHandler(req: NextR
       accessExpiresAt: session.accessExpiresAt.toISOString(),
     });
     setSessionCookies(response, session);
+    applyDeviceCookie(response, started);
     await padResponseTime(startedAt);
     return response;
   } catch (error) {

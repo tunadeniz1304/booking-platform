@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { extractAccessToken, verifyAccessToken, type AccessClaims, type Role } from "./tokens";
 import { isAccessTokenDenied } from "./denylist";
 import { isTokenVersionCurrent } from "./token-version";
+import { isSessionRevoked } from "./session";
 
 export type { AccessClaims, Role } from "./tokens";
 export { ROLES, signAccessToken, verifyAccessToken, extractAccessToken } from "./tokens";
@@ -25,6 +26,8 @@ export async function getAuth(req: AuthRequest): Promise<AccessClaims | null> {
   if (!claims) return null;
   if (await isAccessTokenDenied(claims.jti)) return null;
   if (!(await isTokenVersionCurrent(claims.userId, claims.tv))) return null;
+  // Uzaktan çıkış (P0-4): iptal edilen oturumun erişim token'ı süresini beklemeden düşer.
+  if (claims.sessionId && (await isSessionRevoked(claims.sessionId))) return null;
   return claims;
 }
 

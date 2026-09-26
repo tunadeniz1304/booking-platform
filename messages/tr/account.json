@@ -78,5 +78,26 @@
     "failed": "Doğrulama başarısız",
     "rateLimited": "Çok fazla hatalı deneme. Lütfen daha sonra tekrar deneyin.",
     "cancelled": "Yeniden doğrulama iptal edildi"
+  },
+  "sessions": {
+    "title": "Oturumlar",
+    "description": "Hesabınızda açık olan oturumlar. Tanımadığınız bir cihaz görürseniz oturumu kapatın ve parolanızı değiştirin.",
+    "listTitle": "Etkin oturumlar",
+    "manageLink": "Oturumları ve cihazları yönet",
+    "loading": "Oturumlar yükleniyor…",
+    "empty": "Etkin oturum yok.",
+    "loadFailed": "Oturumlar yüklenemedi",
+    "unknownDevice": "Bilinmeyen cihaz",
+    "current": "Bu cihaz",
+    "started": "Açılış: {date}",
+    "lastSeen": "Son etkinlik: {date}",
+    "ip": "Ağ: {ip}",
+    "revoke": "Oturumu kapat",
+    "revokeOthers": "Diğer tüm oturumları kapat",
+    "confirmRevoke": "Bu oturum kapatılsın mı? O cihazdaki kullanıcı hemen çıkış yapmış olur.",
+    "confirmRevokeCurrent": "Bu cihazdaki oturumunuz kapatılacak ve çıkış yapacaksınız. Devam edilsin mi?",
+    "confirmRevokeOthers": "Bu cihaz dışındaki tüm oturumlar kapatılsın mı?",
+    "revokedOk": "Oturum kapatıldı",
+    "revokeFailed": "Oturum kapatılamadı"
   }
 }

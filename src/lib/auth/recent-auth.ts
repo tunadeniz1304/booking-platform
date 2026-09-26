@@ -9,6 +9,7 @@ import { verifyPasswordConstantTime } from "./password";
 import { verifyReauthPasskey } from "./passkey";
 import { issueSession, revokeSession, type SessionTokens } from "./session";
 import { REFRESH_COOKIE } from "./cookies";
+import { sessionContextFrom } from "./user-sessions";
 
 /**
  * "Recent auth" — hassas işlemler için yakın zamanda yeniden doğrulama (v4#2, P0-4).
@@ -128,7 +129,10 @@ export async function refreshAuthTime(
     refreshToken: req.cookies.get(REFRESH_COOKIE)?.value,
     access: { jti: claims.jti, exp: claims.exp },
   });
-  const session = await issueSession({ id: claims.userId, role: claims.role });
+  const session = await issueSession(
+    { id: claims.userId, role: claims.role },
+    { context: sessionContextFrom(req).context }
+  );
   await audit(claims.userId, "auth.reauth", "User", claims.userId);
   return session;
 }

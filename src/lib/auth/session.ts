@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { redis } from "@/lib/redis";
 import { getConfig } from "@/lib/config/app-config";
 import { UnauthorizedError } from "@/lib/http/errors";
-import { logger } from "@/lib/observability/logger";
+import { logger, errorFields } from "@/lib/observability/logger";
 import { signAccessToken, type Role, ROLES } from "./tokens";
 import { denyAccessToken } from "./denylist";
 
@@ -26,6 +26,8 @@ export interface SessionTokens {
   refreshToken: string;
   refreshExpiresAt: Date;
   user: { id: string; role: Role };
+  /** Oturum (yenileme ailesi) kimliği. */
+  sessionId?: string;
 }
 
 interface RefreshRecord {
@@ -71,9 +73,53 @@ async function createRefreshToken(
   };
 }
 
-async function revokeFamily(family: string): Promise<void> {
+/** Oturum meta verisi (P0-4): cihaz, tarayıcı ve kaba IP ipucu. */
+export interface SessionContext {
+  deviceId?: string | null;
+  userAgent?: string | null;
+  ipHint?: string | null;
+}
+
+/**
+ * Aileyi iptal eder: Redis işareti yetkilidir (yenileme + `sid`'li erişim token'ları düşer);
+ * `UserSession.revokedAt` yalnızca listeleme içindir (best-effort).
+ */
+export async function revokeFamily(family: string): Promise<void> {
   const { REFRESH_TOKEN_TTL_SECONDS } = getConfig();
   await redis.set(`${FAMILY_REVOKED_PREFIX}${family}`, "1", { ex: REFRESH_TOKEN_TTL_SECONDS });
+  try {
+    await prisma.userSession.updateMany({
+      where: { id: family, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+  } catch (error) {
+    logger.warn({ family, ...errorFields(error) }, "session row revoke failed");
+  }
+}
+
+/** Oturum (aile) uzaktan çıkış / yeniden kullanım tespiti ile iptal edildi mi? */
+export async function isSessionRevoked(sessionId: string): Promise<boolean> {
+  return (await redis.exists(`${FAMILY_REVOKED_PREFIX}${sessionId}`)) === 1;
+}
+
+async function recordSessionRow(
+  userId: string,
+  family: string,
+  context: SessionContext | undefined
+): Promise<void> {
+  try {
+    await prisma.userSession.create({
+      data: {
+        id: family,
+        userId,
+        deviceId: context?.deviceId ?? null,
+        userAgent: context?.userAgent?.slice(0, 256) ?? null,
+        ipHint: context?.ipHint ?? null,
+      },
+    });
+  } catch (error) {
+    logger.warn({ userId, ...errorFields(error) }, "session row create failed");
+  }
 }
 
 async function buildSession(
@@ -87,7 +133,8 @@ async function buildSession(
     user.role,
     ACCESS_TOKEN_TTL_SECONDS,
     user.tokenVersion,
-    authTime
+    authTime,
+    family
   );
   const refresh = await createRefreshToken(user.id, family, user.tokenVersion, authTime);
   return {
@@ -109,18 +156,21 @@ export async function issueSession(
     role: string;
     tokenVersion?: number;
   },
-  opts: { authTime?: number } = {}
+  opts: { authTime?: number; context?: SessionContext } = {}
 ): Promise<SessionTokens> {
   const tokenVersion =
     user.tokenVersion ??
     (await prisma.user.findUnique({ where: { id: user.id }, select: { tokenVersion: true } }))
       ?.tokenVersion ??
     0;
-  return buildSession(
+  const family = randomUUID();
+  const session = await buildSession(
     { id: user.id, role: toRole(user.role), tokenVersion },
-    randomUUID(),
+    family,
     opts.authTime ?? Math.floor(Date.now() / 1000)
   );
+  await recordSessionRow(user.id, family, opts.context);
+  return { ...session, sessionId: family };
 }
 
 /**
@@ -162,6 +212,15 @@ export async function rotateRefreshToken(raw: string): Promise<SessionTokens> {
   if ((record.tv ?? 0) !== user.tokenVersion) {
     await revokeFamily(record.family);
     throw new UnauthorizedError("Oturum iptal edildi");
+  }
+
+  try {
+    await prisma.userSession.updateMany({
+      where: { id: record.family, revokedAt: null },
+      data: { lastSeenAt: new Date() },
+    });
+  } catch (error) {
+    logger.warn({ family: record.family, ...errorFields(error) }, "session touch failed");
   }
 
   // auth_time yenilemede TAŞINIR: çalınan yenileme token'ı "yakın zamanda doğrulandı"

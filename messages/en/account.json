@@ -78,5 +78,26 @@
     "failed": "Verification failed",
     "rateLimited": "Too many failed attempts. Please try again later.",
     "cancelled": "Re-authentication was cancelled"
+  },
+  "sessions": {
+    "title": "Sessions",
+    "description": "Sessions currently signed in to your account. If you see a device you don't recognise, sign it out and change your password.",
+    "listTitle": "Active sessions",
+    "manageLink": "Manage sessions and devices",
+    "loading": "Loading sessions…",
+    "empty": "No active sessions.",
+    "loadFailed": "Could not load sessions",
+    "unknownDevice": "Unknown device",
+    "current": "This device",
+    "started": "Signed in: {date}",
+    "lastSeen": "Last active: {date}",
+    "ip": "Network: {ip}",
+    "revoke": "Sign out",
+    "revokeOthers": "Sign out all other sessions",
+    "confirmRevoke": "Sign this session out? Whoever uses that device will be signed out immediately.",
+    "confirmRevokeCurrent": "This will sign you out on this device. Continue?",
+    "confirmRevokeOthers": "Sign out every session except this device?",
+    "revokedOk": "Session signed out",
+    "revokeFailed": "Could not sign the session out"
   }
 }

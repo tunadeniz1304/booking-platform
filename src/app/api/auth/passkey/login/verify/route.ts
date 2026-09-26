@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import type { AuthenticationResponseJSON } from "@simplewebauthn/server";
 import { verifyPasskeyLogin } from "@/lib/auth/passkey";
-import { issueSession } from "@/lib/auth/session";
+import { applyDeviceCookie, startSession } from "@/lib/auth/user-sessions";
 import { setSessionCookies } from "@/lib/auth/cookies";
 import { recordSuccessfulLogin } from "@/lib/auth/account";
 import { toErrorResponse } from "@/lib/http/errors";
@@ -23,13 +23,15 @@ export const POST = observed(
         body.response as unknown as AuthenticationResponseJSON
       );
       await recordSuccessfulLogin(user.id);
-      const session = await issueSession(user);
+      const started = await startSession(req, user, { alertNewDevice: true });
+      const session = started.session;
       const response = NextResponse.json({
         user,
         accessToken: session.accessToken,
         accessExpiresAt: session.accessExpiresAt.toISOString(),
       });
       setSessionCookies(response, session);
+      applyDeviceCookie(response, started);
       return response;
     } catch (error) {
       return toErrorResponse(error, "auth.passkey.login.verify");

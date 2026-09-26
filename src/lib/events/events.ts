@@ -87,8 +87,8 @@ export interface SecurityAlertPayload {
   userId: string;
   to: string;
   name: string;
-  kind: "PASSKEY_ADDED";
-  /** Kullanıcının verdiği passkey adı (varsa). */
+  kind: "PASSKEY_ADDED" | "NEW_DEVICE_LOGIN";
+  /** Passkey adı (PASSKEY_ADDED) veya cihaz/IP ipucu (NEW_DEVICE_LOGIN), varsa. */
   detail: string | null;
   occurredAt: string;
 }

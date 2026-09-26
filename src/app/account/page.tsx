@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import Header from "@/components/layout/Header";
@@ -241,6 +242,12 @@ export default function AccountPage() {
         )}
 
         <PasskeyManager />
+
+        <p className="mt-4 text-sm">
+          <Link href="/account/sessions" className="font-medium text-blue-700 hover:underline">
+            {t("sessions.manageLink")}
+          </Link>
+        </p>
 
         <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-2">
           {/* Rezervasyonlar */}

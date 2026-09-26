@@ -28,6 +28,7 @@ model User {
   locale              String               @default("tr")
   authTokens          AuthToken[]
   webAuthnCredentials WebAuthnCredential[]
+  sessions            UserSession[]
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
   bookings            Booking[]
@@ -40,6 +41,26 @@ model User {
   priceAlerts         PriceAlert[]
   messages            Message[]
   reviewReports       ReviewReport[]
+}
+
+/// Oturum (yenileme token ailesi) kaydı — P0-4 oturum listesi + uzaktan çıkış.
+/// `id` = yenileme ailesi kimliği (erişim token'ında `sid`). Token sırları Redis'te kalır;
+/// burada yalnızca görüntüleme/yeni cihaz tespiti için meta veri tutulur.
+model UserSession {
+  id         String    @id
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// İmzalı `did` çerezinden cihaz kimliği (yeni cihaz bildirimi için).
+  deviceId   String?
+  userAgent  String?
+  /// Kaba IP ipucu (IPv4 /24, IPv6 /64) — tam IP saklanmaz.
+  ipHint     String?
+  createdAt  DateTime  @default(now())
+  lastSeenAt DateTime  @default(now())
+  revokedAt  DateTime?
+
+  @@index([userId, revokedAt])
+  @@index([userId, deviceId])
 }
 
 enum UserRole {

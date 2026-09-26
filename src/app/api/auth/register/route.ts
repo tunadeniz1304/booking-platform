@@ -3,7 +3,7 @@ import { z } from "zod";
 import { AuthTokenKind, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/auth";
-import { issueSession } from "@/lib/auth/session";
+import { applyDeviceCookie, startSession } from "@/lib/auth/user-sessions";
 import { setSessionCookies } from "@/lib/auth/cookies";
 import { issueEmailToken } from "@/lib/auth/account";
 import { ConflictError, toErrorResponse } from "@/lib/http/errors";
@@ -45,7 +45,8 @@ export const POST = observed("auth.register", async function postHandler(req: Ne
     }
     await issueEmailToken(user, AuthTokenKind.EMAIL_VERIFY);
 
-    const session = await issueSession({ ...user, tokenVersion: 0 });
+    const started = await startSession(req, { ...user, tokenVersion: 0 });
+    const session = started.session;
     const response = NextResponse.json(
       {
         user: { ...user, emailVerified: false },
@@ -55,6 +56,7 @@ export const POST = observed("auth.register", async function postHandler(req: Ne
       { status: 201 }
     );
     setSessionCookies(response, session);
+    applyDeviceCookie(response, started);
     return response;
   } catch (error) {
     return toErrorResponse(error, "auth.register");

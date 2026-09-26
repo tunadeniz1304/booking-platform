@@ -27,6 +27,12 @@ export interface SagaOptions {
    */
   from?: string;
   isOutcome?: (error: unknown) => boolean;
+  /**
+   * fix-sweep-3: en az bir telafi adımı başarısız olduysa (ör. void/iade PSP hatası) çağrılır;
+   * saga bunu BullMQ `saga-compensation-retry` işine çevirir (idempotent yeniden deneme).
+   * Kancanın kendi hatası yutulur (loglanır) — asıl hata çağırana yine fırlatılır.
+   */
+  onCompensationFailed?: (failedSteps: string[]) => Promise<void>;
 }
 
 export const sagaCompensationTotal = counter(
@@ -66,17 +72,54 @@ export function isSagaFaultInjected(saga: string, step: string): boolean {
   return faults.has(`${saga}.${step}`);
 }
 
-async function compensate<C>(saga: string, steps: SagaStep<C, unknown>[], ctx: C): Promise<void> {
+async function compensate<C>(
+  saga: string,
+  steps: SagaStep<C, unknown>[],
+  ctx: C
+): Promise<Array<{ step: string; error: unknown }>> {
+  const failed: Array<{ step: string; error: unknown }> = [];
   for (const step of [...steps].reverse()) {
     if (!step.compensate) continue;
     try {
       const did = await step.compensate(ctx);
       if (did !== false) sagaCompensationTotal.inc({ saga, step: step.name, outcome: "ok" });
     } catch (error) {
-      // Telafi başarısızsa diğerlerine devam edilir; alarm metriği + log ile elle müdahale.
+      // Telafi başarısızsa diğerlerine devam edilir; alarm metriği + log + yeniden deneme işi.
       sagaCompensationTotal.inc({ saga, step: step.name, outcome: "failed" });
       logger.error({ saga, step: step.name, ...errorFields(error) }, "saga compensation failed");
+      failed.push({ step: step.name, error });
     }
+  }
+  return failed;
+}
+
+export class SagaCompensationError extends Error {
+  constructor(
+    readonly saga: string,
+    readonly steps: string[],
+    readonly causes: unknown[]
+  ) {
+    super(`Saga telafisi tamamlanamadı: ${saga} (${steps.join(", ")})`);
+    this.name = "SagaCompensationError";
+  }
+}
+
+/**
+ * fix-sweep-3: telafi adımlarını (idempotent) yeniden çalıştırır — `saga-compensation-retry`
+ * işi kullanır. Herhangi biri yine başarısızsa `SagaCompensationError` (BullMQ yeniden dener).
+ */
+export async function rerunCompensations<C>(
+  saga: string,
+  steps: SagaStep<C, unknown>[],
+  ctx: C
+): Promise<void> {
+  const failed = await compensate(saga, steps, ctx);
+  if (failed.length > 0) {
+    throw new SagaCompensationError(
+      saga,
+      failed.map((f) => f.step),
+      failed.map((f) => f.error)
+    );
   }
 }
 
@@ -101,7 +144,14 @@ export async function runSaga<C, R>(
       if (pivoted || options.isOutcome?.(error)) throw error;
       logger.warn({ saga, step: step.name, ...errorFields(error) }, "saga step failed");
       const upTo = Math.max(i + 1, startIndex);
-      await compensate(saga, steps.slice(0, upTo) as SagaStep<C, unknown>[], ctx);
+      const failed = await compensate(saga, steps.slice(0, upTo) as SagaStep<C, unknown>[], ctx);
+      if (failed.length > 0 && options.onCompensationFailed) {
+        await options
+          .onCompensationFailed(failed.map((f) => f.step))
+          .catch((hookError) =>
+            logger.error({ saga, ...errorFields(hookError) }, "compensation retry hook failed")
+          );
+      }
       throw error;
     }
   }

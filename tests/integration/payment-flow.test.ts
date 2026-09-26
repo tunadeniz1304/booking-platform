@@ -1,5 +1,5 @@
 import { beforeAll, beforeEach, afterAll, it, expect } from "vitest";
-import { PrismaClient, Prisma } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 import { describeInt, iso, utcDay } from "./helpers";
 import { createBooking, expireHolds } from "@/lib/booking-service";
 import {
@@ -60,7 +60,7 @@ describeInt("ödeme, iptal, iade ve bildirim (integration)", () => {
         description: "payment test",
         propertyType: "HOTEL",
         locationId: location.id,
-        basePrice: new Prisma.Decimal(1000),
+        basePriceMinor: 100000n,
         cancellationPolicyId: "policy_moderate_v1",
       },
     });
@@ -80,7 +80,7 @@ describeInt("ödeme, iptal, iade ve bildirim (integration)", () => {
         roomTypeId: roomId,
         total: 1,
         date: utcDay(i + 1),
-        price: new Prisma.Decimal(1000),
+        priceMinor: 100000n,
       })),
     });
   });
@@ -104,7 +104,7 @@ describeInt("ödeme, iptal, iade ve bildirim (integration)", () => {
     });
     expect(row.status).toBe("CONFIRMED");
     expect(row.payment?.status).toBe("PAID");
-    expect(Number(row.payment?.amount)).toBe(b.totalPrice); // Payment.amount = gösterilen toplam
+    expect(Number(row.payment?.amountMinor) / 100).toBe(b.totalPrice); // Payment.amount = gösterilen toplam
     expect((row.policySnapshot as { kind: string }).kind).toBe("MODERATE");
     expect(await prisma.ledgerEntry.count({ where: { bookingId: b.id, kind: "CHARGE" } })).toBe(1);
     // Tekrar ödeme idempotent

@@ -6,9 +6,10 @@ import { logger, errorFields } from "@/lib/observability/logger";
 import {
   money,
   toDecimalString,
-  toMinor,
   assertCurrency,
   type CurrencyCode,
+  minorFromDb,
+  moneyFromDb,
 } from "@/lib/money/money";
 import { convert, type FxSnapshot } from "@/lib/money/fx";
 import { getCurrentFx } from "@/lib/fx/store";
@@ -122,7 +123,7 @@ export interface SearchResponse {
 interface CatalogRoom {
   id: string;
   maxOccupancy: number;
-  priceModifier: string;
+  priceModifierMinor: number;
 }
 
 interface CatalogEntry {
@@ -130,7 +131,7 @@ interface CatalogEntry {
   title: string;
   description: string;
   propertyType: string;
-  basePrice: string;
+  basePriceMinor: number;
   currency: string;
   ratingAvg: number;
   ratingCount: number;
@@ -222,7 +223,7 @@ async function loadCatalog(params: SearchParams, ids?: string[]): Promise<Catalo
     guests: params.guests ?? 0,
     ids: ids ? [...ids].sort() : null,
   };
-  const key = `search:cat:v${await getVersion(CATALOG_VERSION_KEY)}:${hashKey(structural)}`;
+  const key = `search:cat2:v${await getVersion(CATALOG_VERSION_KEY)}:${hashKey(structural)}`;
   try {
     const cached = await redis.get(key);
     if (cached) return JSON.parse(cached) as CatalogEntry[];
@@ -238,7 +239,7 @@ async function loadCatalog(params: SearchParams, ids?: string[]): Promise<Catalo
       title: true,
       description: true,
       propertyType: true,
-      basePrice: true,
+      basePriceMinor: true,
       currency: true,
       ratingAvg: true,
       ratingCount: true,
@@ -252,7 +253,7 @@ async function loadCatalog(params: SearchParams, ids?: string[]): Promise<Catalo
           available: true,
           ...(params.guests ? { maxOccupancy: { gte: params.guests } } : {}),
         },
-        select: { id: true, maxOccupancy: true, priceModifier: true },
+        select: { id: true, maxOccupancy: true, priceModifierMinor: true },
       },
     },
   });
@@ -261,7 +262,7 @@ async function loadCatalog(params: SearchParams, ids?: string[]): Promise<Catalo
     title: p.title,
     description: p.description,
     propertyType: p.propertyType,
-    basePrice: p.basePrice.toString(),
+    basePriceMinor: minorFromDb(p.basePriceMinor),
     currency: p.currency,
     ratingAvg: p.ratingAvg,
     ratingCount: p.ratingCount,
@@ -277,7 +278,7 @@ async function loadCatalog(params: SearchParams, ids?: string[]): Promise<Catalo
     rooms: p.rooms.map((r) => ({
       id: r.id,
       maxOccupancy: r.maxOccupancy,
-      priceModifier: r.priceModifier.toString(),
+      priceModifierMinor: minorFromDb(r.priceModifierMinor),
     })),
   }));
   try {
@@ -328,7 +329,14 @@ async function computeQuotes(
   const [inventory, restrictions, plans] = await Promise.all([
     prisma.inventoryDay.findMany({
       where: { roomTypeId: { in: available }, date: { gte: from, lt: to } },
-      select: { roomTypeId: true, date: true, price: true, total: true, sold: true, held: true },
+      select: {
+        roomTypeId: true,
+        date: true,
+        priceMinor: true,
+        total: true,
+        sold: true,
+        held: true,
+      },
     }),
     prisma.restriction.findMany({
       where: { roomTypeId: { in: available }, date: { gte: from, lte: to } },
@@ -360,7 +368,7 @@ async function computeQuotes(
     for (const plan of plansByRoom.get(roomTypeId) ?? []) {
       const priced = priceStay({
         nights: nightInputs,
-        modifierMinor: toMinor(room.priceModifier, entry.currency),
+        modifierMinor: room.priceModifierMinor,
         planModifierBps: plan.priceModifierBps,
         currency: entry.currency,
         taxRules: taxRulesFor(entry.location.country),
@@ -491,7 +499,7 @@ export async function searchProperties(
     const quote = quotes ? quotes.get(e.id) : undefined;
     if (quotes && !quote) continue; // tarih verildi ve uygun oda yok
     const currency = displayCurrency ?? assertCurrency(e.currency);
-    const baseMinor = toMinor(e.basePrice, e.currency);
+    const baseMinor = e.basePriceMinor;
     const amount = quote
       ? displayAmount(quote.total, quote.currency, currency, fx)
       : displayAmount(baseMinor, e.currency, currency, fx);
@@ -502,7 +510,7 @@ export async function searchProperties(
       title: e.title,
       description: e.description,
       propertyType: e.propertyType,
-      basePrice: Number(e.basePrice),
+      basePrice: Number(toDecimalString(money(e.basePriceMinor, e.currency))),
       currency: e.currency,
       ratingAvg: e.ratingAvg,
       ratingCount: e.ratingCount,
@@ -620,7 +628,7 @@ export async function getPopularProperties(limit = 10): Promise<SearchResult[]> 
       title: true,
       description: true,
       propertyType: true,
-      basePrice: true,
+      basePriceMinor: true,
       currency: true,
       ratingAvg: true,
       ratingCount: true,
@@ -635,7 +643,7 @@ export async function getPopularProperties(limit = 10): Promise<SearchResult[]> 
     title: p.title,
     description: p.description,
     propertyType: p.propertyType,
-    basePrice: Number(p.basePrice),
+    basePrice: Number(toDecimalString(moneyFromDb(p.basePriceMinor, p.currency))),
     currency: p.currency,
     ratingAvg: p.ratingAvg,
     ratingCount: p.ratingCount,

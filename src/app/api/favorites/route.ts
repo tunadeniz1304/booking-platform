@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { minorFromDb, toMajorNumber } from "@/lib/money/money";
 import { prisma } from "@/lib/prisma";
 import { getAuth } from "@/lib/auth";
 import { logger, errorFields } from "@/lib/observability/logger";
@@ -28,7 +29,11 @@ export async function GET(req: NextRequest) {
       favorites.map((f) => ({
         ...f,
         property: f.property
-          ? { ...f.property, basePrice: Number(f.property.basePrice) }
+          ? {
+              ...f.property,
+              basePriceMinor: minorFromDb(f.property.basePriceMinor),
+              basePrice: toMajorNumber(f.property.basePriceMinor, f.property.currency),
+            }
           : f.property,
       }))
     );
@@ -70,7 +75,14 @@ export async function POST(req: NextRequest) {
       {
         ...favorite,
         property: favorite.property
-          ? { ...favorite.property, basePrice: Number(favorite.property.basePrice) }
+          ? {
+              ...favorite.property,
+              basePriceMinor: minorFromDb(favorite.property.basePriceMinor),
+              basePrice: toMajorNumber(
+                favorite.property.basePriceMinor,
+                favorite.property.currency
+              ),
+            }
           : favorite.property,
       },
       { status: 201 }

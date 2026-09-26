@@ -1,4 +1,5 @@
 import { Prisma, BookingStatus } from "@prisma/client";
+import { withLegacyDecimals } from "@/lib/money/legacy-json";
 import { prisma } from "@/lib/prisma";
 import { redis } from "@/lib/redis";
 import { invalidatePropertySearchCache } from "@/lib/search";
@@ -27,7 +28,7 @@ import {
   type FxTable,
 } from "@/lib/fx/store";
 import { taxRulesFor } from "@/lib/pricing/tax";
-import { money, toDecimalString, toMinor, assertCurrency } from "@/lib/money/money";
+import { money, toDecimalString, assertCurrency, minorToDb, minorFromDb } from "@/lib/money/money";
 import {
   clockOf,
   DateRangeError,
@@ -163,7 +164,7 @@ const bookingSelect = {
   checkIn: true,
   checkOut: true,
   guestCount: true,
-  totalPrice: true,
+  totalPriceMinor: true,
   currency: true,
   status: true,
   holdExpiresAt: true,
@@ -174,7 +175,7 @@ type BookingRow = Prisma.BookingGetPayload<{ select: typeof bookingSelect }>;
 
 function toDto(row: BookingRow): BookingDTO {
   const currency = assertCurrency(row.currency);
-  const totalMinor = toMinor(row.totalPrice.toString(), currency);
+  const totalMinor = minorFromDb(row.totalPriceMinor);
   return {
     id: row.id,
     propertyId: row.propertyId,
@@ -375,7 +376,7 @@ async function reserveInTransaction(
         maxOccupancy: true,
         units: true,
         available: true,
-        priceModifier: true,
+        priceModifierMinor: true,
         ratePlans: {
           select: {
             id: true,
@@ -416,13 +417,13 @@ async function reserveInTransaction(
       Array<{
         id: string;
         date: Date;
-        price: Prisma.Decimal;
+        priceMinor: bigint;
         total: number;
         sold: number;
         held: number;
       }>
     >`
-      SELECT id, date, price, total, sold, held
+      SELECT id, date, "priceMinor", total, sold, held
       FROM "InventoryDay"
       WHERE "roomTypeId" = ${room.id}
         AND date >= ${toDbDate(checkIn)}
@@ -440,7 +441,7 @@ async function reserveInTransaction(
 
     const priced = priceStay({
       nights: nightInputs,
-      modifierMinor: toMinor(room.priceModifier.toString(), currency),
+      modifierMinor: minorFromDb(room.priceModifierMinor),
       planModifierBps: plan.priceModifierBps,
       units: input.units,
       currency,
@@ -496,7 +497,7 @@ async function reserveInTransaction(
         checkIn: toDbDate(checkIn),
         checkOut: toDbDate(checkOut),
         guestCount: input.guestCount,
-        totalPrice: new Prisma.Decimal(toDecimalString(money(charge.total, charge.currency))),
+        totalPriceMinor: minorToDb(charge.total),
         currency: charge.currency,
         status,
         holdExpiresAt,
@@ -924,4 +925,28 @@ export async function listUserBookingsPage(
 /** Geriye uyum: ilk sayfanın satırları (varsayılan sayfa boyutu). */
 export async function listUserBookings(userId: string): Promise<UserBookingRow[]> {
   return (await listUserBookingsPage(userId)).items;
+}
+
+/**
+ * API sunumu (ADR 0019): `*Minor` BigInt alanlar `number` olur ve yanlarına geriye uyumlu
+ * ondalık string'ler eklenir (`totalPrice`, `payment.amount`, `property.basePrice`, …).
+ */
+export function presentBooking<
+  T extends {
+    currency: string;
+    totalPriceMinor: bigint | number;
+    property?: ({ currency: string } & object) | null;
+    room?: object | null;
+    payment?: ({ currency: string } & object) | null;
+  },
+>(row: T) {
+  const propertyCurrency = row.property?.currency ?? row.currency;
+  return {
+    ...withLegacyDecimals(row),
+    ...(row.property ? { property: withLegacyDecimals(row.property) } : {}),
+    ...(row.room ? { room: withLegacyDecimals(row.room, propertyCurrency) } : {}),
+    ...(row.payment !== undefined
+      ? { payment: row.payment ? withLegacyDecimals(row.payment) : null }
+      : {}),
+  };
 }

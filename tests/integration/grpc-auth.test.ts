@@ -1,6 +1,6 @@
 import { beforeAll, afterAll, it, expect } from "vitest";
 import * as grpc from "@grpc/grpc-js";
-import { PrismaClient, Prisma, BookingStatus } from "@prisma/client";
+import { PrismaClient, BookingStatus } from "@prisma/client";
 import { describeInt, utcDay } from "./helpers";
 import { createGrpcServer, startGrpcServer } from "../../services/grpc/server";
 import { loadBookingV1 } from "../../services/grpc/proto";
@@ -57,7 +57,7 @@ describeInt("regression: #1 gRPC auth (integration)", () => {
         description: "grpc test",
         propertyType: "HOTEL",
         locationId: location.id,
-        basePrice: new Prisma.Decimal(1000),
+        basePriceMinor: 100000n,
       },
     });
     const room = await prisma.roomType.create({
@@ -76,7 +76,7 @@ describeInt("regression: #1 gRPC auth (integration)", () => {
         date: utcDay(d),
         total: 1,
         held: 1,
-        price: new Prisma.Decimal(1000),
+        priceMinor: 100000n,
       })),
     });
     const booking = await prisma.booking.create({
@@ -87,7 +87,7 @@ describeInt("regression: #1 gRPC auth (integration)", () => {
         checkIn: utcDay(20),
         checkOut: utcDay(22),
         guestCount: 1,
-        totalPrice: new Prisma.Decimal(2000),
+        totalPriceMinor: 200000n,
         status: BookingStatus.HELD,
         holdExpiresAt: new Date(Date.now() + 15 * 60_000),
       },

@@ -15,7 +15,7 @@ describeInt("regression: v4#19 ARI fiyatı parseMoney ile (integration)", () => 
       await prisma.inventoryDay.findUniqueOrThrow({
         where: { roomTypeId_date: { roomTypeId: fx.roomId, date: utcDay(day) } },
       })
-    ).price.toString();
+    ).priceMinor.toString();
 
   const msg = (updates: unknown[]) => ({
     roomId: fx.roomId,
@@ -39,8 +39,8 @@ describeInt("regression: v4#19 ARI fiyatı parseMoney ile (integration)", () => 
       ])
     );
     expect(res).toEqual({ status: "applied", applied: 2 });
-    expect(await priceOf(10)).toBe("1234.56");
-    expect(await priceOf(11)).toBe("999.99");
+    expect(await priceOf(10)).toBe("123456");
+    expect(await priceOf(11)).toBe("99999");
   });
 
   it("float (number) fiyat, fazla basamak ve float artığı 400; hiçbir gece değişmez", async () => {
@@ -56,6 +56,6 @@ describeInt("regression: v4#19 ARI fiyatı parseMoney ile (integration)", () => 
       ).rejects.toMatchObject({ status: 400 });
     }
     expect(await priceOf(12)).toBe(before);
-    expect(await priceOf(13)).not.toBe("500");
+    expect(await priceOf(13)).not.toBe("50000");
   });
 });

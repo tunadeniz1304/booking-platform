@@ -1,6 +1,6 @@
 // Tek fiyat motorunun (event-signals, v3#9) olay korelasyonunu canlı DB üzerinde doğrular.
 import { it, expect, beforeAll, afterAll } from "vitest";
-import { PrismaClient, Prisma } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 import { eventSignal, priceNights } from "@/lib/pricing/event-signals";
 import { getConfig } from "@/lib/config/app-config";
 import { describeInt } from "./helpers";
@@ -45,7 +45,7 @@ describeInt("pricing-engine (integration)", () => {
         description: "predictive pricing test",
         propertyType: "HOTEL",
         locationId,
-        basePrice: new Prisma.Decimal(1000),
+        basePriceMinor: 100000n,
         currency: "TRY",
         isActive: true,
       },

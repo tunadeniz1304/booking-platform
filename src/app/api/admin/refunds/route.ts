@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { minorFromDb, moneyFromDb, toDecimalString } from "@/lib/money/money";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth";
@@ -22,8 +23,8 @@ export async function GET(req: NextRequest) {
       select: {
         bookingId: true,
         status: true,
-        amount: true,
-        refundedAmount: true,
+        amountMinor: true,
+        refundedAmountMinor: true,
         currency: true,
         provider: true,
         updatedAt: true,
@@ -32,8 +33,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       failed: failed.map((p) => ({
         ...p,
-        amount: p.amount.toString(),
-        refundedAmount: p.refundedAmount?.toString() ?? null,
+        amountMinor: minorFromDb(p.amountMinor),
+        refundedAmountMinor: minorFromDb(p.refundedAmountMinor),
+        amount: toDecimalString(moneyFromDb(p.amountMinor, p.currency)),
+        refundedAmount: toDecimalString(moneyFromDb(p.refundedAmountMinor, p.currency)),
       })),
     });
   } catch (error) {

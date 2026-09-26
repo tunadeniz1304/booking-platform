@@ -30,7 +30,7 @@ export async function exportUserData(userId: string) {
           checkIn: true,
           checkOut: true,
           guestCount: true,
-          totalPrice: true,
+          totalPriceMinor: true,
           currency: true,
           status: true,
           createdAt: true,
@@ -44,7 +44,7 @@ export async function exportUserData(userId: string) {
         select: {
           id: true,
           bookingId: true,
-          amount: true,
+          amountMinor: true,
           currency: true,
           status: true,
           createdAt: true,

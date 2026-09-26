@@ -21,7 +21,7 @@ function rowsFor(start: string, prices: number[]) {
   const first = parseIsoDate(start);
   return prices.map((p, i) => ({
     date: new Date(`${addDays(first, i)}T00:00:00.000Z`),
-    price: toDecimalString(money(p, "TRY")),
+    priceMinor: BigInt(p),
     total: 1,
     sold: 0,
     held: 0,
@@ -118,8 +118,8 @@ describe("regression: #8 gösterilen fiyat = tahsil edilen fiyat", () => {
 describe("v3 P0-2 oda adedi ve fiyat planı", () => {
   it("birden çok oda: gece başına kalan ≥ adet olmalı; plan farkı bps ile", () => {
     const rows = [
-      { date: new Date("2026-10-01T00:00:00Z"), price: "1000.00", total: 5, sold: 3, held: 0 },
-      { date: new Date("2026-10-02T00:00:00Z"), price: "1000.00", total: 5, sold: 2, held: 1 },
+      { date: new Date("2026-10-01T00:00:00Z"), priceMinor: 100000n, total: 5, sold: 3, held: 0 },
+      { date: new Date("2026-10-02T00:00:00Z"), priceMinor: 100000n, total: 5, sold: 2, held: 1 },
     ];
     const stay = nightsBetween(parseIsoDate("2026-10-01"), parseIsoDate("2026-10-03"));
     expect(nightsFromInventory(rows, stay, "TRY", 2)).not.toBeNull();

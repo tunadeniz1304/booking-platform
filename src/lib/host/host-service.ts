@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { minorFromDb, minorToDb, moneyFromDb, toDecimalString, toMinor } from "@/lib/money/money";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { NotFoundError, ValidationError } from "@/lib/http/errors";
@@ -35,6 +36,7 @@ export async function assertPropertyAccess(actor: AccessClaims, propertyId: stri
       hostId: true,
       licenseNumber: true,
       licenseStatus: true,
+      currency: true,
       location: { select: { country: true } },
     },
   });
@@ -47,7 +49,11 @@ export async function assertPropertyAccess(actor: AccessClaims, propertyId: stri
 export async function assertRoomAccess(actor: AccessClaims, roomId: string) {
   const room = await prisma.roomType.findUnique({
     where: { id: roomId },
-    select: { id: true, propertyId: true, property: { select: { hostId: true } } },
+    select: {
+      id: true,
+      propertyId: true,
+      property: { select: { hostId: true, currency: true } },
+    },
   });
   if (!room || (actor.role !== "ADMIN" && room.property.hostId !== actor.userId)) {
     throw new NotFoundError("Oda bulunamadı");
@@ -104,12 +110,14 @@ export async function updateProperty(
   ) {
     throw new ValidationError("İptal politikası bulunamadı");
   }
+  const { basePrice, ...rest } = patch;
   const updated = await prisma.property.update({
     where: { id: propertyId },
     data: {
-      ...patch,
+      ...rest,
       ...licenseData,
-      basePrice: patch.basePrice !== undefined ? new Prisma.Decimal(patch.basePrice) : undefined,
+      basePriceMinor:
+        basePrice !== undefined ? minorToDb(toMinor(basePrice, property.currency)) : undefined,
     },
     select: {
       id: true,
@@ -117,11 +125,15 @@ export async function updateProperty(
       isActive: true,
       licenseNumber: true,
       licenseStatus: true,
-      basePrice: true,
+      basePriceMinor: true,
     },
   });
   await invalidatePropertySearchCache(propertyId);
-  return updated;
+  return {
+    ...updated,
+    basePriceMinor: minorFromDb(updated.basePriceMinor),
+    basePrice: toDecimalString(moneyFromDb(updated.basePriceMinor, property.currency)),
+  };
 }
 
 /**
@@ -181,12 +193,13 @@ export async function addRoom(
   propertyId: string,
   input: z.infer<typeof roomSchema>
 ) {
-  await assertPropertyAccess(actor, propertyId);
+  const property = await assertPropertyAccess(actor, propertyId);
+  const { priceModifier, ...roomInput } = input;
   const room = await prisma.roomType.create({
     data: {
-      ...input,
+      ...roomInput,
       propertyId,
-      priceModifier: new Prisma.Decimal(input.priceModifier),
+      priceModifierMinor: minorToDb(toMinor(priceModifier, property.currency)),
       ratePlans: { create: DEFAULT_RATE_PLANS.map((p) => ({ ...p })) },
     },
   });
@@ -204,15 +217,17 @@ export async function updateRoom(
   input: z.infer<typeof roomPatchSchema>
 ) {
   const access = await assertRoomAccess(actor, roomId);
-  const { units, ...rest } = input;
+  const { units, priceModifier, ...rest } = input;
   const room = await prisma.$transaction(async (tx) => {
     const updated = await tx.roomType.update({
       where: { id: roomId },
       data: {
         ...rest,
         ...(units !== undefined ? { units } : {}),
-        priceModifier:
-          rest.priceModifier !== undefined ? new Prisma.Decimal(rest.priceModifier) : undefined,
+        priceModifierMinor:
+          priceModifier !== undefined
+            ? minorToDb(toMinor(priceModifier, access.property.currency))
+            : undefined,
       },
     });
     let skipped = 0;
@@ -282,10 +297,14 @@ export async function bulkUpdateAvailability(
     const range = { gte: toDbDate(from), lte: toDbDate(to) };
     let updated = 0;
     let skippedLocked = 0;
-    if (input.price !== undefined) {
+    const priceMinor =
+      input.price === undefined
+        ? undefined
+        : minorToDb(toMinor(input.price, room.property.currency));
+    if (priceMinor !== undefined) {
       const r = await tx.inventoryDay.updateMany({
         where: { roomTypeId: roomId, date: range },
-        data: { price: new Prisma.Decimal(input.price) },
+        data: { priceMinor },
       });
       updated = Math.max(updated, r.count);
     }
@@ -300,13 +319,13 @@ export async function bulkUpdateAvailability(
     }
     // Eksik geceler yalnızca fiyat verildiyse oluşturulur (fiyatsız envanter satırı yok).
     const created =
-      input.price === undefined
+      priceMinor === undefined
         ? { count: 0 }
         : await tx.inventoryDay.createMany({
             data: nights.map((d) => ({
               roomTypeId: roomId,
               date: toDbDate(d),
-              price: new Prisma.Decimal(input.price!),
+              priceMinor,
               total: input.total ?? units,
             })),
             skipDuplicates: true,
@@ -339,7 +358,7 @@ export async function bulkUpdateAvailability(
 }
 
 export async function listHostProperties(actor: AccessClaims) {
-  return prisma.property.findMany({
+  const rows = await prisma.property.findMany({
     where: actor.role === "ADMIN" ? {} : { hostId: actor.userId },
     select: {
       id: true,
@@ -348,7 +367,7 @@ export async function listHostProperties(actor: AccessClaims) {
       isActive: true,
       licenseNumber: true,
       licenseStatus: true,
-      basePrice: true,
+      basePriceMinor: true,
       currency: true,
       ratingAvg: true,
       rooms: {
@@ -358,17 +377,23 @@ export async function listHostProperties(actor: AccessClaims) {
     orderBy: { createdAt: "desc" },
     take: 100,
   });
+  // API sözleşmesi: `basePrice` ondalık string (görüntüleme), `basePriceMinor` hesaplama için.
+  return rows.map((p) => ({
+    ...p,
+    basePriceMinor: minorFromDb(p.basePriceMinor),
+    basePrice: toDecimalString(moneyFromDb(p.basePriceMinor, p.currency)),
+  }));
 }
 
 export async function listHostBookings(actor: AccessClaims) {
-  return prisma.booking.findMany({
+  const rows = await prisma.booking.findMany({
     where: actor.role === "ADMIN" ? {} : { property: { hostId: actor.userId } },
     select: {
       id: true,
       status: true,
       checkIn: true,
       checkOut: true,
-      totalPrice: true,
+      totalPriceMinor: true,
       currency: true,
       propertyId: true,
       roomId: true,
@@ -377,4 +402,9 @@ export async function listHostBookings(actor: AccessClaims) {
     orderBy: { checkIn: "asc" },
     take: 200,
   });
+  return rows.map((b) => ({
+    ...b,
+    totalPriceMinor: minorFromDb(b.totalPriceMinor),
+    totalPrice: toDecimalString(moneyFromDb(b.totalPriceMinor, b.currency)),
+  }));
 }

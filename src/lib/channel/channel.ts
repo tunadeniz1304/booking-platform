@@ -1,7 +1,7 @@
 import { createHash, createHmac, timingSafeEqual } from "crypto";
 import ical from "ical-generator";
 import * as nodeIcal from "node-ical";
-import { Prisma } from "@prisma/client";
+
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 import {
@@ -10,7 +10,7 @@ import {
   ServiceUnavailableError,
   ValidationError,
 } from "@/lib/http/errors";
-import { MoneyError, assertCurrency, money, parseMoney, toDecimalString } from "@/lib/money/money";
+import { MoneyError, assertCurrency, parseMoney, minorToDb } from "@/lib/money/money";
 import {
   addDays,
   clockOf,
@@ -316,7 +316,7 @@ export async function applyAriMessage(input: AriMessage) {
       if (priceMinor !== null) {
         const r = await tx.inventoryDay.updateMany({
           where: { roomTypeId: msg.roomId, date },
-          data: { price: new Prisma.Decimal(toDecimalString(money(priceMinor, currency))) },
+          data: { priceMinor: minorToDb(priceMinor) },
         });
         applied += r.count;
       }

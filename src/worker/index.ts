@@ -61,11 +61,11 @@ async function drainOutbox(): Promise<void> {
 }
 
 async function processPricing(job: Job<PricingJobData>): Promise<void> {
-  const { roomId, dates, basePrice, currency } = job.data;
+  const { roomId, dates, basePriceMinor, currency } = job.data;
   if (!roomId || !Array.isArray(dates) || dates.length === 0) {
     throw new Error("Geçersiz pricing iş yükü: roomId ve dates zorunlu");
   }
-  await updateAvailabilityPrices(roomId, dates, basePrice, currency);
+  await updateAvailabilityPrices(roomId, dates, basePriceMinor, currency);
 }
 
 async function main(): Promise<void> {

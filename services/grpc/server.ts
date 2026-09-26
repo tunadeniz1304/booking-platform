@@ -16,7 +16,7 @@ import { redis } from "@/lib/redis";
 import { getConfig } from "@/lib/config/app-config";
 import { checkRateLimit, type RateLimitCategory } from "@/lib/security/rate-limit";
 import { computeTotal, RestrictionError, SoldOutError } from "@/lib/pricing/quote";
-import { money, toDecimalString, assertCurrency } from "@/lib/money/money";
+import { money, moneyFromDb, toDecimalString, assertCurrency } from "@/lib/money/money";
 import { prisma } from "@/lib/prisma";
 import { createBooking } from "@/lib/booking-service";
 import { payForBooking } from "@/lib/payment/payment-service";
@@ -150,7 +150,7 @@ const handlers = {
     if (!room) throw new GrpcAuthError(grpc.status.NOT_FOUND, "Oda bulunamadı");
     const prices = room.inventory.map((a) => ({
       date: a.date.toISOString().slice(0, 10),
-      price: Number(a.price),
+      price: Number(toDecimalString(moneyFromDb(a.priceMinor, room.property.currency))),
       available: a.sold + a.held < a.total,
     }));
     const currency = assertCurrency(room.property.currency);

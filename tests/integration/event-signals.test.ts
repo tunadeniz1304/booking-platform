@@ -1,5 +1,5 @@
 import { it, expect } from "vitest";
-import { PrismaClient, Prisma } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 import { describeInt, iso, utcDay } from "./helpers";
 import {
   applyEvent,
@@ -34,7 +34,7 @@ describeInt("regression: #13 olay sinyalleri (integration)", () => {
         description: "e",
         propertyType: "HOTEL",
         locationId: loc.id,
-        basePrice: new Prisma.Decimal(1000),
+        basePriceMinor: 100000n,
       },
     });
     // 5 birimlik tek oda tipi (v2'deki 5 ayrı odanın sayaçlı karşılığı)
@@ -53,7 +53,7 @@ describeInt("regression: #13 olay sinyalleri (integration)", () => {
         roomTypeId: roomType.id,
         date: utcDay(i + 1),
         total: 5,
-        price: new Prisma.Decimal(1000),
+        priceMinor: 100000n,
       })),
     });
     const prices = async () =>
@@ -61,9 +61,9 @@ describeInt("regression: #13 olay sinyalleri (integration)", () => {
         await prisma.inventoryDay.findMany({
           where: { roomTypeId: roomType.id },
           orderBy: { date: "asc" },
-          select: { price: true },
+          select: { priceMinor: true },
         })
-      ).map((p) => Number(p.price));
+      ).map((p) => Number(p.priceMinor) / 100);
 
     const event = await proposeEvent({
       locationId: loc.id,

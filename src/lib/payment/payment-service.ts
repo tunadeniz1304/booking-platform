@@ -17,7 +17,7 @@ import { releaseHold, releaseInventory, BookingNotFoundError } from "@/lib/booki
 import { runSaga, type SagaStep } from "@/lib/saga/saga";
 import { PAYMENT_SAGA, SAGA_STEPS } from "@/lib/saga/booking-saga";
 import { invalidatePropertySearchCache } from "@/lib/search";
-import { money, toDecimalString, toMinor, assertCurrency, type Money } from "@/lib/money/money";
+import { money, assertCurrency, type Money, minorToDb, minorFromDb } from "@/lib/money/money";
 import { clockOf, fromDate } from "@/lib/time/nights";
 import { commitHeld, holdUnits, InventoryUnavailableError } from "@/lib/booking/inventory";
 import { logger, errorFields } from "@/lib/observability/logger";
@@ -127,7 +127,7 @@ interface PayableBooking {
   checkIn: Date;
   checkOut: Date;
   holdExpiresAt: Date | null;
-  totalPrice: Prisma.Decimal;
+  totalPriceMinor: bigint;
   currency: string;
   payment: { id: string; status: PaymentStatus; providerRef: string | null } | null;
 }
@@ -145,7 +145,7 @@ async function loadPayable(bookingId: string, userId: string): Promise<PayableBo
       checkIn: true,
       checkOut: true,
       holdExpiresAt: true,
-      totalPrice: true,
+      totalPriceMinor: true,
       currency: true,
       payment: { select: { id: true, status: true, providerRef: true } },
     },
@@ -155,9 +155,9 @@ async function loadPayable(bookingId: string, userId: string): Promise<PayableBo
   return booking;
 }
 
-function amountOf(booking: { totalPrice: Prisma.Decimal; currency: string }): Money {
+function amountOf(booking: { totalPriceMinor: bigint; currency: string }): Money {
   const currency = assertCurrency(booking.currency);
-  return money(toMinor(booking.totalPrice.toString(), currency), currency);
+  return money(minorFromDb(booking.totalPriceMinor), currency);
 }
 
 /**
@@ -195,7 +195,7 @@ async function transitionPayment(
       data: {
         bookingId: booking.id,
         userId: booking.userId,
-        amount: new Prisma.Decimal(toDecimalString(amount)),
+        amountMinor: minorToDb(amount.amount),
         currency: amount.currency,
         provider,
         ...data,
@@ -326,7 +326,7 @@ const PAYMENT_SAGA_STEPS: SagaStep<PaymentSagaCtx, PayOutcome>[] = [
         },
         data: {
           status: PaymentStatus.REFUNDED,
-          refundedAmount: new Prisma.Decimal(toDecimalString(ctx.amount)),
+          refundedAmountMinor: minorToDb(ctx.amount.amount),
           refundedAt: new Date(),
           failureCode: "BOOKING_NOT_CONFIRMABLE",
         },
@@ -425,7 +425,7 @@ export async function confirmInTransaction(
       checkIn: true,
       checkOut: true,
       holdExpiresAt: true,
-      totalPrice: true,
+      totalPriceMinor: true,
       currency: true,
       units: true,
       payment: { select: { id: true, status: true, providerRef: true } },
@@ -484,7 +484,7 @@ export async function confirmInTransaction(
       bookingId: booking.id,
       userId: booking.userId,
       kind: "CHARGE",
-      amount: new Prisma.Decimal(toDecimalString(amount)),
+      amountMinor: minorToDb(amount.amount),
       currency: amount.currency,
       reference: providerRef,
     },
@@ -796,12 +796,12 @@ export async function confirmPaymentChallenge(input: {
 
 function sameAmount(
   event: WebhookEvent,
-  payment: { amount: Prisma.Decimal; currency: string }
+  payment: { amountMinor: bigint; currency: string }
 ): boolean {
   const currency = assertCurrency(payment.currency);
   if (event.data.currency && event.data.currency.toUpperCase() !== currency) return false;
   if (event.data.amount !== undefined) {
-    return event.data.amount === toMinor(payment.amount.toString(), currency);
+    return event.data.amount === minorFromDb(payment.amountMinor);
   }
   return true;
 }
@@ -830,7 +830,7 @@ export async function handleWebhookEvent(
     select: {
       bookingId: true,
       status: true,
-      amount: true,
+      amountMinor: true,
       currency: true,
       booking: { select: { propertyId: true } },
     },
@@ -880,7 +880,7 @@ export async function handleWebhookEvent(
         }
         // Onaylanamıyor (iptal, envanter doldu, başka ödeme kazandı) → otomatik iade + olay kaydı.
         const currency = assertCurrency(payment.currency);
-        const amount = money(toMinor(payment.amount.toString(), currency), currency);
+        const amount = money(minorFromDb(payment.amountMinor), currency);
         await refundLoser(payment.bookingId, event.data.providerRef, amount, error.code);
         await prisma.$transaction(async (tx) => {
           await record(tx);
@@ -892,7 +892,7 @@ export async function handleWebhookEvent(
             },
             data: {
               status: PaymentStatus.REFUNDED,
-              refundedAmount: payment.amount,
+              refundedAmountMinor: payment.amountMinor,
               refundedAt: new Date(),
               failureCode: error.code,
             },
@@ -1024,9 +1024,9 @@ export interface CancellationOutcome {
 function refundTarget(
   booking: {
     userId: string;
-    payment: { amount: Prisma.Decimal; providerRef: string | null } | null;
+    payment: { amountMinor: bigint; providerRef: string | null } | null;
     transfers: Array<{
-      askPrice: Prisma.Decimal;
+      askPriceMinor: bigint;
       currency: string;
       claimedById: string | null;
       buyerPaymentRef: string | null;
@@ -1034,14 +1034,14 @@ function refundTarget(
   },
   currency: string
 ): { providerRef: string | null; refundableMinor: number } {
-  const paid = booking.payment ? toMinor(booking.payment.amount.toString(), currency) : 0;
+  const paid = booking.payment ? minorFromDb(booking.payment.amountMinor) : 0;
   const transfer = booking.transfers[0];
   if (
     transfer?.buyerPaymentRef &&
     transfer.claimedById === booking.userId &&
     transfer.currency === currency
   ) {
-    const ask = toMinor(transfer.askPrice.toString(), currency);
+    const ask = minorFromDb(transfer.askPriceMinor);
     return { providerRef: transfer.buyerPaymentRef, refundableMinor: Math.min(ask, paid) };
   }
   return { providerRef: booking.payment?.providerRef ?? null, refundableMinor: paid };
@@ -1091,12 +1091,12 @@ async function cancelLocked(
         units: true,
         policySnapshot: true,
         property: { select: { timeZone: true, checkInTime: true, checkOutTime: true } },
-        payment: { select: { status: true, amount: true, providerRef: true } },
+        payment: { select: { status: true, amountMinor: true, providerRef: true } },
         transfers: {
           where: { status: "COMPLETED" },
           orderBy: { completedAt: "desc" },
           take: 1,
-          select: { askPrice: true, currency: true, claimedById: true, buyerPaymentRef: true },
+          select: { askPriceMinor: true, currency: true, claimedById: true, buyerPaymentRef: true },
         },
       },
     });
@@ -1143,9 +1143,7 @@ async function cancelLocked(
                 : decision.refundMinor > 0
                   ? PaymentStatus.PARTIALLY_REFUNDED
                   : PaymentStatus.PAID,
-            refundedAmount: new Prisma.Decimal(
-              toDecimalString(money(decision.refundMinor, currency))
-            ),
+            refundedAmountMinor: minorToDb(decision.refundMinor),
             refundedAt: decision.refundMinor > 0 ? now : null,
           },
         });
@@ -1155,7 +1153,7 @@ async function cancelLocked(
               bookingId: booking.id,
               userId: booking.userId,
               kind: "REFUND",
-              amount: new Prisma.Decimal(toDecimalString(money(decision.refundMinor, currency))),
+              amountMinor: minorToDb(decision.refundMinor),
               currency,
               reference: target.providerRef,
             },
@@ -1270,9 +1268,9 @@ export async function retryFailedRefund(bookingId: string): Promise<RefundRetryR
         payment: {
           select: {
             status: true,
-            amount: true,
+            amountMinor: true,
             providerRef: true,
-            refundedAmount: true,
+            refundedAmountMinor: true,
             failureCode: true,
           },
         },
@@ -1280,16 +1278,14 @@ export async function retryFailedRefund(bookingId: string): Promise<RefundRetryR
           where: { status: "COMPLETED" },
           orderBy: { completedAt: "desc" },
           take: 1,
-          select: { askPrice: true, currency: true, claimedById: true, buyerPaymentRef: true },
+          select: { askPriceMinor: true, currency: true, claimedById: true, buyerPaymentRef: true },
         },
       },
     });
     const payment = booking?.payment;
     if (!booking || !payment || payment.failureCode !== REFUND_FAILED) return "noop";
     const currency = assertCurrency(booking.currency);
-    const refundMinor = payment.refundedAmount
-      ? toMinor(payment.refundedAmount.toString(), currency)
-      : 0;
+    const refundMinor = minorFromDb(payment.refundedAmountMinor);
     const target = refundTarget(booking, currency);
     const provider = getPaymentProvider();
     let result: RefundRetryResult = "noop";

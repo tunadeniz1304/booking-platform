@@ -6,7 +6,7 @@ import { assertRoomAccess } from "@/lib/host/host-service";
 import { checkRateParity } from "@/lib/channel/channel";
 import { getConfig } from "@/lib/config/app-config";
 import { prisma } from "@/lib/prisma";
-import { toMinor } from "@/lib/money/money";
+import { toMinor, minorFromDb } from "@/lib/money/money";
 import { fromDate, toDbDate, type IsoDate } from "@/lib/time/nights";
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
@@ -34,10 +34,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
     const currency = room.property.currency;
     const days = await prisma.inventoryDay.findMany({
       where: { roomTypeId: roomId, date: { in: rates.map((r) => toDbDate(r.date as IsoDate)) } },
-      select: { date: true, price: true },
+      select: { date: true, priceMinor: true },
     });
     const warnings = checkRateParity(
-      days.map((d) => ({ date: fromDate(d.date), amount: toMinor(d.price, currency) })),
+      days.map((d) => ({ date: fromDate(d.date), amount: minorFromDb(d.priceMinor) })),
       rates.map((r) => ({ date: r.date as IsoDate, amount: toMinor(r.price, currency) })),
       getConfig().CHANNEL_PARITY_TOLERANCE_BPS
     );

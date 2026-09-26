@@ -120,7 +120,7 @@ describeInt("fiyat tutarlılığı — vergi/ücret motoru (integration)", () =>
     });
     expect(paid.status).toBe("confirmed");
     const payment = await prisma.payment.findUniqueOrThrow({ where: { bookingId: booking.id } });
-    expect(Math.round(Number(payment.amount) * 100)).toBe(quote.total);
+    expect(Number(payment.amountMinor)).toBe(quote.total);
   });
 
   it("TR dışı ülke: vergi satırı yok, toplam = ara toplam", async () => {

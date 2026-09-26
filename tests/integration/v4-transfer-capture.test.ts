@@ -1,6 +1,6 @@
 // v4#1: devir ödemesi capture'dan önce commit edilmemeli (iki aşamalı devir sagası).
 import { beforeAll, afterAll, afterEach, it, expect } from "vitest";
-import { PrismaClient, Prisma, BookingStatus } from "@prisma/client";
+import { PrismaClient, BookingStatus } from "@prisma/client";
 import { describeInt, utcDay } from "./helpers";
 import {
   claimTransfer,
@@ -63,7 +63,7 @@ describeInt("regression: v4#1 devir capture hatası (integration)", () => {
         checkIn: utcDay(dayOffset),
         checkOut: utcDay(dayOffset + 2),
         guestCount: 1,
-        totalPrice: new Prisma.Decimal(2000),
+        totalPriceMinor: 200000n,
         status: BookingStatus.CONFIRMED,
       },
     });
@@ -71,7 +71,7 @@ describeInt("regression: v4#1 devir capture hatası (integration)", () => {
       data: {
         bookingId: b.id,
         userId: seller,
-        amount: new Prisma.Decimal(2000),
+        amountMinor: 200000n,
         provider: "mock",
         providerRef: `pi_v4seller_${b.id}`,
         status: "PAID",
@@ -86,7 +86,7 @@ describeInt("regression: v4#1 devir capture hatası (integration)", () => {
       where: { bookingId, kind: { in: ["TRANSFER_PAYMENT", "TRANSFER_PAYOUT"] } },
     });
     const net = rows.reduce((sum, r) => {
-      const minor = Math.round(Number(r.amount) * 100);
+      const minor = Number(r.amountMinor);
       return r.kind === "TRANSFER_PAYMENT" ? sum + minor : sum - minor;
     }, 0);
     return { count: rows.length, net };
@@ -136,7 +136,7 @@ describeInt("regression: v4#1 devir capture hatası (integration)", () => {
         description: "t",
         propertyType: "HOTEL",
         locationId: location.id,
-        basePrice: new Prisma.Decimal(1000),
+        basePriceMinor: 100000n,
       },
     });
     propertyId = property.id;

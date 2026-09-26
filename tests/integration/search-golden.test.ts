@@ -1,5 +1,5 @@
 import { beforeAll, afterAll, it, expect } from "vitest";
-import { PrismaClient, Prisma } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 import { describeInt, utcDay } from "./helpers";
 import golden from "../fixtures/search-golden.json";
 import { searchProperties } from "@/lib/search";
@@ -91,7 +91,7 @@ describeInt("altın küme: hibrit RRF vs v2 (integration)", () => {
           description: doc.description,
           propertyType: doc.type,
           locationId: location.id,
-          basePrice: new Prisma.Decimal(price),
+          basePriceMinor: BigInt(Math.round(price * 100)),
           currency: "TRY",
           ratingAvg: rating,
           ratingCount,
@@ -103,7 +103,7 @@ describeInt("altın küme: hibrit RRF vs v2 (integration)", () => {
           name: "Oda",
           maxOccupancy: 2,
           bedType: "Çift",
-          priceModifier: new Prisma.Decimal(0),
+          priceModifierMinor: 0n,
           ratePlans: { create: [{ code: "STANDARD", name: "Standart", isDefault: true }] },
         },
       });
@@ -111,7 +111,7 @@ describeInt("altın küme: hibrit RRF vs v2 (integration)", () => {
         data: Array.from({ length: 3 }, (_, d) => ({
           roomTypeId: room.id,
           date: utcDay(d + 1),
-          price: new Prisma.Decimal(price),
+          priceMinor: BigInt(Math.round(price * 100)),
           total: 1,
         })),
       });

@@ -24,7 +24,8 @@ export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];
 export interface PricingJobData {
   roomId: string;
   dates: string[];
-  basePrice: number;
+  /** Taban gecelik fiyat, minor-unit (tesis para biriminde; ADR 0019). */
+  basePriceMinor: number;
   currency: string;
 }
 

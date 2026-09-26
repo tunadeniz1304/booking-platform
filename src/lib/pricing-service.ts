@@ -2,7 +2,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { redis } from "@/lib/redis";
 import { priceNights, type PriceExplanation } from "@/lib/pricing/event-signals";
-import { money, toDecimalString, toMinor } from "@/lib/money/money";
+import { money, toDecimalString, minorToDb } from "@/lib/money/money";
 import { logger, errorFields } from "@/lib/observability/logger";
 
 const PRICE_CACHE_PREFIX = "price:";
@@ -39,7 +39,7 @@ async function cachePrice(result: PricingResult): Promise<void> {
 export async function updateAvailabilityPrices(
   roomId: string,
   dates: string[],
-  basePrice: number,
+  basePriceMinor: number,
   currency: string
 ): Promise<PricingResult[]> {
   const room = await prisma.roomType.findUnique({
@@ -49,7 +49,7 @@ export async function updateAvailabilityPrices(
   const explained = await priceNights({
     locationId: room?.property.locationId ?? null,
     nights: dates,
-    baseMinor: toMinor(basePrice, currency),
+    baseMinor: basePriceMinor,
     currency,
   });
 
@@ -82,17 +82,15 @@ export async function updateAvailabilityPrices(
   await prisma.$transaction(
     async (tx) => {
       for (const result of writable) {
-        const price = new Prisma.Decimal(
-          toDecimalString(money(result.explanation.price, currency))
-        );
+        const price = minorToDb(result.explanation.price);
         const priceExplanation = result.explanation as unknown as Prisma.InputJsonValue;
         await tx.inventoryDay.upsert({
           where: { roomTypeId_date: { roomTypeId: roomId, date: new Date(result.date) } },
-          update: { price, priceExplanation },
+          update: { priceMinor: price, priceExplanation },
           create: {
             roomTypeId: roomId,
             date: new Date(result.date),
-            price,
+            priceMinor: price,
             priceExplanation,
             total: room?.units ?? 1,
           },

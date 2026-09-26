@@ -70,7 +70,7 @@ describeInt("regression: v3#5 host gelir paneli (integration)", () => {
       const afterReject = await prisma.inventoryDay.findFirstOrThrow({
         where: { id: beforeReject.id },
       });
-      expect(afterReject.price.toString()).toBe(beforeReject.price.toString());
+      expect(afterReject.priceMinor).toBe(beforeReject.priceMinor);
       expect(afterReject.priceOverride).toBe(false);
       await expect(rejectSuggestion(host, rejected.id)).rejects.toMatchObject({ status: 409 });
 
@@ -82,13 +82,13 @@ describeInt("regression: v3#5 host gelir paneli (integration)", () => {
         where: { roomTypeId: fx.roomId, date: new Date(`${accepted.date}T00:00:00.000Z`) },
       });
       expect(day.priceOverride).toBe(true);
-      expect(Math.round(Number(day.price) * 100)).toBe(accepted.suggestedMinor);
+      expect(Number(day.priceMinor)).toBe(accepted.suggestedMinor);
       await expect(acceptSuggestion(host, accepted.id)).rejects.toMatchObject({ status: 409 });
 
       // Fiyat motoru sabitlenmiş geceyi ezmez.
       await updateAvailabilityPrices(fx.roomId, [accepted.date, rejected.date], 777, "TRY");
       const kept = await prisma.inventoryDay.findFirstOrThrow({ where: { id: day.id } });
-      expect(kept.price.toString()).toBe(day.price.toString());
+      expect(kept.priceMinor).toBe(day.priceMinor);
 
       // Özet: bekleyenler kararlıları içermez; KPI alanları tutarlı.
       const overview = await getRevenueOverview(host, fx.propertyId);

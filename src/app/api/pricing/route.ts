@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { addPricingUpdateJob } from "@/lib/queue";
+import { toMinor } from "@/lib/money/money";
 import { requireRole } from "@/lib/auth";
 import { NotFoundError, toErrorResponse } from "@/lib/http/errors";
 import { isOwnedBy } from "@/lib/security/ownership";
@@ -37,7 +38,7 @@ export async function POST(req: NextRequest) {
     const jobId = await addPricingUpdateJob({
       roomId,
       dates,
-      basePrice,
+      basePriceMinor: toMinor(basePrice, room.property.currency),
       currency: room.property.currency,
     });
     return NextResponse.json({ queued: true, jobId, roomId, dates: dates.length }, { status: 202 });

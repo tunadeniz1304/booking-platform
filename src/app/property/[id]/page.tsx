@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { minorFromDb, toMajorNumber } from "@/lib/money/money";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
@@ -24,6 +25,7 @@ interface PropertyDetail {
   propertyType: string;
   location: { city: string; country: string };
   basePrice: number;
+  basePriceMinor: number;
   currency: string;
   ratingAvg: number;
   ratingCount: number;
@@ -40,7 +42,7 @@ async function getProperty(id: string): Promise<PropertyDetail | null> {
       title: true,
       description: true,
       propertyType: true,
-      basePrice: true,
+      basePriceMinor: true,
       currency: true,
       ratingAvg: true,
       ratingCount: true,
@@ -67,7 +69,7 @@ async function getProperty(id: string): Promise<PropertyDetail | null> {
             orderBy: { priceModifierBps: "asc" },
           },
           bedType: true,
-          priceModifier: true,
+          priceModifierMinor: true,
           available: true,
         },
         orderBy: { name: "asc" },
@@ -78,11 +80,13 @@ async function getProperty(id: string): Promise<PropertyDetail | null> {
 
   return {
     ...property,
-    basePrice: Number(property.basePrice),
+    basePriceMinor: minorFromDb(property.basePriceMinor),
+    basePrice: toMajorNumber(property.basePriceMinor, property.currency),
     rooms: property.rooms.map((room) => ({
       ...room,
       capacity: room.maxOccupancy,
-      priceModifier: Number(room.priceModifier),
+      priceModifierMinor: minorFromDb(room.priceModifierMinor),
+      priceModifier: toMajorNumber(room.priceModifierMinor, property.currency),
     })),
   };
 }

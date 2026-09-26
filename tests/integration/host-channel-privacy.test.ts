@@ -1,5 +1,5 @@
 import { it, expect } from "vitest";
-import { PrismaClient, Prisma } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 import { describeInt, iso, utcDay } from "./helpers";
 import { bulkUpdateAvailability, updateProperty } from "@/lib/host/host-service";
 import { applyAriMessage, exportRoomCalendar, importCalendar } from "@/lib/channel/channel";
@@ -47,7 +47,7 @@ describeInt("F7 host / kanal / KVKK (integration)", () => {
         description: "host test",
         propertyType: "HOTEL",
         locationId: loc.id,
-        basePrice: new Prisma.Decimal(800),
+        basePriceMinor: 80000n,
         isActive: false,
       },
     });
@@ -59,7 +59,7 @@ describeInt("F7 host / kanal / KVKK (integration)", () => {
       data: Array.from({ length: 20 }, (_, i) => ({
         roomTypeId: room.id,
         date: utcDay(i + 1),
-        price: new Prisma.Decimal(800),
+        priceMinor: 80000n,
         total: 1,
       })),
     });
@@ -131,7 +131,7 @@ describeInt("F7 host / kanal / KVKK (integration)", () => {
       data: Array.from({ length: 20 }, (_, i) => ({
         roomTypeId: room2.id,
         date: utcDay(i + 1),
-        price: new Prisma.Decimal(800),
+        priceMinor: 80000n,
         total: 1,
       })),
     });

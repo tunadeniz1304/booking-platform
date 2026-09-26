@@ -1,5 +1,5 @@
 import { it, expect } from "vitest";
-import { PrismaClient, Prisma } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 import { describeInt, utcDay } from "./helpers";
 import { rollAvailabilityForward } from "@/lib/booking/availability-rollover";
 
@@ -21,7 +21,7 @@ describeInt("P0-9 availability rollover (integration)", () => {
         description: "roll",
         propertyType: "HOTEL",
         locationId: loc.id,
-        basePrice: new Prisma.Decimal(750),
+        basePriceMinor: 75000n,
       },
     });
     const room = await prisma.roomType.create({
@@ -32,7 +32,7 @@ describeInt("P0-9 availability rollover (integration)", () => {
       data: {
         roomTypeId: room.id,
         date: utcDay(3),
-        price: new Prisma.Decimal(999),
+        priceMinor: 99900n,
         total: 2,
         sold: 2,
       },
@@ -43,13 +43,13 @@ describeInt("P0-9 availability rollover (integration)", () => {
     const kept = await prisma.inventoryDay.findUniqueOrThrow({
       where: { roomTypeId_date: { roomTypeId: room.id, date: utcDay(3) } },
     });
-    expect(Number(kept.price)).toBe(999);
+    expect(Number(kept.priceMinor)).toBe(99900);
     expect(kept).toMatchObject({ total: 2, sold: 2, held: 0 });
     // Yeni geceler taban fiyat ve total = units ile açılır
     const fresh = await prisma.inventoryDay.findUniqueOrThrow({
       where: { roomTypeId_date: { roomTypeId: room.id, date: utcDay(10) } },
     });
-    expect(Number(fresh.price)).toBe(750);
+    expect(Number(fresh.priceMinor)).toBe(75000);
     expect(fresh).toMatchObject({ total: 2, sold: 0, held: 0 });
 
     await rollAvailabilityForward(30);

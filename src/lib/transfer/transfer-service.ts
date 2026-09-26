@@ -11,9 +11,11 @@ import {
   money,
   multiplyRate,
   toDecimalString,
-  toMinor,
   assertCurrency,
   type Money,
+  minorToDb,
+  minorFromDb,
+  moneyFromDb,
 } from "@/lib/money/money";
 import { fromDate } from "@/lib/time/nights";
 import { getPaymentProvider } from "@/lib/payment";
@@ -125,7 +127,7 @@ export async function listBookingForTransfer(
   return withSerializableRetry(async (tx) => {
     const booking = await tx.booking.findFirst({
       where: { id: bookingId, userId: sellerId },
-      select: { id: true, status: true, totalPrice: true, currency: true, checkIn: true },
+      select: { id: true, status: true, totalPriceMinor: true, currency: true, checkIn: true },
     });
     if (!booking) throw new TransferError("Rezervasyon bulunamadı", 404, "NOT_FOUND");
     if (booking.status !== BookingStatus.CONFIRMED) {
@@ -144,7 +146,7 @@ export async function listBookingForTransfer(
       );
     }
     const currency = assertCurrency(booking.currency);
-    const paid = money(toMinor(booking.totalPrice.toString(), currency), currency);
+    const paid = money(minorFromDb(booking.totalPriceMinor), currency);
     const maxAsk = multiplyRate(paid, config.TRANSFER_MAX_ASK_RATIO);
     if (askPriceMinor > maxAsk.amount) {
       throw new TransferError(
@@ -185,7 +187,7 @@ export async function listBookingForTransfer(
         id: transferId,
         bookingId,
         sellerId,
-        askPrice: new Prisma.Decimal(toDecimalString(money(askPriceMinor, currency))),
+        askPriceMinor: minorToDb(askPriceMinor),
         currency,
         tokenHash: hashToken(token),
         expiresAt,
@@ -376,13 +378,13 @@ function claimSteps(provider: PaymentProvider): SagaStep<ClaimContext, string>[]
           // Asıl ödeme (satıcının kartı) satıcıda kalır; satıcı bedelini payout ile alır.
           // İptal iadesi alıcının devir ödemesine (buyerPaymentRef) yapılır — yalnızca COMPLETED
           // devir iade hedefi olur, yani capture'ı kesinleşmiş ödeme (bkz. cancelAndRefund).
-          const amount = new Prisma.Decimal(toDecimalString(ask));
+          const amount = minorToDb(ask.amount);
           await tx.payout.create({
             data: {
               userId: transfer.sellerId,
               bookingId: booking.id,
               transferId: transfer.id,
-              amount,
+              amountMinor: amount,
               currency,
             },
           });
@@ -392,7 +394,7 @@ function claimSteps(provider: PaymentProvider): SagaStep<ClaimContext, string>[]
                 bookingId: booking.id,
                 userId: buyerId,
                 kind: "TRANSFER_PAYMENT",
-                amount,
+                amountMinor: amount,
                 currency,
                 reference: ctx.providerRef,
               },
@@ -400,7 +402,7 @@ function claimSteps(provider: PaymentProvider): SagaStep<ClaimContext, string>[]
                 bookingId: booking.id,
                 userId: transfer.sellerId,
                 kind: "TRANSFER_PAYOUT",
-                amount,
+                amountMinor: amount,
                 currency,
                 reference: transfer.id,
               },
@@ -461,7 +463,7 @@ export async function claimTransfer(input: {
   }
 
   const currency = assertCurrency(transfer.currency);
-  const ask = money(toMinor(transfer.askPrice.toString(), currency), currency);
+  const ask = money(minorFromDb(transfer.askPriceMinor), currency);
   const ctx: ClaimContext = {
     transfer: { id: transfer.id, bookingId: transfer.bookingId, sellerId: transfer.sellerId },
     buyerId: input.buyerId,
@@ -517,7 +519,7 @@ export async function listMyTransfers(userId: string) {
       id: true,
       bookingId: true,
       status: true,
-      askPrice: true,
+      askPriceMinor: true,
       currency: true,
       listedAt: true,
       expiresAt: true,
@@ -538,7 +540,7 @@ export async function discoverTransfers(now = new Date()) {
     take: 50,
     select: {
       id: true,
-      askPrice: true,
+      askPriceMinor: true,
       currency: true,
       expiresAt: true,
       seller: { select: { firstName: true, lastName: true } },
@@ -547,7 +549,7 @@ export async function discoverTransfers(now = new Date()) {
           checkIn: true,
           checkOut: true,
           guestCount: true,
-          totalPrice: true,
+          totalPriceMinor: true,
           property: { select: { id: true, title: true, location: { select: { city: true } } } },
         },
       },
@@ -555,8 +557,8 @@ export async function discoverTransfers(now = new Date()) {
   });
   return rows.map((r) => ({
     id: r.id,
-    askPrice: Number(r.askPrice),
-    originalPrice: Number(r.booking.totalPrice),
+    askPrice: Number(toDecimalString(moneyFromDb(r.askPriceMinor, r.currency))),
+    originalPrice: Number(toDecimalString(moneyFromDb(r.booking.totalPriceMinor, r.currency))),
     currency: r.currency,
     expiresAt: r.expiresAt.toISOString(),
     seller: maskName(r.seller.firstName, r.seller.lastName),
@@ -598,7 +600,13 @@ export async function sweepStuckTransfers(
     where: { status: TransferStatus.CAPTURE_PENDING, claimedAt: { lt: cutoff } },
     orderBy: { claimedAt: "asc" },
     take: 100,
-    select: { id: true, bookingId: true, askPrice: true, currency: true, buyerPaymentRef: true },
+    select: {
+      id: true,
+      bookingId: true,
+      askPriceMinor: true,
+      currency: true,
+      buyerPaymentRef: true,
+    },
   });
   const outcomes: Record<SweepOutcome, number> = { voided: 0, refunded: 0, unresolved: 0 };
   let swept = 0;
@@ -617,7 +625,7 @@ export async function sweepStuckTransfers(
       } catch (voidError) {
         try {
           const currency = assertCurrency(t.currency);
-          const ask = money(toMinor(t.askPrice.toString(), currency), currency);
+          const ask = money(minorFromDb(t.askPriceMinor), currency);
           await provider.refund(t.buyerPaymentRef, ask, `transfer-refund:${t.id}`);
           outcome = "refunded";
         } catch (refundError) {

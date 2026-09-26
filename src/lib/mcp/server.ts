@@ -39,7 +39,7 @@ import {
   type CreateBookingInput,
 } from "@/lib/booking-service";
 import { cancelAndRefund, type CancellationOutcome } from "@/lib/payment/payment-service";
-import { toMinor } from "@/lib/money/money";
+import { minorFromDb } from "@/lib/money/money";
 import { verifyAccessToken, type AccessClaims } from "@/lib/auth/tokens";
 import { isAccessTokenDenied } from "@/lib/auth/denylist";
 import { isTokenVersionCurrent } from "@/lib/auth/token-version";
@@ -95,7 +95,7 @@ async function listBookingSummaries(userId: string): Promise<BookingSummary[]> {
     roomName: b.room.name,
     checkIn: dayOf(b.checkIn),
     checkOut: dayOf(b.checkOut),
-    totalMinor: toMinor(b.totalPrice.toString(), b.currency),
+    totalMinor: minorFromDb(b.totalPriceMinor),
     currency: b.currency,
   }));
 }

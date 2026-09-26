@@ -1,7 +1,7 @@
 // Transactional Outbox: booking.created olayı işlem+outbox ile atomik yazılır,
 // relay edilir ve eventBus abonesine teslim edilir; tekrar relay edilmez.
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { PrismaClient, Prisma } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 import { createBooking } from "@/lib/booking-service";
 import { relayOutbox } from "@/lib/cqrs";
 import { eventBus } from "@/lib/cqrs";
@@ -64,7 +64,7 @@ describeInt("outbox (integration)", () => {
         description: "outbox test",
         propertyType: "HOTEL",
         locationId: location.id,
-        basePrice: new Prisma.Decimal(900),
+        basePriceMinor: 90000n,
         currency: "TRY",
         isActive: true,
       },
@@ -75,7 +75,7 @@ describeInt("outbox (integration)", () => {
         name: "Outbox Oda",
         maxOccupancy: 2,
         bedType: "Çift Kişilik",
-        priceModifier: new Prisma.Decimal(0),
+        priceModifierMinor: 0n,
         available: true,
         ratePlans: { create: [{ code: "STANDARD", name: "Standart", isDefault: true }] },
       },
@@ -87,7 +87,7 @@ describeInt("outbox (integration)", () => {
         roomTypeId: room.id,
         date: d,
         total: 1,
-        price: new Prisma.Decimal(900),
+        priceMinor: 90000n,
       })),
     });
   });

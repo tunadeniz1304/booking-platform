@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getConfig } from "@/lib/config/app-config";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/http/errors";
 import { breakers } from "@/lib/resilience/circuit-breaker";
-import { money, multiplyRate, toDecimalString, toMinor, assertCurrency } from "@/lib/money/money";
+import { money, multiplyRate, assertCurrency, minorFromDb, minorToDb } from "@/lib/money/money";
 import {
   addDays,
   dayOfWeek,
@@ -195,7 +195,7 @@ async function repriceLocation(locationId: string, nights: IsoDate[]): Promise<n
       select: {
         id: true,
         date: true,
-        roomType: { select: { property: { select: { basePrice: true, currency: true } } } },
+        roomType: { select: { property: { select: { basePriceMinor: true, currency: true } } } },
       },
     });
     if (rows.length === 0) return 0;
@@ -205,16 +205,16 @@ async function repriceLocation(locationId: string, nights: IsoDate[]): Promise<n
       const currency = row.roomType.property.currency;
       const exp = explainNightPrice({
         date,
-        baseMinor: toMinor(row.roomType.property.basePrice.toString(), currency),
+        baseMinor: minorFromDb(row.roomType.property.basePriceMinor),
         currency,
         events: active,
       });
-      return Prisma.sql`(${row.id}, ${toDecimalString(money(exp.price, currency))}::numeric, ${JSON.stringify(exp)}::jsonb)`;
+      return Prisma.sql`(${row.id}, ${minorToDb(exp.price)}::bigint, ${JSON.stringify(exp)}::jsonb)`;
     });
     const updated = await tx.$executeRaw`
       UPDATE "InventoryDay" AS a
-      SET price = v.price, "priceExplanation" = v.explanation
-      FROM (VALUES ${Prisma.join(values)}) AS v(id, price, explanation)
+      SET "priceMinor" = v.price_minor, "priceExplanation" = v.explanation
+      FROM (VALUES ${Prisma.join(values)}) AS v(id, price_minor, explanation)
       WHERE a.id = v.id`;
     return updated;
   });

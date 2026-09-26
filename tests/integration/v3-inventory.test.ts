@@ -1,6 +1,6 @@
 import { beforeAll, afterAll, it, expect } from "vitest";
 import { NextRequest } from "next/server";
-import { PrismaClient, Prisma } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 import fc from "fast-check";
 import { describeInt, iso, utcDay } from "./helpers";
 import { createStayFixture, type StayFixture } from "./fixtures";
@@ -263,7 +263,7 @@ describeInt("v3 envanter, kısıtlar, saat dilimi ve arama (integration)", () =>
     const istanbul = await createStayFixture(prisma, { tag: "ist" });
     for (const fx of [tokyo, istanbul]) {
       await prisma.inventoryDay.create({
-        data: { roomTypeId: fx.roomId, date: utcDay(0), price: new Prisma.Decimal(1000), total: 1 },
+        data: { roomTypeId: fx.roomId, date: utcDay(0), priceMinor: 100000n, total: 1 },
       });
     }
     const today = iso(utcDay(0));
@@ -434,7 +434,7 @@ describeInt("v3 envanter, kısıtlar, saat dilimi ve arama (integration)", () =>
           checkIn: new Date("2026-01-08T00:00:00Z"),
           checkOut: new Date("2026-01-10T00:00:00Z"),
           guestCount: 1,
-          totalPrice: new Prisma.Decimal(2000),
+          totalPriceMinor: 200000n,
           currency: "TRY",
           status: "CONFIRMED",
         },
@@ -464,7 +464,7 @@ describeInt("v3 envanter, kısıtlar, saat dilimi ve arama (integration)", () =>
       data: [old, edge, kept].map((date) => ({
         roomTypeId: fx.roomId,
         date,
-        price: new Prisma.Decimal(1000),
+        priceMinor: 100000n,
         total: 1,
       })),
     });

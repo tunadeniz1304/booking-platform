@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, expect, it } from "vitest";
-import { Prisma, PrismaClient } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 import { describeInt, iso, utcDay } from "./helpers";
 import { createStayFixture, type StayFixture } from "./fixtures";
 import { createPriceAlert, listPriceAlerts, runPriceAlerts } from "@/lib/pricing/price-alerts";
@@ -42,7 +42,7 @@ describeInt("fiyat alarmı ve içgörü (integration)", () => {
     });
     await prisma.inventoryDay.updateMany({
       where: { roomTypeId: stay.roomId, date: { gte: utcDay(40), lt: utcDay(42) } },
-      data: { price: new Prisma.Decimal(800) },
+      data: { priceMinor: 80000n },
     });
 
     const first = await runPriceAlerts();

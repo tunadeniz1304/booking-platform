@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { createBooking, listUserBookingsPage } from "@/lib/booking-service";
+import { createBooking, listUserBookingsPage, presentBooking } from "@/lib/booking-service";
 import { requireAuth, requireVerifiedEmail } from "@/lib/auth";
 import { toErrorResponse } from "@/lib/http/errors";
 import { observed } from "@/lib/http/observed";
@@ -55,7 +55,7 @@ export const GET = observed("bookings", async function getHandler(req: NextReque
       limit: url.searchParams.get("limit") ?? undefined,
     });
     const page = await listUserBookingsPage(userId, query);
-    const res = NextResponse.json(page.items);
+    const res = NextResponse.json(page.items.map(presentBooking));
     if (page.nextCursor) {
       const next = new URL(url);
       next.searchParams.set("cursor", page.nextCursor);

@@ -1,6 +1,6 @@
 import { beforeAll, afterAll, describe, it, expect } from "vitest";
 import { NextRequest } from "next/server";
-import { Prisma, PrismaClient } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 import { describeInt, iso, utcDay } from "./helpers";
 import { createStayFixture, ledgerNetMinor, type StayFixture } from "./fixtures";
 import { signAccessToken, type Role } from "@/lib/auth/tokens";
@@ -472,7 +472,7 @@ describeInt("API route handler'ları (integration)", () => {
       const q2 = await (await quoteGet(call(quoteUrl(later)), undefined)).json();
       await prisma.inventoryDay.updateMany({
         where: { roomTypeId: fx.roomId, date: utcDay(25) },
-        data: { price: new Prisma.Decimal(1500) },
+        data: { priceMinor: 150000n },
       });
       const changed = await bookingsPost(
         call("/api/bookings", { token, body: { ...later, guestCount: 1, quoteId: q2.quoteId } }),
@@ -882,7 +882,9 @@ describeInt("API route handler'ları (integration)", () => {
       expect(draft.status).toBe(201);
       const d = await draft.json();
       expect(d.isActive).toBe(false);
-      expect(d.basePrice).toBe("1500"); // Decimal JSON'da string olarak serileşir
+      // v4 P0-2: kolon BigInt minor-unit; API ondalık string'i para biriminin üssüyle verir.
+      expect(d.basePrice).toBe("1500.00");
+      expect(d.basePriceMinor).toBe(150_000);
       expect(d.location).toEqual({ city: `Yenikent-${stamp}`, country: "TEST" });
 
       const live = await propertiesPost(
@@ -1065,7 +1067,7 @@ describeInt("API route handler'ları (integration)", () => {
           checkIn: utcDay(-5),
           checkOut: utcDay(-3),
           guestCount: 1,
-          totalPrice: new Prisma.Decimal(2000),
+          totalPriceMinor: 200000n,
           status: "COMPLETED",
         },
       });
@@ -1696,7 +1698,9 @@ describeInt("API route handler'ları (integration)", () => {
         where: { roomTypeId: fx.roomId, date: { gte: utcDay(5), lte: utcDay(9) } },
         orderBy: { date: "asc" },
       });
-      expect(after.map((r) => Number(r.price))).toEqual([1200, 1200, 1200, 1200, 1200]);
+      expect(after.map((r) => Number(r.priceMinor))).toEqual([
+        120000, 120000, 120000, 120000, 120000,
+      ]);
       expect(after.map((r) => r.held)).toEqual([0, 1, 1, 0, 0]);
       const [{ over }] = await prisma.$queryRaw<{ over: bigint }[]>`
         SELECT count(*) AS over FROM "InventoryDay" WHERE sold + held > total`;
@@ -1802,7 +1806,11 @@ describeInt("API route handler'ları (integration)", () => {
       expect(out).toMatchObject({ queued: true, roomId: fx.roomId, dates: 2 });
       expect(typeof out.jobId).toBe("string");
       const job = await getQueue("pricing").getJob(out.jobId);
-      expect(job?.data).toMatchObject({ roomId: fx.roomId, basePrice: 900, currency: "TRY" });
+      expect(job?.data).toMatchObject({
+        roomId: fx.roomId,
+        basePriceMinor: 90_000,
+        currency: "TRY",
+      });
       await job?.remove();
     });
   });

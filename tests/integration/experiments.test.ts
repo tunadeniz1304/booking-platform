@@ -1,5 +1,5 @@
 import { beforeAll, afterAll, it, expect } from "vitest";
-import { PrismaClient, Prisma } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 import { describeInt, utcDay } from "./helpers";
 import { getRankingVariant, RANKING_FLAG, setFlagsForTests } from "@/lib/flags";
 import { experimentResults, type VariantResult } from "@/lib/flags/stats";
@@ -43,7 +43,7 @@ describeInt("deney maruziyeti ve sonuçları (integration)", () => {
         description: "A/B",
         propertyType: "HOTEL",
         locationId: location.id,
-        basePrice: new Prisma.Decimal(500),
+        basePriceMinor: 50000n,
         currency: "TRY",
       },
     });
@@ -54,7 +54,7 @@ describeInt("deney maruziyeti ve sonuçları (integration)", () => {
         name: "Oda",
         maxOccupancy: 2,
         bedType: "Çift",
-        priceModifier: new Prisma.Decimal(0),
+        priceModifierMinor: 0n,
       },
     });
     roomId = room.id;
@@ -98,7 +98,7 @@ describeInt("deney maruziyeti ve sonuçları (integration)", () => {
         checkIn: utcDay(3),
         checkOut: utcDay(4),
         guestCount: 1,
-        totalPrice: new Prisma.Decimal(500),
+        totalPriceMinor: 50000n,
         status: "CONFIRMED",
       },
     });
@@ -125,7 +125,7 @@ describeInt("deney maruziyeti ve sonuçları (integration)", () => {
         checkIn: utcDay(5),
         checkOut: utcDay(6),
         guestCount: 1,
-        totalPrice: new Prisma.Decimal(500),
+        totalPriceMinor: 50000n,
         status: "CONFIRMED",
       },
     });

@@ -1,5 +1,5 @@
 import { beforeAll, afterAll, it, expect } from "vitest";
-import { PrismaClient, Prisma } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 import { describeInt, iso, utcDay } from "./helpers";
 import { getRoomHeat, recordRoomView, type RoomHeat } from "@/lib/live/stats";
 import { acquireConnectionSlot, activeChannelCount, subscribeHeat } from "@/lib/live/hub";
@@ -34,7 +34,7 @@ describeInt("canlı ısı haritası + fiyat servisi (integration)", () => {
         description: "live",
         propertyType: "HOTEL",
         locationId: location.id,
-        basePrice: new Prisma.Decimal(1000),
+        basePriceMinor: 100000n,
       },
     });
     const room = await prisma.roomType.create({
@@ -52,7 +52,7 @@ describeInt("canlı ısı haritası + fiyat servisi (integration)", () => {
       data: Array.from({ length: 4 }, (_, i) => ({
         roomTypeId: roomId,
         date: utcDay(i + 1),
-        price: new Prisma.Decimal(1000),
+        priceMinor: 100000n,
         total: 1,
         sold: i === 0 ? 0 : 1,
       })),
@@ -152,7 +152,7 @@ describeInt("canlı ısı haritası + fiyat servisi (integration)", () => {
       orderBy: { date: "asc" },
     });
     expect(rows).toHaveLength(2); // 10. gün satırı upsert ile oluşturuldu
-    expect(Number(rows[1].price)).toBe(results[1].price);
+    expect(Number(rows[1].priceMinor) / 100).toBe(results[1].price);
     // Yeni gece satılabilir: tek birim, hiçbiri satılmamış/tutulmamış
     expect(rows[1]).toMatchObject({ total: 1, sold: 0, held: 0 });
 

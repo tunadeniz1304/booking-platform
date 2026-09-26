@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getBooking } from "@/lib/booking-service";
+import { getBooking, presentBooking } from "@/lib/booking-service";
 import { cancelAndRefund } from "@/lib/payment/payment-service";
 import { requireAuth } from "@/lib/auth";
 import { toErrorResponse } from "@/lib/http/errors";
@@ -11,7 +11,7 @@ export const GET = observed(
     try {
       const { id } = await params;
       const { userId } = await requireAuth(req);
-      return NextResponse.json({ booking: await getBooking(id, userId) });
+      return NextResponse.json({ booking: presentBooking(await getBooking(id, userId)) });
     } catch (error) {
       return toErrorResponse(error, "bookings.get");
     }

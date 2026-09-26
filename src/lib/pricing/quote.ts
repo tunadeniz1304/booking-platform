@@ -9,9 +9,9 @@ import {
   applyBps,
   money,
   sum,
-  toMinor,
   type CurrencyCode,
   assertCurrency,
+  minorFromDb,
 } from "@/lib/money/money";
 import {
   clockOf,
@@ -137,7 +137,7 @@ export function priceStay(input: {
 export function nightsFromInventory(
   rows: ReadonlyArray<{
     date: Date;
-    price: Prisma.Decimal | string | number;
+    priceMinor: bigint | number;
     total: number;
     sold: number;
     held: number;
@@ -151,7 +151,7 @@ export function nightsFromInventory(
   for (const date of stayNights) {
     const row = byDate.get(date);
     if (!row || row.total - row.sold - row.held < units) return null;
-    out.push({ date, baseMinor: toMinor(row.price.toString(), currency) });
+    out.push({ date, baseMinor: minorFromDb(row.priceMinor) });
   }
   return out;
 }
@@ -235,7 +235,7 @@ export async function computeTotal(req: QuoteRequest, now: Date = new Date()): P
       maxOccupancy: true,
       units: true,
       available: true,
-      priceModifier: true,
+      priceModifierMinor: true,
       propertyId: true,
       property: {
         select: {
@@ -282,7 +282,7 @@ export async function computeTotal(req: QuoteRequest, now: Date = new Date()): P
         roomTypeId: room.id,
         date: { gte: toDbDate(stay.checkIn), lt: toDbDate(stay.checkOut) },
       },
-      select: { date: true, price: true, total: true, sold: true, held: true },
+      select: { date: true, priceMinor: true, total: true, sold: true, held: true },
     }),
     prisma.restriction.findMany({
       where: {
@@ -298,7 +298,7 @@ export async function computeTotal(req: QuoteRequest, now: Date = new Date()): P
 
   const priced = priceStay({
     nights,
-    modifierMinor: toMinor(room.priceModifier.toString(), currency),
+    modifierMinor: minorFromDb(room.priceModifierMinor),
     planModifierBps: plan.priceModifierBps,
     units,
     currency,

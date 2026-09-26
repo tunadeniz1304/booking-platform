@@ -1,5 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import { installQueryStats, isQueryStatsEnabled } from "@/lib/observability/stats";
+// BigInt minor-unit kolonları için JSON güvenlik ağını kurar (ADR 0019).
+import "@/lib/money/money";
 
 const globalForPrisma = globalThis as unknown as { __bookingPrisma?: PrismaClient };
 

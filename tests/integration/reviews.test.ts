@@ -1,5 +1,5 @@
 import { it, expect } from "vitest";
-import { PrismaClient, Prisma } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 import { describeInt, utcDay } from "./helpers";
 import { createReview, replyToReview, reviewsVersion } from "@/lib/reviews/review-service";
 import { summarizeReviews } from "@/lib/ai/review-summary";
@@ -33,7 +33,7 @@ describeInt("P1-4 doğrulanmış yorumlar + atıflı özet (integration)", () =>
         description: "t",
         propertyType: "HOTEL",
         locationId: loc.id,
-        basePrice: new Prisma.Decimal(500),
+        basePriceMinor: 50000n,
       },
     });
     const room = await prisma.roomType.create({
@@ -48,7 +48,7 @@ describeInt("P1-4 doğrulanmış yorumlar + atıflı özet (integration)", () =>
           checkIn: utcDay(out - 2),
           checkOut: utcDay(out),
           guestCount: 1,
-          totalPrice: new Prisma.Decimal(1000),
+          totalPriceMinor: 100000n,
           status,
         },
       });

@@ -1,5 +1,5 @@
 import { beforeAll, afterAll, it, expect } from "vitest";
-import { PrismaClient, Prisma } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 import { describeInt, iso, utcDay } from "./helpers";
 import { createBooking, cancelBooking, expireHolds } from "@/lib/booking-service";
 import { createQuote } from "@/lib/pricing/quote";
@@ -35,7 +35,7 @@ describeInt("rezervasyon çekirdeği (integration)", () => {
         description: "core test",
         propertyType: "HOTEL",
         locationId: location.id,
-        basePrice: new Prisma.Decimal(price),
+        basePriceMinor: BigInt(Math.round(price * 100)),
         currency,
       },
     });
@@ -46,7 +46,7 @@ describeInt("rezervasyon çekirdeği (integration)", () => {
         maxOccupancy: 2,
         units: 1,
         bedType: "Çift",
-        priceModifier: new Prisma.Decimal(50),
+        priceModifierMinor: 5000n,
         ratePlans: { create: [{ code: "STANDARD", name: "Standart", isDefault: true }] },
       },
     });
@@ -54,7 +54,7 @@ describeInt("rezervasyon çekirdeği (integration)", () => {
       data: Array.from({ length: 80 }, (_, i) => ({
         roomTypeId: room.id,
         date: utcDay(i + 1),
-        price: new Prisma.Decimal(price),
+        priceMinor: BigInt(Math.round(price * 100)),
         total: 1,
       })),
     });
@@ -244,7 +244,7 @@ describeInt("rezervasyon çekirdeği (integration)", () => {
     const stale = await createQuote(req);
     await prisma.inventoryDay.updateMany({
       where: { roomTypeId: tryProperty.roomId, date: utcDay(41) },
-      data: { price: new Prisma.Decimal(1300) },
+      data: { priceMinor: 130000n },
     });
     await expect(
       createBooking({

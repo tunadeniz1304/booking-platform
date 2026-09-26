@@ -18,7 +18,7 @@ vi.mock("@/lib/prisma", () => ({
     },
     $transaction: vi.fn(async () => {
       db.created += 1;
-      return { id: "p-new" };
+      return { id: "p-new", basePriceMinor: 250_000n, currency: "TRY" };
     }),
   },
 }));

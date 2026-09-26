@@ -1,5 +1,5 @@
 import { beforeAll, beforeEach, afterAll, it, expect } from "vitest";
-import { PrismaClient, Prisma } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 import { describeInt, iso, utcDay } from "./helpers";
 import { createStayFixture, type StayFixture } from "./fixtures";
 import {
@@ -145,7 +145,7 @@ describeInt("ajan checkout oturumları (P1-11, integration)", () => {
     const { session } = await createCheckoutSession(fx.userId, key(), input);
     await prisma.inventoryDay.updateMany({
       where: { roomTypeId: fx.roomId, date: new Date(`${input.check_in}T00:00:00.000Z`) },
-      data: { price: new Prisma.Decimal(4321) },
+      data: { priceMinor: 432100n },
     });
     await expect(
       completeCheckoutSession(fx.userId, session.id, key(), "spt_mock_ok")

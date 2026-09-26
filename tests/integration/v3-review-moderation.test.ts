@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { NextRequest } from "next/server";
-import { Prisma, PrismaClient } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 import { describeInt, utcDay } from "./helpers";
 import { createStayFixture, type StayFixture } from "./fixtures";
 import { signAccessToken, type Role } from "@/lib/auth/tokens";
@@ -51,7 +51,7 @@ describeInt("P1-7 yorum moderasyonu (integration)", () => {
         checkIn: utcDay(dayOffset),
         checkOut: utcDay(dayOffset + 2),
         guestCount: 1,
-        totalPrice: new Prisma.Decimal(1000),
+        totalPriceMinor: 100000n,
         status,
       },
     });

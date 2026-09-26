@@ -1,5 +1,5 @@
 import { it, expect } from "vitest";
-import { PrismaClient, Prisma } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 import { describeInt, utcDay } from "./helpers";
 import { planTrip } from "@/lib/ai/trip-planner";
 import { optimizeRoute } from "@/lib/routing/optimizer";
@@ -38,7 +38,7 @@ describeInt("P1-6 trip-planner (integration, demo)", () => {
           description: "gezi",
           propertyType: "HOTEL",
           locationId: loc.id,
-          basePrice: new Prisma.Decimal(c.price),
+          basePriceMinor: BigInt(Math.round(c.price * 100)),
         },
       });
       const room = await prisma.roomType.create({
@@ -55,7 +55,7 @@ describeInt("P1-6 trip-planner (integration, demo)", () => {
           roomTypeId: room.id,
           total: 1,
           date: utcDay(i + 1),
-          price: new Prisma.Decimal(c.price),
+          priceMinor: BigInt(Math.round(c.price * 100)),
         })),
         skipDuplicates: true,
       });

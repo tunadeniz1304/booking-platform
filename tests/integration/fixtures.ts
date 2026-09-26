@@ -1,4 +1,4 @@
-import { Prisma, type PrismaClient } from "@prisma/client";
+import { type PrismaClient } from "@prisma/client";
 import { createBooking } from "@/lib/booking-service";
 import { iso, utcDay } from "./helpers";
 
@@ -58,7 +58,7 @@ export async function createStayFixture(
   const location = await prisma.location.create({
     data: { city: `City-${stamp}`, country: opts.country ?? "TEST" },
   });
-  const price = new Prisma.Decimal(opts.nightlyPrice ?? 1000);
+  const price = BigInt(Math.round((opts.nightlyPrice ?? 1000) * 100));
   const property = await prisma.property.create({
     data: {
       licenseStatus: "VERIFIED",
@@ -67,7 +67,7 @@ export async function createStayFixture(
       description: "entegrasyon testi",
       propertyType: "HOTEL",
       locationId: location.id,
-      basePrice: price,
+      basePriceMinor: price,
       cancellationPolicyId: opts.policyId ?? "policy_moderate_v1",
       ...(opts.timeZone ? { timeZone: opts.timeZone } : {}),
     },
@@ -92,7 +92,7 @@ export async function createStayFixture(
     data: Array.from({ length: opts.days ?? 120 }, (_, i) => ({
       roomTypeId: room.id,
       date: utcDay(i + 1),
-      price,
+      priceMinor: price,
       total: units,
     })),
   });
@@ -129,7 +129,7 @@ export async function createStayFixture(
 export async function ledgerNetMinor(prisma: PrismaClient, bookingId: string): Promise<number> {
   const rows = await prisma.ledgerEntry.findMany({ where: { bookingId } });
   return rows.reduce((sum, r) => {
-    const minor = Math.round(Number(r.amount) * 100);
+    const minor = Number(r.amountMinor);
     return r.kind === "CHARGE" ? sum + minor : r.kind === "REFUND" ? sum - minor : sum;
   }, 0);
 }

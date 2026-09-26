@@ -149,6 +149,6 @@ describeInt("kanal yöneticisi (integration)", () => {
     const day = await prisma.inventoryDay.findFirstOrThrow({
       where: { roomTypeId: fx.roomId, date: utcDay(3) },
     });
-    expect(Number(day.price)).toBe(1000);
+    expect(Number(day.priceMinor)).toBe(100000);
   });
 });

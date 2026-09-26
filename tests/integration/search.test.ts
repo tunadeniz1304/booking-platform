@@ -1,5 +1,5 @@
 import { beforeAll, afterAll, it, expect } from "vitest";
-import { PrismaClient, Prisma } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 import { describeInt, iso, utcDay } from "./helpers";
 import {
   searchProperties,
@@ -54,7 +54,7 @@ describeInt("arama (integration)", () => {
         description: opts.description,
         propertyType: opts.propertyType ?? "HOTEL",
         locationId: location.id,
-        basePrice: new Prisma.Decimal(opts.price),
+        basePriceMinor: BigInt(Math.round(opts.price * 100)),
         currency: "TRY",
         ratingAvg: opts.rating,
         ratingCount: 10,
@@ -74,7 +74,7 @@ describeInt("arama (integration)", () => {
         name: "Oda",
         maxOccupancy: opts.capacity ?? 2,
         bedType: "Çift",
-        priceModifier: new Prisma.Decimal(0),
+        priceModifierMinor: 0n,
         ratePlans: { create: [{ code: "STANDARD", name: "Standart", isDefault: true }] },
       },
     });
@@ -82,7 +82,7 @@ describeInt("arama (integration)", () => {
       data: Array.from({ length: 14 }, (_, i) => ({
         roomTypeId: room.id,
         date: utcDay(i + 1),
-        price: new Prisma.Decimal(opts.price),
+        priceMinor: BigInt(Math.round(opts.price * 100)),
         total: 1,
         // Dolu gece: tek birim satılmış (sold + held = total)
         sold: opts.bookedNight !== undefined && i + 1 === opts.bookedNight ? 1 : 0,

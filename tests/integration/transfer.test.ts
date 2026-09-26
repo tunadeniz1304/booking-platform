@@ -1,6 +1,6 @@
 // P1-8 / hata #3: imzalı claim linki, escrow ödemesi, tek kullanımlık token, yarış güvenliği.
 import { beforeAll, afterAll, afterEach, it, expect } from "vitest";
-import { PrismaClient, Prisma, BookingStatus } from "@prisma/client";
+import { PrismaClient, BookingStatus } from "@prisma/client";
 import { describeInt, utcDay } from "./helpers";
 import {
   claimTransfer,
@@ -41,7 +41,7 @@ describeInt("regression: #3 P2P devir (integration)", () => {
         checkIn: utcDay(daysAhead),
         checkOut: utcDay(daysAhead + 2),
         guestCount: 1,
-        totalPrice: new Prisma.Decimal(2000),
+        totalPriceMinor: 200000n,
         status: BookingStatus.CONFIRMED,
       },
     });
@@ -49,7 +49,7 @@ describeInt("regression: #3 P2P devir (integration)", () => {
       data: {
         bookingId: b.id,
         userId: seller,
-        amount: new Prisma.Decimal(2000),
+        amountMinor: 200000n,
         provider: "mock",
         providerRef: `pi_seller_${b.id}`,
         status: "PAID",
@@ -82,7 +82,7 @@ describeInt("regression: #3 P2P devir (integration)", () => {
         description: "t",
         propertyType: "HOTEL",
         locationId: location.id,
-        basePrice: new Prisma.Decimal(1000),
+        basePriceMinor: 100000n,
       },
     });
     propertyId = property.id;
@@ -133,7 +133,7 @@ describeInt("regression: #3 P2P devir (integration)", () => {
     expect(b.payment?.userId).toBe(seller);
     const payout = await prisma.payout.findUniqueOrThrow({ where: { transferId: listed.id } });
     expect(payout).toMatchObject({ userId: seller, status: "PENDING", currency: "TRY" });
-    expect(Number(payout.amount)).toBe(2000);
+    expect(Number(payout.amountMinor)).toBe(200000);
     const ledger = await prisma.ledgerEntry.findMany({
       where: { bookingId },
       orderBy: { kind: "asc" },
@@ -153,7 +153,7 @@ describeInt("regression: #3 P2P devir (integration)", () => {
         date: utcDay(d),
         total: 1,
         sold: 1,
-        price: new Prisma.Decimal(1000),
+        priceMinor: 100000n,
       })),
     });
     const listed = await listBookingForTransfer(bookingId, seller, 150_000);

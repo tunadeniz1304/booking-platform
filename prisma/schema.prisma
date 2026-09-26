@@ -89,7 +89,7 @@ model Property {
   bookings             Booking[]
   reviews              Review[]
   favorites            Favorite[]
-  basePrice            Decimal                     @db.Decimal(10, 2)
+  basePriceMinor       BigInt
   currency             String                      @default("TRY")
   ratingAvg            Float                       @default(0)
   ratingCount          Int                         @default(0)
@@ -191,7 +191,7 @@ model RoomType {
   /// Bu tipten kaç oda satılabilir (günlük `InventoryDay.total` varsayılanı).
   units            Int               @default(1)
   bedType          String
-  priceModifier    Decimal           @default(0) @db.Decimal(10, 2)
+  priceModifierMinor BigInt @default(0)
   available        Boolean           @default(true)
   inventory        InventoryDay[]
   ratePlans        RatePlan[]
@@ -214,7 +214,7 @@ model InventoryDay {
   total            Int
   sold             Int      @default(0)
   held             Int      @default(0)
-  price            Decimal  @db.Decimal(10, 2)
+  priceMinor       BigInt
   /// "Bu fiyat neden?": taban, faktör-başı katkılar ve tavan/taban kırpması.
   priceExplanation Json?
   /// Ev sahibi fiyatı elle/öneri kabulüyle sabitledi (P1-5): fiyat motoru bu geceyi ezmez.
@@ -299,7 +299,7 @@ model Booking {
   checkIn                DateTime          @db.Date
   checkOut               DateTime          @db.Date
   guestCount             Int
-  totalPrice             Decimal           @db.Decimal(10, 2)
+  totalPriceMinor        BigInt
   currency               String            @default("TRY")
   status                 BookingStatus     @default(PENDING)
   /// HELD durumundaki geçici tutma süresi; dolunca expire-holds işi envanteri iade eder.
@@ -376,13 +376,13 @@ model Payment {
   /// Ödemenin sahibi = rezervasyonun güncel sahibi (devirde alıcıya geçer).
   userId         String
   user           User          @relation(fields: [userId], references: [id])
-  amount         Decimal       @db.Decimal(10, 2)
+  amountMinor    BigInt
   currency       String        @default("TRY")
   provider       String
   /// PSP tarafındaki ödeme kimliği (mock: pi_mock_…, stripe: pi_…).
   providerRef    String?       @unique
   status         PaymentStatus @default(PENDING)
-  refundedAmount Decimal       @default(0) @db.Decimal(10, 2)
+  refundedAmountMinor BigInt @default(0)
   failureCode    String?
   authorizedAt   DateTime?
   paidAt         DateTime?
@@ -419,7 +419,7 @@ model LedgerEntry {
   booking   Booking    @relation(fields: [bookingId], references: [id])
   userId    String
   kind      LedgerKind
-  amount    Decimal    @db.Decimal(10, 2)
+  amountMinor BigInt
   currency  String
   reference String?
   createdAt DateTime   @default(now())
@@ -613,7 +613,7 @@ model PriceHistory {
   propertyId      String
   property        Property @relation(fields: [propertyId], references: [id])
   month           DateTime @db.Date
-  avgNightlyPrice Decimal  @db.Decimal(10, 2)
+  avgNightlyPriceMinor BigInt
   demandIndex     Float    @default(50)
   createdAt       DateTime @default(now())
 
@@ -663,7 +663,7 @@ model BookingTransfer {
   sellerId        String
   seller          User           @relation("transferSeller", fields: [sellerId], references: [id])
   status          TransferStatus @default(LISTED)
-  askPrice        Decimal        @db.Decimal(10, 2)
+  askPriceMinor   BigInt
   currency        String         @default("TRY")
   /// İmzalı claim linkinin SHA-256 özeti — token'ın kendisi saklanmaz.
   tokenHash       String         @unique
@@ -699,7 +699,7 @@ model Payout {
   bookingId  String
   booking    Booking      @relation(fields: [bookingId], references: [id])
   transferId String       @unique
-  amount     Decimal      @db.Decimal(10, 2)
+  amountMinor BigInt
   currency   String
   status     PayoutStatus @default(PENDING)
   reference  String?
@@ -717,8 +717,8 @@ model Invoice {
   bookingId String   @unique
   booking   Booking  @relation(fields: [bookingId], references: [id])
   number    String   @unique
-  amount    Decimal  @db.Decimal(10, 2)
-  taxAmount Decimal  @db.Decimal(10, 2)
+  amountMinor BigInt
+  taxAmountMinor BigInt
   currency  String
   buyerName String
   issuedAt  DateTime @default(now())

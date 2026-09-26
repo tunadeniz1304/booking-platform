@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getConfig } from "@/lib/config/app-config";
 import { NotFoundError, ValidationError } from "@/lib/http/errors";
-import { assertCurrency, toMinor } from "@/lib/money/money";
+import { assertCurrency, minorFromDb } from "@/lib/money/money";
 import {
   addDays,
   DateRangeError,
@@ -140,23 +140,23 @@ export async function getPriceInsight(input: {
   const room = await prisma.roomType.findUnique({
     where: { id: input.roomId },
     select: {
-      property: { select: { locationId: true, currency: true, basePrice: true } },
+      property: { select: { locationId: true, currency: true, basePriceMinor: true } },
     },
   });
   if (!room) throw new NotFoundError("Oda bulunamadı");
   const currency = assertCurrency(room.property.currency);
-  const baseMinor = toMinor(room.property.basePrice.toString(), currency);
+  const baseMinor = minorFromDb(room.property.basePriceMinor);
 
   const own = await prisma.inventoryDay.findMany({
     where: {
       roomTypeId: input.roomId,
       date: { gte: toDbDate(nights[0]), lte: toDbDate(nights[nights.length - 1]) },
     },
-    select: { date: true, price: true },
+    select: { date: true, priceMinor: true },
   });
   if (own.length !== nights.length) throw new NotFoundError("Seçilen geceler için fiyat yok");
   const nightlyMinor = Math.round(
-    own.reduce((s, r) => s + toMinor(r.price.toString(), currency), 0) / own.length
+    own.reduce((s, r) => s + minorFromDb(r.priceMinor), 0) / own.length
   );
   const predictedMinor = Math.round(
     nights.reduce((s, d) => s + predictedFor(d, baseMinor, currency), 0) / nights.length
@@ -174,19 +174,19 @@ export async function getPriceInsight(input: {
     },
     select: {
       date: true,
-      price: true,
-      roomType: { select: { property: { select: { basePrice: true } } } },
+      priceMinor: true,
+      roomType: { select: { property: { select: { basePriceMinor: true } } } },
     },
   });
   const scores: number[] = [];
   for (const row of calibration) {
     const predicted = predictedFor(
       fromDate(row.date),
-      toMinor(row.roomType.property.basePrice.toString(), currency),
+      minorFromDb(row.roomType.property.basePriceMinor),
       currency
     );
     if (predicted > 0) {
-      scores.push(relativeScore(toMinor(row.price.toString(), currency), predicted));
+      scores.push(relativeScore(minorFromDb(row.priceMinor), predicted));
     }
   }
 

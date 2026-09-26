@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { PrismaClient, Prisma } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 import { createBooking } from "@/lib/booking-service";
 import { describeInt } from "./helpers";
 
@@ -46,7 +46,7 @@ describeInt("booking-concurrency (integration)", () => {
             roomTypeId: roomId,
             date,
             total: 1,
-            price: new Prisma.Decimal(1000),
+            priceMinor: 100000n,
           },
         });
       })
@@ -83,7 +83,7 @@ describeInt("booking-concurrency (integration)", () => {
         description: "Concurrency test property used by vitest.",
         propertyType: "HOTEL",
         locationId: location.id,
-        basePrice: new Prisma.Decimal(1000),
+        basePriceMinor: 100000n,
         currency: "TRY",
         isActive: true,
       },
@@ -94,7 +94,7 @@ describeInt("booking-concurrency (integration)", () => {
         name: "Test Room",
         maxOccupancy: 2,
         bedType: "Çift Kişilik Yatak",
-        priceModifier: new Prisma.Decimal(0),
+        priceModifierMinor: 0n,
         available: true,
         ratePlans: { create: [{ code: "STANDARD", name: "Standart", isDefault: true }] },
       },

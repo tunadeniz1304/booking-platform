@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
-import { PrismaClient, Prisma } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 import { describeInt } from "./helpers";
 import { createStayFixture, type StayFixture } from "./fixtures";
 import { SoftAuthenticator } from "../helpers/soft-authenticator";
@@ -284,12 +284,12 @@ describeInt("regression: v4#2 çalınan oturum hassas işlemleri ve step-up'ı a
     const original = await prisma.booking.findUniqueOrThrow({ where: { id: b2.id } });
     await prisma.booking.update({
       where: { id: b2.id },
-      data: { totalPrice: original.totalPrice.plus(new Prisma.Decimal(1)) },
+      data: { totalPriceMinor: original.totalPriceMinor + 100n },
     });
     await expect(pay(b2.id, t2, "a3")).rejects.toMatchObject({ code: "STEP_UP_REQUIRED" });
     await prisma.booking.update({
       where: { id: b2.id },
-      data: { totalPrice: original.totalPrice },
+      data: { totalPriceMinor: original.totalPriceMinor },
     });
     await expect(pay(b2.id, t2, "a4")).rejects.toMatchObject({ code: "STEP_UP_REQUIRED" });
     const t3 = await stepUp(b2.id);

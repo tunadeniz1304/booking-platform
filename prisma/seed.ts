@@ -1,4 +1,4 @@
-import { PrismaClient, Prisma, PropertyType, UserRole, BookingStatus } from "@prisma/client";
+import { PrismaClient, PropertyType, UserRole, BookingStatus } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { assertSeedAllowed } from "../src/lib/config/seed-guard";
 
@@ -20,6 +20,18 @@ const IMAGE_POOL = [
   "https://images.unsplash.com/photo-1512918728675-ed5a9ecdebfd?auto=format&fit=crop&w=1200&q=80",
   "https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?auto=format&fit=crop&w=1200&q=80",
 ];
+
+/**
+ * Seed verisi okunabilirlik için ana birimde (TRY, 2 basamak) yazılır; veritabanına
+ * `BigInt *Minor` olarak yazılırken tek noktada çevrilir (ADR 0019).
+ */
+const SEED_EXPONENT = 2;
+function minor(major: number): bigint {
+  return BigInt(Math.round(major * 10 ** SEED_EXPONENT));
+}
+function majorOf(minorAmount: bigint): number {
+  return Number(minorAmount) / 10 ** SEED_EXPONENT;
+}
 
 function addDays(date: Date, days: number): Date {
   const d = new Date(date);
@@ -1064,7 +1076,7 @@ async function main() {
         locationId: locations[prop.loc],
         // ADR 0011: her tesis kendi yerel saat diliminde işler (iade penceresi, gece, iCal).
         timeZone: TIME_ZONES[LOCATIONS[prop.loc].city] ?? "Europe/Istanbul",
-        basePrice: new Prisma.Decimal(prop.basePrice),
+        basePriceMinor: minor(prop.basePrice),
         currency: "TRY",
         ratingAvg: prop.ratingAvg,
         ratingCount: prop.ratingCount,
@@ -1092,7 +1104,7 @@ async function main() {
           maxOccupancy: room.capacity,
           units,
           bedType: room.bedType,
-          priceModifier: new Prisma.Decimal(room.priceModifier),
+          priceModifierMinor: minor(room.priceModifier),
           available: true,
           ratePlans: { create: ratePlansFor(prop.type) },
         },
@@ -1107,7 +1119,7 @@ async function main() {
           roomTypeId: createdRoom.id,
           date,
           total: units,
-          price: new Prisma.Decimal(price),
+          priceMinor: minor(price),
         });
       }
       await prisma.inventoryDay.createMany({ data: availabilities });
@@ -1139,7 +1151,7 @@ async function main() {
         propertyType: "APARTMENT" as PropertyType,
         locationId: locations[0],
         timeZone: "Europe/Istanbul",
-        basePrice: new Prisma.Decimal(1800),
+        basePriceMinor: minor(1800),
         currency: "TRY",
         isActive: true,
         licenseNumber: null,
@@ -1155,7 +1167,7 @@ async function main() {
         maxOccupancy: 2,
         units: 1,
         bedType: "Çift Kişilik Yatak",
-        priceModifier: new Prisma.Decimal(0),
+        priceModifierMinor: 0n,
         available: true,
         ratePlans: { create: ratePlansFor("APARTMENT") },
       },
@@ -1165,7 +1177,7 @@ async function main() {
         roomTypeId: room.id,
         date: addDays(today, day),
         total: 1,
-        price: new Prisma.Decimal(1800),
+        priceMinor: minor(1800),
       })),
     });
     console.log(`Belgesiz demo ilanı (aramada gizli): ${UNLICENSED_DEMO_TITLE}`);
@@ -1191,7 +1203,7 @@ async function main() {
       orderBy: { date: "asc" },
     });
     if (rows.length !== bp.nights) continue;
-    const total = rows.reduce((sum, r) => sum + Number(r.price), 0);
+    const total = rows.reduce((sum, r) => sum + r.priceMinor, 0n);
     const booking = await prisma.booking.create({
       data: {
         userId: allGuests[bp.g].id,
@@ -1200,7 +1212,7 @@ async function main() {
         checkIn,
         checkOut: addDays(checkIn, bp.nights),
         guestCount: 2,
-        totalPrice: new Prisma.Decimal(Math.round(total * 100) / 100),
+        totalPriceMinor: total,
         currency: "TRY",
         status: bp.status as "CONFIRMED" | "PENDING",
       },
@@ -1223,7 +1235,7 @@ async function main() {
         data: {
           bookingId: booking.id,
           userId: allGuests[bp.g].id,
-          amount: booking.totalPrice,
+          amountMinor: booking.totalPriceMinor,
           currency: "TRY",
           provider: "mock-stripe",
           status: "PAID",
@@ -1289,7 +1301,7 @@ async function main() {
       include: { location: true, amenities: { select: { name: true } } },
     });
     if (!prop) continue;
-    const total = Number(prop.basePrice) * seasonFactor(checkIn.getUTCMonth()) * nights;
+    const total = majorOf(prop.basePriceMinor) * seasonFactor(checkIn.getUTCMonth()) * nights;
     const booking = await prisma.booking.create({
       data: {
         userId: reviewer.id,
@@ -1298,7 +1310,7 @@ async function main() {
         checkIn,
         checkOut: addDays(checkIn, nights),
         guestCount: 1 + (plan.g % 2),
-        totalPrice: new Prisma.Decimal(Math.round(total * 100) / 100),
+        totalPriceMinor: minor(total),
         currency: "TRY",
         status: BookingStatus.COMPLETED,
         createdAt: addDays(checkIn, -10),
@@ -1308,7 +1320,7 @@ async function main() {
       data: {
         bookingId: booking.id,
         userId: reviewer.id,
-        amount: booking.totalPrice,
+        amountMinor: booking.totalPriceMinor,
         currency: "TRY",
         provider: "mock-gateway",
         status: "PAID",
@@ -1322,7 +1334,7 @@ async function main() {
         propertyType: prop.propertyType,
         city: prop.location.city,
         amenities: prop.amenities.map((a) => a.name),
-        basePrice: Number(prop.basePrice),
+        basePrice: majorOf(prop.basePriceMinor),
       },
       plan.persona,
       checkIn.getUTCMonth(),
@@ -1341,10 +1353,12 @@ async function main() {
   const historyRows: Array<{
     propertyId: string;
     month: Date;
-    avgNightlyPrice: Prisma.Decimal;
+    avgNightlyPriceMinor: bigint;
     demandIndex: number;
   }> = [];
-  for (const prop of await prisma.property.findMany({ select: { id: true, basePrice: true } })) {
+  for (const prop of await prisma.property.findMany({
+    select: { id: true, basePriceMinor: true },
+  })) {
     const rng = mulberry32([...prop.id].reduce((a, c) => a + c.charCodeAt(0), 7));
     for (let m = 0; m < 12; m++) {
       const monthDate = new Date(
@@ -1352,12 +1366,12 @@ async function main() {
       );
       const sf = seasonFactor(monthDate.getUTCMonth());
       const noise = 0.92 + rng() * 0.16;
-      const avg = Number(prop.basePrice) * sf * noise;
+      const avg = majorOf(prop.basePriceMinor) * sf * noise;
       const demandIndex = Math.round(Math.min(98, Math.max(12, (sf - 0.9) * 220 + noise * 10)));
       historyRows.push({
         propertyId: prop.id,
         month: monthDate,
-        avgNightlyPrice: new Prisma.Decimal(Math.round(avg * 100) / 100),
+        avgNightlyPriceMinor: minor(avg),
         demandIndex,
       });
     }

@@ -5,7 +5,7 @@ import PDFDocument from "pdfkit";
 import { BookingStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { ConflictError, NotFoundError } from "@/lib/http/errors";
-import { formatMoney, fromDecimal, money, toDecimalString } from "@/lib/money/money";
+import { formatMoney, minorFromDb, minorToDb, money } from "@/lib/money/money";
 
 /**
  * Mock e-Arşiv fatura: GİB entegrasyonu YOK. Numara deterministik, PDF üzerinde
@@ -106,8 +106,8 @@ export async function issueInvoice(bookingId: string, userId: string): Promise<I
       create: {
         bookingId,
         number: invoiceNumber(bookingId, issuedAt),
-        amount: booking.totalPrice,
-        taxAmount: toDecimalString(money(taxMinorOf(booking.priceBreakdown), booking.currency)),
+        amountMinor: booking.totalPriceMinor,
+        taxAmountMinor: minorToDb(taxMinorOf(booking.priceBreakdown)),
         currency: booking.currency,
         buyerName: `${booking.user.firstName} ${booking.user.lastName}`.trim(),
         issuedAt,
@@ -119,7 +119,7 @@ export async function issueInvoice(bookingId: string, userId: string): Promise<I
     buyerName: invoice.buyerName,
     bookingId,
     currency: invoice.currency,
-    amountMinor: fromDecimal(invoice.amount, invoice.currency).amount,
-    taxMinor: fromDecimal(invoice.taxAmount, invoice.currency).amount,
+    amountMinor: minorFromDb(invoice.amountMinor),
+    taxMinor: minorFromDb(invoice.taxAmountMinor),
   };
 }

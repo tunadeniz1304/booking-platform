@@ -1,4 +1,3 @@
-import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getConfig } from "@/lib/config/app-config";
 import { addDays, todayUtc, toDbDate } from "@/lib/time/nights";
@@ -20,14 +19,14 @@ export async function rollAvailabilityForward(
   const today = todayUtc(now);
   const rooms = await prisma.roomType.findMany({
     where: { available: true, property: { isActive: true } },
-    select: { id: true, units: true, property: { select: { basePrice: true } } },
+    select: { id: true, units: true, property: { select: { basePriceMinor: true } } },
   });
   let created = 0;
   for (const room of rooms) {
     const data = Array.from({ length: horizonDays }, (_, i) => ({
       roomTypeId: room.id,
       date: toDbDate(addDays(today, i)),
-      price: new Prisma.Decimal(room.property.basePrice.toString()),
+      priceMinor: room.property.basePriceMinor,
       total: room.units,
     }));
     const res = await prisma.inventoryDay.createMany({ data, skipDuplicates: true });

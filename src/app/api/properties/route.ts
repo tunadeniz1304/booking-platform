@@ -1,13 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { Prisma, PropertyType } from "@prisma/client";
+import { PropertyType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth";
 import { ValidationError, toErrorResponse } from "@/lib/http/errors";
 import { httpsUrl } from "@/lib/security/url";
 import { withAiSubject } from "@/lib/http/ai";
 import { DEFAULT_RATE_PLANS, licenseSchema, roomSchema } from "@/lib/host/host-service";
-import { CURRENCIES } from "@/lib/money/money";
+import {
+  CURRENCIES,
+  minorFromDb,
+  minorToDb,
+  moneyFromDb,
+  toDecimalString,
+  toMinor,
+} from "@/lib/money/money";
 import {
   SearchParamsSchema,
   searchParamsFromUrl,
@@ -130,7 +137,7 @@ export async function POST(req: NextRequest) {
           description,
           propertyType: propertyType as PropertyType,
           locationId: location.id,
-          basePrice: new Prisma.Decimal(basePrice),
+          basePriceMinor: minorToDb(toMinor(basePrice, currency)),
           currency,
           // Belge numarası yoksa veya kayıtta doğrulanmadıysa ilan yayınlanmaz (7464 / 7565, v3#25).
           isActive: license?.status === "VERIFIED",
@@ -147,7 +154,7 @@ export async function POST(req: NextRequest) {
               units: room.units,
               ratePlans: { create: DEFAULT_RATE_PLANS.map((p) => ({ ...p })) },
               bedType: room.bedType,
-              priceModifier: new Prisma.Decimal(room.priceModifier),
+              priceModifierMinor: minorToDb(toMinor(room.priceModifier, currency)),
             })),
           },
         },
@@ -155,7 +162,7 @@ export async function POST(req: NextRequest) {
           id: true,
           title: true,
           propertyType: true,
-          basePrice: true,
+          basePriceMinor: true,
           currency: true,
           isActive: true,
           licenseStatus: true,
@@ -173,7 +180,15 @@ export async function POST(req: NextRequest) {
       return created;
     });
 
-    return NextResponse.json(property, { status: 201 });
+    // API sözleşmesi: `basePrice` ondalık string (görüntüleme), `basePriceMinor` hesaplama için.
+    return NextResponse.json(
+      {
+        ...property,
+        basePriceMinor: minorFromDb(property.basePriceMinor),
+        basePrice: toDecimalString(moneyFromDb(property.basePriceMinor, property.currency)),
+      },
+      { status: 201 }
+    );
   } catch (error) {
     return toErrorResponse(error, "properties.create");
   }

@@ -11,7 +11,7 @@ import { redis } from "@/lib/redis";
 import { mapLimit } from "@/lib/resilience/limit";
 import { assertNumbersGrounded, buildFactSet } from "@/lib/llm/guards";
 import { logger } from "@/lib/observability/logger";
-import { money, toDecimalString, toMinor } from "@/lib/money/money";
+import { minorToDb, minorFromDb } from "@/lib/money/money";
 import { addDays, diffDays, fromDate, toDbDate, todayIn, type IsoDate } from "@/lib/time/nights";
 import { assertPropertyAccess, assertRoomAccess } from "@/lib/host/host-service";
 import { invalidatePriceCache } from "@/lib/pricing-service";
@@ -197,7 +197,13 @@ export async function getRevenueOverview(
         checkIn: { lt: toDbDate(to) },
         checkOut: { gt: toDbDate(from) },
       },
-      select: { checkIn: true, checkOut: true, totalPrice: true, currency: true, createdAt: true },
+      select: {
+        checkIn: true,
+        checkOut: true,
+        totalPriceMinor: true,
+        currency: true,
+        createdAt: true,
+      },
     }),
     prisma.priceSuggestion.findMany({
       where: { roomTypeId: { in: roomIds }, status: "PENDING", date: { gte: toDbDate(today) } },
@@ -217,7 +223,7 @@ export async function getRevenueOverview(
   const stays = sameCurrency.map((b) => ({
     checkIn: fromDate(b.checkIn),
     checkOut: fromDate(b.checkOut),
-    totalMinor: toMinor(b.totalPrice.toString(), b.currency),
+    totalMinor: minorFromDb(b.totalPriceMinor),
     createdOn: fromDate(b.createdAt),
   }));
 
@@ -354,7 +360,7 @@ export async function generateSuggestions(
       id: true,
       name: true,
       property: {
-        select: { basePrice: true, currency: true, locationId: true, timeZone: true },
+        select: { basePriceMinor: true, currency: true, locationId: true, timeZone: true },
       },
     },
   });
@@ -362,12 +368,12 @@ export async function generateSuggestions(
   const today = todayIn(timeZone, now);
   const first = addDays(today, 1);
   const last = addDays(today, cfg.REVENUE_SUGGESTION_DAYS);
-  const baseMinor = toMinor(room.property.basePrice.toString(), currency);
+  const baseMinor = minorFromDb(room.property.basePriceMinor);
 
   const [rows, events] = await Promise.all([
     prisma.inventoryDay.findMany({
       where: { roomTypeId: roomId, date: { gte: toDbDate(first), lte: toDbDate(last) } },
-      select: { date: true, total: true, sold: true, held: true, price: true },
+      select: { date: true, total: true, sold: true, held: true, priceMinor: true },
       orderBy: { date: "asc" },
     }),
     prisma.demandEvent.findMany({
@@ -400,7 +406,7 @@ export async function generateSuggestions(
         holiday,
         events: active,
       });
-      const currentMinor = toMinor(row.price.toString(), currency);
+      const currentMinor = minorFromDb(row.priceMinor);
       const explained = await explainSuggestion({
         date,
         currency,
@@ -465,9 +471,7 @@ function alreadyDecided(): ConflictError {
 /** Kabul: fiyatı yazar ve geceyi sabitler (motor artık ezmez). */
 export async function acceptSuggestion(actor: AccessClaims, id: string): Promise<SuggestionView> {
   const { suggestion, propertyId } = await loadOwnedSuggestion(actor, id);
-  const price = new Prisma.Decimal(
-    toDecimalString(money(suggestion.suggestedMinor, suggestion.currency))
-  );
+  const price = minorToDb(suggestion.suggestedMinor);
   await prisma.$transaction(async (tx) => {
     const res = await tx.priceSuggestion.updateMany({
       where: { id, status: "PENDING" },
@@ -477,7 +481,7 @@ export async function acceptSuggestion(actor: AccessClaims, id: string): Promise
     const day = await tx.inventoryDay.updateMany({
       where: { roomTypeId: suggestion.roomTypeId, date: suggestion.date },
       data: {
-        price,
+        priceMinor: price,
         priceOverride: true,
         priceExplanation: {
           source: "host_override",

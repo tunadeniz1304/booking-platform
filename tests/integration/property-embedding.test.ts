@@ -1,5 +1,5 @@
 import { it, expect } from "vitest";
-import { PrismaClient, Prisma } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 import { describeInt } from "./helpers";
 import { appendOutbox, relayOutbox } from "@/lib/cqrs";
 import { EventTypes, makeEvent } from "@/lib/events/events";
@@ -24,7 +24,7 @@ describeInt("regression: #22 yeni mülk embedding'i (integration)", () => {
         description: "Kahvaltı dahil, havuzlu",
         propertyType: "HOTEL",
         locationId: loc.id,
-        basePrice: new Prisma.Decimal(900),
+        basePriceMinor: 90000n,
       },
     });
     await appendOutbox(

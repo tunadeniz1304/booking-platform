@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { redis } from "@/lib/redis";
 import { getConfig } from "@/lib/config/app-config";
 import { eventSignal, priceNights } from "@/lib/pricing/event-signals";
-import { toMinor } from "@/lib/money/money";
+import { minorFromDb, moneyFromDb, toDecimalString } from "@/lib/money/money";
 
 /**
  * Canlı talep ısı haritası istatistikleri.
@@ -96,7 +96,7 @@ export async function getRoomHeat(
     where: { id: roomId },
     select: {
       propertyId: true,
-      property: { select: { locationId: true, currency: true, basePrice: true } },
+      property: { select: { locationId: true, currency: true, basePriceMinor: true } },
     },
   });
   if (!room) return null;
@@ -111,7 +111,7 @@ export async function getRoomHeat(
 
   const availability = await prisma.inventoryDay.findMany({
     where: { roomTypeId: roomId, date: { gte: start, lt: end } },
-    select: { total: true, sold: true, held: true, price: true, date: true },
+    select: { total: true, sold: true, held: true, priceMinor: true, date: true },
   });
 
   // Oda-gece cinsinden: toplam satılabilir, satılmış + tutulmuş (sayaçlı envanter, ADR 0010).
@@ -127,11 +127,15 @@ export async function getRoomHeat(
   const bookedRecent = Number(bookedRaw ?? "0");
 
   // Güncel fiyat = envanterdeki (tek motorla yazılmış) fiyat; çarpan tekrar uygulanmaz (v3#9).
-  const nightlyBase =
-    availability.find((a) => a.date.getTime() === start.getTime())?.price ??
-    room.property.basePrice ??
-    availability[0]?.price;
-  const currentNightlyPrice = Number(nightlyBase ?? 0) || 0;
+  const nightlyBaseMinor =
+    availability.find((a) => a.date.getTime() === start.getTime())?.priceMinor ??
+    room.property.basePriceMinor ??
+    availability[0]?.priceMinor;
+  // Görüntüleme için ana birim (ör. 1234.5); minor-unit'ten para biriminin üssüyle.
+  const currentNightlyPrice =
+    nightlyBaseMinor === undefined
+      ? 0
+      : Number(toDecimalString(moneyFromDb(nightlyBaseMinor, room.property.currency)));
   // Talep sinyali: olay sinyali (ilk gece) ile doluluk kıtlığının ortalaması.
   let demandSignal = scarcity;
   try {
@@ -139,7 +143,7 @@ export async function getRoomHeat(
     const priced = await priceNights({
       locationId: room.property.locationId,
       nights: [firstNight],
-      baseMinor: toMinor(room.property.basePrice.toString(), room.property.currency),
+      baseMinor: minorFromDb(room.property.basePriceMinor),
       currency: room.property.currency,
     });
     demandSignal = (eventSignal(priced.get(firstNight)!) + scarcity) / 2;

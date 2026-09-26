@@ -1,7 +1,7 @@
 // v4#14: bayat rezervasyon durumu (outbox ile önbellek silme) + cursor pagination.
 import { beforeAll, afterAll, it, expect } from "vitest";
 import { NextRequest } from "next/server";
-import { PrismaClient, Prisma } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 import { describeInt } from "./helpers";
 import { createStayFixture, type StayFixture } from "./fixtures";
 import { getBooking, listUserBookingsPage } from "@/lib/booking-service";
@@ -64,7 +64,7 @@ describeInt("regression: v4#14 rezervasyon önbelleği ve sayfalama (integration
       data: {
         bookingId: held.id,
         userId: fx.userId,
-        amount: new Prisma.Decimal(10),
+        amountMinor: 1000n,
         provider: "mock",
         status: "PAID",
       },

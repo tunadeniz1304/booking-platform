@@ -14,7 +14,8 @@ import { binCountry } from "@/lib/risk/bin-table";
  *
  * Hız sayaçları Redis `INCR`+TTL ile (kullanıcı / istemci anahtarı / kart token'ı). İstemci
  * anahtarı güvenilir vekil ayarına göre çözülür (v3#3 IP düzeltmesi); "unknown" kovası sayılmaz.
- * Cihaz izi istemcide üretilen hash'tir (ekran, saat dilimi, dil — `device-fingerprint.ts`).
+ * Cihaz kimliği sunucu imzalı `did` çerezinden (`device-cookie.ts`), BIN PSP token
+ * metadata'sından gelir; ikisi de istemci gövdesinden alınmaz (v4#13).
  * Redis erişilemezse hız/cihaz kuralları puan eklemez (fail-open).
  */
 

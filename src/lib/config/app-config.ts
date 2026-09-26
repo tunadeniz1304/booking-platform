@@ -240,6 +240,24 @@ const schema = z.object({
 
   // P1-3 deneyler: anonim bucket çerezi ömrü (gün)
   EXPERIMENT_COOKIE_DAYS: int(90, 1, 730),
+
+  // v4 F1-B: hassas işlem güvenliği (v4#2) ve ödeme sağlamlığı (v4#7, v4#13)
+  /** Hassas işlemler için son kimlik doğrulamanın (auth_time) azami yaşı (sn). */
+  RECENT_AUTH_MAX_AGE_SECONDS: int(300, 30, 3600),
+  /** Yeniden doğrulama (parola) denemesi sınırı / pencere (kullanıcı başına). */
+  REAUTH_MAX_ATTEMPTS: int(5, 1, 100),
+  REAUTH_WINDOW_SECONDS: int(900, 60, 86_400),
+  /** Yeni kaydedilen passkey bu süre (saat) boyunca ödeme step-up'ında kullanılamaz. */
+  PASSKEY_STEP_UP_COOLDOWN_HOURS: int(24, 0, 24 * 30),
+  /** Rezervasyon başına başarısız ödeme/3DS denemesi sınırı; aşılınca ödeme FAILED. */
+  PAYMENT_MAX_ATTEMPTS: int(5, 1, 50),
+  /** Deneme sayacının ömrü (sn). */
+  PAYMENT_ATTEMPTS_WINDOW_SECONDS: int(86_400, 60, 30 * 86_400),
+  /** Sunucu imzalı cihaz kimliği çerezinin ömrü (gün). */
+  DEVICE_COOKIE_DAYS: int(365, 1, 730),
+  /** Başarısız PSP iadesinin otomatik yeniden deneme sayısı ve üstel gecikme tabanı (ms). */
+  REFUND_RETRY_MAX_ATTEMPTS: int(8, 1, 50),
+  REFUND_RETRY_BASE_DELAY_MS: int(30_000, 10, 3_600_000),
 });
 
 export type AppConfig = z.infer<typeof schema> & { invalidKeys: string[] };

@@ -63,6 +63,10 @@ export class MockPsp implements PaymentProvider {
     };
   }
 
+  async describeToken(cardToken: string): Promise<{ bin: string | null }> {
+    return { bin: parseMockToken(cardToken)?.bin ?? null };
+  }
+
   async void(): Promise<{ status: "voided" }> {
     return { status: "voided" };
   }

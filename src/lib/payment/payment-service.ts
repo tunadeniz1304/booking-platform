@@ -28,6 +28,7 @@ import type { WebhookEvent } from "./webhook";
 import type { PaymentChallenge } from "./provider";
 import { assessPayment, type FraudDecision } from "@/lib/risk/fraud";
 import { consumeStepUp, hasPasskey } from "@/lib/auth/passkey";
+import { getConfig } from "@/lib/config/app-config";
 
 /**
  * Ödeme orkestrasyonu (P0-5, v3 P0-6).
@@ -512,6 +513,64 @@ function assertPayable(booking: PayableBooking): void {
   }
 }
 
+/** Deneme sınırı aşıldı (v4#13): ödeme FAILED, bu rezervasyon için yeni deneme yok. */
+export class PaymentAttemptsExceededError extends HttpError {
+  constructor(maxAttempts: number) {
+    super(
+      429,
+      "PAYMENT_ATTEMPTS_EXCEEDED",
+      "Çok fazla başarısız ödeme denemesi. Bu rezervasyon için ödeme kapatıldı.",
+      { maxAttempts }
+    );
+    this.name = "PaymentAttemptsExceededError";
+  }
+}
+
+const attemptsKey = (bookingId: string) => `pay:attempts:${bookingId}`;
+
+async function assertAttemptsLeft(bookingId: string): Promise<void> {
+  const max = getConfig().PAYMENT_MAX_ATTEMPTS;
+  if (Number((await redis.get(attemptsKey(bookingId))) ?? 0) >= max) {
+    throw new PaymentAttemptsExceededError(max);
+  }
+}
+
+/**
+ * Başarısız yetkilendirme / 3DS denemesini sayar (v4#13). Sınıra ulaşılınca ödeme kalıcı
+ * olarak FAILED(`ATTEMPTS_EXCEEDED`) işaretlenir; sonraki pay/confirm istekleri 429 alır.
+ * Sayaç rezervasyon başınadır: yeni Idempotency-Key ile tekrar `pay` + `confirm` döngüsü
+ * 3DS kodunu kaba kuvvetle denemeye izin vermez.
+ */
+async function recordFailedAttempt(booking: PayableBooking): Promise<void> {
+  const { PAYMENT_MAX_ATTEMPTS, PAYMENT_ATTEMPTS_WINDOW_SECONDS } = getConfig();
+  const attempts = await redis.incrWithTtl(
+    attemptsKey(booking.id),
+    PAYMENT_ATTEMPTS_WINDOW_SECONDS
+  );
+  if (attempts < PAYMENT_MAX_ATTEMPTS) return;
+  await prisma.payment.updateMany({
+    where: { bookingId: booking.id, status: { in: OPEN_STATUSES } },
+    data: { status: PaymentStatus.FAILED, failureCode: "ATTEMPTS_EXCEEDED" },
+  });
+  paymentsTotal.inc({ outcome: "attempts_exceeded" });
+  await audit("system:payment", "payment.attempts_exceeded", "Booking", booking.id, {
+    attempts,
+  });
+  throw new PaymentAttemptsExceededError(PAYMENT_MAX_ATTEMPTS);
+}
+
+/** Kart BIN'i PSP token metadata'sından (v4#13); desteklenmiyorsa / hata → null. */
+async function tokenBin(cardToken: string): Promise<string | null> {
+  const provider = getPaymentProvider();
+  if (!provider.describeToken) return null;
+  try {
+    return (await provider.describeToken(cardToken)).bin;
+  } catch (error) {
+    logger.warn(errorFields(error), "card token metadata unavailable");
+    return null;
+  }
+}
+
 /** Rezervasyon başına ödeme kilidi; kilit alınamazsa 409 PAYMENT_IN_PROGRESS. */
 async function withPaymentLock<T>(bookingId: string, fn: () => Promise<T>): Promise<T> {
   try {
@@ -537,8 +596,10 @@ export async function payForBooking(input: {
     ip?: string;
     ipCountry?: string | null;
     billingCountry?: string | null;
-    /** Kartın ilk 6 hanesi (BIN) ve istemci cihaz izi (P1-8). */
-    cardBin?: string | null;
+    /**
+     * Sunucu imzalı cihaz kimliği (`did` çerezi, v4#13). İstemci gövdesinden ALINMAZ.
+     * BIN de istemciden alınmaz: PSP token metadata'sından okunur (`describeToken`).
+     */
     deviceId?: string | null;
   };
 }): Promise<PayOutcome> {
@@ -562,6 +623,7 @@ async function payLocked(input: Parameters<typeof payForBooking>[0]): Promise<Pa
     return alreadyConfirmed(booking.id, input.userId);
   }
   assertPayable(booking);
+  await assertAttemptsLeft(booking.id);
 
   // P1-8 fraud v2: allow / challenge_3ds / step_up_passkey / review / deny (yalnızca kurallar).
   const [account, recentFailed] = await Promise.all([
@@ -583,7 +645,7 @@ async function payLocked(input: Parameters<typeof payForBooking>[0]): Promise<Pa
     recentFailedPayments: recentFailed,
     ipCountry: input.context?.ipCountry,
     billingCountry: input.context?.billingCountry,
-    cardBin: input.context?.cardBin,
+    cardBin: await tokenBin(input.cardToken),
     deviceId: input.context?.deviceId,
   });
   const gate = await resolveStepUp(input.userId, risk.decision);
@@ -638,6 +700,7 @@ async function payLocked(input: Parameters<typeof payForBooking>[0]): Promise<Pa
       failureCode: result.declineCode,
     });
     paymentsTotal.inc({ outcome: "declined" });
+    await recordFailedAttempt(booking);
     throw new PaymentDeclinedError(result.declineCode);
   }
   if (result.status === "requires_action") {
@@ -682,6 +745,7 @@ export async function confirmPaymentChallenge(input: {
       throw new ConflictError("Doğrulama bekleyen ödeme yok", "NO_PENDING_CHALLENGE");
     }
     assertPayable(booking);
+    await assertAttemptsLeft(booking.id);
     const ref = booking.payment.providerRef;
     const result = await getPaymentProvider().confirmChallenge(ref, input.code);
     if (result.status !== "authorized") {
@@ -693,6 +757,7 @@ export async function confirmPaymentChallenge(input: {
         { providerRef: ref }
       );
       paymentsTotal.inc({ outcome: "declined" });
+      await recordFailedAttempt(booking);
       throw new PaymentDeclinedError(code);
     }
     return captureAndConfirm(booking, result.providerRef, [PaymentStatus.REQUIRES_ACTION]);

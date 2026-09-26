@@ -91,9 +91,11 @@ describe("P0-5 kart token'ı ve MockPsp", () => {
   const exp = { expMonth: 12, expYear: 2030, cvc: "123" };
 
   it("kart numarası token'a gömülmez; senaryolar deterministik", () => {
-    expect(tokenizeCard({ number: TEST_CARDS.success, ...exp })).toBe("tok_mock_ok_4242");
-    expect(tokenizeCard({ number: TEST_CARDS.decline, ...exp })).toBe("tok_mock_decline_0002");
-    expect(tokenizeCard({ number: TEST_CARDS.threeDs, ...exp })).toBe("tok_mock_3ds_3220");
+    expect(tokenizeCard({ number: TEST_CARDS.success, ...exp })).toBe("tok_mock_ok_424242_4242");
+    expect(tokenizeCard({ number: TEST_CARDS.decline, ...exp })).toBe(
+      "tok_mock_decline_400000_0002"
+    );
+    expect(tokenizeCard({ number: TEST_CARDS.threeDs, ...exp })).toBe("tok_mock_3ds_400000_3220");
     expect(() => tokenizeCard({ number: "4242 4242 4242 4241", ...exp })).toThrow(/geçersiz/);
     expect(() =>
       tokenizeCard({ number: TEST_CARDS.success, expMonth: 1, expYear: 2020, cvc: "123" })

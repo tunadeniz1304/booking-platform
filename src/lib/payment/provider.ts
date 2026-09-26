@@ -44,6 +44,11 @@ export interface PaymentProvider {
     idempotencyKey: string
   ): Promise<{ status: "refunded"; refundRef: string }>;
   void(providerRef: string): Promise<{ status: "voided" }>;
+  /**
+   * Token metadata'sı (v4#13): kartın BIN'i (ilk 6 hane) PSP'nin token kaydından okunur;
+   * istemcinin gönderdiği BIN'e güvenilmez. Desteklemeyen sağlayıcı → metot yok / `bin: null`.
+   */
+  describeToken?(cardToken: string): Promise<{ bin: string | null }>;
 }
 
 export class PaymentProviderError extends Error {

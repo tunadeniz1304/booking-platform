@@ -6,7 +6,10 @@
  *   4000 0000 0000 3220 (…3220) → 3DS doğrulaması gerekir
  *   Diğer Luhn-geçerli kartlar → onay
  *
- * Token biçimi: `tok_mock_<senaryo>_<son4>`; kart numarası token'dan geri elde edilemez.
+ * Token biçimi: `tok_mock_<senaryo>_<bin6>_<son4>` (eski biçim `tok_mock_<senaryo>_<son4>` de
+ * kabul edilir). BIN, gerçek PSP'lerin token metadata'sındaki gibi token'a gömülüdür; sunucu
+ * BIN'i istemci gövdesinden DEĞİL token'dan okur (v4#13). Kart numarası token'dan geri elde
+ * edilemez.
  */
 
 export type MockCardScenario = "ok" | "decline" | "3ds";
@@ -19,7 +22,7 @@ export const TEST_CARDS = {
   threeDs: "4000 0000 0000 3220",
 } as const;
 
-const MOCK_CARD_PATTERN = /^tok_mock_(ok|decline|3ds)_(\d{4})$/;
+const MOCK_CARD_PATTERN = /^tok_mock_(ok|decline|3ds)(?:_(\d{6}))?_(\d{4})$/;
 
 function luhn(digits: string): boolean {
   let sum = 0;
@@ -59,12 +62,12 @@ export function tokenizeCard(
   }
   const scenario: MockCardScenario =
     digits === "4000000000000002" ? "decline" : digits.endsWith("3220") ? "3ds" : "ok";
-  return `tok_mock_${scenario}_${digits.slice(-4)}`;
+  return `tok_mock_${scenario}_${digits.slice(0, 6)}_${digits.slice(-4)}`;
 }
 
 export function parseMockToken(
   token: string
-): { scenario: MockCardScenario; last4: string } | null {
+): { scenario: MockCardScenario; bin: string | null; last4: string } | null {
   const m = MOCK_CARD_PATTERN.exec(token);
-  return m ? { scenario: m[1] as MockCardScenario, last4: m[2] } : null;
+  return m ? { scenario: m[1] as MockCardScenario, bin: m[2] ?? null, last4: m[3] } : null;
 }

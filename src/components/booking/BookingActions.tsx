@@ -6,7 +6,6 @@ import { useTranslations } from "next-intl";
 import { ApiError, apiFetch } from "@/lib/api-client";
 import { CardValidationError, TEST_CARDS, tokenizeCard } from "@/lib/payment/card-token";
 import { useFormat } from "@/i18n/use-format";
-import { deviceFingerprint } from "@/lib/risk/device-fingerprint";
 import type { PayResponse } from "./StripePaymentForm";
 import StepUpDialog from "./StepUpDialog";
 
@@ -53,7 +52,7 @@ export default function BookingActions({
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ kind: "error" | "info"; text: string } | null>(null);
   /** Step-up bekleyen ödeme (mock formda doğrulamadan sonra otomatik yeniden denenir). */
-  const [stepUp, setStepUp] = useState<{ cardToken: string; cardBin?: string } | null>(null);
+  const [stepUp, setStepUp] = useState<{ cardToken: string } | null>(null);
   const [idemKey] = useState(() =>
     typeof crypto !== "undefined" ? crypto.randomUUID() : String(Date.now())
   );
@@ -72,15 +71,12 @@ export default function BookingActions({
     setMessage({ kind: "error", text: err instanceof ApiError ? err.message : fallback });
   }
 
-  function submitToken(cardToken: string, cardBin?: string) {
+  // BIN ve cihaz kimliği gönderilmez (v4#13): sunucu token metadata'sı ve imzalı çerezden okur.
+  function submitToken(cardToken: string) {
     return apiFetch<PayResponse>(`/api/bookings/${bookingId}/pay`, {
       method: "POST",
       headers: { "Idempotency-Key": idemKey },
-      body: JSON.stringify({
-        cardToken,
-        ...(cardBin ? { cardBin } : {}),
-        ...(deviceFingerprint() ? { deviceId: deviceFingerprint() } : {}),
-      }),
+      body: JSON.stringify({ cardToken }),
     });
   }
 
@@ -95,7 +91,7 @@ export default function BookingActions({
     }
     setBusy(true);
     try {
-      const out = await submitToken(pending.cardToken, pending.cardBin);
+      const out = await submitToken(pending.cardToken);
       if (out.status === "requires_action")
         setChallenge(out.challenge?.hint ?? t("verificationRequired"));
       else onChanged();
@@ -154,17 +150,15 @@ export default function BookingActions({
       });
       return;
     }
-    const digits = card.number.replace(/\D/g, "");
-    const cardBin = digits.length >= 6 ? digits.slice(0, 6) : undefined;
     setBusy(true);
     try {
-      const out = await submitToken(cardToken, cardBin);
+      const out = await submitToken(cardToken);
       if (out.status === "requires_action")
         setChallenge(out.challenge?.hint ?? t("verificationRequired"));
       else onChanged();
     } catch (err) {
       if (isStepUp(err)) {
-        setStepUp({ cardToken, cardBin });
+        setStepUp({ cardToken });
         return;
       }
       setMessage({

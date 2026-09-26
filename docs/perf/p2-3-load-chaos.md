@@ -173,3 +173,59 @@ alarm kuralları gerçek trafikle tetikleniyor.
   plan süresiyle aynı → deadline ödemeleri süresi dolmuş token'la gidiyordu (ilk koşumun "0 tutarsız"
   sonucu bu yüzden geçersiz; son durum okunamazsa artık tutarsız sayılıyor).
 - `seed-load.ts`: ülke adı `"Türkiye"` (kod değil).
+
+## fix-sweep-3 sonrası
+
+Tarih: 2026-09-27 · Docker yığını **kurulmadı** (C: diskinde ~2 GB boş; app/worker imajlarının
+yeniden derlenmesi sığmıyordu). Bunun yerine aynı kod `next build` + `next start` ve
+`npm run worker` olarak host'ta, tek `pgvector/pgvector:pg16` + `redis:7-alpine` konteynerine
+karşı koşuldu; ortam `docker-compose.load.yml` ile aynı (DEMO_MODE, gevşek rate-limit/fraud,
+`SPLIT_PAY_DEADLINE_MINUTES=5`, `SPLIT_PAY_FALLBACK=refund`), veri `prisma/seed.ts` +
+`scripts/seed-load.ts`. k6 `grafana/k6` konteynerinden `host.docker.internal`'a. Global
+`DB_SERIALIZABLE_RETRY_ATTEMPTS` **6 (varsayılan)** tüm koşumlarda. Mutlak gecikmeler önceki
+tabloyla karşılaştırılamaz (Docker ağ katmanı yok, iki başka proje yığını yine açıktı).
+
+Değişiklik: capture sonrası SERIALIZABLE onay (pivot) artık iade sebebi değildir — ayrı bütçe
+`CONFIRM_SERIALIZABLE_RETRY_ATTEMPTS` (12, her bekleme ≤ `CONFIRM_RETRY_MAX_BACKOFF_MS` = 500 ms,
+en kötü ≈ 4 s); o da tükenirse `CartPayment.failureCode = CONFIRM_PENDING`, tutmalar tutma süresi
+kadar uzatılır, BullMQ `confirm-retry` onaylar (tutma düştüyse aynı işlemde yeniden tutar; envanter
+yoksa ya da son denemede iade + iptal). `load/split-payment-race.js` plan `COLLECTING` iken en çok
+`CONFIRM_POLL_S` (60) sn bekler.
+
+### Bölünmüş ödeme yarışı — `share_race` (`DEADLINE_PLANS=0`)
+
+| Koşum                                               | Plan (yarış kazananı) | Onay ertelendi → `confirm-retry` | SETTLED (herkes ödedi) | İade | Çift yetk. | 5xx |
+| --------------------------------------------------- | --------------------: | -------------------------------: | ---------------------: | ---: | ---------: | --: |
+| 10 VU × 5, onay bütçesi 12 (varsayılan)             |                    50 |                          3 → 3 ✓ |          **50 / 50** ✓ |    0 |          0 |   0 |
+| 20 VU × 5, onay bütçesi **6** (eski bütçe, kontrol) |                    97 |                        52 → 52 ✓ |          **97 / 97** ✓ |    0 |          0 |   0 |
+| 20 VU × 5, onay bütçesi 12 (varsayılan)             |                   100 |                        21 → 21 ✓ |          **99 / 99** ✓ |    0 |          0 |   0 |
+
+- Kontrol koşumu eski davranışın ölçüsüdür: 6 denemelik bütçede 97 planın **52'si (%54)** onayda
+  tükendi — fix-sweep-3 öncesi bunların hepsi iade edilirdi (P2-3: %64–74). Şimdi tamamı
+  `confirm-retry` ile birkaç saniye içinde SETTLED; iade 0. Hedef (herkesin ödediği planların
+  ≥%95'i SETTLED) → **%100**.
+- 12 denemelik bütçe ertelemeyi 52 → 21'e indiriyor (yol daha kısa, iş kuyruğu daha az).
+- Son koşumdaki 1 SETTLED-olmayan plan "herkes ödedi" değildi: bir yarışçının pay **sahiplenme**
+  işlemi (`claimAuthorizedShare`) global 6 denemede tükendi → 409 `TRANSACTION_CONFLICT`, pay açık
+  kaldı, k6 teardown sepeti iptal etti. **Yeni bulgu (düzeltildi):** bu durumda PSP yetkilendirmesi
+  void edilmiyordu (açık yetkilendirme sızıntısı) → artık void + pay yeniden ödenebilir
+  (`v4-fix-sweep-3` testi).
+- `load-assert`: aşırı satış 0 · mizan dengede, jurnal dengesizliği 0 · mutabakat 560 kontrol / 0
+  fark / 0 yetim olay · çift capture 0, `capturedOnOpenPlan` 0, `settledMismatch` 0.
+
+### PSP kaosu — cart-spike 50 VU, `PAY=1`
+
+| Ayar                                                        | Sonuç                                                                                                                                                                                                                                               |
+| ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 300±200 ms, %10 hata, `authorize,capture,refund,void`, 30 s | 3 × 5xx = **3 × 502** `cart.pay` (`PAYMENT_PROVIDER_ERROR`, `Retry-After: 5`; önceden 500); sepet ödemesi `FAILED provider_error:psp_unavailable`, tutmalar korunur                                                                                 |
+| 300±200 ms, **%40** hata, `capture,refund,void`, 60 s       | 2 × 502; 2 telafi düştü (1 void, 1 iade) → 2 `saga-compensation-retry` işi: iade 4. denemede, void 8. (son) denemede tamamlandı → **açık yetkilendirme / iade edilmemiş tahsilat 0** (önceden "sepet CANCELLED + CartPayment AUTHORIZED" kalıyordu) |
+
+Değişmezler kaos sonrası da temiz. Tüm konteynerler ve süreçler koşum sonunda kaldırıldı.
+
+### Geç başarı sayacı
+
+`payment_late_success_total{outcome="refunded"}` (ve `cart_late_success_total`) artık yalnız
+ödemenin İLK işlenmesinde artar; eşzamanlı / farklı kimlikli tekrar teslimler
+`{outcome="redelivered"}`. Webhook fırtınası tekrar koşulmadı; P2-3'teki desen (1 ödeme, 4
+eşzamanlı teslim) `tests/integration/v4-fix-sweep-3.test.ts`'te doğrulandı: düzeltme öncesi
+`refunded` +4, sonrası +1.

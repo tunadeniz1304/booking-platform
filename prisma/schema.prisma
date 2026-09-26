@@ -100,6 +100,8 @@ model Property {
   /// `turkish` yapılandırması, GIN indeksli). Yalnızca SQL'de okunur; migration'da tanımlı.
   searchVector         Unsupported("tsvector")?
   priceHistory         PriceHistory[]
+  /// P1-10: yüklenen fotoğraflar (kalite skoru, pHash, CLIP embedding).
+  photos               PropertyPhoto[]
   /// İptal politikası (yoksa varsayılan MODERATE); rezervasyonda snapshot'ı alınır.
   /// Turizm İşletme Belgesi / 7464 izin belgesi no (ör. 34-12345); boşsa ilan yayınlanmaz.
   licenseNumber        String?
@@ -964,4 +966,38 @@ model JournalLine {
 
   @@index([entryId])
   @@index([accountId, currency])
+}
+
+/// P1-10 görsel zekâ (ADR 0022): host'un yüklediği fotoğraf. Bayt normalize WebP'dir
+/// (EXIF/GPS silinmiş, uzun kenar sınırlı). Skorlar 0..1; `pHash` 64-bit DCT perceptual hash
+/// (16 hex). `embedding` CLIP ViT-B/32 (L2-normalize, 512-d); model/bayrak yoksa null.
+model PropertyPhoto {
+  id                String                      @id @default(cuid())
+  propertyId        String
+  property          Property                    @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  uploadedById      String?
+  contentType       String
+  data              Bytes
+  width             Int
+  height            Int
+  byteSize          Int
+  /// Laplacian varyansı (ham) ve 0..1 normalize netlik skoru.
+  blurVariance      Float?
+  blurScore         Float?
+  /// Histogram tabanlı pozlama skoru (0..1; orta ton + kırpılmamış uçlar = yüksek).
+  exposureScore     Float?
+  qualityScore      Float?
+  pHash             String?                     @db.Char(16)
+  /// Yüklemede bulunan en yakın perceptual duplikat (Hamming ≤ eşik); yoksa null.
+  duplicateOfId     String?
+  duplicateOf       PropertyPhoto?              @relation("PhotoDuplicates", fields: [duplicateOfId], references: [id], onDelete: SetNull)
+  duplicates        PropertyPhoto[]             @relation("PhotoDuplicates")
+  duplicateDistance Int?
+  embedding         Unsupported("vector(512)")?
+  embeddingModel    String?
+  createdAt         DateTime                    @default(now())
+
+  @@index([propertyId, createdAt])
+  @@index([pHash])
+  @@index([duplicateOfId])
 }

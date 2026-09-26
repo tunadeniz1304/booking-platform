@@ -58,3 +58,6 @@ blob-report/
 
 # LTR sentetik tıklama günlüğü (scripts/ltr/generate-clicks.ts çıktısı)
 scripts/ltr/out/
+
+# P1-10: CLIP model önbelleği (npm run vision:download) repoya girmez
+/models/transformers/

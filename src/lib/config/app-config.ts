@@ -245,6 +245,29 @@ const schema = z.object({
   // P1-2 LTR (ONNX); dosya yoksa ağırlıklı sıralamaya düşülür
   LTR_MODEL_PATH: z.string().min(1).default("models/ranker.onnx"),
 
+  // P1-10 görsel zekâ & çok-modlu arama (ADR 0022)
+  /** CLIP görsel embedding + "bu fotoğraftaki gibi" araması; kapalıysa API/UI açıklama döner. */
+  VISION_CLIP_ENABLED: bool(false),
+  /** transformers.js model kimliği ve yerel önbellek dizini (`npm run vision:download`). */
+  VISION_CLIP_MODEL: z.string().min(1).default("Xenova/clip-vit-base-patch32"),
+  VISION_MODEL_DIR: z.string().min(1).default("models/transformers"),
+  /** Yerel dosya yoksa modeli HF Hub'dan indirmeye izin ver (varsayılan kapalı: çevrimdışı). */
+  VISION_ALLOW_REMOTE_MODELS: bool(false),
+  /** Yükleme sınırları: bayt, normalize edilen uzun kenar (px), mülk başına fotoğraf. */
+  VISION_MAX_UPLOAD_BYTES: int(10 * 1024 * 1024, 10_000, 50 * 1024 * 1024),
+  VISION_MAX_EDGE_PX: int(1600, 256, 4096),
+  VISION_MAX_PHOTOS_PER_PROPERTY: int(40, 1, 500),
+  /** Laplacian varyansı bu değerde netlik skoru 1'e doyar (analiz 512 px gri tonda). */
+  VISION_BLUR_VARIANCE_GOOD: num(300, 1, 100_000),
+  /** Kalite skorunda netlik ağırlığı (kalanı pozlama). */
+  VISION_QUALITY_BLUR_WEIGHT: num(0.6, 0, 1),
+  /** Bu skorun altındaki fotoğraf için "düşük kalite" uyarısı. */
+  VISION_LOW_QUALITY_THRESHOLD: num(0.35, 0, 1),
+  /** pHash Hamming mesafesi ≤ eşik → duplikat (64 bit üzerinden). */
+  VISION_DUPLICATE_MAX_HAMMING: int(8, 0, 32),
+  /** Görsel kNN kanalına girmek için en düşük kosinüs benzerliği. */
+  VISION_MIN_SIMILARITY: num(0.5, -1, 1),
+
   // P1-3 deneyler: anonim bucket çerezi ömrü (gün)
   EXPERIMENT_COOKIE_DAYS: int(90, 1, 730),
 

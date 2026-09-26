@@ -120,6 +120,19 @@ referans = min{ gözlem.total : bugün − PRICE_OMNIBUS_DAYS ≤ gözlem.on < b
 - `recordObservation` aynı günün gözlemini üzerine yazar ve pencere dışını atar.
 - `price-alerts` işi (`PRICE_ALERT_CRON`, `15 6 * * *`) takip edilen konaklamanın **vergi dahil toplamını** gözlemler. Toplam Omnibus referansının altına düşerse outbox'a `price.dropped` olayı yazar ve e-posta gönderilir (günde bir kez). Kullanıcı başına en fazla `PRICE_ALERT_MAX_PER_USER` (20) alarm.
 
+### 4.3 Promosyon motoru ve teklifte Omnibus referansı (P1-8)
+
+Kural motoru `src/lib/pricing/promotions.ts` (saf, deterministik). Türler: `EARLY_BIRD` (varışa ≥ `minDaysBefore` gün), `LAST_MINUTE` (≤ `maxDaysBefore`), `LONG_STAY` (≥ `minNights`), `MOBILE_RATE` (Client Hints `Sec-CH-UA-Mobile`, yoksa UA), `COUPON` (kod, `usageLimit`). Günler tesisin yerel bugününe göre sayılır.
+
+1. Uygunluk: aktiflik, `[startsAt, endsAt)`, koşullar, kupon eşleşmesi, kullanım limiti, sabit indirimde para birimi → her promosyon için gerekçe kodu.
+2. Bağımsız indirim: yüzde `bpsOf(ara toplam, bps)` (tek half-up yuvarlama) veya sabit tutar (ara toplamı aşamaz).
+3. Sıra: öncelik ↓ → indirim ↓ → id ↑. Açgözlü birleşme: ilk seçilen birleşemezse tek başına; birleşebilirler yalnız birleşebilirlerle ve her `stackGroup`'tan en fazla biri (`NOT_STACKABLE`, `STACK_GROUP_TAKEN`).
+4. Taban: toplam indirim ≤ ara toplam × `PROMOTION_MAX_DISCOUNT_BPS` (varsayılan %90); aşan satır kırpılır (`DISCOUNT_CAP_REACHED`). Negatif fiyat yok.
+5. `priceStay`: `total = brüt geceler − Σ promosyon + ücretler + hariç vergiler`; indirim gecelere orantılı (en büyük kalan) dağıtılır ve vergiler indirimli gece tutarından hesaplanır. Defter (`taxShareMinor`) bu kırılımdan okur → indirimli tahsilat da dengeli jurnal üretir.
+6. Kupon/limitli promosyon kullanımı rezervasyon (tutma) işleminde koşullu `UPDATE … usageCount < usageLimit` ile sayılır; tutma düşerse (süre dolumu, ödeme hatası, onay öncesi iptal) iade edilir.
+
+Teklifte Omnibus: `InventoryDay.priceMinor` her değiştiğinde DB tetiği `InventoryPriceHistory`'ye yazar. Her gece için `[şimdi − PRICE_OMNIBUS_DAYS, şimdi]` penceresinde herhangi bir anda yürürlükte olan taban fiyatların en düşüğü (pencere başında yürürlükteki fiyat + penceredeki değişiklikler + şu anki fiyat) alınır, konaklama bu fiyatlarla **promosyonsuz** fiyatlanır → `lowestPrice30dMinor` (vergi dahil, tesis para birimi). Arayüz indirim gösterirken üstü çizili fiyat olarak yalnız bunu kullanır (toplamdan yüksekse) ve "son 30 günün en düşük fiyatı" etiketini gösterir. Sınır: geçmiş promosyonlu fiyatlar referansa katılmaz (yalnız taban fiyat geçmişi); arama kartı fiyatı promosyonsuzdur (promosyon teklif/checkout'ta uygulanır).
+
 ## 5. Fraud v2 (`src/lib/risk/fraud.ts`)
 
 Ödeme yetkilendirmesinden önce çalışır. Hız sayaçları Redis `incrWithTtl` ile tutulur. Redis erişilemezse hız ve cihaz kuralları puan eklemez (fail-open); diğer kurallar çalışır. LLM kullanılmaz.

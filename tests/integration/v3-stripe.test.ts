@@ -86,6 +86,8 @@ describeInt("regression: v3#10 gerçek Stripe akışı (kayıtlı yanıtlar, ağ
   });
 
   it("imzası geçerli ama ilgisiz olay türü → 200 ignored", async () => {
+    // v4#16: Stripe imzası yalnızca Stripe aktif sağlayıcıyken kabul edilir.
+    setPaymentProviderForTests(new StripeProvider("sk_test_x"));
     const payload = JSON.stringify({
       id: `evt_ignored_${Date.now()}`,
       object: "event",

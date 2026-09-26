@@ -12,8 +12,13 @@ import { redis } from "@/lib/redis";
 import { appendOutbox } from "@/lib/cqrs";
 import { EventTypes, makeEvent, type SplitShareInvitedPayload } from "@/lib/events/events";
 import { ConflictError, ForbiddenError, HttpError, NotFoundError } from "@/lib/http/errors";
-import { withSerializableRetry } from "@/lib/db/transactions";
-import { runSaga, type SagaStep } from "@/lib/saga/saga";
+import {
+  isSerializationFailure,
+  withConfirmRetry,
+  withSerializableRetry,
+} from "@/lib/db/transactions";
+import { rerunCompensations, runSaga, type SagaStep } from "@/lib/saga/saga";
+import { scheduleCompensationRetry } from "@/lib/saga/compensation-retry";
 import { SAGA_STEPS } from "@/lib/saga/booking-saga";
 import { getPaymentProvider } from "@/lib/payment";
 import type { PaymentChallenge } from "@/lib/payment/provider";
@@ -46,6 +51,7 @@ import {
   withCartPaymentLock,
 } from "./cart-payment";
 import { ShareLinkInvalidError, shareUrl, signShareToken, verifyShareToken } from "./split-token";
+import { deferConfirmation } from "./confirm-pending";
 import { offSessionSetupFor } from "@/lib/payment/psp-customer";
 
 /**
@@ -142,7 +148,7 @@ const planInclude = {
   shares: { select: shareSelect, orderBy: { position: "asc" } },
 } satisfies Prisma.SplitPlanInclude;
 
-type PlanRow = Prisma.SplitPlanGetPayload<{ include: typeof planInclude }>;
+export type PlanRow = Prisma.SplitPlanGetPayload<{ include: typeof planInclude }>;
 
 export interface ShareDTO {
   id: string;
@@ -202,7 +208,7 @@ function presentPlan(plan: PlanRow, withLinks: boolean): SplitPlanDTO {
   };
 }
 
-async function loadPlan(planId: string): Promise<PlanRow> {
+export async function loadPlan(planId: string): Promise<PlanRow> {
   const plan = await prisma.splitPlan.findUnique({ where: { id: planId }, include: planInclude });
   if (!plan) throw new SplitNotFoundError();
   return plan;
@@ -893,18 +899,29 @@ async function planShares(planId: string): Promise<ShareRow[]> {
   });
 }
 
-/** Tahsil edilmiş payları iade eder (anahtar providerRef'e bağlı → tekrar güvenli). */
+/**
+ * Tahsil edilmiş payları iade eder (anahtar providerRef'e bağlı → tekrar güvenli). fix-sweep-3:
+ * bir payın PSP iadesi düşse de diğerleri denenir; sonunda hata fırlatılır (düşen pay CAPTURED
+ * kalır → `saga-compensation-retry` yeniden dener).
+ */
 async function refundCapturedShares(planId: string, reason: string): Promise<number> {
   let n = 0;
+  const failures: unknown[] = [];
   for (const share of await planShares(planId)) {
     if (share.status !== PaymentShareStatus.CAPTURED || !share.providerRef) continue;
     const amount = minorFromDb(share.amountMinor) - minorFromDb(share.refundedAmountMinor);
     if (amount > 0) {
-      await getPaymentProvider().refund(
-        share.providerRef,
-        money(amount, assertCurrency(share.currency)),
-        `compensate:${share.providerRef}`
-      );
+      try {
+        await getPaymentProvider().refund(
+          share.providerRef,
+          money(amount, assertCurrency(share.currency)),
+          `compensate:${share.providerRef}`
+        );
+      } catch (error) {
+        logger.warn({ shareId: share.id, ...errorFields(error) }, "share refund failed");
+        failures.push(error);
+        continue;
+      }
     }
     const now = new Date();
     await prisma.$transaction([
@@ -929,23 +946,31 @@ async function refundCapturedShares(planId: string, reason: string): Promise<num
     ]);
     n++;
   }
+  if (failures.length > 0) throw failures[0];
   return n;
 }
 
-/** Yetkilendirilmiş / 3DS bekleyen payları void eder; ödenmemişleri EXPIRED yapar. */
+/**
+ * Yetkilendirilmiş / 3DS bekleyen payları void eder; ödenmemişleri EXPIRED yapar. fix-sweep-3:
+ * void düşerse pay VOIDED işaretlenMEZ (PSP'de açık yetkilendirme kalmasın); diğerleri
+ * denenir, sonunda hata fırlatılır → `saga-compensation-retry`.
+ */
 async function voidOpenShares(planId: string, reason: string): Promise<number> {
   let n = 0;
+  const failures: unknown[] = [];
   for (const share of await planShares(planId)) {
     if (
       share.providerRef &&
       (share.status === PaymentShareStatus.AUTHORIZED ||
         share.status === PaymentShareStatus.REQUIRES_ACTION)
     ) {
-      await getPaymentProvider()
-        .void(share.providerRef)
-        .catch((error) =>
-          logger.warn({ shareId: share.id, ...errorFields(error) }, "share void failed")
-        );
+      try {
+        await getPaymentProvider().void(share.providerRef);
+      } catch (error) {
+        logger.warn({ shareId: share.id, ...errorFields(error) }, "share void failed");
+        failures.push(error);
+        continue;
+      }
       await prisma.paymentShare.updateMany({
         where: { id: share.id, status: share.status },
         data: { status: PaymentShareStatus.VOIDED, failureCode: reason },
@@ -961,6 +986,7 @@ async function voidOpenShares(planId: string, reason: string): Promise<number> {
       });
     }
   }
+  if (failures.length > 0) throw failures[0];
   return n;
 }
 
@@ -991,8 +1017,9 @@ const SPLIT_SAGA_STEPS: SagaStep<SplitSagaCtx, true>[] = [
     name: SAGA_STEPS.hold,
     run: async () => undefined,
     compensate: async (ctx) => {
-      await markPlanAborted(ctx.plan.id, "SPLIT_NOT_CONFIRMABLE");
-      splitPlanTotal.inc({ outcome: "aborted" });
+      if (await markPlanAborted(ctx.plan.id, "SPLIT_NOT_CONFIRMABLE")) {
+        splitPlanTotal.inc({ outcome: "aborted" });
+      }
       return (await releaseCartHolds(ctx.plan.cartId, CartStatus.OPEN, "payment_failed")) !== null;
     },
   },
@@ -1032,10 +1059,19 @@ const SPLIT_SAGA_STEPS: SagaStep<SplitSagaCtx, true>[] = [
     name: SAGA_STEPS.confirm,
     pivot: true,
     run: async (ctx) => {
-      await withSerializableRetry((tx) => confirmSplitInTransaction(tx, ctx.plan.id), {
-        timeout: 30_000,
-        maxWait: 10_000,
-      });
+      try {
+        await withConfirmRetry((tx) => confirmSplitInTransaction(tx, ctx.plan.id), {
+          timeout: 30_000,
+          maxWait: 10_000,
+          label: `${SPLIT_PAYMENT_SAGA}.confirm`,
+        });
+      } catch (error) {
+        // fix-sweep-3: tüm paylar tahsil edildi; geçici çakışma iade sebebi DEĞİL (P2-3'te
+        // ödenmiş planların %64–74'ü bu yüzden iade ediliyordu) → onay `confirm-retry` işine.
+        if (!isSerializationFailure(error)) throw error;
+        await deferConfirmation({ kind: "split", planId: ctx.plan.id, cartId: ctx.plan.cartId });
+        return { done: true };
+      }
       splitPlanTotal.inc({ outcome: "settled" });
       splitSettlementSeconds.observe((Date.now() - ctx.plan.createdAt.getTime()) / 1000);
       await afterCartConfirmed(ctx.plan.cartId);
@@ -1044,7 +1080,7 @@ const SPLIT_SAGA_STEPS: SagaStep<SplitSagaCtx, true>[] = [
   },
 ];
 
-async function afterCartConfirmed(cartId: string): Promise<void> {
+export async function afterCartConfirmed(cartId: string): Promise<void> {
   const bookings = await prisma.booking.findMany({
     where: { cartId },
     select: { id: true, propertyId: true },
@@ -1057,7 +1093,38 @@ async function afterCartConfirmed(cartId: string): Promise<void> {
 
 /** Tüm paylar yetkilendi → hepsi tahsil → tek işlemde onay (hata → iade/void + tutmalar serbest). */
 async function settleSplit(plan: PlanRow): Promise<void> {
-  await runSaga(SPLIT_PAYMENT_SAGA, SPLIT_SAGA_STEPS, { plan }, { from: SAGA_STEPS.capture });
+  await runSaga(
+    SPLIT_PAYMENT_SAGA,
+    SPLIT_SAGA_STEPS,
+    { plan },
+    {
+      from: SAGA_STEPS.capture,
+      onCompensationFailed: (steps) =>
+        scheduleCompensationRetry({ saga: "split_payment", planId: plan.id }, steps),
+    }
+  );
+}
+
+/**
+ * fix-sweep-3: planın telafisini (plan kapat + tahsilatları iade + yetkilendirmeleri void +
+ * tutmaları bırak) idempotent olarak yeniden çalıştırır (`saga-compensation-retry`). Plan
+ * SETTLED ise (onay kazandı) hiçbir şey yapılmaz. Yine başarısızsa fırlatır.
+ */
+export async function compensateSplitPlan(planId: string): Promise<"compensated" | "noop"> {
+  const head = await prisma.splitPlan.findUnique({
+    where: { id: planId },
+    select: { cartId: true, status: true },
+  });
+  if (!head || head.status === SplitPlanStatus.SETTLED) return "noop";
+  return withCartPaymentLock(head.cartId, async () => {
+    const plan = await loadPlan(planId);
+    if (plan.status === SplitPlanStatus.SETTLED) return "noop";
+    const steps = SPLIT_SAGA_STEPS.filter((s) => s.name !== SAGA_STEPS.confirm);
+    await rerunCompensations(SPLIT_PAYMENT_SAGA, steps as SagaStep<SplitSagaCtx, unknown>[], {
+      plan,
+    });
+    return "compensated" as const;
+  });
 }
 
 /**
@@ -1259,11 +1326,23 @@ async function startFallback(plan: PlanRow, now: Date): Promise<boolean> {
   return true;
 }
 
-/** Planı iptal eder: yeni pay kapanır → tahsilatlar iade, yetkilendirmeler void, tutmalar serbest. */
-async function abortPlan(plan: PlanRow, reason: string, cartTo: CartStatus): Promise<boolean> {
+/**
+ * Planı iptal eder: yeni pay kapanır → tahsilatlar iade, yetkilendirmeler void, tutmalar serbest.
+ * fix-sweep-3: PSP iade/void hatası tutmaların bırakılmasını engellemez; kalan telafi
+ * `saga-compensation-retry` işine verilir.
+ */
+export async function abortPlan(
+  plan: PlanRow,
+  reason: string,
+  cartTo: CartStatus
+): Promise<boolean> {
   if (!(await markPlanAborted(plan.id, reason))) return false;
-  await refundCapturedShares(plan.id, reason);
-  await voidOpenShares(plan.id, reason);
+  const failed: string[] = [];
+  await refundCapturedShares(plan.id, reason).catch(() => failed.push(SAGA_STEPS.capture));
+  await voidOpenShares(plan.id, reason).catch(() => failed.push(SAGA_STEPS.authorize));
+  if (failed.length > 0) {
+    await scheduleCompensationRetry({ saga: "split_payment", planId: plan.id }, failed);
+  }
   await releaseCartHolds(
     plan.cartId,
     cartTo,

@@ -15,6 +15,10 @@ export const QUEUE_NAMES = {
   saga: "saga",
   /** Başarısız PSP iadelerinin üstel geri çekilmeli yeniden denemesi (v4#7). */
   refundRetry: "refund-retry",
+  /** fix-sweep-3: capture sonrası çakışan ödeme onayının yeniden denemesi (iade yerine). */
+  confirmRetry: "confirm-retry",
+  /** fix-sweep-3: başarısız saga telafisinin (void/iade) yeniden denemesi. */
+  sagaCompensationRetry: "saga-compensation-retry",
   /** Uyum otomasyonu (P1-13): 7565 kaldırma SLA kontrolü (gecikmeli iş). */
   compliance: "compliance",
   /** P1-3 fiyat takvimi (MinPriceByDate): artımlı + tam yeniden hesaplama. */

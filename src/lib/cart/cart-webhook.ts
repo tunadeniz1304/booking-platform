@@ -179,10 +179,13 @@ async function shareSucceeded(event: WebhookEvent, shareId: string): Promise<Res
     money(minorFromDb(share.amountMinor), assertCurrency(share.currency)),
     `compensate:${ref}`
   );
-  await withSerializableRetry(async (tx) => {
+  const firstRefund = await withSerializableRetry(async (tx) => {
     await record(tx);
-    await tx.paymentShare.updateMany({
-      where: { id: shareId, status: { not: PaymentShareStatus.CAPTURED } },
+    const marked = await tx.paymentShare.updateMany({
+      where: {
+        id: shareId,
+        status: { notIn: [PaymentShareStatus.CAPTURED, PaymentShareStatus.REFUNDED] },
+      },
       data: {
         status: PaymentShareStatus.REFUNDED,
         refundedAmountMinor: share.amountMinor,
@@ -195,8 +198,10 @@ async function shareSucceeded(event: WebhookEvent, shareId: string): Promise<Res
       create: { id: `comp:${ref}`, type: "compensation.split_share_late", providerRef: ref },
       update: {},
     });
+    return marked.count === 1;
   });
-  cartLateSuccessTotal.inc({ subject: "share", outcome: "refunded" });
+  // fix-sweep-3: sayaç ödemeyi sayar, teslimatı değil → tekrar teslim ayrı etiket.
+  cartLateSuccessTotal.inc({ subject: "share", outcome: firstRefund ? "refunded" : "redelivered" });
   await audit("system:webhook", "cart.split_late_success", "Cart", share.cartId, {
     outcome: "refunded",
     eventId: event.id,
@@ -279,11 +284,17 @@ async function cartSucceeded(event: WebhookEvent, cartPaymentId: string): Promis
 }
 
 /**
- * Sepeti onaylanabilir hâle getirir: HELD ise (zamanında) dokunmaz → true. Süresi dolmuş /
- * bırakılmışsa kalem rezervasyonlarının tutmalarını yeniden alır (yer yoksa fırlatır → iade)
- * ve sepeti HELD'e döndürür → false. Bölünmüş ödeme planı varsa tek ödeme uygulanamaz.
+ * Sepeti onaylanabilir hâle getirir: sepet ve tüm kalem rezervasyonları HELD ise dokunmaz →
+ * true. Süresi dolmuş / bırakılmışsa (ya da sepet HELD iken bir kalemin tutması düşmüşse)
+ * kalem tutmalarını yeniden alır (yer yoksa fırlatır → iade) ve sepeti HELD'e döndürür →
+ * false. Bölünmüş ödeme planı varsa tek ödeme uygulanamaz (`allowSplit` yalnız
+ * `confirm-retry` işinin plan onayı içindir).
  */
-async function reholdCartInTx(tx: Prisma.TransactionClient, cartId: string): Promise<boolean> {
+export async function reholdCartInTx(
+  tx: Prisma.TransactionClient,
+  cartId: string,
+  opts: { allowSplit?: boolean; holdUntil?: Date } = {}
+): Promise<boolean> {
   await tx.$queryRaw`SELECT id FROM "Cart" WHERE id = ${cartId} FOR UPDATE`;
   const cart = await tx.cart.findUniqueOrThrow({
     where: { id: cartId },
@@ -293,18 +304,23 @@ async function reholdCartInTx(tx: Prisma.TransactionClient, cartId: string): Pro
       payment: { select: { splitPlans: { select: { status: true } } } },
     },
   });
-  if (cart.payment?.splitPlans.some((p) => p.status !== SplitPlanStatus.ABORTED)) {
+  if (
+    !opts.allowSplit &&
+    cart.payment?.splitPlans.some((p) => p.status !== SplitPlanStatus.ABORTED)
+  ) {
     throw new ConflictError("Sepet bölünmüş ödemeyle ödeniyor", "SPLIT_ACTIVE");
   }
-  if (cart.status === CartStatus.HELD) return true;
-  if (cart.status !== CartStatus.EXPIRED && cart.status !== CartStatus.OPEN) {
+  if (
+    cart.status !== CartStatus.HELD &&
+    cart.status !== CartStatus.EXPIRED &&
+    cart.status !== CartStatus.OPEN
+  ) {
     throw new ConflictError("Sepet artık onaylanamaz", "CART_NOT_CONFIRMABLE");
   }
   const ids = cart.items.map((i) => i.bookingId).filter((id): id is string => !!id);
   if (ids.length === 0 || ids.length !== cart.items.length) {
     throw new ConflictError("Sepet kalemleri eksik", "CART_INCOMPLETE");
   }
-  const holdExpiresAt = new Date(Date.now() + LATE_SUCCESS_HOLD_MS);
   const bookings = await tx.booking.findMany({
     where: { id: { in: ids }, cartId },
     select: {
@@ -318,6 +334,8 @@ async function reholdCartInTx(tx: Prisma.TransactionClient, cartId: string): Pro
     },
     orderBy: { id: "asc" },
   });
+  if (cart.status === CartStatus.HELD && bookings.every((b) => b.status === "HELD")) return true;
+  const holdExpiresAt = opts.holdUntil ?? new Date(Date.now() + LATE_SUCCESS_HOLD_MS);
   for (const b of bookings) {
     if (b.status === "EXPIRED") {
       await holdUnits(tx, {
@@ -366,11 +384,15 @@ async function refundCartPayment(
     money(minorFromDb(cp.amountMinor), assertCurrency(cp.currency)),
     `compensate:${ref}`
   );
-  await withSerializableRetry(async (tx) => {
+  const firstRefund = await withSerializableRetry(async (tx) => {
     await record(tx);
     const now = new Date();
-    await tx.cartPayment.updateMany({
-      where: { id: cartPaymentId, providerRef: ref, status: { not: PaymentStatus.PAID } },
+    const marked = await tx.cartPayment.updateMany({
+      where: {
+        id: cartPaymentId,
+        providerRef: ref,
+        status: { notIn: [PaymentStatus.PAID, PaymentStatus.REFUNDED] },
+      },
       data: {
         status: PaymentStatus.REFUNDED,
         paidAt: now,
@@ -384,8 +406,9 @@ async function refundCartPayment(
       create: { id: `comp:${ref}`, type: "compensation.cart_late", providerRef: ref },
       update: {},
     });
+    return marked.count === 1;
   });
-  cartLateSuccessTotal.inc({ subject: "cart", outcome: "refunded" });
+  cartLateSuccessTotal.inc({ subject: "cart", outcome: firstRefund ? "refunded" : "redelivered" });
   await audit("system:webhook", "cart.late_success", "Cart", cp.cartId, {
     outcome: "refunded",
     eventId: event.id,

@@ -44,6 +44,7 @@
     "holdFailed": "Could not hold the rooms",
     "declined": "Payment declined; all holds were released. You can hold again and try another card.",
     "expired": "The hold expired.",
+    "confirmPending": "Your payment was received; the booking confirmation will complete within a few seconds. Refresh your cart to see the status.",
     "success": "Your bookings are confirmed!",
     "successHint": "A total of {amount} was charged in a single payment.",
     "viewBooking": "View booking",

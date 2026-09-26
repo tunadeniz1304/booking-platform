@@ -12,7 +12,8 @@ import type { SplitPlanDTO } from "@/lib/cart/split-payment";
 
 type PayOutcome =
   | { status: "confirmed"; cartId: string; bookingIds: string[]; amount: number; currency: string }
-  | { status: "requires_action"; cartId: string; challenge?: { hint?: string } };
+  | { status: "requires_action"; cartId: string; challenge?: { hint?: string } }
+  | { status: "pending_confirmation"; cartId: string };
 
 const newKey = () =>
   typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -71,6 +72,12 @@ export default function CartCheckoutPage() {
   async function finish(outcome: PayOutcome) {
     if (outcome.status === "requires_action") {
       setChallenge(outcome.challenge?.hint ?? tp("verificationRequired"));
+      return;
+    }
+    if (outcome.status === "pending_confirmation") {
+      // fix-sweep-3: tahsilat alındı, onay kuyrukta (iade yok) → aynı anahtarla tekrar güvenli.
+      setMessage(t("checkout.confirmPending"));
+      await reload();
       return;
     }
     const res = await apiFetch<{ cart: CartDTO }>(`/api/cart/${outcome.cartId}`);

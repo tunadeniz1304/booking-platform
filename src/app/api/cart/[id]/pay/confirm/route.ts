@@ -13,9 +13,11 @@ export const POST = observed(
       const { id } = await params;
       const { userId } = await requireVerifiedEmail(req);
       const { code } = cartConfirmSchema.parse(await req.json());
-      return NextResponse.json(
-        await confirmCartChallenge({ cartId: id, userId, code: code ?? "" })
-      );
+      const outcome = await confirmCartChallenge({ cartId: id, userId, code: code ?? "" });
+      // fix-sweep-3: onay kuyrukta (capture alındı) → 202.
+      return NextResponse.json(outcome, {
+        status: outcome.status === "pending_confirmation" ? 202 : 200,
+      });
     } catch (error) {
       return toErrorResponse(error, "cart.pay.confirm");
     }

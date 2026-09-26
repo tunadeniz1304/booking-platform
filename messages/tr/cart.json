@@ -44,6 +44,7 @@
     "holdFailed": "Odalar tutulamadı",
     "declined": "Ödeme reddedildi; tüm tutmalar bırakıldı. Tekrar tutup başka bir kartla deneyebilirsiniz.",
     "expired": "Tutma süresi doldu.",
+    "confirmPending": "Ödemeniz alındı; rezervasyon onayı birkaç saniye içinde tamamlanacak. Sepetinizi yenileyerek durumu görebilirsiniz.",
     "success": "Rezervasyonlarınız onaylandı!",
     "successHint": "Toplam {amount} tek ödemeyle tahsil edildi.",
     "viewBooking": "Rezervasyonu görüntüle",

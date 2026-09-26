@@ -2,12 +2,13 @@ import { Prisma, BookingStatus, CartStatus, PaymentStatus } from "@prisma/client
 import { prisma } from "@/lib/prisma";
 import { redis } from "@/lib/redis";
 import { ConflictError, HttpError } from "@/lib/http/errors";
-import { withSerializableRetry } from "@/lib/db/transactions";
+import { isSerializationFailure, withConfirmRetry } from "@/lib/db/transactions";
 import { createRedlock, LockError } from "@/lib/distributed-lock/redlock";
-import { runSaga, type SagaStep } from "@/lib/saga/saga";
+import { rerunCompensations, runSaga, type SagaStep } from "@/lib/saga/saga";
+import { scheduleCompensationRetry } from "@/lib/saga/compensation-retry";
 import { SAGA_STEPS } from "@/lib/saga/booking-saga";
 import { getPaymentProvider, type AuthorizeResult } from "@/lib/payment";
-import type { PaymentChallenge } from "@/lib/payment/provider";
+import { PaymentProviderError, type PaymentChallenge } from "@/lib/payment/provider";
 import {
   applyConfirmation,
   CaptureRaceLostError,
@@ -15,6 +16,7 @@ import {
   nextConfirmedState,
   PaymentDeclinedError,
   PaymentInProgressError,
+  PROVIDER_ERROR_PREFIX,
 } from "@/lib/payment/payment-service";
 import { assessPayment } from "@/lib/risk/fraud";
 import { getConfig } from "@/lib/config/app-config";
@@ -26,6 +28,7 @@ import { errorFields, logger } from "@/lib/observability/logger";
 import { audit } from "@/lib/admin/audit";
 import { CartNotFoundError, releaseCartHolds } from "./cart-service";
 import { offSessionSetupFor } from "@/lib/payment/psp-customer";
+import { CONFIRM_PENDING, deferConfirmation } from "./confirm-pending";
 
 /**
  * Sepetin TEK ödemesi (P1-1): toplam tutar tek PSP yetkilendirmesi → capture → tek işlemde
@@ -64,7 +67,18 @@ export type CartPayOutcome =
       amount: number;
       currency: string;
     }
-  | { status: "requires_action"; cartId: string; challenge: PaymentChallenge };
+  | { status: "requires_action"; cartId: string; challenge: PaymentChallenge }
+  /**
+   * fix-sweep-3: capture alındı, onay işlemi çakışmada → iade YOK; `confirm-retry` işi onaylar
+   * (HTTP 202). İstemci sepeti yeniden çekerek sonucu görür.
+   */
+  | {
+      status: "pending_confirmation";
+      cartId: string;
+      bookingIds: string[];
+      amount: number;
+      currency: string;
+    };
 
 export interface PayableCart {
   id: string;
@@ -74,7 +88,7 @@ export interface PayableCart {
   amount: Money;
   bookingIds: string[];
   propertyIds: string[];
-  payment: { status: PaymentStatus; providerRef: string | null } | null;
+  payment: { status: PaymentStatus; providerRef: string | null; failureCode: string | null } | null;
 }
 
 export async function loadPayableCart(cartId: string, userId: string): Promise<PayableCart> {
@@ -90,7 +104,7 @@ export async function loadPayableCart(cartId: string, userId: string): Promise<P
       bookings: {
         select: { id: true, status: true, totalPriceMinor: true, currency: true, propertyId: true },
       },
-      payment: { select: { status: true, providerRef: true } },
+      payment: { select: { status: true, providerRef: true, failureCode: true } },
     },
   });
   // IDOR: başkasının sepeti "bulunamadı"
@@ -125,6 +139,23 @@ function confirmedOutcome(cart: PayableCart): CartPayOutcome {
     amount: cart.amount.amount,
     currency: cart.amount.currency,
   };
+}
+
+function pendingOutcome(cart: PayableCart): CartPayOutcome {
+  return {
+    status: "pending_confirmation",
+    cartId: cart.id,
+    bookingIds: cart.bookingIds,
+    amount: cart.amount.amount,
+    currency: cart.amount.currency,
+  };
+}
+
+function isConfirmPending(cart: PayableCart): boolean {
+  return (
+    cart.payment?.status === PaymentStatus.AUTHORIZED &&
+    cart.payment.failureCode === CONFIRM_PENDING
+  );
 }
 
 function isCheckedOut(cart: PayableCart): boolean {
@@ -218,6 +249,8 @@ export async function payCart(input: {
 async function payLocked(input: Parameters<typeof payCart>[0]): Promise<CartPayOutcome> {
   const cart = await loadPayableCart(input.cartId, input.userId);
   if (isCheckedOut(cart)) return confirmedOutcome(cart);
+  // fix-sweep-3: tahsil edildi, onay kuyrukta → aynı sonuç (ikinci yetkilendirme YOK).
+  if (isConfirmPending(cart)) return pendingOutcome(cart);
   await assertPayableCart(cart);
   await assertAttemptsLeft(cart.id);
   await assertNoActiveSplit(cart.id);
@@ -291,13 +324,31 @@ async function payLocked(input: Parameters<typeof payCart>[0]): Promise<CartPayO
       select: { propertyId: true, roomTypeId: true },
     })
   );
-  const result: AuthorizeResult = await provider.authorize({
-    ...offSession,
-    amount: cart.amount,
-    cardToken: input.cardToken,
-    idempotencyKey: `auth:cart:${cart.id}:${input.idempotencyKey}`,
-    metadata: { cartId: cart.id, ...(force3ds ? { force3ds: "1" } : {}) },
-  });
+  let result: AuthorizeResult;
+  try {
+    result = await provider.authorize({
+      ...offSession,
+      amount: cart.amount,
+      cardToken: input.cardToken,
+      idempotencyKey: `auth:cart:${cart.id}:${input.idempotencyKey}`,
+      metadata: { cartId: cart.id, ...(force3ds ? { force3ds: "1" } : {}) },
+    });
+  } catch (error) {
+    if (error instanceof PaymentProviderError) {
+      // fix-sweep-3 (fix-sweep-2 deseni): sağlayıcı hatası ret değildir → sepet ödemesi FAILED
+      // + `provider_error:<kod>` (açık durum, yeniden ödenebilir), deneme hakkı DÜŞMEZ, tutmalar
+      // korunur; HTTP 502 PAYMENT_PROVIDER_ERROR + Retry-After (`toErrorResponse`).
+      await prisma.cartPayment.updateMany({
+        where: { cartId: cart.id, status: { in: OPEN_STATUSES } },
+        data: {
+          status: PaymentStatus.FAILED,
+          failureCode: `${PROVIDER_ERROR_PREFIX}${error.code}`.slice(0, 64),
+        },
+      });
+      cartPaymentsTotal.inc({ outcome: "provider_error" });
+    }
+    throw error;
+  }
   if (result.status === "declined") {
     return failCart(cart, result.providerRef, result.declineCode);
   }
@@ -330,6 +381,7 @@ export async function confirmCartChallenge(input: {
   return withCartPaymentLock(input.cartId, async () => {
     const cart = await loadPayableCart(input.cartId, input.userId);
     if (isCheckedOut(cart)) return confirmedOutcome(cart);
+    if (isConfirmPending(cart)) return pendingOutcome(cart);
     if (cart.payment?.status !== PaymentStatus.REQUIRES_ACTION || !cart.payment.providerRef) {
       throw new ConflictError("Doğrulama bekleyen ödeme yok", "NO_PENDING_CHALLENGE");
     }
@@ -417,7 +469,11 @@ const CART_SAGA_STEPS: SagaStep<CartSagaCtx, CartPayOutcome>[] = [
       const now = new Date();
       await prisma.$transaction([
         prisma.cartPayment.updateMany({
-          where: { cartId: ctx.cart.id, providerRef: ctx.providerRef },
+          where: {
+            cartId: ctx.cart.id,
+            providerRef: ctx.providerRef,
+            status: { not: PaymentStatus.PAID },
+          },
           data: {
             status: PaymentStatus.REFUNDED,
             paidAt: now,
@@ -447,10 +503,23 @@ const CART_SAGA_STEPS: SagaStep<CartSagaCtx, CartPayOutcome>[] = [
     name: SAGA_STEPS.confirm,
     pivot: true,
     run: async (ctx) => {
-      await withSerializableRetry(
-        (tx) => confirmCartInTransaction(tx, ctx.cart.id, ctx.providerRef),
-        { timeout: 30_000, maxWait: 10_000 }
-      );
+      try {
+        await withConfirmRetry((tx) => confirmCartInTransaction(tx, ctx.cart.id, ctx.providerRef), {
+          timeout: 30_000,
+          maxWait: 10_000,
+          label: `${CART_PAYMENT_SAGA}.confirm`,
+        });
+      } catch (error) {
+        // fix-sweep-3: capture alındı; geçici çakışma iade sebebi DEĞİL → onayı kuyruğa al.
+        if (!isSerializationFailure(error)) throw error;
+        await deferConfirmation({
+          kind: "cart",
+          cartId: ctx.cart.id,
+          providerRef: ctx.providerRef,
+        });
+        cartPaymentsTotal.inc({ outcome: "confirm_pending" });
+        return { done: pendingOutcome(ctx.cart) };
+      }
       cartPaymentsTotal.inc({ outcome: "confirmed" });
       for (const propertyId of ctx.cart.propertyIds) {
         await invalidatePropertySearchCache(propertyId).catch(() => undefined);
@@ -467,7 +536,60 @@ async function captureAndConfirmCart(
   claimFrom: readonly PaymentStatus[]
 ): Promise<CartPayOutcome> {
   const ctx: CartSagaCtx = { cart, providerRef, claimFrom, claimed: false, captured: false };
-  return runSaga(CART_PAYMENT_SAGA, CART_SAGA_STEPS, ctx, { from: SAGA_STEPS.capture });
+  return runSaga(CART_PAYMENT_SAGA, CART_SAGA_STEPS, ctx, {
+    from: SAGA_STEPS.capture,
+    // fix-sweep-3: void/iade düştüyse açık yetkilendirme / iade edilmemiş tahsilat kalmasın.
+    onCompensationFailed: (steps) =>
+      scheduleCompensationRetry(
+        { saga: "cart_payment", cartId: cart.id, providerRef, captured: ctx.captured },
+        steps
+      ),
+  });
+}
+
+/**
+ * fix-sweep-3: sepet ödemesinin telafisini DB'den kurulan bağlamla (idempotent) yeniden
+ * çalıştırır — `saga-compensation-retry` işi ve onaylanamayan `confirm-retry` işi kullanır.
+ * Sepet ödemesi bu ref'le PAID ise (onay kazandı) hiçbir şey yapılmaz. Yine başarısızsa fırlatır.
+ */
+export async function compensateCartPayment(input: {
+  cartId: string;
+  providerRef: string;
+  captured: boolean;
+}): Promise<"compensated" | "noop"> {
+  const cp = await prisma.cartPayment.findUnique({
+    where: { cartId: input.cartId },
+    select: { status: true, providerRef: true, amountMinor: true, currency: true, userId: true },
+  });
+  if (!cp) return "noop";
+  if (cp.providerRef !== input.providerRef) {
+    // Tahsil hakkını hiç almamış (yarışı kaybetmiş) yetkilendirme: yalnız PSP'de void; satıra
+    // dokunulmaz (satır başka bir ödemenindir).
+    if (input.captured) return "noop";
+    await getPaymentProvider().void(input.providerRef);
+    return "compensated";
+  }
+  if (cp.status === PaymentStatus.PAID) return "noop";
+  const cart: PayableCart = {
+    id: input.cartId,
+    userId: cp.userId,
+    status: CartStatus.HELD,
+    holdExpiresAt: null,
+    amount: money(minorFromDb(cp.amountMinor), assertCurrency(cp.currency)),
+    bookingIds: [],
+    propertyIds: [],
+    payment: null,
+  };
+  const ctx: CartSagaCtx = {
+    cart,
+    providerRef: input.providerRef,
+    claimFrom: OPEN_STATUSES,
+    claimed: true,
+    captured: input.captured,
+  };
+  const steps = CART_SAGA_STEPS.filter((s) => s.name !== SAGA_STEPS.confirm);
+  await rerunCompensations(CART_PAYMENT_SAGA, steps as SagaStep<CartSagaCtx, unknown>[], ctx);
+  return "compensated";
 }
 
 /**

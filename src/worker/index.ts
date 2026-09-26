@@ -30,6 +30,11 @@ import {
 import { ICAL_POLL_JOB, runIcalPoll, scheduleIcalPoll } from "./jobs/ical-poll";
 import { WALLET_SWEEP_JOB, runWalletSweepJob, scheduleWalletSweep } from "./jobs/wallet";
 import { onRefundRetryFailed, processRefundRetry } from "./jobs/refund-retry";
+import { onConfirmRetryFailed, processConfirmRetryJob } from "./jobs/confirm-retry";
+import {
+  onCompensationRetryFailed,
+  processCompensationRetryJob,
+} from "./jobs/saga-compensation-retry";
 import { runSplitDeadlineJob, SPLIT_DEADLINE_JOB } from "@/lib/cart/split-payment";
 import { TRANSFER_SWEEP_JOB, runTransferSweep, scheduleTransferSweep } from "./jobs/transfer-sweep";
 import {
@@ -143,6 +148,21 @@ async function main(): Promise<void> {
   const refundRetry = new Worker(QUEUE_NAMES.refundRetry, processRefundRetry, { connection });
   refundRetry.on("failed", onRefundRetryFailed);
   workers.push(refundRetry);
+
+  // fix-sweep-3: capture sonrası çakışan onay (iade yerine yeniden deneme) ve başarısız saga
+  // telafisinin (void/iade) yeniden denemesi.
+  const confirmRetry = new Worker(QUEUE_NAMES.confirmRetry, processConfirmRetryJob, {
+    connection,
+  });
+  confirmRetry.on("failed", onConfirmRetryFailed);
+  workers.push(confirmRetry);
+  const compensationRetry = new Worker(
+    QUEUE_NAMES.sagaCompensationRetry,
+    processCompensationRetryJob,
+    { connection }
+  );
+  compensationRetry.on("failed", (job, err) => void onCompensationRetryFailed(job, err));
+  workers.push(compensationRetry);
 
   // P1-13a: 7565 kaldırma SLA kontrolü (gecikmeli iş + yedek süpürücü).
   const compliance = new Worker(QUEUE_NAMES.compliance, processComplianceJob, { connection });

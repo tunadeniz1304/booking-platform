@@ -9,12 +9,13 @@ import {
   type BookingConfirmedPayload,
 } from "@/lib/events/events";
 import { ConflictError, HttpError } from "@/lib/http/errors";
-import { withSerializableRetry } from "@/lib/db/transactions";
+import { withConfirmRetry, withSerializableRetry } from "@/lib/db/transactions";
 import { createRedlock, LockError } from "@/lib/distributed-lock/redlock";
 import { transition, type BookingState } from "@/lib/booking/state-machine";
 import { computeRefund, parseSnapshot, type RefundDecision } from "@/lib/booking/cancellation";
 import { releaseHold, releaseInventory, BookingNotFoundError } from "@/lib/booking-service";
-import { runSaga, type SagaStep } from "@/lib/saga/saga";
+import { rerunCompensations, runSaga, type SagaStep } from "@/lib/saga/saga";
+import { scheduleCompensationRetry } from "@/lib/saga/compensation-retry";
 import { PAYMENT_SAGA, SAGA_STEPS } from "@/lib/saga/booking-saga";
 import { invalidatePropertySearchCache } from "@/lib/search";
 import { money, assertCurrency, type Money, minorToDb, minorFromDb } from "@/lib/money/money";
@@ -442,8 +443,10 @@ const PAYMENT_SAGA_STEPS: SagaStep<PaymentSagaCtx, PayOutcome>[] = [
     pivot: true,
     run: async (ctx) => {
       // HELD→CONFIRMED + PAID + defter + outbox (tek işlem).
-      const paymentId = await withSerializableRetry((tx) =>
-        confirmInTransaction(tx, ctx.booking.id, ctx.providerRef)
+      // fix-sweep-3: onay adımının ayrı (üst sınırlı geri çekilmeli) deneme bütçesi.
+      const paymentId = await withConfirmRetry(
+        (tx) => confirmInTransaction(tx, ctx.booking.id, ctx.providerRef),
+        { label: `${PAYMENT_SAGA}.confirm` }
       );
       paymentsTotal.inc({ outcome: "confirmed" });
       await afterBookingWrite(ctx.booking.propertyId, ctx.booking.id);
@@ -476,7 +479,22 @@ async function captureAndConfirm(
     captured: false,
   };
   try {
-    return await runSaga(PAYMENT_SAGA, PAYMENT_SAGA_STEPS, ctx, { from: SAGA_STEPS.capture });
+    return await runSaga(PAYMENT_SAGA, PAYMENT_SAGA_STEPS, ctx, {
+      from: SAGA_STEPS.capture,
+      // fix-sweep-3: void/iade düştüyse `saga-compensation-retry` (açık yetkilendirme kalmasın).
+      onCompensationFailed: (steps) =>
+        scheduleCompensationRetry(
+          {
+            saga: "payment",
+            bookingId: booking.id,
+            userId: booking.userId,
+            providerRef,
+            claimed: ctx.claimed,
+            captured: ctx.captured,
+          },
+          steps
+        ),
+    });
   } catch (error) {
     if (error instanceof CaptureRaceLostError) {
       // Başka bir ödeme bu arada onayladı: bizimki iade edildi → idempotent sonuç.
@@ -485,6 +503,48 @@ async function captureAndConfirm(
     }
     throw error;
   }
+}
+
+/**
+ * fix-sweep-3: tekil ödeme sagasının telafisini DB'den kurulan bağlamla (idempotent) yeniden
+ * çalıştırır (`saga-compensation-retry`). Ödeme bu ref'le tahsil edilmiş sayılıyorsa (onay
+ * kazandı) hiçbir şey yapılmaz; tahsil hakkını almamış yetkilendirme yalnız PSP'de void edilir.
+ */
+export async function retryPaymentCompensation(input: {
+  bookingId: string;
+  userId: string;
+  providerRef: string;
+  claimed: boolean;
+  captured: boolean;
+}): Promise<"compensated" | "noop"> {
+  return withPaymentLock(input.bookingId, async () => {
+    const booking = await loadPayable(input.bookingId, input.userId);
+    const ours = booking.payment?.providerRef === input.providerRef;
+    if (!input.claimed || !ours) {
+      if (input.captured) return "noop";
+      await getPaymentProvider().void(input.providerRef);
+      return "compensated" as const;
+    }
+    if (booking.payment && SETTLED_STATUSES.includes(booking.payment.status)) {
+      if (booking.payment.status !== PaymentStatus.REFUNDED) return "noop";
+    }
+    // Tutar ödeme satırından: kredi telafisi önceki koşuda çalıştıysa `chargeOf` toplamı verir.
+    const row = await prisma.payment.findUniqueOrThrow({
+      where: { bookingId: booking.id },
+      select: { amountMinor: true, currency: true },
+    });
+    const ctx: PaymentSagaCtx = {
+      booking,
+      providerRef: input.providerRef,
+      amount: amountOf({ totalPriceMinor: row.amountMinor, currency: row.currency }),
+      claimFrom: OPEN_STATUSES,
+      claimed: true,
+      captured: input.captured,
+    };
+    const steps = PAYMENT_SAGA_STEPS.filter((s) => s.name !== SAGA_STEPS.confirm);
+    await rerunCompensations(PAYMENT_SAGA, steps as SagaStep<PaymentSagaCtx, unknown>[], ctx);
+    return "compensated" as const;
+  });
 }
 
 function creditField(creditMinor: bigint): { creditMinor?: number } {
@@ -1089,7 +1149,7 @@ export async function handleWebhookEvent(
         const currency = assertCurrency(payment.currency);
         const amount = money(minorFromDb(payment.amountMinor), currency);
         await refundLoser(payment.bookingId, event.data.providerRef, amount, error.code);
-        await withSerializableRetry(async (tx) => {
+        const firstRefund = await withSerializableRetry(async (tx) => {
           await record(tx);
           const now = new Date();
           const marked = await tx.payment.updateMany({
@@ -1109,8 +1169,11 @@ export async function handleWebhookEvent(
           if (marked.count === 1) {
             await journalCompensation(tx, payment.bookingId, event.data.providerRef);
           }
+          return marked.count === 1;
         });
-        latePaymentSuccessTotal.inc({ outcome: "refunded" });
+        // fix-sweep-3 (P2-3 bulgusu): sayaç ÖDEMEYİ sayar — yalnız ilk işleme `refunded`;
+        // eşzamanlı / farklı kimlikli tekrar teslimler `redelivered` (iade PSP'de zaten tek).
+        latePaymentSuccessTotal.inc({ outcome: firstRefund ? "refunded" : "redelivered" });
         await audit("system:webhook", "payment.late_success", "Booking", payment.bookingId, {
           outcome: "refunded",
           eventId: event.id,

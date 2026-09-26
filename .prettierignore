@@ -14,6 +14,8 @@ migrations
 tsconfig.tsbuildinfo
 next-env.d.ts
 booking.md
+booking-v4.md
+.claude
 .code-review-graph
 data
 *.min.js

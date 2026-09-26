@@ -1452,9 +1452,9 @@ model InventoryPriceHistory {
   @@index([roomTypeId, date, effectiveAt])
 }
 
-/// P1-4 ev sahibi ödeme hesabı (ADR 0021). KYC durumu şimdilik burada tutulur (P1-4 kendi
-/// alanı; KYC/trust modeli IdentityVerification ile ileride bağlanır). İlişki alanı yok
-/// (User'a dokunulmadı); `userId` tekil.
+/// P1-4 ev sahibi ödeme hesabı (ADR 0021). `kycStatus` payout sağlayıcısının bağlı hesap
+/// durumudur (Stripe Connect); mock sağlayıcıda P1-6 IdentityVerification'dan türetilir.
+/// İlişki alanı yok (User'a dokunulmadı); `userId` tekil.
 model HostAccount {
   id                  String         @id @default(cuid())
   userId              String         @unique

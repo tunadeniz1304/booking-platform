@@ -1,11 +1,14 @@
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { PrismaClient } from "@prisma/client";
-import { describeInt, utcDay } from "./helpers";
+import { describeInt, iso, utcDay } from "./helpers";
 import { createStayFixture, type StayFixture } from "./fixtures";
 import { updateProperty } from "@/lib/host/host-service";
 import { searchProperties, invalidateSearchCache } from "@/lib/search";
 import { buildSdepRows, sdepRowSchema, toSdepCsv, SDEP_HEADER } from "@/lib/compliance/sdep";
 import type { AccessClaims } from "@/lib/auth";
+import { GET as propertyGet } from "@/app/api/properties/[id]/route";
+import { computeTotal } from "@/lib/pricing/quote";
+import { createBooking } from "@/lib/booking-service";
 
 /**
  * P1-10 belge/kayıt no (TR 7565, AB 2024/1028): doğrulanmamış ilan yayınlanamaz ve
@@ -63,6 +66,41 @@ describeInt("P1-10 lisans doğrulama + SDEP (integration)", () => {
       data: { licenseStatus: "VERIFIED" },
     });
     expect(await visibleInSearch()).toBe(true);
+  });
+
+  it("regression: v3#26 doğrulanmamış ilan detay API'si 404, teklif ve rezervasyon reddedilir", async () => {
+    const detail = () =>
+      propertyGet(new Request(`http://t/api/properties/${fx.propertyId}`), {
+        params: Promise.resolve({ id: fx.propertyId }),
+      });
+    const stay = { checkIn: iso(utcDay(20)), checkOut: iso(utcDay(22)) };
+    const quote = () =>
+      computeTotal({ roomId: fx.roomId, propertyId: fx.propertyId, guests: 1, ...stay });
+    const book = () =>
+      createBooking({
+        userId: fx.userId,
+        propertyId: fx.propertyId,
+        roomId: fx.roomId,
+        guestCount: 1,
+        ...stay,
+      });
+
+    for (const licenseStatus of ["PENDING", "REJECTED"] as const) {
+      await prisma.property.update({
+        where: { id: fx.propertyId },
+        data: { isActive: true, licenseStatus },
+      });
+      expect((await detail()).status).toBe(404);
+      await expect(quote()).rejects.toMatchObject({ status: 404 });
+      await expect(book()).rejects.toMatchObject({ status: 404 });
+    }
+
+    await prisma.property.update({
+      where: { id: fx.propertyId },
+      data: { licenseStatus: "VERIFIED" },
+    });
+    expect((await detail()).status).toBe(200);
+    await expect(quote()).resolves.toMatchObject({ propertyId: fx.propertyId });
   });
 
   it("SDEP: kayıt no başına gece/misafir toplamı, şemaya uygun CSV", async () => {

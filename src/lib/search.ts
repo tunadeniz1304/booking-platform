@@ -22,6 +22,7 @@ import { computeAffinity, affinityBoostFor } from "@/lib/search/vector";
 import { breakers, BreakerOpenError } from "@/lib/resilience/circuit-breaker";
 import { taxRulesFor } from "@/lib/pricing/tax";
 import { SearchParamsSchema, type SearchInput, type SearchParams } from "@/lib/search/params";
+import { LISTABLE_PROPERTY } from "@/lib/compliance/listing";
 
 export { SearchParamsSchema, searchParamsFromUrl } from "@/lib/search/params";
 export type { SearchParams, SearchInput } from "@/lib/search/params";
@@ -174,7 +175,7 @@ export async function invalidatePropertySearchCache(propertyId: string): Promise
 // --- 1) Katalog adayları -------------------------------------------------------------
 
 function structuralWhere(params: SearchParams, ids?: string[]): Prisma.PropertyWhereInput {
-  const and: Prisma.PropertyWhereInput[] = [{ isActive: true, licenseStatus: "VERIFIED" }];
+  const and: Prisma.PropertyWhereInput[] = [{ ...LISTABLE_PROPERTY }];
   if (ids) and.push({ id: { in: ids } });
   if (params.query && !ids) {
     and.push({
@@ -584,7 +585,7 @@ export async function getPopularProperties(limit = 10): Promise<SearchResult[]> 
     logger.error(errorFields(error), "Popular cache read failed");
   }
   const properties = await prisma.property.findMany({
-    where: { isActive: true, licenseStatus: "VERIFIED" },
+    where: LISTABLE_PROPERTY,
     orderBy: [{ ratingAvg: "desc" }, { ratingCount: "desc" }, { id: "asc" }],
     take: limit,
     select: {

@@ -50,6 +50,7 @@ import { checkRestrictions, describeViolation } from "@/lib/booking/restrictions
 import { holdUnits, InventoryUnavailableError, releaseForStatus } from "@/lib/booking/inventory";
 import { logger, errorFields } from "@/lib/observability/logger";
 import { counter } from "@/lib/observability/metrics";
+import { LISTABLE_PROPERTY } from "@/lib/compliance/listing";
 
 /**
  * Rezervasyon çekirdeği — fazla satış kanıtlanabilir biçimde imkânsızdır (ADR 0002, 0010):
@@ -340,7 +341,8 @@ async function reserveInTransaction(
   return withSerializableRetry(async (tx) => {
     const policySelect = { select: { kind: true, version: true, rules: true } } as const;
     const room = await tx.roomType.findFirst({
-      where: { id: input.roomId, propertyId: input.propertyId, property: { isActive: true } },
+      // Önceden alınmış teklif olsa bile doğrulanmamış ilan satılamaz (v3#26).
+      where: { id: input.roomId, propertyId: input.propertyId, property: LISTABLE_PROPERTY },
       select: {
         id: true,
         maxOccupancy: true,

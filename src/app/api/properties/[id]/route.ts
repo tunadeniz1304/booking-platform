@@ -3,6 +3,7 @@ import { requireRole } from "@/lib/auth";
 import { toErrorResponse } from "@/lib/http/errors";
 import { propertyPatchSchema, updateProperty } from "@/lib/host/host-service";
 import { prisma } from "@/lib/prisma";
+import { LISTABLE_PROPERTY } from "@/lib/compliance/listing";
 import { logger, errorFields } from "@/lib/observability/logger";
 
 interface Props {
@@ -13,7 +14,8 @@ export async function GET(_req: Request, { params }: Props) {
   const { id } = await params;
   try {
     const property = await prisma.property.findFirst({
-      where: { id, isActive: true },
+      // Doğrulanmamış (PENDING/REJECTED) ilan aramadaki gibi 404 (v3#26).
+      where: { id, ...LISTABLE_PROPERTY },
       select: {
         id: true,
         title: true,

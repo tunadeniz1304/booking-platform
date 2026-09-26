@@ -25,6 +25,7 @@ import {
 import { checkRestrictions, describeViolation } from "@/lib/booking/restrictions";
 import { chargeAmount, getCurrentFx, resolveChargeCurrency } from "@/lib/fx/store";
 import { computeTaxes, taxRulesFor, type TaxLine, type TaxRule } from "@/lib/pricing/tax";
+import { isListable } from "@/lib/compliance/listing";
 
 /**
  * Fiyatın TEK kaynağı.
@@ -240,6 +241,7 @@ export async function computeTotal(req: QuoteRequest, now: Date = new Date()): P
         select: {
           currency: true,
           isActive: true,
+          licenseStatus: true,
           timeZone: true,
           checkInTime: true,
           checkOutTime: true,
@@ -249,7 +251,12 @@ export async function computeTotal(req: QuoteRequest, now: Date = new Date()): P
       ratePlans: { select: ratePlanSelect },
     },
   });
-  if (!room || !room.property.isActive || (req.propertyId && room.propertyId !== req.propertyId)) {
+  // Doğrulanmamış ilana teklif verilmez (v3#26).
+  if (
+    !room ||
+    !isListable(room.property) ||
+    (req.propertyId && room.propertyId !== req.propertyId)
+  ) {
     throw new NotFoundError("Oda bulunamadı");
   }
   let stay;

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { prisma } from "@/lib/prisma";
+import { LISTABLE_PROPERTY } from "@/lib/compliance/listing";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import PropertyGallery from "@/components/property/PropertyGallery";
@@ -32,7 +33,7 @@ interface PropertyDetail {
 
 async function getProperty(id: string): Promise<PropertyDetail | null> {
   const property = await prisma.property.findFirst({
-    where: { id, isActive: true },
+    where: { id, ...LISTABLE_PROPERTY },
     select: {
       id: true,
       title: true,

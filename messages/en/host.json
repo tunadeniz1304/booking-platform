@@ -91,5 +91,18 @@
     "suggesting": "Preparing suggestion…",
     "suggest": "Suggest listing copy",
     "draft": "Draft (not published automatically; edit and approve it)"
+  },
+  "photos": {
+    "title": "Photos",
+    "uploading": "Uploading and analysing…",
+    "quality": "Quality score: {score}/100",
+    "duplicate": {
+      "SAME_PROPERTY": "This photo already seems to be in this listing.",
+      "OWN_LISTING": "This photo is already used in one of your other listings.",
+      "OTHER_LISTING": "A similar photo exists in another listing; please only use photos you own."
+    },
+    "remove": "Remove photo",
+    "lowQuality": "The photo looks blurry or poorly exposed; consider uploading a sharper shot.",
+    "visualOff": "Visual similarity search is disabled here; the photo was still published."
   }
 }

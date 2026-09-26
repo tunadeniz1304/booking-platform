@@ -2,6 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import Header from "@/components/layout/Header";
@@ -48,7 +49,12 @@ interface SearchResultItem {
   quote?: { roomId: string; ratePlanId: string; total: number; currency: string; nights: number };
   score?: number;
   explain?: Record<string, number>;
+  /** P1-10: "benzerlerini göster" kaynağı (görsel arama açıksa). */
+  coverPhotoId?: string;
 }
+
+type VisualReason =
+  "FLAG_OFF" | "MODULE_MISSING" | "MODEL_MISSING" | "LOAD_FAILED" | "VECTOR_UNAVAILABLE";
 
 interface SearchResponse {
   results: SearchResultItem[];
@@ -57,6 +63,7 @@ interface SearchResponse {
   pageSize: number;
   totalPages: number;
   cached: boolean;
+  visual?: { enabled: boolean; applied: boolean; reason: VisualReason | null };
 }
 
 interface SmartResponse extends SearchResponse {
@@ -102,12 +109,21 @@ function SearchPageContent() {
   const checkIn = searchParams.get("checkIn") || "";
   const checkOut = searchParams.get("checkOut") || "";
   const guests = Number(searchParams.get("guests")) || 2;
+  const similarToPhotoId = searchParams.get("similarToPhotoId") || "";
+  /** Mevcut aramayı koruyarak görsel kNN kaynağını değiştiren bağlantı (boş → kaldır). */
+  const similarHref = (photoId: string) => {
+    const next = new URLSearchParams(searchParams.toString());
+    if (photoId) next.set("similarToPhotoId", photoId);
+    else next.delete("similarToPhotoId");
+    return `/search?${next.toString()}`;
+  };
 
   const [results, setResults] = useState<SearchResultItem[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [cached, setCached] = useState(false);
+  const [visual, setVisual] = useState<SearchResponse["visual"]>(undefined);
 
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 20000]);
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
@@ -141,6 +157,7 @@ function SearchPageContent() {
         if (guests) params.set("guests", String(guests));
         if (sortBy && sortBy !== "recommended") params.set("sort", sortBy);
       }
+      if (similarToPhotoId) params.set("similarToPhotoId", similarToPhotoId);
       params.set("page", "1");
       params.set("pageSize", "24");
 
@@ -150,12 +167,13 @@ function SearchPageContent() {
       setResults(data.results);
       setTotal(data.total);
       setCached(data.cached);
+      setVisual(data.visual);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("errors.load"));
     } finally {
       setLoading(false);
     }
-  }, [destination, checkIn, checkOut, guests, sortBy, smartFilters, t]);
+  }, [destination, checkIn, checkOut, guests, sortBy, smartFilters, similarToPhotoId, t]);
 
   useEffect(() => {
     const timer = setTimeout(() => void load(), 0);
@@ -221,6 +239,21 @@ function SearchPageContent() {
               ? `${f.date(checkIn)} - ${f.date(checkOut)} · ${t("guestCount", { count: guests })}`
               : t("guestCount", { count: guests })}
           </p>
+          {similarToPhotoId && visual && (
+            <div className="mt-3 flex flex-wrap items-center gap-3 text-sm" role="status">
+              <span className={visual.applied ? "text-gray-900" : "text-amber-800"}>
+                {visual.applied
+                  ? t("visual.similarHeading")
+                  : t(`visual.reasons.${visual.reason ?? "LOAD_FAILED"}`)}
+              </span>
+              <Link
+                href={similarHref("")}
+                className={`font-medium text-blue-700 underline ${focusRing}`}
+              >
+                {t("visual.clearSimilar")}
+              </Link>
+            </div>
+          )}
         </div>
 
         <div className="mb-6">
@@ -419,6 +452,14 @@ function SearchPageContent() {
                       }
                     />
                     <RankingWhy score={property.score} explain={property.explain} />
+                    {property.coverPhotoId && (
+                      <Link
+                        href={similarHref(property.coverPhotoId)}
+                        className={`mt-1 inline-block text-sm font-medium text-blue-700 underline ${focusRing}`}
+                      >
+                        {t("visual.showSimilar")}
+                      </Link>
+                    )}
                   </div>
                 ))}
               </div>

@@ -54,7 +54,8 @@ export async function apiFetch<T = unknown>(path: string, options: RequestInit =
     ...options,
     credentials: "same-origin",
     headers: {
-      "Content-Type": "application/json",
+      // FormData (dosya yükleme): tarayıcı multipart sınırını kendisi yazar.
+      ...(options.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
       ...(options.headers as Record<string, string> | undefined),
     },
   };

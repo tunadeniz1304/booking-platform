@@ -296,6 +296,7 @@ function PropertyPanel({ property, onChanged }: { property: HostProperty; onChan
       </div>
 
       {p.rooms.length > 0 && <CalendarForm rooms={p.rooms} propertyId={p.id} />}
+      <PhotoUpload propertyId={p.id} onChanged={onChanged} />
       <ListingCopy propertyId={p.id} />
     </Card>
   );
@@ -551,6 +552,107 @@ function ListingCopy({ propertyId }: { propertyId: string }) {
               <span className="font-semibold">EN:</span> {draft.en}
             </p>
           </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+interface PhotoUploadResult {
+  photo: { id: string; url: string; quality: { qualityScore: number } };
+  duplicate: { scope: "SAME_PROPERTY" | "OWN_LISTING" | "OTHER_LISTING"; distance: number } | null;
+  warnings: Array<"DUPLICATE" | "LOW_QUALITY">;
+  visual: { enabled: boolean; reason: string | null };
+}
+
+/** P1-10: fotoğraf yükleme — kalite skoru, duplikat ve düşük kalite uyarısı (engellemez). */
+function PhotoUpload({ propertyId, onChanged }: { propertyId: string; onChanged: () => void }) {
+  const t = useTranslations("host");
+  const [result, setResult] = useState<PhotoUploadResult | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const inputId = `photo-${propertyId}`;
+
+  async function upload(file: File) {
+    setBusy(true);
+    setError(null);
+    setResult(null);
+    try {
+      const body = new FormData();
+      body.append("file", file);
+      setResult(
+        await apiFetch<PhotoUploadResult>(`/api/host/properties/${propertyId}/photos`, {
+          method: "POST",
+          body,
+        })
+      );
+      onChanged();
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function remove(photoId: string) {
+    setBusy(true);
+    try {
+      await apiFetch(`/api/host/properties/${propertyId}/photos/${photoId}`, { method: "DELETE" });
+      setResult(null);
+      onChanged();
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="mt-6 border-t pt-4">
+      <label htmlFor={inputId} className="text-base font-semibold text-gray-900">
+        {t("photos.title")}
+      </label>
+      <input
+        id={inputId}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/avif"
+        disabled={busy}
+        className="mt-2 block text-sm text-gray-800"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) void upload(file);
+          e.target.value = "";
+        }}
+      />
+      <div aria-live="polite" className="mt-2 space-y-1 text-sm">
+        {busy && <p className="text-gray-700">{t("photos.uploading")}</p>}
+        {error && (
+          <p role="alert" className="text-red-700">
+            {error}
+          </p>
+        )}
+        {result && (
+          <>
+            <p className="text-gray-800">
+              {t("photos.quality", { score: Math.round(result.photo.quality.qualityScore * 100) })}
+            </p>
+            {result.duplicate && (
+              <p role="alert" className="text-amber-800">
+                {t(`photos.duplicate.${result.duplicate.scope}`)}{" "}
+                <button
+                  type="button"
+                  className="font-medium underline"
+                  onClick={() => void remove(result.photo.id)}
+                >
+                  {t("photos.remove")}
+                </button>
+              </p>
+            )}
+            {result.warnings.includes("LOW_QUALITY") && (
+              <p className="text-amber-800">{t("photos.lowQuality")}</p>
+            )}
+            {!result.visual.enabled && <p className="text-gray-600">{t("photos.visualOff")}</p>}
+          </>
         )}
       </div>
     </div>

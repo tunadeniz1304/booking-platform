@@ -111,5 +111,17 @@
     "seeDeal": "Fırsatı Gör",
     "addFavorite": "Favorilere ekle",
     "removeFavorite": "Favorilerden çıkar"
+  },
+  "visual": {
+    "showSimilar": "Benzerlerini göster",
+    "similarHeading": "Bu fotoğrafa benzeyen ilanlar",
+    "clearSimilar": "Görsel aramayı kaldır",
+    "reasons": {
+      "FLAG_OFF": "Görsel arama bu ortamda kapalı.",
+      "MODULE_MISSING": "Görsel model çalışma zamanı kurulu değil.",
+      "MODEL_MISSING": "Görsel arama modeli henüz indirilmemiş.",
+      "LOAD_FAILED": "Görsel arama modeli yüklenemedi.",
+      "VECTOR_UNAVAILABLE": "Görsel arama için vektör veritabanı yok."
+    }
   }
 }

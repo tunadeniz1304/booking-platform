@@ -111,5 +111,17 @@
     "seeDeal": "See deal",
     "addFavorite": "Add to favourites",
     "removeFavorite": "Remove from favourites"
+  },
+  "visual": {
+    "showSimilar": "Show similar",
+    "similarHeading": "Listings similar to this photo",
+    "clearSimilar": "Clear visual search",
+    "reasons": {
+      "FLAG_OFF": "Visual search is disabled in this environment.",
+      "MODULE_MISSING": "The visual model runtime is not installed.",
+      "MODEL_MISSING": "The visual search model has not been downloaded yet.",
+      "LOAD_FAILED": "The visual search model could not be loaded.",
+      "VECTOR_UNAVAILABLE": "No vector database is available for visual search."
+    }
   }
 }

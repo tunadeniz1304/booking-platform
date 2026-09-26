@@ -91,5 +91,18 @@
     "suggesting": "Öneri hazırlanıyor…",
     "suggest": "İlan metni önerisi",
     "draft": "Taslak (otomatik yayınlanmaz, düzenleyip onaylayın)"
+  },
+  "photos": {
+    "title": "Fotoğraflar",
+    "uploading": "Yükleniyor ve analiz ediliyor…",
+    "quality": "Kalite skoru: {score}/100",
+    "duplicate": {
+      "SAME_PROPERTY": "Bu fotoğraf bu ilanda zaten var gibi görünüyor.",
+      "OWN_LISTING": "Bu fotoğraf diğer ilanlarınızdan birinde zaten kullanılıyor.",
+      "OTHER_LISTING": "Bu fotoğrafın benzeri başka bir ilanda bulunuyor; yalnızca size ait fotoğrafları kullanın."
+    },
+    "remove": "Fotoğrafı kaldır",
+    "lowQuality": "Fotoğraf bulanık veya pozlaması zayıf görünüyor; daha net bir kare yüklemeyi düşünün.",
+    "visualOff": "Görsel benzerlik araması bu ortamda kapalı; fotoğraf yine de yayınlandı."
   }
 }

@@ -112,6 +112,10 @@ const schema = z.object({
   TRANSFER_CAPTURE_PENDING_TIMEOUT_SECONDS: int(15 * 60, 60, 24 * 60 * 60),
   TRANSFER_SWEEP_CRON: z.string().min(1).default("*/5 * * * *"),
 
+  // Defter (P0-3)
+  /** Günlük PSP ↔ jurnal mutabakat işinin cron'u (UTC); dünün kayıtlarını karşılaştırır. */
+  LEDGER_RECONCILE_CRON: z.string().min(1).default("45 2 * * *"),
+
   // Fraud v2 (P1-8): skor → allow < challenge_3ds < step_up_passkey < review < deny
   FRAUD_CHALLENGE_THRESHOLD: int(30, 0, 100),
   FRAUD_STEP_UP_THRESHOLD: int(45, 0, 100),

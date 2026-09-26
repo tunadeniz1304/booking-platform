@@ -77,7 +77,7 @@ describeInt("P1-7 yorum moderasyonu (integration)", () => {
   });
   afterAll(() => prisma.$disconnect());
 
-  it("v3#24: çıkışı geçmiş CONFIRMED rezervasyon yorum hakkı vermez; COMPLETED verir", async () => {
+  it("regression: v3#24 çıkışı geçmiş CONFIRMED rezervasyon yorum hakkı vermez; COMPLETED verir", async () => {
     const confirmed = await pastBooking("CONFIRMED");
     expect((await postReview(confirmed.id, { rating: 5 })).status).toBe(403);
 

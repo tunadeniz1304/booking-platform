@@ -57,7 +57,7 @@ function memoryBudget(limit: number): LlmBudget & { used: Map<string, number> } 
 beforeEach(() => resetLlmRuntimeForTests());
 
 describe("§3 v3-a kullanıcı başına günlük token bütçesi", () => {
-  it("bütçe dolunca canlı çağrı yapılmaz → demo çıktısı, fallback + reason budget", async () => {
+  it("regression: v3#22 bütçe dolunca canlı çağrı yapılmaz → demo, fallback + reason budget", async () => {
     const bodies: unknown[] = [];
     const budget = memoryBudget(60);
     const client = createLlmClient({ settings: live(), fetch: okFetch(bodies), budget });
@@ -93,7 +93,7 @@ describe("§3 v3-a kullanıcı başına günlük token bütçesi", () => {
 });
 
 describe("§3 v3-b tüm AI uçları `ai` rate-limit kategorisinde", () => {
-  it("yorum özeti dahil", () => {
+  it("regression: v3#22 yorum özeti dahil", () => {
     expect(categorize("/api/properties/p1/reviews/summary")).toBe("ai");
     expect(categorize("/api/properties/p1/reviews")).toBe("search");
     expect(categorize("/api/search/smart")).toBe("ai");

@@ -41,6 +41,28 @@ const req = (method: string, path: string, body?: unknown, bearer?: string) =>
   });
 
 /**
+ * Paylaşımlı DB'de outbox'ta önceki dosyaların birikmiş mesajları olabilir (test-stabilization
+ * kural 1): tek `relayOutbox(200)` bizim mesajımıza ulaşmayabilir. Beklenen bildirim(ler)
+ * oluşana ya da kuyruk boşalana dek parti parti aktarır (sınırlı döngü).
+ */
+async function relayUntil(
+  prisma: PrismaClient,
+  dedupeKeys: string[],
+  maxRounds = 50
+): Promise<void> {
+  for (let round = 0; round < maxRounds; round++) {
+    const found = await prisma.notification.count({ where: { dedupeKey: { in: dedupeKeys } } });
+    if (found >= dedupeKeys.length) return;
+    if ((await relayOutbox(500)) === 0) {
+      const pending = await prisma.outboxMessage.count({
+        where: { status: "PENDING", availableAfter: { lte: new Date() } },
+      });
+      if (pending === 0) return;
+    }
+  }
+}
+
+/**
  * P2-1a — DSA md. 20 itiraz akışı + DSA kaldırmasında yeniden yayın engeli; AP2 mandate
  * listesi ve iptali (iptal edilen nonce checkout'ta 403 MANDATE_REVOKED; Redis kaybında
  * AuditLog yedeği).
@@ -129,7 +151,10 @@ describeInt("P2-1a DSA itiraz + mandate iptali (integration)", () => {
     expect(await hasActiveDsaRestriction(fx.propertyId)).toBe(true);
 
     // Karar e-postası imzalı itiraz bağlantısını taşır (rol başına).
-    await relayOutbox(200);
+    await relayUntil(prisma, [
+      `dsa.notice_decided:${id}:host`,
+      `dsa.notice_decided:${id}:reporter`,
+    ]);
     const hostMail = await prisma.notification.findUniqueOrThrow({
       where: { dedupeKey: `dsa.notice_decided:${id}:host` },
     });
@@ -198,7 +223,7 @@ describeInt("P2-1a DSA itiraz + mandate iptali (integration)", () => {
       })
     ).toBeGreaterThanOrEqual(1);
 
-    await relayOutbox(200);
+    await relayUntil(prisma, [`dsa.appeal_received:${appealId}`, `dsa.appeal_decided:${appealId}`]);
     const received = await prisma.notification.findUnique({
       where: { dedupeKey: `dsa.appeal_received:${appealId}` },
     });
@@ -251,7 +276,7 @@ describeInt("P2-1a DSA itiraz + mandate iptali (integration)", () => {
       (await prisma.property.findUniqueOrThrow({ where: { id: fx.propertyId } })).isActive
     ).toBe(false);
     expect(await relist()).toBe("DSA_RESTRICTION_ACTIVE");
-    await relayOutbox(200);
+    await relayUntil(prisma, [`dsa.appeal_decided:${appealId}`]);
     const mail = await prisma.notification.findUniqueOrThrow({
       where: { dedupeKey: `dsa.appeal_decided:${appealId}` },
     });

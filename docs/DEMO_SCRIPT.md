@@ -67,12 +67,15 @@ curl -s localhost:3000/api/agentic/checkout_sessions/$ACS/complete -H "authoriza
 
 ## 4. Hasar talebi → depozito (~30 sn)
 
-Hasar talebi konaklama başladıktan sonra açılabildiği için canlı demoda zaman ileri sarılamaz; bu adım süreç içi v4 senaryosuyla gösterilir (tesis depozito ayarı → girişten önce off-session provizyon → ev sahibinin `HOST_DAMAGE` talebi → admin kararı). Senaryo `DATABASE_URL`, `REDIS_URL` ve `DEMO_MODE=true` ortamı ister; compose yığınında worker konteyneri bunlara sahiptir:
+Hasar talebi konaklama başladıktan sonra açılabildiği için canlı demoda zaman ileri sarılamaz; bu adım süreç içi v4 senaryosuyla gösterilir (tesis depozito ayarı → girişten önce off-session provizyon → ev sahibinin `HOST_DAMAGE` talebi → admin kararı). Senaryo `DATABASE_URL`, `REDIS_URL` ve `DEMO_MODE=true` ortamı ister. Compose yığınında bu adresler worker konteynerinin giriş noktasında (`docker/entrypoint.sh`, `secrets-init` sırlarından) kurulur; `docker compose exec` giriş noktasını atladığından komut onun üzerinden çalıştırılır:
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.demo.yml exec worker \
+  /bin/sh /usr/local/bin/entrypoint.sh \
   npx tsx --conditions=react-server scripts/demo-scenarios.ts --only=10
 ```
+
+14 senaryonun tamamı aynı yolla: `… exec -e BASE_URL=http://app:3000 worker /bin/sh /usr/local/bin/entrypoint.sh npm run demo:scenarios` (Git Bash'te `MSYS_NO_PATHCONV=1` önekiyle).
 
 Ardından `admin@booking.test` ile `/admin/claims` (talep, kanıt, SLA, karar) açılır; misafir tarafı `/resolution`'dadır.
 

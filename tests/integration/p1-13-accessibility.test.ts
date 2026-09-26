@@ -1,4 +1,5 @@
 import { it, expect, beforeAll, afterAll } from "vitest";
+import sharp from "sharp";
 import { NextRequest } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { describeInt } from "./helpers";
@@ -11,6 +12,8 @@ import * as featureRoute from "@/app/api/host/properties/[id]/accessibility/[fea
 import * as adminList from "@/app/api/admin/accessibility/route";
 import * as adminVerify from "@/app/api/admin/accessibility/[id]/route";
 import { GET as searchGet } from "@/app/api/search/route";
+import { STUB_MODEL_ID } from "@/lib/vision/stub-embedder";
+import { solidImage } from "../helpers/test-images";
 
 /**
  * P1-13(e) erişilebilirlik: host beyanı + kanıt fotoğrafı (ownership), admin doğrulaması
@@ -66,17 +69,31 @@ describeInt("P1-13(e) erişilebilirlik özellikleri (integration)", () => {
     return { status: res.status, body: await res.json() };
   }
 
+  /**
+   * Kanıt fotoğrafı: analiz + embedding'i DOLU gerçek WebP — P1-10 backfill'leri (global
+   * tarama) bu satırları işlemeye çalışmasın (paralel koşan v4-vision testini bozmasın).
+   */
   async function photo(propertyId: string): Promise<string> {
+    const data = await sharp(await solidImage(120, 32, 24))
+      .webp()
+      .toBuffer();
     const row = await prisma.propertyPhoto.create({
       data: {
         propertyId,
         contentType: "image/webp",
-        data: Buffer.from("fake-webp"),
-        width: 10,
-        height: 10,
-        byteSize: 9,
+        data,
+        width: 32,
+        height: 24,
+        byteSize: data.byteLength,
+        pHash: "0000000000000000",
+        qualityScore: 0.5,
+        embeddingModel: STUB_MODEL_ID,
       },
     });
+    await prisma.$executeRawUnsafe(
+      `UPDATE "PropertyPhoto" SET embedding = array_fill(0.01::real, ARRAY[512])::vector WHERE id = $1`,
+      row.id
+    );
     return row.id;
   }
 

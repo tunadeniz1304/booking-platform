@@ -84,7 +84,8 @@ test("a11y: sepet", async ({ page, baseURL }) => {
   await expectNoSeriousViolations(page);
 });
 
-test("a11y: karşılaştırma", async ({ page }) => {
+test("a11y: karşılaştırma", async ({ page, baseURL }) => {
+  await loginViaApi(page, baseURL!, GUEST_EMAIL);
   const [a, b] = [await findStay(page.request, 0), await findStay(page.request, 1)];
   await page.goto(`/compare?ids=${a.propertyId},${b.propertyId}`);
   await expect(page.locator("main h1")).toBeVisible();

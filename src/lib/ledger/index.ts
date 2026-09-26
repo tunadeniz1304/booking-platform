@@ -26,7 +26,9 @@ export {
   postRefundFromEscrow,
   refundTaxMinor,
   releasedSplitOf,
+  splitHostRecovery,
   taxShareMinor,
   type CaptureJournalInput,
+  type HostRecoverySplit,
   type RefundJournalInput,
 } from "./booking-money";

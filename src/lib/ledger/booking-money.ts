@@ -1,4 +1,6 @@
 import type { Prisma } from "@prisma/client";
+import { account } from "./accounts";
+import { getAccountBalance } from "./balance";
 import { postJournal, type PostResult } from "./journal";
 import { bookingCaptured, refundIssued } from "./templates";
 
@@ -127,18 +129,58 @@ export async function releasedSplitOf(
   return hostId ? { hostId, amountMinor, feeMinor } : null;
 }
 
+export interface HostRecoverySplit {
+  reserveMinor: bigint;
+  payableMinor: bigint;
+  platformCoverMinor: bigint;
+}
+
+/**
+ * Serbest bırakma sonrası iadenin ev sahibi payını kaynaklara böler (P1-5, saf):
+ * önce rezerv, sonra kullanılabilir host_payable (bekleyen payout'lar düşülmüş), kalan
+ * platform üstlenir → ev sahibi bakiyesi hiçbir zaman eksiye düşmez.
+ */
+export function splitHostRecovery(
+  hostPartMinor: bigint,
+  reserveBalanceMinor: bigint,
+  availablePayableMinor: bigint
+): HostRecoverySplit {
+  const clamp = (v: bigint) => (v < 0n ? 0n : v);
+  const need = clamp(hostPartMinor);
+  const reserveMinor = need < clamp(reserveBalanceMinor) ? need : clamp(reserveBalanceMinor);
+  const rest = need - reserveMinor;
+  const payableMinor = rest < clamp(availablePayableMinor) ? rest : clamp(availablePayableMinor);
+  return { reserveMinor, payableMinor, platformCoverMinor: rest - payableMinor };
+}
+
+/** host_payable − bekleyen (PENDING) payout'lar: iadenin geri alabileceği kullanılabilir bakiye. */
+async function availablePayableMinor(tx: Tx, hostId: string, currency: string): Promise<bigint> {
+  const [balance, legacy, host] = await Promise.all([
+    getAccountBalance(tx, account.hostPayable(hostId), currency),
+    tx.payout.aggregate({
+      where: { userId: hostId, currency, status: "PENDING" },
+      _sum: { amountMinor: true },
+    }),
+    tx.hostPayout.aggregate({
+      where: { userId: hostId, currency, status: "PENDING" },
+      _sum: { amountMinor: true },
+    }),
+  ]);
+  return balance.balanceMinor - (legacy._sum.amountMinor ?? 0n) - (host._sum.amountMinor ?? 0n);
+}
+
 /**
  * İade jurnali. Emanet serbest bırakılmadıysa: Dr escrow + tax_payable / Cr psp_clearing.
- * Serbest bırakıldıysa (P1-4): vergi hariç tutar komisyon oranında platform_revenue'dan,
- * kalanı host_payable'dan geri alınır (ev sahibi bakiyesi eksiye düşebilir → payout
- * motoru yalnız pozitif kullanılabilir bakiyeyi öder). Aynı anahtarla jurnal zaten varsa
- * (retry) yeniden hesaplanmaz — serbest bırakma araya girse bile içerik çakışması olmaz.
- * Tutar 0 ise jurnal yok.
+ * Serbest bırakıldıysa (P1-4): vergi hariç tutar komisyon oranında platform_revenue'dan geri
+ * alınır; ev sahibi payı (P1-5) ÖNCE host_reserve'den, yetmezse kullanılabilir host_payable'dan,
+ * o da yetmezse platform üstlenir (platform_revenue) — ev sahibi bakiyesi eksiye düşmez.
+ * Aynı anahtarla jurnal zaten varsa (retry) yeniden hesaplanmaz — serbest bırakma araya girse
+ * bile içerik çakışması olmaz. Tutar 0 ise jurnal yok.
  */
 export async function postRefundFromEscrow(
   tx: Tx,
   i: RefundJournalInput
-): Promise<PostResult | null> {
+): Promise<(PostResult & { recovery?: HostRecoverySplit }) | null> {
   if (i.refundMinor <= 0n) return null;
   const key = `refund-issued:${i.refundRef}`;
   const existing = await tx.journalEntry.findUnique({
@@ -167,15 +209,24 @@ export async function postRefundFromEscrow(
   };
   if (!released) return postJournal(tx, refundIssued({ ...base, from: "escrow" }));
   const net = i.refundMinor - taxMinor;
-  const fee =
+  const rawFee =
     released.amountMinor > 0n ? mulDivHalfUp(net, released.feeMinor, released.amountMinor) : 0n;
-  return postJournal(
+  const fee = rawFee > net ? net : rawFee;
+  const recovery = splitHostRecovery(
+    net - fee,
+    (await getAccountBalance(tx, account.hostReserve(released.hostId), i.currency)).balanceMinor,
+    await availablePayableMinor(tx, released.hostId, i.currency)
+  );
+  const res = await postJournal(
     tx,
     refundIssued({
       ...base,
       from: "released",
       hostId: released.hostId,
-      platformFeeMinor: fee > net ? net : fee,
+      platformFeeMinor: fee,
+      hostReserveMinor: recovery.reserveMinor,
+      platformCoverMinor: recovery.platformCoverMinor,
     })
   );
+  return { ...res, recovery };
 }

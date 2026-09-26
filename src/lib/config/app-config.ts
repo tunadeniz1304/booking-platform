@@ -155,6 +155,30 @@ const schema = z.object({
   /** Escrow + rezerv serbest bırakma süpürme işinin cron'u (UTC). */
   ESCROW_RELEASE_CRON: z.string().min(1).default("*/30 * * * *"),
 
+  // Hasar depozitosu + çözüm merkezi (P1-5, ADR 0021 §Depozito)
+  /** Depozito ön provizyonu tesisin yerel giriş anından bu kadar saat ÖNCE alınır. */
+  DEPOSIT_PREAUTH_HOURS_BEFORE: int(24, 0, 24 * 7),
+  /** Yerel çıkıştan bu kadar gün sonra açık hasar talebi yoksa provizyon bırakılır (void). */
+  DEPOSIT_HOLD_DAYS: int(3, 0, 30),
+  /** PSP provizyonunun geçerlilik süresi (Stripe kart: ~7 gün); sonra EXPIRED, tahsil edilemez. */
+  DEPOSIT_AUTH_VALID_DAYS: int(7, 1, 30),
+  /** Ev sahibinin ayarlayabileceği azami depozito (minor-unit). */
+  DEPOSIT_MAX_MINOR: int(5_000_000, 1, 1_000_000_000),
+  /** Depozito ön provizyon / void / süre dolumu süpürme işinin cron'u (UTC). */
+  DEPOSIT_SWEEP_CRON: z.string().min(1).default("*/15 * * * *"),
+  /** Karşı tarafın talebe yanıt süresi (saat); aşımda otomatik ESCALATED. */
+  CLAIM_RESPONSE_SLA_HOURS: int(72, 1, 24 * 14),
+  /** Gecikmeli SLA işi kaybolursa yedek süpürücü (UTC cron). */
+  CLAIM_SLA_SWEEP_CRON: z.string().min(1).default("*/10 * * * *"),
+  /** Misafir iade talebi yerel çıkıştan en geç bu kadar gün sonra açılabilir. */
+  CLAIM_GUEST_WINDOW_DAYS: int(14, 1, 365),
+  /** Kanıt yükleme sınırları: bayt, piksel (sıkıştırma bombası), kenar ve talep başına dosya. */
+  CLAIM_EVIDENCE_MAX_BYTES: int(8 * 1024 * 1024, 1024, 50 * 1024 * 1024),
+  CLAIM_EVIDENCE_PDF_MAX_BYTES: int(5 * 1024 * 1024, 1024, 50 * 1024 * 1024),
+  CLAIM_EVIDENCE_MAX_PIXELS: int(40_000_000, 10_000, 268_402_689),
+  CLAIM_EVIDENCE_MAX_EDGE_PX: int(2560, 256, 8192),
+  CLAIM_EVIDENCE_MAX_FILES: int(10, 1, 50),
+
   // PWA + Web Push (P1-12)
   /** VAPID anahtar çifti (base64url) ve iletişim (`mailto:` / `https:`); biri eksikse push kapalı. */
   VAPID_PUBLIC_KEY: z.string().default(""),

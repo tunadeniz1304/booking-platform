@@ -12,6 +12,12 @@ function refFor(prefix: string, key: string): string {
   return `${prefix}_${createHash("sha256").update(key).digest("hex").slice(0, 24)}`;
 }
 
+/** `pi_mockhold_<tutar>_…` → ön provizyon tutarı; depozito referansı değilse null. */
+export function parseMockHoldRef(providerRef: string): number | null {
+  const m = /^pi_mockhold_(\d+)_[0-9a-f]+$/.exec(providerRef);
+  return m ? Number(m[1]) : null;
+}
+
 export class MockPsp implements PaymentProvider {
   readonly name = "mock";
 
@@ -50,8 +56,37 @@ export class MockPsp implements PaymentProvider {
     return { status: "authorized", providerRef };
   }
 
-  async capture(): Promise<{ status: "captured" }> {
+  async capture(providerRef?: string, amount?: Money): Promise<{ status: "captured" }> {
+    // Depozito ön provizyonu tutarı referansta taşınır (durumsuz mock): aşan capture reddedilir.
+    const held = providerRef ? parseMockHoldRef(providerRef) : null;
+    if (held !== null && amount && amount.amount > held) {
+      throw new PaymentProviderError(
+        "amount_too_large",
+        "Tahsil tutarı ön provizyon tutarını aşıyor"
+      );
+    }
     return { status: "captured" };
+  }
+
+  /**
+   * P1-5 depozito ön provizyonu (off-session). Kaynak ödeme referansı `decline` içeriyorsa
+   * (demo/test) reddedilir. Referans biçimi: `pi_mockhold_<tutar>_<özet>`.
+   */
+  async authorizeHold(input: {
+    amount: Money;
+    sourceProviderRef: string;
+    idempotencyKey: string;
+  }): Promise<AuthorizeResult> {
+    if (input.amount.amount <= 0)
+      throw new PaymentProviderError("invalid_amount", "Tutar pozitif olmalı");
+    const providerRef = `pi_mockhold_${input.amount.amount}_${createHash("sha256")
+      .update(`${input.idempotencyKey}:${input.sourceProviderRef}`)
+      .digest("hex")
+      .slice(0, 20)}`;
+    if (input.sourceProviderRef.includes("decline")) {
+      return { status: "declined", providerRef, declineCode: "card_declined" };
+    }
+    return { status: "authorized", providerRef };
   }
 
   async refund(providerRef: string, amount: Money, idempotencyKey: string) {

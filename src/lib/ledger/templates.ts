@@ -26,6 +26,7 @@ export const JournalKinds = {
   TransferSettled: "TRANSFER_SETTLED",
   CreditIssued: "CREDIT_ISSUED",
   CreditSpent: "CREDIT_SPENT",
+  DepositCaptured: "DEPOSIT_CAPTURED",
 } as const;
 
 interface Common {
@@ -208,11 +209,21 @@ export interface RefundIssuedInput extends Common {
   hostId?: string;
   /** `released` iadede platform komisyonundan geri alınan pay. */
   platformFeeMinor?: bigint;
+  /** `released` iadede ev sahibi payının ÖNCE rezervden (host_reserve) karşılanan kısmı (P1-5). */
+  hostReserveMinor?: bigint;
+  /**
+   * `released` iadede ev sahibinin rezervi + kullanılabilir bakiyesi yetmediğinde platformun
+   * üstlendiği kısım (platform_revenue'dan; ev sahibi bakiyesi eksiye düşmez, P1-5).
+   */
+  platformCoverMinor?: bigint;
   /** Nereye: kartına (`psp`) ya da misafir kredisine (`guest_credit`). */
   to?: "psp" | "guest_credit";
 }
 
-/** İade: Dr (escrow | host_payable + platform_revenue) + tax_payable / Cr psp_clearing | guest_credit. */
+/**
+ * İade: Dr (escrow | host_reserve + host_payable + platform_revenue) + tax_payable
+ *       / Cr psp_clearing | guest_credit.
+ */
 export function refundIssued(i: RefundIssuedInput): JournalInput {
   const amount = positive("amountMinor", i.amountMinor);
   const tax = i.taxMinor ?? 0n;
@@ -224,10 +235,18 @@ export function refundIssued(i: RefundIssuedInput): JournalInput {
       throw new LedgerError(422, "LEDGER_INVALID_SPLIT", "Serbest bırakılmış iade hostId ister");
     }
     const fee = i.platformFeeMinor ?? 0n;
-    const hostPart = remainder(amount, { taxMinor: tax, platformFeeMinor: fee });
+    const reserve = i.hostReserveMinor ?? 0n;
+    const cover = i.platformCoverMinor ?? 0n;
+    const hostPart = remainder(amount, {
+      taxMinor: tax,
+      platformFeeMinor: fee,
+      hostReserveMinor: reserve,
+      platformCoverMinor: cover,
+    });
     debits.push(
+      dr(account.hostReserve(i.hostId), reserve, i.currency),
       dr(account.hostPayable(i.hostId), hostPart, i.currency),
-      dr(account.platformRevenue(), fee, i.currency)
+      dr(account.platformRevenue(), fee + cover, i.currency)
     );
   }
   const target = i.to === "guest_credit" ? account.guestCredit(i.guestId) : account.pspClearing();
@@ -351,6 +370,36 @@ export function creditSpent(i: CreditSpentInput): JournalInput {
   );
 }
 
+export interface DepositCapturedInput extends Common {
+  depositId: string;
+  bookingId: string;
+  hostId: string;
+  /** PSP'de fiilen tahsil edilen depozito tutarı (≤ ön provizyon). */
+  amountMinor: bigint;
+}
+
+/**
+ * Hasar depozitosu tahsilatı (P1-5, ADR 0021): Dr psp_clearing / Cr host_payable(host).
+ * Hasar tazminidir: platform komisyonu ve vergi yok, emanetten geçmez (konaklama bedeli
+ * değil; karar anında ev sahibine borçlanılır). Ön provizyonu aşan tazmin talebi deftere
+ * alacak olarak YAZILMAZ (tahsil edilemez; yalnız talep kaydında `uncollectedMinor`).
+ */
+export function depositCaptured(i: DepositCapturedInput): JournalInput {
+  const amount = positive("amountMinor", i.amountMinor);
+  return entry(
+    i,
+    {
+      idempotencyKey: `deposit-captured:${i.depositId}`,
+      kind: JournalKinds.DepositCaptured,
+      bookingId: i.bookingId,
+    },
+    [
+      dr(account.pspClearing(), amount, i.currency),
+      cr(account.hostPayable(i.hostId), amount, i.currency),
+    ]
+  );
+}
+
 type Tx = Prisma.TransactionClient;
 
 /** Şablonu aynı işlemde yazan kısayollar: `await post.bookingCaptured(tx, {...})`. */
@@ -365,4 +414,5 @@ export const post = {
   transferSettled: (tx: Tx, i: TransferSettledInput) => postJournal(tx, transferSettled(i)),
   creditIssued: (tx: Tx, i: CreditIssuedInput) => postJournal(tx, creditIssued(i)),
   creditSpent: (tx: Tx, i: CreditSpentInput) => postJournal(tx, creditSpent(i)),
+  depositCaptured: (tx: Tx, i: DepositCapturedInput) => postJournal(tx, depositCaptured(i)),
 };

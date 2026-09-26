@@ -49,6 +49,18 @@ export interface PaymentProvider {
    * istemcinin gönderdiği BIN'e güvenilmez. Desteklemeyen sağlayıcı → metot yok / `bin: null`.
    */
   describeToken?(cardToken: string): Promise<{ bin: string | null }>;
+  /**
+   * P1-5 hasar depozitosu: asıl tahsilatın kartıyla AYRI, kullanıcı yokken (off-session)
+   * ön provizyon (manuel capture). Sonra `capture(ref, tutar)` (kısmi olabilir; ön provizyonu
+   * aşamaz) ya da `void(ref)`. Desteklemeyen sağlayıcı → metot yok (depozito FAILED).
+   */
+  authorizeHold?(input: {
+    amount: Money;
+    /** Kartı yeniden kullanılacak asıl tahsilatın PSP kimliği. */
+    sourceProviderRef: string;
+    idempotencyKey: string;
+    metadata?: Record<string, string>;
+  }): Promise<AuthorizeResult>;
 }
 
 export class PaymentProviderError extends Error {

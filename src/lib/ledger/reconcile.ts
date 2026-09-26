@@ -12,10 +12,10 @@ export const reconciliationRunsTotal = counter(
   ["outcome"] as const
 );
 
-export type ReconKind = "capture" | "refund" | "transfer";
+export type ReconKind = "capture" | "refund" | "transfer" | "deposit";
 
 export interface ReconDiffRow {
-  subject: "payment" | "transfer";
+  subject: "payment" | "transfer" | "deposit";
   subjectId: string;
   bookingId: string | null;
   kind: ReconKind;
@@ -60,6 +60,7 @@ export function dayWindow(date: string | Date): { date: string; from: Date; to: 
  * - capture: Payment.amountMinor (paidAt doluysa) ↔ BOOKING_CAPTURED Dr psp_clearing
  * - refund:  Payment.refundedAmountMinor ↔ REFUND_ISSUED Cr psp_clearing (krediye iade hariç)
  * - transfer: COMPLETED devrin askPriceMinor'ı ↔ TRANSFER_SETTLED Dr psp_clearing
+ * - deposit: hasar depozitosunun capturedMinor'ı ↔ DEPOSIT_CAPTURED Dr psp_clearing (P1-5)
  */
 export async function reconcile(
   date: string | Date,
@@ -161,6 +162,8 @@ export async function reconcile(
     }
   }
 
+  checked += await reconcileDeposits(db, inDay, differences);
+
   const imbalanced = await db.$queryRaw<Array<{ n: bigint }>>`
     SELECT count(*)::bigint AS n FROM (
       SELECT l."entryId"
@@ -208,6 +211,65 @@ export async function reconcile(
   const ok = differences.length === 0 && imbalancedEntries === 0 && orphanEvents.length === 0;
   reconciliationRunsTotal.inc({ outcome: ok ? "clean" : "diff" });
   return { date: day, from, to, checked, differences, imbalancedEntries, orphanEvents, ok };
+}
+
+/**
+ * P1-5 depozito mutabakatı: o gün tahsil edilmiş ya da o gün DEPOSIT_CAPTURED jurnali oluşmuş
+ * her depozito için PSP tarafı (capturedMinor) ↔ jurnaldeki Dr psp_clearing (tüm zamanlar).
+ */
+async function reconcileDeposits(
+  db: Db,
+  inDay: { gte: Date; lt: Date },
+  out: ReconDiffRow[]
+): Promise<number> {
+  const PREFIX = "deposit-captured:";
+  const [captured, entries] = await Promise.all([
+    db.damageDeposit.findMany({ where: { capturedAt: inDay }, select: { id: true } }),
+    db.journalEntry.findMany({
+      where: { occurredAt: inDay, kind: JournalKinds.DepositCaptured },
+      select: { idempotencyKey: true },
+    }),
+  ]);
+  const ids = unique([
+    ...captured.map((d) => d.id),
+    ...entries.map((e) => e.idempotencyKey.slice(PREFIX.length)),
+  ]);
+  if (ids.length === 0) return 0;
+  const [deposits, lines] = await Promise.all([
+    db.damageDeposit.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, bookingId: true, currency: true, capturedMinor: true },
+    }),
+    db.journalLine.findMany({
+      where: {
+        side: "DEBIT",
+        account: { kind: "PSP_CLEARING" },
+        entry: {
+          kind: JournalKinds.DepositCaptured,
+          idempotencyKey: { in: ids.map((id) => `${PREFIX}${id}`) },
+        },
+      },
+      select: { amountMinor: true, entry: { select: { idempotencyKey: true } } },
+    }),
+  ]);
+  const journal = new Map<string, bigint>();
+  for (const l of lines) {
+    const id = l.entry.idempotencyKey.slice(PREFIX.length);
+    journal.set(id, (journal.get(id) ?? 0n) + l.amountMinor);
+  }
+  for (const d of deposits) {
+    push(
+      out,
+      "deposit",
+      d.id,
+      d.bookingId,
+      "deposit",
+      d.currency,
+      d.capturedMinor,
+      journal.get(d.id) ?? 0n
+    );
+  }
+  return deposits.length;
 }
 
 function unique(values: ReadonlyArray<string | null | undefined>): string[] {

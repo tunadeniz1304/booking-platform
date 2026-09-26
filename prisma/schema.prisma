@@ -1615,3 +1615,154 @@ model PaymentShareRefund {
   @@unique([shareId, bookingId])
   @@index([bookingId])
 }
+
+/// P1-5 hasar depozitosu ayarı: ilan geneli (roomTypeId=null) ya da oda tipine özel tutar
+/// (oda tipi ilan genelini ezer). Para birimi ilanın para birimidir. İlişki alanı yok
+/// (mevcut modellere dokunmamak için); sahiplik servis katmanında denetlenir.
+model DamageDepositSetting {
+  id          String   @id @default(cuid())
+  propertyId  String
+  roomTypeId  String?
+  amountMinor BigInt
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([propertyId, roomTypeId])
+  @@index([propertyId])
+}
+
+enum DamageDepositStatus {
+  /// Tutar belirlendi; ön provizyon anı (yerel giriş − DEPOSIT_PREAUTH_HOURS_BEFORE) bekleniyor.
+  SCHEDULED
+  AUTHORIZED
+  CAPTURED_PARTIAL
+  CAPTURED
+  VOIDED
+  /// Provizyon süresi (DEPOSIT_AUTH_VALID_DAYS) doldu; artık tahsil edilemez.
+  EXPIRED
+  /// PSP ön provizyonu reddetti / kaynak kart yeniden kullanılamıyor.
+  FAILED
+}
+
+/// P1-5: rezervasyon tahsilatından AYRI PSP ön provizyonu (manuel capture). Capture tutarı
+/// ön provizyonu aşamaz (DB CHECK + kod). Çıkış + DEPOSIT_HOLD_DAYS sonra talep yoksa void.
+model DamageDeposit {
+  id               String              @id @default(cuid())
+  bookingId        String              @unique
+  amountMinor      BigInt
+  currency         String
+  capturedMinor    BigInt              @default(0)
+  status           DamageDepositStatus @default(SCHEDULED)
+  provider         String
+  /// PSP ön provizyon kimliği (mock: pi_mockhold_…, stripe: pi_…).
+  providerRef      String?             @unique
+  /// Kartı yeniden kullanılan asıl tahsilatın PSP kimliği.
+  sourcePaymentRef String?
+  failureCode      String?
+  authorizeAfter   DateTime
+  voidAfter        DateTime
+  authorizedAt     DateTime?
+  capturedAt       DateTime?
+  voidedAt         DateTime?
+  expiredAt        DateTime?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  @@index([status, authorizeAfter])
+  @@index([status, voidAfter])
+}
+
+enum ClaimType {
+  /// Misafirin iade talebi (ilan tarif edildiği gibi değil vb.).
+  GUEST_REFUND
+  /// Ev sahibinin hasar talebi (depozitodan tahsil).
+  HOST_DAMAGE
+  /// PSP itirazı (Stripe `charge.dispute.*`); taraflar değil PSP açar.
+  CHARGEBACK
+}
+
+enum ClaimStatus {
+  /// Karşı taraf yanıt verdi; yönetici kararı bekleniyor.
+  OPEN
+  /// Karşı tarafın yanıtı bekleniyor (SLA: slaDueAt).
+  AWAITING_RESPONSE
+  /// SLA aşıldı ya da PSP itirazı: yönetici önceliği.
+  ESCALATED
+  RESOLVED_APPROVED
+  RESOLVED_PARTIAL
+  RESOLVED_REJECTED
+  /// Açan geri çekti ya da itiraz kararsız kapandı.
+  CLOSED
+}
+
+/// P1-5 çözüm merkezi talebi. Tutarlar minor-unit, rezervasyon para biriminde.
+model Claim {
+  id                   String          @id @default(cuid())
+  bookingId            String
+  type                 ClaimType
+  /// Açan kullanıcı (CHARGEBACK'te null: PSP açar).
+  openedById           String?
+  /// Yanıt vermesi beklenen karşı taraf.
+  respondentId         String?
+  amountRequestedMinor BigInt
+  currency             String
+  description          String
+  status               ClaimStatus     @default(AWAITING_RESPONSE)
+  slaDueAt             DateTime?
+  respondedAt          DateTime?
+  escalatedAt          DateTime?
+  /// Karar: onaylanan tutar, fiilen iade/tahsil edilen, tahsil edilemeyen (yalnız kayıt),
+  /// platformun üstlendiği (ev sahibi bakiyesi yetmediğinde).
+  awardedMinor         BigInt?
+  settledMinor         BigInt?
+  uncollectedMinor     BigInt?
+  platformCoveredMinor BigInt?
+  decisionNote         String?
+  decidedById          String?
+  decidedAt            DateTime?
+  /// PSP itiraz kimliği (Stripe `dp_…`), durum ve gerekçe.
+  externalRef          String?         @unique
+  externalStatus       String?
+  externalReason       String?
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+  messages             ClaimMessage[]
+  evidence             ClaimEvidence[]
+
+  @@index([bookingId])
+  @@index([status, slaDueAt])
+  @@index([openedById])
+  @@index([respondentId])
+}
+
+model ClaimMessage {
+  id        String   @id @default(cuid())
+  claimId   String
+  claim     Claim    @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  authorId  String
+  /// Yazanın rolü talepte: OPENER | RESPONDENT | ADMIN | SYSTEM.
+  role      String
+  body      String
+  createdAt DateTime @default(now())
+
+  @@index([claimId, createdAt])
+}
+
+/// Kanıt dosyası: görseller `sharp` ile yeniden kodlanır (tüm metadata/EXIF/GPS silinir),
+/// PDF yalnız boyut + imza doğrulamasıyla saklanır. Yalnız taraflar ve yönetici okur.
+model ClaimEvidence {
+  id          String   @id @default(cuid())
+  claimId     String
+  claim       Claim    @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  uploaderId  String
+  contentType String
+  byteSize    Int
+  width       Int?
+  height      Int?
+  sha256      String
+  data        Bytes
+  createdAt   DateTime @default(now())
+
+  @@index([claimId, createdAt])
+}

@@ -26,6 +26,15 @@ export interface SharedPaymentTokenGrant {
   expiresAt: Date | null;
 }
 
+/** Genişletilmemiş (string) ya da genişletilmiş ({id}) Stripe başvurusunun kimliği. */
+function refId(value: unknown): string | null {
+  if (typeof value === "string") return value;
+  if (value && typeof value === "object" && "id" in value && typeof value.id === "string") {
+    return value.id;
+  }
+  return null;
+}
+
 /** SDK'nın kendi yeniden denemesi kapalı: idempotency anahtarları üst katmanda yönetilir. */
 const STRIPE_MAX_NETWORK_RETRIES = 0;
 
@@ -163,6 +172,60 @@ export class StripeProvider implements PaymentProvider {
       )
     );
     return { status: "refunded" as const, refundRef: refund.id };
+  }
+
+  /**
+   * P1-5 depozito ön provizyonu: asıl PaymentIntent'in kartı + müşterisiyle off-session,
+   * `capture_method=manual`. Kart ancak asıl ödeme müşteriye bağlı ve yeniden kullanılabilir
+   * (setup_future_usage=off_session) ise kullanılabilir; değilse `payment_method_not_reusable`.
+   * Off-session'da 3DS istenirse (authentication_required) ret sayılır.
+   */
+  async authorizeHold(input: {
+    amount: Money;
+    sourceProviderRef: string;
+    idempotencyKey: string;
+    metadata?: Record<string, string>;
+  }): Promise<AuthorizeResult> {
+    const source = await this.call(() =>
+      this.stripe.paymentIntents.retrieve(input.sourceProviderRef)
+    );
+    const paymentMethod = refId(source.payment_method);
+    const customer = refId(source.customer);
+    if (!paymentMethod || !customer) {
+      throw new PaymentProviderError(
+        "payment_method_not_reusable",
+        "Asıl ödemenin kartı depozito için yeniden kullanılamıyor"
+      );
+    }
+    try {
+      const intent = await this.stripe.paymentIntents.create(
+        {
+          amount: input.amount.amount,
+          currency: input.amount.currency.toLowerCase(),
+          customer,
+          payment_method: paymentMethod,
+          off_session: true,
+          confirm: true,
+          capture_method: "manual",
+          metadata: { ...input.metadata, purpose: "damage_deposit" },
+        },
+        { idempotencyKey: input.idempotencyKey }
+      );
+      const result = this.toResult(intent);
+      return result.status === "requires_action"
+        ? { status: "declined", providerRef: intent.id, declineCode: "authentication_required" }
+        : result;
+    } catch (error) {
+      if (error instanceof Stripe.errors.StripeCardError) {
+        const raw = error.raw as { payment_intent?: { id?: string } } | undefined;
+        return {
+          status: "declined",
+          providerRef: raw?.payment_intent?.id ?? `declined:${input.idempotencyKey}`,
+          declineCode: error.decline_code ?? error.code ?? "card_declined",
+        };
+      }
+      return this.call(() => Promise.reject(error));
+    }
   }
 
   async void(providerRef: string) {

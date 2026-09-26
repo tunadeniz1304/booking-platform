@@ -1,7 +1,7 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { getConfig } from "@/lib/config/app-config";
 import { withSerializableRetry } from "@/lib/db/transactions";
-import { JournalKinds, post } from "@/lib/ledger";
+import { account as ledgerAccount, getAccountBalance, JournalKinds, post } from "@/lib/ledger";
 import { roundHalfUp } from "@/lib/money/currencies";
 import { logger } from "@/lib/observability/logger";
 import { counter } from "@/lib/observability/metrics";
@@ -208,10 +208,19 @@ async function releaseDueReserves(
   const hostFilter = opts.hostIds
     ? Prisma.sql`AND a."ownerId" = ANY(${opts.hostIds}::text[])`
     : Prisma.empty;
+  // P1-5: serbest bırakma sonrası iadeler rezervi kullanabilir → açılan tutar, rezervasyona
+  // atfedilen KALAN rezervdir (o rezervasyonun host_reserve satırları net toplamı) ve ev
+  // sahibinin güncel rezerv bakiyesiyle sınırlanır (host_reserve eksiye düşmez).
   const due = await prisma.$queryRaw<
     Array<{ bookingId: string; hostId: string; currency: string; amountMinor: bigint }>
   >`
-    SELECT e."bookingId", a."ownerId" AS "hostId", l."currency", l."amountMinor"
+    SELECT x."bookingId", x."hostId", x."currency", x."amountMinor" FROM (
+    SELECT e."bookingId", a."ownerId" AS "hostId", l."currency", e."occurredAt",
+           (SELECT COALESCE(SUM(CASE WHEN l2."side" = 'CREDIT' THEN l2."amountMinor" ELSE -l2."amountMinor" END), 0)
+              FROM "JournalLine" l2
+              JOIN "JournalEntry" e2 ON e2."id" = l2."entryId"
+             WHERE l2."accountId" = l."accountId" AND l2."currency" = l."currency"
+               AND e2."bookingId" = e."bookingId")::bigint AS "amountMinor"
       FROM "JournalEntry" e
       JOIN "JournalLine" l ON l."entryId" = e."id"
       JOIN "LedgerAccount" a ON a."id" = l."accountId"
@@ -222,20 +231,29 @@ async function releaseDueReserves(
          SELECT 1 FROM "JournalEntry" r WHERE r."idempotencyKey" = 'reserve-released:' || e."bookingId"
        )
        ${bookingFilter} ${hostFilter}
-     ORDER BY e."occurredAt" ASC
+    ) x
+     WHERE x."amountMinor" > 0
+     ORDER BY x."occurredAt" ASC
      LIMIT ${opts.limit ?? 500}`;
   let count = 0;
   for (const r of due) {
+    if (BigInt(r.amountMinor) <= 0n) continue;
     try {
-      const res = await withSerializableRetry((tx) =>
-        post.reserveReleased(tx, {
+      const res = await withSerializableRetry(async (tx) => {
+        const hostReserve = (
+          await getAccountBalance(tx, ledgerAccount.hostReserve(r.hostId), r.currency)
+        ).balanceMinor;
+        const amountMinor =
+          BigInt(r.amountMinor) < hostReserve ? BigInt(r.amountMinor) : hostReserve;
+        if (amountMinor <= 0n) return { created: false };
+        return post.reserveReleased(tx, {
           bookingId: r.bookingId,
           hostId: r.hostId,
           currency: r.currency,
-          amountMinor: BigInt(r.amountMinor),
+          amountMinor,
           occurredAt: now,
-        })
-      );
+        });
+      });
       if (res.created) count += 1;
     } catch (error) {
       logger.error(

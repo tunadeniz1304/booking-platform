@@ -1030,6 +1030,10 @@ async function main() {
     await prisma.invoice.deleteMany();
     // P1-1: sepetler (kalemler + sepet ödemesi kaskadla silinir).
     await prisma.cart.deleteMany();
+    // P1-5: talepler (mesaj + kanıt kaskadla), depozitolar ve depozito ayarları (FK yok).
+    await prisma.claim.deleteMany();
+    await prisma.damageDeposit.deleteMany();
+    await prisma.damageDepositSetting.deleteMany();
     await prisma.payout.deleteMany();
     await prisma.payment.deleteMany();
     await prisma.review.deleteMany();

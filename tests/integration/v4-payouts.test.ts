@@ -248,7 +248,7 @@ describeInt("P1-4 escrow → serbest bırakma → payout (+ rezerv, iptal, durdu
     await assertBooksClean();
   });
 
-  it("serbest bırakma sonrası iade host_payable + komisyondan düşer; defter tutarlı", async () => {
+  it("serbest bırakma sonrası iade önce rezervden + komisyondan düşer (P1-5); defter tutarlı", async () => {
     const cfg = getConfig();
     const c = await fx.hold({ nights: 1 });
     const pc = await pay(c.id);
@@ -256,6 +256,7 @@ describeInt("P1-4 escrow → serbest bırakma → payout (+ rezerv, iptal, durdu
     const escrowC = (await bookingEscrowMinor(prisma, c.id)).get("TRY")!;
     expect((await runEscrowRelease(after, { bookingIds: [c.id] })).released).toBe(1);
     const payableBefore = await bal("payable");
+    const reserveBefore = await bal("reserve");
     const booking = await prisma.booking.findUniqueOrThrow({ where: { id: c.id } });
     // İyi niyet iadesi (ör. yönetici): PSP tarafı Payment satırında, defter "released" dalında.
     const refund = 1_000n;
@@ -280,11 +281,14 @@ describeInt("P1-4 escrow → serbest bırakma → payout (+ rezerv, iptal, durdu
       include: { lines: { include: { account: true } } },
     });
     const kinds = entry.lines.map((l) => `${l.side}:${l.account.kind}`).sort();
-    expect(kinds).toContain("DEBIT:HOST_PAYABLE");
+    // P1-5: ev sahibi payı önce rezervden karşılanır (rezerv yeterli → host_payable'a dokunulmaz).
+    expect(kinds).toContain("DEBIT:HOST_RESERVE");
+    expect(kinds).not.toContain("DEBIT:HOST_PAYABLE");
     expect(kinds).toContain("DEBIT:PLATFORM_REVENUE");
     expect(kinds).not.toContain("DEBIT:ESCROW");
-    const hostDebit = entry.lines.find((l) => l.account.kind === "HOST_PAYABLE")!.amountMinor;
-    expect(await bal("payable")).toBe(payableBefore - hostDebit);
+    const hostDebit = entry.lines.find((l) => l.account.kind === "HOST_RESERVE")!.amountMinor;
+    expect(await bal("reserve")).toBe(reserveBefore - hostDebit);
+    expect(await bal("payable")).toBe(payableBefore);
     const split = computeReleaseSplit(escrowC, cfg.PLATFORM_COMMISSION_BPS, cfg.PAYOUT_RESERVE_BPS);
     expect(split.hostNetMinor).toBeGreaterThan(hostDebit);
     await assertBooksClean();

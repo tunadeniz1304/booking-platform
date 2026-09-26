@@ -19,6 +19,8 @@ export const QUEUE_NAMES = {
   compliance: "compliance",
   /** P1-3 fiyat takvimi (MinPriceByDate): artımlı + tam yeniden hesaplama. */
   priceCalendar: "price-calendar",
+  /** P1-5 çözüm merkezi: talep yanıt SLA'sı ve depozito void (gecikmeli işler). */
+  resolution: "resolution",
 } as const;
 
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];

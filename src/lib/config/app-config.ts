@@ -116,6 +116,26 @@ const schema = z.object({
   /** Günlük PSP ↔ jurnal mutabakat işinin cron'u (UTC); dünün kayıtlarını karşılaştırır. */
   LEDGER_RECONCILE_CRON: z.string().min(1).default("45 2 * * *"),
 
+  // PWA + Web Push (P1-12)
+  /** VAPID anahtar çifti (base64url) ve iletişim (`mailto:` / `https:`); biri eksikse push kapalı. */
+  VAPID_PUBLIC_KEY: z.string().default(""),
+  VAPID_PRIVATE_KEY: z.string().default(""),
+  VAPID_SUBJECT: z.string().default(""),
+  /** Abonelik uç noktası için izinli push servisi alan adları ("*." önekli joker). SSRF koruması. */
+  PUSH_ENDPOINT_HOSTS: z
+    .string()
+    .default(
+      "fcm.googleapis.com,updates.push.services.mozilla.com,*.push.services.mozilla.com,web.push.apple.com,*.push.apple.com,*.notify.windows.com"
+    ),
+  /** Kullanıcı başına azami abonelik (cihaz); aşılırsa en eskisi silinir. */
+  PUSH_MAX_SUBSCRIPTIONS_PER_USER: int(10, 1, 100),
+  /** Push servisinde bekleme süresi (sn) ve gönderim zaman aşımı (ms). */
+  PUSH_TTL_SECONDS: int(86_400, 0, 2_419_200),
+  PUSH_SEND_TIMEOUT_MS: int(10_000, 100, 60_000),
+  /** Check-in hatırlatma işi (cron, UTC) ve kaç gün önceden hatırlatılacağı. */
+  PUSH_CHECKIN_REMINDER_CRON: z.string().min(1).default("0 7 * * *"),
+  PUSH_CHECKIN_REMINDER_DAYS_AHEAD: int(1, 0, 14),
+
   // Fraud v2 (P1-8): skor → allow < challenge_3ds < step_up_passkey < review < deny
   FRAUD_CHALLENGE_THRESHOLD: int(30, 0, 100),
   FRAUD_STEP_UP_THRESHOLD: int(45, 0, 100),

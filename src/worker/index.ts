@@ -31,6 +31,11 @@ import {
   scheduleLedgerReconcile,
 } from "./jobs/ledger-reconcile";
 import { processComplianceJob, scheduleTakedownSlaSweep } from "./jobs/compliance";
+import {
+  PUSH_CHECKIN_REMINDER_JOB,
+  runPushReminders,
+  schedulePushReminders,
+} from "./jobs/push-reminders";
 import { runOutboxRelay } from "@/lib/cqrs";
 import { registerEventHandlers } from "@/lib/events/register";
 import { updateAvailabilityPrices } from "@/lib/pricing-service";
@@ -92,6 +97,7 @@ async function main(): Promise<void> {
       if (job.name === ICAL_POLL_JOB) return runIcalPoll();
       if (job.name === TRANSFER_SWEEP_JOB) return runTransferSweep();
       if (job.name === LEDGER_RECONCILE_JOB) return runLedgerReconcile();
+      if (job.name === PUSH_CHECKIN_REMINDER_JOB) return runPushReminders();
       throw new Error(`Bilinmeyen bakım işi: ${job.name}`);
     },
     { connection }
@@ -137,6 +143,7 @@ async function main(): Promise<void> {
   await scheduleTransferSweep(getQueue(QUEUE_NAMES.maintenance));
   await scheduleLedgerReconcile(getQueue(QUEUE_NAMES.maintenance));
   await scheduleTakedownSlaSweep(getQueue(QUEUE_NAMES.compliance));
+  await schedulePushReminders(getQueue(QUEUE_NAMES.maintenance));
 
   // Prometheus için işçi metrikleri (outbox, expire, bildirim sayaçları).
   const metricsPort = Number(process.env.WORKER_METRICS_PORT ?? 9464);

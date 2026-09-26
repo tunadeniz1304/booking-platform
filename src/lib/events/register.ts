@@ -27,6 +27,7 @@ import {
   notifyNoticeReceived,
 } from "@/lib/notifications/compliance-notifications";
 import type { NoticeEventPayload } from "@/lib/compliance/dsa";
+import { pushPriceDrop } from "@/lib/push/notifications";
 
 /**
  * Outbox'tan yayınlanan domain olaylarının tüketicileri (worker sürecinde).
@@ -80,6 +81,8 @@ export function registerEventHandlers(): void {
   );
   on<AuthEmailRequestedPayload>(EventTypes.AuthEmailRequested, notifyAuthEmail);
   on<PriceDroppedPayload>(EventTypes.PriceDropped, notifyPriceDrop);
+  // P1-12: aynı olay abone cihazlara push olarak da gider (ayrı tüketici; hata e-postayı etkilemez).
+  on<PriceDroppedPayload>(EventTypes.PriceDropped, pushPriceDrop);
   on<SecurityAlertPayload>(EventTypes.SecurityAlert, notifySecurityAlert);
   on<NoticeEventPayload>(EventTypes.NoticeReceived, notifyNoticeReceived);
   on<NoticeEventPayload>(EventTypes.NoticeDecided, notifyNoticeDecided);

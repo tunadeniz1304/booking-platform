@@ -39,6 +39,7 @@ model User {
   listedTransfers     BookingTransfer[]    @relation("transferSeller")
   claimedTransfers    BookingTransfer[]    @relation("transferBuyer")
   priceAlerts         PriceAlert[]
+  pushSubscriptions   PushSubscription[]
   messages            Message[]
   reviewReports       ReviewReport[]
 }
@@ -61,6 +62,25 @@ model UserSession {
 
   @@index([userId, revokedAt])
   @@index([userId, deviceId])
+}
+
+/// P1-12: tarayıcı Web Push aboneliği (uç nokta + ECDH anahtarları). 404/410 dönen abonelik silinir.
+model PushSubscription {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Push servisinin uç noktası (yalnızca izinli sağlayıcı alan adları; tekil).
+  endpoint      String    @unique
+  p256dh        String
+  auth          String
+  /// Bildirim dili ("tr" | "en").
+  locale        String    @default("tr")
+  userAgent     String?
+  createdAt     DateTime  @default(now())
+  lastSuccessAt DateTime?
+  failureCount  Int       @default(0)
+
+  @@index([userId])
 }
 
 enum UserRole {

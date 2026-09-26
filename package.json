@@ -30,6 +30,8 @@
     "mcp:smoke": "cross-env LOG_TO_STDERR=true tsx --conditions=react-server scripts/mcp-smoke.ts",
     "docs:screenshots": "tsx scripts/screenshots.ts",
     "embeddings:backfill": "tsx --conditions=react-server scripts/backfill-embeddings.ts",
+    "vision:backfill": "tsx --conditions=react-server scripts/backfill-vision.ts",
+    "vision:download": "tsx --conditions=react-server scripts/download-clip.ts",
     "ltr:clicks": "tsx scripts/ltr/generate-clicks.ts",
     "ltr:train": "python scripts/ltr/train.py",
     "llm:smoke": "tsx --conditions=react-server scripts/llm-smoke.ts",

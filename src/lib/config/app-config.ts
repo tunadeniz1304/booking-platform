@@ -265,8 +265,8 @@ const schema = z.object({
   VISION_LOW_QUALITY_THRESHOLD: num(0.35, 0, 1),
   /** pHash Hamming mesafesi ≤ eşik → duplikat (64 bit üzerinden). */
   VISION_DUPLICATE_MAX_HAMMING: int(8, 0, 32),
-  /** Görsel kNN kanalına girmek için en düşük kosinüs benzerliği. */
-  VISION_MIN_SIMILARITY: num(0.5, -1, 1),
+  /** Görsel kNN kanalına girmek için en düşük kosinüs benzerliği (CLIP'te ilgisiz görseller ~0.5–0.7). */
+  VISION_MIN_SIMILARITY: num(0.75, -1, 1),
 
   // P1-3 deneyler: anonim bucket çerezi ömrü (gün)
   EXPERIMENT_COOKIE_DAYS: int(90, 1, 730),

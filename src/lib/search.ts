@@ -102,8 +102,6 @@ export type RankingMode = "weighted" | "ltr";
 
 export interface SearchOptions {
   ranking?: RankingMode;
-  /** P1-10: görsel arama durumu (açıksa veya `similarToPhotoId` istendiyse). */
-  visual?: VisionStatus & { applied: boolean };
 }
 
 export interface SearchResponse {
@@ -117,6 +115,8 @@ export interface SearchResponse {
   semantic?: boolean;
   /** "Önerilen" sıralamada gerçekte kullanılan sıralayıcı. */
   ranking?: RankingMode;
+  /** P1-10: görsel arama durumu (açıksa veya `similarToPhotoId` istendiyse). */
+  visual?: VisionStatus & { applied: boolean };
 }
 
 interface CatalogRoom {

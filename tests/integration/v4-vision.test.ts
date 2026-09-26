@@ -9,6 +9,7 @@ import { resetConfigForTests } from "@/lib/config/app-config";
 import { setImageEmbedderForTests } from "@/lib/vision/clip";
 import { createStubImageEmbedder, STUB_MODEL_ID } from "@/lib/vision/stub-embedder";
 import { searchProperties } from "@/lib/search";
+import { backfillPhotoAnalysis, backfillPhotoEmbeddings } from "@/lib/vision/backfill";
 import * as photosRoute from "@/app/api/host/properties/[id]/photos/route";
 import * as photoRoute from "@/app/api/host/properties/[id]/photos/[photoId]/route";
 import * as publicPhoto from "@/app/api/photos/[id]/route";
@@ -173,5 +174,33 @@ describeInt("P1-10 görsel zekâ & çok-modlu arama (integration)", () => {
       process.env.VISION_CLIP_ENABLED = "true";
       resetConfigForTests();
     }
+  });
+
+  it("backfill: eksik kalite/pHash ve embedding'i doldurur, idempotent", async () => {
+    const data = await sharp(original).resize(256).webp().toBuffer();
+    const raw = await prisma.propertyPhoto.create({
+      data: {
+        propertyId: b.propertyId,
+        contentType: "image/webp",
+        data,
+        width: 256,
+        height: 192,
+        byteSize: data.byteLength,
+      },
+    });
+    expect(await backfillPhotoAnalysis()).toBeGreaterThanOrEqual(1);
+    const analysed = await prisma.propertyPhoto.findUniqueOrThrow({ where: { id: raw.id } });
+    expect(analysed.pHash).toMatch(/^[0-9a-f]{16}$/);
+    expect(analysed.qualityScore).not.toBeNull();
+    // Aynı sahnenin küçültülmüş kopyası → a'daki orijinalin duplikatı olarak işaretlenir.
+    expect(analysed.duplicateOfId).not.toBeNull();
+
+    const stub = createStubImageEmbedder();
+    expect(await backfillPhotoEmbeddings(stub)).toBeGreaterThanOrEqual(1);
+    expect(await backfillPhotoEmbeddings(stub)).toBe(0);
+    expect(await backfillPhotoAnalysis()).toBe(0);
+    const rows = await prisma.$queryRaw<Array<{ has: boolean }>>`
+      SELECT embedding IS NOT NULL AS has FROM "PropertyPhoto" WHERE id = ${raw.id}`;
+    expect(rows[0]!.has).toBe(true);
   });
 });

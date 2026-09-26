@@ -45,6 +45,9 @@ import * as hostA11y from "@/app/api/host/properties/[id]/accessibility/route";
 import * as hostA11yFeature from "@/app/api/host/properties/[id]/accessibility/[featureId]/route";
 import * as adminA11y from "@/app/api/admin/accessibility/route";
 import * as adminA11yVerify from "@/app/api/admin/accessibility/[id]/route";
+import * as hostPromotions from "@/app/api/host/promotions/route";
+import * as hostPromotion from "@/app/api/host/promotions/[id]/route";
+import * as couponValidate from "@/app/api/coupons/validate/route";
 import * as adminNotices from "@/app/api/admin/notices/route";
 import * as adminNotice from "@/app/api/admin/notices/[id]/route";
 import * as adminTransparency from "@/app/api/admin/compliance/transparency/route";
@@ -161,6 +164,21 @@ const MATRIX: Array<[string, string, Handler, Role[]]> = [
     hostA11yFeature.DELETE as unknown as Handler,
     HOST_ADMIN,
   ],
+  ["GET /api/host/promotions", "GET", hostPromotions.GET as unknown as Handler, HOST_ADMIN],
+  ["POST /api/host/promotions", "POST", hostPromotions.POST as unknown as Handler, HOST_ADMIN],
+  [
+    "PATCH /api/host/promotions/[id]",
+    "PATCH",
+    hostPromotion.PATCH as unknown as Handler,
+    HOST_ADMIN,
+  ],
+  [
+    "DELETE /api/host/promotions/[id]",
+    "DELETE",
+    hostPromotion.DELETE as unknown as Handler,
+    HOST_ADMIN,
+  ],
+  ["POST /api/coupons/validate", "POST", couponValidate.POST as unknown as Handler, ALL],
   ["GET /api/admin/notices", "GET", adminNotices.GET as unknown as Handler, ["ADMIN"]],
   ["POST /api/admin/notices/[id]", "POST", adminNotice.POST as unknown as Handler, ["ADMIN"]],
   [

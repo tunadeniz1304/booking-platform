@@ -29,7 +29,8 @@ export function categorize(pathname: string): RateLimitCategory {
   if (
     pathname.startsWith("/api/bookings") ||
     pathname.startsWith("/api/transfers") ||
-    pathname.startsWith("/api/cart")
+    pathname.startsWith("/api/cart") ||
+    pathname.startsWith("/api/coupons")
   ) {
     return "booking";
   }

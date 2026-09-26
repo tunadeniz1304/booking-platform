@@ -1,4 +1,4 @@
-/* global __ENV, __VU, __ITER */
+/* global __ENV, __ITER */
 /**
  * k6 BÖLÜNMÜŞ ÖDEME yarış testi (P1-2 / P2-3) — iki senaryo:
  *
@@ -21,6 +21,7 @@
  *   DEADLINE_PLANS (20; 0 → senaryo kapalı), OFFSET_MS (4000), SETTLE_WAIT_S (75).
  */
 import http from "k6/http";
+import exec from "k6/execution";
 import { check, fail, sleep } from "k6";
 import { Counter, Trend } from "k6/metrics";
 
@@ -118,7 +119,9 @@ function loginAll(count) {
         "POST",
         `${BASE}/api/auth/login`,
         JSON.stringify({ email: email(i), password: loginPassword }),
-        { headers: { "content-type": "application/json" } },
+        // Oturum çerezleri VU çerez kavanozuna girmesin: Bearer isteklerine çerez eklenirse
+        // uygulama Origin'siz çerezli isteği CSRF sayar (403 CSRF_REJECTED).
+        { headers: { "content-type": "application/json" }, jar: new http.CookieJar() },
       ]);
     }
     for (const res of http.batch(reqs)) {
@@ -127,6 +130,17 @@ function loginAll(count) {
     }
   }
   return tokens;
+}
+
+/** Tek hesap girişi: erişim token'ı 5 dk yaşar (= plan süresi) → deadline VU'ları taze token alır. */
+function login(i) {
+  const res = http.post(
+    `${BASE}/api/auth/login`,
+    JSON.stringify({ email: email(i), password: loginPassword }),
+    { headers: { "content-type": "application/json" }, jar: new http.CookieJar() }
+  );
+  if (res.status !== 200) fail(`login başarısız (${email(i)}): ${res.status}`);
+  return res.json("accessToken");
 }
 
 function clearCart(token) {
@@ -217,8 +231,8 @@ export function setup() {
       planId: made.plan.id,
       deadlineAt: Date.parse(made.plan.deadlineAt),
       share: tokenFromUrl(open.inviteUrl),
-      org,
-      payer: tokens[DL_PAYER0 + i],
+      orgIdx: DL_ORG0 + i,
+      payerIdx: DL_PAYER0 + i,
     });
   }
   console.log(
@@ -228,8 +242,11 @@ export function setup() {
 }
 
 export function shareRace(data) {
-  const org = data.tokens[__VU - 1];
-  const made = planFor(org, [null, null], DAY_OFFSET + ((__VU * 7 + __ITER) % 150));
+  // __VU senaryolar arası globaldir; bir senaryonun VU kimlikleri ardışık blok olduğundan
+  // mod RACE_VUS her yarış VU'suna [0, RACE_VUS) içinde tekil bir organizatör verir.
+  const vu = (exec.vu.idInTest - 1) % RACE_VUS;
+  const org = data.tokens[vu];
+  const made = planFor(org, [null, null], DAY_OFFSET + ((vu * 7 + __ITER) % 150));
   if (!made) return;
   const shares = made.plan.shares;
   const contested = shares.find((s) => !s.isOrganizer);
@@ -238,7 +255,7 @@ export function shareRace(data) {
   const pool = data.tokens.length - RACER0;
   const racers = [];
   for (let r = 0; r < RACERS; r++) {
-    racers.push(data.tokens[RACER0 + ((__VU * 13 + __ITER * RACERS + r) % pool)]);
+    racers.push(data.tokens[RACER0 + ((vu * 13 + __ITER * RACERS + r) % pool)]);
   }
   const shareToken = tokenFromUrl(contested.inviteUrl);
   const responses = http.batch(
@@ -285,24 +302,35 @@ export function shareRace(data) {
 }
 
 export function deadlineRace(data) {
-  const plan = data.deadlinePlans[__VU - 1];
+  // VU başına 1 yineleme → senaryo içi yineleme sırası planın tekil indeksidir (__VU global).
+  const idx = exec.scenario.iterationInTest;
+  const plan = data.deadlinePlans[idx];
   if (!plan) return;
-  // VU'ları süre sonunun [-OFFSET_MS, +OFFSET_MS] aralığına yay.
+  // Planları süre sonunun [-OFFSET_MS, +OFFSET_MS] aralığına yay.
   const n = Math.max(1, data.deadlinePlans.length - 1);
-  const offset = -OFFSET_MS + Math.round((2 * OFFSET_MS * (__VU - 1)) / n);
-  const waitMs = plan.deadlineAt + offset - Date.now();
-  if (waitMs > 0) sleep(waitMs / 1000);
-  const res = payShare(plan.payer, plan.share, `k6-dl-${plan.planId}`);
+  const offset = -OFFSET_MS + Math.round((2 * OFFSET_MS * idx) / n);
+  const at = plan.deadlineAt + offset;
+  // Setup token'ları süre sonuna kadar dolar (erişim token'ı 5 dk): ödemeden ~10 sn önce yenile.
+  if (at - 10_000 > Date.now()) sleep((at - 10_000 - Date.now()) / 1000);
+  const payer = login(plan.payerIdx);
+  if (at > Date.now()) sleep((at - Date.now()) / 1000);
+  const res = payShare(payer, plan.share, `k6-dl-${plan.planId}`);
   const paid = res.status === 200;
   if (paid) dlPaid.add(1);
   else dlRejected.add(1);
+  if (![200, 409, 410].includes(res.status)) {
+    console.warn(`deadline ödemesi beklenmeyen yanıt: ${res.status} ${res.body}`);
+  }
   // Süre sonu işi + süpürücü (dakikalık) işini bitirsin.
   sleep(Math.max(0, (plan.deadlineAt + SETTLE_WAIT_S * 1000 - Date.now()) / 1000));
-  const final = note(http.get(`${BASE}/api/cart/${plan.cartId}/split`, { headers: hdr(plan.org) }));
+  const final = note(
+    http.get(`${BASE}/api/cart/${plan.cartId}/split`, { headers: hdr(login(plan.orgIdx)) })
+  );
   const status = final.status === 200 ? final.json("plan.status") : null;
   if (status === "SETTLED") dlFinalSettled.add(1);
   else dlFinalClosed.add(1);
-  const consistent = paid ? status === "SETTLED" : status !== "SETTLED";
+  // Son durum okunamazsa (status null) tutarlılık kanıtlanamaz → tutarsız say.
+  const consistent = status !== null && (paid ? status === "SETTLED" : status !== "SETTLED");
   if (!consistent) {
     dlInconsistent.add(1);
     console.warn(

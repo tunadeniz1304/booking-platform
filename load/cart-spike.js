@@ -106,7 +106,9 @@ export function setup() {
         "POST",
         `${BASE}/api/auth/login`,
         JSON.stringify({ email, password: loginPassword }),
-        { headers: { "content-type": "application/json" } },
+        // Oturum çerezleri VU çerez kavanozuna girmesin: Bearer isteklerine çerez eklenirse
+        // uygulama Origin'siz çerezli isteği CSRF sayar (403 CSRF_REJECTED).
+        { headers: { "content-type": "application/json" }, jar: new http.CookieJar() },
       ])
     );
     responses.forEach((login, i) => {

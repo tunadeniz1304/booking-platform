@@ -4,7 +4,8 @@
  *
  * setup(): BOOKINGS adet HELD rezervasyon (LOAD_ROOMS'taki stok sınırlı odalar) açar ve her
  * birine 3DS kartıyla ödeme başlatır (202; PSP ref'i MockPsp'nin deterministik şemasından
- * hesaplanır: `pi_mock_` + sha256(`auth:<bookingId>:<key>:<token>`)[0:24] + `_3ds`).
+ * hesaplanır: `pi_mock_` + sha256(`auth:<bookingId>:<key>:<creditMinor>:<token>`)[0:24] + `_3ds`;
+ * yük hesaplarının cüzdan kredisi yok → creditMinor = 0).
  * CANCEL_PCT kadarını webhook'tan ÖNCE iptal eder → gelen başarı "geç başarı" olur ve
  * otomatik iade edilmelidir (payment_late_success_total{outcome="refunded"}).
  *
@@ -106,7 +107,9 @@ export function setup() {
         "POST",
         `${BASE}/api/auth/login`,
         JSON.stringify({ email: email(i), password: loginPassword }),
-        { headers: { "content-type": "application/json" } },
+        // Oturum çerezleri VU çerez kavanozuna girmesin: Bearer isteklerine çerez eklenirse
+        // uygulama Origin'siz çerezli isteği CSRF sayar (403 CSRF_REJECTED).
+        { headers: { "content-type": "application/json" }, jar: new http.CookieJar() },
       ]);
     }
     for (const res of http.batch(reqs)) {
@@ -134,7 +137,7 @@ export function setup() {
       { headers: hdr(token, { "idempotency-key": `k6-wh-b-${Date.now()}-${i}` }) }
     );
     if (create.status !== 201) continue;
-    const bookingId = create.json("id");
+    const bookingId = create.json("booking.id");
     const key = `k6-wh-${bookingId}`;
     const pay = http.post(
       `${BASE}/api/bookings/${bookingId}/pay`,
@@ -147,7 +150,7 @@ export function setup() {
       console.warn(`3DS ödeme başlatılamadı: ${pay.status} ${pay.body}`);
       continue;
     }
-    const ref = `pi_mock_${crypto.sha256(`auth:${bookingId}:${key}:${CARD}`, "hex").slice(0, 24)}_3ds`;
+    const ref = `pi_mock_${crypto.sha256(`auth:${bookingId}:${key}:0:${CARD}`, "hex").slice(0, 24)}_3ds`;
     const cancel = Math.random() * 100 < CANCEL_PCT;
     if (cancel) {
       const del = http.del(`${BASE}/api/bookings/${bookingId}`, null, { headers: hdr(token) });
@@ -224,7 +227,7 @@ export function teardown(data) {
   const summary = {};
   for (const b of data.bookings) {
     const res = http.get(`${BASE}/api/bookings/${b.bookingId}`, { headers: hdr(b.token) });
-    const status = res.status === 200 ? res.json("status") : `http_${res.status}`;
+    const status = res.status === 200 ? res.json("booking.status") : `http_${res.status}`;
     const key = `${b.cancelled ? "iptal" : "aktif"}:${status}`;
     summary[key] = (summary[key] || 0) + 1;
     const expected = b.cancelled ? "CANCELLED" : "CONFIRMED";

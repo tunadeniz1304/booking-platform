@@ -59,11 +59,11 @@ async function main(): Promise<void> {
     console.log(`seed-load: ${accounts} doğrulanmış hesap hazır`);
 
     const template = await prisma.property.findFirst({
-      where: { isActive: true, licenseStatus: "VERIFIED", location: { country: "TR" } },
+      where: { isActive: true, licenseStatus: "VERIFIED", location: { country: "Türkiye" } },
       select: { hostId: true, locationId: true, cancellationPolicyId: true },
       orderBy: { createdAt: "asc" },
     });
-    if (!template) throw new Error("Önce demo seed yüklenmeli (TR'de doğrulanmış ilan yok)");
+    if (!template) throw new Error("Önce demo seed yüklenmeli (Türkiye'de doğrulanmış ilan yok)");
 
     let property = await prisma.property.findFirst({
       where: { title: LOAD_PROPERTY_TITLE },

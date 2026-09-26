@@ -30,6 +30,7 @@ import {
   runLedgerReconcile,
   scheduleLedgerReconcile,
 } from "./jobs/ledger-reconcile";
+import { processComplianceJob, scheduleTakedownSlaSweep } from "./jobs/compliance";
 import { runOutboxRelay } from "@/lib/cqrs";
 import { registerEventHandlers } from "@/lib/events/register";
 import { updateAvailabilityPrices } from "@/lib/pricing-service";
@@ -118,6 +119,16 @@ async function main(): Promise<void> {
   const refundRetry = new Worker(QUEUE_NAMES.refundRetry, processRefundRetry, { connection });
   refundRetry.on("failed", onRefundRetryFailed);
   workers.push(refundRetry);
+
+  // P1-13a: 7565 kaldırma SLA kontrolü (gecikmeli iş + yedek süpürücü).
+  const compliance = new Worker(QUEUE_NAMES.compliance, processComplianceJob, { connection });
+  compliance.on("failed", (job, err) =>
+    logger.error(
+      { jobId: job?.id, queue: QUEUE_NAMES.compliance, ...errorFields(err) },
+      "job failed"
+    )
+  );
+  workers.push(compliance);
   await scheduleExpireHolds(getQueue(QUEUE_NAMES.maintenance));
   await scheduleFxRefresh(getQueue(QUEUE_NAMES.maintenance));
   await schedulePriceAlerts(getQueue(QUEUE_NAMES.maintenance));
@@ -125,6 +136,7 @@ async function main(): Promise<void> {
   await scheduleIcalPoll(getQueue(QUEUE_NAMES.maintenance));
   await scheduleTransferSweep(getQueue(QUEUE_NAMES.maintenance));
   await scheduleLedgerReconcile(getQueue(QUEUE_NAMES.maintenance));
+  await scheduleTakedownSlaSweep(getQueue(QUEUE_NAMES.compliance));
 
   // Prometheus için işçi metrikleri (outbox, expire, bildirim sayaçları).
   const metricsPort = Number(process.env.WORKER_METRICS_PORT ?? 9464);

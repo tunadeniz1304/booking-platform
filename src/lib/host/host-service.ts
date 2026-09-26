@@ -13,6 +13,7 @@ import {
 } from "@/lib/time/nights";
 import type { AccessClaims } from "@/lib/auth";
 import { LICENSE_RE, isLicenseFormatValid, verifyLicense } from "@/lib/compliance/license-registry";
+import { assertNoOpenTakedown } from "@/lib/compliance/takedown";
 
 /**
  * Host extranet (P1-7). Tüm işlemler sahiplik kontrollüdür: HOST yalnızca kendi
@@ -71,6 +72,8 @@ export async function updateProperty(
   patch: z.infer<typeof propertyPatchSchema>
 ) {
   const property = await assertPropertyAccess(actor, propertyId);
+  // P1-13a: açık 7565 kaldırma talebi varken ilan yeniden yayına alınamaz.
+  if (patch.isActive) await assertNoOpenTakedown(propertyId);
   const license = patch.licenseNumber ?? property.licenseNumber;
   if (patch.isActive && !license) {
     throw new ValidationError("Belge numarası olmadan ilan yayınlanamaz");

@@ -15,6 +15,8 @@ export const QUEUE_NAMES = {
   saga: "saga",
   /** Başarısız PSP iadelerinin üstel geri çekilmeli yeniden denemesi (v4#7). */
   refundRetry: "refund-retry",
+  /** Uyum otomasyonu (P1-13): 7565 kaldırma SLA kontrolü (gecikmeli iş). */
+  compliance: "compliance",
 } as const;
 
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];

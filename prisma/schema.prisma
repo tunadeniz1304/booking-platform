@@ -1001,3 +1001,100 @@ model PropertyPhoto {
   @@index([pHash])
   @@index([duplicateOfId])
 }
+
+/// P1-13a: 7565 s. Kanun kapsamında yetkili makam (Bakanlık) kaldırma talebi. İlan alındığı
+/// anda pasife alınır; `slaDueAt` (alınma + TAKEDOWN_SLA_HOURS) geçtiğinde ilan hâlâ yayında
+/// ya da talep işlenmemişse SLA aşımı (metrik + alarm). İlişki alanı yok (yalnız ekleme).
+model TakedownRequest {
+  id            String         @id @default(cuid())
+  source        TakedownSource
+  /// Resmî yazı / evrak numarası.
+  referenceNo   String?
+  propertyId    String
+  reason        String
+  receivedAt    DateTime
+  slaDueAt      DateTime
+  status        TakedownStatus @default(RECEIVED)
+  actionedAt    DateTime?
+  slaCheckedAt  DateTime?
+  slaBreachedAt DateTime?
+  createdById   String
+  resolvedAt    DateTime?
+  resolvedById  String?
+  resolution    String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@index([propertyId, status])
+  @@index([status, slaDueAt])
+}
+
+enum TakedownSource {
+  MINISTRY_7565
+  COURT_ORDER
+  OTHER_AUTHORITY
+}
+
+enum TakedownStatus {
+  /// Alındı; ilan henüz pasife alınamadı.
+  RECEIVED
+  /// İlan pasif (kaldırma uygulandı).
+  ACTIONED
+  /// Yönetici kapattı (kaldırma sürer ya da talep geri çekildi → ilan yeniden açılabilir).
+  CLOSED
+}
+
+/// P1-13b: DSA (AB 2022/2065) md. 16 bildirim-ve-eylem. Herkese açık formdan gelir;
+/// karar md. 17 gerekçeli karar bildirimiyle (statement of reasons) e-postalanır.
+model Notice {
+  id                 String          @id @default(cuid())
+  propertyId         String?
+  contentUrl         String
+  category           NoticeCategory
+  explanation        String
+  reporterName       String?
+  reporterEmail      String
+  goodFaith          Boolean
+  locale             String          @default("tr")
+  status             NoticeStatus    @default(RECEIVED)
+  decision           NoticeDecision?
+  decisionGround     NoticeGround?
+  legalReference     String?
+  statementOfReasons String?
+  automated          Boolean         @default(false)
+  decidedAt          DateTime?
+  decidedById        String?
+  createdAt          DateTime        @default(now())
+
+  @@index([status, createdAt])
+  @@index([propertyId])
+}
+
+enum NoticeCategory {
+  ILLEGAL_LISTING
+  UNLICENSED
+  FRAUD_SCAM
+  IP_INFRINGEMENT
+  DISCRIMINATION
+  UNSAFE
+  OTHER
+}
+
+enum NoticeStatus {
+  RECEIVED
+  DECIDED
+}
+
+enum NoticeDecision {
+  /// İçerik kaldırıldı / ilan pasife alındı.
+  REMOVED
+  /// İşlem yapılmadı.
+  NO_ACTION
+}
+
+enum NoticeGround {
+  /// Hukuka aykırı içerik (md. 17(3)(d)).
+  ILLEGAL_CONTENT
+  /// Kullanım koşullarına aykırılık (md. 17(3)(e)).
+  TERMS_OF_SERVICE
+}

@@ -288,6 +288,15 @@ const schema = z.object({
   /** Başarısız PSP iadesinin otomatik yeniden deneme sayısı ve üstel gecikme tabanı (ms). */
   REFUND_RETRY_MAX_ATTEMPTS: int(8, 1, 50),
   REFUND_RETRY_BASE_DELAY_MS: int(30_000, 10, 3_600_000),
+
+  // P1-13 uyum otomasyonu
+  /** 7565 kaldırma talebi SLA süresi (saat): alınmadan bu süre sonra ilan yayında olmamalı. */
+  TAKEDOWN_SLA_HOURS: int(24, 1, 24 * 7),
+  /** Gecikmeli SLA işi kaybolursa yedek süpürücü (UTC cron). */
+  TAKEDOWN_SLA_SWEEP_CRON: z.string().min(1).default("*/10 * * * *"),
+  /** DSA herkese açık bildirim formu: istemci başına pencere içinde en fazla bildirim. */
+  DSA_NOTICE_MAX_PER_WINDOW: int(5, 1, 1000),
+  DSA_NOTICE_WINDOW_SECONDS: int(3600, 60, 86_400),
 });
 
 export type AppConfig = z.infer<typeof schema> & { invalidKeys: string[] };

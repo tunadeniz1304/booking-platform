@@ -20,5 +20,11 @@
       "demo": "Demo (deterministic)",
       "fallback": "Fallback (LLM failed)"
     }
+  },
+  "theme": {
+    "label": "Theme",
+    "system": "System theme",
+    "light": "Light theme",
+    "dark": "Dark theme"
   }
 }

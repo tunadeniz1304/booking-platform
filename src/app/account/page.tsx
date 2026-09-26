@@ -206,7 +206,7 @@ export default function AccountPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
-      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+      <main id="main" className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold text-gray-900">{t("title")}</h1>
           <button
@@ -404,7 +404,7 @@ export default function AccountPage() {
             </div>
           </section>
         </div>
-      </div>
+      </main>
       <Footer />
     </div>
   );

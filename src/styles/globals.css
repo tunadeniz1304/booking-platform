@@ -13,3 +13,71 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/*
+ * P2-1a karanlık mod: renk değişkenleri tailwind.config.ts'de. Marka mavisi keyfi değerle
+ * (`text-[#003580]` …) yazılmış sınıflar koyu zeminde AA kontrastı sağlamaz; karanlık temada
+ * açık maviye yönlendirilir (yeni kodda `text-brand` / `ring-brand` kullanın).
+ */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .text-\[\#003580\],
+  :root:not([data-theme="light"]) .hover\:text-\[\#003580\]:hover,
+  :root:not([data-theme="light"]) .focus\:text-\[\#003580\]:focus {
+    color: rgb(var(--brand-fg));
+  }
+  :root:not([data-theme="light"]) .border-\[\#003580\],
+  :root:not([data-theme="light"]) .hover\:border-\[\#003580\]:hover,
+  :root:not([data-theme="light"]) .focus\:border-\[\#003580\]:focus {
+    border-color: rgb(var(--brand-ring));
+  }
+  :root:not([data-theme="light"]) .ring-\[\#003580\],
+  :root:not([data-theme="light"]) .focus\:ring-\[\#003580\]:focus,
+  :root:not([data-theme="light"]) .focus-visible\:ring-\[\#003580\]:focus-visible,
+  :root:not([data-theme="light"]) .target\:ring-\[\#003580\]:target {
+    --tw-ring-color: rgb(var(--brand-ring));
+  }
+}
+:root[data-theme="dark"] .text-\[\#003580\],
+:root[data-theme="dark"] .hover\:text-\[\#003580\]:hover,
+:root[data-theme="dark"] .focus\:text-\[\#003580\]:focus {
+  color: rgb(var(--brand-fg));
+}
+:root[data-theme="dark"] .border-\[\#003580\],
+:root[data-theme="dark"] .hover\:border-\[\#003580\]:hover,
+:root[data-theme="dark"] .focus\:border-\[\#003580\]:focus {
+  border-color: rgb(var(--brand-ring));
+}
+:root[data-theme="dark"] .ring-\[\#003580\],
+:root[data-theme="dark"] .focus\:ring-\[\#003580\]:focus,
+:root[data-theme="dark"] .focus-visible\:ring-\[\#003580\]:focus-visible,
+:root[data-theme="dark"] .target\:ring-\[\#003580\]:target {
+  --tw-ring-color: rgb(var(--brand-ring));
+}
+
+/*
+ * WCAG 2.2 — 2.4.7/2.4.11: halka (ring) sınıfı olmayan odaklanabilir öğelerde de görünür
+ * odak çerçevesi; yapışkan başlık odaktaki öğeyi örtmesin diye kaydırma payı.
+ */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible:not([class*="ring"]) {
+  outline: 2px solid rgb(var(--brand-ring, 0 53 128));
+  outline-offset: 2px;
+}
+html {
+  scroll-padding-top: 5rem;
+}
+
+/*
+ * WCAG 2.2 — 2.5.8 hedef boyutu (en az 24×24 CSS px): düğme ve seçim kutuları küçük
+ * yazı/dolgu ile daralsa bile tıklama alanı 24 px'in altına inmez.
+ */
+@layer base {
+  button,
+  select,
+  [role="button"],
+  input[type="button"],
+  input[type="submit"],
+  input[type="reset"] {
+    min-height: 1.5rem;
+    min-width: 1.5rem;
+  }
+}

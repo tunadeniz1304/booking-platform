@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { fetchCurrentUser, logout, type SessionUser } from "@/lib/api-client";
 import LocaleSwitcher from "./LocaleSwitcher";
+import ThemeToggle from "./ThemeToggle";
 
 type NavKey = "stays" | "plan" | "transfers" | "cart" | "host" | "admin" | "mailbox";
 
@@ -74,12 +75,6 @@ export default function Header() {
 
   return (
     <header className="bg-[#003580] text-white">
-      <a
-        href="#main"
-        className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded focus:bg-white focus:px-3 focus:py-2 focus:text-[#003580]"
-      >
-        {t("skipToContent")}
-      </a>
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         <div className="flex items-center gap-6">
           <Link href="/" className={`rounded-sm text-2xl font-bold tracking-tight ${focusRing}`}>
@@ -100,6 +95,7 @@ export default function Header() {
         </div>
 
         <div className="flex items-center gap-2">
+          <ThemeToggle />
           <LocaleSwitcher />
           {user ? (
             <div className="flex items-center gap-2">

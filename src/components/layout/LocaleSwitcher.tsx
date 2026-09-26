@@ -26,10 +26,10 @@ export default function LocaleSwitcher() {
           }).catch(() => undefined);
           router.refresh();
         }}
-        className="rounded border border-white/40 bg-transparent px-1 py-0.5"
+        className="min-h-[1.75rem] rounded border border-white/40 bg-transparent px-1 py-0.5"
       >
         {LOCALES.map((l) => (
-          <option key={l} value={l} className="text-gray-900">
+          <option key={l} value={l} className="bg-white text-gray-900">
             {t(l)}
           </option>
         ))}

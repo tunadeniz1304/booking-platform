@@ -20,5 +20,11 @@
       "demo": "Demo (deterministik)",
       "fallback": "Yedek (LLM başarısız)"
     }
+  },
+  "theme": {
+    "label": "Tema",
+    "system": "Sistem teması",
+    "light": "Açık tema",
+    "dark": "Koyu tema"
   }
 }

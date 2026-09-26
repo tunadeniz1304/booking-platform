@@ -27,6 +27,8 @@ export const EventTypes = {
   NoticeReceived: "compliance.notice_received",
   /** DSA bildirimine karar verildi → gerekçeli karar bildirimi (P1-13b). */
   NoticeDecided: "compliance.notice_decided",
+  /** Parti riski skoru eşik üstünde → ev sahibine uyarı (P1-6). */
+  PartyRiskFlagged: "trust.party_risk_flagged",
 } as const;
 
 export type EventType = (typeof EventTypes)[keyof typeof EventTypes];
@@ -113,6 +115,12 @@ export interface PriceDroppedPayload {
   currentMinor: number;
   /** Gözlem günü (YYYY-MM-DD) — e-posta tekilliği için. */
   observedOn: string;
+}
+
+export interface PartyRiskFlaggedPayload {
+  bookingId: string;
+  hostId: string;
+  propertyId: string;
 }
 
 export interface PropertyCreatedPayload {

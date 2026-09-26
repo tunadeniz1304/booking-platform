@@ -11,6 +11,7 @@ import {
   type SecurityAlertPayload,
   type PriceDroppedPayload,
   type PropertyAvailabilityChangedPayload,
+  type PartyRiskFlaggedPayload,
 } from "./events";
 import { notifyAuthEmail, notifyPriceDrop } from "@/lib/notifications/auth-notifications";
 import { upsertPropertyEmbedding } from "@/lib/embedding/backfill";
@@ -33,6 +34,8 @@ import {
   onAvailabilityChanged,
   onBookingInventoryChanged,
 } from "@/lib/pricing/price-calendar-jobs";
+import { onBookingCreatedPartyRisk } from "@/lib/trust/party-risk-service";
+import { notifyHostPartyRisk } from "@/lib/notifications/trust-notifications";
 
 /**
  * Outbox'tan yayınlanan domain olaylarının tüketicileri (worker sürecinde).
@@ -82,6 +85,9 @@ export function registerEventHandlers(): void {
   registered = true;
 
   on<BookingCreatedPayload>(EventTypes.BookingCreated, invalidateStay);
+  // P1-6: parti riski skoru (booking-service'e dokunmadan) → eşik üstünde host uyarısı.
+  on<BookingCreatedPayload>(EventTypes.BookingCreated, onBookingCreatedPartyRisk);
+  on<PartyRiskFlaggedPayload>(EventTypes.PartyRiskFlagged, notifyHostPartyRisk);
   // Saga devamı (P0-7): fatura → bildirim, BullMQ FlowProducer ile.
   on<BookingConfirmedPayload>(EventTypes.BookingConfirmed, startBookingFulfilment);
   on<BookingCancelledPayload>(EventTypes.BookingCancelled, async (p) => {

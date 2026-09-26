@@ -37,6 +37,8 @@ import * as adminReconciliation from "@/app/api/admin/reconciliation/route";
 import * as hostPhotos from "@/app/api/host/properties/[id]/photos/route";
 import * as hostPhoto from "@/app/api/host/properties/[id]/photos/[photoId]/route";
 import * as accountSessions from "@/app/api/account/sessions/route";
+import * as accountIdentity from "@/app/api/account/identity/route";
+import * as hostPartyRisk from "@/app/api/host/trust/party-risk/route";
 import * as adminTakedowns from "@/app/api/admin/takedowns/route";
 import * as adminTakedown from "@/app/api/admin/takedowns/[id]/route";
 import * as hostA11y from "@/app/api/host/properties/[id]/accessibility/route";
@@ -114,6 +116,8 @@ const MATRIX: Array<[string, string, Handler, Role[]]> = [
     ["ADMIN"],
   ],
   ["GET /api/account/sessions", "GET", accountSessions.GET as unknown as Handler, ALL],
+  ["GET /api/account/identity", "GET", accountIdentity.GET as unknown as Handler, ALL],
+  ["GET /api/host/trust/party-risk", "GET", hostPartyRisk.GET as unknown as Handler, HOST_ADMIN],
   ["GET /api/admin/takedowns", "GET", adminTakedowns.GET as unknown as Handler, ["ADMIN"]],
   ["POST /api/admin/takedowns", "POST", adminTakedowns.POST as unknown as Handler, ["ADMIN"]],
   ["POST /api/admin/takedowns/[id]", "POST", adminTakedown.POST as unknown as Handler, ["ADMIN"]],

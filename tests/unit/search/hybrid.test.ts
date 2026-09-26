@@ -61,4 +61,24 @@ describe("P1-1 hibrit arama — saf parçalar", () => {
     expect(ndcgAtK(["b"], grades)).toBeLessThan(ndcgAtK(["a"], grades));
     expect(ndcgAtK(["a"], new Map([["a", 0]]))).toBe(0);
   });
+
+  it("P1-10 rrfFuse 3 liste (sözcüksel + vektör + görsel): görsel kanal sıralamayı değiştirir", () => {
+    const k = 60;
+    const lex = ["a", "b", "c"];
+    const vec = ["b", "a"];
+    const img = ["c", "d"];
+    const two = rrfFuse([lex, vec], k);
+    const three = rrfFuse([lex, vec, img], k);
+    expect(two.get("c")).toBeCloseTo(1 / (k + 3), 12);
+    expect(three.get("c")).toBeCloseTo(1 / (k + 3) + 1 / (k + 1), 12);
+    expect(three.get("d")).toBeCloseTo(1 / (k + 2), 12);
+    expect(three.get("a")).toBeCloseTo(1 / (k + 1) + 1 / (k + 2), 12);
+    // Yalnız görsel listede olan aday da havuza girer; üç listede birden olan yoktur.
+    expect([...three.keys()].sort()).toEqual(["a", "b", "c", "d"]);
+    const order = [...three.entries()].sort((x, y) => y[1] - x[1]).map(([id]) => id);
+    expect(order.slice(0, 2).sort()).toEqual(["a", "b"]);
+    expect(order[2]).toBe("c");
+    // Yalnız görsel liste (metin sorgusu yok): sıralama görsel kNN sırasıdır.
+    expect([...rrfFuse([[], [], img], k).keys()]).toEqual(["c", "d"]);
+  });
 });

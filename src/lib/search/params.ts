@@ -50,6 +50,12 @@ export const SearchParamsSchema = z
     ),
     sort: z.enum(SORTS).optional(),
     semantic: z.boolean().optional(),
+    /** P1-10: "bu fotoğraftaki gibi" — görsel kNN kanalının kaynak fotoğrafı. */
+    similarToPhotoId: z
+      .string()
+      .trim()
+      .regex(/^[A-Za-z0-9_-]{1,64}$/, "Geçersiz fotoğraf kimliği")
+      .optional(),
     userId: z.string().max(64).optional(),
   })
   .superRefine((v, ctx) => {
@@ -99,5 +105,6 @@ export function searchParamsFromUrl(sp: URLSearchParams): Record<string, unknown
     pageSize: sp.get("pageSize") ?? undefined,
     sort: sp.get("sort") || undefined,
     semantic: flag("semantic") || undefined,
+    similarToPhotoId: sp.get("similarToPhotoId") || undefined,
   };
 }

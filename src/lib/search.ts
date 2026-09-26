@@ -16,6 +16,7 @@ import { nightsFromInventory, priceStay } from "@/lib/pricing/quote";
 import { checkRestrictions, type RestrictionRow } from "@/lib/booking/restrictions";
 import { RANKING_WEIGHTS, RANKING_WEIGHTS_WITH_QUERY, rankResults } from "@/lib/search/ranking";
 import { hybridSearch, type HybridHit } from "@/lib/search/hybrid";
+import { coverPhotoIds, visualSearchStatus, type VisionStatus } from "@/lib/vision/visual-search";
 import { rankWithLtr } from "@/lib/search/ltr";
 import { nightsBetween, toDbDate, type IsoDate } from "@/lib/time/nights";
 import { computeAffinity, affinityBoostFor } from "@/lib/search/vector";
@@ -92,6 +93,8 @@ export interface SearchResult {
   display?: { amount: number; currency: string };
   score?: number;
   explain?: Record<string, number>;
+  /** P1-10: "benzerlerini göster" için kapak fotoğrafı (görsel arama açıksa ve embedding varsa). */
+  coverPhotoId?: string;
 }
 
 /** Sıralayıcı seçimi (P1-3 deneyi): "weighted" v2 davranışı, "ltr" ONNX modeli. */
@@ -99,6 +102,8 @@ export type RankingMode = "weighted" | "ltr";
 
 export interface SearchOptions {
   ranking?: RankingMode;
+  /** P1-10: görsel arama durumu (açıksa veya `similarToPhotoId` istendiyse). */
+  visual?: VisionStatus & { applied: boolean };
 }
 
 export interface SearchResponse {
@@ -429,17 +434,25 @@ function stayOf(params: SearchParams): Stay | null {
   return nights.length > 0 ? { checkIn, checkOut, nights } : null;
 }
 
-async function hybridPoolFor(params: SearchParams): Promise<Map<string, HybridHit> | null> {
-  const query = params.query?.trim();
-  if (!query) return null;
+async function hybridPoolFor(
+  params: SearchParams,
+  visualOn: boolean
+): Promise<Map<string, HybridHit> | null> {
+  const query = params.query?.trim() ?? "";
+  const similarToPhotoId = visualOn ? params.similarToPhotoId : undefined;
+  if (!query && !similarToPhotoId) return null;
   try {
     const hits = await breakers.search.call(
       () =>
-        hybridSearch(query, {
-          city: params.city,
-          country: params.country,
-          propertyType: params.propertyType,
-        }),
+        hybridSearch(
+          query,
+          {
+            city: params.city,
+            country: params.country,
+            propertyType: params.propertyType,
+          },
+          { similarToPhotoId }
+        ),
       async () => {
         throw new BreakerOpenError("search-hybrid");
       }
@@ -465,7 +478,8 @@ export async function searchProperties(
   const sort = params.sort ?? "recommended";
   const displayCurrency = params.currency ? assertCurrency(params.currency) : undefined;
 
-  const pool = await hybridPoolFor(params);
+  const visual = await visualSearchStatus();
+  const pool = await hybridPoolFor(params, visual.enabled);
   const entries = await loadCatalog(params, pool ? [...pool.keys()] : undefined);
   const stay = stayOf(params);
   const quotes = stay ? await stayQuotes(entries, stay, params.guests ?? 1) : null;
@@ -563,8 +577,18 @@ export async function searchProperties(
   }
 
   const total = ordered.length;
+  let pageResults = ordered.slice((page - 1) * pageSize, page * pageSize);
+  if (visual.enabled && pageResults.length > 0) {
+    const covers = await coverPhotoIds(pageResults.map((r) => r.id)).catch((error: unknown) => {
+      logger.warn(errorFields(error), "cover photo lookup failed");
+      return new Map<string, string>();
+    });
+    pageResults = pageResults.map((r) =>
+      covers.has(r.id) ? { ...r, coverPhotoId: covers.get(r.id)! } : r
+    );
+  }
   return {
-    results: ordered.slice((page - 1) * pageSize, page * pageSize),
+    results: pageResults,
     total,
     page,
     pageSize,
@@ -572,6 +596,9 @@ export async function searchProperties(
     cached: false,
     ...(pool ? { semantic: true } : {}),
     ...(rankingMode ? { ranking: rankingMode } : {}),
+    ...(visual.enabled || params.similarToPhotoId
+      ? { visual: { ...visual, applied: visual.enabled && Boolean(params.similarToPhotoId) } }
+      : {}),
   };
 }
 

@@ -34,6 +34,17 @@ const schema = z.object({
   /** P1-1 grup sepeti: en fazla kalem, sepet tutma süresi (dk; tüm kalemler ortak bitiş). */
   CART_MAX_ITEMS: int(10, 1, 50),
   CART_HOLD_TTL_MINUTES: int(15, 1, 24 * 60),
+  /**
+   * P1-2 bölünmüş ödeme: payların son ödeme süresi (dk), yedek (organizatör) aşaması süresi,
+   * süre sonu davranışı (organizer → kalan organizatöre; refund → hepsi void/iade), en fazla
+   * pay ve tutma payı. Plan kurulunca sepet tutması süre + yedek + pay kadar uzatılır; son
+   * ödeme anı tutma bitişini asla aşmaz.
+   */
+  SPLIT_PAY_DEADLINE_MINUTES: int(60, 5, 3 * 24 * 60),
+  SPLIT_PAY_FALLBACK_MINUTES: int(30, 5, 24 * 60),
+  SPLIT_PAY_FALLBACK: z.enum(["organizer", "refund"]).default("organizer"),
+  SPLIT_PAY_MAX_SHARES: int(10, 2, 20),
+  SPLIT_PAY_HOLD_GRACE_MINUTES: int(5, 1, 60),
   /** Platform hizmet bedeli (baz puan; 0 → yok). Vergi kuralları: TAX_RULES_JSON / data/tax-rules.json. */
   SERVICE_FEE_BPS: int(0, 0, 3000),
   /** Geçmiş envanter günleri bu kadar gün sonra budanır (P0-11). */

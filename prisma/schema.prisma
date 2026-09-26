@@ -1364,6 +1364,8 @@ model CartPayment {
   paidAt              DateTime?
   refundedAt          DateTime?
   payments            Payment[]
+  /// P1-2: bölünmüş ödeme planları (en fazla biri aktif; kısmi benzersiz indeks).
+  splitPlans          SplitPlan[]
   createdAt           DateTime      @default(now())
   updatedAt           DateTime      @updatedAt
 
@@ -1509,4 +1511,107 @@ model HostPayout {
 
   @@index([status, createdAt])
   @@index([userId, createdAt])
+}
+
+// ───────────── P1-2 bölünmüş ödeme (split payment) ─────────────
+
+enum PaymentShareStatus {
+  INVITED
+  REQUIRES_ACTION
+  AUTHORIZED
+  CAPTURED
+  FAILED
+  VOIDED
+  REFUNDED
+  EXPIRED
+}
+
+enum SplitFallbackMode {
+  /// Süre sonunda ödenmemiş paylar organizatöre tek "yedek pay" olarak düşer.
+  ORGANIZER_PAYS
+  /// Süre sonunda tüm yetkilendirmeler void / tahsilatlar iade, tutmalar serbest.
+  REFUND_ALL
+}
+
+enum SplitPlanStatus {
+  COLLECTING
+  FALLBACK
+  SETTLED
+  ABORTED
+}
+
+/// Sepetin bölünmüş ödeme planı: paylar ayrı PSP yetkilendirmesi; hepsi yetkilenince hepsi
+/// tahsil edilir ve sepet tek işlemde onaylanır (CartPayment = plan toplamı, providerRef null).
+model SplitPlan {
+  id            String            @id @default(cuid())
+  cartId        String
+  cartPaymentId String
+  cartPayment   CartPayment       @relation(fields: [cartPaymentId], references: [id], onDelete: Cascade)
+  organizerId   String
+  fallbackMode  SplitFallbackMode
+  status        SplitPlanStatus   @default(COLLECTING)
+  /// Payların son ödeme anı (yedek aşamasında organizatörün son anı). Tutma bitişinden önce.
+  deadlineAt    DateTime
+  settledAt     DateTime?
+  abortedAt     DateTime?
+  abortReason   String?
+  shares        PaymentShare[]
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  @@index([cartId])
+  @@index([status, deadlineAt])
+}
+
+/// Bölünmüş ödemenin bir payı (katılımcı ya da organizatör). Davet linki HMAC imzalı ve
+/// süreli; `inviteNonce` değişirse eski linkler geçersiz olur.
+model PaymentShare {
+  id                  String               @id @default(cuid())
+  planId              String
+  plan                SplitPlan            @relation(fields: [planId], references: [id], onDelete: Cascade)
+  cartPaymentId       String
+  cartId              String
+  position            Int
+  isOrganizer         Boolean              @default(false)
+  /// Süre sonunda ödenmemiş payları organizatöre toplayan yedek pay.
+  isFallback          Boolean              @default(false)
+  participantEmail    String?
+  /// Payı ödeyen (ya da ödemesi beklenen organizatör) kullanıcı.
+  payerUserId         String?
+  amountMinor         BigInt
+  currency            String
+  status              PaymentShareStatus   @default(INVITED)
+  provider            String?
+  providerRef         String?              @unique
+  failureCode         String?
+  refundedAmountMinor BigInt               @default(0)
+  inviteNonce         String
+  authorizedAt        DateTime?
+  capturedAt          DateTime?
+  refundedAt          DateTime?
+  refunds             PaymentShareRefund[]
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  @@unique([planId, position])
+  @@index([cartId])
+  @@index([payerUserId])
+}
+
+/// Bölünmüş ödemeli sepette kalem iptali iadesinin paylara dağılımı (PSP iadesi pay başına).
+model PaymentShareRefund {
+  id          String       @id @default(cuid())
+  shareId     String
+  share       PaymentShare @relation(fields: [shareId], references: [id], onDelete: Cascade)
+  bookingId   String
+  amountMinor BigInt
+  currency    String
+  /// PENDING → PSP iadesi bekleniyor/yeniden denenecek; DONE → iade edildi.
+  status      String       @default("PENDING")
+  refundRef   String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@unique([shareId, bookingId])
+  @@index([bookingId])
 }

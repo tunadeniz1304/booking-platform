@@ -1,0 +1,84 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`P1-4 DAC7 export > CSV (snapshot) — başlık, CSV enjeksiyonu kaçışı 1`] = `
+"SellerRef,Name,TIN,CurrCode,ConsiderationQ1,ConsiderationQ2,ConsiderationQ3,ConsiderationQ4,ConsiderationTotal,FeesQ1,FeesQ2,FeesQ3,FeesQ4,FeesTotal,NumberOfActivitiesQ1,NumberOfActivitiesQ2,NumberOfActivitiesQ3,NumberOfActivitiesQ4,NumberOfActivitiesTotal,NumberOfDaysRented,PropertyCount
+host_a,Ayşe Yılmaz,NOTIN,EUR,0.00,0.00,0.00,99.99,99.99,0.00,0.00,0.00,15.00,15.00,0,0,0,1,1,1,1
+host_b,"'=HYPERLINK(""x"")",NOTIN,TRY,1000.00,2000.50,0.00,0.00,3000.50,150.00,300.08,0.00,0.00,450.08,1,1,0,0,2,7,2
+"
+`;
+
+exports[`P1-4 DAC7 export > JSON raporu (snapshot) 1`] = `
+{
+  "messageSpec": {
+    "disclaimer": "Portföy projesi — eğitim amaçlı DAC7 benzeri çıktı; resmî beyan veya hukuki tavsiye değildir.",
+    "messageRefId": "DAC7-2026-fe58da0c8f28",
+    "messageType": "DPI",
+    "reportingPeriod": "2026-12-31",
+    "timestamp": "2027-01-15T08:00:00.000Z",
+  },
+  "reportableSellers": [
+    {
+      "consideration": {
+        "q1": "0.00",
+        "q2": "0.00",
+        "q3": "0.00",
+        "q4": "99.99",
+        "total": "99.99",
+      },
+      "currCode": "EUR",
+      "fees": {
+        "q1": "0.00",
+        "q2": "0.00",
+        "q3": "0.00",
+        "q4": "15.00",
+        "total": "15.00",
+      },
+      "identity": {
+        "name": "Ayşe Yılmaz",
+        "tin": "NOTIN",
+      },
+      "numberOfActivities": {
+        "q1": 0,
+        "q2": 0,
+        "q3": 0,
+        "q4": 1,
+        "total": 1,
+      },
+      "numberOfDaysRented": 1,
+      "propertyCount": 1,
+      "sellerRef": "host_a",
+    },
+    {
+      "consideration": {
+        "q1": "1000.00",
+        "q2": "2000.50",
+        "q3": "0.00",
+        "q4": "0.00",
+        "total": "3000.50",
+      },
+      "currCode": "TRY",
+      "fees": {
+        "q1": "150.00",
+        "q2": "300.08",
+        "q3": "0.00",
+        "q4": "0.00",
+        "total": "450.08",
+      },
+      "identity": {
+        "name": "=HYPERLINK("x")",
+        "tin": "NOTIN",
+      },
+      "numberOfActivities": {
+        "q1": 1,
+        "q2": 1,
+        "q3": 0,
+        "q4": 0,
+        "total": 2,
+      },
+      "numberOfDaysRented": 7,
+      "propertyCount": 2,
+      "sellerRef": "host_b",
+    },
+  ],
+}
+`;

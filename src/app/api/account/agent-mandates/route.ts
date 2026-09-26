@@ -1,9 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireVerifiedEmail } from "@/lib/auth";
+import { requireAuth, requireVerifiedEmail } from "@/lib/auth";
 import { assertRecentAuth } from "@/lib/auth/recent-auth";
 import { toErrorResponse } from "@/lib/http/errors";
 import { observed } from "@/lib/http/observed";
-import { issueMandate } from "@/lib/agentic/mandate";
+import { issueMandate, listMandates } from "@/lib/agentic/mandate";
+
+/** Kullanıcının verdiği mandate'ler (P2-1a): durum active|expired|revoked + kullanım. */
+export const GET = observed(
+  "account.agent_mandates.list",
+  async function getHandler(req: NextRequest) {
+    try {
+      const claims = await requireAuth(req);
+      return NextResponse.json({ mandates: await listMandates(claims.userId) });
+    } catch (error) {
+      return toErrorResponse(error, "account.agent_mandates.list");
+    }
+  }
+);
 
 /**
  * AP2 intent mandate verir (P1-11): kullanıcı, ajanına tutar/para birimi/süre (ve isteğe

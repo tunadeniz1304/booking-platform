@@ -78,12 +78,18 @@ import * as cartSplit from "@/app/api/cart/[id]/split/route";
 import * as cartSplitInvite from "@/app/api/cart/[id]/split/shares/[shareId]/invite/route";
 import * as payShare from "@/app/api/pay/share/[token]/route";
 import * as payShareConfirm from "@/app/api/pay/share/[token]/confirm/route";
+import * as adminAppeals from "@/app/api/admin/notice-appeals/route";
+import * as adminAppeal from "@/app/api/admin/notice-appeals/[id]/route";
+import * as agentMandates from "@/app/api/account/agent-mandates/route";
+import * as agentMandate from "@/app/api/account/agent-mandates/[nonce]/route";
 
 type Handler = (
   req: NextRequest,
   ctx: { params: Promise<Record<string, string>> }
 ) => Promise<Response>;
-const ctx = { params: Promise.resolve({ id: "x", roomId: "x", shareId: "x", token: "x" }) };
+const ctx = {
+  params: Promise.resolve({ id: "x", roomId: "x", shareId: "x", token: "x", nonce: "x" }),
+};
 const ALL: Role[] = ["USER", "HOST", "ADMIN"];
 const HOST_ADMIN: Role[] = ["HOST", "ADMIN"];
 
@@ -261,6 +267,21 @@ const MATRIX: Array<[string, string, Handler, Role[]]> = [
     "PUT",
     hostDeposit.PUT as unknown as Handler,
     HOST_ADMIN,
+  ],
+  // P2-1a: DSA md. 20 itiraz kuyruğu (ADMIN) + mandate listesi/iptali (sahiplik → 404).
+  ["GET /api/admin/notice-appeals", "GET", adminAppeals.GET as unknown as Handler, ["ADMIN"]],
+  [
+    "POST /api/admin/notice-appeals/[id]",
+    "POST",
+    adminAppeal.POST as unknown as Handler,
+    ["ADMIN"],
+  ],
+  ["GET /api/account/agent-mandates", "GET", agentMandates.GET as unknown as Handler, ALL],
+  [
+    "DELETE /api/account/agent-mandates/[nonce]",
+    "DELETE",
+    agentMandate.DELETE as unknown as Handler,
+    ALL,
   ],
 ];
 

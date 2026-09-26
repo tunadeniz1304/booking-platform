@@ -14,7 +14,9 @@ import {
   MANDATE_TYP,
   MandateError,
   memoryNonceStore,
+  memoryRevocationStore,
   redisNonceStore,
+  redisRevocationStore,
   signMandate,
   verifyMandateToken,
   issueMandate,
@@ -25,6 +27,8 @@ import { resetConfigForTests } from "@/lib/config/app-config";
 import { audit } from "@/lib/admin/audit";
 
 const NOW = new Date("2026-10-01T10:00:00.000Z");
+/** Birim testlerde DB'ye düşülmesin: iptal deposu bellekte. */
+const revocations = memoryRevocationStore();
 const charge = (over: Partial<MandateCharge> = {}): MandateCharge => ({
   userId: "u1",
   checkoutSessionId: "cs1",
@@ -168,13 +172,18 @@ describe("AP2 intent mandate (P1-11)", () => {
     const record = vi.fn(async () => undefined);
     const { mandate } = await sign();
     await expect(
-      authorizeMandate(mandate, charge(), { nonces, now: NOW, record })
+      authorizeMandate(mandate, charge(), { nonces, now: NOW, record, revocations })
     ).resolves.toMatchObject({ sub: "u1" });
     await expect(
-      authorizeMandate(mandate, charge(), { nonces, now: NOW, record })
+      authorizeMandate(mandate, charge(), { nonces, now: NOW, record, revocations })
     ).resolves.toBeTruthy();
     await expect(
-      authorizeMandate(mandate, charge({ checkoutSessionId: "cs2" }), { nonces, now: NOW, record })
+      authorizeMandate(mandate, charge({ checkoutSessionId: "cs2" }), {
+        nonces,
+        now: NOW,
+        record,
+        revocations,
+      })
     ).rejects.toMatchObject({ status: 409, code: "MANDATE_REPLAYED" });
     expect(record).toHaveBeenCalledWith(
       "agent_mandate.rejected",
@@ -186,7 +195,7 @@ describe("AP2 intent mandate (P1-11)", () => {
   it("Redis nonce deposu: SET NX ile ilk oturuma bağlanır", async () => {
     const { mandate, claims } = await sign();
     const record = vi.fn(async () => undefined);
-    const deps = { nonces: redisNonceStore, now: NOW, record };
+    const deps = { nonces: redisNonceStore, now: NOW, record, revocations };
     await authorizeMandate(mandate, charge({ checkoutSessionId: "r-1" }), deps);
     await authorizeMandate(mandate, charge({ checkoutSessionId: "r-1" }), deps);
     await expect(
@@ -197,11 +206,13 @@ describe("AP2 intent mandate (P1-11)", () => {
 
   it("mandate yoksa MANDATE_REQUIRED (403, denetlenir); AGENT_MANDATE_REQUIRED=false iken geçer", async () => {
     const record = vi.fn(async () => undefined);
-    await expect(authorizeMandate(undefined, charge(), { record })).rejects.toMatchObject({
+    await expect(
+      authorizeMandate(undefined, charge(), { record, revocations })
+    ).rejects.toMatchObject({
       status: 403,
       code: "MANDATE_REQUIRED",
     });
-    await expect(authorizeMandate("  ", charge(), { record })).rejects.toMatchObject({
+    await expect(authorizeMandate("  ", charge(), { record, revocations })).rejects.toMatchObject({
       code: "MANDATE_REQUIRED",
     });
     expect(record).toHaveBeenCalledWith(
@@ -211,9 +222,11 @@ describe("AP2 intent mandate (P1-11)", () => {
     );
     vi.stubEnv("AGENT_MANDATE_REQUIRED", "false");
     resetConfigForTests();
-    await expect(authorizeMandate(null, charge(), { record })).resolves.toBeNull();
+    await expect(authorizeMandate(null, charge(), { record, revocations })).resolves.toBeNull();
     // Verilmişse yine doğrulanır.
-    await expect(authorizeMandate("x.y.z", charge(), { record })).rejects.toMatchObject({
+    await expect(
+      authorizeMandate("x.y.z", charge(), { record, revocations })
+    ).rejects.toMatchObject({
       code: "MANDATE_INVALID",
     });
   });
@@ -224,15 +237,48 @@ describe("AP2 intent mandate (P1-11)", () => {
     const { mandate } = await sign({ expiresInMinutes: 1 });
     const later = new Date(NOW.getTime() + 2 * 60_000);
     await expect(
-      authorizeMandate(mandate, charge(), { nonces, now: later, record })
+      authorizeMandate(mandate, charge(), { nonces, now: later, record, revocations })
     ).rejects.toMatchObject({ code: "MANDATE_EXPIRED" });
     await expect(
-      authorizeMandate(mandate, charge({ amountMinor: 999_999 }), { nonces, now: NOW, record })
+      authorizeMandate(mandate, charge({ amountMinor: 999_999 }), {
+        nonces,
+        now: NOW,
+        record,
+        revocations,
+      })
     ).rejects.toMatchObject({ status: 402 });
     // Reddedilen denemeler nonce'u tüketmez: başka oturum hâlâ kullanabilir.
     await expect(
-      authorizeMandate(mandate, charge({ checkoutSessionId: "cs9" }), { nonces, now: NOW, record })
+      authorizeMandate(mandate, charge({ checkoutSessionId: "cs9" }), {
+        nonces,
+        now: NOW,
+        record,
+        revocations,
+      })
     ).resolves.toBeTruthy();
+  });
+
+  it("iptal edilen mandate (nonce/jti) MANDATE_REVOKED ile reddedilir ve nonce bağlanmaz", async () => {
+    const nonces = memoryNonceStore();
+    const record = vi.fn(async () => undefined);
+    const store = memoryRevocationStore();
+    const { mandate, claims } = await sign();
+    store.revoke(claims.nonce);
+    await expect(
+      authorizeMandate(mandate, charge(), { nonces, now: NOW, record, revocations: store })
+    ).rejects.toMatchObject({ status: 403, code: "MANDATE_REVOKED" });
+    expect(record).toHaveBeenCalledWith(
+      "agent_mandate.rejected",
+      expect.anything(),
+      expect.objectContaining({ reason: "MANDATE_REVOKED" })
+    );
+    expect(await nonces.bind(claims.nonce, "other", 60)).toEqual({ boundTo: "other" });
+  });
+
+  it("Redis iptal işareti varsa DB'ye gitmeden iptal sayılır", async () => {
+    const { redis } = await import("@/lib/redis");
+    await redis.set("agent-mandate:revoked:nonce-redis-1", "1", { ex: 60 });
+    await expect(redisRevocationStore.isRevoked("nonce-redis-1")).resolves.toBe(true);
   });
 
   it("issueMandate denetim kaydı yazar (nonce = varlık kimliği)", async () => {

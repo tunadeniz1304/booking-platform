@@ -3,7 +3,8 @@ import { SignJWT, jwtVerify, errors as joseErrors } from "jose";
 import { z } from "zod";
 import { getConfig } from "@/lib/config/app-config";
 import { getJwtSecret } from "@/lib/auth/tokens";
-import { HttpError, ValidationError } from "@/lib/http/errors";
+import { HttpError, NotFoundError, ValidationError } from "@/lib/http/errors";
+import { prisma } from "@/lib/prisma";
 import { redis } from "@/lib/redis";
 import { audit } from "@/lib/admin/audit";
 import { logger } from "@/lib/observability/logger";
@@ -45,7 +46,8 @@ export type MandateRejectReason =
   | "MANDATE_CURRENCY_MISMATCH"
   | "MANDATE_PROPERTY_MISMATCH"
   | "MANDATE_AMOUNT_EXCEEDED"
-  | "MANDATE_REPLAYED";
+  | "MANDATE_REPLAYED"
+  | "MANDATE_REVOKED";
 
 const STATUS: Record<MandateRejectReason, number> = {
   MANDATE_REQUIRED: 403,
@@ -57,6 +59,7 @@ const STATUS: Record<MandateRejectReason, number> = {
   // AP2: limit aşımı ödeme gerektirir → kullanıcı onayı (step-up) olmadan ödenmez.
   MANDATE_AMOUNT_EXCEEDED: 402,
   MANDATE_REPLAYED: 409,
+  MANDATE_REVOKED: 403,
 };
 
 const MESSAGES: Record<MandateRejectReason, string> = {
@@ -69,6 +72,7 @@ const MESSAGES: Record<MandateRejectReason, string> = {
   MANDATE_AMOUNT_EXCEEDED:
     "Tutar mandate limitini aşıyor; kullanıcının daha yüksek limitli yeni mandate onaylaması gerekiyor",
   MANDATE_REPLAYED: "Bu mandate başka bir checkout için kullanılmış",
+  MANDATE_REVOKED: "Mandate kullanıcı tarafından iptal edilmiş",
 };
 
 export class MandateError extends HttpError {
@@ -219,6 +223,166 @@ export function memoryNonceStore(): NonceStore {
   };
 }
 
+// ---------------------------------------------------------------------------
+// İptal (revocation) — P2-1a
+// ---------------------------------------------------------------------------
+
+/** İptal edilmiş mandate nonce'ları (jti). */
+export interface RevocationStore {
+  isRevoked(nonce: string): Promise<boolean>;
+}
+
+const revokedKey = (nonce: string) => `agent-mandate:revoked:${nonce}`;
+
+/**
+ * Redis önce (hızlı yol); Redis'te yoksa ya da Redis erişilemezse kalıcı kayıt (AuditLog
+ * `agent_mandate.revoked`) — Redis verisi kaybolsa bile iptal edilmiş mandate kabul edilmez.
+ */
+export const redisRevocationStore: RevocationStore = {
+  async isRevoked(nonce) {
+    try {
+      if (await redis.get(revokedKey(nonce))) return true;
+    } catch (error) {
+      logger.warn({ err: String(error) }, "mandate revocation cache unavailable; using audit log");
+    }
+    const rows = await prisma.auditLog.count({
+      where: { action: "agent_mandate.revoked", entity: "AgentMandate", entityId: nonce },
+    });
+    return rows > 0;
+  },
+};
+
+export function memoryRevocationStore(revoked: Iterable<string> = []): RevocationStore & {
+  revoke(nonce: string): void;
+} {
+  const set = new Set(revoked);
+  return {
+    async isRevoked(nonce) {
+      return set.has(nonce);
+    },
+    revoke(nonce) {
+      set.add(nonce);
+    },
+  };
+}
+
+export type MandateStatus = "active" | "expired" | "revoked";
+
+export interface MandateSummary {
+  nonce: string;
+  maxAmountMinor: number;
+  currency: string;
+  expiresAt: string;
+  propertyId: string[] | null;
+  issuedAt: string;
+  revokedAt: string | null;
+  status: MandateStatus;
+  /** Nonce bir checkout oturumuna bağlandı mı (Redis erişilemezse null). */
+  used: boolean | null;
+}
+
+interface IssuedMeta {
+  maxAmountMinor?: number;
+  currency?: string;
+  expiresAt?: string;
+  propertyId?: string[] | null;
+}
+
+/**
+ * Kullanıcının verdiği mandate'ler (P2-1a). Mandate'ler DB'de ayrı tabloda tutulmaz
+ * (ADR 0023): verme/iptal denetim kaydından, kullanım Redis nonce bağından okunur.
+ */
+export async function listMandates(
+  userId: string,
+  now = new Date(),
+  limit = 50
+): Promise<MandateSummary[]> {
+  const issued = await prisma.auditLog.findMany({
+    where: { actorId: userId, action: "agent_mandate.issued", entity: "AgentMandate" },
+    orderBy: { createdAt: "desc" },
+    take: limit,
+  });
+  const nonces = issued.map((r) => r.entityId).filter((n): n is string => !!n);
+  const revoked = new Map(
+    (
+      await prisma.auditLog.findMany({
+        where: {
+          actorId: userId,
+          action: "agent_mandate.revoked",
+          entity: "AgentMandate",
+          entityId: { in: nonces },
+        },
+        select: { entityId: true, createdAt: true },
+      })
+    ).map((r) => [r.entityId!, r.createdAt])
+  );
+  let bound: Array<string | null> | null = null;
+  try {
+    bound = await redis.mget(nonces.map(nonceKey));
+  } catch {
+    bound = null;
+  }
+  const usedByNonce = new Map(nonces.map((n, i) => [n, bound ? bound[i] !== null : null]));
+  const out: MandateSummary[] = [];
+  for (const row of issued) {
+    if (!row.entityId) continue;
+    const meta = (row.meta ?? {}) as IssuedMeta;
+    const used = usedByNonce.get(row.entityId) ?? null;
+    const revokedAt = revoked.get(row.entityId) ?? null;
+    const expiresAt = meta.expiresAt ?? row.createdAt.toISOString();
+    out.push({
+      nonce: row.entityId,
+      maxAmountMinor: Number(meta.maxAmountMinor ?? 0),
+      currency: meta.currency ?? "",
+      expiresAt,
+      propertyId: meta.propertyId ?? null,
+      issuedAt: row.createdAt.toISOString(),
+      revokedAt: revokedAt?.toISOString() ?? null,
+      status: revokedAt ? "revoked" : Date.parse(expiresAt) <= now.getTime() ? "expired" : "active",
+      used,
+    });
+  }
+  return out;
+}
+
+/**
+ * Mandate'i iptal eder (idempotent). Önce kalıcı denetim kaydı, sonra Redis işareti
+ * (mandate süresi + 1 saat). Yalnız mandate'i veren kullanıcı iptal edebilir (aksi 404).
+ */
+export async function revokeMandate(
+  userId: string,
+  nonce: string,
+  now = new Date()
+): Promise<{ nonce: string; revokedAt: string }> {
+  const issued = await prisma.auditLog.findFirst({
+    where: {
+      actorId: userId,
+      action: "agent_mandate.issued",
+      entity: "AgentMandate",
+      entityId: nonce,
+    },
+  });
+  if (!issued) throw new NotFoundError("Mandate bulunamadı");
+  const existing = await prisma.auditLog.findFirst({
+    where: { actorId: userId, action: "agent_mandate.revoked", entityId: nonce },
+  });
+  if (existing) return { nonce, revokedAt: existing.createdAt.toISOString() };
+  await audit(userId, "agent_mandate.revoked", "AgentMandate", nonce, {});
+  const expiresAt = Date.parse(((issued.meta ?? {}) as IssuedMeta).expiresAt ?? "");
+  const ttl = Number.isFinite(expiresAt)
+    ? Math.max(60, Math.ceil((expiresAt - now.getTime()) / 1000) + 3600)
+    : 7 * 86_400;
+  try {
+    await redis.set(revokedKey(nonce), "1", { ex: ttl });
+  } catch (error) {
+    logger.warn(
+      { err: String(error) },
+      "mandate revocation cache write failed; audit log holds it"
+    );
+  }
+  return { nonce, revokedAt: now.toISOString() };
+}
+
 export interface MandateCharge {
   userId: string;
   /** Checkout oturumu: nonce buna bağlanır (aynı oturumun yeniden denemesi serbest). */
@@ -253,6 +417,7 @@ export function assertWithinMandate(claims: MandateClaims, charge: MandateCharge
 
 export interface AuthorizeMandateDeps {
   nonces?: NonceStore;
+  revocations?: RevocationStore;
   now?: Date;
   /** Denetim kaydı (varsayılan AuditLog). Smoke/birim testte enjekte edilir. */
   record?: (action: string, charge: MandateCharge, meta: Record<string, unknown>) => Promise<void>;
@@ -275,6 +440,7 @@ export async function authorizeMandate(
   const now = deps.now ?? new Date();
   const record = deps.record ?? auditRecord;
   const nonces = deps.nonces ?? redisNonceStore;
+  const revocations = deps.revocations ?? redisRevocationStore;
   const trimmed = token?.trim();
   try {
     if (!trimmed) {
@@ -282,6 +448,7 @@ export async function authorizeMandate(
       throw new MandateError("MANDATE_REQUIRED");
     }
     const claims = await verifyMandateToken(trimmed, now);
+    if (await revocations.isRevoked(claims.nonce)) throw new MandateError("MANDATE_REVOKED");
     assertWithinMandate(claims, charge);
     const ttl = Math.max(60, Math.ceil((Date.parse(claims.expiresAt) - now.getTime()) / 1000));
     const { boundTo } = await nonces.bind(claims.nonce, charge.checkoutSessionId, ttl + 3600);

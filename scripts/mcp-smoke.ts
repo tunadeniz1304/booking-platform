@@ -153,9 +153,11 @@ async function smokeMandate(): Promise<boolean> {
   const { handleMcpHttp } = await import("@/lib/mcp/http");
   const { defaultDeps } = await import("@/lib/mcp/server");
   const { signAccessToken, verifyAccessToken } = await import("@/lib/auth/tokens");
-  const { authorizeMandate, memoryNonceStore, signMandate } = await import("@/lib/agentic/mandate");
+  const { authorizeMandate, memoryNonceStore, memoryRevocationStore, signMandate } =
+    await import("@/lib/agentic/mandate");
   const { HttpError } = await import("@/lib/http/errors");
   const nonces = memoryNonceStore();
+  const revocations = memoryRevocationStore();
   const deps: McpDeps = {
     ...defaultDeps,
     authenticate: (t: string) => verifyAccessToken(t),
@@ -174,7 +176,7 @@ async function smokeMandate(): Promise<boolean> {
           currency: "TRY",
           propertyId: SMOKE_PROPERTY,
         },
-        { nonces, record: async () => undefined }
+        { nonces, revocations, record: async () => undefined }
       );
       return {
         id: sessionId,

@@ -1803,3 +1803,112 @@ enum NoticeAppealStatus {
   /// İtiraz reddedildi: karar geçerli.
   REJECTED
 }
+
+// ---------------------------------------------------------------------------
+// P1-7 sadakat & cüzdan (ADR 0020 §Kredi). Mevcut modellere ilişki/kolon eklenmez (FK yok);
+// para hareketi jurnalde (`guest_credit:<userId>`), lot'lar yalnız harcama/son kullanma izi.
+// Değişmez: guest_credit bakiyesi = Σ lot.remainingMinor + Σ RESERVED harcama (kullanıcı+para birimi).
+// ---------------------------------------------------------------------------
+
+/// Kullanıcının sadakat seviyesi: tamamlanan konaklama sayısından (outbox tüketicisi) türetilir.
+model LoyaltyAccount {
+  userId         String   @id
+  completedStays Int      @default(0)
+  /// 0..3 (LOYALTY_TIER_THRESHOLDS indeksi).
+  tier           Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+enum LoyaltyCashbackStatus {
+  PENDING
+  ISSUED
+  SKIPPED
+}
+
+/// Tamamlanan konaklamanın cashback'i: iade/talep penceresi (dueAt) sonrası krediye çevrilir.
+model LoyaltyCashback {
+  id          String                @id @default(cuid())
+  bookingId   String                @unique
+  userId      String
+  currency    String
+  tier        Int
+  bps         Int
+  amountMinor BigInt?
+  status      LoyaltyCashbackStatus @default(PENDING)
+  dueAt       DateTime
+  issuedAt    DateTime?
+  creditId    String?
+  reason      String?
+  createdAt   DateTime              @default(now())
+
+  @@index([status, dueAt])
+  @@index([userId])
+}
+
+enum WalletCreditSource {
+  CASHBACK
+  REFUND
+}
+
+/// Kredi lot'u: harcama FIFO (son kullanma tarihi en yakın önce); süre dolunca kalan ters jurnalle düşer.
+model WalletCredit {
+  id             String                  @id @default(cuid())
+  userId         String
+  currency       String
+  source         WalletCreditSource
+  /// İdempotent kaynak anahtarı (`cashback:<bookingId>`, `refund:<spendId>:<allocationId>`).
+  sourceRef      String                  @unique
+  amountMinor    BigInt
+  remainingMinor BigInt
+  /// Süre dolumuyla düşülen toplam (jurnal anahtarı bundan türer).
+  expiredMinor   BigInt                  @default(0)
+  expiresAt      DateTime
+  bookingId      String?
+  createdAt      DateTime                @default(now())
+  allocations    CreditSpendAllocation[]
+
+  @@index([userId, currency, expiresAt])
+  @@index([expiresAt])
+}
+
+enum CreditSpendStatus {
+  RESERVED
+  SPENT
+  RELEASED
+}
+
+/// Rezervasyon ödemesinde kullanılan kredi: RESERVED (kart öncesi) → SPENT (onay) | RELEASED.
+model CreditSpend {
+  id            String                  @id @default(cuid())
+  userId        String
+  bookingId     String
+  currency      String
+  amountMinor   BigInt
+  /// Harcamanın vergi payı (creditSpent jurnalinde tax_payable'a yazılan).
+  taxMinor      BigInt                  @default(0)
+  refundedMinor BigInt                  @default(0)
+  status        CreditSpendStatus       @default(RESERVED)
+  releaseReason String?
+  createdAt     DateTime                @default(now())
+  settledAt     DateTime?
+  releasedAt    DateTime?
+  allocations   CreditSpendAllocation[]
+
+  @@index([bookingId])
+  @@index([userId, status])
+}
+
+/// Harcamanın lot dağılımı (iade aynı lot'un son kullanma tarihiyle yeni lot açar).
+model CreditSpendAllocation {
+  id            String       @id @default(cuid())
+  spendId       String
+  spend         CreditSpend  @relation(fields: [spendId], references: [id], onDelete: Cascade)
+  creditId      String
+  credit        WalletCredit @relation(fields: [creditId], references: [id])
+  amountMinor   BigInt
+  refundedMinor BigInt       @default(0)
+
+  @@unique([spendId, creditId])
+  @@index([creditId])
+}

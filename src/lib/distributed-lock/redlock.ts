@@ -62,35 +62,47 @@ export class Redlock {
   ) {}
 
   /**
-   * Kaynağı kilitler. `waitMs` dolmadan edinilemezse LockError fırlatır.
+   * Kaynağı kilitler. `waitMs` verilirse deneme sayısı yerine toplam bekleme bütçesi
+   * (ms) uygulanır; bütçe ya da `retryCount` dolmadan edinilemezse LockError fırlatır.
    */
   async acquire(
     resource: string,
     ttlMs?: number,
-    opts: { retryCount?: number; retryDelayMs?: number } = {}
+    opts: { retryCount?: number; retryDelayMs?: number; waitMs?: number } = {}
   ): Promise<LockHandle> {
     const ttl = ttlMs ?? this.defaults.ttlMs ?? 30000;
     const retryCount = opts.retryCount ?? this.defaults.retryCount ?? 5;
     const retryDelayMs = opts.retryDelayMs ?? this.defaults.retryDelayMs ?? 100;
 
     const token = randomUUID();
+    // Önceki bir SET istemci tarafında hata verdiyse (ör. komut zaman aşımı)
+    // sunucuda yine de uygulanmış olabilir: anahtar bizim token'ımızla durur ve
+    // sonraki NX denemeleri kendi kilidimize takılır. Bu durumda GET ile
+    // sahipliği doğrulayıp kilidi edinilmiş sayarız.
+    let uncertainSet = false;
+    const deadline = opts.waitMs === undefined ? undefined : Date.now() + opts.waitMs;
+    let attempts = 0;
 
-    for (let attempt = 0; attempt <= retryCount; attempt++) {
+    for (let attempt = 0; deadline !== undefined || attempt <= retryCount; attempt++) {
+      attempts += 1;
       try {
         const ok = await this.redis.set(resource, token, { nx: true, ex: Math.ceil(ttl / 1000) });
-        if (ok) {
+        if (ok || (uncertainSet && (await this.redis.get(resource)) === token)) {
           const fencingToken = await this.nextFencingToken(resource);
           return { resource, token, fencingToken, ttlMs: ttl };
         }
       } catch {
-        // deneme başarısız → jitter'lı bekle ve yeniden dene
+        // deneme başarısız → jitter'lı bekle ve yeniden dene; SET sunucuda
+        // uygulanmış olabileceği için sonraki turda sahiplik kontrolü yapılır
+        uncertainSet = true;
       }
       // jitter'lı bekleme → thundering herd azalt
       const jitter = Math.floor(Math.random() * retryDelayMs);
+      if (deadline !== undefined && Date.now() + retryDelayMs + jitter > deadline) break;
       await sleep(retryDelayMs + jitter);
     }
 
-    throw new LockError(`Lock "${resource}" acquired after ${retryCount + 1} attempts`);
+    throw new LockError(`Lock "${resource}" not acquired after ${attempts} attempts`);
   }
 
   /** Monoton fencing token üretir (Redis INCR — atomik). */
@@ -122,11 +134,18 @@ export class Redlock {
   async withLock<T>(
     resource: string,
     fn: (handle: LockHandle) => Promise<T>,
-    opts?: { ttlMs?: number; retryCount?: number; retryDelayMs?: number; renewEveryMs?: number }
+    opts?: {
+      ttlMs?: number;
+      retryCount?: number;
+      retryDelayMs?: number;
+      waitMs?: number;
+      renewEveryMs?: number;
+    }
   ): Promise<T> {
     const handle = await this.acquire(resource, opts?.ttlMs, {
       retryCount: opts?.retryCount,
       retryDelayMs: opts?.retryDelayMs,
+      waitMs: opts?.waitMs,
     });
     return this.runGuarded(handle, fn, opts?.renewEveryMs);
   }

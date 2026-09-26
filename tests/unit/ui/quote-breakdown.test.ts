@@ -8,11 +8,12 @@ import quoteTr from "../../../messages/tr/quote.json";
 
 function render(quote: QuoteView): string {
   return renderToStaticMarkup(
-    createElement(
-      NextIntlClientProvider,
-      { locale: "tr", messages: { quote: quoteTr }, timeZone: "UTC" },
-      createElement(QuoteBreakdown, { quote })
-    )
+    createElement(NextIntlClientProvider, {
+      locale: "tr",
+      messages: { quote: quoteTr },
+      timeZone: "UTC",
+      children: createElement(QuoteBreakdown, { quote }),
+    })
   );
 }
 

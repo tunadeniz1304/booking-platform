@@ -60,6 +60,11 @@ export const SearchParamsSchema = z
     userId: z.string().max(64).optional(),
     /** P1-13(e): yalnız doğrulanmış erişilebilirlik özellikleri; seçilen HER kod gerekir (AND). */
     accessibility: z.array(z.enum(ACCESSIBILITY_CODES)).max(ACCESSIBILITY_CODES.length).optional(),
+    /**
+     * P1-3 esnek tarih: ±N gün (0 = kapalı). Tarihlerle birlikte anlamlıdır; üst sınır
+     * `SEARCH_FLEX_MAX_DAYS`'e kırpılır (varsayılan 3).
+     */
+    flexDays: optionalNumber(z.coerce.number().int().min(0).max(7)),
   })
   .superRefine((v, ctx) => {
     if (Boolean(v.checkIn) !== Boolean(v.checkOut)) {
@@ -115,5 +120,6 @@ export function searchParamsFromUrl(sp: URLSearchParams): Record<string, unknown
     semantic: flag("semantic") || undefined,
     similarToPhotoId: sp.get("similarToPhotoId") || undefined,
     accessibility: accessibility && accessibility.length > 0 ? accessibility : undefined,
+    flexDays: sp.get("flexDays") ?? undefined,
   };
 }

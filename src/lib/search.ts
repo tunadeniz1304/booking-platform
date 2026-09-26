@@ -19,13 +19,15 @@ import { RANKING_WEIGHTS, RANKING_WEIGHTS_WITH_QUERY, rankResults } from "@/lib/
 import { hybridSearch, type HybridHit } from "@/lib/search/hybrid";
 import { coverPhotoIds, visualSearchStatus, type VisionStatus } from "@/lib/vision/visual-search";
 import { rankWithLtr } from "@/lib/search/ltr";
-import { nightsBetween, toDbDate, type IsoDate } from "@/lib/time/nights";
+import { addDays, fromDate, nightsBetween, toDbDate, type IsoDate } from "@/lib/time/nights";
 import { computeAffinity, affinityBoostFor } from "@/lib/search/vector";
 import { breakers, BreakerOpenError } from "@/lib/resilience/circuit-breaker";
 import { taxRulesFor } from "@/lib/pricing/tax";
 import { SearchParamsSchema, type SearchInput, type SearchParams } from "@/lib/search/params";
 import { LISTABLE_PROPERTY } from "@/lib/compliance/listing";
 import { accessibilityWhere } from "@/lib/search/accessibility-filter";
+import { getConfig } from "@/lib/config/app-config";
+import { pickFlexCandidates, type FlexRow } from "@/lib/search/flex";
 
 export { SearchParamsSchema, searchParamsFromUrl } from "@/lib/search/params";
 export type { SearchParams, SearchInput } from "@/lib/search/params";
@@ -97,6 +99,26 @@ export interface SearchResult {
   explain?: Record<string, number>;
   /** P1-10: "benzerlerini göster" için kapak fotoğrafı (görsel arama açıksa ve embedding varsa). */
   coverPhotoId?: string;
+  /**
+   * P1-3 esnek tarih (`flexDays` > 0): aynı gece sayısıyla ±N gün içinde daha ucuz tarih.
+   * Tutar teklif motoruyla kesin hesaplanır (aynı misafir sayısı; mülk para birimi, minor-unit).
+   */
+  flexSuggestion?: FlexSuggestion;
+}
+
+export interface FlexSuggestion {
+  checkIn: IsoDate;
+  checkOut: IsoDate;
+  /** Girişin asıl tarihe göre kaydırılması (gün; negatif = daha erken). */
+  shiftDays: number;
+  roomId: string;
+  ratePlanId: string;
+  total: number;
+  /** Asıl tarihlerdeki toplamdan fark (minor-unit, > 0). */
+  savings: number;
+  currency: string;
+  /** Görüntü para birimindeki karşılıklar (ana birim). */
+  display: { total: number; savings: number; currency: string };
 }
 
 /** Sıralayıcı seçimi (P1-3 deneyi): "weighted" v2 davranışı, "ltr" ONNX modeli. */
@@ -119,6 +141,8 @@ export interface SearchResponse {
   ranking?: RankingMode;
   /** P1-10: görsel arama durumu (açıksa veya `similarToPhotoId` istendiyse). */
   visual?: VisionStatus & { applied: boolean };
+  /** P1-3: uygulanan esnek tarih penceresi (±gün); yalnız tarihli ve `flexDays` > 0 aramada. */
+  flex?: { days: number };
 }
 
 interface CatalogRoom {
@@ -600,6 +624,26 @@ export async function searchProperties(
       covers.has(r.id) ? { ...r, coverPhotoId: covers.get(r.id)! } : r
     );
   }
+  const flexDays = Math.min(params.flexDays ?? 0, getConfig().SEARCH_FLEX_MAX_DAYS);
+  if (stay && flexDays > 0 && pageResults.length > 0) {
+    const suggestions = await flexSuggestions(
+      entries.filter((e) => pageResults.some((r) => r.id === e.id)),
+      pageResults,
+      stay,
+      flexDays,
+      params.guests ?? 1,
+      (minor, from) => {
+        const currency = displayCurrency ?? assertCurrency(from);
+        return { amount: displayAmount(minor, from, currency, fx), currency };
+      }
+    ).catch((error: unknown) => {
+      logger.warn(errorFields(error), "flex suggestions failed");
+      return new Map<string, FlexSuggestion>();
+    });
+    pageResults = pageResults.map((r) =>
+      suggestions.has(r.id) ? { ...r, flexSuggestion: suggestions.get(r.id)! } : r
+    );
+  }
   return {
     results: pageResults,
     total,
@@ -612,7 +656,92 @@ export async function searchProperties(
     ...(visual.enabled || params.similarToPhotoId
       ? { visual: { ...visual, applied: visual.enabled && Boolean(params.similarToPhotoId) } }
       : {}),
+    ...(stay && flexDays > 0 ? { flex: { days: flexDays } } : {}),
   };
+}
+
+/**
+ * P1-3 ±N gün önerisi: `MinPriceByDate`'ten tesis başına en ucuz kaydırma adayı seçilir
+ * (tahmin), sonra aday tarihler için teklif motoruyla (`stayQuotes` → `priceStay`) KESİN
+ * toplam hesaplanır; yalnızca asıl tarihlerden gerçekten ucuzsa öneri eklenir.
+ */
+async function flexSuggestions(
+  entries: CatalogEntry[],
+  results: SearchResult[],
+  stay: Stay,
+  flexDays: number,
+  guests: number,
+  toDisplay: (minor: number, currency: string) => { amount: number; currency: string }
+): Promise<Map<string, FlexSuggestion>> {
+  const out = new Map<string, FlexSuggestion>();
+  if (entries.length === 0) return out;
+  const first = addDays(stay.checkIn, -flexDays);
+  const last = addDays(stay.nights[stay.nights.length - 1], flexDays);
+  const rows = await prisma.minPriceByDate.findMany({
+    where: {
+      propertyId: { in: entries.map((e) => e.id) },
+      date: { gte: toDbDate(first), lte: toDbDate(last) },
+    },
+    select: {
+      propertyId: true,
+      date: true,
+      minTotalMinor: true,
+      availableRoomTypes: true,
+      minStay: true,
+      closedToArrival: true,
+    },
+  });
+  const baseline = new Map(
+    results.filter((r) => r.quote).map((r) => [r.id, r.quote!.total] as const)
+  );
+  const candidates = pickFlexCandidates({
+    rows: rows.map((r): FlexRow => ({
+      propertyId: r.propertyId,
+      date: fromDate(r.date),
+      minTotalMinor: r.minTotalMinor === null ? null : minorFromDb(r.minTotalMinor),
+      availableRoomTypes: r.availableRoomTypes,
+      minStay: r.minStay,
+      closedToArrival: r.closedToArrival,
+    })),
+    nights: stay.nights,
+    flexDays,
+    baseline,
+  });
+  // Aynı kaydırmaya düşen tesisler tek teklif hesaplamasında toplanır (en fazla 2N grup).
+  const byShift = new Map<number, CatalogEntry[]>();
+  for (const e of entries) {
+    const c = candidates.get(e.id);
+    if (c) byShift.set(c.shiftDays, [...(byShift.get(c.shiftDays) ?? []), e]);
+  }
+  for (const [shift, group] of byShift) {
+    const shifted: Stay = {
+      checkIn: addDays(stay.checkIn, shift),
+      checkOut: addDays(stay.checkOut, shift),
+      nights: stay.nights.map((n) => addDays(n, shift)),
+    };
+    const quotes = await stayQuotes(group, shifted, guests);
+    for (const e of group) {
+      const q = quotes.get(e.id);
+      const current = baseline.get(e.id);
+      if (!q || current === undefined || q.currency !== e.currency || q.total >= current) continue;
+      out.set(e.id, {
+        checkIn: shifted.checkIn,
+        checkOut: shifted.checkOut,
+        shiftDays: shift,
+        roomId: q.roomId,
+        ratePlanId: q.ratePlanId,
+        total: q.total,
+        savings: current - q.total,
+        currency: q.currency,
+        display: {
+          total: toDisplay(q.total, q.currency).amount,
+          savings: toDisplay(current - q.total, q.currency).amount,
+          currency: toDisplay(0, q.currency).currency,
+        },
+      });
+    }
+  }
+  return out;
 }
 
 export async function getPopularProperties(limit = 10): Promise<SearchResult[]> {

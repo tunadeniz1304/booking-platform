@@ -20,6 +20,8 @@ import { getPaymentProvider } from "@/lib/payment";
 import type { PaymentProvider } from "@/lib/payment/provider";
 import { runSaga, type SagaStep } from "@/lib/saga/saga";
 import { logger, errorFields } from "@/lib/observability/logger";
+import { counter } from "@/lib/observability/metrics";
+import { audit } from "@/lib/admin/audit";
 
 /**
  * P2P rezervasyon devri (ikincil pazar).
@@ -567,4 +569,78 @@ export async function discoverTransfers(now = new Date()) {
       city: r.booking.property.location.city,
     },
   }));
+}
+
+export const transferSweepTotal = counter(
+  "transfer_sweep_total",
+  "CAPTURE_PENDING'de takılıp süpürülen devirler",
+  ["outcome"] as const
+);
+
+export type SweepOutcome = "voided" | "refunded" | "unresolved";
+
+/**
+ * Takılı devir süpürücüsü (v4#1 ek): süreç capture ile commit arasında çökerse ilan
+ * `CAPTURE_PENDING`'de kalır ve yeniden listelemeyi bloklar. Eşikten
+ * (`TRANSFER_CAPTURE_PENDING_TIMEOUT_SECONDS`) eski kayıtlar önce koşullu olarak FAILED'a
+ * çekilir (geç biten bir saga commit'i artık tutmaz; kendi telafisiyle iade eder), sonra
+ * yetkilendirme void edilir; void olmazsa (capture yapılmış) saga ile AYNI idempotency
+ * anahtarıyla iade edilir — çift iade olmaz. Sahiplik hiç değişmemiştir. Her kayıt audit'lenir.
+ */
+export async function sweepStuckTransfers(
+  now = new Date(),
+  provider: PaymentProvider = getPaymentProvider()
+): Promise<{ swept: number; outcomes: Record<SweepOutcome, number> }> {
+  const cutoff = new Date(
+    now.getTime() - getConfig().TRANSFER_CAPTURE_PENDING_TIMEOUT_SECONDS * 1000
+  );
+  const stuck = await prisma.bookingTransfer.findMany({
+    where: { status: TransferStatus.CAPTURE_PENDING, claimedAt: { lt: cutoff } },
+    orderBy: { claimedAt: "asc" },
+    take: 100,
+    select: { id: true, bookingId: true, askPrice: true, currency: true, buyerPaymentRef: true },
+  });
+  const outcomes: Record<SweepOutcome, number> = { voided: 0, refunded: 0, unresolved: 0 };
+  let swept = 0;
+  for (const t of stuck) {
+    const marked = await prisma.bookingTransfer.updateMany({
+      where: { id: t.id, status: TransferStatus.CAPTURE_PENDING, claimedAt: { lt: cutoff } },
+      data: { status: TransferStatus.FAILED, failedAt: now, failureCode: "CAPTURE_TIMEOUT" },
+    });
+    if (marked.count !== 1) continue; // başka süpürücü/saga önce davrandı
+    swept += 1;
+    let outcome: SweepOutcome = "unresolved";
+    if (t.buyerPaymentRef) {
+      try {
+        await provider.void(t.buyerPaymentRef);
+        outcome = "voided";
+      } catch (voidError) {
+        try {
+          const currency = assertCurrency(t.currency);
+          const ask = money(toMinor(t.askPrice.toString(), currency), currency);
+          await provider.refund(t.buyerPaymentRef, ask, `transfer-refund:${t.id}`);
+          outcome = "refunded";
+        } catch (refundError) {
+          logger.error(
+            { transferId: t.id, void: errorFields(voidError).err, ...errorFields(refundError) },
+            "stuck transfer compensation failed; manual review required"
+          );
+        }
+      }
+    }
+    if (outcome === "unresolved") {
+      await prisma.bookingTransfer.update({
+        where: { id: t.id },
+        data: { failureCode: "CAPTURE_TIMEOUT_UNRESOLVED" },
+      });
+    }
+    outcomes[outcome] += 1;
+    transferSweepTotal.inc({ outcome });
+    await audit("system:transfer-sweep", "transfer.capture_timeout", "BookingTransfer", t.id, {
+      bookingId: t.bookingId,
+      outcome,
+    });
+  }
+  if (swept > 0) logger.warn({ swept, outcomes }, "stuck CAPTURE_PENDING transfers swept");
+  return { swept, outcomes };
 }

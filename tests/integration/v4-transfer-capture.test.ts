@@ -5,6 +5,7 @@ import { describeInt, utcDay } from "./helpers";
 import {
   claimTransfer,
   listBookingForTransfer,
+  sweepStuckTransfers,
   TRANSFER_SAGA,
   TRANSFER_SAGA_STEPS,
 } from "@/lib/transfer/transfer-service";
@@ -250,5 +251,65 @@ describeInt("regression: v4#1 devir capture hatası (integration)", () => {
     expect(psp.captures).toEqual([transfer.buyerPaymentRef]);
     expect(await prisma.payout.count({ where: { transferId } })).toBe(1);
     expect(await transferLedger(bookingId)).toEqual({ count: 2, net: 0 });
+  });
+  /** Çöken süreç simülasyonu: ilan CAPTURE_PENDING'de, `minutesAgo` dakika önce talep edilmiş. */
+  async function stuckTransfer(minutesAgo: number) {
+    const bookingId = await confirmedBooking();
+    const listed = await listBookingForTransfer(bookingId, seller, 150_000);
+    await prisma.bookingTransfer.update({
+      where: { id: listed.id },
+      data: {
+        status: "CAPTURE_PENDING",
+        claimedById: buyer,
+        claimedAt: new Date(Date.now() - minutesAgo * 60_000),
+        buyerPaymentRef: `pi_v4stuck_${listed.id}`,
+      },
+    });
+    return { bookingId, transferId: listed.id, ref: `pi_v4stuck_${listed.id}` };
+  }
+
+  it("regression: v4#1 takılı CAPTURE_PENDING süpürülür: void + FAILED + audit, yeniden listelenebilir", async () => {
+    const psp = new ScriptedPsp();
+    const old = await stuckTransfer(60);
+    const fresh = await stuckTransfer(1);
+    const res = await sweepStuckTransfers(new Date(), psp);
+    expect(res.swept).toBeGreaterThanOrEqual(1);
+
+    await expectUnchanged(old.bookingId, old.transferId, "CAPTURE_TIMEOUT");
+    expect(psp.voids).toContain(old.ref);
+    expect(psp.refunds).toEqual([]);
+    expect(
+      await prisma.auditLog.findFirst({
+        where: { action: "transfer.capture_timeout", entityId: old.transferId },
+      })
+    ).toMatchObject({ actorId: "system:transfer-sweep", meta: { outcome: "voided" } });
+    // Eşik altındaki (saga hâlâ sürüyor olabilir) kayda dokunulmaz.
+    expect(
+      (await prisma.bookingTransfer.findUniqueOrThrow({ where: { id: fresh.transferId } })).status
+    ).toBe("CAPTURE_PENDING");
+    expect(psp.voids).not.toContain(fresh.ref);
+    // Blok kalktı: satıcı yeniden listeleyebilir.
+    await expect(listBookingForTransfer(old.bookingId, seller, 150_000)).resolves.toMatchObject({
+      id: expect.any(String),
+    });
+    // İkinci süpürme aynı kaydı tekrar işlemez.
+    await sweepStuckTransfers(new Date(), psp);
+    expect(psp.voids.filter((r) => r === old.ref)).toHaveLength(1);
+  });
+
+  it("regression: v4#1 void edilemeyen (capture yapılmış) takılı devir saga anahtarıyla iade edilir", async () => {
+    const psp = new ScriptedPsp();
+    psp.void = async () => {
+      throw new Error("already captured");
+    };
+    const stuck = await stuckTransfer(60);
+    await sweepStuckTransfers(new Date(), psp);
+    await expectUnchanged(stuck.bookingId, stuck.transferId, "CAPTURE_TIMEOUT");
+    expect(psp.refunds).toContainEqual({ ref: stuck.ref, amount: 150_000 });
+    expect(
+      await prisma.auditLog.findFirst({
+        where: { action: "transfer.capture_timeout", entityId: stuck.transferId },
+      })
+    ).toMatchObject({ meta: { outcome: "refunded" } });
   });
 });

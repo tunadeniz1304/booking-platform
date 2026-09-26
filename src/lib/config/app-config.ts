@@ -108,6 +108,9 @@ const schema = z.object({
   TRANSFER_MAX_ASK_RATIO: num(1.0, 0.1, 2),
   TRANSFER_MIN_HOURS_BEFORE_CHECKIN: int(48, 0, 24 * 60),
   TRANSFER_LINK_TTL_HOURS: int(24 * 7, 1, 24 * 60),
+  /** CAPTURE_PENDING'de bu süreden uzun kalan devir süpürülür (void/iade + FAILED). */
+  TRANSFER_CAPTURE_PENDING_TIMEOUT_SECONDS: int(15 * 60, 60, 24 * 60 * 60),
+  TRANSFER_SWEEP_CRON: z.string().min(1).default("*/5 * * * *"),
 
   // Fraud v2 (P1-8): skor → allow < challenge_3ds < step_up_passkey < review < deny
   FRAUD_CHALLENGE_THRESHOLD: int(30, 0, 100),

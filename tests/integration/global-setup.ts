@@ -42,7 +42,13 @@ export default async function setup(project: TestProject): Promise<() => Promise
       new RedisContainer("redis:7-alpine").start(),
     ]);
 
-    const databaseUrl = `${pg.getConnectionUri()}?connection_limit=20&pool_timeout=30`;
+    // connect_timeout: Prisma varsayılanı 5 sn. Makine yükü altında (paralel ajan
+    // konteynerleri, Docker Desktop port yönlendirmesi) yeni bağlantının TCP + SCRAM el
+    // sıkışması 5 sn'yi aşıp P1001 "Can't reach database server" üretiyordu — 100 paralel
+    // isteğin havuzu doldurduğu anda ya da dosyanın ilk sorgusunda (~5 sn'de düşen testler).
+    // pool_timeout: 100 paralel istek 20 bağlantıyı beklerken yük altında 30 sn sınırdaydı.
+    // İkisi de yalnızca bekleme üst sınırıdır; iş mantığını/yarışları değiştirmez.
+    const databaseUrl = `${pg.getConnectionUri()}?connection_limit=20&pool_timeout=60&connect_timeout=30`;
     const redisUrl = `redis://${redis.getHost()}:${redis.getMappedPort(6379)}`;
 
     execFileSync(

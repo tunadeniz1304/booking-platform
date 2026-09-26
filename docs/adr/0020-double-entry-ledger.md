@@ -47,3 +47,22 @@ tutarsızlıkları (eksik iade kaydı, çift tahsilat) fark edilmez kılar.
 - (−) Servisler bağlanana kadar mutabakat tüm ödemeleri "jurnalsiz" gösterir; geçiş
   tarihinden önceki ödemeler için fark beklenir (gerekirse açılış kaydıyla kapatılır).
 - (−) `SET CONSTRAINTS` her jurnalde iki ek sorgu; hacim düşük, kabul edildi.
+
+## Ek: Kredi (P1-7 sadakat & cüzdan)
+
+- **Fonlama:** cashback bir pazarlama ikramıdır; ayrı gider hesabı açılmadı, `creditIssued`
+  (fundedBy `platform`) ile **Dr platform_revenue** (kontra-gelir) / Cr `guest_credit:<userId>`.
+  Süresi dolan kalan `creditExpired` ile tersine döner (Dr guest_credit / Cr platform_revenue,
+  anahtar `credit-expired:<lotId>:<önceden düşülen>`).
+- **Lot'lar** (`WalletCredit`) yalnız harcama sırası ve son kullanma izidir; para jurnalde.
+  Değişmez: guest_credit bakiyesi = Σ lot kalanı + Σ RESERVED harcama (int testte her adımda).
+- **Kısmi ödeme:** kredi rezervi (lot kalanı düşer, jurnal yok) → kart provizyon/capture →
+  onay pivotunda AYNI işlemde `creditSpent` (Dr guest_credit / Cr escrow + tax_payable; vergi
+  payı = vergi(toplam) − vergi(kart)). `Payment.amountMinor` yalnız kart payıdır → mutabakat
+  (psp_clearing) değişmez. Kart hatası/saga telafisi/tutma dolumu rezervi bırakır.
+- **İade simetrisi:** iptal iadesi kart ve kredi paylarına ödendikleri oranda (`allocateMinor`)
+  bölünür; kredi payı `refundIssued to:"guest_credit"` ile emanetten döner ve orijinal lot'un
+  son kullanma tarihiyle yeni lot açılır. Eski defter görünümü (`listBookingLedger`) krediye
+  iadeyi PSP parası saymaz.
+- Sınır: kredi yalnız tekil rezervasyonda (sepet/bölünmüş ödeme yok); tam kredi ödemesi yok
+  (kartla en az `WALLET_MIN_CARD_MINOR`); talep (claim) iadeleri yalnız kart payından.

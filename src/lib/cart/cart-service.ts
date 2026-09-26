@@ -284,24 +284,37 @@ export async function addCartItem(userId: string, input: CartItemInput): Promise
   }
   assertCartCurrency(quote, cart.currency);
   const cartId = cart.id;
-  await withSerializableRetry(async (tx) => {
-    await bumpOpenCart(tx, cartId);
-    const count = await tx.cartItem.count({ where: { cartId } });
-    if (count >= getConfig().CART_MAX_ITEMS) {
-      throw new ValidationError(`Sepette en fazla ${getConfig().CART_MAX_ITEMS} kalem olabilir`);
+  // READ COMMITTED + sepet satır kilidi (SERIALIZABLE değil): `bumpOpenCart`'ın koşullu UPDATE'i
+  // sepet satırını işlem sonuna dek kilitler. Aynı sepete eşzamanlı eklemeler bu kilitte sıralanır
+  // (sayım kilit altında doğru), tutma/kapama da aynı satırı güncellediği için ardından gelen
+  // ekleme `status = OPEN` koşulunu yeniden değerlendirip 409 alır. SSI'de ise farklı
+  // kullanıcıların sepetleri küçük CartItem tablosundaki sayım/ekleme predikat kilitleri
+  // yüzünden sahte rw-çakışması (P2034) üretiyordu (test-stabilization (c)3).
+  await prisma.$transaction(
+    async (tx) => {
+      await bumpOpenCart(tx, cartId);
+      const count = await tx.cartItem.count({ where: { cartId } });
+      if (count >= getConfig().CART_MAX_ITEMS) {
+        throw new ValidationError(`Sepette en fazla ${getConfig().CART_MAX_ITEMS} kalem olabilir`);
+      }
+      await tx.cartItem.create({
+        data: {
+          cartId,
+          propertyId: quote.propertyId,
+          roomTypeId: quote.roomId,
+          adults: input.adults,
+          children: input.children ?? 0,
+          quantity: quote.units,
+          ...snapshotOf(quote),
+        },
+      });
+    },
+    {
+      isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
+      maxWait: 5000,
+      timeout: 10000,
     }
-    await tx.cartItem.create({
-      data: {
-        cartId,
-        propertyId: quote.propertyId,
-        roomTypeId: quote.roomId,
-        adults: input.adults,
-        children: input.children ?? 0,
-        quantity: quote.units,
-        ...snapshotOf(quote),
-      },
-    });
-  });
+  );
   return presentCart(await loadCart(cartId));
 }
 

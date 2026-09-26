@@ -184,3 +184,25 @@ Testler ağa çıkmaz; canlı model kalitesi için otomatik bir benchmark yoktur
 - Redaksiyon desen tabanlıdır; serbest metinde geçen ve kullanıcı listesinde olmayan üçüncü kişi adlarını yakalamayabilir.
 - Mesaj taslağı geçmiş mesajları modele gönderir (redaksiyon ve maskeleme sonrası); host göndermeden önce içeriği kontrol etmelidir.
 - LLM çıktısı hukuki, tıbbi veya finansal tavsiye değildir; olay etkisi önerileri admin tarafından doğrulanmalıdır.
+
+## 6. Görsel zekâ: fotoğraf kalite skoru ve CLIP ([ADR 0022](adr/0022-multimodal-search.md))
+
+### 6.1 Kalite skoru ve pHash (`src/lib/vision/quality.ts`, `phash.ts`)
+
+- **Model değil, deterministik sinyal işleme.** Netlik: 512 px gri tonda 4-komşu Laplacian varyansı, `VISION_BLUR_VARIANCE_GOOD`'a (300) bölünüp 0..1'e kırpılır. Pozlama: parlaklık histogramının ortalamasının orta tona (128) yakınlığı × kırpılmış uç piksel (≤8 / ≥247) cezası. Kalite = 0.6·netlik + 0.4·pozlama (`VISION_QUALITY_BLUR_WEIGHT`).
+- **pHash:** 32×32 gri → 2B DCT → düşük frekanslı 8×8 katsayı medyana göre 64 bit. Duplikat = Hamming ≤ `VISION_DUPLICATE_MAX_HAMMING` (8). Yeniden boyutlandırma/JPEG/+%10 parlaklıkta ≤8, farklı sahnede >8 (birim test; ölçülen sentetik örneklerde 28–36; %8 kenar kırpmada 14 → kaçar).
+- **Karar vermez:** skor ve duplikat yalnız host'a uyarıdır; yükleme engellenmez, ilan otomatik reddedilmez, arama sıralamasına girmez.
+
+### 6.2 CLIP görsel embedding (`src/lib/vision/clip.ts`)
+
+- Model: `Xenova/clip-vit-base-patch32` (OpenAI CLIP ViT-B/32'nin ONNX dönüşümü), yalnız görü kulesi, 8-bit nicemlenmiş (~86 MB), `@huggingface/transformers` ile CPU'da; 512-d, L2-normalize. Yerel ölçüm (dizüstü CPU): yükleme ~1.2 sn, görsel başına ~80 ms.
+- Kullanım: yalnız "bu fotoğraftaki gibi" arama kanalı (RRF'de sıra tabanlı; ağırlığı diğer kanallarla eşit). Kosinüs < `VISION_MIN_SIMILARITY` (0.75) elenir — CLIP'te ilgisiz görsel çiftleri bile ~0.5–0.7 benzerlik verebildiği için eşik yüksek tutuldu.
+- Opsiyoneldir: `VISION_CLIP_ENABLED=false` (varsayılan), paket yok veya model indirilmemişse (`npm run vision:download`) özellik kapalı; API `visual.reason` (`FLAG_OFF`/`MODULE_MISSING`/`MODEL_MISSING`/`LOAD_FAILED`/`VECTOR_UNAVAILABLE`) ve UI açıklama döner. Testler deterministik stub (16×16 RGB) kullanır; ağa çıkmaz.
+
+### 6.3 Sınırlamalar ve önyargı
+
+- CLIP, internetten toplanmış İngilizce ağırlıklı görsel-metin çiftleriyle eğitildi; Batı mimari/iç mekân estetiğini "tipik" sayma ve yerel (ör. geleneksel Türk evi, köy evi) sahneleri daha az ayırt etme eğilimi vardır. Görsel benzerlik stil/renk düzenine duyarlıdır; aynı mülkün gece/gündüz fotoğrafları uzak düşebilir.
+- Görsel benzerlik fiyat, konum veya kaliteyi ima etmez; kanal yalnız aday üretir, sıralama mevcut ağırlıklı/LTR sıralayıcıda kalır.
+- Kalite skoru profesyonel/estetik değerlendirme değildir: bilinçli bokeh, gece çekimi veya minimalist beyaz iç mekân düşük skor alabilir; eşik (`VISION_LOW_QUALITY_THRESHOLD` 0.35) yalnız uyarı üretir.
+- pHash kırpma, aynalama ve güçlü filtreye dayanıklı değildir (kırpılmış kopya kaçabilir); farklı ama çok benzer kareler (aynı odanın iki çekimi) duplikat sayılabilir. Başka host'un ilanıyla eşleşmede o ilanın kimliği gösterilmez.
+- Yüz/kişi tanıma yapılmaz; yüklemede EXIF/GPS meta verisi silinir. Otomatik değerlendirme veri kümesi (etiketli benzerlik çiftleri) yoktur.

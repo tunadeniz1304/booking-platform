@@ -888,4 +888,101 @@ describeInt("P1-2 bölünmüş ödeme: paylar, süre sonu, yarışlar, geç webh
     expect(await shareJournal()).toEqual(expected);
     expect(await imbalanceCount()).toBe(0);
   });
+  /** Payın (paymentId = share.id) jurnal türleri, psp_clearing neti ve tahsilat toplamı. */
+  async function shareJournalOf(shareId: string) {
+    const entries = await prisma.journalEntry.findMany({
+      where: { paymentId: shareId },
+      select: {
+        kind: true,
+        lines: { select: { side: true, amountMinor: true, account: { select: { kind: true } } } },
+      },
+    });
+    let pspNet = 0n;
+    let captured = 0n;
+    for (const l of entries.flatMap((e) => e.lines)) {
+      if (l.account.kind !== "PSP_CLEARING") continue;
+      pspNet += l.side === "DEBIT" ? l.amountMinor : -l.amountMinor;
+      if (l.side === "DEBIT") captured += l.amountMinor;
+    }
+    return { kinds: entries.map((e) => e.kind).sort(), pspNet, captured };
+  }
+
+  it("regression: v2-P0-3 plan telafisinde iade edilen tahsil edilmiş paylar jurnale yazılır; mutabakat temiz", async () => {
+    psp = new SpyPsp();
+    setPaymentProviderForTests(psp);
+    const { organizer, cart } = await heldCart("p03-comp", 45);
+    const p1 = await newUser("p03-comp-p1");
+    const plan = await createSplitPlan({
+      cartId: cart.id,
+      userId: organizer.id,
+      mode: "equal",
+      participants: [{ email: p1.email }],
+    });
+    await pay(tokenOf(plan, 1), p1);
+    injectSagaFaultForTests(SPLIT_PAYMENT_SAGA, "confirm");
+    await expect(pay(tokenOf(plan, 0), organizer)).rejects.toThrow();
+
+    const shares = await prisma.paymentShare.findMany({ where: { planId: plan.id } });
+    expect(shares).toHaveLength(2);
+    for (const share of shares) {
+      expect(share.status).toBe("REFUNDED");
+      expect(await shareJournalOf(share.id)).toEqual({
+        kinds: ["BOOKING_CAPTURED", "REFUND_ISSUED"],
+        pspNet: 0n,
+        captured: share.amountMinor,
+      });
+    }
+    const ids = new Set(shares.map((s) => s.id));
+    const report = await reconcile(iso(new Date()), prisma);
+    expect(report.differences.filter((d) => ids.has(d.subjectId))).toEqual([]);
+    await expectLedgerClean(cart.id);
+  });
+
+  it("regression: v2-P0-3 mutabakat jurnalsiz pay iadesini fark olarak raporlar", async () => {
+    psp = new SpyPsp();
+    setPaymentProviderForTests(psp);
+    const { organizer, cart } = await heldCart("p03-nojournal", 55);
+    const p1 = await newUser("p03-nojournal-p1");
+    const plan = await createSplitPlan({
+      cartId: cart.id,
+      userId: organizer.id,
+      mode: "equal",
+      participants: [{ email: p1.email }],
+    });
+    await pay(tokenOf(plan, 1), p1);
+    const share = await prisma.paymentShare.findFirstOrThrow({
+      where: { planId: plan.id, position: 1 },
+    });
+    expect(share.providerRef).toBeTruthy();
+    // Jurnal yazmadan iade eden bir yol: pay REFUNDED + telafi işareti, jurnal yok.
+    const now = new Date();
+    await prisma.paymentShare.update({
+      where: { id: share.id },
+      data: {
+        status: "REFUNDED",
+        capturedAt: now,
+        refundedAmountMinor: share.amountMinor,
+        refundedAt: now,
+      },
+    });
+    await prisma.paymentEvent.create({
+      data: {
+        id: `comp:${share.providerRef}`,
+        type: "compensation.split_share",
+        providerRef: share.providerRef,
+        receivedAt: now,
+      },
+    });
+    const report = await reconcile(iso(now), prisma);
+    const mine = report.differences
+      .filter((d) => d.subjectId === share.id)
+      .map((d) => ({ subject: d.subject, kind: d.kind, psp: d.pspMinor, journal: d.journalMinor }))
+      .sort((a, b) => a.kind.localeCompare(b.kind));
+    expect(mine).toEqual([
+      { subject: "payment_share", kind: "capture", psp: share.amountMinor, journal: 0n },
+      { subject: "payment_share", kind: "refund", psp: share.amountMinor, journal: 0n },
+    ]);
+    // Sepeti serbest bırak (sonraki testlerin envanteri etkilenmesin).
+    await releaseCartWithSplit(organizer.id, cart.id).catch(() => undefined);
+  });
 });

@@ -11,7 +11,12 @@ import {
   payForBooking,
 } from "@/lib/payment/payment-service";
 import { MOCK_3DS_CODE } from "@/lib/payment/card-token";
-import { claimTransfer, listBookingForTransfer } from "@/lib/transfer/transfer-service";
+import {
+  claimTransfer,
+  listBookingForTransfer,
+  sweepStuckTransfers,
+} from "@/lib/transfer/transfer-service";
+import { getConfig } from "@/lib/config/app-config";
 import { setPaymentProviderForTests } from "@/lib/payment";
 import { MockPsp } from "@/lib/payment/mock-psp";
 import { runPayouts } from "@/worker/jobs/payouts";
@@ -250,6 +255,145 @@ describeInt("F2c defter bağlama: rezervasyon → ödeme → iade → iptal → 
     expect(replayed).toBe(false);
     expect(await transferJournal()).toEqual(expected);
     await assertBooksClean();
+  });
+
+  /** Devrin jurnal türleri, psp_clearing neti ve tahsilat (Dr psp_clearing) toplamı. */
+  async function transferJournalOf(transferId: string) {
+    const entries = await prisma.journalEntry.findMany({
+      where: { transferId },
+      select: {
+        kind: true,
+        lines: { select: { side: true, amountMinor: true, account: { select: { kind: true } } } },
+      },
+    });
+    let psp = 0n;
+    let captured = 0n;
+    for (const l of entries.flatMap((e) => e.lines)) {
+      if (l.account.kind !== "PSP_CLEARING") continue;
+      psp += l.side === "DEBIT" ? l.amountMinor : -l.amountMinor;
+      if (l.side === "DEBIT") captured += l.amountMinor;
+    }
+    return { kinds: entries.map((e) => e.kind).sort(), psp, captured };
+  }
+
+  /** Capture yapılmış yetkilendirme void edilemez (Stripe semantiği); iadeleri kaydeder. */
+  class CapturedPsp extends MockPsp {
+    captured = new Set<string>();
+    refundKeys: string[] = [];
+    constructor(private readonly afterCapture: () => Promise<void> = async () => {}) {
+      super();
+    }
+    async capture(...args: Parameters<MockPsp["capture"]>) {
+      const res = await super.capture(...args);
+      if (args[0]) this.captured.add(args[0]);
+      await this.afterCapture();
+      return res;
+    }
+    async void(ref?: string): ReturnType<MockPsp["void"]> {
+      if (ref && this.captured.has(ref)) throw new Error("already captured");
+      return super.void();
+    }
+    async refund(...args: Parameters<MockPsp["refund"]>) {
+      this.refundKeys.push(args[2]);
+      return super.refund(...args);
+    }
+  }
+
+  it("regression: v2-P0-3 süpürücü ↔ saga yarışı: iki telafi de koşar, jurnal tek çift, mutabakat temiz", async () => {
+    const bk = await fx.hold({ nights: 1 });
+    await pay(bk.id);
+    const ask = Math.max(1, Math.floor(bk.totalMinor / 2));
+    const listed = await listBookingForTransfer(bk.id, fx.userId, ask);
+    touched.transfers.add(listed.id);
+    // Capture tamamlandıktan hemen sonra süpürücü eşiği aşılmış sayar (süreç takıldı) → FAILED +
+    // CAPTURE_TIMEOUT, void düşer → iade. Ardından saganın commit'i ALREADY_CLAIMED ile düşer ve
+    // kendi capture telafisi aynı anahtarla yeniden iade eder.
+    const later = () =>
+      new Date(Date.now() + (getConfig().TRANSFER_CAPTURE_PENDING_TIMEOUT_SECONDS + 60) * 1000);
+    const psp: CapturedPsp = new CapturedPsp(async () => {
+      await sweepStuckTransfers(later(), psp);
+    });
+    setPaymentProviderForTests(psp);
+    await expect(
+      claimTransfer({ token: listed.claimToken, buyerId: buyer, cardToken: "tok_mock_ok_4242" })
+    ).rejects.toMatchObject({ status: 409, code: "ALREADY_CLAIMED" });
+
+    const transfer = await prisma.bookingTransfer.findUniqueOrThrow({ where: { id: listed.id } });
+    expect(transfer).toMatchObject({ status: "FAILED", failureCode: "CAPTURE_TIMEOUT" });
+    expect(psp.refundKeys.filter((k) => k === `transfer-refund:${listed.id}`)).toHaveLength(2);
+    expect(await transferJournalOf(listed.id)).toEqual({
+      kinds: ["BOOKING_CAPTURED", "REFUND_ISSUED"],
+      psp: 0n,
+      captured: BigInt(ask),
+    });
+    await assertBooksClean();
+  });
+
+  /** Çöken süreç simülasyonu: ilan CAPTURE_PENDING'de, eşikten eski, capture yapılmış. */
+  async function stuckCapturedTransfer() {
+    const bk = await fx.hold({ nights: 1 });
+    await pay(bk.id);
+    const ask = Math.max(1, Math.floor(bk.totalMinor / 2));
+    const listed = await listBookingForTransfer(bk.id, fx.userId, ask);
+    const ref = `pi_p03stuck_${listed.id}`;
+    await prisma.bookingTransfer.update({
+      where: { id: listed.id },
+      data: {
+        status: "CAPTURE_PENDING",
+        claimedById: buyer,
+        claimedAt: new Date(
+          Date.now() - (getConfig().TRANSFER_CAPTURE_PENDING_TIMEOUT_SECONDS + 60) * 1000
+        ),
+        buyerPaymentRef: ref,
+      },
+    });
+    return { bookingId: bk.id, transferId: listed.id, ref, ask };
+  }
+
+  it("regression: v2-P0-3 süpürücünün capture iadesi jurnale yazılır; ikinci süpürme çoğaltmaz", async () => {
+    const stuck = await stuckCapturedTransfer();
+    touched.transfers.add(stuck.transferId);
+    const psp = new CapturedPsp();
+    psp.captured.add(stuck.ref);
+    await sweepStuckTransfers(new Date(), psp);
+    expect(psp.refundKeys).toContain(`transfer-refund:${stuck.transferId}`);
+    const expected = {
+      kinds: ["BOOKING_CAPTURED", "REFUND_ISSUED"],
+      psp: 0n,
+      captured: BigInt(stuck.ask),
+    };
+    expect(await transferJournalOf(stuck.transferId)).toEqual(expected);
+    await sweepStuckTransfers(new Date(), psp);
+    expect(await transferJournalOf(stuck.transferId)).toEqual(expected);
+    await assertBooksClean();
+  });
+
+  it("regression: v2-P0-3 mutabakat jurnalsiz devir iadesini fark olarak raporlar", async () => {
+    const stuck = await stuckCapturedTransfer();
+    const now = new Date();
+    // Jurnal yazmadan iade eden bir yol: durum FAILED + telafi işareti, jurnal yok.
+    await prisma.bookingTransfer.update({
+      where: { id: stuck.transferId },
+      data: { status: "FAILED", failedAt: now, failureCode: "CAPTURE_TIMEOUT" },
+    });
+    await prisma.paymentEvent.create({
+      data: {
+        id: `comp:${stuck.ref}`,
+        type: "compensation.transfer_capture",
+        providerRef: stuck.ref,
+        receivedAt: now,
+      },
+    });
+    const report = await reconcile(now.toISOString().slice(0, 10), prisma);
+    const mine = report.differences
+      .filter((d) => d.subjectId === stuck.transferId)
+      .map((d) => ({ subject: d.subject, kind: d.kind, psp: d.pspMinor, journal: d.journalMinor }))
+      .sort((a, b) => a.kind.localeCompare(b.kind));
+    expect(mine).toEqual([
+      { subject: "transfer", kind: "capture", psp: BigInt(stuck.ask), journal: 0n },
+      { subject: "transfer", kind: "refund", psp: BigInt(stuck.ask), journal: 0n },
+    ]);
+    expect(report.ok).toBe(false);
   });
 
   it("property: rastgele akış dizileri sonrası defter dengede, mutabakat farkı 0", async () => {

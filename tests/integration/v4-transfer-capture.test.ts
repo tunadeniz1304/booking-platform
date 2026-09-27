@@ -474,4 +474,38 @@ describeInt("regression: v4#1 devir capture hatası (integration)", () => {
     expect(transfer.claimedById).toBe(buyer);
     expect(psp.captures).toEqual([transfer.buyerPaymentRef]);
   });
+
+  it("regression: aynı Idempotency-Key ile 5xx sonrası yeniden deneme void edilmiş provizyonu kullanmaz → COMPLETED", async () => {
+    const psp = new StripeLikePsp();
+    setPaymentProviderForTests(psp);
+    const bookingId = await confirmedBooking();
+    const listed = await listBookingForTransfer(bookingId, seller, 150_000);
+    const claim = () =>
+      claimTransfer({
+        token: listed.claimToken,
+        buyerId: buyer,
+        cardToken: "tok_mock_ok_4242",
+        idempotencyKey: "client-key-retry",
+      });
+
+    injectSagaFaultForTests(TRANSFER_SAGA, TRANSFER_SAGA_STEPS.reserve);
+    await expect(claim()).rejects.toMatchObject({ status: 502, code: "TRANSFER_PAYMENT_FAILED" });
+    expect(psp.voids).toHaveLength(1);
+    expect(
+      (await prisma.bookingTransfer.findUniqueOrThrow({ where: { id: listed.id } })).status
+    ).toBe("LISTED");
+    injectSagaFaultForTests(TRANSFER_SAGA, null);
+
+    const res = await claim();
+    expect(res.status).toBe("COMPLETED");
+    expect(new Set(psp.keys).size).toBe(2);
+
+    const transfer = await prisma.bookingTransfer.findUniqueOrThrow({ where: { id: listed.id } });
+    expect(transfer.status).toBe("COMPLETED");
+    expect(psp.voids).not.toContain(transfer.buyerPaymentRef);
+    expect(psp.captures).toEqual([transfer.buyerPaymentRef]);
+    expect((await prisma.booking.findUniqueOrThrow({ where: { id: bookingId } })).userId).toBe(
+      buyer
+    );
+  });
 });

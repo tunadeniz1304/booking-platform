@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { getConfig } from "@/lib/config/app-config";
-import { toErrorResponse, ValidationError } from "@/lib/http/errors";
+import { toErrorResponse } from "@/lib/http/errors";
+import { readMultipartFile } from "@/lib/http/body-limit";
 import { uploadClaimEvidence } from "@/lib/resolution/claims";
-
-/** Multipart gövdesinde dosya dışı alanlar için pay (sınır + başlıklar). */
-const MULTIPART_OVERHEAD_BYTES = 64 * 1024;
 
 /**
  * Kanıt yükle (multipart `file`). Tür dosya imzasından belirlenir; görseller yeniden kodlanır
@@ -17,16 +15,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const actor = await requireAuth(req);
     const cfg = getConfig();
     const max = Math.max(cfg.CLAIM_EVIDENCE_MAX_BYTES, cfg.CLAIM_EVIDENCE_PDF_MAX_BYTES);
-    const declared = Number(req.headers.get("content-length") ?? "0");
-    if (declared > max + MULTIPART_OVERHEAD_BYTES) throw new ValidationError("Dosya çok büyük");
-    let file: FormDataEntryValue | null;
-    try {
-      file = (await req.formData()).get("file");
-    } catch {
-      throw new ValidationError("multipart/form-data gövdesi bekleniyor");
-    }
-    if (!file || typeof file === "string") throw new ValidationError("`file` alanı gerekli");
-    if (file.size > max) throw new ValidationError("Dosya çok büyük");
+    // v5#11: gövde akıştan sayılarak okunur (content-length'e güvenilmez; aşımda 413).
+    const file = await readMultipartFile(req, max);
     const row = await uploadClaimEvidence(actor, id, Buffer.from(await file.arrayBuffer()));
     return NextResponse.json(row, { status: 201 });
   } catch (error) {

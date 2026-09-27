@@ -98,6 +98,10 @@ export const ERROR_CATALOG = {
     status: 409,
     description: "Eşzamanlı işlem çakışması; `Retry-After` sonrası aynı Idempotency-Key ile tekrar",
   },
+  PAYLOAD_TOO_LARGE: {
+    status: 413,
+    description: "İstek gövdesi sınırı aştı (akıştan sayılır; content-length'e güvenilmez)",
+  },
   INVALID_CARD_TOKEN: { status: 422, description: "Kart token'ı ödeme sağlayıcısınca reddedildi" },
   RATE_LIMITED: {
     status: 429,

@@ -37,7 +37,8 @@ describe("regression: v5#11 yükleme gövdesi akıştan sayılarak sınırlanır
   it("beyan edilen content-length sınırı aşıyorsa gövde hiç okunmadan 413", async () => {
     const { req, pulled } = chunkedRequest(4 * CHUNK, { "content-length": String(8 * CHUNK) });
     await expect(readBodyLimited(req, 2 * CHUNK)).rejects.toMatchObject({ status: 413 });
-    expect(pulled()).toBe(0);
+    // Akış yapıcısı yalnız ilk parçayı önceden çeker (highWaterMark=1); gövde okunmaz.
+    expect(pulled()).toBeLessThanOrEqual(CHUNK);
   });
 
   it("sınır içindeki gövde eksiksiz döner (sınıra eşit dahil)", async () => {

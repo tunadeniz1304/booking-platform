@@ -1,20 +1,94 @@
+<a id="readme-top"></a>
+
+<div align="center">
+
 # booking-platform
 
 **Çift rezervasyonu ve çift tahsilatı testlerle kanıtlanabilir biçimde imkânsız kılan, her kuruşu çift girişli bir defterde dengeli tutan, ajanların (MCP/ACP/UCP) kullanıcının imzaladığı sınırlı bir yetkiyle (AP2 mandate) insanlarla aynı güvenli akıştan rezervasyon yapabildiği ve GenAI'ı anahtar ve internet olmadan da çalışacak şekilde yalnızca açıklama ve özetleme için kullanan bir konaklama rezervasyon (OTA) platformu.**
 
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+![Node.js 22](https://img.shields.io/badge/node-22-339933?logo=nodedotjs&logoColor=white)
+![TypeScript strict](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
+![Next.js 16](https://img.shields.io/badge/Next.js-16-000000?logo=nextdotjs&logoColor=white)
+![PostgreSQL 16](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)
+![Redis 7](https://img.shields.io/badge/Redis-7-DC382D?logo=redis&logoColor=white)
+<br />
+![Unit tests](https://img.shields.io/badge/unit%20tests-1028%20passing-brightgreen)
+![Integration tests](https://img.shields.io/badge/integration%20tests-342%20passing-brightgreen)
+![E2E tests](https://img.shields.io/badge/e2e%20tests-35%20passing-brightgreen)
+![Coverage](https://img.shields.io/badge/coverage-lines%2090.35%25%20%C2%B7%20branches%2079.13%25-green)
+
+[**Dokümantasyonu keşfet »**](docs/ARCHITECTURE.md)
+
+[Demo akışı](docs/DEMO_SCRIPT.md) · [Değişiklik günlüğü](CHANGELOG.md) · [Final raporu](docs/FINAL_REPORT.md) · [English summary](#english-summary)
+
+</div>
+
 > **Portföy/demo projesidir; gerçek ödeme alınmaz, gerçek konaklama satılmaz; vergi oranları ve mevzuat bilgisi eğitim amaçlıdır, hukuki/mali tavsiye değildir.**
 
-Next.js 16 (App Router) · React 19 · TypeScript strict · PostgreSQL 16 + pgvector + pg_trgm · Prisma 5 · Redis 7 · BullMQ (FlowProducer) · Temporal (polyfill) · MCP (streamable HTTP + stdio) · gRPC · next-intl · jose + WebAuthn · OpenTelemetry · Prometheus · Vitest + testcontainers + fast-check · Playwright + axe · k6
+<details>
+<summary><strong>İçindekiler</strong></summary>
+
+1. [Proje hakkında](#proje-hakkında)
+   - [Değer önerisi](#değer-önerisi)
+   - [Kullanılan teknolojiler](#kullanılan-teknolojiler)
+2. [Mimari](#mimari)
+   - [Sektör kıyası](#sektör-kıyası)
+3. [Başlarken](#başlarken)
+   - [Gereksinimler](#gereksinimler)
+   - [Kurulum](#kurulum)
+4. [Kullanım](#kullanım)
+   - [Demo kullanıcılar](#demo-kullanıcılar)
+   - [LLM modu](#llm-modu)
+   - [Ajanlar için: MCP, ACP, UCP ve mandate](#ajanlar-için-mcp-acp-ucp-ve-mandate)
+   - [Demo senaryoları](#demo-senaryoları)
+   - [Ekran görüntüleri](#ekran-görüntüleri)
+5. [Özellikler (v4)](#özellikler-v4)
+   - [Neyi kanıtlıyor?](#neyi-kanıtlıyor)
+6. [Testler ve betikler](#testler-ve-betikler)
+7. [Gözlemlenebilirlik](#gözlemlenebilirlik)
+8. [Yol haritası](#yol-haritası)
+9. [Dürüstlük notu: mock / demo olanlar](#dürüstlük-notu-mock--demo-olanlar)
+10. [Dokümantasyon](#dokümantasyon)
+11. [Katkı](#katkı)
+12. [Lisans](#lisans)
+13. [İletişim](#contact)
+14. [Teşekkürler ve atıflar](#teşekkürler-ve-atıflar)
+15. [Yasal uyarı](#yasal-uyarı)
+16. [English summary](#english-summary)
+
+</details>
+
+## Proje hakkında
+
+[![Grup sepeti — iki tesis, tümü-ya-hiç tutma](docs/img/v4-cart.png)](#ekran-görüntüleri)
 
 Sürüm: **v4** ([CHANGELOG](CHANGELOG.md), [FINAL_REPORT](docs/FINAL_REPORT.md))
 
-## Değer önerisi
+### Değer önerisi
 
 1. **Para doğruluğu kanıtlanır, varsayılmaz.** Tüm tutarlar ISO 4217 üssüne göre `BigInt` minor-unit; her tahsilat, iade, escrow serbest bırakma, payout, depozito, cüzdan kredisi ve kaybedilen itiraz dengeli bir jurnal girişi yazar (DB tetiği Σ=0'ı zorlar); günlük mutabakat PSP gerçeğiyle farkı raporlar. Property testleri ve senaryolar her adımda "mizan dengede, fark 0" doğrular.
 2. **Sektör devlerinin pazar yeri özellikleri, tek tutarlı çekirdek üstünde.** Grup sepeti (tümü-ya-hiç tutma), bölünmüş ödeme, check-in+24 saat escrow ve rezervli payout, hasar depozitosu + çözüm merkezi, sadakat/cüzdan, promosyon motoru (Omnibus 30 gün), esnek tarih fiyat takvimi, görsel arama, PWA — hepsi aynı kilit, saga, outbox ve defteri kullanır.
 3. **Ajanlar için güvenli ticaret.** MCP, ACP ve UCP uçları insan checkout'uyla aynı sagayı çalıştırır; ödeme kullanıcının imzaladığı, süreli, tutar sınırlı (isteğe bağlı ilan kısıtlı) ve tek kullanımlık AP2 intent mandate'i olmadan yapılamaz; mandate verme recent-auth ister ve iptal edilebilir.
 
----
+### Kullanılan teknolojiler
+
+[![Next.js](https://img.shields.io/badge/Next.js_16-000000?logo=nextdotjs&logoColor=white)](https://nextjs.org)
+[![React](https://img.shields.io/badge/React_19-20232A?logo=react&logoColor=61DAFB)](https://react.dev)
+[![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL_16-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org)
+[![Prisma](https://img.shields.io/badge/Prisma_5-2D3748?logo=prisma&logoColor=white)](https://www.prisma.io)
+[![Redis](https://img.shields.io/badge/Redis_7-DC382D?logo=redis&logoColor=white)](https://redis.io)
+[![BullMQ](https://img.shields.io/badge/BullMQ-E0234E)](https://docs.bullmq.io)
+[![OpenTelemetry](https://img.shields.io/badge/OpenTelemetry-000000?logo=opentelemetry&logoColor=white)](https://opentelemetry.io)
+[![Prometheus](https://img.shields.io/badge/Prometheus-E6522C?logo=prometheus&logoColor=white)](https://prometheus.io)
+[![Vitest](https://img.shields.io/badge/Vitest-6E9F18?logo=vitest&logoColor=white)](https://vitest.dev)
+[![Playwright](https://img.shields.io/badge/Playwright-2EAD33)](https://playwright.dev)
+[![k6](https://img.shields.io/badge/k6-7D64FF?logo=k6&logoColor=white)](https://k6.io)
+
+Tam yığın: Next.js 16 (App Router) · React 19 · TypeScript strict · PostgreSQL 16 + pgvector + pg_trgm · Prisma 5 · Redis 7 · BullMQ (FlowProducer) · Temporal (polyfill) · MCP (streamable HTTP + stdio) · gRPC · next-intl · jose + WebAuthn · OpenTelemetry · Prometheus · Vitest + testcontainers + fast-check · Playwright + axe · k6
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## Mimari
 
@@ -75,7 +149,7 @@ flowchart LR
 
 Ayrıntılar: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) (defter, sepet/bölünmüş ödeme, escrow/payout/depozito ve mandate akış diyagramları; saga sekansı; hibrit arama) · kararlar: [docs/adr/](docs/adr/)
 
-## Sektör kıyası
+### Sektör kıyası
 
 | Yetkinlik                   | Sektör liderleri                                     | v3.0.0                        | v4 (bu repoda)                                                                                                                                                                                         | Mock / sınır                                                                                  |
 | --------------------------- | ---------------------------------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
@@ -97,49 +171,18 @@ Ayrıntılar: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) (defter, sepet/bölü
 
 v3'ten devralınan yetkinlikler (oda tipi envanteri, vergi motoru, FX snapshot, hibrit arama + LTR, gelir paneli, kanal yöneticisi, mesajlaşma, i18n) değişmeden korunur; ayrıntı [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-## Ekran görüntüleri
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-### v4
+## Başlarken
 
-| Grup sepeti (iki tesis, tümü-ya-hiç)                            | Sepet checkout'u (odalar tutuldu, tek ödeme)                |
-| --------------------------------------------------------------- | ----------------------------------------------------------- |
-| ![Grup sepeti](docs/img/v4-cart.png)                            | ![Sepet checkout](docs/img/v4-checkout-cart.png)            |
-| **Bölünmüş ödeme (organizatör + 2 katılımcı, son ödeme saati)** | **PDP fiyat takvimi (gecelik en düşük fiyat, vergi dahil)** |
-| ![Bölünmüş ödeme](docs/img/v4-split-payment.png)                | ![Fiyat takvimi](docs/img/v4-price-calendar.png)            |
-| **İlan karşılaştırma (teklif motoru toplamı + AI yorumu)**      | **Çözüm merkezi — yönetici talep kuyruğu**                  |
-| ![Karşılaştırma](docs/img/v4-compare.png)                       | ![Çözüm merkezi](docs/img/v4-resolution.png)                |
-| **Cüzdan ve sadakat (`/account`)**                              | **Ev sahibi payout paneli (emanet / serbest / rezerv)**     |
-| ![Cüzdan](docs/img/v4-wallet.png)                               | ![Payout paneli](docs/img/v4-host-payouts.png)              |
-| **Koyu tema (`prefers-color-scheme: dark`)**                    |                                                             |
-| ![Koyu tema](docs/img/v4-dark-mode.png)                         |                                                             |
+### Gereksinimler
 
-### v3
+- **Docker** (Compose v2) — demo yığını için tek gereksinim. `.env` dosyası gerekmez (varsa okunur).
+- **Node.js 22** ve npm — yalnız yerel geliştirme için (Docker imajları `node:22-alpine` tabanlıdır). Entegrasyon testleri de Docker ister (testcontainers).
 
-| Satır kalemli checkout (gece, konaklama vergisi, dahil KDV) | PDP fiyat içgörüsü (conformal aralık, "olağan" etiketi) |
-| ----------------------------------------------------------- | ------------------------------------------------------- |
-| ![Checkout fiyat kırılımı](docs/img/checkout-breakdown.png) | ![Fiyat içgörüsü](docs/img/price-insight.png)           |
-| **Host gelir paneli (`/host/revenue`)**                     | **Rezervasyon mesajlaşması (telefon numarası maskeli)** |
-| ![Gelir paneli](docs/img/host-revenue.png)                  | ![Mesajlaşma](docs/img/messaging.png)                   |
-| **Akıllı filtre (doğal dil → filtre çipleri)**              | **Mülk sayfası (galeri, fiyat, atıflı yorum özeti)**    |
-| ![Smart Filter](docs/img/search-smart-filter.png)           | ![PDP](docs/img/property.png)                           |
-| **Çok şehirli trip-planner (araçlı, grounded)**             | **Host extranet**                                       |
-| ![Trip planner](docs/img/trip-planner.png)                  | ![Host](docs/img/host-extranet.png)                     |
-| **Ana sayfa**                                               | **Admin paneli (outbox, moderasyon, deney, fraud)**     |
-| ![Ana sayfa](docs/img/home.png)                             | ![Admin](docs/img/admin.png)                            |
+### Kurulum
 
-**MCP `ui://stay-card` widget'ı:**
-
-![MCP stay card](docs/img/mcp-stay-card.png)
-
-Görüntüler compose demo yığınından (seed'li, LLM demo modu) `npm run docs:screenshots` ile üretilir ([scripts/screenshots.ts](scripts/screenshots.ts)). Dürüstlük notları:
-
-- MCP kartı gerçek `POST /api/mcp` yanıtlarından (`resources/read ui://stay-card` + `tools/call search_stays`) çizilir, ancak ChatGPT/Claude istemcisinin ekran görüntüsü **değildir**: şablon, Apps SDK'nın sağladığı `window.openai.toolOutput` ile aynı biçimde beslenerek boş bir sayfada render edilir.
-- v4 kümesi `SCREENSHOT_SET=v4 npm run docs:screenshots` ile üretilir; betik demo yığınında örnek bir sepet ve bölünmüş ödeme planı oluşturur (bir katılımcı payını ödemiştir). Çözüm merkezi görüntüsündeki hasar talebi `npm run demo:scenarios` senaryo 10'dan gelir (canlı demoda konaklama başlamadan talep açılamaz). Demo misafirinin tamamlanmış konaklaması olmadığından cüzdan boş görünür; cashback → kredi akışı senaryo 14'te doğrulanır. Seed fiyatları düz olduğundan fiyat takviminde tüm günler aynı seviyededir.
-- Gelir paneli görüntüsündeki mülkte seçilen pencerede satış olmadığı için metrikler sıfırdır.
-
-## 30 saniyede çalıştır
-
-Gereksinim: Docker (Compose v2). `.env` dosyası gerekmez (varsa okunur).
+#### 30 saniyede çalıştır (Docker Compose demo)
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.demo.yml up
@@ -151,8 +194,21 @@ docker compose -f docker-compose.yml -f docker-compose.demo.yml up
 - **Sırlar otomatik üretilir.** `secrets-init` servisi ilk açılışta JWT, iç API, transfer imza, webhook, metrik, Postgres ve Redis sırlarını rastgele üretip `booking_secrets` volume'una yazar. İmajlarda sır yoktur.
 - **Demo verisi:** `migrate` servisi `prisma migrate deploy` çalıştırır, ardından `DEMO_SEED` açıksa ve veritabanı boşsa seed yükler (v4 eki: ev sahibi payout hesabı, 4 promosyon + `HOSGELDIN` kuponu, ilan fotoğrafları, doğrulanmış erişilebilirlik özellikleri). `DEMO_MODE` kapalıyken demo seed reddedilir ve `/dev/mailbox` 404 döner (`src/lib/config/seed-guard.ts`).
 - **Anahtar ve internet gerekmez:** LLM → DEMO, ödeme ve payout → mock, KYC → mock, e-Arşiv entegratörü → mock, FX → statik yedek, kayıt no → mock registry, embedding → hash, SMTP → dev mailbox, Web Push → kapalı.
-- Demo durumunu sıfırlamak: `npm run demo:reset`; 14 uçtan uca senaryo (7 HTTP + 7 v4 süreç içi, her v4 senaryosunda mizan ve mutabakat kontrolü): `npm run demo:scenarios`.
-- Yerel geliştirme: `npm run db:up` → `npm run db:migrate && npm run db:seed` → `npm run dev` ve ayrı terminalde `npm run worker`.
+
+#### Yerel geliştirme
+
+```bash
+npm run db:up                          # dev compose: Postgres + Redis
+npm run db:migrate && npm run db:seed  # prisma migrate deploy + seed
+npm run dev                            # Next.js geliştirme sunucusu
+npm run worker                         # ayrı terminalde BullMQ worker
+```
+
+Yapılandırılabilir ortam değişkenlerinin adları [.env.example](.env.example) dosyasında listelenir.
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+## Kullanım
 
 ### Demo kullanıcılar
 
@@ -167,9 +223,7 @@ docker compose -f docker-compose.yml -f docker-compose.demo.yml up
 
 Demo kullanıcılarının e-postası doğrulanmıştır (rezervasyon/ödeme/devir doğrulanmış e-posta ister). Test kartları (mock hosted fields, tarayıcıda token'a çevrilir): `4242 4242 4242 4242` onay, `4000 0000 0000 0002` ret, `4000 0000 0000 3220` 3DS (doğrulama kodu `123456`). SMTP yapılandırılmamışsa e-postalar (bölünmüş ödeme davetleri dahil) <http://localhost:3000/dev/mailbox> sayfasına düşer.
 
-3 dakikalık demo akışı: [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md)
-
-## LLM modu
+### LLM modu
 
 Tüm LLM erişimi `src/lib/llm/` sözleşmesinden geçer ([ADR 0005](docs/adr/0005-llm-contract.md), [MODEL_CARD](docs/MODEL_CARD.md)).
 
@@ -194,7 +248,59 @@ Tüm LLM erişimi `src/lib/llm/` sözleşmesinden geçer ([ADR 0005](docs/adr/00
 
 Access token `POST /api/auth/login` yanıtındaki `accessToken` alanından alınır. Mandate'siz, süresi dolmuş, limiti aşan, başka kullanıcıya ait, iptal edilmiş veya tekrar oynatılan mandate PSP'ye gitmeden reddedilir (403/402/409 `MANDATE_*`). Duman testi: `npm run mcp:smoke` (mandate'li başarı + ret yolları). Karar: [ADR 0023](docs/adr/0023-agentic-commerce-mandates.md).
 
-## v4 özellikleri
+### Demo senaryoları
+
+- 3 dakikalık demo akışı: [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md)
+- Demo durumunu sıfırlamak: `npm run demo:reset`; 14 uçtan uca senaryo (7 HTTP + 7 v4 süreç içi, her v4 senaryosunda mizan ve mutabakat kontrolü): `npm run demo:scenarios`.
+
+### Ekran görüntüleri
+
+#### v4
+
+| Grup sepeti (iki tesis, tümü-ya-hiç)                            | Sepet checkout'u (odalar tutuldu, tek ödeme)                |
+| --------------------------------------------------------------- | ----------------------------------------------------------- |
+| ![Grup sepeti](docs/img/v4-cart.png)                            | ![Sepet checkout](docs/img/v4-checkout-cart.png)            |
+| **Bölünmüş ödeme (organizatör + 2 katılımcı, son ödeme saati)** | **PDP fiyat takvimi (gecelik en düşük fiyat, vergi dahil)** |
+| ![Bölünmüş ödeme](docs/img/v4-split-payment.png)                | ![Fiyat takvimi](docs/img/v4-price-calendar.png)            |
+| **İlan karşılaştırma (teklif motoru toplamı + AI yorumu)**      | **Çözüm merkezi — yönetici talep kuyruğu**                  |
+| ![Karşılaştırma](docs/img/v4-compare.png)                       | ![Çözüm merkezi](docs/img/v4-resolution.png)                |
+| **Cüzdan ve sadakat (`/account`)**                              | **Ev sahibi payout paneli (emanet / serbest / rezerv)**     |
+| ![Cüzdan](docs/img/v4-wallet.png)                               | ![Payout paneli](docs/img/v4-host-payouts.png)              |
+| **Koyu tema (`prefers-color-scheme: dark`)**                    |                                                             |
+| ![Koyu tema](docs/img/v4-dark-mode.png)                         |                                                             |
+
+<details>
+<summary><strong>v3 ekran görüntüleri ve MCP kartı</strong></summary>
+
+#### v3
+
+| Satır kalemli checkout (gece, konaklama vergisi, dahil KDV) | PDP fiyat içgörüsü (conformal aralık, "olağan" etiketi) |
+| ----------------------------------------------------------- | ------------------------------------------------------- |
+| ![Checkout fiyat kırılımı](docs/img/checkout-breakdown.png) | ![Fiyat içgörüsü](docs/img/price-insight.png)           |
+| **Host gelir paneli (`/host/revenue`)**                     | **Rezervasyon mesajlaşması (telefon numarası maskeli)** |
+| ![Gelir paneli](docs/img/host-revenue.png)                  | ![Mesajlaşma](docs/img/messaging.png)                   |
+| **Akıllı filtre (doğal dil → filtre çipleri)**              | **Mülk sayfası (galeri, fiyat, atıflı yorum özeti)**    |
+| ![Smart Filter](docs/img/search-smart-filter.png)           | ![PDP](docs/img/property.png)                           |
+| **Çok şehirli trip-planner (araçlı, grounded)**             | **Host extranet**                                       |
+| ![Trip planner](docs/img/trip-planner.png)                  | ![Host](docs/img/host-extranet.png)                     |
+| **Ana sayfa**                                               | **Admin paneli (outbox, moderasyon, deney, fraud)**     |
+| ![Ana sayfa](docs/img/home.png)                             | ![Admin](docs/img/admin.png)                            |
+
+**MCP `ui://stay-card` widget'ı:**
+
+![MCP stay card](docs/img/mcp-stay-card.png)
+
+</details>
+
+Görüntüler compose demo yığınından (seed'li, LLM demo modu) `npm run docs:screenshots` ile üretilir ([scripts/screenshots.ts](scripts/screenshots.ts)). Dürüstlük notları:
+
+- MCP kartı gerçek `POST /api/mcp` yanıtlarından (`resources/read ui://stay-card` + `tools/call search_stays`) çizilir, ancak ChatGPT/Claude istemcisinin ekran görüntüsü **değildir**: şablon, Apps SDK'nın sağladığı `window.openai.toolOutput` ile aynı biçimde beslenerek boş bir sayfada render edilir.
+- v4 kümesi `SCREENSHOT_SET=v4 npm run docs:screenshots` ile üretilir; betik demo yığınında örnek bir sepet ve bölünmüş ödeme planı oluşturur (bir katılımcı payını ödemiştir). Çözüm merkezi görüntüsündeki hasar talebi `npm run demo:scenarios` senaryo 10'dan gelir (canlı demoda konaklama başlamadan talep açılamaz). Demo misafirinin tamamlanmış konaklaması olmadığından cüzdan boş görünür; cashback → kredi akışı senaryo 14'te doğrulanır. Seed fiyatları düz olduğundan fiyat takviminde tüm günler aynı seviyededir.
+- Gelir paneli görüntüsündeki mülkte seçilen pencerede satış olmadığı için metrikler sıfırdır.
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+## Özellikler (v4)
 
 - **Güvenlik düzeltmeleri v4#1–#20** — her biri `regression: v4#N` testiyle ([SECURITY §5](docs/SECURITY.md)): devir capture-önce-commit sagası, recent-auth ve işleme bağlı step-up, LLM bütçe/eşzamanlılık, anonim rate-limit anahtarı, güvenli compose varsayılanları, doğrulanmış e-posta zorunluluğu, iptal–capture yarışı, geç webhook mutabakatı, idempotency gövde bağı, SSRF, PoW'lu giriş sertleştirmesi, 3DS deneme sınırı, cursor sayfalama, minor-unit para, webhook sağlayıcı ayrımı, son admin koruması, HLL görüntülenme sayacı, ARI para doğrulaması, `.env.*` ignore.
 - **Para çekirdeği:** `BigInt` minor-unit (ADR 0019), çift girişli defter + günlük mutabakat + `GET /api/admin/reconciliation` (ADR 0020).
@@ -211,7 +317,7 @@ Access token `POST /api/auth/login` yanıtındaki `accessToken` alanından alın
 - **Hesap:** oturum listesi ve uzaktan çıkış (`/account/sessions`), yeni cihaz bildirimi (ADR 0024); koyu tema; WCAG 2.2 AA.
 - **Demo:** 7 yeni süreç içi v4 senaryosu, isteğe bağlı Inside Airbnb içe aktarımı.
 
-## Neyi kanıtlıyor?
+### Neyi kanıtlıyor?
 
 Aşağıdaki iddiaların her biri gerçek PostgreSQL + Redis (testcontainers) üzerinde koşan entegrasyon testleriyle korunur:
 
@@ -231,7 +337,16 @@ Aşağıdaki iddiaların her biri gerçek PostgreSQL + Redis (testcontainers) ü
 
 Yük ve kaos ölçümleri: [docs/perf/](docs/perf/). Arama kalitesi ([docs/perf/ltr.md](docs/perf/ltr.md)): 30 sorguluk altın kümede nDCG@10 v2 0.2377 → hibrit RRF 0.8733; sentetik tıklama verisinde LTR 0.7343 → 0.8130. **LTR verisi sentetiktir**, gerçek kullanıcı davranışını temsil etmez.
 
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
 ## Testler ve betikler
+
+| Paket                       | Sonuç (v4)                |
+| --------------------------- | ------------------------- |
+| Unit                        | 1028 test                 |
+| Integration                 | 342 test                  |
+| E2E (+ axe)                 | 35 test                   |
+| Kapsam (unit + integration) | satır %90,35 · dal %79,13 |
 
 ```bash
 npm run check          # lint + typecheck + prettier --check + unit testler (altyapısız)
@@ -264,6 +379,8 @@ npm run test:e2e       # Playwright + axe, çalışan demo yığınına karşı
 
 Entegrasyon testleri hiçbir zaman `DATABASE_URL`'e yazmaz; container'ın URL'ini kullanır. Testler ağa çıkmaz (`tests/setup.ts` global `fetch`'i engeller). CI: [.github/workflows/ci.yml](.github/workflows/ci.yml).
 
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
 ## Gözlemlenebilirlik
 
 ```bash
@@ -271,6 +388,43 @@ docker compose --profile observability up --build
 ```
 
 Prometheus <http://127.0.0.1:9090>, Grafana <http://127.0.0.1:3001> (dashboard: `docs/observability/grafana-dashboard.json`), Tempo (OTLP). `/api/metrics` `METRICS_TOKEN` ile korunur; worker metrikleri 9464 portundadır (ör. `saga_compensation_total`, `ledger_imbalance_total`, `takedown_sla_breach_total`). `/api/health` (liveness) ve `/api/ready` (DB + Redis) açıktır.
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+## Yol haritası
+
+Tamamlananlar (v4):
+
+- [x] Güvenlik düzeltmeleri v4#1–#20, her biri regresyon testiyle
+- [x] `BigInt` minor-unit para, çift girişli defter ve günlük mutabakat
+- [x] Grup sepeti (tümü-ya-hiç tutma) ve bölünmüş ödeme
+- [x] Escrow, payout, rezerv ve DAC7 dışa aktarımı
+- [x] Hasar depozitosu ve çözüm merkezi (talepler, chargeback senkronu)
+- [x] Güven & emniyet: KYC, mesaj dolandırıcılık taraması, parti riski paneli
+- [x] Sadakat ve cüzdan; promosyon motoru, kupon ve Omnibus referansı
+- [x] Esnek tarih fiyat takvimi ve aramada ±N gün önerisi
+- [x] AI yorum öne çıkanları (alıntı guard'lı) ve ilan karşılaştırma
+- [x] Görsel zekâ: kalite skoru, pHash duplikat, CLIP görsel arama
+- [x] Ajan ticareti v2: ACP SPT, UCP, AP2 mandate
+- [x] PWA + Web Push
+- [x] Uyum otomasyonu: 7565 SLA, DSA bildirim/karar/itiraz, şeffaflık raporu, UBL-TR, saklama işi
+- [x] Hesap güvenliği: recent-auth, işleme bağlı step-up, oturum listesi + uzaktan çıkış, yeni cihaz bildirimi
+
+Açık / ertelenenler (aşağıdaki [dürüstlük notu](#dürüstlük-notu-mock--demo-olanlar), [ARCHITECTURE §18](docs/ARCHITECTURE.md#18-bilinen-sınırlamalar) ve [COMPLIANCE §6](docs/COMPLIANCE.md#6-sınırlar) sınırlarından):
+
+- [ ] CI iş akışının ([ci.yml](.github/workflows/ci.yml)) v4 kalite kapılarına göre güncellenmesi (ertelendi)
+- [ ] Stripe test modu hesabıyla canlı smoke: SPT (ACP), Connect, off-session depozito, Stripe Identity
+- [ ] Stripe Connect onboarding linki ve payout webhook'ları
+- [ ] AP2 mandate'leri için ES256/EdDSA + JWKS (üçüncü taraf doğrulaması)
+- [ ] Sepet ve bölünmüş ödemede Stripe Payment Element, passkey step-up, cüzdan kredisi ve kupon
+- [ ] Parti riski için ev sahibi onay adımı (şu an yalnız uyarı + panel)
+- [ ] DSA: bildirenin kabul edilen itirazıyla kaldırılan ilana ev sahibinin yeniden itirazı
+- [ ] GİB/özel entegratör, Bakanlık ve AB kayıt servisi entegrasyonları; UBL-TR XSD doğrulaması
+- [ ] 6502 ön bilgilendirme formu ve cayma istisnası beyanı arayüzü
+- [ ] Erişilebilirlik: manuel ekran okuyucu testi ve erişilebilirlik beyanı sayfası
+- [ ] LTR modelinin gerçek (sentetik olmayan) tıklama verisiyle eğitilmesi
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## Dürüstlük notu: mock / demo olanlar
 
@@ -294,6 +448,8 @@ Aşağıdakiler gerçek bir dış servise **bağlı değildir** ya da yalnızca 
 
 Bilinen sınırlamaların tamamı: [docs/ARCHITECTURE.md §18](docs/ARCHITECTURE.md#18-bilinen-sınırlamalar), [docs/SECURITY.md](docs/SECURITY.md), [docs/COMPLIANCE.md](docs/COMPLIANCE.md).
 
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
 ## Dokümantasyon
 
 | Doküman                                      | İçerik                                                                                              |
@@ -310,21 +466,58 @@ Bilinen sınırlamaların tamamı: [docs/ARCHITECTURE.md §18](docs/ARCHITECTURE
 | [perf/](docs/perf/) · [chaos](load/chaos.md) | Performans, yük, kaos ve sıralama ölçümleri                                                         |
 | [CHANGELOG](CHANGELOG.md)                    | Sürüm notları                                                                                       |
 
+<details>
+<summary><strong>Mimari karar kayıtları (ADR 0001–0024)</strong></summary>
+
 ADR'ler: [0001 modüler monolit](docs/adr/0001-modular-monolith.md) · [0002 iki katmanlı kilit](docs/adr/0002-two-layer-locking.md) · [0003 transactional outbox](docs/adr/0003-transactional-outbox.md) · [0004 minor-unit para ve quote](docs/adr/0004-minor-unit-money-quote.md) · [0005 LLM sözleşmesi](docs/adr/0005-llm-contract.md) · [0006 availability partisyonu](docs/adr/0006-availability-partitioning.md) · [0007 devir claim linki ve escrow](docs/adr/0007-transfer-claim-link-escrow.md) · [0008 hash vs gerçek embedding](docs/adr/0008-hash-vs-real-embedding.md) · [0009 Next 16 yükseltmesi](docs/adr/0009-framework-upgrade-next16.md) · [0010 oda tipi envanteri](docs/adr/0010-room-type-inventory-counters.md) · [0011 tesis saat dilimi](docs/adr/0011-property-time-zone-temporal.md) · [0012 vergi motoru ve kalıcı FX](docs/adr/0012-tax-engine-and-persistent-fx.md) · [0013 ödeme sagası](docs/adr/0013-payment-saga.md) · [0014 hibrit arama ve LTR](docs/adr/0014-hybrid-search-ltr-experiments.md) · [0015 ajan rezervasyonu ve gelir paneli](docs/adr/0015-agentic-booking-channel-revenue.md) · [0016 legacy fiyat ve pazarlık](docs/adr/0016-legacy-pricing-and-negotiation.md) · [0017 mesajlaşma, moderasyon, step-up](docs/adr/0017-messaging-moderation-step-up.md) · [0018 i18n](docs/adr/0018-i18n-namespaces-and-formatting.md) · [0019 BigInt minor-unit para](docs/adr/0019-minor-unit-bigint-money.md) · [0020 çift girişli defter ve mutabakat](docs/adr/0020-double-entry-ledger.md) · [0021 escrow, payout, rezerv, depozito](docs/adr/0021-escrow-payout-deposit.md) · [0022 çok-modlu arama](docs/adr/0022-multimodal-search.md) · [0023 ajan ticareti ve mandate'ler](docs/adr/0023-agentic-commerce-mandates.md) · [0024 recent-auth ve step-up bağlama](docs/adr/0024-recent-auth-step-up-binding.md)
 
-## Yasal uyarı ve atıflar
+</details>
 
-**Portföy/demo projesidir; gerçek ödeme alınmaz, gerçek konaklama satılmaz; vergi, fatura, DAC7, KYC ve diğer regülasyon uygulamaları eğitim amaçlıdır, hukuki/mali tavsiye değildir.** Mock e-Arşiv faturalarda "DEMO — mali değeri yoktur" yazar. Uyum dokümanı hukuki görüş değildir. Demo yığını internete açık bir ortamda çalıştırılmamalıdır.
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+## Katkı
+
+Bu bir portföy projesidir; öneri ve hata bildirimleri memnuniyetle karşılanır.
+
+1. Repoyu fork'layın ve bir özellik dalı açın (`git checkout -b feat/kisa-aciklama`).
+2. Commit mesajlarında [Conventional Commits](https://www.conventionalcommits.org/) kullanın (ör. `feat(cart): …`, `fix(security): …`, `docs(readme): …`).
+3. Göndermeden önce `npm run check` (lint + typecheck + format:check + unit testler) yeşil olmalı; altyapıya dokunan değişikliklerde `npm run test:int` de koşun.
+4. Dala push edip bir pull request açın.
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+## Lisans
+
+[MIT](LICENSE) lisansı ile dağıtılır. Ayrıntı için [LICENSE](LICENSE) dosyasına bakın.
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+<a id="contact"></a>
+
+## İletişim
+
+- GitHub: [@tunadeniz1304](https://github.com/tunadeniz1304)
+- Proje: <https://github.com/tunadeniz1304/booking-platform>
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+## Teşekkürler ve atıflar
 
 - Harita/konum verisi: © OpenStreetMap katkıda bulunanları, [ODbL](https://opendatacommons.org/licenses/odbl/) lisansıyla.
 - Görseller: [Unsplash](https://unsplash.com) (Unsplash License); fotoğraflar sahiplerine aittir. Ağ yoksa seed, sharp ile üretilmiş sentetik sahneler kullanır.
 - Seed verisi (kullanıcılar, yorumlar, fiyat geçmişi) ve LTR tıklama günlüğü deterministik olarak üretilmiş kurgusal veridir.
+- Üzerine inşa edilen açık kaynak projeler: [Next.js](https://nextjs.org), [React](https://react.dev), [Prisma](https://www.prisma.io), [PostgreSQL](https://www.postgresql.org), [pgvector](https://github.com/pgvector/pgvector), [Redis](https://redis.io), [BullMQ](https://docs.bullmq.io), [Model Context Protocol](https://modelcontextprotocol.io), [next-intl](https://next-intl.dev), [OpenTelemetry](https://opentelemetry.io), [Prometheus](https://prometheus.io), [Vitest](https://vitest.dev), [Testcontainers](https://testcontainers.com), [fast-check](https://fast-check.dev), [Playwright](https://playwright.dev), [axe-core](https://github.com/dequelabs/axe-core), [k6](https://k6.io).
+- README yapısı: [Best-README-Template](https://github.com/othneildrew/Best-README-Template); rozetler: [Shields.io](https://shields.io).
 
 ### Veri atfı (Inside Airbnb)
 
 `npm run import:insideairbnb` ile isteğe bağlı içe aktarılan İstanbul ilanları [Inside Airbnb](https://insideairbnb.com/get-the-data/) verisinden uyarlanmıştır ve [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) lisansına tabidir: alt küme alınır, alanlar platform modeline eşlenir, ev sahibi adı/kimliği gibi kişisel alanlar içe alınmaz; her ilanın açıklamasında kaynak belirtilir. Veri repoya eklenmez (betik dosya/URL ile çalışır). `--osm` ile eklenen "yakındaki yerler" bilgisi © OpenStreetMap katkıda bulunanları, ODbL.
 
-Lisans: [MIT](LICENSE)
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+## Yasal uyarı
+
+**Portföy/demo projesidir; gerçek ödeme alınmaz, gerçek konaklama satılmaz; vergi, fatura, DAC7, KYC ve diğer regülasyon uygulamaları eğitim amaçlıdır, hukuki/mali tavsiye değildir.** Mock e-Arşiv faturalarda "DEMO — mali değeri yoktur" yazar. Uyum dokümanı hukuki görüş değildir. Demo yığını internete açık bir ortamda çalıştırılmamalıdır.
 
 ---
 
@@ -335,3 +528,5 @@ Lisans: [MIT](LICENSE)
 Agents book through MCP, ACP (Stripe Shared Payment Token path) or UCP endpoints that run the same saga as the web checkout, and every agent payment needs a user-signed, time- and amount-bound (optionally listing-bound), single-use AP2 intent mandate. Sensitive account actions require recent authentication; step-up tokens are bound to booking + amount + nonce. The LLM only explains and summarises (quote-guarded review highlights, listing comparison); without a key it runs a deterministic demo mode. Still mock by default: payments (`MockPsp`), payouts, KYC (Stripe Identity mock), e-Arşiv integrator, license/STR registries; Stripe SPT/Connect/deposit paths are tested only against a network-less fake; CLIP visual search is optional.
 
 Run it: `docker compose -f docker-compose.yml -f docker-compose.demo.yml up`, then open <http://localhost:3000>. Demo accounts (`guest@`, `host@`, `admin@booking.test`, password `Password123!`) exist **only with the demo override**. No real payments are taken and no real stays are sold; tax and regulatory features are for education only. Optional Inside Airbnb data is CC BY 4.0.
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>

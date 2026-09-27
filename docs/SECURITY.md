@@ -150,9 +150,14 @@ reddedilir; tüm yollar `src/lib/compliance/listing.ts` içindeki `LISTABLE_PROP
 
 ## 7. Bilinen sınırlamalar (bilinçli ödünleşimler)
 
-- Next.js 16'da `request.ip` yoktur; `TRUSTED_PROXY_HOPS=0` iken istemci IP'si bilinemediğinde
-  anonimler paylaşılan `anon` kovasına düşer (UA yalnız ikincil kova). Gerçek istemci IP'si
-  için ters vekil + `TRUSTED_PROXY_HOPS` önerilir.
+- Next.js 16'da `request.ip` yoktur; istemci IP'si yalnız güvenilir ters vekilden gelir. v5#6
+  ile bu artık ödünleşim değil, zorunlu yapılandırmadır (ADR 0034): compose'da uygulama yalnız
+  iç ağda, önünde Caddy (`docker/Caddyfile`) ve `TRUSTED_PROXY_HOPS=1`. Üretimde vekilsiz kurulum
+  (`TRUSTED_PROXY_HOPS=0`, `TRUST_REAL_IP_HEADER=false`) `ALLOW_DIRECT_EXPOSURE=true` ile açıkça
+  kabul edilmedikçe `/api/ready` 503 `DIRECT_EXPOSURE_UNSAFE` + başlangıç ERROR logu verir.
+  Bilinçli doğrudan kurulumda anonimler yine paylaşılan `anon` kovasındadır, ancak giriş/kayıt/
+  şifre sıfırlamada kova tükenince 429 yerine e-posta anahtarlı ikincil kova + PoW'a düşülür
+  (hizmet reddi yerine yavaşlatma).
 - Outbox yükünde e-posta token'ının yalnız hash'i ve şifreli (AES-256-GCM) link bulunur; dev
   mailbox'ta link düz metindir ve yalnız sahibine görünür. Gerçek SMTP ile mailbox kapatılır
   (`DEMO_MODE=false`).

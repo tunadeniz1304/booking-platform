@@ -235,6 +235,8 @@ describe("v2-P0-5 LLM istemcisi: dolu kuyruk / zaman aşımı → fallback 'conc
 
     release();
     await busy;
+    // Yuva, işin sonucu çözüldükten sonra (`finally`) bırakılır.
+    await new Promise((r) => setTimeout(r, 0));
     expect(limiter.activeCount).toBe(0);
   });
 });

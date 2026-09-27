@@ -388,6 +388,11 @@ describeInt("P1-1 grup sepeti: tümü-ya-hiç tutma + tek ödeme", () => {
     expect(aAfter.payment?.status).toBe("REFUNDED");
     expect(aAfter.payment?.refundedAmountMinor).toBe(a.cp.amountMinor);
     expect(await usage(x.promoId)).toBe(1);
+    expect(
+      await prisma.promotionRedemption.count({
+        where: { promotionId: x.promoId, bookingId: { in: aAfter.bookings.map((b) => b.id) } },
+      })
+    ).toBe(0);
 
     // 2) Limit müsait → A onaylanır, kullanım yeniden sayılır ve A'ya bağlanır.
     const y = await limitedStay("cart-late-promo-y");
@@ -405,7 +410,14 @@ describeInt("P1-1 grup sepeti: tümü-ya-hiç tutma + tek ödeme", () => {
       where: { promotionId: y.promoId, bookingId: { in: cAfter.bookings.map((b) => b.id) } },
     });
     expect(rows).toHaveLength(1);
-    expect(rows[0].amountMinor).toBeGreaterThan(0n);
+    // Tutar, kalemin tutma anındaki indirim satırıyla aynı (kırılım anlık görüntüsü).
+    const owner = cAfter.bookings.find((b) => b.id === rows[0].bookingId)!;
+    const breakdown = owner.priceBreakdown as {
+      discounts?: { promotionId: string; amount: number }[];
+    };
+    const discount = breakdown.discounts?.find((d) => d.promotionId === y.promoId);
+    expect(discount?.amount).toBeGreaterThan(0);
+    expect(rows[0].amountMinor).toBe(BigInt(discount!.amount));
   });
 
   it("sahiplik: başkasının sepeti 404", async () => {

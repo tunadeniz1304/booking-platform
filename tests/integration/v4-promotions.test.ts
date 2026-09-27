@@ -447,6 +447,12 @@ describeInt("P1-8 promosyon motoru + Omnibus (integration)", () => {
       where: { roomTypeId: roomA, date: utcDay(44) },
     });
     expect(day).toMatchObject({ held: 0, sold: 0 });
+    // Geri alınan yeniden talep A'ya kullanım satırı bırakmaz.
+    expect(
+      await prisma.promotionRedemption.count({
+        where: { bookingId: a.bookingId, promotionId: promoId },
+      })
+    ).toBe(0);
     await prisma.promotion.update({ where: { id: promoId }, data: { active: false } });
   });
 
@@ -484,7 +490,14 @@ describeInt("P1-8 promosyon motoru + Omnibus (integration)", () => {
     );
     const rows = await redemption();
     expect(rows).toHaveLength(1);
-    expect(rows[0].amountMinor).toBeGreaterThan(0n);
+    // Tutar, tutma anındaki indirim satırıyla aynı (kırılım anlık görüntüsü).
+    const breakdown = after.priceBreakdown as {
+      discounts?: { promotionId: string; amount: number }[];
+    };
+    const discount = breakdown.discounts?.find((d) => d.promotionId === promoId);
+    expect(discount?.amount).toBeGreaterThan(0);
+    expect(rows[0].amountMinor).toBe(BigInt(discount!.amount));
+    expect(rows[0].currency).toBe(after.currency);
     await prisma.promotion.update({ where: { id: promoId }, data: { active: false } });
   });
 

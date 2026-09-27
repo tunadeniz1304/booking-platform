@@ -441,4 +441,37 @@ describeInt("regression: v4#1 devir capture hatası (integration)", () => {
       buyer
     );
   });
+
+  it("regression: aynı Idempotency-Key ile reddedilen karttan sonra farklı kart → PSP'ye yeni anahtar, COMPLETED", async () => {
+    const psp = new StripeLikePsp();
+    setPaymentProviderForTests(psp);
+    const bookingId = await confirmedBooking();
+    const listed = await listBookingForTransfer(bookingId, seller, 150_000);
+    const idempotencyKey = "client-key-1";
+
+    const declined = () =>
+      claimTransfer({
+        token: listed.claimToken,
+        buyerId: buyer,
+        cardToken: "tok_mock_decline_0002",
+        idempotencyKey,
+      });
+    await expect(declined()).rejects.toMatchObject({ status: 402, code: "PAYMENT_DECLINED" });
+    // Aynı isteğin tekrarı (aynı anahtar + aynı kart) aynı PSP anahtarını kullanır.
+    await expect(declined()).rejects.toMatchObject({ status: 402, code: "PAYMENT_DECLINED" });
+    expect(new Set(psp.keys).size).toBe(1);
+
+    const res = await claimTransfer({
+      token: listed.claimToken,
+      buyerId: buyer,
+      cardToken: "tok_mock_ok_4242",
+      idempotencyKey,
+    });
+    expect(res.status).toBe("COMPLETED");
+    expect(new Set(psp.keys).size).toBe(2);
+
+    const transfer = await prisma.bookingTransfer.findUniqueOrThrow({ where: { id: listed.id } });
+    expect(transfer.claimedById).toBe(buyer);
+    expect(psp.captures).toEqual([transfer.buyerPaymentRef]);
+  });
 });

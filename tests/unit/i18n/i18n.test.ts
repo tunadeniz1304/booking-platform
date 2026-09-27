@@ -164,3 +164,12 @@ describe("v2-P1-3 Accept-Language dil müzakeresi", () => {
     expect(resolveRequestLocale("", null)).toBe("tr");
   });
 });
+
+describe("regression: v5#15 ilk ziyarette Accept-Language müzakeresi", () => {
+  it("çerezsiz `en-GB;q=0.9` → en; geçerli çerez her zaman kazanır", () => {
+    expect(resolveRequestLocale(undefined, "en-GB;q=0.9")).toBe("en");
+    expect(resolveRequestLocale(null, "en-GB;q=0.9, tr;q=0.5")).toBe("en");
+    expect(resolveRequestLocale("tr", "en-GB;q=0.9")).toBe("tr");
+    expect(resolveRequestLocale("en", "tr-TR")).toBe("en");
+  });
+});

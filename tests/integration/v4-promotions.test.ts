@@ -447,6 +447,12 @@ describeInt("P1-8 promosyon motoru + Omnibus (integration)", () => {
       where: { roomTypeId: roomA, date: utcDay(44) },
     });
     expect(day).toMatchObject({ held: 0, sold: 0 });
+    // A'nın bırakılan kullanımı kayıtlı kalır (promosyon/tutar kaybolmaz) ama sayılmaz.
+    const aRows = await prisma.promotionRedemption.findMany({
+      where: { bookingId: a.bookingId, promotionId: promoId },
+    });
+    expect(aRows).toHaveLength(1);
+    expect(aRows[0].releasedAt).not.toBeNull();
     await prisma.promotion.update({ where: { id: promoId }, data: { active: false } });
   });
 
@@ -485,6 +491,7 @@ describeInt("P1-8 promosyon motoru + Omnibus (integration)", () => {
     const rows = await redemption();
     expect(rows).toHaveLength(1);
     expect(rows[0].amountMinor).toBeGreaterThan(0n);
+    expect(rows[0].releasedAt).toBeNull();
     await prisma.promotion.update({ where: { id: promoId }, data: { active: false } });
   });
 

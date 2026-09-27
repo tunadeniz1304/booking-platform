@@ -21,6 +21,7 @@ import { invalidatePropertySearchCache } from "@/lib/search";
 import { money, assertCurrency, type Money, minorToDb, minorFromDb } from "@/lib/money/money";
 import { clockOf, fromDate } from "@/lib/time/nights";
 import { commitHeld, holdUnits, InventoryUnavailableError } from "@/lib/booking/inventory";
+import { reclaimPromotionRedemptions } from "@/lib/pricing/promotion-redemption";
 import { logger, errorFields } from "@/lib/observability/logger";
 import { counter } from "@/lib/observability/metrics";
 import { audit } from "@/lib/admin/audit";
@@ -1249,6 +1250,9 @@ async function reconcileLateSuccess(
           checkOut: booking.checkOut,
           units: booking.units,
         });
+        // v2-P0-1: süre dolumunda iade edilen limitli promosyon kullanımı yeniden sayılır
+        // (limit bu arada dolduysa 409 → işlem geri alınır, iade).
+        await reclaimPromotionRedemptions(tx, booking.id);
       } else if (booking.status !== "HELD") {
         return false;
       }

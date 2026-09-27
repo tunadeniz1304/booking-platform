@@ -388,6 +388,11 @@ describeInt("P1-1 grup sepeti: tümü-ya-hiç tutma + tek ödeme", () => {
     expect(aAfter.payment?.status).toBe("REFUNDED");
     expect(aAfter.payment?.refundedAmountMinor).toBe(a.cp.amountMinor);
     expect(await usage(x.promoId)).toBe(1);
+    const aRows = await prisma.promotionRedemption.findMany({
+      where: { promotionId: x.promoId, bookingId: { in: aAfter.bookings.map((b) => b.id) } },
+    });
+    expect(aRows).toHaveLength(1);
+    expect(aRows[0].releasedAt).not.toBeNull();
 
     // 2) Limit müsait → A onaylanır, kullanım yeniden sayılır ve A'ya bağlanır.
     const y = await limitedStay("cart-late-promo-y");
@@ -406,6 +411,7 @@ describeInt("P1-1 grup sepeti: tümü-ya-hiç tutma + tek ödeme", () => {
     });
     expect(rows).toHaveLength(1);
     expect(rows[0].amountMinor).toBeGreaterThan(0n);
+    expect(rows[0].releasedAt).toBeNull();
   });
 
   it("sahiplik: başkasının sepeti 404", async () => {

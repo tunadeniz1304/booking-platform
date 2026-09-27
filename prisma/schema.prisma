@@ -1439,7 +1439,8 @@ model Promotion {
 }
 
 /// P1-8: limitli promosyonun bir rezervasyonda kullanımı. Tutma düşerse (süre dolumu/ödeme
-/// hatası/onay öncesi iptal) satır silinir ve `usageCount` geri alınır.
+/// hatası/onay öncesi iptal) `usageCount` geri alınır ve satır `releasedAt` ile işaretlenir
+/// (v2-P0-1: geç ödeme başarısı aynı promosyon/tutarı koşullu olarak yeniden talep eder).
 model PromotionRedemption {
   id          String    @id @default(cuid())
   promotionId String
@@ -1449,6 +1450,8 @@ model PromotionRedemption {
   amountMinor BigInt
   currency    String
   createdAt   DateTime  @default(now())
+  /// null → kullanım sayılıyor; dolu → tutma düştü, kullanım iade edildi.
+  releasedAt  DateTime?
 
   @@unique([promotionId, bookingId])
   @@index([bookingId])

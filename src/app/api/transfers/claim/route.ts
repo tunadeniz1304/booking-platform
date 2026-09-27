@@ -14,7 +14,11 @@ export async function POST(req: NextRequest) {
   try {
     const { userId } = await requireVerifiedEmail(req);
     const { token, cardToken } = claimSchema.parse(await req.json());
-    return NextResponse.json(await claimTransfer({ token, buyerId: userId, cardToken }));
+    // Opsiyonel: aynı isteğin tekrarı aynı provizyonu kullanır; yoksa deneme başına yeni anahtar.
+    const idempotencyKey = req.headers.get("idempotency-key")?.slice(0, 128) || undefined;
+    return NextResponse.json(
+      await claimTransfer({ token, buyerId: userId, cardToken, idempotencyKey })
+    );
   } catch (error) {
     return toErrorResponse(error, "transfers.claim");
   }

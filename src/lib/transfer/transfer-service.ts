@@ -1,6 +1,8 @@
-import { createHash, createHmac, randomBytes, timingSafeEqual } from "crypto";
+import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from "crypto";
 import { Prisma, BookingStatus, TransferStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { redis } from "@/lib/redis";
+import { createRedlock, LockError } from "@/lib/distributed-lock/redlock";
 import { invalidateBookingCache } from "@/lib/booking/booking-cache";
 import { HttpError } from "@/lib/http/errors";
 import { getConfig } from "@/lib/config/app-config";
@@ -228,6 +230,8 @@ interface ClaimContext {
   transfer: { id: string; bookingId: string; sellerId: string };
   buyerId: string;
   cardToken: string;
+  /** Denemeye özgü authorize idempotency anahtarı (eşzamanlı/yeniden denemeler paylaşmaz). */
+  authorizeKey: string;
   ask: Money;
   now: Date;
   providerRef?: string;
@@ -284,7 +288,7 @@ function claimSteps(provider: PaymentProvider): SagaStep<ClaimContext, string>[]
         const auth = await provider.authorize({
           amount: ctx.ask,
           cardToken: ctx.cardToken,
-          idempotencyKey: `transfer:${ctx.transfer.id}:${ctx.buyerId}`,
+          idempotencyKey: ctx.authorizeKey,
         });
         if (auth.status !== "authorized") {
           throw new HttpError(402, "PAYMENT_DECLINED", "Ödeme onaylanmadı; devir gerçekleşmedi");
@@ -445,10 +449,35 @@ function claimSteps(provider: PaymentProvider): SagaStep<ClaimContext, string>[]
   ];
 }
 
+const redlock = createRedlock(redis);
+
+/**
+ * Devir başına talep kilidi: aynı ilana gelen talepler (aynı alıcının çift gönderimi dahil)
+ * sıralanır; kilidi sonra alan istek durumu yeniden okur ve 409 alır — hiçbir zaman PSP'ye
+ * gitmez, dolayısıyla başkasının provizyonuna dokunamaz. Bütçe aşılırsa 409 CLAIM_IN_PROGRESS.
+ */
+async function withClaimLock<T>(transferId: string, fn: () => Promise<T>): Promise<T> {
+  try {
+    return await redlock.withLock(`transfer:claim:${transferId}`, fn, {
+      waitMs: getConfig().LOCK_WAIT_BUDGET_MS,
+    });
+  } catch (error) {
+    if (error instanceof LockError) {
+      throw new TransferError("Bu devir için talep işleniyor", 409, "TRANSFER_CLAIM_IN_PROGRESS");
+    }
+    throw error;
+  }
+}
+
 export async function claimTransfer(input: {
   token: string;
   buyerId: string;
   cardToken: string;
+  /**
+   * İsteğin Idempotency-Key'i (varsa): aynı isteğin tekrarı aynı provizyonu kullanır.
+   * Yoksa deneme başına rastgele — reddedilen karttan sonra başka kartla yeniden deneme mümkün.
+   */
+  idempotencyKey?: string;
   now?: Date;
 }): Promise<ClaimResult> {
   assertEnabled();
@@ -457,6 +486,15 @@ export async function claimTransfer(input: {
   if (!payload)
     throw new TransferError("Devir linki geçersiz veya süresi dolmuş", 403, "INVALID_TOKEN");
 
+  return withClaimLock(payload.transferId, () => claimLocked(input, payload, now));
+}
+
+/** Kilit altında: ilan durumu burada (yeniden) okunur. */
+async function claimLocked(
+  input: { token: string; buyerId: string; cardToken: string; idempotencyKey?: string },
+  payload: TokenPayload,
+  now: Date
+): Promise<ClaimResult> {
   const transfer = await prisma.bookingTransfer.findUnique({ where: { id: payload.transferId } });
   if (
     !transfer ||
@@ -474,10 +512,12 @@ export async function claimTransfer(input: {
 
   const currency = assertCurrency(transfer.currency);
   const ask = money(minorFromDb(transfer.askPriceMinor), currency);
+  const attempt = input.idempotencyKey ?? randomUUID();
   const ctx: ClaimContext = {
     transfer: { id: transfer.id, bookingId: transfer.bookingId, sellerId: transfer.sellerId },
     buyerId: input.buyerId,
     cardToken: input.cardToken,
+    authorizeKey: `transfer:${transfer.id}:${input.buyerId}:${attempt}`,
     ask,
     now,
     reserved: false,

@@ -4,6 +4,10 @@ Bu dosyadaki tüm önemli değişiklikler burada belgelenir. Biçim [Keep a Chan
 
 ## [Unreleased]
 
+### Dependencies
+
+- `zod-to-json-schema` (ISC; zaten `@modelcontextprotocol/sdk` üzerinden kuruluydu) doğrudan bağımlılık oldu: `/api/openapi.json` gövde/sorgu şemaları route'ların zod şemalarından üretilir (v5#16).
+
 ## [4.0.0] - 2026-09-27
 
 v3.0.0'dan sonra 181 commit (79 feat · 34 fix · 31 test · 30 docs · 5 chore · 2 refactor), 23 yeni migration. v3'ün bilinen 20 hatası kapatıldı ve her biri `regression: v4#N` etiketli testle korunuyor (28 test dosyası, #1–#20 hepsi). Para minor-unit `BigInt`'e taşındı, çift girişli defter + günlük mutabakat eklendi; grup sepeti, bölünmüş ödeme, escrow/payout, hasar depozitosu, cüzdan, promosyon, KYC, ajan mandate'leri, PWA ve uyum otomasyonu geldi. Ayrıntı, ölçümler ve dürüstlük notu: `docs/FINAL_REPORT.md`.

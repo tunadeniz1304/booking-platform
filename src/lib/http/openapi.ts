@@ -151,7 +151,15 @@ export function buildOpenApiDocument() {
         "Tutarlar minor-unit tamsayıdır. Hatalar ortak zarfla döner: `{ error, code, details? }`.",
     },
     servers: [{ url: "/" }],
-    tags: [{ name: "search" }, { name: "pricing" }, { name: "bookings" }, { name: "payments" }],
+    tags: [
+      { name: "search" },
+      { name: "pricing" },
+      { name: "bookings" },
+      { name: "payments" },
+      { name: "transfers" },
+      { name: "auth" },
+      { name: "llm" },
+    ],
     paths: {
       "/api/search": {
         get: {
@@ -324,6 +332,101 @@ export function buildOpenApiDocument() {
             ]),
             "422": errorResponse("Kart token'ı reddedildi.", ["INVALID_CARD_TOKEN"]),
             "502": ref("responses", "PaymentProviderError"),
+          },
+        },
+      },
+      // v5#16: docs/api-contract.md'nin atladığı uçlar (gövde şemaları route'lardaki zod ile aynı).
+      "/api/search/smart": {
+        post: {
+          operationId: "smartSearch",
+          tags: ["search"],
+          summary:
+            "Doğal dil araması: metin → yapılandırılmış filtre + sonuç (oturumsuz, AI kovası)",
+          requestBody: {
+            required: true,
+            content: jsonContent(
+              {
+                type: "object",
+                required: ["text"],
+                properties: { text: { type: "string", minLength: 3, maxLength: 300 } },
+              },
+              { text: "İstanbul'da deniz manzaralı 2 kişilik otel" }
+            ),
+          },
+          responses: {
+            "200": {
+              description: "Çözümlenen filtre ve sonuçlar",
+              content: jsonContent({ type: "object" }),
+            },
+            ...common,
+          },
+        },
+      },
+      "/api/transfers/claim": {
+        post: {
+          operationId: "claimTransfer",
+          tags: ["transfers"],
+          summary: "Devredilen rezervasyonu imzalı bağlantı token'ı ve kartla devral",
+          security: secured,
+          requestBody: {
+            required: true,
+            content: jsonContent({
+              type: "object",
+              required: ["token", "cardToken"],
+              properties: {
+                token: { type: "string", minLength: 20, maxLength: 1000 },
+                cardToken: { type: "string", minLength: 8, maxLength: 200 },
+              },
+            }),
+          },
+          responses: {
+            "200": { description: "Devir tamamlandı", content: jsonContent({ type: "object" }) },
+            ...authed,
+            "404": ref("responses", "NotFound"),
+            "409": errorResponse("Devir bu durumda alınamaz.", ["INVALID_STATE"]),
+          },
+        },
+      },
+      "/api/auth/refresh": {
+        post: {
+          operationId: "refreshSession",
+          tags: ["auth"],
+          summary: "Yenileme token'ı (httpOnly çerez ya da gövde) ile erişim token'ını döndür",
+          requestBody: {
+            required: false,
+            content: jsonContent({
+              type: "object",
+              properties: { refreshToken: { type: "string", minLength: 10, maxLength: 200 } },
+            }),
+          },
+          responses: {
+            "200": { description: "Yeni erişim token'ı", content: jsonContent({ type: "object" }) },
+            ...common,
+            "401": ref("responses", "Unauthorized"),
+          },
+        },
+      },
+      "/api/auth/logout": {
+        post: {
+          operationId: "logout",
+          tags: ["auth"],
+          summary:
+            "Oturumu kapat: erişim token'ı denylist'e, yenileme ailesi iptal, çerezler silinir",
+          responses: {
+            "200": { description: "Çıkış yapıldı", content: jsonContent({ type: "object" }) },
+            ...common,
+          },
+        },
+      },
+      "/api/llm/status": {
+        get: {
+          operationId: "llmStatus",
+          tags: ["llm"],
+          summary: "LLM çalışma modu (canlı/demo; anahtar değeri dönmez; oturum gerekir)",
+          security: secured,
+          responses: {
+            "200": { description: "LLM durumu", content: jsonContent({ type: "object" }) },
+            "401": ref("responses", "Unauthorized"),
           },
         },
       },

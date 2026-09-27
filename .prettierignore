@@ -21,3 +21,5 @@ data
 *.min.js
 tsconfig.json
 goal-prompt.md
+.loop
+booking-v5.md

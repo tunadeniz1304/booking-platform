@@ -73,6 +73,8 @@ const schema = z.object({
   INVENTORY_RETENTION_DAYS: int(400, 30, 3650),
   // Veri yaşam döngüsü (P0-5): `data-retention` bakım işi; yasal saklamalı kayıtlar (fatura,
   // jurnal, DSA/KYC/talep denetim izleri) HİÇ silinmez — docs/COMPLIANCE.md "Saklama politikası".
+  /** KVKK dışa aktarımında çok satırlı ilişki başına en fazla satır (v5#8; aşımda truncated). */
+  PRIVACY_EXPORT_MAX_ROWS: int(5000, 1, 100_000),
   /** Denetim kaydı (yasal saklamaya tabi eylemler hariç: bkz. LEGAL_HOLD_AUDIT_PREFIXES). */
   RETENTION_AUDIT_LOG_DAYS: int(730, 180, 3650),
   /** Webhook tekilleştirme kaydı; sağlayıcı yeniden deneme penceresinden (≤30 gün) uzun olmalı. */

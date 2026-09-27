@@ -5,12 +5,16 @@ import { toErrorResponse } from "@/lib/http/errors";
 import { deleteAccount, exportUserData } from "@/lib/privacy/privacy-service";
 import { revokeSession } from "@/lib/auth/session";
 import { REFRESH_COOKIE, clearSessionCookies } from "@/lib/auth/cookies";
+import { readConsent } from "@/lib/privacy/consent";
 
 /** "Verilerimi indir" (KVKK md. 11) — JSON ek dosya. */
 export async function GET(req: NextRequest) {
   try {
     const { userId } = await requireAuth(req);
-    return new NextResponse(JSON.stringify(await exportUserData(userId), null, 2), {
+    const data = await exportUserData(userId, {
+      cookieConsent: readConsent(req.headers.get("cookie") ?? ""),
+    });
+    return new NextResponse(JSON.stringify(data, null, 2), {
       headers: {
         "content-type": "application/json",
         "content-disposition": "attachment; filename=verilerim.json",

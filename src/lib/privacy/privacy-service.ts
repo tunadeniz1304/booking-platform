@@ -7,6 +7,8 @@ import { cancelAndRefund } from "@/lib/payment/payment-service";
 import { cancelTransferListing } from "@/lib/transfer/transfer-service";
 import { listMandates } from "@/lib/agentic/mandate";
 import { logger, errorFields } from "@/lib/observability/logger";
+import { getConfig } from "@/lib/config/app-config";
+import type { ConsentValue } from "@/lib/privacy/consent";
 
 /**
  * KVKK/GDPR self-servis (P2-5).
@@ -14,8 +16,15 @@ import { logger, errorFields } from "@/lib/observability/logger";
  * - Silme: hesap anonimleştirilir; rezervasyon/ödeme kayıtları yasal saklama için
  *   korunur ama kişisel alanlar pseudonimleştirilir, yorum metinleri silinir.
  */
-export async function exportUserData(userId: string) {
-  const user = await prisma.user.findUniqueOrThrow({
+export interface ExportOptions {
+  /** İstek çerezinden okunan çerez onayı (rıza sunucuda değil yalnız çerezde tutulur). */
+  cookieConsent?: ConsentValue | null;
+}
+
+export async function exportUserData(userId: string, opts: ExportOptions = {}) {
+  // v5#8: çok satırlı ilişkiler sınırlı (bellek/yanıt boyutu); aşımda `truncated` işaretlenir.
+  const maxRows = getConfig().PRIVACY_EXPORT_MAX_ROWS;
+  const raw = await prisma.user.findUniqueOrThrow({
     where: { id: userId },
     select: {
       id: true,
@@ -29,6 +38,8 @@ export async function exportUserData(userId: string) {
       createdAt: true,
       updatedAt: true,
       bookings: {
+        orderBy: { createdAt: "desc" },
+        take: maxRows + 1,
         select: {
           id: true,
           propertyId: true,
@@ -46,6 +57,8 @@ export async function exportUserData(userId: string) {
       },
       favorites: { select: { propertyId: true, createdAt: true } },
       payments: {
+        orderBy: { createdAt: "desc" },
+        take: maxRows + 1,
         select: {
           id: true,
           bookingId: true,
@@ -57,15 +70,29 @@ export async function exportUserData(userId: string) {
       },
     },
   });
+  const user = {
+    ...raw,
+    bookings: raw.bookings.slice(0, maxRows),
+    payments: raw.payments.slice(0, maxRows),
+  };
   // Bildirim gövdesi tek kullanımlık bağlantı/token içerebilir → yalnız konu + tarih.
-  const notifications = await prisma.notification.findMany({
+  const notificationRows = await prisma.notification.findMany({
     where: { userId },
+    orderBy: { createdAt: "desc" },
+    take: maxRows + 1,
     select: { subject: true, createdAt: true },
   });
   return {
     exportedAt: new Date().toISOString(),
+    truncated: {
+      bookings: raw.bookings.length > maxRows,
+      payments: raw.payments.length > maxRows,
+      notifications: notificationRows.length > maxRows,
+    },
     user,
-    notifications,
+    notifications: notificationRows.slice(0, maxRows),
+    // Rıza kaydı sunucuda tutulmaz (P2-5: yalnız `cookie_consent` çerezi); istekteki değer.
+    consents: { cookie: opts.cookieConsent ?? null, storage: "cookie" as const },
     messages: await exportMessages(userId),
     agentMandates: await listMandates(userId, new Date(), null),
     agentMandateEvents: await prisma.auditLog.findMany({
@@ -208,6 +235,26 @@ export async function exportUserData(userId: string) {
     pushSubscriptions: await prisma.pushSubscription.findMany({
       where: { userId },
       select: { id: true, locale: true, userAgent: true, createdAt: true, lastSuccessAt: true },
+    }),
+    // Bölünmüş ödeme payları: davet nonce'u ve PSP referansı dışarıda.
+    paymentShares: await prisma.paymentShare.findMany({
+      where: { payerUserId: userId },
+      orderBy: { createdAt: "desc" },
+      take: maxRows,
+      select: {
+        id: true,
+        cartId: true,
+        isOrganizer: true,
+        isFallback: true,
+        amountMinor: true,
+        currency: true,
+        status: true,
+        refundedAmountMinor: true,
+        authorizedAt: true,
+        capturedAt: true,
+        refundedAt: true,
+        createdAt: true,
+      },
     }),
     identityVerifications: await prisma.identityVerification.findMany({
       where: { userId },

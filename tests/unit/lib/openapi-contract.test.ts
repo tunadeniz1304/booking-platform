@@ -146,6 +146,21 @@ describe("v2 P1-2: OpenAPI 3.1 sözleşmesi", () => {
     expect(syncProblems(doc.paths)).toEqual([]);
   });
 
+  it("regression: v5#16 api-contract'ın atladığı uçlar da belgelenir ve senkrondur", () => {
+    const expected: Array<[string, string]> = [
+      ["/api/transfers/claim", "post"],
+      ["/api/search/smart", "post"],
+      ["/api/auth/refresh", "post"],
+      ["/api/auth/logout", "post"],
+      ["/api/llm/status", "get"],
+    ];
+    const paths = doc.paths as Record<string, Record<string, unknown>>;
+    for (const [path, method] of expected) {
+      expect(paths[path]?.[method], `${method.toUpperCase()} ${path}`).toBeDefined();
+    }
+    expect(syncProblems(doc.paths)).toEqual([]);
+  });
+
   it("senkron denetimi eksik route dosyasını ve metodu yakalar", () => {
     expect(syncProblems({ "/api/bookings/{id}/refund-now": { post: {} } })).toHaveLength(1);
     expect(syncProblems({ "/api/quote": { post: {} } })).toEqual([

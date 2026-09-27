@@ -4,6 +4,8 @@ import { describeInt, iso, utcDay } from "./helpers";
 import { bulkUpdateAvailability, updateProperty } from "@/lib/host/host-service";
 import { applyAriMessage, exportRoomCalendar, importCalendar } from "@/lib/channel/channel";
 import { deleteAccount, exportUserData } from "@/lib/privacy/privacy-service";
+import { issueMandate, revokeMandate } from "@/lib/agentic/mandate";
+import { hashPassword } from "@/lib/auth";
 import type { AccessClaims } from "@/lib/auth";
 
 const claims = (userId: string, role: AccessClaims["role"]): AccessClaims => ({
@@ -158,6 +160,247 @@ describeInt("F7 host / kanal / KVKK (integration)", () => {
     const anon = await prisma.user.findUniqueOrThrow({ where: { id: host.id } });
     expect(anon.email).toMatch(/@anon\.invalid$/);
     expect(anon.firstName).toBe("Silinmiş");
+    await prisma.$disconnect();
+  });
+
+  it("KVKK dışa aktarımı: mesaj, mandate, talep, cüzdan, devir, passkey, oturum; gizli alan ve sızıntı yok", async () => {
+    const prisma = new PrismaClient();
+    const stamp = Date.now().toString(36);
+    const guestHash = await hashPassword(`parola-${stamp}`);
+    const mkUser = (tag: string, role: "USER" | "HOST", passwordHash = "x") =>
+      prisma.user.create({
+        data: {
+          email: `${tag}-${stamp}@t.test`,
+          passwordHash,
+          firstName: `${tag}Ad`,
+          lastName: `${tag}Soyad${stamp}`,
+          role,
+        },
+      });
+    const guest = await mkUser("misafir", "USER", guestHash);
+    const host = await mkUser("evsahibi", "HOST");
+    const stranger = await mkUser("yabanci", "USER");
+    const loc = await prisma.location.create({ data: { city: `Kvkk-${stamp}`, country: "TEST" } });
+    const property = await prisma.property.create({
+      data: {
+        licenseStatus: "VERIFIED",
+        hostId: host.id,
+        title: "Kvkk",
+        description: "kvkk test",
+        propertyType: "HOTEL",
+        locationId: loc.id,
+        basePriceMinor: 50000n,
+      },
+    });
+    const room = await prisma.roomType.create({
+      data: { propertyId: property.id, name: "K", maxOccupancy: 2, bedType: "Ç" },
+    });
+    const mkBooking = (userId: string) =>
+      prisma.booking.create({
+        data: {
+          userId,
+          propertyId: property.id,
+          roomId: room.id,
+          checkIn: utcDay(30),
+          checkOut: utcDay(32),
+          guestCount: 2,
+          totalPriceMinor: 100000n,
+          status: "CONFIRMED",
+        },
+      });
+    const booking = await mkBooking(guest.id);
+    const strangerBooking = await mkBooking(stranger.id);
+    const payment = await prisma.payment.create({
+      data: {
+        bookingId: booking.id,
+        userId: guest.id,
+        amountMinor: 100000n,
+        provider: "mock",
+        providerRef: `pi_mock_${stamp}`,
+        status: "PAID",
+      },
+    });
+    const thread = await prisma.messageThread.create({ data: { bookingId: booking.id } });
+    const guestText = `misafir-mesaji-${stamp}`;
+    const hostText = `evsahibi-yaniti-${stamp}`;
+    await prisma.message.create({
+      data: { threadId: thread.id, senderId: guest.id, senderRole: "GUEST", body: guestText },
+    });
+    await prisma.message.create({
+      data: { threadId: thread.id, senderId: host.id, senderRole: "HOST", body: hostText },
+    });
+    const strangerThread = await prisma.messageThread.create({
+      data: { bookingId: strangerBooking.id },
+    });
+    const strangerText = `yabanci-mesaji-${stamp}`;
+    await prisma.message.create({
+      data: {
+        threadId: strangerThread.id,
+        senderId: stranger.id,
+        senderRole: "GUEST",
+        body: strangerText,
+      },
+    });
+    const mandate = await issueMandate(guest.id, {
+      maxAmountMinor: 100000,
+      currency: "TRY",
+      expiresInMinutes: 10,
+    });
+    const revoked = await issueMandate(guest.id, {
+      maxAmountMinor: 5000,
+      currency: "TRY",
+      expiresInMinutes: 10,
+    });
+    await revokeMandate(guest.id, revoked.claims.nonce);
+    const strangerMandate = await issueMandate(stranger.id, {
+      maxAmountMinor: 7000,
+      currency: "TRY",
+      expiresInMinutes: 10,
+    });
+    const alert = await prisma.priceAlert.create({
+      data: {
+        userId: guest.id,
+        roomTypeId: room.id,
+        checkIn: utcDay(40),
+        checkOut: utcDay(41),
+        currency: "TRY",
+        lastTotalMinor: 50000,
+      },
+    });
+    const claimText = `talep-aciklamasi-${stamp}`;
+    const claimReply = `talep-yaniti-${stamp}`;
+    const claim = await prisma.claim.create({
+      data: {
+        bookingId: booking.id,
+        type: "GUEST_REFUND",
+        openedById: guest.id,
+        respondentId: host.id,
+        amountRequestedMinor: 10000n,
+        currency: "TRY",
+        description: claimText,
+      },
+    });
+    await prisma.claimMessage.create({
+      data: { claimId: claim.id, authorId: host.id, role: "RESPONDENT", body: claimReply },
+    });
+    const credit = await prisma.walletCredit.create({
+      data: {
+        userId: guest.id,
+        currency: "TRY",
+        source: "CASHBACK",
+        sourceRef: `cashback:kvkk-${stamp}`,
+        amountMinor: 2000n,
+        remainingMinor: 1500n,
+        expiresAt: utcDay(365),
+      },
+    });
+    const spend = await prisma.creditSpend.create({
+      data: {
+        userId: guest.id,
+        bookingId: booking.id,
+        currency: "TRY",
+        amountMinor: 500n,
+        status: "SPENT",
+        allocations: { create: [{ creditId: credit.id, amountMinor: 500n }] },
+      },
+    });
+    await prisma.loyaltyAccount.create({
+      data: { userId: guest.id, completedStays: 3, tier: 1 },
+    });
+    const transferTokenHash = `transfer-token-hash-${stamp}`;
+    const transfer = await prisma.bookingTransfer.create({
+      data: {
+        bookingId: booking.id,
+        sellerId: guest.id,
+        askPriceMinor: 90000n,
+        tokenHash: transferTokenHash,
+        expiresAt: utcDay(10),
+      },
+    });
+    const publicKey = Buffer.from(`passkey-public-key-${stamp}`);
+    const passkey = await prisma.webAuthnCredential.create({
+      data: {
+        id: `cred-${stamp}`,
+        userId: guest.id,
+        publicKey,
+        counter: 42,
+        name: `Anahtarım-${stamp}`,
+      },
+    });
+    const session = await prisma.userSession.create({
+      data: { id: `sess-${stamp}`, userId: guest.id, userAgent: "vitest", ipHint: "10.0.0.0/24" },
+    });
+    const authTokenHash = `auth-token-hash-${stamp}`;
+    await prisma.authToken.create({
+      data: {
+        userId: guest.id,
+        kind: "PASSWORD_RESET",
+        tokenHash: authTokenHash,
+        expiresAt: utcDay(1),
+      },
+    });
+
+    const text = JSON.stringify(await exportUserData(guest.id));
+    for (const needle of [
+      booking.id,
+      payment.id,
+      guestText,
+      hostText,
+      mandate.claims.nonce,
+      revoked.claims.nonce,
+      alert.id,
+      claim.id,
+      claimText,
+      claimReply,
+      credit.id,
+      spend.id,
+      transfer.id,
+      passkey.id,
+      `Anahtarım-${stamp}`,
+      session.id,
+    ]) {
+      expect(text, needle).toContain(needle);
+    }
+    const exported = JSON.parse(text) as {
+      agentMandates?: Array<{ nonce: string; maxAmountMinor: number; revokedAt: string | null }>;
+      loyalty?: { account: { tier: number } | null };
+    };
+    expect(exported.agentMandates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          nonce: mandate.claims.nonce,
+          maxAmountMinor: 100000,
+          revokedAt: null,
+        }),
+        expect.objectContaining({ nonce: revoked.claims.nonce, revokedAt: expect.any(String) }),
+      ])
+    );
+    expect(exported.loyalty?.account?.tier).toBe(1);
+
+    // Gizli materyal yok (bcrypt özeti, token özetleri, passkey public key/counter)
+    expect(text).not.toMatch(/\$2[aby]\$\d\d\$/);
+    expect(text).not.toContain(guestHash);
+    expect(text).not.toMatch(/passwordHash|tokenVersion|refreshToken|tokenHash|publicKey/i);
+    expect(text).not.toContain(transferTokenHash);
+    expect(text).not.toContain(authTokenHash);
+    expect(text).not.toContain(publicKey.toString("base64"));
+    // Başka kullanıcının verisi ve karşı tarafın kişisel alanları sızmaz
+    expect(text).not.toContain(strangerText);
+    expect(text).not.toContain(strangerMandate.claims.nonce);
+    expect(text).not.toContain(strangerBooking.id);
+    expect(text).not.toContain(stranger.email);
+    expect(text).not.toContain(host.email);
+    expect(text).not.toContain(host.lastName);
+
+    // Ev sahibi tarafı: aldığı misafir mesajı ve kendi yanıtı var; misafirin mandate'i yok
+    const hostExport = JSON.stringify(await exportUserData(host.id));
+    expect(hostExport).toContain(guestText);
+    expect(hostExport).toContain(hostText);
+    expect(hostExport).toContain(claimReply);
+    expect(hostExport).not.toContain(mandate.claims.nonce);
+    expect(hostExport).not.toContain(guest.email);
+    expect(hostExport).not.toContain(guest.lastName);
+    expect(hostExport).not.toContain(strangerText);
     await prisma.$disconnect();
   });
 });

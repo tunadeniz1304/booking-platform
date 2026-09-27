@@ -45,3 +45,14 @@ export const llmTokensTotal = counter("llm_tokens_total", "LLM token kullanımı
   "task",
   "kind",
 ] as const);
+
+/**
+ * v2-P0-5: eşzamanlılık kuyruğu dolu (`queue_full`) veya kuyrukta zaman aşımı
+ * (`queue_timeout`) nedeniyle SDK'ya gitmeden reddedilen çağrılar (sohbet → fallback
+ * "concurrency"; embedding → çağıran deterministik yola düşer).
+ */
+export const llmConcurrencyRejectedTotal = counter(
+  "llm_concurrency_rejected_total",
+  "Eşzamanlılık kuyruğu dolu/zaman aşımı nedeniyle reddedilen LLM çağrıları",
+  ["task", "reason"] as const
+);

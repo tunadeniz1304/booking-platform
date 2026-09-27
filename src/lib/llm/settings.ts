@@ -11,6 +11,7 @@ import { loadEnv } from "@/lib/config/load-env";
  *  - v4: LLM_MAX_CONCURRENCY (varsayılan 4), LLM_VISION_MODEL (opsiyonel)
  *  - Bütçe: LLM_DAILY_TOKEN_BUDGET_PER_USER, LLM_DAILY_TOKEN_BUDGET_SYSTEM,
  *    LLM_PROMPT_CHARS_PER_TOKEN (rezervasyon tahmini)
+ *  - v2-P0-5: LLM_MAX_QUEUE (varsayılan 32), LLM_QUEUE_TIMEOUT_MS (varsayılan 10000)
  *
  * Anahtarın kendisi yalnızca istemci oluşturulurken kullanılır; log, hata
  * mesajı, durum yanıtı veya telemetride asla yer almaz (yalnızca `hasKey`).
@@ -33,6 +34,10 @@ export const LLM_DEFAULTS = {
   promptCharsPerToken: 3,
   /** Süreç başına aynı anda uçuşta olabilecek azami LLM/embedding isteği (v4#3). */
   maxConcurrency: 4,
+  /** Sınırlayıcı kuyruğunda bekleyebilecek azami istek; doluysa fallback "concurrency" (v2-P0-5). */
+  maxQueue: 32,
+  /** Kuyrukta azami bekleme (ms); aşılırsa fallback "concurrency" (v2-P0-5). */
+  queueTimeoutMs: 10_000,
 } as const;
 
 const KEY_VARS = ["LLM_API_KEY", "DEEPSEEK_API_KEY", "EVREN_API_KEY", "OPENAI_API_KEY"] as const;
@@ -68,6 +73,9 @@ const settingsSchema = z.object({
     .default(LLM_DEFAULTS.dailyTokenBudgetSystem),
   promptCharsPerToken: z.coerce.number().min(1).max(8).default(LLM_DEFAULTS.promptCharsPerToken),
   maxConcurrency: z.coerce.number().int().min(1).max(64).default(LLM_DEFAULTS.maxConcurrency),
+  /** 0 = boş yuva yoksa beklemeden reddet. */
+  maxQueue: z.coerce.number().int().min(0).max(10_000).default(LLM_DEFAULTS.maxQueue),
+  queueTimeoutMs: z.coerce.number().int().min(1).max(120_000).default(LLM_DEFAULTS.queueTimeoutMs),
   /** Opsiyonel görsel (vision) model; yoksa görsel özellikler deterministik yola düşer. */
   visionModel: z.string().min(1).optional(),
   logPrompts: z.boolean().default(false),
@@ -120,6 +128,8 @@ export function parseLlmSettings(env: Env): LlmSettings {
     dailyTokenBudgetSystem: env.LLM_DAILY_TOKEN_BUDGET_SYSTEM || undefined,
     promptCharsPerToken: env.LLM_PROMPT_CHARS_PER_TOKEN || undefined,
     maxConcurrency: env.LLM_MAX_CONCURRENCY || undefined,
+    maxQueue: env.LLM_MAX_QUEUE || undefined,
+    queueTimeoutMs: env.LLM_QUEUE_TIMEOUT_MS || undefined,
     visionModel: env.LLM_VISION_MODEL?.trim() || undefined,
     logPrompts: env.LLM_LOG_PROMPTS === "true" && env.NODE_ENV !== "production",
   };

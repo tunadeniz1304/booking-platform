@@ -17,7 +17,13 @@ import { getLlmSettings, type LlmSettings } from "./settings";
 import { LlmJsonError, parseJsonWithSchema } from "./json";
 import { Redactor, redactText } from "./redaction";
 import { GuardError } from "./guards";
-import { llmLatencySeconds, llmRequestsTotal, llmRouteFor, llmTokensTotal } from "./metrics";
+import {
+  llmConcurrencyRejectedTotal,
+  llmLatencySeconds,
+  llmRequestsTotal,
+  llmRouteFor,
+  llmTokensTotal,
+} from "./metrics";
 import {
   createRedisBudget,
   currentLlmSubject,
@@ -25,7 +31,7 @@ import {
   type LlmBudget,
 } from "./budget";
 import { redis } from "@/lib/redis";
-import { createLimiter, type Limiter } from "@/lib/resilience/limit";
+import { createLimiter, LimiterRejectedError, type Limiter } from "@/lib/resilience/limit";
 
 /**
  * LLM Sözleşmesi — tüm GenAI özellikleri LLM'e YALNIZCA bu istemci üzerinden erişir.
@@ -40,7 +46,9 @@ import { createLimiter, type Limiter } from "@/lib/resilience/limit";
  * - LLM'e giden her mesaj KVKK redaksiyonundan geçer (`Redactor`).
  * - LLM bağlayıcı karar VERMEZ: çıktılar öneri/açıklama/çeviridir.
  * - Süreç başına en fazla `LLM_MAX_CONCURRENCY` istek aynı anda uçuştadır (v4#3);
- *   fazlası sırada bekler (sağlayıcıya ani yük/harcama patlaması gitmez).
+ *   fazlası sırada bekler (sağlayıcıya ani yük/harcama patlaması gitmez). Kuyruk
+ *   `LLM_MAX_QUEUE` ile sınırlı, beklemesi `LLM_QUEUE_TIMEOUT_MS` ile kısıtlı; dolu kuyruk
+ *   veya zaman aşımı → SDK'ya gitmeden fallback, reason "concurrency" (v2-P0-5).
  * - Her canlı istek (araç döngüsünün her adımı ve embeddings dahil) bir bütçe öznesine
  *   atomik token rezervasyonu ister; özne yoksa veya bütçe doluysa SDK'ya gidilmez
  *   (fail-closed, v2-P0-4).
@@ -77,6 +85,7 @@ export type FallbackReason =
   | "tool_loop_exceeded"
   | "budget"
   | "no_subject"
+  | "concurrency"
   | "unknown";
 
 export interface LlmMessage {
@@ -182,16 +191,32 @@ export function resetLlmRuntimeForTests(): void {
 
 // --- Eşzamanlılık (v4#3) --------------------------------------------------------
 
-const processLimiters = new Map<number, Limiter>();
+const processLimiters = new Map<string, Limiter>();
 
-/** Aynı sınır değeri için süreç-çapı tek sınırlayıcı (chat + embeddings ortak havuz). */
-export function getLlmLimiter(concurrency: number): Limiter {
-  let limiter = processLimiters.get(concurrency);
+type LlmLimiterSettings = Pick<LlmSettings, "maxConcurrency" | "maxQueue" | "queueTimeoutMs">;
+
+/**
+ * Aynı sınır değerleri için süreç-çapı tek sınırlayıcı (chat + embeddings ortak havuz).
+ * Kuyruk sınırlı ve beklemesi zaman aşımlı (v2-P0-5): patlamada kapanışlar bellekte birikmez.
+ */
+export function getLlmLimiter(settings: LlmLimiterSettings): Limiter {
+  const key = `${settings.maxConcurrency}|${settings.maxQueue}|${settings.queueTimeoutMs}`;
+  let limiter = processLimiters.get(key);
   if (!limiter) {
-    limiter = createLimiter(concurrency);
-    processLimiters.set(concurrency, limiter);
+    limiter = createLimiter(settings.maxConcurrency, {
+      maxQueue: settings.maxQueue,
+      queueTimeoutMs: settings.queueTimeoutMs,
+    });
+    processLimiters.set(key, limiter);
   }
   return limiter;
+}
+
+/** Sınırlayıcı reddi (dolu kuyruk / kuyrukta zaman aşımı) sayılır; hata aynen fırlatılır. */
+function countLimiterRejection(task: LlmTask | "embedding", error: unknown): void {
+  if (error instanceof LimiterRejectedError) {
+    llmConcurrencyRejectedTotal.inc({ task, reason: error.reason });
+  }
 }
 
 // --- Hata sınıflandırma --------------------------------------------------------
@@ -234,6 +259,7 @@ function classifyLlmError(error: unknown): FallbackReason {
   if (error instanceof EmptyResponseError) return "empty_response";
   if (error instanceof ToolLoopExceededError) return "tool_loop_exceeded";
   if (error instanceof BudgetDeniedError) return error.reason;
+  if (error instanceof LimiterRejectedError) return "concurrency";
   if ((error as Error)?.name === "AbortError") return "aborted";
   return "unknown";
 }
@@ -295,7 +321,9 @@ async function withBudgetHold<R>(
   try {
     res = await send();
   } catch (error) {
-    if (rejectedByProvider(error)) await budget.consume(hold.subject, -hold.reserved, hold.at);
+    // Sağlayıcı reddi veya sınırlayıcı reddi (istek hiç gönderilmedi) faturalanmaz.
+    if (rejectedByProvider(error) || error instanceof LimiterRejectedError)
+      await budget.consume(hold.subject, -hold.reserved, hold.at);
     throw error;
   }
   const used = usedTokens(res);
@@ -323,7 +351,7 @@ export function createLlmClient(options: CreateLlmClientOptions = {}): LlmClient
   const budget =
     options.budget ??
     createRedisBudget(redis, settings.dailyTokenBudgetPerUser, settings.dailyTokenBudgetSystem);
-  const limit = options.limiter ?? getLlmLimiter(settings.maxConcurrency);
+  const limit = options.limiter ?? getLlmLimiter(settings);
 
   /**
    * `LLM_LOG_PROMPTS=true` (production dışı) iken YALNIZCA redakte edilmiş prompt debug
@@ -494,6 +522,7 @@ export function createLlmClient(options: CreateLlmClientOptions = {}): LlmClient
     if (error instanceof BudgetDeniedError) {
       return demoResult(task, demo, "fallback", started, error.reason);
     }
+    countLimiterRejection(task, error);
     const reason = classifyLlmError(error);
     runtimeStatus.lastError = reason;
     logger.warn({ task, reason, ...errorFields(error) }, "llm fallback");
@@ -733,7 +762,7 @@ export function createRemoteEmbedFn(
   const budget =
     options.budget ??
     createRedisBudget(redis, llm.dailyTokenBudgetPerUser, llm.dailyTokenBudgetSystem);
-  const limit = options.limiter ?? getLlmLimiter(llm.maxConcurrency);
+  const limit = options.limiter ?? getLlmLimiter(llm);
   const client = new OpenAI({
     apiKey: llm.apiKey,
     baseURL: llm.baseUrl,
@@ -758,7 +787,14 @@ export function createRemoteEmbedFn(
     const res = await withBudgetHold(
       budget,
       hold,
-      () => limit(() => client.embeddings.create({ model, input, dimensions })),
+      () =>
+        limit(() => client.embeddings.create({ model, input, dimensions })).catch(
+          (error: unknown) => {
+            // Dolu kuyruk / zaman aşımı: sayılır ve fırlatılır (çağıran deterministik yola düşer).
+            countLimiterRejection("embedding", error);
+            throw error;
+          }
+        ),
       (r) => r.usage?.total_tokens
     );
     return res.data.map((d) => d.embedding);

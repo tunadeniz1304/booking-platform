@@ -24,6 +24,7 @@ const PUBLIC_API: readonly PublicRule[] = [
   { prefix: "/api/routing/optimize", methods: ["GET"] },
   { prefix: "/api/transfers/discover", methods: ["GET"] },
   { prefix: "/api/notices", methods: ["POST"] }, // DSA md. 16 herkese açık bildirim (P1-13b)
+  { prefix: "/api/openapi.json", methods: ["GET"] }, // makine okunur sözleşme (v2 P1-2)
 ];
 
 /**

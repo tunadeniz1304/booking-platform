@@ -72,6 +72,51 @@ export class ServiceUnavailableError extends HttpError {
   }
 }
 
+export interface ErrorCatalogEntry {
+  status: number;
+  description: string;
+}
+
+/**
+ * Genel hata kodu kataloğu (v2 P1-2): bu dosyadaki sınıfların, `toErrorResponse`'un ve
+ * proxy'nin ürettiği kodlar. OpenAPI belgesi (`/api/openapi.json`) buradan beslenir; alana
+ * özgü 409/422 kodları (PRICE_CHANGED, ROOM_BUSY…) ilgili işlemde belgelenir.
+ */
+export const ERROR_CATALOG = {
+  VALIDATION_ERROR: {
+    status: 400,
+    description: "İstek doğrulanamadı; `details` alan hatalarını taşır",
+  },
+  INVALID_JSON: { status: 400, description: "Gövde geçerli JSON değil" },
+  UNAUTHORIZED: { status: 401, description: "Oturum yok ya da token geçersiz" },
+  FORBIDDEN: { status: 403, description: "Kaynağa ya da işleme yetki yok" },
+  EMAIL_NOT_VERIFIED: { status: 403, description: "Hassas işlem için e-posta doğrulanmalı" },
+  CSRF_REJECTED: { status: 403, description: "Çerezli istekte Origin doğrulanamadı" },
+  NOT_FOUND: { status: 404, description: "Kayıt bulunamadı (başkasının kaydı da 404 döner)" },
+  CONFLICT: { status: 409, description: "Genel durum çakışması" },
+  TRANSACTION_CONFLICT: {
+    status: 409,
+    description: "Eşzamanlı işlem çakışması; `Retry-After` sonrası aynı Idempotency-Key ile tekrar",
+  },
+  INVALID_CARD_TOKEN: { status: 422, description: "Kart token'ı ödeme sağlayıcısınca reddedildi" },
+  RATE_LIMITED: {
+    status: 429,
+    description: "İstek sınırı aşıldı; `X-RateLimit-*` başlıklarına bakın",
+  },
+  INTERNAL_ERROR: { status: 500, description: "Beklenmeyen hata; iç ayrıntı istemciye verilmez" },
+  PAYMENT_PROVIDER_ERROR: {
+    status: 502,
+    description: "Ödeme sağlayıcısına ulaşılamadı; `Retry-After` sonrası tekrar denenebilir",
+  },
+  SERVICE_UNAVAILABLE: { status: 503, description: "Bağımlı servis geçici olarak kullanılamıyor" },
+  RATE_LIMIT_UNAVAILABLE: {
+    status: 503,
+    description: "Rate-limit deposu (Redis) yok; güvenli tarafta kalınarak reddedildi",
+  },
+} as const satisfies Record<string, ErrorCatalogEntry>;
+
+export type ErrorCode = keyof typeof ERROR_CATALOG;
+
 /** Hata → JSON yanıt. Bilinmeyen hatalar 500 ve genel mesajla döner (loglanır). */
 export function toErrorResponse(error: unknown, context = "request"): NextResponse {
   if (error instanceof HttpError) {

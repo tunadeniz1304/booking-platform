@@ -7,15 +7,18 @@ import {
   sweepClaimSla,
 } from "@/lib/resolution/claims";
 import {
+  DEPOSIT_CAPTURE_SWEEP_JOB,
   DEPOSIT_SWEEP_JOB,
   DEPOSIT_VOID_JOB,
   releaseDeposit,
+  sweepCapturingDeposits,
   sweepDeposits,
 } from "@/lib/resolution/deposit";
 
 /**
  * `resolution` kuyruğu (P1-5): talep yanıt SLA'sının gecikmeli kontrolü, depozito void'i
- * (çıkış + DEPOSIT_HOLD_DAYS) ve kaybolan işler için iki yedek süpürücü (UTC cron).
+ * (çıkış + DEPOSIT_HOLD_DAYS), kaybolan işler için iki yedek süpürücü ve takılı depozito
+ * capture'ı uzlaştırıcısı (`deposit-capture-sweep`, v5#2) (UTC cron).
  */
 export async function processResolutionJob(job: Job<{ claimId?: string; depositId?: string }>) {
   if (job.name === CLAIM_SLA_CHECK_JOB) {
@@ -28,6 +31,7 @@ export async function processResolutionJob(job: Job<{ claimId?: string; depositI
   }
   if (job.name === CLAIM_SLA_SWEEP_JOB) return sweepClaimSla();
   if (job.name === DEPOSIT_SWEEP_JOB) return sweepDeposits();
+  if (job.name === DEPOSIT_CAPTURE_SWEEP_JOB) return sweepCapturingDeposits();
   throw new Error(`Bilinmeyen çözüm merkezi işi: ${job.name}`);
 }
 
@@ -44,5 +48,11 @@ export async function scheduleResolutionSweeps(queue: Queue): Promise<void> {
     DEPOSIT_SWEEP_JOB,
     { pattern: cfg.DEPOSIT_SWEEP_CRON, tz: "UTC" },
     { name: DEPOSIT_SWEEP_JOB, data: {}, opts }
+  );
+  // v5#2: CAPTURING'de takılan depozito capture'larını uzlaştırır.
+  await queue.upsertJobScheduler(
+    DEPOSIT_CAPTURE_SWEEP_JOB,
+    { pattern: cfg.DEPOSIT_CAPTURE_SWEEP_CRON, tz: "UTC" },
+    { name: DEPOSIT_CAPTURE_SWEEP_JOB, data: {}, opts }
   );
 }

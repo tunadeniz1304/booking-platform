@@ -182,9 +182,13 @@ export class StripeProvider implements PaymentProvider {
     return this.toResult(await this.call(() => this.stripe.paymentIntents.retrieve(providerRef)));
   }
 
-  async capture(providerRef: string, amount: Money) {
+  async capture(providerRef: string, amount: Money, idempotencyKey?: string) {
     await this.call(() =>
-      this.stripe.paymentIntents.capture(providerRef, { amount_to_capture: amount.amount })
+      this.stripe.paymentIntents.capture(
+        providerRef,
+        { amount_to_capture: amount.amount },
+        idempotencyKey ? { idempotencyKey } : undefined
+      )
     );
     return { status: "captured" as const };
   }

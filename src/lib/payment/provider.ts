@@ -48,7 +48,15 @@ export interface PaymentProvider {
   }>;
   /** 3DS doğrulamasını tamamlar. */
   confirmChallenge(providerRef: string, code: string): Promise<AuthorizeResult>;
-  capture(providerRef: string, amount: Money): Promise<{ status: "captured" }>;
+  /**
+   * v5#2: `idempotencyKey` verilirse PSP aynı anahtarlı tekrar capture'ı tek işlem sayar (yeniden
+   * deneme / süpürücü uzlaştırması çift tahsilat yapmaz). Verilmezse sağlayıcı varsayılanı.
+   */
+  capture(
+    providerRef: string,
+    amount: Money,
+    idempotencyKey?: string
+  ): Promise<{ status: "captured" }>;
   refund(
     providerRef: string,
     amount: Money,

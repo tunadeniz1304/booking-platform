@@ -1651,6 +1651,9 @@ enum DamageDepositStatus {
   /// Tutar belirlendi; ön provizyon anı (yerel giriş − DEPOSIT_PREAUTH_HOURS_BEFORE) bekleniyor.
   SCHEDULED
   AUTHORIZED
+  /// v5#2: capture niyeti yazıldı, PSP capture'ı/sonuç işlemi sürüyor ya da yarıda kaldı
+  /// (`deposit-capture-sweep` aynı idempotency anahtarıyla uzlaştırır).
+  CAPTURING
   CAPTURED_PARTIAL
   CAPTURED
   VOIDED
@@ -1663,29 +1666,35 @@ enum DamageDepositStatus {
 /// P1-5: rezervasyon tahsilatından AYRI PSP ön provizyonu (manuel capture). Capture tutarı
 /// ön provizyonu aşamaz (DB CHECK + kod). Çıkış + DEPOSIT_HOLD_DAYS sonra talep yoksa void.
 model DamageDeposit {
-  id               String              @id @default(cuid())
-  bookingId        String              @unique
-  amountMinor      BigInt
-  currency         String
-  capturedMinor    BigInt              @default(0)
-  status           DamageDepositStatus @default(SCHEDULED)
-  provider         String
+  id                 String              @id @default(cuid())
+  bookingId          String              @unique
+  amountMinor        BigInt
+  currency           String
+  capturedMinor      BigInt              @default(0)
+  status             DamageDepositStatus @default(SCHEDULED)
+  provider           String
   /// PSP ön provizyon kimliği (mock: pi_mockhold_…, stripe: pi_…).
-  providerRef      String?             @unique
+  providerRef        String?             @unique
   /// Kartı yeniden kullanılan asıl tahsilatın PSP kimliği.
-  sourcePaymentRef String?
-  failureCode      String?
-  authorizeAfter   DateTime
-  voidAfter        DateTime
-  authorizedAt     DateTime?
-  capturedAt       DateTime?
-  voidedAt         DateTime?
-  expiredAt        DateTime?
-  createdAt        DateTime            @default(now())
-  updatedAt        DateTime            @updatedAt
+  sourcePaymentRef   String?
+  failureCode        String?
+  authorizeAfter     DateTime
+  voidAfter          DateTime
+  authorizedAt       DateTime?
+  capturedAt         DateTime?
+  voidedAt           DateTime?
+  expiredAt          DateTime?
+  /// v5#2: CAPTURING niyetinin tutarı ve başlangıcı (süpürücü eşiği için).
+  captureIntentMinor BigInt?
+  captureStartedAt   DateTime?
+  /// v5#2: capture'ı başlatan hasar talebi (yeniden kararda tahsil edilen tutar sayılır).
+  captureClaimId     String?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
 
   @@index([status, authorizeAfter])
   @@index([status, voidAfter])
+  @@index([status, captureStartedAt])
 }
 
 enum ClaimType {

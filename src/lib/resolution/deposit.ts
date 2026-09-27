@@ -30,6 +30,10 @@ type Db = PrismaClient | Prisma.TransactionClient;
 
 export const DEPOSIT_VOID_JOB = "deposit-void";
 export const DEPOSIT_SWEEP_JOB = "deposit-sweep";
+/** v5#2: CAPTURING'de takılan depozitoları uzlaştıran tekrarlayan iş. */
+export const DEPOSIT_CAPTURE_SWEEP_JOB = "deposit-capture-sweep";
+/** Süpürücünün tek koşuda işlediği azami CAPTURING kaydı. */
+const CAPTURE_SWEEP_BATCH = 100;
 
 const HOUR_MS = 3_600_000;
 const DAY_MS = 86_400_000;
@@ -440,15 +444,103 @@ export interface CaptureResult {
   status: "CAPTURED" | "CAPTURED_PARTIAL";
 }
 
+/** v5#2: depozito capture'ının PSP idempotency anahtarı (ilk deneme + süpürücü aynı). */
+export function depositCaptureKey(depositId: string): string {
+  return `deposit-capture:${depositId}`;
+}
+
+export const depositCaptureSweepTotal = counter(
+  "deposit_capture_sweep_total",
+  "CAPTURING'de takılan depozitoların uzlaştırılması (completed/reverted/failed)",
+  ["outcome"] as const
+);
+
+/**
+ * PSP hatası capture hakkında kesin bilgi veriyor mu? Ağ/zaman aşımı/5xx/`psp_unavailable`
+ * belirsizdir (capture PSP'de gerçekleşmiş olabilir) → niyet CAPTURING kalır, süpürücü aynı
+ * anahtarla uzlaştırır. Diğer `PaymentProviderError`'lar PSP'nin kesin reddidir → AUTHORIZED'a dön.
+ */
+function isUncertainPspError(error: unknown): boolean {
+  if (!(error instanceof PaymentProviderError)) return true;
+  return (
+    error.code === "psp_unavailable" ||
+    error.code === "http_unknown" ||
+    error.code.startsWith("http_5") ||
+    error.code === "lock_timeout" ||
+    error.code === "rate_limit"
+  );
+}
+
+type Tx = Prisma.TransactionClient;
+
+export interface CaptureOptions {
+  /** Capture'ı başlatan hasar talebi (yeniden kararda tahsil edilen tutar sayılır). */
+  claimId?: string;
+  /** Capture sonucuyla AYNI işlemde koşar (ör. talep kararının kesinleşmesi). */
+  finalize?: (tx: Tx, capturedMinor: bigint) => Promise<void>;
+}
+
+/** tx2: CAPTURING → CAPTURED(_PARTIAL) + `depositCaptured` jurnali (+ çağıranın finalize'ı). */
+async function completeCapture(
+  tx: Tx,
+  deposit: { id: string; bookingId: string; amountMinor: bigint; currency: string },
+  amountMinor: bigint,
+  now: Date,
+  finalize?: CaptureOptions["finalize"]
+): Promise<"CAPTURED" | "CAPTURED_PARTIAL"> {
+  const booking = await tx.booking.findUnique({
+    where: { id: deposit.bookingId },
+    select: { property: { select: { hostId: true } } },
+  });
+  if (!booking) throw new NotFoundError("Rezervasyon bulunamadı");
+  const status = amountMinor === deposit.amountMinor ? "CAPTURED" : "CAPTURED_PARTIAL";
+  const res = await tx.damageDeposit.updateMany({
+    where: { id: deposit.id, status: "CAPTURING" },
+    data: { status, capturedMinor: amountMinor, capturedAt: now },
+  });
+  if (res.count !== 1) {
+    throw new DepositCaptureError("DEPOSIT_NOT_CAPTURING", "Depozito eşzamanlı değişti");
+  }
+  await post.depositCaptured(tx, {
+    depositId: deposit.id,
+    bookingId: deposit.bookingId,
+    hostId: booking.property.hostId,
+    currency: deposit.currency,
+    amountMinor,
+    occurredAt: now,
+  });
+  if (finalize) await finalize(tx, amountMinor);
+  return status;
+}
+
+/** PSP kesin reddetti → niyet geri alınır (depozito yeniden tahsil edilebilir). */
+async function revertCaptureIntent(depositId: string): Promise<void> {
+  await prisma.damageDeposit.updateMany({
+    where: { id: depositId, status: "CAPTURING" },
+    data: {
+      status: "AUTHORIZED",
+      captureIntentMinor: null,
+      captureStartedAt: null,
+      captureClaimId: null,
+    },
+  });
+}
+
 /**
  * Hasar talebi kararı: depozitodan `amountMinor` tahsil eder. Tutar ön provizyonu AŞAMAZ
- * (422 DEPOSIT_CAPTURE_EXCEEDS_AUTH; ayrıca DB CHECK). PSP capture tx dışında; ardından aynı
- * SERIALIZABLE tx'te koşullu durum geçişi + `depositCaptured` jurnali.
+ * (422 DEPOSIT_CAPTURE_EXCEEDS_AUTH; ayrıca DB CHECK).
+ *
+ * v5#2 iki aşamalı niyet: tx1 `AUTHORIZED → CAPTURING` (+ tutar, başlangıç, talep), PSP
+ * `capture(ref, tutar, "deposit-capture:<id>")`, tx2 `CAPTURING → CAPTURED` + `depositCaptured`
+ * jurnali + çağıranın `finalize`'ı (aynı işlem). PSP belirsiz düşer ya da tx2 düşerse kayıt
+ * CAPTURING kalır; `deposit-capture-sweep` aynı anahtarla capture'ı yineleyip (PSP tek işlem
+ * sayar) tx2'yi tamamlar → tek capture + tek jurnal. PSP kesin reddederse niyet geri alınır.
  */
 export async function captureDeposit(
   depositId: string,
   amountMinor: bigint,
-  now = new Date()
+  now = new Date(),
+  opts: CaptureOptions = {}
 ): Promise<CaptureResult> {
   const deposit = await prisma.damageDeposit.findUnique({ where: { id: depositId } });
   if (!deposit) throw new NotFoundError("Depozito bulunamadı");
@@ -473,36 +565,101 @@ export async function captureDeposit(
     depositEventsTotal.inc({ outcome: "expired" });
     throw new DepositCaptureError("DEPOSIT_EXPIRED", "Depozito provizyonunun süresi dolmuş");
   }
-  const property = await prisma.booking.findUnique({
-    where: { id: deposit.bookingId },
-    select: { property: { select: { hostId: true } } },
-  });
-  if (!property) throw new NotFoundError("Rezervasyon bulunamadı");
 
-  await getPaymentProvider().capture(
-    deposit.providerRef,
-    money(minorFromDb(amountMinor), deposit.currency)
-  );
-  const status = amountMinor === deposit.amountMinor ? "CAPTURED" : "CAPTURED_PARTIAL";
-  await withSerializableRetry(async (tx) => {
-    const res = await tx.damageDeposit.updateMany({
-      where: { id: deposit.id, status: "AUTHORIZED" },
-      data: { status, capturedMinor: amountMinor, capturedAt: now },
-    });
-    if (res.count !== 1) {
-      throw new DepositCaptureError("DEPOSIT_NOT_AUTHORIZED", "Depozito eşzamanlı değişti");
-    }
-    await post.depositCaptured(tx, {
-      depositId: deposit.id,
-      bookingId: deposit.bookingId,
-      hostId: property.property.hostId,
-      currency: deposit.currency,
-      amountMinor,
-      occurredAt: now,
-    });
+  // tx1: niyet. Süpürücü eşiği gerçek saatle ölçülür (`now` iş zamanı olabilir).
+  const intent = await prisma.damageDeposit.updateMany({
+    where: { id: deposit.id, status: "AUTHORIZED" },
+    data: {
+      status: "CAPTURING",
+      captureIntentMinor: amountMinor,
+      captureStartedAt: new Date(),
+      captureClaimId: opts.claimId ?? null,
+    },
   });
+  if (intent.count !== 1) {
+    throw new DepositCaptureError("DEPOSIT_NOT_AUTHORIZED", "Depozito eşzamanlı değişti");
+  }
+  try {
+    await getPaymentProvider().capture(
+      deposit.providerRef,
+      money(minorFromDb(amountMinor), deposit.currency),
+      depositCaptureKey(deposit.id)
+    );
+  } catch (error) {
+    if (!isUncertainPspError(error)) await revertCaptureIntent(deposit.id);
+    throw error;
+  }
+  const status = await withSerializableRetry((tx) =>
+    completeCapture(tx, deposit, amountMinor, now, opts.finalize)
+  );
   depositEventsTotal.inc({ outcome: "captured" });
   return { capturedMinor: amountMinor, status };
+}
+
+export type CaptureSettleOutcome = "completed" | "reverted" | "failed" | "skipped";
+
+/**
+ * v5#2: CAPTURING'de kalan tek depozitoyu uzlaştırır — aynı idempotency anahtarıyla capture
+ * (PSP tekrarı tek işlem sayar), ardından tx2. PSP kesin reddederse niyet geri alınır.
+ */
+export async function settleCapturingDeposit(
+  depositId: string,
+  now = new Date()
+): Promise<CaptureSettleOutcome> {
+  const d = await prisma.damageDeposit.findUnique({ where: { id: depositId } });
+  if (!d || d.status !== "CAPTURING" || !d.providerRef || d.captureIntentMinor === null) {
+    return "skipped";
+  }
+  try {
+    await getPaymentProvider().capture(
+      d.providerRef,
+      money(minorFromDb(d.captureIntentMinor), d.currency),
+      depositCaptureKey(d.id)
+    );
+  } catch (error) {
+    if (isUncertainPspError(error)) {
+      logger.warn({ depositId, ...errorFields(error) }, "deposit capture still uncertain");
+      return "failed";
+    }
+    await revertCaptureIntent(d.id);
+    logger.warn({ depositId, ...errorFields(error) }, "deposit capture rejected; intent reverted");
+    return "reverted";
+  }
+  const amount = d.captureIntentMinor;
+  await withSerializableRetry((tx) => completeCapture(tx, d, amount, now));
+  depositEventsTotal.inc({ outcome: "captured" });
+  return "completed";
+}
+
+/**
+ * `deposit-capture-sweep` işi: eşikten (`DEPOSIT_CAPTURE_SWEEP_AFTER_SECONDS`) eski CAPTURING
+ * kayıtları uzlaştırır (süren capture ile yarışmaz). Her sonuç `deposit_capture_sweep_total`.
+ */
+export async function sweepCapturingDeposits(
+  now = new Date()
+): Promise<Record<Exclude<CaptureSettleOutcome, "skipped">, number>> {
+  const cutoff = new Date(now.getTime() - getConfig().DEPOSIT_CAPTURE_SWEEP_AFTER_SECONDS * 1000);
+  const stuck = await prisma.damageDeposit.findMany({
+    where: { status: "CAPTURING", captureStartedAt: { lt: cutoff } },
+    orderBy: { captureStartedAt: "asc" },
+    select: { id: true },
+    take: CAPTURE_SWEEP_BATCH,
+  });
+  const out = { completed: 0, reverted: 0, failed: 0 };
+  for (const { id } of stuck) {
+    let outcome: CaptureSettleOutcome;
+    try {
+      outcome = await settleCapturingDeposit(id, now);
+    } catch (error) {
+      logger.error({ depositId: id, ...errorFields(error) }, "deposit capture sweep errored");
+      outcome = "failed";
+    }
+    if (outcome === "skipped") continue;
+    out[outcome] += 1;
+    depositCaptureSweepTotal.inc({ outcome });
+  }
+  if (stuck.length > 0) logger.warn(out, "stuck CAPTURING deposits swept");
+  return out;
 }
 
 export interface DepositSweepResult {

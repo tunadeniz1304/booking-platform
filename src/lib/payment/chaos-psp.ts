@@ -57,9 +57,9 @@ export function withChaos(
       await disturb("confirmChallenge");
       return inner.confirmChallenge(ref, code);
     },
-    capture: async (ref, amount) => {
+    capture: async (ref, amount, key) => {
       await disturb("capture");
-      return inner.capture(ref, amount);
+      return inner.capture(ref, amount, key);
     },
     refund: async (ref, amount, key) => {
       await disturb("refund");

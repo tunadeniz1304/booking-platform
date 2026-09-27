@@ -23,7 +23,13 @@ import {
   reserveClaimShareRefunds,
   settledSplitPlanId,
 } from "@/lib/cart/split-refund";
-import { captureDeposit, depositAuthValid, releaseDeposit, toDepositView } from "./deposit";
+import {
+  captureDeposit,
+  depositAuthValid,
+  releaseDeposit,
+  settleCapturingDeposit,
+  toDepositView,
+} from "./deposit";
 import { sanitizeEvidence } from "./evidence";
 
 /**
@@ -904,6 +910,10 @@ async function settleGuestRefund(
  * Hasar tazmini: depozitodan en fazla ön provizyon kadar tahsil (captureDeposit), fazlası
  * yalnız kayıt (`uncollectedMinor`; defterde alacak YOK). Provizyon yok/süresi dolmuşsa tümü
  * tahsil edilemez olarak kaydedilir.
+ *
+ * v5#2: karar (finalize) capture sonucuyla AYNI işlemde kesinleşir. Önceki deneme capture'ı
+ * yarıda bıraktıysa (CAPTURING) önce uzlaştırılır; bu talep için zaten tahsil edilmiş tutar
+ * yeniden kararda "tahsil edildi" sayılır (ikinci capture denenmez, `uncollected` şişmez).
  */
 async function settleHostDamage(
   admin: AccessClaims,
@@ -913,23 +923,46 @@ async function settleHostDamage(
   note: string,
   now: Date
 ): Promise<DecisionResult> {
-  let settled = 0n;
-  if (award > 0n) {
-    const deposit = await prisma.damageDeposit.findUnique({
-      where: { bookingId: claim.bookingId },
-    });
-    if (deposit?.status === "AUTHORIZED" && depositAuthValid(deposit, now)) {
-      const available = deposit.amountMinor - deposit.capturedMinor;
-      const capture = award < available ? award : available;
-      if (capture > 0n) settled = (await captureDeposit(deposit.id, capture, now)).capturedMinor;
-    }
-  }
-  const amounts = {
+  const amountsFor = (settled: bigint) => ({
     awardedMinor: award,
     settledMinor: settled,
     uncollectedMinor: award - settled,
     platformCoveredMinor: 0n,
-  };
+  });
+  let settled = 0n;
+  if (award > 0n) {
+    let deposit = await prisma.damageDeposit.findUnique({
+      where: { bookingId: claim.bookingId },
+    });
+    if (deposit?.status === "CAPTURING") {
+      await settleCapturingDeposit(deposit.id, now);
+      deposit = await prisma.damageDeposit.findUnique({ where: { id: deposit.id } });
+      if (deposit?.status === "CAPTURING") {
+        throw new ConflictError(
+          "Depozito tahsilatı sürüyor; kısa süre sonra yeniden deneyin",
+          "DEPOSIT_CAPTURE_PENDING"
+        );
+      }
+    }
+    const capturedForClaim =
+      deposit?.captureClaimId === claim.id &&
+      (deposit.status === "CAPTURED" || deposit.status === "CAPTURED_PARTIAL");
+    if (deposit && capturedForClaim) {
+      settled = deposit.capturedMinor < award ? deposit.capturedMinor : award;
+    } else if (deposit?.status === "AUTHORIZED" && depositAuthValid(deposit, now)) {
+      const available = deposit.amountMinor - deposit.capturedMinor;
+      const capture = award < available ? award : available;
+      if (capture > 0n) {
+        const amounts = amountsFor(capture);
+        await captureDeposit(deposit.id, capture, now, {
+          claimId: claim.id,
+          finalize: (tx) => finalize(tx, admin, claim, status, note, now, amounts),
+        });
+        return { status, ...amounts };
+      }
+    }
+  }
+  const amounts = amountsFor(settled);
   await withSerializableRetry((tx) => finalize(tx, admin, claim, status, note, now, amounts));
   return { status, ...amounts };
 }

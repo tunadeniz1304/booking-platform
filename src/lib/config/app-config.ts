@@ -207,6 +207,13 @@ const schema = z.object({
   DEPOSIT_MAX_MINOR: int(5_000_000, 1, 1_000_000_000),
   /** Depozito ön provizyon / void / süre dolumu süpürme işinin cron'u (UTC). */
   DEPOSIT_SWEEP_CRON: z.string().min(1).default("*/15 * * * *"),
+  /**
+   * v5#2: CAPTURING'de bu kadar saniyeden uzun kalan depozito süpürücüde uzlaştırılır (aynı
+   * idempotency anahtarıyla capture + jurnal). Süren bir capture ile yarışmamak için eşik.
+   */
+  DEPOSIT_CAPTURE_SWEEP_AFTER_SECONDS: int(300, 30, 86_400),
+  /** v5#2: `deposit-capture-sweep` işinin cron'u (UTC). */
+  DEPOSIT_CAPTURE_SWEEP_CRON: z.string().min(1).default("*/5 * * * *"),
   /** Karşı tarafın talebe yanıt süresi (saat); aşımda otomatik ESCALATED. */
   CLAIM_RESPONSE_SLA_HOURS: int(72, 1, 24 * 14),
   /** Gecikmeli SLA işi kaybolursa yedek süpürücü (UTC cron). */

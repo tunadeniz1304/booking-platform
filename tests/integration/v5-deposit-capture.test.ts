@@ -17,19 +17,16 @@ import type { AccessClaims } from "@/lib/auth";
 import { releaseAt } from "@/lib/payout/escrow";
 import { isTrialBalanced, trialBalance } from "@/lib/ledger";
 import { decideClaim, openClaim } from "@/lib/resolution/claims";
-import * as depositModule from "@/lib/resolution/deposit";
-import { captureDeposit, depositWindow, sweepDeposits } from "@/lib/resolution/deposit";
+import {
+  captureDeposit,
+  depositCaptureSweepTotal,
+  depositWindow,
+  sweepCapturingDeposits,
+  sweepDeposits,
+} from "@/lib/resolution/deposit";
 
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
-
-/** Depozito capture süpürücüsü (v5#2'de eklenir; kırmızı aşamada yok). */
-const sweepCapturing = (now: Date) =>
-  (
-    depositModule as unknown as {
-      sweepCapturingDeposits: (now: Date) => Promise<unknown>;
-    }
-  ).sweepCapturingDeposits(now);
 
 /** Capture çağrılarını (ref, tutar, idempotency anahtarı) kaydeden mock. */
 class SpyPsp extends MockPsp {
@@ -150,13 +147,7 @@ describeInt("v5#2 depozito capture iki aşamalı niyet + süpürücü (regressio
 
   /** Süpürücü eşiğinden sonraki bir "şimdi". */
   const later = (from: Date) =>
-    new Date(
-      from.getTime() +
-        (((getConfig() as unknown as Record<string, number>).DEPOSIT_CAPTURE_SWEEP_AFTER_SECONDS ??
-          0) +
-          60) *
-          1000
-    );
+    new Date(from.getTime() + (getConfig().DEPOSIT_CAPTURE_SWEEP_AFTER_SECONDS + 60) * 1000);
 
   it("capture sonrası tx2 düşer → CAPTURING kalır; süpürücü tek capture (aynı anahtar) + tek jurnal", async () => {
     const { dep, w } = await authorizedDeposit();
@@ -170,15 +161,17 @@ describeInt("v5#2 depozito capture iki aşamalı niyet + süpürücü (regressio
     expect(await journalCount(dep.id)).toBe(0);
     await dropFaults();
 
-    await sweepCapturing(later(new Date()));
+    await sweepCapturingDeposits(later(new Date()));
     const after = await prisma.damageDeposit.findUniqueOrThrow({ where: { id: dep.id } });
     expect(after).toMatchObject({ status: "CAPTURED_PARTIAL", capturedMinor: 20_000n });
+    const metric = await depositCaptureSweepTotal.get();
+    expect(metric.values.find((v) => v.labels.outcome === "completed")?.value).toBeGreaterThan(0);
     expect(await journalCount(dep.id)).toBe(1);
     const keys = new Set(psp.captures.filter((c) => c.ref === dep.providerRef).map((c) => c.key));
     expect([...keys]).toEqual([`deposit-capture:${dep.id}`]);
     // İkinci süpürme yeni capture/jurnal üretmez.
     const calls = psp.captures.length;
-    await sweepCapturing(later(new Date()));
+    await sweepCapturingDeposits(later(new Date()));
     expect(psp.captures.length).toBe(calls);
     expect(await journalCount(dep.id)).toBe(1);
     expect(isTrialBalanced(await trialBalance(prisma))).toBe(true);
@@ -207,7 +200,7 @@ describeInt("v5#2 depozito capture iki aşamalı niyet + süpürücü (regressio
     expect(open.status).not.toMatch(/^RESOLVED/);
     await dropFaults();
 
-    await sweepCapturing(later(new Date()));
+    await sweepCapturingDeposits(later(new Date()));
     const result = await decide();
     expect(result).toMatchObject({
       status: "RESOLVED_APPROVED",

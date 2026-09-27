@@ -56,6 +56,7 @@ export class MockPsp implements PaymentProvider {
     return { status: "authorized", providerRef };
   }
 
+  /** Durumsuz mock: aynı anahtarlı (v5#2 `idempotencyKey`) tekrar capture aynı sonucu verir. */
   async capture(providerRef?: string, amount?: Money): Promise<{ status: "captured" }> {
     // Depozito ön provizyonu tutarı referansta taşınır (durumsuz mock): aşan capture reddedilir.
     const held = providerRef ? parseMockHoldRef(providerRef) : null;

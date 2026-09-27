@@ -8,6 +8,7 @@ import { redis } from "@/lib/redis";
 import { getConfig } from "@/lib/config/app-config";
 import { anonymousIdentities, SHARED_ANON_KEY } from "@/lib/security/ip";
 import { categorize, checkRateLimit } from "@/lib/security/rate-limit";
+import { AUTH_DEGRADED_HEADER, AUTH_DEGRADED_PATHS } from "@/lib/security/auth-degraded";
 import {
   allowedOriginsFromEnv,
   isCsrfViolation,
@@ -60,28 +61,54 @@ async function handleApi(req: NextRequest, requestHeaders: Headers, requestId: s
   // Anonimde anahtar soket/güvenilir-proxy IP'sidir (IPv6 /64). IP bilinmiyorsa
   // paylaşılan `anon` kovası birincildir; UA parmak izi yalnızca ikincil, daha dar
   // bir kovadır — UA değiştirmek toplam kotayı büyütmez (v4#4).
+  // v5#6: Next 16'da `NextRequest.ip` yok ve kendi barındırmada soket adresi Proxy'ye
+  // ulaşmaz; istemci IP'si yalnızca güvenilir ters vekilin (Caddy, ADR 0034) başlığından gelir.
   const category = categorize(pathname);
   const identities = claims
     ? { primary: `u:${claims.userId}`, secondary: null }
     : anonymousIdentities(req.headers, {
         trustedProxyHops: config.TRUSTED_PROXY_HOPS,
         trustRealIpHeader: config.TRUST_REAL_IP_HEADER,
-        socketIp: (req as unknown as { ip?: string }).ip,
       });
-  let decision = await checkRateLimit(redis, {
-    category,
-    identity: identities.primary,
-    config,
-    limitMultiplier:
-      identities.primary === SHARED_ANON_KEY ? config.RATE_LIMIT_ANON_SHARED_MULTIPLIER : 1,
-  });
-  if (identities.secondary && decision.allowed && !decision.unavailable) {
+  const sharedPrimary = identities.primary === SHARED_ANON_KEY;
+  // v5#6: e-postalı auth uçlarında paylaşılan kova tükenince istemcinin kendi (ikincil) kovası
+  // boşsa 429 yerine yavaşlatılmış yola (e-posta kovası + PoW) düşülür: tek saldırgan herkesin
+  // girişini kilitleyemez. İkincil kova önce sayılır ki saldırgan kendi kovasında 429 alsın.
+  const degradable =
+    sharedPrimary &&
+    category === "auth" &&
+    method === "POST" &&
+    (AUTH_DEGRADED_PATHS as readonly string[]).includes(pathname);
+  let decision;
+  let degraded = false;
+  if (degradable && identities.secondary) {
+    decision = await checkRateLimit(redis, { category, identity: identities.secondary, config });
+    if (decision.allowed && !decision.unavailable) {
+      const shared = await checkRateLimit(redis, {
+        category,
+        identity: identities.primary,
+        config,
+        limitMultiplier: config.RATE_LIMIT_ANON_SHARED_MULTIPLIER,
+      });
+      if (shared.unavailable) decision = shared;
+      else degraded = !shared.allowed;
+    }
+  } else {
     decision = await checkRateLimit(redis, {
       category,
-      identity: identities.secondary,
+      identity: identities.primary,
       config,
+      limitMultiplier: sharedPrimary ? config.RATE_LIMIT_ANON_SHARED_MULTIPLIER : 1,
     });
+    if (identities.secondary && decision.allowed && !decision.unavailable) {
+      decision = await checkRateLimit(redis, {
+        category,
+        identity: identities.secondary,
+        config,
+      });
+    }
   }
+  if (degraded) requestHeaders.set(AUTH_DEGRADED_HEADER, "1");
   responseHeaders.set("X-RateLimit-Limit", String(decision.limit));
   responseHeaders.set("X-RateLimit-Remaining", String(decision.remaining));
   responseHeaders.set("X-RateLimit-Reset", String(decision.resetSeconds));
@@ -152,6 +179,8 @@ async function handleApi(req: NextRequest, requestHeaders: Headers, requestId: s
 export async function proxy(req: NextRequest) {
   const requestHeaders = new Headers(req.headers);
   for (const name of IDENTITY_HEADERS) requestHeaders.delete(name);
+  // Yavaşlatılmış auth işaretini yalnız proxy yazar (v5#6).
+  requestHeaders.delete(AUTH_DEGRADED_HEADER);
 
   const requestId = requestIdFrom(req);
   requestHeaders.set("x-request-id", requestId);

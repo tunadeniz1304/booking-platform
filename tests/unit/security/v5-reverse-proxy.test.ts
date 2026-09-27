@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { NextRequest } from "next/server";
 import type { FakeRedis } from "../../helpers/fake-redis";
 
@@ -136,5 +138,22 @@ describe("regression: v5#6 ters vekil ve istemci IP'si", () => {
     await expect(
       enforceDegradedAuth({ headers: new Headers() }, { email: "a@t.test", pow: null })
     ).resolves.toBeUndefined();
+  });
+});
+
+describe("regression: v5#6 compose: uygulama yalnız Caddy arkasında", () => {
+  const read = (f: string) => readFileSync(path.join(process.cwd(), f), "utf8");
+  it("app host'a port açmaz, Caddy yayımlar, TRUSTED_PROXY_HOPS=1; Caddy XFF'yi soketten yazar", () => {
+    const compose = read("docker-compose.yml");
+    const appBlock = compose.slice(compose.indexOf("\n  app:"), compose.indexOf("\n  caddy:"));
+    expect(appBlock).not.toMatch(/ports:/);
+    const caddyBlock = compose.slice(compose.indexOf("\n  caddy:"), compose.indexOf("\n  worker:"));
+    expect(caddyBlock).toMatch(/ports:/);
+    expect(caddyBlock).toMatch(/docker\/Caddyfile/);
+    const common = compose.slice(compose.indexOf("x-common-env"), compose.indexOf("x-app-env"));
+    expect(common).toMatch(/TRUSTED_PROXY_HOPS: "1"/);
+    const caddyfile = read("docker/Caddyfile");
+    expect(caddyfile).toMatch(/reverse_proxy app:3000/);
+    expect(caddyfile).toMatch(/header_up X-Forwarded-For \{remote_host\}/);
   });
 });

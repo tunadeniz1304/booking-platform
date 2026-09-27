@@ -3,9 +3,12 @@ import { z } from "zod";
 import { padResponseTime, requestPasswordReset } from "@/lib/auth/account";
 import { toErrorResponse } from "@/lib/http/errors";
 import { observed } from "@/lib/http/observed";
+import { enforceDegradedAuth } from "@/lib/security/auth-degraded";
 
 const bodySchema = z.object({
   email: z.string().trim().email("Geçerli bir e-posta girin").max(254),
+  /** Paylaşılan anonim kova tükendiğinde istenen iş kanıtı (v5#6; form otomatik çözer). */
+  pow: z.object({ challenge: z.string().max(200), nonce: z.string().max(32) }).nullish(),
 });
 
 /**
@@ -16,7 +19,8 @@ const bodySchema = z.object({
 export const POST = observed("auth.password.forgot", async function postHandler(req: NextRequest) {
   const startedAt = Date.now();
   try {
-    const { email } = bodySchema.parse(await req.json());
+    const { email, pow } = bodySchema.parse(await req.json());
+    await enforceDegradedAuth(req, { email, pow });
     await requestPasswordReset(email);
     await padResponseTime(startedAt);
     return NextResponse.json(

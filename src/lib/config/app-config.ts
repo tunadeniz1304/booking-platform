@@ -322,6 +322,12 @@ const schema = z.object({
   TRUSTED_PROXY_HOPS: int(0, 0, 10),
   /** hops=0 iken önde başlığı ezen tek ters vekil varsa `x-real-ip`'ye güven (v3#3). */
   TRUST_REAL_IP_HEADER: bool(false),
+  /**
+   * v5#6: üretimde (demo dışı) önde ters vekil yoksa (hops=0, x-real-ip güveni yok) istemci IP'si
+   * bilinemez → tüm anonimler tek kovayı paylaşır. Bu kurulum bilinçli değilse `/api/ready` 503
+   * döner; yalnızca IP'yi başka yolla sınırlayan (ör. tek kiracılı iç ağ) kurulumlar `true` verir.
+   */
+  ALLOW_DIRECT_EXPOSURE: bool(false),
   /** Hesap (e-posta) bazlı giriş denemesi limiti — IP'den bağımsız (v3#3). */
   RATE_LIMIT_LOGIN_PER_ACCOUNT_MAX: int(10, 1),
   /** v3: 15 → 5 dk (denylist Redis yokken fail-closed; iptal penceresi kısa). */

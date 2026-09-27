@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
+import { postJsonWithPow } from "@/lib/auth/pow-fetch";
 
 interface RegisterResponse {
   user: { id: string; firstName: string; lastName: string; email: string; role: string };
@@ -27,10 +28,11 @@ export default function RegisterPage() {
     setError(null);
     setSubmitting(true);
     try {
-      const res = await fetch("/api/auth/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ firstName, lastName, email, password }),
+      const res = await postJsonWithPow("/api/auth/register", {
+        firstName,
+        lastName,
+        email,
+        password,
       });
       const data = (await res.json()) as RegisterResponse & { error?: string };
       if (!res.ok) {

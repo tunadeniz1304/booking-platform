@@ -4,6 +4,7 @@ import { FormEvent, useState } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import AuthCard, { Notice } from "@/components/auth/AuthCard";
+import { postJsonWithPow } from "@/lib/auth/pow-fetch";
 
 /** Şifre sıfırlama isteği — yanıt hesabın varlığını ele vermez (daima aynı mesaj). */
 export default function ForgotPasswordPage() {
@@ -14,11 +15,7 @@ export default function ForgotPasswordPage() {
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setState("sending");
-    const res = await fetch("/api/auth/password/forgot", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email }),
-    }).catch(() => null);
+    const res = await postJsonWithPow("/api/auth/password/forgot", { email }).catch(() => null);
     setState(res && res.status === 202 ? "sent" : "error");
   };
 

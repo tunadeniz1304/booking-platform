@@ -27,8 +27,10 @@ interface HeaderSource {
  *
  *  - Önde güvenilir proxy varsa (`trustedProxyHops > 0`) `X-Forwarded-For`
  *    zincirinin sondan `trustedProxyHops`'uncu halkası.
- *  - Aksi halde çalışma ortamının verdiği soket IP'si (`socketIp`; Next.js'te
- *    platform `request.ip` sağlıyorsa). İstemci başlıklarına hiç güvenilmez.
+ *  - Aksi halde çalışma ortamının verdiği soket IP'si (`socketIp`). İstemci başlıklarına
+ *    hiç güvenilmez. Not (v5#6): Next 16'da `NextRequest.ip` kaldırıldı; kendi barındırmada
+ *    soket adresi route/proxy'ye ulaşmaz → pratikte "unknown". Üretimde istemci IP'si için
+ *    önde ters vekil (compose'da Caddy, `TRUSTED_PROXY_HOPS=1`) gerekir — ADR 0034.
  * @param headers istek başlıkları
  * @param trustedProxyHops önümüzdeki güvenilir proxy sayısı
  * @param socketIp TCP soketinden gelen uzak adres (varsa)

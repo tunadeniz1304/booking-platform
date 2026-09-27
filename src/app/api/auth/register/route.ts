@@ -8,6 +8,7 @@ import { setSessionCookies } from "@/lib/auth/cookies";
 import { issueEmailToken } from "@/lib/auth/account";
 import { ConflictError, toErrorResponse } from "@/lib/http/errors";
 import { observed } from "@/lib/http/observed";
+import { enforceDegradedAuth } from "@/lib/security/auth-degraded";
 import { passwordSchema } from "@/lib/auth/password-policy";
 import { LOCALE_COOKIE, resolveLocale } from "@/i18n/config";
 
@@ -16,12 +17,15 @@ const registerSchema = z.object({
   lastName: z.string().trim().min(2, "Soyad en az 2 karakter olmalıdır").max(60),
   email: z.string().trim().email("Geçerli bir e-posta girin").max(254),
   password: passwordSchema,
+  /** Paylaşılan anonim kova tükendiğinde istenen iş kanıtı (v5#6; form otomatik çözer). */
+  pow: z.object({ challenge: z.string().max(200), nonce: z.string().max(32) }).nullish(),
 });
 
 /** Kayıt: oturum açılır ve doğrulama e-postası outbox'a yazılır (P0-8). */
 export const POST = observed("auth.register", async function postHandler(req: NextRequest) {
   try {
-    const { firstName, lastName, email, password } = registerSchema.parse(await req.json());
+    const { firstName, lastName, email, password, pow } = registerSchema.parse(await req.json());
+    await enforceDegradedAuth(req, { email, pow });
 
     const passwordHash = await hashPassword(password);
     let user;

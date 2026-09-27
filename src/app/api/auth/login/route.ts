@@ -1,3 +1,4 @@
+import { enforceDegradedAuth, isAuthDegraded } from "@/lib/security/auth-degraded";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
@@ -38,8 +39,11 @@ export const POST = observed("auth.login", async function postHandler(req: NextR
       trustRealIpHeader: config.TRUST_REAL_IP_HEADER,
       socketIp: (req as unknown as { ip?: string }).ip,
     });
+    // v5#6: paylaşılan anonim kova tükendiyse e-posta kovası + PoW (proxy işareti).
+    const degraded = isAuthDegraded(req);
+    await enforceDegradedAuth(req, { email, pow });
     // Gecikme / PoW / e-posta başına limit (IP'den bağımsız, v3#3) — parola kontrolünden önce.
-    await assertLoginAttemptAllowed({ email, client, pow });
+    await assertLoginAttemptAllowed({ email, client, pow, powVerified: degraded });
 
     const user = await prisma.user.findUnique({
       where: { email: email.toLowerCase() },

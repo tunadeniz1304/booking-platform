@@ -101,6 +101,8 @@ export async function assertLoginAttemptAllowed(input: {
   email: string;
   client: string;
   pow?: PowSolution | null;
+  /** Yavaşlatılmış auth yolunda PoW zaten doğrulandı (v5#6) — ikinci bulmaca istenmez. */
+  powVerified?: boolean;
   now?: number;
 }): Promise<void> {
   const config = getConfig();
@@ -131,7 +133,7 @@ export async function assertLoginAttemptAllowed(input: {
     pairFails >= config.AUTH_LOCKOUT_THRESHOLD ||
     acctFails >= config.AUTH_LOCKOUT_THRESHOLD ||
     attempts > config.RATE_LIMIT_LOGIN_PER_ACCOUNT_MAX * rateLimitRelaxFactor(config);
-  if (needsPow && !(await verifyPow(input.pow, now))) {
+  if (needsPow && !input.powVerified && !(await verifyPow(input.pow, now))) {
     throw new PowRequiredError(issuePowChallenge(now));
   }
 }

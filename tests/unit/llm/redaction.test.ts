@@ -134,4 +134,35 @@ describe("KVKK redaksiyonu", () => {
       expect(redactText(text)).toBe(text);
     });
   });
+  describe("regression: v5#19 IBAN ayraç varyantları", () => {
+    it("çift boşluklu IBAN maskelenir", () => {
+      expect(redactText("IBAN TR33  0006  1005  1978  6457  8413  26 lütfen")).toBe(
+        "IBAN <IBAN_1> lütfen"
+      );
+    });
+
+    it("tireli IBAN maskelenir ve restore orijinali döndürür", () => {
+      const r = new Redactor();
+      const text = "IBAN TR33-0006-1005-1978-6457-8413-26.";
+      const out = r.redact(text);
+      expect(out).toBe("IBAN <IBAN_1>.");
+      expect(r.restore(out)).toBe(text);
+      expect(redactText("IBAN DE89 - 3704 - 0044 - 0532 - 0130 - 00.")).toBe("IBAN <IBAN_1>.");
+    });
+
+    it("NBSP ve karışık ayraçlı IBAN maskelenir", () => {
+      expect(redactText("IBAN TR33  0006 1005 -1978 6457 8413 26.")).toBe("IBAN <IBAN_1>.");
+    });
+
+    it("isValidIban tüm ayraçları (tire, NBSP, çoklu boşluk) temizler", () => {
+      expect(isValidIban("TR33-0006-1005-1978-6457-8413-26")).toBe(true);
+      expect(isValidIban("DE89  3704 - 0044  0532-0130-00")).toBe(true);
+      expect(isValidIban("DE89-3704-0044-0532-0130-01")).toBe(false);
+    });
+
+    it("kart ve telefon sırası korunur (IBAN sanılmaz)", () => {
+      expect(redactText(`kart ${CARD.replace(/ /g, "-")}`)).toBe("kart <KART_1>");
+      expect(redactText("tel 0532-123-45-67")).toBe("tel <TELEFON_1>");
+    });
+  });
 });

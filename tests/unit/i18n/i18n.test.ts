@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { createFormatter, intlLocale } from "@/lib/i18n/format";
 import { checkMessagesDir, compareLocales, flattenKeys, placeholders } from "@/lib/i18n/check";
 import { NAMESPACES, loadMessages } from "@/i18n/messages";
+import { negotiateLocale, resolveRequestLocale } from "@/i18n/config";
 
 describe("P1-12 i18n biçimlendirme (Intl)", () => {
   it("arayüz dili BCP-47 etiketine eşlenir; bilinmeyen dil tr'ye düşer", () => {
@@ -100,5 +101,66 @@ describe("P1-12 i18n anahtar denetimi", () => {
     expect(problems).toContain("tr içinde eksik");
     expect(problems).toContain("en metni boş");
     expect(checkMessagesDir(path.join(root, "nope"), ["a"]).length).toBe(2);
+  });
+});
+
+describe("v2-P1-3 Accept-Language dil müzakeresi", () => {
+  it("başlık yoksa ya da boşsa varsayılan tr", () => {
+    expect(negotiateLocale(undefined)).toBe("tr");
+    expect(negotiateLocale(null)).toBe("tr");
+    expect(negotiateLocale("")).toBe("tr");
+  });
+
+  it("bölge alt etiketi ana dile eşlenir; büyük/küçük harf duyarsız", () => {
+    expect(negotiateLocale("en-GB,en;q=0.9,tr;q=0.5")).toBe("en");
+    expect(negotiateLocale("EN-us")).toBe("en");
+    expect(negotiateLocale("tr-TR,tr;q=0.9,en;q=0.8")).toBe("tr");
+  });
+
+  it("desteklenmeyen dil tr'ye düşer", () => {
+    expect(negotiateLocale("ja-JP")).toBe("tr");
+    expect(negotiateLocale("ja-JP,ja;q=0.9,de;q=0.8")).toBe("tr");
+  });
+
+  it("q-değerleri sırayı belirler; eşit q'da başlıktaki sıra", () => {
+    expect(negotiateLocale("tr;q=0.4,en;q=0.8")).toBe("en");
+    expect(negotiateLocale("de,tr;q=0.5,en;q=0.7")).toBe("en");
+    expect(negotiateLocale("en;q=0.5,tr;q=0.5")).toBe("en");
+    expect(negotiateLocale("ja,en;q=0.1")).toBe("en");
+  });
+
+  it("q=0 dili dışlar", () => {
+    expect(negotiateLocale("en;q=0")).toBe("tr");
+    expect(negotiateLocale("en-GB,en;q=0")).toBe("tr");
+    expect(negotiateLocale("tr;q=0,en;q=0.1")).toBe("en");
+  });
+
+  it("joker (*) anılmamış ve dışlanmamış ilk desteklenen dile eşlenir", () => {
+    expect(negotiateLocale("*")).toBe("tr");
+    expect(negotiateLocale("ja,*;q=0.5")).toBe("tr");
+    expect(negotiateLocale("tr;q=0,*")).toBe("en");
+    expect(negotiateLocale("tr;q=0.1,*;q=0.5")).toBe("en");
+    expect(negotiateLocale("*;q=0")).toBe("tr");
+  });
+
+  it("bozuk başlık ve girdiler yok sayılır", () => {
+    expect(negotiateLocale(",,;")).toBe("tr");
+    expect(negotiateLocale("en;q=abc")).toBe("tr");
+    expect(negotiateLocale("en;q=1.5,ja")).toBe("tr");
+    expect(negotiateLocale("en;q=-1")).toBe("tr");
+    expect(negotiateLocale("<script>,en_US")).toBe("tr");
+    expect(negotiateLocale("en-, ;q=0.9")).toBe("tr");
+    expect(negotiateLocale("garbage===;;, en;q=0.3")).toBe("en");
+    expect(negotiateLocale(" en ; q = 0.8 ")).toBe("en");
+    expect(negotiateLocale("x".repeat(5000))).toBe("tr");
+  });
+
+  it("açık çerez seçimi Accept-Language'i her zaman ezer; geçersiz çerez müzakereye bırakır", () => {
+    expect(resolveRequestLocale("tr", "en-US,en;q=0.9")).toBe("tr");
+    expect(resolveRequestLocale("en", "tr-TR")).toBe("en");
+    expect(resolveRequestLocale(undefined, "en-GB,en;q=0.9,tr;q=0.5")).toBe("en");
+    expect(resolveRequestLocale(undefined, "ja-JP")).toBe("tr");
+    expect(resolveRequestLocale("de", "en")).toBe("en");
+    expect(resolveRequestLocale("", null)).toBe("tr");
   });
 });

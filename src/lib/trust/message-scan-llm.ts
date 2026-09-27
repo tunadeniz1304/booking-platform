@@ -11,8 +11,10 @@ import type { MessageRiskClassifier } from "./message-scan";
  * (`null`). Canlıda metin istemcinin KVKK redaksiyonundan geçer; yanıt yalnızca
  * `SUSPICIOUS|BENIGN` etiketidir. Fallback (timeout/geçersiz JSON) → `null` (sinyal yok).
  * Uyarı bandı ve engelleme kararı bu sonuçtan etkilenmez (message-scan.ts).
+ * Çağrı `subject` (gönderen kullanıcı, `u:<id>`) bütçesine faturalanır; özne yoksa
+ * istemci canlı çağrı yapmaz (fail-closed → sinyal yok).
  */
-export function getMessageRiskClassifier(): MessageRiskClassifier | undefined {
+export function getMessageRiskClassifier(subject?: string): MessageRiskClassifier | undefined {
   if (!getConfig().MESSAGE_SCAN_LLM_ENABLED) return undefined;
   const client = getLlmClient();
   if (client.settings.effectiveMode === "demo") return undefined;
@@ -28,7 +30,7 @@ export function getMessageRiskClassifier(): MessageRiskClassifier | undefined {
         },
         { role: "user", content: text },
       ],
-      { demo: () => ({ label: "BENIGN" as const }), temperature: 0 }
+      { demo: () => ({ label: "BENIGN" as const }), temperature: 0, subject }
     );
     return res.llmMode === "live" ? res.data.label : null;
   };

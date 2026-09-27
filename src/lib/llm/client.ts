@@ -41,6 +41,9 @@ import { createLimiter, type Limiter } from "@/lib/resilience/limit";
  * - LLM bağlayıcı karar VERMEZ: çıktılar öneri/açıklama/çeviridir.
  * - Süreç başına en fazla `LLM_MAX_CONCURRENCY` istek aynı anda uçuştadır (v4#3);
  *   fazlası sırada bekler (sağlayıcıya ani yük/harcama patlaması gitmez).
+ * - Her canlı istek (araç döngüsünün her adımı ve embeddings dahil) bir bütçe öznesine
+ *   atomik token rezervasyonu ister; özne yoksa veya bütçe doluysa SDK'ya gidilmez
+ *   (fail-closed, v2-P0-4).
  * - `openai` SDK'sı YALNIZCA bu dosyada içe aktarılır (ESLint kısıtı; embeddings dahil).
  */
 
@@ -73,6 +76,7 @@ export type FallbackReason =
   | "empty_response"
   | "tool_loop_exceeded"
   | "budget"
+  | "no_subject"
   | "unknown";
 
 export interface LlmMessage {
@@ -109,7 +113,10 @@ export interface LlmCallOptions<T> {
   signal?: AbortSignal;
   temperature?: number;
   maxTokens?: number;
-  /** Bütçe öznesi; verilmezse istek bağlamından (`runWithLlmSubject`) alınır. */
+  /**
+   * Bütçe öznesi; verilmezse istek bağlamından (`runWithLlmSubject`) alınır. İkisi de
+   * yoksa canlı çağrı yapılmaz (fail-closed, `reason: "no_subject"`).
+   */
   subject?: string;
 }
 
@@ -196,6 +203,14 @@ class EmptyResponseError extends Error {
   }
 }
 
+/** Canlı istekten önce bütçe rezervasyonu reddedildi → SDK'ya gidilmez. */
+class BudgetDeniedError extends Error {
+  constructor(readonly reason: "budget" | "no_subject") {
+    super(reason === "budget" ? "LLM token bütçesi dolu" : "LLM bütçe öznesi yok");
+    this.name = "BudgetDeniedError";
+  }
+}
+
 class ToolLoopExceededError extends Error {
   constructor() {
     super("Araç adım sınırı aşıldı");
@@ -218,8 +233,74 @@ function classifyLlmError(error: unknown): FallbackReason {
   if (error instanceof GuardError) return "guard_failed";
   if (error instanceof EmptyResponseError) return "empty_response";
   if (error instanceof ToolLoopExceededError) return "tool_loop_exceeded";
+  if (error instanceof BudgetDeniedError) return error.reason;
   if ((error as Error)?.name === "AbortError") return "aborted";
   return "unknown";
+}
+
+// --- Bütçe rezervasyonu (v2-P0-4) ----------------------------------------------
+
+/** Rezervasyon miktarı: istek gövdesinden temkinli prompt tahmini + azami yanıt token'ı. */
+function estimateTokens(request: unknown, maxCompletion: number, charsPerToken: number): number {
+  return Math.ceil(JSON.stringify(request).length / charsPerToken) + maxCompletion;
+}
+
+/** Sağlayıcı isteği 4xx ile reddetti (faturalanmaz) → rezervasyon iade edilebilir. */
+function rejectedByProvider(error: unknown): boolean {
+  if (!(error instanceof APIError)) return false;
+  const status = error.status ?? 0;
+  return status >= 400 && status < 500;
+}
+
+interface BudgetHold {
+  subject: string;
+  reserved: number;
+  /** Rezervasyon anı; düzeltme aynı gün anahtarına yazılır. */
+  at: Date;
+}
+
+/**
+ * Canlı istekten ÖNCE atomik rezervasyon (fail-closed): özne yoksa veya bütçe doluysa
+ * `BudgetDeniedError`. Eşzamanlı çağrılar bütçeyi en fazla bir rezervasyon kadar aşabilir.
+ */
+async function holdBudget(
+  budget: LlmBudget,
+  task: LlmTask | "embedding",
+  subject: string | undefined,
+  tokens: number
+): Promise<BudgetHold> {
+  if (!subject) {
+    logger.warn({ task }, "llm call without budget subject; skipped");
+    throw new BudgetDeniedError("no_subject");
+  }
+  const at = new Date();
+  if (!(await budget.reserve(subject, tokens, at))) {
+    llmBudgetExceededTotal.inc({ task });
+    throw new BudgetDeniedError("budget");
+  }
+  return { subject, reserved: tokens, at };
+}
+
+/**
+ * Rezervasyonlu istek: yanıt gelince rezervasyon gerçek kullanımla düzeltilir (kullanım
+ * bilinmiyorsa rezervasyon kalır); sağlayıcı 4xx ile reddettiyse rezervasyon iade edilir.
+ */
+async function withBudgetHold<R>(
+  budget: LlmBudget,
+  hold: BudgetHold,
+  send: () => Promise<R>,
+  usedTokens: (res: R) => number | undefined
+): Promise<R> {
+  let res: R;
+  try {
+    res = await send();
+  } catch (error) {
+    if (rejectedByProvider(error)) await budget.consume(hold.subject, -hold.reserved, hold.at);
+    throw error;
+  }
+  const used = usedTokens(res);
+  if (used !== undefined) await budget.consume(hold.subject, used - hold.reserved, hold.at);
+  return res;
 }
 
 // --- İstemci ------------------------------------------------------------------
@@ -239,21 +320,10 @@ type Completion = Pick<ChatCompletion, "choices" | "usage" | "model">;
 export function createLlmClient(options: CreateLlmClientOptions = {}): LlmClient {
   const settings = options.settings ?? getLlmSettings();
   const jsonKey = `${settings.baseUrlHost}|${settings.model}`;
-  const budget = options.budget ?? createRedisBudget(redis, settings.dailyTokenBudgetPerUser);
+  const budget =
+    options.budget ??
+    createRedisBudget(redis, settings.dailyTokenBudgetPerUser, settings.dailyTokenBudgetSystem);
   const limit = options.limiter ?? getLlmLimiter(settings.maxConcurrency);
-
-  /** Canlı çağrı öncesi: özne bütçesini doldurduysa `true` (→ demo, reason "budget"). */
-  async function overBudget(task: LlmTask, subject: string | undefined): Promise<boolean> {
-    if (!subject) return false;
-    if (!(await budget.exceeded(subject))) return false;
-    llmBudgetExceededTotal.inc({ task });
-    return true;
-  }
-
-  async function charge(subject: string | undefined, usage?: LlmUsage): Promise<void> {
-    if (subject && usage)
-      await budget.consume(subject, usage.promptTokens + usage.completionTokens);
-  }
 
   /**
    * `LLM_LOG_PROMPTS=true` (production dışı) iken YALNIZCA redakte edilmiş prompt debug
@@ -345,6 +415,32 @@ export function createLlmClient(options: CreateLlmClientOptions = {}): LlmClient
     };
   }
 
+  /** Bütçe rezervasyonlu tek SDK isteği (araç döngüsünde her adım ayrı rezervasyon). */
+  async function metered(
+    task: LlmTask,
+    subject: string | undefined,
+    params: Omit<ChatCompletionCreateParamsNonStreaming, "model">,
+    wantJson: boolean,
+    signal?: AbortSignal
+  ): Promise<{ res: Completion; usage?: LlmUsage }> {
+    const hold = await holdBudget(
+      budget,
+      task,
+      subject,
+      estimateTokens(params, params.max_tokens ?? settings.maxTokens, settings.promptCharsPerToken)
+    );
+    const res = await withBudgetHold(
+      budget,
+      hold,
+      () => create(params, wantJson, signal),
+      (r) => {
+        const u = usageOf(r);
+        return u ? u.promptTokens + u.completionTokens : undefined;
+      }
+    );
+    return { res, usage: usageOf(res) };
+  }
+
   function contentOf(res: Completion): string {
     // Yalnızca `message.content`; `reasoning_content` gibi sağlayıcıya özgü alanlar yok sayılır.
     const content = res.choices?.[0]?.message?.content;
@@ -394,6 +490,10 @@ export function createLlmClient(options: CreateLlmClientOptions = {}): LlmClient
     demo: () => T | Promise<T>,
     started: number
   ): Promise<LlmResult<T>> {
+    // Bütçe reddi sağlayıcı hatası değildir: süreç durumu (lastError) değişmez.
+    if (error instanceof BudgetDeniedError) {
+      return demoResult(task, demo, "fallback", started, error.reason);
+    }
     const reason = classifyLlmError(error);
     runtimeStatus.lastError = reason;
     logger.warn({ task, reason, ...errorFields(error) }, "llm fallback");
@@ -414,14 +514,13 @@ export function createLlmClient(options: CreateLlmClientOptions = {}): LlmClient
         return demoResult(task, opts.demo, "demo", started);
       }
       const subject = opts.subject ?? currentLlmSubject();
-      if (await overBudget(task, subject)) {
-        return demoResult(task, opts.demo, "fallback", started, "budget");
-      }
       const redactor = new Redactor(opts.knownNames ?? []);
       try {
         const redacted = redactMessages(messages, redactor);
         logPrompt(task, redacted);
-        const res = await create(
+        const { res, usage } = await metered(
+          task,
+          subject,
           {
             messages: redacted,
             temperature: opts.temperature ?? settings.temperature,
@@ -430,8 +529,6 @@ export function createLlmClient(options: CreateLlmClientOptions = {}): LlmClient
           true,
           opts.signal
         );
-        const usage = usageOf(res);
-        await charge(subject, usage);
         let data = parseJsonWithSchema(contentOf(res), schema);
         if (opts.restorePii !== false) data = redactor.restoreDeep(data);
         if (opts.validate) data = opts.validate(data) ?? data;
@@ -461,14 +558,13 @@ export function createLlmClient(options: CreateLlmClientOptions = {}): LlmClient
         return demoResult(task, opts.demo, "demo", started);
       }
       const subject = opts.subject ?? currentLlmSubject();
-      if (await overBudget(task, subject)) {
-        return demoResult(task, opts.demo, "fallback", started, "budget");
-      }
       const redactor = new Redactor(opts.knownNames ?? []);
       try {
         const redacted = redactMessages(messages, redactor);
         logPrompt(task, redacted);
-        const res = await create(
+        const { res, usage } = await metered(
+          task,
+          subject,
           {
             messages: redacted,
             temperature: opts.temperature ?? settings.temperature,
@@ -477,8 +573,6 @@ export function createLlmClient(options: CreateLlmClientOptions = {}): LlmClient
           false,
           opts.signal
         );
-        const usage = usageOf(res);
-        await charge(subject, usage);
         let text = contentOf(res).trim();
         if (opts.restorePii !== false) text = redactor.restore(text);
         if (opts.validate) text = opts.validate(text) ?? text;
@@ -513,12 +607,6 @@ export function createLlmClient(options: CreateLlmClientOptions = {}): LlmClient
         return { ...(await demoResult(task, opts.demo, "demo", started)), toolCalls };
       }
       const subject = opts.subject ?? currentLlmSubject();
-      if (await overBudget(task, subject)) {
-        return {
-          ...(await demoResult(task, opts.demo, "fallback", started, "budget")),
-          toolCalls,
-        };
-      }
       const redactor = new Redactor(opts.knownNames ?? []);
       const byName = new Map(tools.map((t) => [t.name, t]));
       const toolDefs: ChatCompletionTool[] = tools.map((t) => ({
@@ -531,7 +619,10 @@ export function createLlmClient(options: CreateLlmClientOptions = {}): LlmClient
 
       try {
         for (let step = 0; step <= settings.maxToolSteps; step++) {
-          const res = await create(
+          // Her adım ayrı rezervasyon: bütçe adım ortasında dolarsa sonraki istek yapılmaz.
+          const { res, usage: u } = await metered(
+            task,
+            subject,
             {
               messages: convo,
               tools: toolDefs,
@@ -541,11 +632,9 @@ export function createLlmClient(options: CreateLlmClientOptions = {}): LlmClient
             false,
             opts.signal
           );
-          const u = usageOf(res);
           if (u) {
             usage.promptTokens += u.promptTokens;
             usage.completionTokens += u.completionTokens;
-            await charge(subject, u);
           }
           const message = res.choices?.[0]?.message;
           const calls = message?.tool_calls ?? [];
@@ -616,8 +705,8 @@ export function getLlmClient(): LlmClient {
 export type EmbedFn = (texts: string[], dimensions: number) => Promise<number[][]>;
 
 export class LlmBudgetExceededError extends Error {
-  constructor() {
-    super("Günlük LLM token bütçesi aşıldı");
+  constructor(readonly reason: "budget" | "no_subject" = "budget") {
+    super(reason === "budget" ? "Günlük LLM token bütçesi aşıldı" : "LLM bütçe öznesi yok");
     this.name = "LlmBudgetExceededError";
   }
 }
@@ -632,8 +721,8 @@ export interface RemoteEmbedOptions {
 /**
  * Canlı mod + `EMBEDDING_MODEL` varsa uzak embedding fonksiyonu, yoksa `null`
  * (çağıran ağsız hash-embedder'a düşer). Giden her metin KVKK redaksiyonundan geçer;
- * istek bağlamında bir özne varsa günlük bütçe kontrol edilir/faturalanır (aşımda
- * `LlmBudgetExceededError` → çağıran deterministik yola düşer).
+ * istek bağlamındaki özneye atomik token rezervasyonu yapılır. Özne yoksa veya bütçe
+ * doluysa ağa çıkılmaz: `LlmBudgetExceededError` → çağıran deterministik yola düşer.
  */
 export function createRemoteEmbedFn(
   model: string | undefined,
@@ -641,7 +730,9 @@ export function createRemoteEmbedFn(
 ): EmbedFn | null {
   const llm = options.settings ?? getLlmSettings();
   if (!model || llm.effectiveMode !== "live" || !llm.apiKey) return null;
-  const budget = options.budget ?? createRedisBudget(redis, llm.dailyTokenBudgetPerUser);
+  const budget =
+    options.budget ??
+    createRedisBudget(redis, llm.dailyTokenBudgetPerUser, llm.dailyTokenBudgetSystem);
   const limit = options.limiter ?? getLlmLimiter(llm.maxConcurrency);
   const client = new OpenAI({
     apiKey: llm.apiKey,
@@ -651,14 +742,25 @@ export function createRemoteEmbedFn(
     ...(options.fetch ? { fetch: options.fetch } : {}),
   });
   return async (texts, dimensions) => {
-    const subject = currentLlmSubject();
-    if (subject && (await budget.exceeded(subject))) {
-      llmBudgetExceededTotal.inc({ task: "embedding" });
-      throw new LlmBudgetExceededError();
-    }
     const input = texts.map((t) => redactText(t));
-    const res = await limit(() => client.embeddings.create({ model, input, dimensions }));
-    if (subject && res.usage) await budget.consume(subject, res.usage.total_tokens ?? 0);
+    let hold: BudgetHold;
+    try {
+      hold = await holdBudget(
+        budget,
+        "embedding",
+        currentLlmSubject(),
+        estimateTokens(input, 0, llm.promptCharsPerToken)
+      );
+    } catch (error) {
+      if (error instanceof BudgetDeniedError) throw new LlmBudgetExceededError(error.reason);
+      throw error;
+    }
+    const res = await withBudgetHold(
+      budget,
+      hold,
+      () => limit(() => client.embeddings.create({ model, input, dimensions })),
+      (r) => r.usage?.total_tokens
+    );
     return res.data.map((d) => d.embedding);
   };
 }

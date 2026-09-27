@@ -1,4 +1,10 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
+
+// v2-P0-4: öznesiz canlı çağrı fail-closed → canlı yol açık bir test öznesiyle sınanır.
+vi.mock("@/lib/llm/budget", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/llm/budget")>()),
+  currentLlmSubject: () => "u:test",
+}));
 import {
   buildReviewHighlights,
   splitSentences,
@@ -45,7 +51,11 @@ const config: HighlightsConfig = {
   minQuoteChars: 12,
 };
 
-const noBudget: LlmBudget = { exceeded: async () => false, consume: async () => undefined };
+const noBudget: LlmBudget = {
+  exceeded: async () => false,
+  reserve: async () => true,
+  consume: async () => undefined,
+};
 const demoClient = () => createLlmClient({ settings: parseLlmSettings({}), budget: noBudget });
 
 function liveClient(content: (call: number, body: { messages: { content: string }[] }) => unknown) {

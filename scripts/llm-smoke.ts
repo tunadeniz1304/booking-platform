@@ -9,6 +9,7 @@ import { z } from "zod";
 import { loadEnv } from "../src/lib/config/load-env";
 import { describeLlmMode, getLlmSettings } from "../src/lib/llm/settings";
 import { createLlmClient } from "../src/lib/llm/client";
+import { systemLlmSubject } from "../src/lib/llm/budget";
 import { demoSmoke } from "../src/lib/llm/demo";
 
 async function main(): Promise<void> {
@@ -22,6 +23,8 @@ async function main(): Promise<void> {
   }
 
   const client = createLlmClient({ settings });
+  // Öznesiz canlı çağrı fail-closed; duman testi sistem bütçesine faturalanır.
+  const subject = systemLlmSubject("smoke");
   const json = await client.completeJson(
     "smoke",
     z.object({ ok: z.boolean(), message: z.string() }),
@@ -32,7 +35,7 @@ async function main(): Promise<void> {
       },
       { role: "user", content: "Bağlantı testi." },
     ],
-    { demo: demoSmoke }
+    { demo: demoSmoke, subject }
   );
   console.log(
     `JSON  → mod=${json.llmMode} gecikme=${json.latencyMs}ms${json.reason ? ` neden=${json.reason}` : ""}`
@@ -41,7 +44,7 @@ async function main(): Promise<void> {
   const text = await client.completeText(
     "smoke",
     [{ role: "user", content: "Tek kelimeyle yanıt ver: merhaba" }],
-    { demo: () => "demo" }
+    { demo: () => "demo", subject }
   );
   console.log(
     `METİN → mod=${text.llmMode} gecikme=${text.latencyMs}ms${text.reason ? ` neden=${text.reason}` : ""}`

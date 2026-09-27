@@ -92,7 +92,8 @@ describeInt("P0-6 /api/metrics iş serileri", () => {
       "smart_filter",
       z.object({ city: z.string() }),
       [{ role: "user", content: "İstanbul" }],
-      { demo: () => ({ city: "demo" }) }
+      // v2-P0-4: öznesiz canlı çağrı fail-closed → açık özne.
+      { demo: () => ({ city: "demo" }), subject: "u:metrics" }
     );
     expect(res.llmMode).toBe("live");
 

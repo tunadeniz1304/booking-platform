@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { toVectorLiteral } from "@/lib/embedding/embedder";
 import { embedText } from "@/lib/embedding/provider";
+import { runWithSystemLlmSubject } from "@/lib/llm/budget";
 
 /**
  * Property gömme vektörlerini hesaplar ve pgvector'a yazar.
@@ -25,7 +26,9 @@ export async function upsertPropertyEmbedding(propertyId: string): Promise<void>
     ...property.amenities.map((a) => a.name),
   ].join(" ");
 
-  const vector = await embedText(text);
+  // İndeksleme bir sistem işidir: uzak embedding çağrısı sistem bütçesine faturalanır
+  // (öznesiz çağrı fail-closed olduğundan aksi halde hash uzayına düşülürdü).
+  const vector = await runWithSystemLlmSubject("embedding_index", () => embedText(text));
   const literal = toVectorLiteral(vector);
 
   await prisma.$executeRaw`

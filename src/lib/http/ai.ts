@@ -2,7 +2,7 @@ import type { NextRequest } from "next/server";
 import { getAuth } from "@/lib/auth";
 import { getConfig } from "@/lib/config/app-config";
 import { anonymousIdentities } from "@/lib/security/ip";
-import { runWithLlmSubject } from "@/lib/llm/budget";
+import { runWithLlmSubject, userLlmSubject } from "@/lib/llm/budget";
 
 /**
  * AI uçları için ortak yardımcılar.
@@ -12,7 +12,7 @@ import { runWithLlmSubject } from "@/lib/llm/budget";
  */
 async function aiSubject(req: NextRequest): Promise<string> {
   const claims = await getAuth(req);
-  if (claims) return `u:${claims.userId}`;
+  if (claims) return userLlmSubject(claims.userId);
   const config = getConfig();
   return anonymousIdentities(req.headers, {
     trustedProxyHops: config.TRUSTED_PROXY_HOPS,

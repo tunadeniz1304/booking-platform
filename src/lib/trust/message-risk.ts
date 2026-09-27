@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { HttpError } from "@/lib/http/errors";
 import { counter } from "@/lib/observability/metrics";
 import { scanMessage, type MessageScanResult } from "./message-scan";
+import { userLlmSubject } from "@/lib/llm/budget";
 import { getMessageRiskClassifier } from "./message-scan-llm";
 
 /**
@@ -46,9 +47,15 @@ function ownHosts(): string[] {
   return hosts;
 }
 
-/** Ham mesaj metnini tarar (kurallar + opsiyonel LLM ek sinyali). */
-export function scanOutgoingMessage(body: string): Promise<MessageScanResult> {
-  return scanMessage(body, { ownHosts: ownHosts(), classify: getMessageRiskClassifier() });
+/**
+ * Ham mesaj metnini tarar (kurallar + opsiyonel LLM ek sinyali). LLM çağrısı gönderenin
+ * günlük token bütçesine faturalanır.
+ */
+export function scanOutgoingMessage(body: string, senderId: string): Promise<MessageScanResult> {
+  return scanMessage(body, {
+    ownHosts: ownHosts(),
+    classify: getMessageRiskClassifier(userLlmSubject(senderId)),
+  });
 }
 
 const needsRecord = (scan: MessageScanResult) =>

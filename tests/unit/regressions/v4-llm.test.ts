@@ -61,6 +61,11 @@ function memoryBudget(limit: number): LlmBudget & { used: Map<string, number> } 
     async exceeded(subject) {
       return (used.get(subject) ?? 0) >= limit;
     },
+    async reserve(subject, tokens) {
+      if ((used.get(subject) ?? 0) >= limit) return false;
+      used.set(subject, (used.get(subject) ?? 0) + tokens);
+      return true;
+    },
     async consume(subject, tokens) {
       used.set(subject, (used.get(subject) ?? 0) + tokens);
     },
@@ -94,12 +99,16 @@ describe("regression: v4#3 LLM eşzamanlılık sınırı (LLM_MAX_CONCURRENCY)",
       settings,
       fetch: f.fetch,
       limiter: createLimiter(settings.maxConcurrency),
+      budget: memoryBudget(Number.POSITIVE_INFINITY),
     });
-    const results = await Promise.all(
-      Array.from({ length: 20 }, () =>
-        client.completeJson("smoke", z.object({ ok: z.boolean() }), [], {
-          demo: () => ({ ok: false }),
-        })
+    // v2-P0-4: öznesiz canlı çağrı fail-closed → açık özne (bütçe burada sınanmıyor).
+    const results = await runWithLlmSubject("u:concurrency", () =>
+      Promise.all(
+        Array.from({ length: 20 }, () =>
+          client.completeJson("smoke", z.object({ ok: z.boolean() }), [], {
+            demo: () => ({ ok: false }),
+          })
+        )
       )
     );
     expect(results.every((r) => r.llmMode === "live")).toBe(true);

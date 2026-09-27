@@ -48,6 +48,11 @@ function memoryBudget(limit: number): LlmBudget & { used: Map<string, number> } 
     async exceeded(subject) {
       return (used.get(subject) ?? 0) >= limit;
     },
+    async reserve(subject, tokens) {
+      if ((used.get(subject) ?? 0) >= limit) return false;
+      used.set(subject, (used.get(subject) ?? 0) + tokens);
+      return true;
+    },
     async consume(subject, tokens) {
       used.set(subject, (used.get(subject) ?? 0) + tokens);
     },

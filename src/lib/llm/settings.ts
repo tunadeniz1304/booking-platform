@@ -9,6 +9,8 @@ import { loadEnv } from "@/lib/config/load-env";
  *  - Base URL: LLM_BASE_URL → DEEPSEEK_BASE_URL → EVREN_BASE_URL → OPENAI_BASE_URL
  *  - Model:    LLM_MODEL → DEEPSEEK_MODEL
  *  - v4: LLM_MAX_CONCURRENCY (varsayılan 4), LLM_VISION_MODEL (opsiyonel)
+ *  - Bütçe: LLM_DAILY_TOKEN_BUDGET_PER_USER, LLM_DAILY_TOKEN_BUDGET_SYSTEM,
+ *    LLM_PROMPT_CHARS_PER_TOKEN (rezervasyon tahmini)
  *
  * Anahtarın kendisi yalnızca istemci oluşturulurken kullanılır; log, hata
  * mesajı, durum yanıtı veya telemetride asla yer almaz (yalnızca `hasKey`).
@@ -25,6 +27,10 @@ export const LLM_DEFAULTS = {
   maxToolSteps: 5,
   /** Kullanıcı (özne) başına günlük token bütçesi; 0 = sınırsız. */
   dailyTokenBudgetPerUser: 50_000,
+  /** Sistem işleri (`sys:<iş>`, ör. embedding indeksleme) başına günlük bütçe; 0 = sınırsız. */
+  dailyTokenBudgetSystem: 1_000_000,
+  /** Bütçe rezervasyonunda prompt token tahmini: karakter / bu değer (Türkçe için temkinli). */
+  promptCharsPerToken: 3,
   /** Süreç başına aynı anda uçuşta olabilecek azami LLM/embedding isteği (v4#3). */
   maxConcurrency: 4,
 } as const;
@@ -54,6 +60,13 @@ const settingsSchema = z.object({
     .min(0)
     .max(10_000_000)
     .default(LLM_DEFAULTS.dailyTokenBudgetPerUser),
+  dailyTokenBudgetSystem: z.coerce
+    .number()
+    .int()
+    .min(0)
+    .max(100_000_000)
+    .default(LLM_DEFAULTS.dailyTokenBudgetSystem),
+  promptCharsPerToken: z.coerce.number().min(1).max(8).default(LLM_DEFAULTS.promptCharsPerToken),
   maxConcurrency: z.coerce.number().int().min(1).max(64).default(LLM_DEFAULTS.maxConcurrency),
   /** Opsiyonel görsel (vision) model; yoksa görsel özellikler deterministik yola düşer. */
   visionModel: z.string().min(1).optional(),
@@ -104,6 +117,8 @@ export function parseLlmSettings(env: Env): LlmSettings {
     maxTokens: env.LLM_MAX_TOKENS || undefined,
     maxToolSteps: env.LLM_MAX_TOOL_STEPS || undefined,
     dailyTokenBudgetPerUser: env.LLM_DAILY_TOKEN_BUDGET_PER_USER || undefined,
+    dailyTokenBudgetSystem: env.LLM_DAILY_TOKEN_BUDGET_SYSTEM || undefined,
+    promptCharsPerToken: env.LLM_PROMPT_CHARS_PER_TOKEN || undefined,
     maxConcurrency: env.LLM_MAX_CONCURRENCY || undefined,
     visionModel: env.LLM_VISION_MODEL?.trim() || undefined,
     logPrompts: env.LLM_LOG_PROMPTS === "true" && env.NODE_ENV !== "production",

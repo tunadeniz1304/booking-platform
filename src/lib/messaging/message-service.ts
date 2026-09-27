@@ -120,7 +120,7 @@ export async function sendMessage(
     throw new ValidationError("Yapay zekâ taslağı yalnızca ev sahibi tarafından gönderilebilir");
   }
   // P1-6: dolandırıcılık taraması ham metinde (maskeleme IBAN/link'i gizlemeden önce).
-  const scan = await scanOutgoingMessage(input.body);
+  const scan = await scanOutgoingMessage(input.body, userId);
   await enforceMessageScan(scan, { bookingId, senderId: userId });
   const masked = maskMessage(input.body);
   const thread = await prisma.messageThread.upsert({

@@ -1,4 +1,11 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
+
+// v2-P0-4: öznesiz canlı çağrı fail-closed. Bu dosya bütçeyi değil istemci davranışını
+// sınar → açık bir test öznesi + sınırsız bütçe (LLM_DAILY_TOKEN_BUDGET_PER_USER=0).
+vi.mock("@/lib/llm/budget", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/llm/budget")>()),
+  currentLlmSubject: () => "u:test",
+}));
 import { z } from "zod";
 import { createLlmClient, getLlmRuntimeStatus, resetLlmRuntimeForTests } from "@/lib/llm/client";
 import { parseLlmSettings } from "@/lib/llm/settings";
@@ -61,6 +68,7 @@ const liveSettings = parseLlmSettings({
   LLM_API_KEY: "test-k",
   LLM_MAX_RETRIES: "0",
   LLM_TIMEOUT_SECONDS: "1",
+  LLM_DAILY_TOKEN_BUDGET_PER_USER: "0",
 });
 const schema = z.object({ city: z.string(), maxPrice: z.number() });
 const demo = () => ({ city: "DemoŞehir", maxPrice: 1 });

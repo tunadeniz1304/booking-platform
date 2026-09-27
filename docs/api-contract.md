@@ -2,6 +2,8 @@
 
 Base URL: `/api`. Tüm istek/yanıtlar JSON'dur. UI kopyası Türkçe'dir; API alan adları İngilizce'dir.
 
+> **Makine okunur sözleşme:** `GET /api/openapi.json` (oturumsuz) çekirdek misafir akışını — `/api/search`, `/api/quote`, `/api/bookings`, `/api/bookings/{id}` (GET, DELETE = iptal), `/api/bookings/{id}/pay` — OpenAPI 3.1 olarak yayımlar: Bearer (`bearerAuth`) şeması, `Idempotency-Key` başlığı, ortak `Error` zarfı ve `x-error-catalog` hata kodu kataloğu (`ERROR_CATALOG`, `src/lib/http/errors.ts`). İstek şemaları route'ların kullandığı zod şemalarından üretilir (`src/lib/http/api-schemas.ts` → `src/lib/http/openapi.ts`); belge ile route dosyalarının uyumu `tests/unit/lib/openapi-contract.test.ts` ile denetlenir. Bu dosya insan okunur ayrıntı ve belgelenmemiş diğer uçlar içindir.
+
 ## 0. Ortak Sözleşmeler
 
 ### 0.1 Hata Zarfı (Error Envelope)
@@ -42,7 +44,7 @@ Zod doğrulama hatalarında:
 - Giriş/kayıt yanıtı: `{ user, token }`. Token JWT'dir (algorithm HS256, `sub` = userId, `role` claim'i içerir).
 - İstemci token'ı **`Authorization: Bearer <token>`** başlığında **veya** `token` httpOnly cookie'sinde gönderir.
 - Proxy (`src/proxy.ts`), korunan `/api` isteklerini doğrular ve `x-user-id` / `x-user-role` başlıklarını yalnızca doğrulanmış token'dan alt uçlara ekler.
-- Oturum gerektirmeyen uçlar `src/lib/security/public-routes.ts` içindeki `PUBLIC_API` listesindedir: `/api/auth/*`, `/api/health`, `/api/ready`, `/api/metrics`, `/api/internal/*`, `/api/payments/webhook` (tüm metotlar); `/api/search` (GET, POST); `/api/properties*`, `/api/locations`, `/api/quote`, `/api/rooms/*`, `/api/routing/optimize`, `/api/transfers/discover` (yalnızca GET). Route handler'lar ayrıca kendi yetki kontrolünü yapar.
+- Oturum gerektirmeyen uçlar `src/lib/security/public-routes.ts` içindeki `PUBLIC_API` listesindedir: `/api/auth/*`, `/api/health`, `/api/ready`, `/api/metrics`, `/api/internal/*`, `/api/payments/webhook` (tüm metotlar); `/api/search` (GET, POST); `/api/properties*`, `/api/locations`, `/api/quote`, `/api/rooms/*`, `/api/routing/optimize`, `/api/transfers/discover`, `/api/openapi.json` (yalnızca GET). Route handler'lar ayrıca kendi yetki kontrolünü yapar.
 
 ### 0.4 Idempotency
 

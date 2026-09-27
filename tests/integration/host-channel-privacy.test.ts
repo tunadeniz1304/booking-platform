@@ -181,26 +181,33 @@ describeInt("F7 host / kanal / KVKK (integration)", () => {
     const host = await mkUser("evsahibi", "HOST");
     const stranger = await mkUser("yabanci", "USER");
     const loc = await prisma.location.create({ data: { city: `Kvkk-${stamp}`, country: "TEST" } });
-    const property = await prisma.property.create({
-      data: {
-        licenseStatus: "VERIFIED",
-        hostId: host.id,
-        title: "Kvkk",
-        description: "kvkk test",
-        propertyType: "HOTEL",
-        locationId: loc.id,
-        basePriceMinor: 50000n,
-      },
-    });
-    const room = await prisma.roomType.create({
-      data: { propertyId: property.id, name: "K", maxOccupancy: 2, bedType: "Ç" },
-    });
-    const mkBooking = (userId: string) =>
+    // Yabancının rezervasyonu başka ev sahibinin ilanında (ayrı konuşma, ortak taraf yok).
+    const otherHost = await mkUser("baskaevsahibi", "HOST");
+    const mkListing = async (hostId: string) => {
+      const property = await prisma.property.create({
+        data: {
+          licenseStatus: "VERIFIED",
+          hostId,
+          title: "Kvkk",
+          description: "kvkk test",
+          propertyType: "HOTEL",
+          locationId: loc.id,
+          basePriceMinor: 50000n,
+        },
+      });
+      const room = await prisma.roomType.create({
+        data: { propertyId: property.id, name: "K", maxOccupancy: 2, bedType: "Ç" },
+      });
+      return { property, room };
+    };
+    const { property, room } = await mkListing(host.id);
+    const otherListing = await mkListing(otherHost.id);
+    const mkBooking = (userId: string, listing = { property, room }) =>
       prisma.booking.create({
         data: {
           userId,
-          propertyId: property.id,
-          roomId: room.id,
+          propertyId: listing.property.id,
+          roomId: listing.room.id,
           checkIn: utcDay(30),
           checkOut: utcDay(32),
           guestCount: 2,
@@ -209,7 +216,7 @@ describeInt("F7 host / kanal / KVKK (integration)", () => {
         },
       });
     const booking = await mkBooking(guest.id);
-    const strangerBooking = await mkBooking(stranger.id);
+    const strangerBooking = await mkBooking(stranger.id, otherListing);
     const payment = await prisma.payment.create({
       data: {
         bookingId: booking.id,

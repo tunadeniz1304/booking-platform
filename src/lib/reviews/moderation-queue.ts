@@ -4,6 +4,7 @@ import { NotFoundError } from "@/lib/http/errors";
 import { withSerializableRetry } from "@/lib/db/transactions";
 import { getLlmClient } from "@/lib/llm/client";
 import { demoModerationExplain } from "@/lib/llm/demo";
+import { assertNumbersGrounded, buildFactSet } from "@/lib/llm/guards";
 import { bumpVersion, recomputeRating } from "@/lib/reviews/review-service";
 import type { ModerationReason } from "@/lib/reviews/moderation";
 
@@ -26,6 +27,8 @@ function parseReasons(raw: unknown): ModerationReason[] {
  * yorum metni modele gönderilmez (PII içerebilir). Demo/hata → deterministik metin.
  */
 async function explain(reasons: ModerationReason[]): Promise<string> {
+  // v2-P0-7: açıklamadaki her sayı gerekçe kodu/detayından gelmeli; uydurma sayı → demo.
+  const facts = buildFactSet(reasons.flatMap((r) => [r.code, r.detail]));
   const res = await getLlmClient().completeJson(
     "moderation_explain",
     z.object({ explanation: z.string().min(5).max(600) }),
@@ -37,7 +40,10 @@ async function explain(reasons: ModerationReason[]): Promise<string> {
       },
       { role: "user", content: JSON.stringify(reasons) },
     ],
-    { demo: () => demoModerationExplain(reasons) }
+    {
+      demo: () => demoModerationExplain(reasons),
+      validate: (data) => assertNumbersGrounded(data.explanation, facts),
+    }
   );
   return res.data.explanation;
 }

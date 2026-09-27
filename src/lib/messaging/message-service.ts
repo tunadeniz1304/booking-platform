@@ -5,6 +5,7 @@ import { getConfig } from "@/lib/config/app-config";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/http/errors";
 import { getLlmClient } from "@/lib/llm/client";
 import { demoMessageDraft } from "@/lib/llm/demo";
+import { assertNumbersGrounded, buildFactSet } from "@/lib/llm/guards";
 import { maskMessage } from "./mask";
 import { publishMessage, type MessageEvent } from "./hub";
 import {
@@ -32,6 +33,7 @@ export interface ThreadAccess {
   guestName: string;
   checkIn: Date;
   checkOut: Date;
+  guestCount: number;
 }
 
 export async function resolveThreadAccess(
@@ -46,6 +48,7 @@ export async function resolveThreadAccess(
       status: true,
       checkIn: true,
       checkOut: true,
+      guestCount: true,
       user: { select: { firstName: true } },
       property: { select: { hostId: true, title: true } },
     },
@@ -66,6 +69,7 @@ export async function resolveThreadAccess(
     guestName: b.user.firstName || "Misafir",
     checkIn: b.checkIn,
     checkOut: b.checkOut,
+    guestCount: b.guestCount,
   };
 }
 
@@ -145,6 +149,8 @@ export async function sendMessage(
   return event;
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 /** LLM'e misafir adı yerine giden takma ad (pseudonim). */
 export const GUEST_NAME_PLACEHOLDER = "[MISAFIR]";
 
@@ -172,9 +178,25 @@ export async function draftHostReply(bookingId: string, userId: string) {
     checkOut: access.checkOut.toISOString().slice(0, 10),
     lastGuestMessage: lastGuest,
   };
+  const nights = Math.round((access.checkOut.getTime() - access.checkIn.getTime()) / DAY_MS);
+  // v2-P0-7: taslaktaki her sayı/tarih rezervasyon olgularından gelmeli (tarihler, gece ve
+  // misafir sayısı koddan). Mesaj geçmişi bilerek olgu sayılmaz: misafirin yazdığı bir
+  // tutar ("1500 TL iade") modele tekrar ettirilip taahhüde dönüşemez → demo taslağı.
+  const factSet = buildFactSet([
+    access.propertyTitle,
+    facts.checkIn,
+    facts.checkOut,
+    nights,
+    access.guestCount,
+  ]);
   // v4#3: misafirin adı modele GİTMEZ — yer tutucuyla gönderilir, yanıtta geri konur.
   // Geçmiş mesajlardaki ad da (≥3 harf) istemci redaksiyonunda `knownNames` ile maskelenir.
-  const llmFacts = { ...facts, guestName: GUEST_NAME_PLACEHOLDER };
+  const llmFacts = {
+    ...facts,
+    guestName: GUEST_NAME_PLACEHOLDER,
+    nights,
+    guestCount: access.guestCount,
+  };
   const res = await getLlmClient().completeJson(
     "message_draft",
     z.object({ reply: z.string().min(5).max(getConfig().MESSAGE_MAX_LENGTH) }),
@@ -191,7 +213,11 @@ export async function draftHostReply(bookingId: string, userId: string) {
         }),
       },
     ],
-    { demo: () => demoMessageDraft(facts), knownNames: [access.guestName] }
+    {
+      demo: () => demoMessageDraft(facts),
+      knownNames: [access.guestName],
+      validate: (data) => assertNumbersGrounded(data.reply, factSet),
+    }
   );
   const reply = res.data.reply.split(GUEST_NAME_PLACEHOLDER).join(access.guestName);
   // Taslak da platform dışı iletişim içeremez.

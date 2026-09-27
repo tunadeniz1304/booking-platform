@@ -72,9 +72,26 @@ export class FakeRedis implements RedisClient {
     if (v === 1) this.ttls.set(key, seconds);
     return v;
   }
-  /** Yalnızca HyperLogLog betikleri (PFADD+TTL / PFCOUNT) kesin küme ile taklit edilir. */
+  /**
+   * Yalnızca HyperLogLog betikleri (PFADD+TTL / PFCOUNT) kesin küme ile ve LLM bütçe
+   * betikleri (rezervasyon / düzeltme) taklit edilir. Betik gövdesi eşzamanlı (await'siz)
+   * çalışır → Redis'teki gibi atomik.
+   */
   async eval(script = "", keys: string[] = [], args: string[] = []): Promise<unknown> {
     this.guard("eval");
+    if (script.includes("llm-budget-reserve")) {
+      const cur = Number(this.store.get(keys[0]) ?? "0");
+      if (cur >= Number(args[2])) return 0;
+      this.store.set(keys[0], String(cur + Number(args[0])));
+      if (!this.ttls.has(keys[0])) this.ttls.set(keys[0], Number(args[1]));
+      return 1;
+    }
+    if (script.includes("llm-budget-adjust")) {
+      const v = Math.max(0, Number(this.store.get(keys[0]) ?? "0") + Number(args[0]));
+      this.store.set(keys[0], String(v));
+      if (!this.ttls.has(keys[0])) this.ttls.set(keys[0], Number(args[1]));
+      return v;
+    }
     if (script.includes("'PFADD'")) {
       const added = await this.sadd(keys[0], args[0]);
       if (args[1]) this.ttls.set(keys[0], Number(args[1]));

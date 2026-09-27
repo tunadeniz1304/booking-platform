@@ -218,6 +218,16 @@ describe("proxy yetki ve CSRF", () => {
     expect(cspA).not.toBe(b.headers.get("content-security-policy"));
   });
 
+  it("keşif belgeleri (JWKS, UCP profili) oturumsuz geçer; sayfa CSP'si eklenmez", async () => {
+    for (const path of ["/.well-known/jwks.json", "/.well-known/ucp"]) {
+      const res = await proxy(req(path));
+      expect(res.status).toBe(200);
+      expect(res.headers.get("x-middleware-next")).toBe("1");
+      expect(res.headers.get("content-security-policy")).toBeNull();
+      expect(res.headers.get("x-request-id")).toBeTruthy();
+    }
+  });
+
   it("Stripe alan adları CSP'ye yalnızca PAYMENT_PROVIDER=stripe iken eklenir", async () => {
     vi.stubEnv("PAYMENT_PROVIDER", "mock");
     const mock = (await proxy(req("/search"))).headers.get("content-security-policy") ?? "";

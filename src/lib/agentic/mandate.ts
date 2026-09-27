@@ -1,21 +1,22 @@
-import { hkdfSync, randomUUID } from "node:crypto";
-import { SignJWT, jwtVerify, errors as joseErrors } from "jose";
+import { randomUUID } from "node:crypto";
+import { SignJWT, jwtVerify, errors as joseErrors, type JWSHeaderParameters } from "jose";
 import { z } from "zod";
 import { getConfig } from "@/lib/config/app-config";
-import { getJwtSecret } from "@/lib/auth/tokens";
 import { HttpError, NotFoundError, ValidationError } from "@/lib/http/errors";
 import { prisma } from "@/lib/prisma";
 import { redis } from "@/lib/redis";
 import { audit } from "@/lib/admin/audit";
 import { logger } from "@/lib/observability/logger";
+import { MANDATE_ALG, MandateKeyConfigError, mandateKeyRing } from "./mandate-keys";
 
 /**
  * AP2 tarzı imzalı intent mandate (P1-11, ADR 0023).
  *
  * Kullanıcı (recent-auth ile) ajana "şu tutara kadar, şu para biriminde, şu tarihe kadar,
- * isteğe bağlı şu ilanlarda" harcama yetkisi verir. Mandate kompakt JWS'tir (HS256, ayrı
- * anahtar); ajan checkout'u tamamlarken sunar. Doğrulama sırası:
- *   imza/aud/iss/typ → süre → sub = oturumdaki kullanıcı → para birimi → ilan kısıtı →
+ * isteğe bağlı şu ilanlarda" harcama yetkisi verir. Mandate kompakt JWS'tir (ES256 + `kid`,
+ * açık anahtarlar `/.well-known/jwks.json`'da — ADR 0025); ajan checkout'u tamamlarken sunar.
+ * Doğrulama sırası:
+ *   kid → imza/aud/iss/typ → süre → sub = oturumdaki kullanıcı → para birimi → ilan kısıtı →
  *   tutar (aşarsa 402 + step-up: kullanıcı daha yüksek limitli yeni mandate imzalar) →
  *   nonce tek kullanımlık (ilk checkout oturumuna bağlanır; başka oturumda 409).
  * Mandate bir kimlik bilgisi değildir: kimlik her zaman transport'taki access token'dan gelir.
@@ -23,7 +24,6 @@ import { logger } from "@/lib/observability/logger";
 
 export const MANDATE_TYP = "ap2-intent-mandate+jwt";
 const ISSUER = "booking-platform";
-const ALG = "HS256";
 
 export interface MandateClaims {
   /** Mandate'i veren kullanıcı. */
@@ -85,13 +85,14 @@ export class MandateError extends HttpError {
   }
 }
 
-/** İmza anahtarı: `AGENT_MANDATE_SIGNING_KEY` (≥32) ya da JWT sırrından ayrı bağlamla HKDF. */
-export function mandateKey(env: Record<string, string | undefined> = process.env): Uint8Array {
-  const configured = env.AGENT_MANDATE_SIGNING_KEY?.trim() ?? "";
-  if (configured.length >= 32) return new TextEncoder().encode(configured);
-  return new Uint8Array(
-    hkdfSync("sha256", getJwtSecret(), Buffer.alloc(0), "booking-platform:agent-mandate:v1", 32)
-  );
+/**
+ * Doğrulama anahtarını başlıktaki `kid` ile seçer (etkin + rotasyondaki eski anahtarlar).
+ * kid yok ya da bilinmiyor → MANDATE_INVALID; eski HS256 mandate'ler `algorithms` ile reddedilir.
+ */
+function verificationKey(header: JWSHeaderParameters) {
+  const key = header.kid ? mandateKeyRing().verifiers.get(header.kid) : undefined;
+  if (!key) throw new MandateError("MANDATE_INVALID");
+  return key;
 }
 
 export const issueMandateSchema = z
@@ -134,14 +135,15 @@ export async function signMandate(
     nonce: randomUUID(),
   };
   const { sub, aud, ...rest } = claims;
+  const { active } = mandateKeyRing();
   const mandate = await new SignJWT({ ...rest })
-    .setProtectedHeader({ alg: ALG, typ: MANDATE_TYP })
+    .setProtectedHeader({ alg: MANDATE_ALG, typ: MANDATE_TYP, kid: active.kid })
     .setSubject(sub)
     .setAudience(aud)
     .setIssuer(ISSUER)
     .setIssuedAt(iat)
     .setExpirationTime(exp)
-    .sign(mandateKey());
+    .sign(active.privateKey);
   return { mandate, claims };
 }
 
@@ -175,8 +177,8 @@ const claimsSchema = z.object({
 export async function verifyMandateToken(token: string, now = new Date()): Promise<MandateClaims> {
   let payload: unknown;
   try {
-    const out = await jwtVerify(token, mandateKey(), {
-      algorithms: [ALG],
+    const out = await jwtVerify(token, verificationKey, {
+      algorithms: [MANDATE_ALG],
       issuer: ISSUER,
       audience: getConfig().AGENT_MANDATE_AUDIENCE,
       typ: MANDATE_TYP,
@@ -185,6 +187,10 @@ export async function verifyMandateToken(token: string, now = new Date()): Promi
     });
     payload = out.payload;
   } catch (error) {
+    if (error instanceof MandateKeyConfigError) {
+      logger.error({ detail: error.detail }, "agent mandate keys unavailable");
+      throw error;
+    }
     if (error instanceof joseErrors.JWTExpired) throw new MandateError("MANDATE_EXPIRED");
     throw new MandateError("MANDATE_INVALID");
   }

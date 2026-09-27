@@ -22,6 +22,7 @@ import {
   issueMandate,
   type MandateCharge,
 } from "@/lib/agentic/mandate";
+import { mandateKeyRing } from "@/lib/agentic/mandate-keys";
 import { signAccessToken } from "@/lib/auth/tokens";
 import { resetConfigForTests } from "@/lib/config/app-config";
 import { audit } from "@/lib/admin/audit";
@@ -48,9 +49,13 @@ afterEach(() => {
 });
 
 describe("AP2 intent mandate (P1-11)", () => {
-  it("imzalar: JWS başlığı typ + HS256; claim'ler sub/aud/limit/para birimi/süre/nonce", async () => {
+  it("imzalar: JWS başlığı typ + ES256 + kid; claim'ler sub/aud/limit/para birimi/süre/nonce", async () => {
     const { mandate, claims } = await sign({ propertyIds: ["p1", "p1", "p2"] });
-    expect(decodeProtectedHeader(mandate)).toMatchObject({ alg: "HS256", typ: MANDATE_TYP });
+    expect(decodeProtectedHeader(mandate)).toEqual({
+      alg: "ES256",
+      typ: MANDATE_TYP,
+      kid: mandateKeyRing().active.kid,
+    });
     expect(claims).toMatchObject({
       sub: "u1",
       aud: "booking-platform:agentic-checkout",
@@ -87,14 +92,14 @@ describe("AP2 intent mandate (P1-11)", () => {
     await expect(verifyMandateToken(token)).rejects.toMatchObject({ code: "MANDATE_INVALID" });
 
     // Doğru anahtar ama typ başlığı yok → ret.
-    const { mandateKey } = await import("@/lib/agentic/mandate");
+    const { active } = mandateKeyRing();
     const noTyp = await new SignJWT({ maxAmountMinor: 1, currency: "TRY", nonce: "n".repeat(16) })
-      .setProtectedHeader({ alg: "HS256" })
+      .setProtectedHeader({ alg: "ES256", kid: active.kid })
       .setSubject("u1")
       .setAudience("booking-platform:agentic-checkout")
       .setIssuer("booking-platform")
       .setExpirationTime("1h")
-      .sign(mandateKey());
+      .sign(active.privateKey);
     await expect(verifyMandateToken(noTyp)).rejects.toMatchObject({ code: "MANDATE_INVALID" });
     await expect(verifyMandateToken("a.b.c")).rejects.toBeInstanceOf(MandateError);
   });

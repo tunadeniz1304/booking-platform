@@ -315,6 +315,8 @@ const schema = z.object({
   /** Yeni mandate'in varsayılan ve azami geçerlilik süresi (dk). */
   AGENT_MANDATE_DEFAULT_TTL_MINUTES: int(60, 1, 43_200),
   AGENT_MANDATE_MAX_TTL_MINUTES: int(10_080, 5, 43_200),
+  /** `/.well-known/jwks.json` önbellek süresi (sn); anahtar rotasyonunda eski kid bu süreden uzun tutulmalı. */
+  AGENT_MANDATE_JWKS_MAX_AGE_SECONDS: int(300, 0, 86_400),
 
   // Güvenlik / ağ
   TRUSTED_PROXY_HOPS: int(0, 0, 10),

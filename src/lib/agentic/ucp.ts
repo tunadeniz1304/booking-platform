@@ -2,6 +2,7 @@ import { z } from "zod";
 import { createCheckoutSchema, type CheckoutSessionView, type CheckoutStatus } from "./checkout";
 import { activeSptProvider } from "./spt";
 import { MANDATE_TYP } from "./mandate";
+import { MANDATE_ALG } from "./mandate-keys";
 import { getConfig } from "@/lib/config/app-config";
 
 /**
@@ -186,6 +187,8 @@ export function ucpProfile(origin: string) {
         required: config.AGENT_MANDATE_REQUIRED,
         format: "jws",
         typ: MANDATE_TYP,
+        alg: MANDATE_ALG,
+        jwks_uri: `${origin}/.well-known/jwks.json`,
         audience: config.AGENT_MANDATE_AUDIENCE,
         claims: ["sub", "aud", "maxAmountMinor", "currency", "expiresAt", "propertyId", "nonce"],
         issue_endpoint: `${origin}/api/account/agent-mandates`,

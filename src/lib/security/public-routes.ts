@@ -26,6 +26,19 @@ const PUBLIC_API: readonly PublicRule[] = [
   { prefix: "/api/notices", methods: ["POST"] }, // DSA md. 16 herkese açık bildirim (P1-13b)
 ];
 
+/**
+ * Herkese açık keşif belgeleri (API dışı, oturumsuz): UCP profili ve mandate doğrulaması
+ * için açık anahtarlar (ADR 0025). Proxy bunlara oturum ya da sayfa CSP'si uygulamaz.
+ */
+export const PUBLIC_DISCOVERY_PATHS: readonly string[] = [
+  "/.well-known/ucp",
+  "/.well-known/jwks.json",
+];
+
+export function isPublicDiscovery(pathname: string): boolean {
+  return PUBLIC_DISCOVERY_PATHS.includes(pathname);
+}
+
 /** CSRF Origin kontrolünün uygulanmadığı (kendi imza/sır doğrulaması olan) uçlar. */
 export const CSRF_EXEMPT_PREFIXES: readonly string[] = [
   "/api/payments/webhook",

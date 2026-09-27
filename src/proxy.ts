@@ -15,7 +15,7 @@ import {
   requestOrigin,
 } from "@/lib/security/csrf";
 import { buildCsp } from "@/lib/security/headers";
-import { CSRF_EXEMPT_PREFIXES, isPublicApi } from "@/lib/security/public-routes";
+import { CSRF_EXEMPT_PREFIXES, isPublicApi, isPublicDiscovery } from "@/lib/security/public-routes";
 
 /**
  * Ağ sınırı (Next 16 Proxy, Node runtime):
@@ -158,6 +158,13 @@ export async function proxy(req: NextRequest) {
 
   if (req.nextUrl.pathname.startsWith("/api")) {
     return handleApi(req, requestHeaders, requestId);
+  }
+
+  // Keşif belgeleri (JWKS, UCP profili) herkese açık JSON'dur: oturum ve sayfa CSP'si yok.
+  if (isPublicDiscovery(req.nextUrl.pathname)) {
+    const response = NextResponse.next({ request: { headers: requestHeaders } });
+    response.headers.set("x-request-id", requestId);
+    return response;
   }
 
   const nonce = Buffer.from(randomUUID()).toString("base64");

@@ -26,7 +26,7 @@ import { runSaga, type SagaStep } from "@/lib/saga/saga";
 import { logger, errorFields } from "@/lib/observability/logger";
 import { counter } from "@/lib/observability/metrics";
 import { audit } from "@/lib/admin/audit";
-import { post, postCaptureCompensation } from "@/lib/ledger";
+import { CompensationMarkers, post, postCaptureCompensation } from "@/lib/ledger";
 
 /**
  * P2P rezervasyon devri (ikincil pazar).
@@ -275,6 +275,39 @@ async function loadTransferableBooking(
 }
 
 /**
+ * Capture'ı alınmış devir ödemesinin iadesi (saga capture telafisi ve takılı devir süpürücüsü).
+ * İki yol da AYNI iade anahtarını (`transfer-refund:<id>`) kullanır → PSP'de çift iade yok.
+ * v2-P0-3: iade sonrası tek işlemde telafi işareti (`comp:<buyerPaymentRef>`, mutabakatın PSP
+ * tarafı) + tahsilat/iade jurnali; anahtarlar aynı olduğundan yarışan ikinci yol yeniden yazmaz.
+ */
+async function refundTransferCapture(
+  provider: PaymentProvider,
+  i: { transferId: string; bookingId: string; buyerPaymentRef: string; ask: Money }
+): Promise<void> {
+  const refundRef = `transfer-refund:${i.transferId}`;
+  await provider.refund(i.buyerPaymentRef, i.ask, refundRef);
+  const markerId = `comp:${i.buyerPaymentRef}`;
+  await withSerializableRetry(async (tx) => {
+    await tx.paymentEvent.upsert({
+      where: { id: markerId },
+      create: {
+        id: markerId,
+        type: CompensationMarkers.transferCapture,
+        providerRef: i.buyerPaymentRef,
+      },
+      update: {},
+    });
+    await postCaptureCompensation(tx, {
+      refundRef,
+      bookingId: i.bookingId,
+      transferId: i.transferId,
+      currency: i.ask.currency,
+      amountMinor: minorToDb(i.ask.amount),
+    });
+  });
+}
+
+/**
  * Devir sagası (v4#1). Sahiplik, payout ve defter YALNIZCA capture başarılı olduktan sonra
  * yazılır; öncesinde ilan `CAPTURE_PENDING` ara durumunda tutulur (ikinci alıcı giremez).
  *
@@ -357,18 +390,12 @@ function claimSteps(provider: PaymentProvider): SagaStep<ClaimContext, string>[]
       },
       async compensate(ctx) {
         if (!ctx.captured || !ctx.providerRef) return false;
-        const refundRef = `transfer-refund:${ctx.transfer.id}`;
-        await provider.refund(ctx.providerRef, ctx.ask, refundRef);
-        // v2-P0-3: alıcının tahsilatı + iadesi jurnale (iade anahtarıyla → tekrar telafide yazılmaz).
-        await withSerializableRetry((tx) =>
-          postCaptureCompensation(tx, {
-            refundRef,
-            bookingId: ctx.transfer.bookingId,
-            transferId: ctx.transfer.id,
-            currency: ctx.ask.currency,
-            amountMinor: minorToDb(ctx.ask.amount),
-          })
-        );
+        await refundTransferCapture(provider, {
+          transferId: ctx.transfer.id,
+          bookingId: ctx.transfer.bookingId,
+          buyerPaymentRef: ctx.providerRef,
+          ask: ctx.ask,
+        });
       },
     },
     {
@@ -679,7 +706,8 @@ export type SweepOutcome = "voided" | "refunded" | "unresolved";
  * (`TRANSFER_CAPTURE_PENDING_TIMEOUT_SECONDS`) eski kayıtlar önce koşullu olarak FAILED'a
  * çekilir (geç biten bir saga commit'i artık tutmaz; kendi telafisiyle iade eder), sonra
  * yetkilendirme void edilir; void olmazsa (capture yapılmış) saga ile AYNI idempotency
- * anahtarıyla iade edilir — çift iade olmaz. Sahiplik hiç değişmemiştir. Her kayıt audit'lenir.
+ * anahtarıyla iade edilir — çift iade olmaz; iade saga ile aynı anahtarlarla jurnale yazılır
+ * (v2-P0-3). Sahiplik hiç değişmemiştir. Her kayıt audit'lenir.
  */
 export async function sweepStuckTransfers(
   now = new Date(),
@@ -717,8 +745,12 @@ export async function sweepStuckTransfers(
       } catch (voidError) {
         try {
           const currency = assertCurrency(t.currency);
-          const ask = money(minorFromDb(t.askPriceMinor), currency);
-          await provider.refund(t.buyerPaymentRef, ask, `transfer-refund:${t.id}`);
+          await refundTransferCapture(provider, {
+            transferId: t.id,
+            bookingId: t.bookingId,
+            buyerPaymentRef: t.buyerPaymentRef,
+            ask: money(minorFromDb(t.askPriceMinor), currency),
+          });
           outcome = "refunded";
         } catch (refundError) {
           logger.error(

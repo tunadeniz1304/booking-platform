@@ -32,6 +32,7 @@ import { invalidatePropertySearchCache } from "@/lib/search";
 import { counter, histogram } from "@/lib/observability/metrics";
 import { errorFields, logger } from "@/lib/observability/logger";
 import { audit } from "@/lib/admin/audit";
+import { CompensationMarkers, postCaptureCompensation } from "@/lib/ledger";
 import { getQueue, QUEUE_NAMES } from "@/lib/queue";
 import { fromDate } from "@/lib/time/nights";
 import {
@@ -934,8 +935,9 @@ async function refundCapturedShares(planId: string, reason: string): Promise<num
       }
     }
     const now = new Date();
-    await prisma.$transaction([
-      prisma.paymentShare.updateMany({
+    const ref = share.providerRef;
+    await withSerializableRetry(async (tx) => {
+      const marked = await tx.paymentShare.updateMany({
         where: { id: share.id, status: PaymentShareStatus.CAPTURED },
         data: {
           status: PaymentShareStatus.REFUNDED,
@@ -943,17 +945,23 @@ async function refundCapturedShares(planId: string, reason: string): Promise<num
           refundedAt: now,
           failureCode: reason,
         },
-      }),
-      prisma.paymentEvent.upsert({
-        where: { id: `comp:${share.providerRef}` },
-        create: {
-          id: `comp:${share.providerRef}`,
-          type: "compensation.split_share",
-          providerRef: share.providerRef,
-        },
+      });
+      await tx.paymentEvent.upsert({
+        where: { id: `comp:${ref}` },
+        create: { id: `comp:${ref}`, type: CompensationMarkers.splitShare, providerRef: ref },
         update: {},
-      }),
-    ]);
+      });
+      // v2-P0-3: payın tahsilatı + iadesi jurnale (geç pay iadesiyle aynı anahtar → çoğalmaz).
+      if (marked.count === 1) {
+        await postCaptureCompensation(tx, {
+          refundRef: `compensate:${ref}`,
+          paymentId: share.id,
+          currency: share.currency,
+          amountMinor: share.amountMinor,
+          occurredAt: now,
+        });
+      }
+    });
     n++;
   }
   if (failures.length > 0) throw failures[0];

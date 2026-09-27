@@ -13,7 +13,7 @@ import type { WebhookEvent } from "@/lib/payment/webhook";
 import { WebhookMismatchError } from "@/lib/payment/payment-service";
 import { holdUnits, InventoryUnavailableError } from "@/lib/booking/inventory";
 import { reclaimPromotionRedemptions } from "@/lib/pricing/promotion-redemption";
-import { postCaptureCompensation } from "@/lib/ledger";
+import { CompensationMarkers, postCaptureCompensation } from "@/lib/ledger";
 import { assertCurrency, minorFromDb, money } from "@/lib/money/money";
 import { counter } from "@/lib/observability/metrics";
 import { errorFields, logger } from "@/lib/observability/logger";
@@ -197,7 +197,11 @@ async function shareSucceeded(event: WebhookEvent, shareId: string): Promise<Res
     });
     await tx.paymentEvent.upsert({
       where: { id: `comp:${ref}` },
-      create: { id: `comp:${ref}`, type: "compensation.split_share_late", providerRef: ref },
+      create: {
+        id: `comp:${ref}`,
+        type: CompensationMarkers.splitShareLate,
+        providerRef: ref,
+      },
       update: {},
     });
     // v2-P0-3: payın tahsilatı + iadesi jurnale (anahtar ref'e bağlı, yalnız ilk işaretlemede).

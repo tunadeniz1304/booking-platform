@@ -16,6 +16,7 @@ export { getAccountBalance, isTrialBalanced, trialBalance, type AccountBalance }
 export { listBookingLedger, netChargedMinor, toMinorBigint, type LedgerViewRow } from "./legacy";
 export {
   dayWindow,
+  CompensationMarkers,
   reconcile,
   serializeReport,
   type ReconciliationReport,

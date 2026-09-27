@@ -6,8 +6,20 @@ import { JournalKinds } from "./templates";
 
 type Db = PrismaClient | Prisma.TransactionClient;
 
-/** Devir sagasında capture alınıp commit düştüğünde yazılan hata kodu (tahsilat iade edildi). */
-const TRANSFER_REFUNDED_FAILURE = "COMMIT_FAILED";
+/**
+ * v2-P0-3: PSP'de tahsil edilip tamamen iade edilen (telafi) ödemelerin `PaymentEvent` işaretleri
+ * (`comp:<providerRef>`). Mutabakat bu ödemelerin PSP tarafını jurnalden değil işaretten bilir.
+ */
+export const CompensationMarkers = {
+  /** Devir capture'ı iade edildi (saga telafisi ya da takılı devir süpürücüsü). */
+  transferCapture: "compensation.transfer_capture",
+  /** Bölünmüş ödemede tahsil edilmiş pay plan iptali / saga telafisiyle iade edildi. */
+  splitShare: "compensation.split_share",
+  /** Plan kapandıktan sonra gelen pay başarısı iade edildi. */
+  splitShareLate: "compensation.split_share_late",
+} as const;
+
+const SHARE_MARKERS = [CompensationMarkers.splitShare, CompensationMarkers.splitShareLate];
 
 export const reconciliationRunsTotal = counter(
   "ledger_reconciliation_runs_total",
@@ -18,7 +30,7 @@ export const reconciliationRunsTotal = counter(
 export type ReconKind = "capture" | "refund" | "transfer" | "deposit" | "chargeback";
 
 export interface ReconDiffRow {
-  subject: "payment" | "cart_payment" | "transfer" | "deposit" | "claim";
+  subject: "payment" | "cart_payment" | "payment_share" | "transfer" | "deposit" | "claim";
   subjectId: string;
   bookingId: string | null;
   kind: ReconKind;
@@ -62,10 +74,12 @@ export function dayWindow(date: string | Date): { date: string; from: Date; to: 
  *
  * - capture: Payment.amountMinor (paidAt doluysa) ↔ BOOKING_CAPTURED Dr psp_clearing
  * - refund:  Payment.refundedAmountMinor ↔ REFUND_ISSUED Cr psp_clearing (krediye iade hariç)
- * - transfer: COMPLETED devrin askPriceMinor'ı ↔ TRANSFER_SETTLED Dr psp_clearing; capture sonrası
- *   commit'i düşüp iade edilen (FAILED + COMMIT_FAILED) devrin ask'ı ↔ telafi capture/refund (v2-P0-3)
+ * - transfer: COMPLETED devrin askPriceMinor'ı ↔ TRANSFER_SETTLED Dr psp_clearing; capture'ı iade
+ *   edilen devrin (telafi işareti var) ask'ı ↔ telafi capture/refund (v2-P0-3)
  * - cart_payment: kalem `Payment`'ı olmayan (onaylanmamış) sepet ödemesinin capture/refund'u ↔
  *   telafi jurnali (v2-P0-3); onaylanmış sepet kalem `Payment`'ları üzerinden mutabık
+ * - payment_share: telafi işareti olan payın tutarı ↔ `paymentId = PaymentShare.id` capture/refund
+ *   (v2-P0-3); onaylanan planın payları kalem `Payment`'ları üzerinden mutabık
  * - deposit: hasar depozitosunun capturedMinor'ı ↔ DEPOSIT_CAPTURED Dr psp_clearing (P1-5)
  * - chargeback: kaybedilen itirazın (CHARGEBACK talebi) awardedMinor'ı ↔ CHARGEBACK_LOST
  *   Cr psp_clearing (fix-sweep-2)
@@ -90,8 +104,24 @@ export async function reconcile(
     where: { OR: [{ paidAt: inDay }, { refundedAt: inDay }] },
     select: { id: true },
   });
+  const dayMarkers = await db.paymentEvent.findMany({
+    where: {
+      receivedAt: inDay,
+      type: { in: [CompensationMarkers.transferCapture, ...SHARE_MARKERS] },
+      providerRef: { not: null },
+    },
+    select: { type: true, providerRef: true },
+  });
+  const markerRefs = (types: readonly string[]) =>
+    unique(dayMarkers.filter((m) => types.includes(m.type)).map((m) => m.providerRef));
   const pspTransfers = await db.bookingTransfer.findMany({
-    where: { OR: [{ completedAt: inDay }, { failedAt: inDay }] },
+    where: {
+      OR: [
+        { completedAt: inDay },
+        { failedAt: inDay },
+        { buyerPaymentRef: { in: markerRefs([CompensationMarkers.transferCapture]) } },
+      ],
+    },
     select: { id: true },
   });
   const pspCartPayments = await db.cartPayment.findMany({
@@ -154,12 +184,16 @@ export async function reconcile(
     }
   }
 
+  const nonBookingIds = paymentIds.filter((id) => !bookingPaymentIds.has(id));
   checked += await reconcileCartPayments(
     db,
-    unique([
-      ...pspCartPayments.map((c) => c.id),
-      ...paymentIds.filter((id) => !bookingPaymentIds.has(id)),
-    ]),
+    unique([...pspCartPayments.map((c) => c.id), ...nonBookingIds]),
+    differences
+  );
+  checked += await reconcilePaymentShares(
+    db,
+    nonBookingIds,
+    markerRefs(SHARE_MARKERS),
     differences
   );
 
@@ -172,17 +206,22 @@ export async function reconcile(
         currency: true,
         askPriceMinor: true,
         status: true,
-        failureCode: true,
+        buyerPaymentRef: true,
       },
     });
     const journal = await pspSums(db, "transferId", transferIds);
+    const refunded = await markedRefs(
+      db,
+      [CompensationMarkers.transferCapture],
+      unique(transfers.map((t) => t.buyerPaymentRef))
+    );
     for (const t of transfers) {
       const settled = t.status === "COMPLETED" ? t.askPriceMinor : 0n;
-      // Capture alındı, commit düştü → saga tahsilatı iade etti (transfer-service capture telafisi).
+      // Capture iade edildi (saga telafisi ya da süpürücü; hata kodundan bağımsız, işarete göre).
       const compensated =
-        t.status === "FAILED" && t.failureCode === TRANSFER_REFUNDED_FAILURE ? t.askPriceMinor : 0n;
+        t.buyerPaymentRef && refunded.has(t.buyerPaymentRef) ? t.askPriceMinor : 0n;
       const j = journal.get(t.id);
-      checked += t.status === "FAILED" ? 3 : 1;
+      checked += t.status === "COMPLETED" && compensated === 0n ? 1 : 3;
       push(
         differences,
         "transfer",
@@ -307,6 +346,50 @@ async function reconcileCartPayments(db: Db, ids: string[], out: ReconDiffRow[])
     );
   }
   return carts.length * 2;
+}
+
+/**
+ * v2-P0-3 pay mutabakatı: telafi işareti (`comp:<providerRef>`) olan pay PSP'de tahsil edilip
+ * tamamen iade edilmiştir → capture = refund = `amountMinor` ↔ `paymentId = PaymentShare.id`
+ * jurnali. İşaretsiz payın kendi jurnali olmamalı (onaylanan planın payları kalem `Payment`'larında).
+ */
+async function reconcilePaymentShares(
+  db: Db,
+  ids: string[],
+  refs: string[],
+  out: ReconDiffRow[]
+): Promise<number> {
+  if (ids.length === 0 && refs.length === 0) return 0;
+  const shares = await db.paymentShare.findMany({
+    where: { OR: [{ id: { in: ids } }, { providerRef: { in: refs } }] },
+    select: { id: true, currency: true, amountMinor: true, providerRef: true },
+  });
+  if (shares.length === 0) return 0;
+  const [journal, refunded] = await Promise.all([
+    pspSums(
+      db,
+      "paymentId",
+      shares.map((s) => s.id)
+    ),
+    markedRefs(db, SHARE_MARKERS, unique(shares.map((s) => s.providerRef))),
+  ]);
+  for (const s of shares) {
+    const j = journal.get(s.id);
+    const compensated = s.providerRef && refunded.has(s.providerRef) ? s.amountMinor : 0n;
+    push(out, "payment_share", s.id, null, "capture", s.currency, compensated, j?.capture ?? 0n);
+    push(out, "payment_share", s.id, null, "refund", s.currency, compensated, j?.refund ?? 0n);
+  }
+  return shares.length * 2;
+}
+
+/** Verilen türde telafi işareti (tüm zamanlar) bulunan providerRef'ler. */
+async function markedRefs(db: Db, types: readonly string[], refs: string[]): Promise<Set<string>> {
+  if (refs.length === 0) return new Set();
+  const rows = await db.paymentEvent.findMany({
+    where: { type: { in: [...types] }, providerRef: { in: refs } },
+    select: { providerRef: true },
+  });
+  return new Set(unique(rows.map((r) => r.providerRef)));
 }
 
 /**

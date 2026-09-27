@@ -17,7 +17,7 @@ import {
   type CartDTO,
   type CartPayOutcome,
 } from "@/lib/cart";
-import { cancelAndRefund, payForBooking } from "@/lib/payment/payment-service";
+import { cancelAndRefund, handleWebhookEvent, payForBooking } from "@/lib/payment/payment-service";
 import { MOCK_3DS_CODE } from "@/lib/payment/card-token";
 import { setPaymentProviderForTests } from "@/lib/payment";
 import { MockPsp } from "@/lib/payment/mock-psp";
@@ -319,6 +319,93 @@ describeInt("P1-1 grup sepeti: tümü-ya-hiç tutma + tek ödeme", () => {
     const released = await releaseCart(user, rehold.id);
     expect(released.status).toBe("OPEN");
     await expectReleased(rehold, [a, b], 60);
+  });
+
+  it("regression: v2-P0-1 sepet geç ödeme başarısı: limitli promosyon dolduysa iade, müsaitse onay + kullanım yeniden sayılır", async () => {
+    /** Tek kullanımlık otomatik (kuponsuz) limitli promosyonlu ilan. */
+    async function limitedStay(tag: string) {
+      const fx = await createStayFixture(prisma, { tag, units: 3 });
+      const promo = await prisma.promotion.create({
+        data: {
+          hostId: fx.hostId,
+          propertyId: fx.propertyId,
+          name: "Tek kullanımlık uzun konaklama",
+          type: "LONG_STAY",
+          minNights: 2,
+          discountBps: 1000,
+          usageLimit: 1,
+        },
+      });
+      return { fx, promoId: promo.id };
+    }
+    const usage = async (promoId: string) =>
+      (await prisma.promotion.findUniqueOrThrow({ where: { id: promoId } })).usageCount;
+
+    /** Sepet tutulur, tek ödeme 3DS'te bekler, sepet süresi dolar (kullanım iade edilir). */
+    async function lapsedCart(fx: StayFixture, promoId: string, start: number) {
+      const user = await newUser(`late-promo-${start}`);
+      await addCartItem(user, item(fx, start));
+      const held = await holdCart(user);
+      expect(await usage(promoId)).toBe(1);
+      const pending = await payCart({
+        cartId: held.id,
+        userId: user,
+        cardToken: "tok_mock_3ds_3220",
+        idempotencyKey: `late-promo-${held.id}`,
+      });
+      expect(pending.status).toBe("requires_action");
+      await prisma.cart.update({
+        where: { id: held.id },
+        data: { holdExpiresAt: new Date(Date.now() - 1000) },
+      });
+      expect(await expireCarts(new Date(), 10_000)).toBeGreaterThanOrEqual(1);
+      expect(await usage(promoId)).toBe(0);
+      const cp = await prisma.cartPayment.findUniqueOrThrow({ where: { cartId: held.id } });
+      return { held, cp };
+    }
+    const lateSucceeded = (cp: { providerRef: string | null; amountMinor: bigint }) =>
+      handleWebhookEvent({
+        id: `evt_v2_p0_1_cart_${cp.providerRef}`,
+        type: "payment.succeeded",
+        data: { providerRef: cp.providerRef!, amount: Number(cp.amountMinor), currency: "TRY" },
+      });
+
+    // 1) Limit bu arada doldu (B kullandı) → A onaylanmaz, tam iade, sayaç 1.
+    const x = await limitedStay("cart-late-promo-x");
+    const a = await lapsedCart(x.fx, x.promoId, 20);
+    const userB = await newUser("late-promo-b");
+    await addCartItem(userB, item(x.fx, 20));
+    await holdCart(userB);
+    expect(await usage(x.promoId)).toBe(1);
+    const refunded = await lateSucceeded(a.cp);
+    expect(refunded.compensated).toBe(true);
+    const aAfter = await prisma.cart.findUniqueOrThrow({
+      where: { id: a.held.id },
+      include: { bookings: true, payment: true },
+    });
+    expect(aAfter.status).not.toBe("CHECKED_OUT");
+    expect(aAfter.bookings.every((b) => b.status !== "CONFIRMED")).toBe(true);
+    expect(aAfter.payment?.status).toBe("REFUNDED");
+    expect(aAfter.payment?.refundedAmountMinor).toBe(a.cp.amountMinor);
+    expect(await usage(x.promoId)).toBe(1);
+
+    // 2) Limit müsait → A onaylanır, kullanım yeniden sayılır ve A'ya bağlanır.
+    const y = await limitedStay("cart-late-promo-y");
+    const c = await lapsedCart(y.fx, y.promoId, 24);
+    const confirmed = await lateSucceeded(c.cp);
+    expect(confirmed.compensated).toBeUndefined();
+    const cAfter = await prisma.cart.findUniqueOrThrow({
+      where: { id: c.held.id },
+      include: { bookings: true, payment: true },
+    });
+    expect(cAfter.status).toBe("CHECKED_OUT");
+    expect(cAfter.bookings.every((b) => b.status === "CONFIRMED")).toBe(true);
+    expect(await usage(y.promoId)).toBe(1);
+    const rows = await prisma.promotionRedemption.findMany({
+      where: { promotionId: y.promoId, bookingId: { in: cAfter.bookings.map((b) => b.id) } },
+    });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].amountMinor).toBeGreaterThan(0n);
   });
 
   it("sahiplik: başkasının sepeti 404", async () => {

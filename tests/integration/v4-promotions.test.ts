@@ -7,7 +7,11 @@ import { createStayFixture, type StayFixture } from "./fixtures";
 import { signAccessToken, type Role } from "@/lib/auth/tokens";
 import { computeTotal, createQuote } from "@/lib/pricing/quote";
 import { createBooking, releaseHold } from "@/lib/booking-service";
-import { confirmPaymentChallenge, payForBooking } from "@/lib/payment/payment-service";
+import {
+  confirmPaymentChallenge,
+  handleWebhookEvent,
+  payForBooking,
+} from "@/lib/payment/payment-service";
 import { MOCK_3DS_CODE } from "@/lib/payment/card-token";
 import { isTrialBalanced, reconcile, taxShareMinor, trialBalance } from "@/lib/ledger";
 import * as promotionsRoute from "@/app/api/host/promotions/route";
@@ -353,6 +357,134 @@ describeInt("P1-8 promosyon motoru + Omnibus (integration)", () => {
       couponCode: "YARIS2",
     });
     expect(again.booking.priceBreakdown?.coupon).toEqual({ code: "YARIS2", status: "APPLIED" });
+    await prisma.promotion.update({ where: { id: promoId }, data: { active: false } });
+  });
+
+  /** v2-P0-1: kuponlu tutma 3DS'te bekler, süresi dolar (kullanım iade edilir). */
+  async function couponHoldLapsed(roomId: string, code: string, startInDays: number) {
+    const held = await createBooking({
+      userId: fx.userId,
+      propertyId: fx.propertyId,
+      roomId,
+      checkIn: iso(utcDay(startInDays)),
+      checkOut: iso(utcDay(startInDays + 2)),
+      guestCount: 1,
+      couponCode: code,
+    });
+    expect(held.booking.priceBreakdown?.coupon).toEqual({ code, status: "APPLIED" });
+    const out = await payForBooking({
+      bookingId: held.booking.id,
+      userId: fx.userId,
+      cardToken: "tok_mock_3ds_3220",
+      idempotencyKey: `v2-p0-1-${held.booking.id}`,
+    });
+    expect(out.status).toBe("requires_action");
+    await prisma.booking.update({
+      where: { id: held.booking.id },
+      data: { holdExpiresAt: new Date(Date.now() - 1000) },
+    });
+    expect(await releaseHold(held.booking.id)).toBe(true);
+    const payment = await prisma.payment.findUniqueOrThrow({
+      where: { bookingId: held.booking.id },
+    });
+    return { bookingId: held.booking.id, payment };
+  }
+
+  function lateSucceeded(payment: { providerRef: string | null; amountMinor: bigint }) {
+    return handleWebhookEvent({
+      id: `evt_v2_p0_1_${payment.providerRef}`,
+      type: "payment.succeeded",
+      data: {
+        providerRef: payment.providerRef!,
+        amount: Number(payment.amountMinor),
+        currency: "TRY",
+      },
+    });
+  }
+
+  it("regression: v2-P0-1 geç ödeme başarısı, kupon limiti bu arada dolduysa onaylamaz ve tam iade eder", async () => {
+    const coupon = await createPromo({
+      name: "Geç kupon",
+      type: "COUPON",
+      couponCode: "GEC1",
+      discountBps: 1500,
+      usageLimit: 1,
+      propertyId: fx.propertyId,
+    });
+    expect(coupon.status).toBe(201);
+    const promoId = coupon.body.promotion.id as string;
+    const [roomA, roomB] = await Promise.all([extraRoom(fx.propertyId), extraRoom(fx.propertyId)]);
+    const usage = async () =>
+      (await prisma.promotion.findUniqueOrThrow({ where: { id: promoId } })).usageCount;
+
+    const a = await couponHoldLapsed(roomA, "GEC1", 44);
+    expect(await usage()).toBe(0);
+    // Bu arada B kuponun tek kullanımını alır.
+    const b = await createBooking({
+      userId: other.userId,
+      propertyId: fx.propertyId,
+      roomId: roomB,
+      checkIn: iso(utcDay(44)),
+      checkOut: iso(utcDay(46)),
+      guestCount: 1,
+      couponCode: "GEC1",
+    });
+    expect(b.booking.priceBreakdown?.coupon).toEqual({ code: "GEC1", status: "APPLIED" });
+    expect(await usage()).toBe(1);
+
+    const res = await lateSucceeded(a.payment);
+    expect(res.compensated).toBe(true);
+    const after = await prisma.booking.findUniqueOrThrow({
+      where: { id: a.bookingId },
+      include: { payment: true },
+    });
+    expect(after.status).toBe("EXPIRED");
+    expect(after.payment?.status).toBe("REFUNDED");
+    expect(after.payment?.refundedAmountMinor).toBe(a.payment.amountMinor);
+    expect(await usage()).toBe(1);
+    // A'nın geri alınan tutması envanterde kalmadı.
+    const day = await prisma.inventoryDay.findFirstOrThrow({
+      where: { roomTypeId: roomA, date: utcDay(44) },
+    });
+    expect(day).toMatchObject({ held: 0, sold: 0 });
+    await prisma.promotion.update({ where: { id: promoId }, data: { active: false } });
+  });
+
+  it("regression: v2-P0-1 geç ödeme başarısı, kupon limiti müsaitse onaylar ve kullanımı yeniden sayar", async () => {
+    const coupon = await createPromo({
+      name: "Geç kupon 2",
+      type: "COUPON",
+      couponCode: "GEC2",
+      discountBps: 1500,
+      usageLimit: 1,
+      propertyId: fx.propertyId,
+    });
+    expect(coupon.status).toBe(201);
+    const promoId = coupon.body.promotion.id as string;
+    const roomA = await extraRoom(fx.propertyId);
+
+    const a = await couponHoldLapsed(roomA, "GEC2", 48);
+    const redemption = async () =>
+      prisma.promotionRedemption.findMany({
+        where: { bookingId: a.bookingId, promotionId: promoId },
+      });
+    const released = await prisma.promotion.findUniqueOrThrow({ where: { id: promoId } });
+    expect(released.usageCount).toBe(0);
+
+    const res = await lateSucceeded(a.payment);
+    expect(res.compensated).toBeUndefined();
+    const after = await prisma.booking.findUniqueOrThrow({
+      where: { id: a.bookingId },
+      include: { payment: true },
+    });
+    expect(after.status).toBe("CONFIRMED");
+    expect(after.payment?.status).toBe("PAID");
+    expect((await prisma.promotion.findUniqueOrThrow({ where: { id: promoId } })).usageCount).toBe(
+      1
+    );
+    const rows = await redemption();
+    expect(rows).toHaveLength(1);
+    expect(rows[0].amountMinor).toBeGreaterThan(0n);
     await prisma.promotion.update({ where: { id: promoId }, data: { active: false } });
   });
 

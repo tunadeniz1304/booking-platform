@@ -291,16 +291,17 @@ interface IssuedMeta {
 /**
  * Kullanıcının verdiği mandate'ler (P2-1a). Mandate'ler DB'de ayrı tabloda tutulmaz
  * (ADR 0023): verme/iptal denetim kaydından, kullanım Redis nonce bağından okunur.
+ * `limit: null` → tümü (KVKK dışa aktarımı).
  */
 export async function listMandates(
   userId: string,
   now = new Date(),
-  limit = 50
+  limit: number | null = 50
 ): Promise<MandateSummary[]> {
   const issued = await prisma.auditLog.findMany({
     where: { actorId: userId, action: "agent_mandate.issued", entity: "AgentMandate" },
     orderBy: { createdAt: "desc" },
-    take: limit,
+    take: limit ?? undefined,
   });
   const nonces = issued.map((r) => r.entityId).filter((n): n is string => !!n);
   const revoked = new Map(

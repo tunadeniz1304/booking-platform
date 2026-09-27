@@ -5,6 +5,7 @@ import { hashPassword } from "@/lib/auth";
 import { bumpTokenVersion, publishTokenVersion } from "@/lib/auth/token-version";
 import { cancelAndRefund } from "@/lib/payment/payment-service";
 import { cancelTransferListing } from "@/lib/transfer/transfer-service";
+import { listMandates } from "@/lib/agentic/mandate";
 import { logger, errorFields } from "@/lib/observability/logger";
 
 /**
@@ -21,8 +22,12 @@ export async function exportUserData(userId: string) {
       email: true,
       firstName: true,
       lastName: true,
+      avatarUrl: true,
       role: true,
+      locale: true,
+      emailVerifiedAt: true,
       createdAt: true,
+      updatedAt: true,
       bookings: {
         select: {
           id: true,
@@ -52,11 +57,241 @@ export async function exportUserData(userId: string) {
       },
     },
   });
+  // Bildirim gövdesi tek kullanımlık bağlantı/token içerebilir → yalnız konu + tarih.
   const notifications = await prisma.notification.findMany({
     where: { userId },
     select: { subject: true, createdAt: true },
   });
-  return { exportedAt: new Date().toISOString(), user, notifications };
+  return {
+    exportedAt: new Date().toISOString(),
+    user,
+    notifications,
+    messages: await exportMessages(userId),
+    agentMandates: await listMandates(userId, new Date(), null),
+    agentMandateEvents: await prisma.auditLog.findMany({
+      where: {
+        actorId: userId,
+        action: { in: ["agent_mandate.accepted", "agent_mandate.rejected"] },
+      },
+      select: { action: true, entityId: true, meta: true, createdAt: true },
+      orderBy: { createdAt: "asc" },
+    }),
+    priceAlerts: await prisma.priceAlert.findMany({
+      where: { userId },
+      select: {
+        id: true,
+        roomTypeId: true,
+        checkIn: true,
+        checkOut: true,
+        guests: true,
+        currency: true,
+        lastTotalMinor: true,
+        observations: true,
+        active: true,
+        lastNotifiedAt: true,
+        createdAt: true,
+      },
+    }),
+    claims: await exportClaims(userId),
+    transfers: await prisma.bookingTransfer
+      .findMany({
+        where: { OR: [{ sellerId: userId }, { claimedById: userId }] },
+        // tokenHash (claim bağlantısı) ve PSP referansı dışarıda.
+        select: {
+          id: true,
+          bookingId: true,
+          sellerId: true,
+          status: true,
+          askPriceMinor: true,
+          currency: true,
+          expiresAt: true,
+          listedAt: true,
+          claimedAt: true,
+          completedAt: true,
+          cancelledAt: true,
+          failedAt: true,
+          failureCode: true,
+        },
+      })
+      .then((rows) =>
+        rows.map(({ sellerId, ...t }) => ({
+          ...t,
+          role: sellerId === userId ? "SELLER" : "BUYER",
+        }))
+      ),
+    wallet: {
+      credits: await prisma.walletCredit.findMany({
+        where: { userId },
+        select: {
+          id: true,
+          currency: true,
+          source: true,
+          sourceRef: true,
+          amountMinor: true,
+          remainingMinor: true,
+          expiredMinor: true,
+          expiresAt: true,
+          bookingId: true,
+          createdAt: true,
+        },
+      }),
+      spends: await prisma.creditSpend.findMany({
+        where: { userId },
+        select: {
+          id: true,
+          bookingId: true,
+          currency: true,
+          amountMinor: true,
+          taxMinor: true,
+          refundedMinor: true,
+          status: true,
+          releaseReason: true,
+          createdAt: true,
+          settledAt: true,
+          releasedAt: true,
+          allocations: { select: { creditId: true, amountMinor: true, refundedMinor: true } },
+        },
+      }),
+    },
+    loyalty: {
+      account: await prisma.loyaltyAccount.findUnique({
+        where: { userId },
+        select: { completedStays: true, tier: true, createdAt: true, updatedAt: true },
+      }),
+      cashbacks: await prisma.loyaltyCashback.findMany({
+        where: { userId },
+        select: {
+          id: true,
+          bookingId: true,
+          currency: true,
+          tier: true,
+          bps: true,
+          amountMinor: true,
+          status: true,
+          dueAt: true,
+          issuedAt: true,
+          creditId: true,
+          reason: true,
+          createdAt: true,
+        },
+      }),
+    },
+    carts: await prisma.cart.findMany({
+      where: { userId },
+      select: {
+        id: true,
+        status: true,
+        currency: true,
+        checkedOutAt: true,
+        expiredAt: true,
+        cancelledAt: true,
+        createdAt: true,
+        bookings: { select: { id: true } },
+      },
+    }),
+    // Gizli materyal (public key, sayaç, uç nokta anahtarları, sağlayıcı ref'i) dışarıda.
+    passkeys: await prisma.webAuthnCredential.findMany({
+      where: { userId },
+      select: { id: true, name: true, transports: true, createdAt: true, lastUsedAt: true },
+    }),
+    sessions: await prisma.userSession.findMany({
+      where: { userId },
+      select: {
+        id: true,
+        userAgent: true,
+        ipHint: true,
+        createdAt: true,
+        lastSeenAt: true,
+        revokedAt: true,
+      },
+    }),
+    pushSubscriptions: await prisma.pushSubscription.findMany({
+      where: { userId },
+      select: { id: true, locale: true, userAgent: true, createdAt: true, lastSuccessAt: true },
+    }),
+    identityVerifications: await prisma.identityVerification.findMany({
+      where: { userId },
+      select: { id: true, provider: true, status: true, verifiedAt: true, createdAt: true },
+    }),
+  };
+}
+
+/**
+ * Kullanıcının gönderdiği ve misafir ya da ev sahibi olarak taraf olduğu konuşmalardaki
+ * mesajlar. Karşı tarafın kimliği yerine yalnız rolü ve `fromMe` verilir.
+ */
+async function exportMessages(userId: string) {
+  const rows = await prisma.message.findMany({
+    where: {
+      OR: [
+        { senderId: userId },
+        { thread: { booking: { userId } } },
+        { thread: { booking: { property: { hostId: userId } } } },
+      ],
+    },
+    select: {
+      id: true,
+      threadId: true,
+      thread: { select: { bookingId: true } },
+      senderId: true,
+      senderRole: true,
+      body: true,
+      maskedKinds: true,
+      fromAiDraft: true,
+      createdAt: true,
+    },
+    orderBy: { createdAt: "asc" },
+  });
+  return rows.map(({ thread, senderId, ...m }) => ({
+    ...m,
+    bookingId: thread.bookingId,
+    fromMe: senderId === userId,
+  }));
+}
+
+/** Açtığı ya da yanıtlayan olduğu talepler; mesaj ve kanıtlarda karşı taraf kimliği yok. */
+async function exportClaims(userId: string) {
+  const rows = await prisma.claim.findMany({
+    where: { OR: [{ openedById: userId }, { respondentId: userId }] },
+    select: {
+      id: true,
+      bookingId: true,
+      type: true,
+      openedById: true,
+      amountRequestedMinor: true,
+      currency: true,
+      description: true,
+      status: true,
+      slaDueAt: true,
+      respondedAt: true,
+      escalatedAt: true,
+      awardedMinor: true,
+      settledMinor: true,
+      decisionNote: true,
+      decidedAt: true,
+      createdAt: true,
+      messages: {
+        select: { id: true, authorId: true, role: true, body: true, createdAt: true },
+        orderBy: { createdAt: "asc" },
+      },
+      evidence: {
+        select: {
+          id: true,
+          uploaderId: true,
+          contentType: true,
+          byteSize: true,
+          sha256: true,
+          createdAt: true,
+        },
+      },
+    },
+  });
+  return rows.map(({ openedById, messages, evidence, ...c }) => ({
+    ...c,
+    role: openedById === userId ? "OPENER" : "RESPONDENT",
+    messages: messages.map(({ authorId, ...m }) => ({ ...m, fromMe: authorId === userId })),
+    evidence: evidence.map(({ uploaderId, ...e }) => ({ ...e, fromMe: uploaderId === userId })),
+  }));
 }
 
 export interface DeleteAccountResult {

@@ -99,6 +99,22 @@ v3'ten devralınan yetkinlikler (oda tipi envanteri, vergi motoru, FX snapshot, 
 
 ## Ekran görüntüleri
 
+### v4
+
+| Grup sepeti (iki tesis, tümü-ya-hiç)                            | Sepet checkout'u (odalar tutuldu, tek ödeme)                |
+| --------------------------------------------------------------- | ----------------------------------------------------------- |
+| ![Grup sepeti](docs/img/v4-cart.png)                            | ![Sepet checkout](docs/img/v4-checkout-cart.png)            |
+| **Bölünmüş ödeme (organizatör + 2 katılımcı, son ödeme saati)** | **PDP fiyat takvimi (gecelik en düşük fiyat, vergi dahil)** |
+| ![Bölünmüş ödeme](docs/img/v4-split-payment.png)                | ![Fiyat takvimi](docs/img/v4-price-calendar.png)            |
+| **İlan karşılaştırma (teklif motoru toplamı + AI yorumu)**      | **Çözüm merkezi — yönetici talep kuyruğu**                  |
+| ![Karşılaştırma](docs/img/v4-compare.png)                       | ![Çözüm merkezi](docs/img/v4-resolution.png)                |
+| **Cüzdan ve sadakat (`/account`)**                              | **Ev sahibi payout paneli (emanet / serbest / rezerv)**     |
+| ![Cüzdan](docs/img/v4-wallet.png)                               | ![Payout paneli](docs/img/v4-host-payouts.png)              |
+| **Koyu tema (`prefers-color-scheme: dark`)**                    |                                                             |
+| ![Koyu tema](docs/img/v4-dark-mode.png)                         |                                                             |
+
+### v3
+
 | Satır kalemli checkout (gece, konaklama vergisi, dahil KDV) | PDP fiyat içgörüsü (conformal aralık, "olağan" etiketi) |
 | ----------------------------------------------------------- | ------------------------------------------------------- |
 | ![Checkout fiyat kırılımı](docs/img/checkout-breakdown.png) | ![Fiyat içgörüsü](docs/img/price-insight.png)           |
@@ -118,7 +134,7 @@ v3'ten devralınan yetkinlikler (oda tipi envanteri, vergi motoru, FX snapshot, 
 Görüntüler compose demo yığınından (seed'li, LLM demo modu) `npm run docs:screenshots` ile üretilir ([scripts/screenshots.ts](scripts/screenshots.ts)). Dürüstlük notları:
 
 - MCP kartı gerçek `POST /api/mcp` yanıtlarından (`resources/read ui://stay-card` + `tools/call search_stays`) çizilir, ancak ChatGPT/Claude istemcisinin ekran görüntüsü **değildir**: şablon, Apps SDK'nın sağladığı `window.openai.toolOutput` ile aynı biçimde beslenerek boş bir sayfada render edilir.
-- Bu görüntüler v3 arayüzündendir; v4 ekranları (fiyat takvimi, sepet, bölünmüş ödeme, çözüm merkezi, payout paneli) henüz bu tabloya eklenmedi.
+- v4 kümesi `SCREENSHOT_SET=v4 npm run docs:screenshots` ile üretilir; betik demo yığınında örnek bir sepet ve bölünmüş ödeme planı oluşturur (bir katılımcı payını ödemiştir). Çözüm merkezi görüntüsündeki hasar talebi `npm run demo:scenarios` senaryo 10'dan gelir (canlı demoda konaklama başlamadan talep açılamaz). Demo misafirinin tamamlanmış konaklaması olmadığından cüzdan boş görünür; cashback → kredi akışı senaryo 14'te doğrulanır. Seed fiyatları düz olduğundan fiyat takviminde tüm günler aynı seviyededir.
 - Gelir paneli görüntüsündeki mülkte seçilen pencerede satış olmadığı için metrikler sıfırdır.
 
 ## 30 saniyede çalıştır

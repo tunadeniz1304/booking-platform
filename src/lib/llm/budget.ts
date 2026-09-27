@@ -51,7 +51,10 @@ export function currentLlmSubject(): string | undefined {
 }
 
 export interface LlmBudget {
-  /** Bu özne bugün bütçesini doldurdu mu? */
+  /**
+   * Salt-okuma: bu özne bugün bütçesini doldurdu mu? Yalnız gözlem/test içindir; çağrı
+   * izni için KULLANILMAZ (kontrol + düşüm ayrık olur, yarışa açıktır) — izin `reserve` ile.
+   */
   exceeded(subject: string, now?: Date): Promise<boolean>;
   /**
    * Atomik rezervasyon: özne limitin altındaysa `tokens` kadar ayırır → `true`;

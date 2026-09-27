@@ -1,5 +1,6 @@
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { createMcpServer, defaultDeps, type McpDeps } from "./server";
+import { runWithLlmSubject, userLlmSubject } from "@/lib/llm/budget";
 
 /**
  * MCP streamable HTTP uç noktası (P1-11): `POST /api/mcp`.
@@ -12,6 +13,8 @@ import { createMcpServer, defaultDeps, type McpDeps } from "./server";
  * JSON-RPC'ye hiç ulaşmadan 401 + `WWW-Authenticate` döner. Doğrulanan token SDK'ya
  * `authInfo` olarak geçer; `MCP_ACCESS_TOKEN` ortam yedeği HTTP'de KAPALIDIR.
  * Rate-limit `src/proxy.ts` içinde `agentic` kategorisiyle (kullanıcı başına) uygulanır.
+ * Araçların LLM/embedding çağrıları (ör. `search_stays` sorgu gömmesi) token kullanıcısının
+ * bütçesine (`u:<id>`) faturalanır (v2-P0-4).
  */
 
 function unauthorized(message: string): Response {
@@ -49,9 +52,11 @@ export async function handleMcpHttp(req: Request, deps: McpDeps = defaultDeps): 
   });
   await server.connect(transport);
   try {
-    return await transport.handleRequest(req, {
-      authInfo: { token, clientId: claims.userId, scopes: [] },
-    });
+    return await runWithLlmSubject(userLlmSubject(claims.userId), () =>
+      transport.handleRequest(req, {
+        authInfo: { token, clientId: claims.userId, scopes: [] },
+      })
+    );
   } finally {
     await server.close();
   }

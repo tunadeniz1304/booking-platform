@@ -27,6 +27,11 @@ export interface QueryEmbedder extends Embedder {
    * (bütçe/özne yok/ağ/boyut) hash'e düşülmez — hash vektörü uzak indeksle karşılaştırılamaz.
    */
   embedQuery(text: string): Promise<number[] | null>;
+  /**
+   * İndekse yazılacak vektör: aynı sözleşme (indeks uzayı ya da `null`). Uzak sağlayıcı
+   * reddederse hash vektörü uzak-model indeksine yazılmaz; çağıran UPDATE'i atlar.
+   */
+  embedForIndex(text: string): Promise<number[] | null>;
 }
 
 export class HashEmbedder implements QueryEmbedder {
@@ -36,6 +41,9 @@ export class HashEmbedder implements QueryEmbedder {
     return texts.map(encode);
   }
   async embedQuery(text: string): Promise<number[] | null> {
+    return encode(text);
+  }
+  async embedForIndex(text: string): Promise<number[] | null> {
     return encode(text);
   }
 }
@@ -59,11 +67,17 @@ export class OpenAIEmbedder implements QueryEmbedder {
     }
   }
   async embedQuery(text: string): Promise<number[] | null> {
+    return this.embedStrict(text, "query embedding failed; vector channel skipped");
+  }
+  async embedForIndex(text: string): Promise<number[] | null> {
+    return this.embedStrict(text, "index embedding failed; stored vector left unchanged");
+  }
+  private async embedStrict(text: string, failureMessage: string): Promise<number[] | null> {
     try {
       const [vector] = await this.embedRemote([text]);
       return vector;
     } catch (error) {
-      logger.warn(errorFields(error), "query embedding failed; vector channel skipped");
+      logger.warn(errorFields(error), failureMessage);
       return null;
     }
   }
@@ -87,6 +101,11 @@ export function getEmbedder(): QueryEmbedder {
 export async function embedText(text: string): Promise<number[]> {
   const [v] = await getEmbedder().embed([text]);
   return v;
+}
+
+/** İndeks vektörü; indeks uzayında üretilemezse `null` (bkz. `QueryEmbedder.embedForIndex`). */
+export async function embedForIndex(text: string): Promise<number[] | null> {
+  return getEmbedder().embedForIndex(text);
 }
 
 /** Arama sorgusu vektörü; indeks uzayında üretilemezse `null` (bkz. `QueryEmbedder.embedQuery`). */

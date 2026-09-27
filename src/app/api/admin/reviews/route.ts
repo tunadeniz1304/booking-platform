@@ -3,14 +3,16 @@ import { z } from "zod";
 import { requireRole } from "@/lib/auth";
 import { toErrorResponse } from "@/lib/http/errors";
 import { audit } from "@/lib/admin/audit";
-import { withAiSubject } from "@/lib/http/ai";
+import { markAiGenerated, withAiSubject } from "@/lib/http/ai";
 import { decideModeration, listModerationQueue } from "@/lib/reviews/moderation-queue";
 
 /** Yorum moderasyon kuyruğu (ADMIN): filtreye takılan ve şikâyetle gizlenen yorumlar. */
 export async function GET(req: NextRequest) {
   try {
     await requireRole(req, ["ADMIN"]);
-    return NextResponse.json(await withAiSubject(req, () => listModerationQueue()));
+    const queue = await withAiSubject(req, () => listModerationQueue());
+    // Dizi biçimi korunur; her öğe AI açıklaması taşıdığından öğe bazında işaretlenir (AI Act Md. 50).
+    return NextResponse.json(queue.map((item) => markAiGenerated(item)));
   } catch (error) {
     return toErrorResponse(error, "admin.reviews");
   }

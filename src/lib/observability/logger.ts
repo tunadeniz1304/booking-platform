@@ -4,7 +4,8 @@ import { trace } from "@opentelemetry/api";
 /**
  * Uygulama geneli yapılandırılmış logger (pino).
  *
- * - Hassas alanlar (authorization, cookie, parola, token, API anahtarı) redakte edilir.
+ * - Hassas alanlar (authorization, cookie, parola, token, API anahtarı, özel anahtar —
+ *   ör. `AGENT_MANDATE_PRIVATE_KEY`) redakte edilir.
  * - Testlerde varsayılan seviye `silent`; `LOG_LEVEL` ile değiştirilebilir.
  * - İstek/iz korelasyonu için `child({ requestId, traceId })` kullanılır.
  */
@@ -37,6 +38,10 @@ export const LOGGER_OPTIONS: pino.LoggerOptions = {
       "*.passwordHash",
       "*.token",
       "*.apiKey",
+      "privateKey",
+      "*.privateKey",
+      "AGENT_MANDATE_PRIVATE_KEY",
+      "*.AGENT_MANDATE_PRIVATE_KEY",
       "headers.authorization",
       "headers.cookie",
       "req.headers.authorization",

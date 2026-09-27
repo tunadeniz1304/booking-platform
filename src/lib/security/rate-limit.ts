@@ -25,8 +25,36 @@ const SENSITIVE: ReadonlySet<RateLimitCategory> = new Set([
   "ai",
 ]);
 
+/**
+ * LLM çağıran uçlar — §3 v3-b, v5#12. Liste `tests/unit/security/v5-rate-limit-category.test.ts`
+ * içinde LLM istemcisini çağıran modüllere ulaşan route'lardan statik olarak doğrulanır;
+ * ön ek kovalarından (booking/search) ÖNCE değerlendirilir (ör. mesaj taslağı).
+ */
+const AI_PREFIXES = ["/api/ai", "/api/search/smart"] as const;
+const AI_EXACT: ReadonlySet<string> = new Set([
+  "/api/compare",
+  "/api/admin/events",
+  "/api/admin/reviews",
+  "/api/host/revenue/suggestions",
+]);
+const AI_PATTERNS: readonly RegExp[] = [
+  /^\/api\/properties\/[^/]+\/reviews\/summary$/,
+  /^\/api\/properties\/[^/]+\/review-highlights$/,
+  /^\/api\/bookings\/[^/]+\/messages\/draft$/,
+];
+
+function isAiPath(pathname: string): boolean {
+  return (
+    AI_PREFIXES.some((p) => pathname.startsWith(p)) ||
+    AI_EXACT.has(pathname) ||
+    AI_PATTERNS.some((re) => re.test(pathname))
+  );
+}
+
 export function categorize(pathname: string): RateLimitCategory {
   if (pathname.startsWith("/api/auth")) return "auth";
+  // Tüm AI uçları `ai` kategorisinde (maliyetli; Redis yoksa fail-closed).
+  if (isAiPath(pathname)) return "ai";
   if (
     pathname.startsWith("/api/bookings") ||
     pathname.startsWith("/api/transfers") ||
@@ -39,17 +67,13 @@ export function categorize(pathname: string): RateLimitCategory {
   if (pathname.startsWith("/api/payments") || pathname.startsWith("/api/pay/share")) {
     return "payment";
   }
-  // Ajan uçları (P1-11): MCP HTTP + ACP checkout — ayrı kova, rezervasyon/ödeme yapabilir.
-  if (pathname.startsWith("/api/mcp") || pathname.startsWith("/api/agentic")) return "agentic";
-  // Tüm AI uçları (yorum özeti dahil) `ai` kategorisinde — §3 v3-b.
+  // Ajan uçları (P1-11, v5#12): MCP HTTP + ACP + UCP checkout — ayrı kova, rezervasyon/ödeme yapabilir.
   if (
-    pathname.startsWith("/api/ai") ||
-    pathname.startsWith("/api/search/smart") ||
-    /^\/api\/properties\/[^/]+\/reviews\/summary$/.test(pathname) ||
-    /^\/api\/properties\/[^/]+\/review-highlights$/.test(pathname) ||
-    pathname === "/api/compare"
+    pathname.startsWith("/api/mcp") ||
+    pathname.startsWith("/api/agentic") ||
+    pathname.startsWith("/api/ucp")
   ) {
-    return "ai";
+    return "agentic";
   }
   if (
     pathname.startsWith("/api/search") ||

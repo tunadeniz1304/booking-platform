@@ -376,6 +376,10 @@ describeInt("F2c defter bağlama: rezervasyon → ödeme → iade → iptal → 
     }
   }
 
+  /** Süpürücü eşiği (`TRANSFER_CAPTURE_PENDING_TIMEOUT_SECONDS`) aşılmış bir "şimdi". */
+  const afterTimeout = () =>
+    new Date(Date.now() + (getConfig().TRANSFER_CAPTURE_PENDING_TIMEOUT_SECONDS + 60) * 1000);
+
   /** Devrin bugünkü mutabakat farkları (tür sırasıyla). */
   async function transferDiffs(transferId: string) {
     const report = await reconcile(new Date().toISOString().slice(0, 10), prisma);
@@ -398,10 +402,10 @@ describeInt("F2c defter bağlama: rezervasyon → ödeme → iade → iptal → 
       { subject: "transfer", kind: "refund", psp: BigInt(stuck.ask), journal: 0n },
     ]);
 
-    // Sonraki süpürme aynı iade anahtarıyla yeniden dener ve jurnali tamamlar (tek çift).
+    // Eşik sonrası süpürme aynı iade anahtarıyla yeniden dener ve jurnali tamamlar (tek çift).
     const psp = new CapturedPsp();
     psp.captured.add(stuck.ref);
-    await sweepStuckTransfers(new Date(), psp);
+    await sweepStuckTransfers(afterTimeout(), psp);
     expect(psp.refundKeys).toContain(`transfer-refund:${stuck.transferId}`);
     const expected = {
       kinds: ["BOOKING_CAPTURED", "REFUND_ISSUED"],
@@ -409,7 +413,7 @@ describeInt("F2c defter bağlama: rezervasyon → ödeme → iade → iptal → 
       captured: BigInt(stuck.ask),
     };
     expect(await transferJournalOf(stuck.transferId)).toEqual(expected);
-    await sweepStuckTransfers(new Date(), psp);
+    await sweepStuckTransfers(afterTimeout(), psp);
     expect(await transferJournalOf(stuck.transferId)).toEqual(expected);
     touched.transfers.add(stuck.transferId);
     await assertBooksClean();
@@ -440,7 +444,7 @@ describeInt("F2c defter bağlama: rezervasyon → ödeme → iade → iptal → 
 
     const psp = new CapturedPsp();
     psp.captured.add(transfer.buyerPaymentRef!);
-    await sweepStuckTransfers(new Date(), psp);
+    await sweepStuckTransfers(afterTimeout(), psp);
     expect(await transferJournalOf(listed.id)).toEqual({
       kinds: ["BOOKING_CAPTURED", "REFUND_ISSUED"],
       psp: 0n,

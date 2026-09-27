@@ -25,6 +25,13 @@ const PUBLIC_API: readonly PublicRule[] = [
   { prefix: "/api/transfers/discover", methods: ["GET"] },
   { prefix: "/api/notices", methods: ["POST"] }, // DSA md. 16 herkese açık bildirim (P1-13b)
   { prefix: "/api/openapi.json", methods: ["GET"] }, // makine okunur sözleşme (v2 P1-2)
+  // v5#7: ilan görselleri (PDP, arama motorları). Route yalnız aktif ilanın fotoğrafını döner
+  // (pasif → 404); erişilebilirlik kanıt fotoğrafları da aynı önek — yayındaki ilanın parçası.
+  { prefix: "/api/photos/", methods: ["GET"] },
+  // v5#7 (bilinçli karar): PDP'deki fiyat içgörüsü ve karşılaştırma oturumsuz da çalışır.
+  // İçgörü deterministik → `search` kovası; karşılaştırma LLM yorumu → `ai` kovası + anonim bütçe.
+  { prefix: "/api/price-insight", methods: ["GET"] },
+  { prefix: "/api/compare", methods: ["GET"] },
 ];
 
 /**

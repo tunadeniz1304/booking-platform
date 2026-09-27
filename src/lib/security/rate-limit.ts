@@ -79,7 +79,10 @@ export function categorize(pathname: string): RateLimitCategory {
     pathname.startsWith("/api/search") ||
     pathname.startsWith("/api/properties") ||
     pathname.startsWith("/api/locations") ||
-    pathname.startsWith("/api/quote")
+    pathname.startsWith("/api/quote") ||
+    // v5#7: herkese açık ucuz okumalar (görsel, fiyat içgörüsü).
+    pathname.startsWith("/api/photos/") ||
+    pathname.startsWith("/api/price-insight")
   ) {
     return "search";
   }

@@ -44,7 +44,7 @@ Zod doğrulama hatalarında:
 - Giriş/kayıt yanıtı: `{ user, token }`. Token JWT'dir (algorithm HS256, `sub` = userId, `role` claim'i içerir).
 - İstemci token'ı **`Authorization: Bearer <token>`** başlığında **veya** `token` httpOnly cookie'sinde gönderir.
 - Proxy (`src/proxy.ts`), korunan `/api` isteklerini doğrular ve `x-user-id` / `x-user-role` başlıklarını yalnızca doğrulanmış token'dan alt uçlara ekler.
-- Oturum gerektirmeyen uçlar `src/lib/security/public-routes.ts` içindeki `PUBLIC_API` listesindedir: `/api/auth/*`, `/api/health`, `/api/ready`, `/api/metrics`, `/api/internal/*`, `/api/payments/webhook` (tüm metotlar); `/api/search` (GET, POST); `/api/properties*`, `/api/locations`, `/api/quote`, `/api/rooms/*`, `/api/routing/optimize`, `/api/transfers/discover`, `/api/openapi.json` (yalnızca GET). Route handler'lar ayrıca kendi yetki kontrolünü yapar.
+- Oturum gerektirmeyen uçlar `src/lib/security/public-routes.ts` içindeki `PUBLIC_API` listesindedir: `/api/auth/*`, `/api/health`, `/api/ready`, `/api/metrics`, `/api/internal/*`, `/api/payments/webhook` (tüm metotlar); `/api/search` (GET, POST); `/api/properties*`, `/api/locations`, `/api/quote`, `/api/rooms/*`, `/api/routing/optimize`, `/api/transfers/discover`, `/api/openapi.json`, `/api/photos/*` (yalnız aktif ilanın görseli), `/api/price-insight`, `/api/compare` (yalnızca GET; v5#7). Route handler'lar ayrıca kendi yetki kontrolünü yapar.
 
 ### 0.4 Idempotency
 

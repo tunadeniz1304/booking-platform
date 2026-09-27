@@ -492,6 +492,8 @@ const schema = z.object({
   PASSKEY_STEP_UP_COOLDOWN_HOURS: int(24, 0, 24 * 30),
   /** Rezervasyon başına başarısız ödeme/3DS denemesi sınırı; aşılınca ödeme FAILED. */
   PAYMENT_MAX_ATTEMPTS: int(5, 1, 50),
+  /** v5#5: alıcı başına günlük başarısız devir talebi sınırı (kart test kahini koruması). */
+  TRANSFER_CLAIM_MAX_ATTEMPTS_PER_DAY: int(10, 1, 1000),
   /** Deneme sayacının ömrü (sn). */
   PAYMENT_ATTEMPTS_WINDOW_SECONDS: int(86_400, 60, 30 * 86_400),
   /**

@@ -19,7 +19,8 @@ import { registry } from "@/lib/observability/metrics";
 class SpyPsp extends MockPsp {
   authorizations = 0;
   override async authorize(input: Parameters<MockPsp["authorize"]>[0]) {
-    this.authorizations += 1;
+    // Yalnız devir talebi provizyonları (satıcının rezervasyon ödemesi sayılmaz).
+    if (input.idempotencyKey.startsWith("transfer:")) this.authorizations += 1;
     return super.authorize(input);
   }
 }

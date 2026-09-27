@@ -75,7 +75,11 @@ export const REFUND_RETRY_JOB = "refund-retry";
  * DIŞINDA yapılır. Tüm tutarlar minor-unit.
  */
 
-const paymentsTotal = counter("payment_attempts_total", "Ödeme denemeleri", ["outcome"] as const);
+/** v5#5: `flow` etiketi devir talebi denemelerini (`transfer`) ayırır; rezervasyon yolu boş. */
+const paymentsTotal = counter("payment_attempts_total", "Ödeme denemeleri", [
+  "outcome",
+  "flow",
+] as const);
 export const captureRaceTotal = counter(
   "payment_capture_race_total",
   "Yarışı kaybedip telafi edilen yetkilendirme/tahsilatlar",

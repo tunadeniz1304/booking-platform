@@ -27,6 +27,7 @@ import { logger, errorFields } from "@/lib/observability/logger";
 import { counter } from "@/lib/observability/metrics";
 import { audit } from "@/lib/admin/audit";
 import { CompensationMarkers, post, postCaptureCompensation } from "@/lib/ledger";
+import { assessPayment } from "@/lib/risk/fraud";
 
 /**
  * P2P rezervasyon devri (ikincil pazar).
@@ -514,6 +515,128 @@ function claimSteps(provider: PaymentProvider): SagaStep<ClaimContext, string>[]
 
 const redlock = createRedlock(redis);
 
+const DAY_SECONDS = 86_400;
+
+/**
+ * v5#5: ödeme yollarıyla ortak `payment_attempts_total`; devir talebi `flow="transfer"`
+ * etiketiyle sayılır (declined / fraud_denied / fraud_review / attempts_exhausted / claimed).
+ */
+const paymentAttemptsTotal = counter("payment_attempts_total", "Ödeme denemeleri", [
+  "outcome",
+  "flow",
+] as const);
+
+const claimAttemptsKey = (transferId: string, buyerId: string) =>
+  `transfer:claim:attempts:${transferId}:${buyerId}`;
+const claimDailyKey = (buyerId: string) => `transfer:claim:attempts:day:${buyerId}`;
+
+/**
+ * v5#5 kart test kahini koruması: (devir, alıcı) başına `PAYMENT_MAX_ATTEMPTS` (pencere
+ * `PAYMENT_ATTEMPTS_WINDOW_SECONDS`) ve alıcı başına günlük `TRANSFER_CLAIM_MAX_ATTEMPTS_PER_DAY`
+ * başarısız deneme. Sınırdaysa PSP'ye gidilmeden 429 ATTEMPTS_EXHAUSTED.
+ */
+async function assertClaimAttemptsLeft(transferId: string, buyerId: string): Promise<void> {
+  const cfg = getConfig();
+  const [pair, daily] = await Promise.all([
+    redis.get(claimAttemptsKey(transferId, buyerId)),
+    redis.get(claimDailyKey(buyerId)),
+  ]);
+  const exhausted =
+    Number(pair ?? 0) >= cfg.PAYMENT_MAX_ATTEMPTS ||
+    Number(daily ?? 0) >= cfg.TRANSFER_CLAIM_MAX_ATTEMPTS_PER_DAY;
+  if (!exhausted) return;
+  paymentAttemptsTotal.inc({ flow: "transfer", outcome: "attempts_exhausted" });
+  throw new TransferError(
+    "Çok fazla başarısız devir denemesi; lütfen daha sonra tekrar deneyin",
+    429,
+    "ATTEMPTS_EXHAUSTED"
+  );
+}
+
+/** Başarısız (reddedilen) talep denemesini iki sayaca yazar ve metriği artırır. */
+async function recordFailedClaim(
+  transferId: string,
+  buyerId: string,
+  outcome: "declined" | "fraud_denied" | "fraud_review"
+): Promise<void> {
+  paymentAttemptsTotal.inc({ flow: "transfer", outcome });
+  const window = getConfig().PAYMENT_ATTEMPTS_WINDOW_SECONDS;
+  await Promise.all([
+    redis.incrWithTtl(claimAttemptsKey(transferId, buyerId), window),
+    redis.incrWithTtl(claimDailyKey(buyerId), DAY_SECONDS),
+  ]).catch((error) =>
+    logger.error({ transferId, ...errorFields(error) }, "claim attempt counter failed")
+  );
+}
+
+/**
+ * v5#5: ödeme yollarıyla aynı fraud skoru. `deny` → 403 FRAUD_BLOCKED, `review` → 403
+ * TRANSFER_REVIEW_REQUIRED (devirde manuel inceleme kuyruğu yok → fail-closed); ikisi de PSP'ye
+ * gitmez ve başarısız deneme sayılır. `challenge_3ds` / `step_up_passkey`: devir talebinde
+ * etkileşimli doğrulama adımı olmadığından PSP'nin kendi 3DS kararı geçerlidir (`requires_action`
+ * → ret); karar FraudCheck'e yazılır.
+ */
+async function assessClaimRisk(
+  transfer: { id: string; bookingId: string },
+  input: { buyerId: string; cardToken: string; context?: ClaimRequestContext },
+  amountMinor: number
+): Promise<void> {
+  const [account, recentFailed] = await Promise.all([
+    prisma.user.findUnique({ where: { id: input.buyerId }, select: { createdAt: true } }),
+    prisma.payment.count({
+      where: {
+        userId: input.buyerId,
+        status: "FAILED",
+        updatedAt: { gte: new Date(Date.now() - DAY_SECONDS * 1000) },
+      },
+    }),
+  ]);
+  const risk = await assessPayment(redis, {
+    userId: input.buyerId,
+    ip: input.context?.ip ?? "unknown",
+    cardToken: input.cardToken,
+    amountMinor,
+    accountCreatedAt: account?.createdAt ?? new Date(),
+    recentFailedPayments: recentFailed,
+    ipCountry: input.context?.ipCountry,
+    cardBin: null,
+    deviceId: input.context?.deviceId,
+  });
+  await prisma.fraudCheck.create({
+    data: {
+      bookingId: transfer.bookingId,
+      userId: input.buyerId,
+      score: risk.score,
+      decision: risk.decision,
+      reasons: [
+        ...risk.hits,
+        { rule: "transfer", points: 0, detail: `transfer:${transfer.id}` },
+      ] as unknown as Prisma.InputJsonValue,
+    },
+  });
+  if (risk.decision === "deny") {
+    await recordFailedClaim(transfer.id, input.buyerId, "fraud_denied");
+    throw new HttpError(403, "FRAUD_BLOCKED", "Ödeme güvenlik kontrolünden geçemedi", {
+      score: risk.score,
+    });
+  }
+  if (risk.decision === "review") {
+    await recordFailedClaim(transfer.id, input.buyerId, "fraud_review");
+    throw new TransferError(
+      "Bu devir talebi güvenlik incelemesi gerektiriyor",
+      403,
+      "TRANSFER_REVIEW_REQUIRED"
+    );
+  }
+}
+
+/** İstemci bağlamı (fraud sinyalleri); route'tan gelir, doğrudan çağrılarda opsiyonel. */
+export interface ClaimRequestContext {
+  ip?: string;
+  ipCountry?: string | null;
+  deviceId?: string | null;
+}
+
 /**
  * Devir başına talep kilidi: aynı ilana gelen talepler (aynı alıcının çift gönderimi dahil)
  * sıralanır; kilidi sonra alan istek durumu yeniden okur ve 409 alır — hiçbir zaman PSP'ye
@@ -541,6 +664,7 @@ export async function claimTransfer(input: {
    * Yoksa deneme başına rastgele — reddedilen karttan sonra başka kartla yeniden deneme mümkün.
    */
   idempotencyKey?: string;
+  context?: ClaimRequestContext;
   now?: Date;
 }): Promise<ClaimResult> {
   assertEnabled();
@@ -554,7 +678,13 @@ export async function claimTransfer(input: {
 
 /** Kilit altında: ilan durumu burada (yeniden) okunur. */
 async function claimLocked(
-  input: { token: string; buyerId: string; cardToken: string; idempotencyKey?: string },
+  input: {
+    token: string;
+    buyerId: string;
+    cardToken: string;
+    idempotencyKey?: string;
+    context?: ClaimRequestContext;
+  },
   payload: TokenPayload,
   now: Date
 ): Promise<ClaimResult> {
@@ -575,6 +705,9 @@ async function claimLocked(
 
   const currency = assertCurrency(transfer.currency);
   const ask = money(minorFromDb(transfer.askPriceMinor), currency);
+  // v5#5: deneme sınırı ve fraud kapısı PSP'den ÖNCE.
+  await assertClaimAttemptsLeft(transfer.id, input.buyerId);
+  await assessClaimRisk(transfer, input, ask.amount);
   // İstemci anahtarı kart özetiyle birleşir: aynı istek tekrarı aynı provizyonu kullanır,
   // aynı anahtarla başka kart ise yeni deneme sayılır (PSP idempotency çakışması olmaz).
   // Nesil sayacı: provizyonu telafide void edilen anahtar yakılır; aynı anahtarla yeniden
@@ -615,6 +748,9 @@ async function claimLocked(
           logger.error({ transferId: transfer.id, ...errorFields(e) }, "claim key burn failed")
         );
     }
+    if (error instanceof HttpError && error.code === "PAYMENT_DECLINED") {
+      await recordFailedClaim(transfer.id, input.buyerId, "declined");
+    }
     if (error instanceof HttpError) throw error;
     logger.error({ transferId: transfer.id, ...errorFields(error) }, "transfer saga failed");
     throw new TransferError(
@@ -624,6 +760,7 @@ async function claimLocked(
     );
   }
 
+  paymentAttemptsTotal.inc({ flow: "transfer", outcome: "claimed" });
   await invalidateBookingCache(bookingId);
   return {
     transferId: transfer.id,

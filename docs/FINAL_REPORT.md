@@ -1,7 +1,143 @@
 # booking-platform — Final raporu
 
 > Portföy/demo projesidir; gerçek ödeme alınmaz, gerçek konaklama satılmaz.
-> v3 bölümü en üstte; v2.0.0 raporu aşağıda değiştirilmeden korunur.
+> v4 bölümü en üstte; v3.0.0 ve v2.0.0 raporları aşağıda değiştirilmeden korunur.
+
+# v4
+
+## 1. Özet (v4.0.0, 2026-09-27)
+
+v3.0.0'dan sonra 181 commit (79 feat · 34 fix · 31 test · 30 docs · 5 chore · 2 refactor;
+`git log v3.0.0..v4.0.0 --format=%s`), 23 yeni migration, 648 dosya değişti. v3'ün bilinen 20
+hatası (`booking-v4.md` §1) kapatıldı; her biri `regression: v4#N` etiketli testle korunuyor:
+
+```bash
+grep -rl "regression: v4#" tests | wc -l                        # 28 dosya
+grep -rho "regression: v4#[0-9]*" tests | sort -u | wc -l       # 20 benzersiz etiket (#1–#20)
+```
+
+Başlıca eklemeler: minor-unit `BigInt` para (ADR 0019), DB tetikli çift girişli defter + günlük
+mutabakat (ADR 0020), grup sepeti + bölünmüş ödeme, escrow/payout/komisyon/rezerv + hasar
+depozitosu + çözüm merkezi (ADR 0021), cüzdan/sadakat, promosyon motoru + Omnibus, KYC ve
+güven-emniyet, AI yorum öne çıkanları + karşılaştırma, görsel arama (ADR 0022), ajan ticareti
+ACP/UCP/AP2 mandate'leri (ADR 0023), recent-auth + oturum yönetimi (ADR 0024), PWA + Web Push,
+7565/DSA/UBL-TR/erişilebilirlik uyumu, veri saklama işi, SLO + alarmlar, k6 yük/kaos testleri.
+
+## 2. Faz faz yapılanlar
+
+Faz planı `booking-v4.md` §5. Paralel çalışılan işler aşağıda plandaki faza göre gruplanmıştır;
+aralıklar `git log --oneline <aralık>` ile incelenebilir.
+
+| Faz    | İçerik                                                                                                     | Commit aralığı (commit sayısı)                                                                                                                                                          |
+| ------ | ---------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **F0** | Taban çizgisi (unit 503, int 176), v4 plan dokümanı                                                        | `v3.0.0..04b27cf` (2)                                                                                                                                                                   |
+| **F1** | §3 LLM sözleşmesi doğrulaması, v4#1–#14, #16–#20, P0-4 oturumlar, transfer sweep                           | `04b27cf..c9ee863` (26)                                                                                                                                                                 |
+| **F2** | P0-2 minor-unit + v4#15, P0-3 defter çekirdeği, defterin servislere bağlanması                             | `c9ee863..f27fbaa` (5), `8e92b68..d8a5f14` (5), `9ebbc4c..b306965` (4)                                                                                                                  |
+| **F3** | P1-1 grup sepeti, P1-2 bölünmüş ödeme, P1-3 fiyat takvimi                                                  | `40ceb0d..2448079` (8), `0569888..3bcbd29` (7), `06cb0e5..52bf485` (3)                                                                                                                  |
+| **F4** | P1-4 payout/escrow/DAC7, P1-5 depozito + çözüm merkezi, P1-7 cüzdan                                        | `31d7e06..0569888` (7), `3bcbd29..c0eb6dc` (6), `05f4fc1..e768979` (6)                                                                                                                  |
+| **F5** | P1-6 KYC/güven-emniyet, P1-8 promosyon + Omnibus                                                           | `52bf485..40ceb0d` (5), `2448079..4471f0f` (6)                                                                                                                                          |
+| **F6** | P1-9 yorum öne çıkanları + karşılaştırma, P1-10 görsel zekâ                                                | `d8a5f14..895411b` (5), `f27fbaa..5dc5080` (8)                                                                                                                                          |
+| **F7** | P1-11 ajan ticareti v2, P1-12 PWA + Web Push                                                               | `4471f0f..31d7e06` (7), `895411b..9ebbc4c` (3)                                                                                                                                          |
+| **F8** | P1-13 uyum (a–e), P2-1 UI/dark mode/WCAG 2.2, test stabilizasyonu, P2-2 demo, P2-3 yük/kaos, fix-sweep 1–3 | `5dc5080..8e92b68`, `b306965..06cb0e5`, `c0eb6dc..1a7f931`, `1a7f931..05f4fc1`, `8f98985..c18f8db`, `1ce25ca..535f789`, `e768979..8f98985`, `c18f8db..c7c7c8e`, `535f789..d7c45d5` (56) |
+| **F9** | §7 dokümanları + ADR 0024, tam kalite kapısı + DoD doğrulaması, v4 ekran görüntüleri, README, bu sürüm     | `c7c7c8e..1ce25ca` (8), `d7c45d5..f753216` (3), `f753216..4fcd105` (1), `chore(release): 4.0.0`                                                                                         |
+
+## 3. Bitiş tanımı (DoD, `booking-v4.md` §8) — durum ve kanıt
+
+| #   | Madde                                                            | Durum  | Kanıt                                                                                                                                                                                                                                                                                                                                                                                                 |
+| --- | ---------------------------------------------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Demo compose ile arama → sepet → split → onay → iptal/iade       | ✓      | Demo yığınında HTTP betiğiyle (e2e spec değil): arama 4 sonuç → 2 tesisli sepet HELD → 3 eşit pay → plan SETTLED, 2 rezervasyon CONFIRMED → iptal, %100 iade, ödeme REFUNDED. Yalnız `docker-compose.yml`: `DEMO_MODE=false`, `COOKIE_SECURE=true`, demo seed atlandı, `/dev/mailbox` 404, çerezler `Secure; HttpOnly`, HSTS var.                                                                     |
+| 2   | `.env` yokken DEMO, varken CANLI; `llm:smoke`; `/api/llm/status` | Kısmen | `.env`'siz: `/api/llm/status` → `effectiveMode: demo`, `hasKey: false`; `npm run llm:smoke` DEMO OK; `tests/unit/llm/v4-contract.test.ts` + mevcut `tests/unit/llm/*` canlı yolu sahte fetch ile test eder. **Gerçek anahtarla canlı mod bu sürümde denenmedi — kullanıcı ortamında doğrulanmalı.**                                                                                                   |
+| 3   | 20 hatanın her biri `regression: v4#N` testiyle kapalı           | ✓      | Yukarıdaki `grep` komutları: 28 dosya, #1–#20 benzersiz 20 etiket; `docs/SECURITY.md` §5 hata → test eşlemesi.                                                                                                                                                                                                                                                                                        |
+| 4   | Her para senaryosunda defter dengede, mutabakat farkı 0          | ✓      | Property testleri `tests/unit/ledger/ledger-templates.test.ts`, `tests/unit/ledger/booking-money.test.ts`, `tests/unit/wallet/rules.test.ts`; int `tests/integration/v4-ledger-flows.test.ts` ve cart/split/payouts/resolution/wallet/fix-sweep-2/3 testleri her adımda mizan + `reconcile` farkı 0; k6 sonrası `load-assert` 0 fark.                                                                 |
+| 5   | `npm run demo:scenarios` tüm v4 senaryoları                      | ✓      | 14/14 PASS (v3 1–7 + v4 8–14), v4 senaryolarının hepsinde mizan dengede + mutabakat farkı 0 (demo compose yığını).                                                                                                                                                                                                                                                                                    |
+| 6   | `npm run mcp:smoke` mandate'li rezervasyon + mandate reddi       | ✓      | mandate'li `checkout_stay` completed; `MANDATE_REQUIRED` / `EXPIRED` / `AMOUNT_EXCEEDED` / `REPLAYED` ve `EMAIL_NOT_VERIFIED` reddi. DB'li akış: `tests/integration/p1-11-agentic-mandates.test.ts`.                                                                                                                                                                                                  |
+| 7   | k6 sepet spike'ında aşırı satış 0; sonuçlar `docs/perf/`         | ✓      | `docs/perf/p2-3-load-chaos.md`: cart-spike 100 VU → 217/217 atomik, kısmi tutma 0, 5xx 0; tüm koşumlar sonrası aşırı satış 0/0. (Tutma p95 hedefi aşıldı — §6.)                                                                                                                                                                                                                                       |
+| 8   | axe e2e 0 ihlal; i18n eksik anahtar 0                            | ✓      | `npm run test:e2e` 35/35 (demo yığını, `tests/e2e/a11y.spec.ts` 18 test, `wcag22aa` etiketiyle); `npm run i18n:check` 32 ad alanı, eksik 0.                                                                                                                                                                                                                                                           |
+| 9   | Kalite kapısı her fazda yeşil; CI main'de yeşil                  | Kısmen | Yerel kapının tamamı yeşil (§4). **CI (`.github/workflows/ci.yml`) v4 kapısına genişletilmedi ve GitHub'da yeşil olduğu doğrulanmadı — kullanıcı kararıyla ertelendi.** v4'te ci.yml'e yalnız e2e için demo override satırı eklendi.                                                                                                                                                                  |
+| 10  | §7 dokümanları güncel; ADR 0019–0024; README dürüstlük notu      | ✓      | `docs/adr/0019`–`0024`; README (dürüstlük notu tablosu), ARCHITECTURE §13–§18, COMPLIANCE, SECURITY §4–§5, MODEL_CARD, METHODOLOGY, DEMO_SCRIPT, api-contract v4 uçları; göreli link denetimi 206 link / 0 kırık.                                                                                                                                                                                     |
+| 11  | `docs/FINAL_REPORT.md`                                           | ✓      | Bu bölüm.                                                                                                                                                                                                                                                                                                                                                                                             |
+| 12  | Atıf yok, secret taraması 0, `v4.0.0` tag'i, `git status` temiz  | Kısmen | Secret: `git log -p v3.0.0..HEAD` desen taraması 2 eşleşme, ikisi de yanlış pozitif (§7). **Atıf: v4 aralığında 3 commit mesajında (`535f789`, `5fb32ec`, `9477ab7`; P2-3 yük/kaos işi) AI ortak-yazar satırı var ve bunlar zaten push edilmiş; kaldırmak geçmişi yeniden yazmayı ve force push'u gerektirir (§9'da yasak) — kullanıcı kararı bekliyor.** Diğer 178 commit ve sürüm commit'i atıfsız. |
+
+## 4. Ölçümler
+
+Tüm sayılar 2026-09-27 tarihli F9b-1 tam kapı koşusundan (main = `d7c45d5` + doküman commit'leri;
+bu sürümde yalnız doküman değişti) ve `docs/perf/p2-3-load-chaos.md`'den alınmıştır.
+
+| Ölçüm                                                                  | Değer                                                                                                 |
+| ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| Unit (`npm run test:unit`)                                             | 113 dosya / **1028** test ✓ (v3.0.0: 503)                                                             |
+| Integration (`npm run test:int`, testcontainers)                       | 75 dosya / **342** test ✓, 0 skip (v3.0.0: 176)                                                       |
+| Birleşik kapsam (`npm run test:coverage`, eşik satır 80 / dal 70)      | 188 dosya / 1370 test · satır **%90,35** · dal **%79,13** · ifade %88,19                              |
+| e2e (`npm run test:e2e`, Playwright + axe, demo yığını)                | **35/35** ✓ (7 dosya, 1,4 dk), axe ciddi/kritik ihlal 0 (v3.0.0: 18)                                  |
+| `npm run demo:scenarios`                                               | **14/14** PASS                                                                                        |
+| `npm run mcp:smoke` / `npm run llm:smoke`                              | ✓ / ✓ (DEMO)                                                                                          |
+| `npm run i18n:check`                                                   | 32 ad alanı, eksik 0                                                                                  |
+| `npm run build` / `docker compose build`                               | ✓ / ✓ (web 440 MB, worker 2.08 GB)                                                                    |
+| `npm audit --omit=dev --audit-level=high`                              | high/critical 0 (4 moderate, `@opentelemetry` — v3 raporundaki aynı zincir)                           |
+| Regresyon etiketleri                                                   | 20 benzersiz `regression: v4#N`, 28 dosya                                                             |
+| k6 cart-spike 100 VU / 30 s                                            | tutma 15 × 200 / 202 × 409, kısmi tutma 0, 5xx 0, atomiklik 217/217, p95 10,07 s ✗                    |
+| k6 cart-spike 20 VU / 30 s                                             | 15 / 43, kısmi 0, 5xx 0, p95 5,72 s ✗                                                                 |
+| k6 split `share_race` (fix-sweep-3 sonrası, 20 VU × 5)                 | 100 plan, çift yetkilendirme 0, ertelenen onay 21 → 21, **99/99 SETTLED**, iade 0                     |
+| k6 split `deadline_race`                                               | 20 plan: 10 SETTLED / 10 ABORTED, tutarsız 0                                                          |
+| k6 webhook-storm                                                       | 1 023 webhook (400 tekrar, 23 bozuk imza), 5xx 0, 159 CONFIRMED + 41 iptal/iade                       |
+| Kaos (PSP 300±200 ms, %10–40 hata; Redis 15 s pause)                   | PSP hatası → 502; telafi retry ile açık yetkilendirme 0; Redis kesintisinde 5xx yalnız pencere içinde |
+| Değişmezler (tüm yük/kaos koşumları sonrası, `scripts/load-assert.ts`) | aşırı satış 0 · mizan dengede · mutabakat 1 198 kayıt / 0 fark · çift capture 0                       |
+
+## 5. Hâlâ mock / sentetik olanlar
+
+- **Ödeme:** varsayılan sağlayıcı MockPsp. Stripe Shared Payment Token, Stripe Connect payout,
+  Stripe Identity ve Stripe depozito (müşteri + `off_session`) yolları yalnız sahte Stripe
+  sunucusuyla (`tests/support/stripe-fake.ts`) test edildi; gerçek Stripe test hesabında koşulmadı.
+- **KYC:** `MockIdentityProvider` (test belgesiyle deterministik).
+- **Payout:** `MockPayoutProvider`; Stripe Connect onboarding linki ve payout webhook'ları yok.
+- **e-Arşiv/e-Fatura:** UBL-TR XML gerçek, entegratör mock; XSD yok → yapısal snapshot testi.
+- **7565 / DSA:** Bakanlık bağlantısı yok; bildirimler uygulama içinden.
+- **Görsel arama:** CLIP opsiyonel (varsayılan kapalı, demo override'ında açık); testler stub embedder.
+- **LLM:** anahtar yoksa deterministik demo yanıtları; hash embedding yedeği; LTR sentetik tıklamalı.
+- **Web Push:** VAPID anahtarları yoksa kapalı.
+- **Mandate:** HS256, yalnız platform doğrular (ES256/JWKS yok).
+
+## 6. Bilinen sınırlamalar ve ertelenenler
+
+- **CI ertelendi:** `ci.yml` v4 kapısına (mcp:smoke, e2e demo yığını, coverage eşiği) göre
+  güncellenmedi; GitHub Actions'ta yeşil koşu doğrulanmadı (kullanıcı kararı). Kapı yerelde yeşil.
+- **Canlı LLM:** yalnız DEMO modu doğrulandı; kullanıcının `.env`'indeki anahtarla canlı mod,
+  `npm run llm:smoke` ve `/api/llm/status` kullanıcı ortamında kontrol edilmeli.
+- **Performans:** sepet tutma p95 hedefi (2 s) aşılıyor (100 VU 10,07 s) — tüm VU'lar aynı 4
+  envanter satırında (bilerek sıcak nokta); para/değişmez ihlali yok. Tekil rezervasyon
+  ödemesinde ertelenmiş onay kuyruğu yok (yalnız genişletilmiş deneme bütçesi).
+- **Sepet/bölünmüş ödeme:** passkey step-up yok (3DS'e düşer), Stripe Payment Element yok, kupon
+  ve cüzdan kredisi yok; bölünmüş ödemede plan kapandıktan sonra gelen geç pay her zaman iade.
+- **Çözüm merkezi:** sepet tahsilatında itiraz ilk rezervasyona bağlı; itiraz ücreti,
+  `funds_reinstated`/kazanılan itiraz dönüşü ve DAC7'de itiraz kaybı yok; devredilmiş
+  rezervasyonda misafir talebi kapalı.
+- **Payout:** serbest bırakma sonrası iadede host bakiyesi rezerv → bakiye → platform kaybı
+  sırasıyla karşılanır; F2c öncesi jurnalsiz ödemeler serbest bırakılmaz.
+- **Cüzdan:** tam kredi ödemesi yok; talep (GUEST_REFUND) iadeleri yalnız kart payından;
+  devredilmiş rezervasyon iptalinde satıcının kredisi iade edilmez.
+- **Güven-emniyet:** parti riski yalnız uyarı (ev sahibi onay adımı yok); mesaj taraması AI
+  taslağına uygulanmaz.
+- **Promosyon:** arama kartı ve fiyat takvimi promosyonsuz taban fiyatı gösterir; Omnibus
+  referansı yalnız taban fiyat geçmişinden.
+- **Ajan:** mandate kaydı AuditLog + Redis'te (ayrı tablo yok); Redis kaybında nonce TTL içinde
+  yeniden kullanılabilir.
+- **PWA:** `pushsubscriptionchange` işlenmiyor; Lighthouse PWA kategorisi (Lighthouse 12'de
+  kaldırıldı) yerine kurulabilirlik e2e + unit ile doğrulandı.
+- **Veri saklama:** bildirim e-postası gövdeleri ve `ExperimentExposure` için saklama politikası yok.
+- **Defter:** eski `LedgerEntry` yazımı dual-write olarak sürüyor.
+- Tek bölge, tek Postgres; yük testleri tek makinede, uygulamayla aynı host'ta.
+
+Ayrıntılı liste: `docs/ARCHITECTURE.md` §18, `docs/COMPLIANCE.md` §6, README dürüstlük notu.
+
+## 7. Sürüm kontrolleri
+
+- `npm run check` (lint + typecheck + format:check + unit) sürüm commit'inden önce yeşil.
+- Secret taraması: sürüm commit'i `git diff --cached` → 0. Tüm v4 aralığı `git log -p v3.0.0..HEAD`
+  → 2 eşleşme, ikisi de `tests/unit/regressions/v4-webhook-provider.test.ts`'te webhook sırrı ortam
+  değişkenine test sabitinin (`MOCK_SECRET`, `STRIPE_SECRET` — sahte fixture değerleri) atanması;
+  gerçek sızıntı yok.
+- AI atfı: `git log v3.0.0..HEAD --format=%B` üzerinde ortak-yazar satırı / araç imzası araması → 3
+  (yukarıdaki 3 commit, zaten `origin/main`'de). Sürüm commit'inde atıf yok.
 
 # v3
 

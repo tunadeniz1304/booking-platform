@@ -4,6 +4,96 @@ Bu dosyadaki tüm önemli değişiklikler burada belgelenir. Biçim [Keep a Chan
 
 ## [Unreleased]
 
+## [4.0.0] - 2026-09-27
+
+v3.0.0'dan sonra 181 commit (79 feat · 34 fix · 31 test · 30 docs · 5 chore · 2 refactor), 23 yeni migration. v3'ün bilinen 20 hatası kapatıldı ve her biri `regression: v4#N` etiketli testle korunuyor (28 test dosyası, #1–#20 hepsi). Para minor-unit `BigInt`'e taşındı, çift girişli defter + günlük mutabakat eklendi; grup sepeti, bölünmüş ödeme, escrow/payout, hasar depozitosu, cüzdan, promosyon, KYC, ajan mandate'leri, PWA ve uyum otomasyonu geldi. Ayrıntı, ölçümler ve dürüstlük notu: `docs/FINAL_REPORT.md`.
+
+### Security
+
+- **v4#1** Devir ödemesi artık `booking_transfer` sagasıyla: alıcı capture'ı başarılı olmadan sahiplik, payout ve defter yazılmaz; `CAPTURE_PENDING`/`FAILED` durumları, telafi (iade/void) ve takılan devirler için `transfer-sweep` işi (`TRANSFER_CAPTURE_PENDING_TIMEOUT_SECONDS`).
+- **v4#2** Hassas işlemler (passkey ekleme/silme, hesap silme, uzaktan çıkış, mandate verme) `auth_time` ile son 5 dk içinde yeniden doğrulama ister (403 `REAUTH_REQUIRED`); yeni passkey'e e-posta bildirimi + 24 saat step-up soğuması; step-up belirteci `bookingId + amountMinor + nonce`'a bağlı ve tek kullanımlık (GETDEL) (ADR 0024).
+- **v4#3** Tüm LLM yolları (mesaj taslağı, gelir önerileri, moderasyon, arama embedding'i dahil) kullanıcı başına bütçeye tabi; süreç çapı eşzamanlılık sınırı `LLM_MAX_CONCURRENCY`; embedding'ler redakte; taslakta misafir adı takma adla; `openai` importu yalnız `src/lib/llm/client.ts`.
+- **v4#4** Anonim rate-limit anahtarı soket IP'si + IPv6 /64 kovası; IP yoksa paylaşılan `anon` kovası (UA yalnız ikincil); `ai` kategorisi Redis düşünce fail-closed.
+- **v4#5** `docker-compose.yml` güvenli varsayılanlarla (DEMO kapalı, `COOKIE_SECURE=true`); demo ayarları `docker-compose.demo.yml` override'ında; JWT sırrı gücü test dışında her ortamda denetlenir; dev mailbox yalnız kullanıcının kendi mesajlarını gösterir; kalıcı DEMO şeridi.
+- **v4#6** Rezervasyon, ödeme, yorum, devir, ajan checkout ve MCP `create_hold`/`checkout_stay` doğrulanmış e-posta ister (403 `EMAIL_NOT_VERIFIED`).
+- **v4#7** İptal, ödemeyle aynı `pay:<bookingId>` kilidi + satır kilidi altında; `REFUND_FAILED` BullMQ `refund-retry` kuyruğuyla üstel geri çekilmeli yeniden denenir; admin iade kuyruğu `/api/admin/refunds`.
+- **v4#8** Geç gelen başarılı webhook önce uzlaştırılır (envanter uygunsa yeniden tut + onayla, değilse iade); `payment_late_success_total{outcome}` + audit.
+- **v4#9** Rezervasyon idempotency anahtarı istek gövdesi karmasına bağlı; farklı gövde 409 `IDEMPOTENCY_KEY_REUSED`.
+- **v4#10** Ajan checkout oturumu her okumada rezervasyon durumuyla uzlaştırılır; süresi dolmuş tutma oturumu kilitlemez.
+- **v4#11** SSRF: NAT64, 6to4, Teredo, gömülü IPv4, TEST-NET ve belgeleme aralıkları reddedilir; iCal toplam süre sınırı (`ICAL_FETCH_DEADLINE_MS`) ve sınırlı eşzamanlı yoklama.
+- **v4#12** Hesap kilitleme yerine (istemci, e-posta) çifti için kademeli gecikme + HMAC imzalı proof-of-work; giriş/sıfırlamada sabit süreli yanıt; sıfırlama e-posta başına sınırlı; outbox'ta yalnız token hash'i + AES-GCM ile mühürlü link.
+- **v4#13** 3DS/ödeme denemesi rezervasyon başına sınırlı (`PAYMENT_MAX_ATTEMPTS`); BIN PSP token'ından, cihaz kimliği sunucu imzalı `did` çerezinden.
+- **v4#14** Rezervasyon önbelleği durum olaylarında temizlenir; ödeme durumu önbelleğe alınmaz.
+- **v4#15** `Decimal(10,2)` para kolonları minor-unit `BigInt`'e taşındı (KWD/BHD 3 hane, JPY 0 hane; ADR 0019).
+- **v4#16** Webhook yalnız aktif sağlayıcının imzasıyla kabul edilir; başka sağlayıcının imzası veya imzasız istek 401 `WRONG_PROVIDER_SIGNATURE`.
+- **v4#17** Son aktif ADMIN düşürülemez (satır kilidiyle sayım, 409 `LAST_ADMIN`).
+- **v4#18** Canlı görüntülenme sayısı imzalı oturum/cihaz başına HyperLogLog ile; çerez basımı istemci başına sınırlı.
+- **v4#19** Kanal ARI fiyatları zod ile ondalık string veya `priceMinor` tamsayı; float/üs reddedilir.
+- **v4#20** `.gitignore` `.env.*` kalıbını kapsar (`!.env.example`).
+- Oturum listesi ve uzaktan çıkış (`/account/sessions`), yeni cihaz girişinde e-posta uyarısı; iptal edilen oturum ailesinin erişim token'ı da reddedilir (`sid` claim).
+- Webhook/KYC/DSA itiraz/bölünmüş ödeme linkleri HMAC imzalı; kanıt yüklemeleri magic-byte kontrolü + yeniden kodlama, EXIF/GPS temizliği.
+
+### Added
+
+- **P0-2 — Minor-unit para (ADR 0019):** ISO 4217 üs tablosu, tek half-up yuvarlama, expand/contract migration'ları + idempotent `npm run money:backfill`; KWD/JPY round-trip property testleri.
+- **P0-3 — Çift girişli defter (ADR 0020):** `LedgerAccount`/`JournalEntry`/`JournalLine`, DB tetiğiyle Σborç=Σalacak ve append-only; capture, iade, escrow serbest bırakma, payout, devir, depozito, kredi ve kaybedilen itiraz şablonları; `GET /api/admin/reconciliation`, günlük `ledger-reconcile` işi.
+- **P0-4 — Hassas işlem güvenliği:** recent-auth, yeniden doğrulama penceresi, `UserSession` modeli, oturum yönetimi arayüzü.
+- **P0-5 — Veri yaşam döngüsü:** `data-retention` işi (AuditLog, PaymentEvent, Outbox, InventoryPriceHistory, MessageRiskFlag, AuthToken; yasal saklama önekleri hariç), `npm run data:retention`; migration'lar temiz DB ve v3 dump'ı üzerinde doğrulandı.
+- **P0-6 — Gözlemlenebilirlik:** iş metrikleri (`ledger_imbalance_total`, `refund_retry_total`, `payment_late_success_total`, `llm_tokens_total{route}`, `takedown_sla_breach_total`, `confirm_retry_total`, `saga_compensation_retry_total` …), 16 Prometheus alarm kuralı (`docker/observability/alerts.yml`), `docs/observability/SLO.md`, Grafana SLO paneli.
+- **P1-1 — Grup sepeti:** `Cart`/`CartItem`/`CartPayment`, sıralı Redlock + tek SERIALIZABLE tx'te tümü-ya-hiç tutma, tek PSP tahsilatı, `/api/cart/*`, `/cart` ve `/checkout/cart`.
+- **P1-2 — Bölünmüş ödeme:** `SplitPlan`/`PaymentShare`, HMAC davet linki, `split_payment` sagası, süre sonunda organizatör yedeği veya tam iade, sepet ve pay için geç webhook uzlaştırması.
+- **P1-3 — Esnek tarih fiyat takvimi:** `MinPriceByDate` materyalize tablo (artımlı + gece işi), `/api/properties/[id]/calendar-prices`, aramada `flexDays` (±3 gün), PDP ay ızgarası.
+- **P1-4 — Payout/escrow/komisyon (ADR 0021):** `HostAccount`, `HostPayout`, `PAYOUT_RELEASE_HOURS` sonrası escrow serbest bırakma, platform komisyonu, rezerv, Stripe Connect adaptörü + mock; `npm run dac7:export`.
+- **P1-5 — Hasar depozitosu ve çözüm merkezi:** off-session ön provizyon, misafir/ev sahibi talepleri, kanıt yükleme, SLA eskalasyonu, admin kararı, `charge.dispute.*` senkronu.
+- **P1-6 — KYC ve güven-emniyet:** `IdentityVerification` (Stripe Identity adaptörü + deterministik mock), mesaj dolandırıcılık taraması (LLM yalnız sinyal), parti riski puanı ve ev sahibi uyarısı.
+- **P1-7 — Sadakat ve cüzdan:** seviyeler, cashback kredisi (`guest_credit`), krediyle kısmi ödeme, simetrik iade, süre dolumu işi.
+- **P1-8 — Promosyon motoru + Omnibus:** early-bird, last-minute, uzun konaklama, mobil fiyat, kupon; öncelik/birleşme kuralları, indirim tavanı, "son 30 günün en düşük fiyatı" (`InventoryPriceHistory` tetiği).
+- **P1-9 — AI yorum öne çıkanları ve karşılaştırma:** k-means kümeleme + birebir alıntı guard'ı, `/api/compare` (toplamlar teklif motoruyla aynı), `/compare` sayfası.
+- **P1-10 — Görsel zekâ (ADR 0022):** `PropertyPhoto` kalite skoru, pHash duplikat tespiti, opsiyonel CLIP embedding, aramada RRF'nin 3. listesi "bu fotoğraftaki gibi".
+- **P1-11 — Ajan ticareti v2 (ADR 0023):** Stripe Shared Payment Token yolu, UCP `/.well-known/ucp` + lodging checkout, AP2 tarzı imzalı intent mandate (tutar/süre/ilan/tekrar kontrolü, iptal), MCP `checkout_stay`.
+- **P1-12 — PWA + Web Push:** manifest, service worker, çevrimdışı seyahat kartı + imzalı QR, VAPID push (fiyat düşüşü, check-in hatırlatması).
+- **P1-13 — Uyum otomasyonu:** 7565 kaldırma talebi + 24 s SLA, DSA bildirim/karar/itiraz (md.16/17/20) + şeffaflık raporu, UBL-TR 1.2 XML + mock entegratör, konaklama vergisi oran tarihçesi, doğrulanmış erişilebilirlik özellikleri + arama filtresi.
+- **P2-1 — Arayüz:** sepet, bölünmüş ödeme, fiyat takvimi, karşılaştırma, çözüm merkezi, cüzdan, payout ekranları; karanlık tema; WCAG 2.2 (skip link, odak görünürlüğü, hedef boyutu); 32 i18n ad alanı.
+- **P2-2 — Demo:** `demo:scenarios` v4 senaryoları 8–14 (her birinde mizan + mutabakat kontrolü), v4 seed (promosyon, fotoğraf, erişilebilirlik, host hesabı), `npm run import:insideairbnb` (CC BY 4.0, opsiyonel OSM).
+- **P2-3 — Yük ve kaos:** k6 `cart-spike`, `split-payment-race`, `webhook-storm`; MockPsp gecikme/hata enjeksiyonu; `scripts/load-assert.ts`; sonuçlar `docs/perf/p2-3-load-chaos.md`.
+- LLM sözleşmesi: `LLM_MAX_CONCURRENCY`, `LLM_VISION_MODEL`; `/api/llm/status` alanları.
+- Dokümantasyon: ADR 0019–0024, ARCHITECTURE §13–§18, COMPLIANCE, SECURITY v4 tehdit modeli, api-contract v4 uçları, v4 ekran görüntüleri, README standart şablonla yeniden düzenlendi.
+
+### Changed
+
+- Para alanları `*Minor` `BigInt` kolonlarında; eski ondalık kolonlar kaldırıldı. API yanıtlarında ondalık tutarlar artık birimin üssüne göre sabit haneli **string** (`"1500.00"`; önceden `"1500"`), yanlarında `*Minor` sayı alanları.
+- `GET /api/bookings` imleç tabanlı sayfalı (`?limit&cursor`, `X-Next-Cursor` + `Link rel=next`); gövde dizi olarak kalır.
+- Varsayılan compose güvenli; demo için `docker compose -f docker-compose.yml -f docker-compose.demo.yml up`. Demo'da rate-limit çarpanı `RATE_LIMIT_DEMO_RELAX_MULTIPLIER` (üretimde yok sayılır).
+- Rezervasyon, ödeme, yorum ve devir için e-posta doğrulaması zorunlu.
+- Hesap kilidi kaldırıldı; aşırı giriş denemesi 429 `LOGIN_DELAYED` / `POW_REQUIRED` döner (giriş sayfası PoW'u otomatik çözer).
+- Sepet ödemesinde onay serileştirme çakışmasıyla tükenirse iade yerine `202 pending_confirmation` + `confirm-retry` kuyruğu; saga telafisi başarısızsa `saga-compensation-retry`.
+- PSP hataları 502 `PAYMENT_PROVIDER_ERROR` (`Retry-After`), geçersiz kart token'ı 422 `INVALID_CARD_TOKEN`; ödeme yeniden denenebilir kalır.
+- Kilit bekleme bütçesi yapılandırılabilir (`LOCK_WAIT_BUDGET_MS`); bekleme tükenip oda doluysa 409 `SOLD_OUT`, değilse `ROOM_BUSY`.
+- `completeCheckoutSession` ve ACP complete mandate ister (`AGENT_MANDATE_REQUIRED`, varsayılan açık).
+- Worker'a v4 işleri: refund-retry, transfer-sweep, ledger-reconcile, escrow-release, wallet-sweep, price-calendar, push, compliance/SLA, resolution, confirm-retry, saga-compensation-retry, data-retention.
+
+### Deprecated
+
+- API yanıtlarındaki eski ondalık para alanları (`totalPrice`, `amount`, `basePrice` vb.) bir sürüm boyunca korunur; yeni istemciler `*Minor` alanlarını kullanmalı (ADR 0019).
+- Eski `LedgerEntry` yazımı çift girişli jurnalle birlikte (dual-write) sürüyor; okuyucular `listBookingLedger` kullanır, `LedgerEntry` ileride kaldırılacak.
+
+### Fixed
+
+- **fix-sweep-1:** Redlock belirsiz `SET NX` sonrası kendi token'ını edinilmiş sayar; kilit bütçesi config'e taşındı; `addCartItem` READ COMMITTED + sepet satır kilidi (sahte serileştirme çakışmaları); e2e uyarı seçicisi Next route announcer'ı dışlar.
+- **fix-sweep-2:** talep iadesi sonrası iptal `refundedAmountMinor`'ı eziyordu (artık kümülatif, iade kalan tutardan); PSP hataları 500 yerine 502; kaybedilen chargeback jurnali (`platform_loss`) ve ev sahibinden mahsup; bölünmüş ödemeli rezervasyonda talep iadesi ve depozito; Stripe depozitosu için müşteri + `setup_future_usage=off_session`.
+- **fix-sweep-3:** yük altında bölünmüş/sepet onayında serileştirme tükenmesi ödenmiş planları iade ediyordu (artık ertelenen onay + yeniden deneme); başarısız saga telafileri yeniden denenir; pay sahiplenme çakışmasında provizyon void edilir; geç başarı iadesi eşzamanlı tekrar teslimde tek kez sayılır.
+- Integration testlerinde Docker port yönlendiricisi kaynaklı bağlantı kopmaları TCP yeniden bağlanma vekiliyle giderildi; paylaşılan DB'ye bağlı sıra-bağımlı testler kendi fixture'larına kapsandı.
+- `demo:scenarios` compose worker'ında entrypoint üzerinden çalışır (ortam değişkenleri boş kalıyordu).
+
+### Known limitations
+
+- CI (`.github/workflows/ci.yml`) v4 kapısına genişletilmedi ve GitHub'da yeşil doğrulanmadı (kullanıcı kararıyla ertelendi); kapı yerelde yeşil.
+- Canlı LLM modu bu sürümde yalnız anahtarsız DEMO modunda doğrulandı; canlı mod kullanıcı ortamında doğrulanmalı.
+- Stripe SPT, Stripe Connect, Stripe Identity ve Stripe depozito yolları yalnız sahte (fake) sunucuyla test edildi; varsayılan PSP MockPsp.
+- Sepet ani yükünde tutma p95 hedefi (2 s) aşılıyor (100 VU: 10,07 s; sıcak nokta); para/değişmez ihlali yok.
+- Mandate'ler HS256 ile yalnız platform tarafından doğrulanır; sepet/bölünmüş ödemede kredi ve kupon yok; parti riski yalnız uyarı (onay adımı yok).
+- Tam liste: `docs/FINAL_REPORT.md` ve `docs/ARCHITECTURE.md` §18.
+
 ## [3.0.0] - 2026-09-26
 
 v2'nin bilinen 22 hatası (`regression: v3#N` etiketli testlerle) kapatıldı; envanter, vergi/FX, ödeme sagası, hibrit arama + LTR, mesajlaşma/moderasyon, ajan rezervasyonu, gelir paneli ve gerçek i18n eklendi. Ayrıntı ve dürüstlük notu: `docs/FINAL_REPORT.md`.
@@ -138,5 +228,7 @@ v1'in prototip çekirdeği üretim kalitesinde bir rezervasyon platformuna dön�
 
 - İlk prototip: Next.js 14 arayüzü, Redlock + `FOR UPDATE` rezervasyon, çarpımsal fiyat motoru, pazarlık motoru, gRPC tanımları, deterministik seed.
 
-[Unreleased]: https://github.com/tunadeniz1304/booking-platform/compare/v2.0.0...HEAD
+[Unreleased]: https://github.com/tunadeniz1304/booking-platform/compare/v4.0.0...HEAD
+[4.0.0]: https://github.com/tunadeniz1304/booking-platform/compare/v3.0.0...v4.0.0
+[3.0.0]: https://github.com/tunadeniz1304/booking-platform/compare/v2.0.0...v3.0.0
 [2.0.0]: https://github.com/tunadeniz1304/booking-platform/releases/tag/v2.0.0

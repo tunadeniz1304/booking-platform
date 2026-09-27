@@ -1,23 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
 import { requireVerifiedEmail } from "@/lib/auth";
 import { toErrorResponse, ValidationError } from "@/lib/http/errors";
 import { payForBooking } from "@/lib/payment/payment-service";
 import { getConfig } from "@/lib/config/app-config";
 import { clientKey } from "@/lib/security/ip";
 import { observed } from "@/lib/http/observed";
+import { payBookingSchema } from "@/lib/http/api-schemas";
 import { resolveDeviceId, setDeviceCookie } from "@/lib/risk/device-cookie";
-
-const bodySchema = z.object({
-  /** PSP hosted-field token'ı (kart numarası sunucuya gelmez). */
-  cardToken: z.string().min(8).max(200),
-  /** Passkey step-up token'ı (v4#2): bu rezervasyon + tutara bağlı, tek kullanımlık. */
-  stepUpToken: z.string().min(16).max(64).optional(),
-  /** P1-7: cüzdan kredisinden kullanılacak tutar (minor-unit); kalan kartla ödenir. */
-  creditMinor: z.number().int().min(0).max(1_000_000_000_000).optional(),
-  // v4#13: `cardBin` / `deviceId` artık istemciden ALINMAZ (gönderilirse yok sayılır):
-  // BIN PSP token metadata'sından, cihaz kimliği sunucu imzalı `did` çerezinden gelir.
-});
 
 /** HELD rezervasyonun ödemesi: authorize → (3DS) → capture → CONFIRMED. */
 export const POST = observed(
@@ -32,7 +21,7 @@ export const POST = observed(
     try {
       const { id } = await params;
       const { userId } = await requireVerifiedEmail(req);
-      const { cardToken, stepUpToken, creditMinor } = bodySchema.parse(await req.json());
+      const { cardToken, stepUpToken, creditMinor } = payBookingSchema.parse(await req.json());
       const idempotencyKey = req.headers.get("idempotency-key")?.slice(0, 128);
       if (!idempotencyKey) throw new ValidationError("Idempotency-Key başlığı zorunludur");
       const config = getConfig();

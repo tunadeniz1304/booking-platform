@@ -176,6 +176,8 @@ export async function proxy(req: NextRequest) {
   const response = NextResponse.next({ request: { headers: requestHeaders } });
   response.headers.set("Content-Security-Policy", csp);
   response.headers.set("x-request-id", requestId);
+  // Sayfa dili çerezden, yoksa Accept-Language'ten çözülür; paylaşılan önbellek dilleri karıştırmasın.
+  response.headers.append("Vary", "Accept-Language, Cookie");
   return response;
 }
 

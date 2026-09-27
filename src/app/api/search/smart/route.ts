@@ -16,21 +16,25 @@ export const POST = observed("search.smart", async function smartHandler(req: Ne
   const { text } = bodySchema.parse(await req.json());
   const translated = await withAiSubject(req, () => translateQuery(text));
   const f = translated.data;
-  const results = await searchProperties({
-    city: f.city,
-    query: f.query,
-    guests: f.guests,
-    minPrice: f.minPrice,
-    maxPrice: f.maxPrice,
-    amenities: f.amenities,
-    propertyType: f.propertyType,
-    checkIn: f.checkIn,
-    checkOut: f.checkOut,
-    sort: f.sort ?? "recommended",
-    page: 1,
-    pageSize: 24,
-    userId: (await getAuth(req))?.userId,
-  });
+  const userId = (await getAuth(req))?.userId;
+  // Hibrit aramanın sorgu gömmesi de isteğin öznesine faturalanır (öznesiz → vektör kanalı yok).
+  const results = await withAiSubject(req, () =>
+    searchProperties({
+      city: f.city,
+      query: f.query,
+      guests: f.guests,
+      minPrice: f.minPrice,
+      maxPrice: f.maxPrice,
+      amenities: f.amenities,
+      propertyType: f.propertyType,
+      checkIn: f.checkIn,
+      checkOut: f.checkOut,
+      sort: f.sort ?? "recommended",
+      page: 1,
+      pageSize: 24,
+      userId,
+    })
+  );
   // AI yalnızca filtre çevirisini yapar (işaretli); sonuç listesi deterministik aramadır.
   return NextResponse.json({
     filters: markAiGenerated(f),

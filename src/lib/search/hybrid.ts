@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getConfig } from "@/lib/config/app-config";
 import { splitWords, toVectorLiteral } from "@/lib/embedding/embedder";
 import { expandSynonyms } from "@/lib/embedding/synonyms";
-import { embedText } from "@/lib/embedding/provider";
+import { embedQuery } from "@/lib/embedding/provider";
 import { isVectorEnabled } from "@/lib/search/vector";
 
 /**
@@ -15,7 +15,7 @@ import { isVectorEnabled } from "@/lib/search/vector";
  *  - **lex**: `Property.searchVector` (GENERATED; `simple` + `turkish`, GIN) ∪ konum adı;
  *    sorgu sözcükleri eşanlamlılarla genişletilir, 3+ harfte önek eşleşmesi (`:*`).
  *  - **vec**: pgvector `<=>` kosinüs; `SEARCH_HYBRID_MIN_SIMILARITY` altı atılır
- *    (pgvector yoksa kanal boş).
+ *    (pgvector yoksa ya da sorgu indeks uzayında gömülemezse kanal boş).
  *  - **trg**: pg_trgm `word_similarity` (yazım hatası: "Bodurm" → Bodrum).
  *  - **img** (P1-10, ADR 0022): "bu fotoğraftaki gibi" — `similarToPhotoId` verilirse
  *    kaynak fotoğrafın CLIP embedding'ine kosinüs kNN (`PropertyPhoto.embedding`, mülk başına
@@ -126,8 +126,11 @@ export async function hybridSearch(
     : Prisma.sql`SELECT NULL::text AS id, NULL::bigint AS rank, NULL::float8 AS score WHERE false`;
 
   let vecCte = Prisma.sql`SELECT NULL::text AS id, NULL::bigint AS rank, NULL::float8 AS sim WHERE false`;
-  if (vectorOn && text) {
-    const literal = toVectorLiteral(await embedText(text));
+  // Sorgu vektörü indeks uzayında üretilemezse (uzak gömme bütçe/özne ile reddedildi)
+  // kanal boş kalır; hash vektörü uzak indeksle karşılaştırılmaz.
+  const queryVector = vectorOn && text ? await embedQuery(text) : null;
+  if (queryVector) {
+    const literal = toVectorLiteral(queryVector);
     vecCte = Prisma.sql`
       SELECT id, row_number() OVER (ORDER BY sim DESC, id) AS rank, sim
       FROM (

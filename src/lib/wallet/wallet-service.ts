@@ -463,6 +463,79 @@ export async function issueDueCashbacks(now = new Date(), limit = 200): Promise<
 }
 
 /**
+ * v5#20: cashback verildikten SONRA gelen iade / kaybedilen itiraz krediyi düşürür. Hak edilen
+ * tutar güncel net kart tabanından (ödeme − iadeler − kaybedilen itirazlar − `extraOutMinor`)
+ * yeniden hesaplanır; fazlası önce bu cashback lot'unun harcanmamış kısmından geri alınır,
+ * yetmezse bakiye eksiye düşürülmez — kalan `platform_loss`'a yazılır (`creditClawback`).
+ * `LoyaltyCashback.amountMinor` hak edilen tutara iner → tekrar çağrı yalnız yeni farkı işler.
+ * Döner: geri alınan toplam (lot + zarar).
+ */
+export async function clawbackCashbackInTx(
+  tx: Tx,
+  bookingId: string,
+  opts: { now?: Date; extraOutMinor?: bigint; excludeClaimId?: string } = {}
+): Promise<bigint> {
+  const cb = await tx.loyaltyCashback.findUnique({ where: { bookingId } });
+  if (!cb || cb.status !== "ISSUED" || !cb.amountMinor || cb.amountMinor <= 0n) return 0n;
+  const payment = await tx.payment.findUnique({
+    where: { bookingId },
+    select: { amountMinor: true, refundedAmountMinor: true, currency: true },
+  });
+  if (!payment) return 0n;
+  const chargebacks = await tx.claim.aggregate({
+    where: {
+      bookingId,
+      type: "CHARGEBACK",
+      status: "RESOLVED_APPROVED",
+      ...(opts.excludeClaimId ? { id: { not: opts.excludeClaimId } } : {}),
+    },
+    _sum: { awardedMinor: true },
+  });
+  const net =
+    payment.amountMinor -
+    payment.refundedAmountMinor -
+    (chargebacks._sum.awardedMinor ?? 0n) -
+    (opts.extraOutMinor ?? 0n);
+  const entitled = BigInt(cashbackMinor(net > 0n ? minorFromDb(net) : 0, cb.bps, payment.currency));
+  const excess = cb.amountMinor - entitled;
+  if (excess <= 0n) return 0n;
+
+  let recovered = 0n;
+  if (cb.creditId) {
+    const lot = await tx.walletCredit.findUnique({
+      where: { id: cb.creditId },
+      select: { remainingMinor: true },
+    });
+    const available = lot?.remainingMinor ?? 0n;
+    recovered = available < excess ? available : excess;
+    if (recovered > 0n) {
+      const res = await tx.walletCredit.updateMany({
+        where: { id: cb.creditId, remainingMinor: { gte: recovered } },
+        data: { remainingMinor: { decrement: recovered } },
+      });
+      if (res.count !== 1) {
+        throw new ConflictError("Kredi eşzamanlı değişti", "CONCURRENT_UPDATE");
+      }
+    }
+  }
+  await post.creditClawback(tx, {
+    clawbackRef: `cashback:${bookingId}:${entitled}`,
+    guestId: cb.userId,
+    bookingId,
+    currency: payment.currency,
+    recoveredMinor: recovered,
+    unrecoveredMinor: excess - recovered,
+    occurredAt: opts.now,
+  });
+  await tx.loyaltyCashback.update({
+    where: { id: cb.id },
+    data: { amountMinor: entitled, reason: "CLAWED_BACK" },
+  });
+  walletEventsTotal.inc({ event: "cashback_clawback" });
+  return excess;
+}
+
+/**
  * Süre dolumu (BullMQ `wallet-sweep`): son kullanma tarihi geçmiş lot'un KALANI ters
  * jurnalle (creditExpired) düşer. Anahtar lot + önceden düşülen tutar → aynı lot'a sonradan
  * (rezerv bırakma) dönen tutar ayrı jurnalle düşer; tekrar koşu no-op.

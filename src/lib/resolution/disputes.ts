@@ -8,6 +8,7 @@ import { logger } from "@/lib/observability/logger";
 import { counter } from "@/lib/observability/metrics";
 import { signWebhook, type WebhookEvent } from "@/lib/payment/webhook";
 import { prisma } from "@/lib/prisma";
+import { clawbackCashbackInTx } from "@/lib/wallet/wallet-service";
 
 /**
  * P1-5: PSP itirazı (Stripe `charge.dispute.created|updated|closed`) → CHARGEBACK talebi.
@@ -129,6 +130,12 @@ async function settleLostChargeback(
       occurredAt: now,
     });
     loss = res?.recovery?.platformCoverMinor ?? 0n;
+    // v5#20: kaybedilen itiraz kart tabanını düşürür → fazla cashback geri alınır.
+    await clawbackCashbackInTx(tx, bookingId, {
+      now,
+      extraOutMinor: journaled,
+      excludeClaimId: claimId,
+    });
   }
   if (journaled < amount) {
     logger.warn(

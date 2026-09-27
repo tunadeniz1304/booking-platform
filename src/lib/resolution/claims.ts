@@ -31,6 +31,7 @@ import {
   toDepositView,
 } from "./deposit";
 import { sanitizeEvidence } from "./evidence";
+import { clawbackCashbackInTx } from "@/lib/wallet/wallet-service";
 
 /**
  * P1-5 çözüm merkezi (Airbnb Resolution Center benzeri).
@@ -894,6 +895,8 @@ async function settleGuestRefund(
         occurredAt: now,
       });
       platformCover = journal?.recovery?.platformCoverMinor ?? 0n;
+      // v5#20: cashback verilmişse yeni net tabana göre fazlası geri alınır.
+      await clawbackCashbackInTx(tx, booking.id, { now });
     }
     const amounts = {
       awardedMinor: award,

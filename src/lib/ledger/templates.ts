@@ -27,6 +27,7 @@ export const JournalKinds = {
   CreditIssued: "CREDIT_ISSUED",
   CreditSpent: "CREDIT_SPENT",
   CreditExpired: "CREDIT_EXPIRED",
+  CreditClawback: "CREDIT_CLAWBACK",
   DepositCaptured: "DEPOSIT_CAPTURED",
   ChargebackLost: "CHARGEBACK_LOST",
 } as const;
@@ -457,6 +458,41 @@ export function creditExpired(i: CreditExpiredInput): JournalInput {
   );
 }
 
+export interface CreditClawbackInput extends Common {
+  /** Geri alma anahtarı (`cashback:<bookingId>:<hak edilen yeni tutar>`). */
+  clawbackRef: string;
+  guestId: string;
+  bookingId: string;
+  /** Harcanmamış krediden geri alınan kısım. */
+  recoveredMinor: bigint;
+  /** Kredi harcanmış/düşmüş → geri alınamayan kısım (misafir bakiyesi eksiye düşmez). */
+  unrecoveredMinor: bigint;
+}
+
+/**
+ * v5#20 fazla verilmiş cashback'in geri alınması: harcanmamış kısım Dr guest_credit /
+ * Cr platform_revenue (ikramın tersi); geri alınamayan kısım Dr platform_loss /
+ * Cr platform_revenue (ikram maliyeti gelir indiriminden zarara sınıflanır).
+ */
+export function creditClawback(i: CreditClawbackInput): JournalInput {
+  const recovered = nonNegative("recoveredMinor", i.recoveredMinor);
+  const unrecovered = nonNegative("unrecoveredMinor", i.unrecoveredMinor);
+  positive("clawbackMinor", recovered + unrecovered);
+  return entry(
+    i,
+    {
+      idempotencyKey: `credit-clawback:${i.clawbackRef}`,
+      kind: JournalKinds.CreditClawback,
+      bookingId: i.bookingId,
+    },
+    [
+      dr(account.guestCredit(i.guestId), recovered, i.currency),
+      dr(account.platformLoss(), unrecovered, i.currency),
+      cr(account.platformRevenue(), recovered + unrecovered, i.currency),
+    ]
+  );
+}
+
 export interface DepositCapturedInput extends Common {
   depositId: string;
   bookingId: string;
@@ -502,5 +538,6 @@ export const post = {
   creditIssued: (tx: Tx, i: CreditIssuedInput) => postJournal(tx, creditIssued(i)),
   creditSpent: (tx: Tx, i: CreditSpentInput) => postJournal(tx, creditSpent(i)),
   creditExpired: (tx: Tx, i: CreditExpiredInput) => postJournal(tx, creditExpired(i)),
+  creditClawback: (tx: Tx, i: CreditClawbackInput) => postJournal(tx, creditClawback(i)),
   depositCaptured: (tx: Tx, i: DepositCapturedInput) => postJournal(tx, depositCaptured(i)),
 };

@@ -23,7 +23,7 @@ ve kullanıcının imzaladığı, sınırlı bir harcama yetkisi (mandate).
    Platform **merchant-of-record** kalır: tahsilat platform hesabına, jurnal
    `bookingCaptured` (ADR 0020) değişmedi.
 2. **AP2 intent mandate (`src/lib/agentic/mandate.ts`).** Kompakt JWS, `typ:
-ap2-intent-mandate+jwt`, HS256, **ayrı anahtar** `AGENT_MANDATE_SIGNING_KEY` (boşsa JWT
+ap2-intent-mandate+jwt`, HS256 (v2-P1-1 ile ES256 + JWKS; bkz. [ADR 0025](0025-asymmetric-mandate-signing.md)), **ayrı anahtar** `AGENT_MANDATE_SIGNING_KEY` (boşsa JWT
    sırrından ayrı HKDF bağlamıyla türetilir; access token mandate yerine geçemez). Claim'ler:
    `sub`, `aud` (`AGENT_MANDATE_AUDIENCE`), `iss`, `maxAmountMinor`, `currency`, `expiresAt`
    (+`exp`), opsiyonel `propertyId[]`, tek kullanımlık `nonce`.
@@ -54,7 +54,7 @@ mcp:smoke` mandate'li başarı ile mandate'siz/dolmuş/aşan/replay/doğrulanmam
   token tek başına ödeme yapamaz (mandate da gerekir) ve limitin üstü her zaman kullanıcıya döner.
 - (+) UCP ve ACP aynı saga, aynı fiyat motoru, aynı defter; ikinci bir ödeme yolu yok.
 - (−) HS256: mandate'i yalnız platform doğrulayabilir (üçüncü taraf doğrulaması için ES256/EdDSA +
-  JWKS gerekir — ileride). Mandate kayıtları DB'de değil; iptal (revocation) yok, kısa TTL ve
+  JWKS gerekir — [ADR 0025](0025-asymmetric-mandate-signing.md) ile çözüldü). Mandate kayıtları DB'de değil; iptal (revocation) yok, kısa TTL ve
   tek kullanımlık nonce ile sınırlanır. Redis kaybında nonce tekrar kullanılabilir (TTL içinde).
 - (−) Stripe SPT uç noktası/parametre adları önizleme API'sine göre modellendi ve yalnız ağsız
   fake ile test edildi; canlı Stripe hesabıyla smoke yapılmadı. UCP profili resmi şemanın

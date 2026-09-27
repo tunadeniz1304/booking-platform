@@ -522,38 +522,39 @@ UCP uçları (`/api/ucp/checkout-sessions/*`) yalnız şema eşler ve ACP servis
 
 ## 17. Mimari karar kayıtları
 
-| ADR                                                 | Konu                                               |
-| --------------------------------------------------- | -------------------------------------------------- |
-| [0001](adr/0001-modular-monolith.md)                | Modüler monolit                                    |
-| [0002](adr/0002-two-layer-locking.md)               | İki katmanlı kilit (Redlock + SERIALIZABLE)        |
-| [0003](adr/0003-transactional-outbox.md)            | Transactional outbox                               |
-| [0004](adr/0004-minor-unit-money-quote.md)          | Minor-unit para ve quote                           |
-| [0005](adr/0005-llm-contract.md)                    | LLM sözleşmesi                                     |
-| [0006](adr/0006-availability-partitioning.md)       | Availability partisyonu (v3'te kaldırıldı)         |
-| [0007](adr/0007-transfer-claim-link-escrow.md)      | Devir claim linki ve escrow                        |
-| [0008](adr/0008-hash-vs-real-embedding.md)          | Hash vs gerçek embedding                           |
-| [0009](adr/0009-framework-upgrade-next16.md)        | Next.js 16 yükseltmesi                             |
-| [0010](adr/0010-room-type-inventory-counters.md)    | Oda tipi envanter sayaçları                        |
-| [0011](adr/0011-property-time-zone-temporal.md)     | Tesis saat dilimi (Temporal)                       |
-| [0012](adr/0012-tax-engine-and-persistent-fx.md)    | Vergi motoru ve kalıcı FX                          |
-| [0013](adr/0013-payment-saga.md)                    | Ödeme sagası                                       |
-| [0014](adr/0014-hybrid-search-ltr-experiments.md)   | Hibrit arama, LTR, deneyler                        |
-| [0015](adr/0015-agentic-booking-channel-revenue.md) | Ajan rezervasyon kanalı ve gelir paneli            |
-| [0016](adr/0016-legacy-pricing-and-negotiation.md)  | Legacy fiyat ve pazarlık                           |
-| [0017](adr/0017-messaging-moderation-step-up.md)    | Mesajlaşma, moderasyon, step-up                    |
-| [0018](adr/0018-i18n-namespaces-and-formatting.md)  | i18n ad alanları ve biçimlendirme                  |
-| [0019](adr/0019-minor-unit-bigint-money.md)         | `BigInt` minor-unit para ve ISO 4217 üs tablosu    |
-| [0020](adr/0020-double-entry-ledger.md)             | Çift girişli defter ve günlük mutabakat            |
-| [0021](adr/0021-escrow-payout-deposit.md)           | Escrow, payout, rezerv, hasar depozitosu           |
-| [0022](adr/0022-multimodal-search.md)               | Görsel zekâ ve çok-modlu arama                     |
-| [0023](adr/0023-agentic-commerce-mandates.md)       | Ajan ticareti: ACP SPT, UCP, AP2 mandate           |
-| [0024](adr/0024-recent-auth-step-up-binding.md)     | Recent-auth, işleme bağlı step-up, oturum yönetimi |
+| ADR                                                 | Konu                                                |
+| --------------------------------------------------- | --------------------------------------------------- |
+| [0001](adr/0001-modular-monolith.md)                | Modüler monolit                                     |
+| [0002](adr/0002-two-layer-locking.md)               | İki katmanlı kilit (Redlock + SERIALIZABLE)         |
+| [0003](adr/0003-transactional-outbox.md)            | Transactional outbox                                |
+| [0004](adr/0004-minor-unit-money-quote.md)          | Minor-unit para ve quote                            |
+| [0005](adr/0005-llm-contract.md)                    | LLM sözleşmesi                                      |
+| [0006](adr/0006-availability-partitioning.md)       | Availability partisyonu (v3'te kaldırıldı)          |
+| [0007](adr/0007-transfer-claim-link-escrow.md)      | Devir claim linki ve escrow                         |
+| [0008](adr/0008-hash-vs-real-embedding.md)          | Hash vs gerçek embedding                            |
+| [0009](adr/0009-framework-upgrade-next16.md)        | Next.js 16 yükseltmesi                              |
+| [0010](adr/0010-room-type-inventory-counters.md)    | Oda tipi envanter sayaçları                         |
+| [0011](adr/0011-property-time-zone-temporal.md)     | Tesis saat dilimi (Temporal)                        |
+| [0012](adr/0012-tax-engine-and-persistent-fx.md)    | Vergi motoru ve kalıcı FX                           |
+| [0013](adr/0013-payment-saga.md)                    | Ödeme sagası                                        |
+| [0014](adr/0014-hybrid-search-ltr-experiments.md)   | Hibrit arama, LTR, deneyler                         |
+| [0015](adr/0015-agentic-booking-channel-revenue.md) | Ajan rezervasyon kanalı ve gelir paneli             |
+| [0016](adr/0016-legacy-pricing-and-negotiation.md)  | Legacy fiyat ve pazarlık                            |
+| [0017](adr/0017-messaging-moderation-step-up.md)    | Mesajlaşma, moderasyon, step-up                     |
+| [0018](adr/0018-i18n-namespaces-and-formatting.md)  | i18n ad alanları ve biçimlendirme                   |
+| [0019](adr/0019-minor-unit-bigint-money.md)         | `BigInt` minor-unit para ve ISO 4217 üs tablosu     |
+| [0020](adr/0020-double-entry-ledger.md)             | Çift girişli defter ve günlük mutabakat             |
+| [0021](adr/0021-escrow-payout-deposit.md)           | Escrow, payout, rezerv, hasar depozitosu            |
+| [0022](adr/0022-multimodal-search.md)               | Görsel zekâ ve çok-modlu arama                      |
+| [0023](adr/0023-agentic-commerce-mandates.md)       | Ajan ticareti: ACP SPT, UCP, AP2 mandate            |
+| [0024](adr/0024-recent-auth-step-up-binding.md)     | Recent-auth, işleme bağlı step-up, oturum yönetimi  |
+| [0025](adr/0025-asymmetric-mandate-signing.md)      | AP2 mandate ES256 imzası, JWKS ve anahtar rotasyonu |
 
 ## 18. Bilinen sınırlamalar
 
 - Ödeme sağlayıcısı (MockPsp), payout sağlayıcısı, KYC, e-Arşiv entegratörü ve lisans/kayıt servisleri varsayılan olarak mock/demo'dur; Stripe SPT, Connect ve depozito (Customer + `setup_future_usage`) yolları yalnız ağsız fake ile test edildi (§5.2, §7, §15).
 - Sepet ve bölünmüş ödemede Stripe Payment Element, passkey step-up ve cüzdan kredisi yoktur; sepette kupon yoktur.
 - Sepet tahsilatında itiraz ilk rezervasyona bağlanır; aşan tutar `uncollectedMinor` olarak elle işlenir.
-- AP2 mandate HS256 ile imzalanır (yalnız platform doğrular); mandate kaydı ayrı tablo değil, `AuditLog` + Redis nonce'tur.
+- AP2 mandate ES256 + `kid` ile imzalanır; açık anahtarlar `/.well-known/jwks.json`'da, ajan/PSP bağımsız doğrular ([ADR 0025](adr/0025-asymmetric-mandate-signing.md)); mandate kaydı ayrı tablo değil, `AuditLog` + Redis nonce'tur.
 - LTR modeli sentetik tıklamalarla eğitilmiştir; embedding varsayılanı hash tabanlıdır; CLIP opsiyoneldir ([MODEL_CARD](MODEL_CARD.md)).
 - Yük ve kaos testleri tek makinede koşuldu; sonuçlar [docs/perf/](perf/) ve `load/chaos.md` altında.

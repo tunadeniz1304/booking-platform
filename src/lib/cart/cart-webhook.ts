@@ -12,6 +12,7 @@ import { getPaymentProvider } from "@/lib/payment";
 import type { WebhookEvent } from "@/lib/payment/webhook";
 import { WebhookMismatchError } from "@/lib/payment/payment-service";
 import { holdUnits, InventoryUnavailableError } from "@/lib/booking/inventory";
+import { reclaimPromotionRedemptions } from "@/lib/pricing/promotion-redemption";
 import { assertCurrency, minorFromDb, money } from "@/lib/money/money";
 import { counter } from "@/lib/observability/metrics";
 import { errorFields, logger } from "@/lib/observability/logger";
@@ -344,6 +345,8 @@ export async function reholdCartInTx(
         checkOut: b.checkOut,
         units: b.units,
       });
+      // v2-P0-1: kalemin iade edilen limitli promosyon kullanımı yeniden sayılır (dolduysa 409 → iade).
+      await reclaimPromotionRedemptions(tx, b.id);
     } else if (b.status !== "HELD") {
       throw new ConflictError("Sepet kalemi artık onaylanamaz", "CART_NOT_CONFIRMABLE");
     }

@@ -100,4 +100,38 @@ describe("KVKK redaksiyonu", () => {
       expect(redactText(text)).toBe(text);
     });
   });
+
+  describe("regression: v2-P0-8 deneme 2 ayraç, sıra ve önek varyantları", () => {
+    it("NBSP/sekme ayraçlı TR ve DE IBAN maskelenir", () => {
+      expect(redactText("IBAN TR33 0006 1005 1978 6457 8413 26.")).toBe("IBAN <IBAN_1>.");
+      expect(redactText("IBAN DE89 3704\t0044 0532 0130 00.")).toBe("IBAN <IBAN_1>.");
+      expect(isValidIban("DE89 3704 0044 0532 0130 00")).toBe(true);
+    });
+
+    it("küçük harfli IBAN maskelenir", () => {
+      expect(redactText("iban gb82 west 1234 5698 7654 32 lütfen")).toBe("iban <IBAN_1> lütfen");
+      expect(redactText("iban gb82west12345698765432")).toBe("iban <IBAN_1>");
+    });
+
+    it("+ önekli numaranın tamamı tek etiket olur", () => {
+      expect(redactText("ara +1 (555) 123-4567")).toBe("ara <TELEFON_1>");
+      expect(redactText("ara +90 532 123 45 67")).toBe("ara <TELEFON_1>");
+    });
+
+    it("00 önekli uluslararası numaralar maskelenir", () => {
+      expect(redactText("tel 0049 30 1234567")).toBe("tel <TELEFON_1>");
+      expect(redactText("tel 0044 20 7946 0958")).toBe("tel <TELEFON_1>");
+      expect(redactText("tel 0090 212 555 12 34")).toBe("tel <TELEFON_1>");
+    });
+
+    it("TR sabit hat noktalı ve ayrık 0 yazılışları maskelenir", () => {
+      expect(redactText("ofis 0216.555.12.34")).toBe("ofis <TELEFON_1>");
+      expect(redactText("ofis 0 212 555 12 34")).toBe("ofis <TELEFON_1>");
+    });
+
+    it("negatif: nokta ayraçlı tutar telefon sayılmaz", () => {
+      const text = "toplam +12.345.678 TL, bakiye 1.250.000 TL";
+      expect(redactText(text)).toBe(text);
+    });
+  });
 });

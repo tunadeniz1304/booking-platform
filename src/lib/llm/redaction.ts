@@ -22,9 +22,15 @@ export const EMAIL_RE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
  * yakalamak istediğinden bilerek ayrı tutulur.
  */
 export const IBAN_RE = /\bTR\d{2}(?:\s?\d{4}){5}\s?\d{2}\b/gi;
-/** ISO 13616 adayı: ülke kodu + 2 kontrol hanesi + 4'lü (herhangi boşlukla/bitişik) BBAN grupları. */
+/**
+ * ISO 13616 adayı: ülke kodu + 2 kontrol hanesi + 4'lü BBAN grupları. Gruplar arası ayraç
+ * sıfır veya daha fazla boşluk (NBSP/sekme dahil) ya da tire olabilir ("TR33-0006-…",
+ * çift boşluk). Ayraç ve grup karakter kümeleri ayrık olduğundan geri izleme sınırlıdır.
+ */
 export const IBAN_CANDIDATE_RE =
-  /(?<![A-Za-z0-9])[A-Za-z]{2}\d{2}(?:\s?[A-Za-z0-9]{4}){2,7}(?:\s?[A-Za-z0-9]{1,4})?(?![A-Za-z0-9])/g;
+  /(?<![A-Za-z0-9])[A-Za-z]{2}\d{2}(?:[\s-]*[A-Za-z0-9]{4}){2,7}(?:[\s-]*[A-Za-z0-9]{1,4})?(?![A-Za-z0-9])/g;
+/** IBAN gruplarını ayırabilen karakterler (boşluk türleri + tire). */
+const IBAN_SEPARATOR_RE = /[\s-]/;
 export const CARD_CANDIDATE_RE = /(?<!\d)(?:\d[ -]?){12,18}\d(?!\d)/g;
 export const TCKN_CANDIDATE_RE = /(?<!\d)[1-9]\d{10}(?!\d)/g;
 export const PHONE_RE =
@@ -67,9 +73,9 @@ export function isLuhnValid(digits: string): boolean {
   return sum % 10 === 0;
 }
 
-/** ISO 13616 IBAN doğrulaması: biçim + mod-97 (kalan 1). Boşluklar (NBSP dahil) yok sayılır. */
+/** ISO 13616 IBAN doğrulaması: biçim + mod-97 (kalan 1). Tüm ayraçlar (boşluk, NBSP, tire) yok sayılır. */
 export function isValidIban(value: string): boolean {
-  const iban = value.replace(/\s/g, "").toUpperCase();
+  const iban = value.replace(/[\s-]/g, "").toUpperCase();
   if (iban.length < IBAN_LENGTH.min || iban.length > IBAN_LENGTH.max) return false;
   if (!/^[A-Z]{2}\d{2}[A-Z0-9]+$/.test(iban)) return false;
   let rem = 0;
@@ -86,10 +92,10 @@ export function isValidIban(value: string): boolean {
  */
 function longestIbanPrefix(candidate: string): string | null {
   for (let end = candidate.length; end > 0; end--) {
-    if (/\s/.test(candidate[end - 1])) continue;
+    if (IBAN_SEPARATOR_RE.test(candidate[end - 1])) continue;
     const prefix = candidate.slice(0, end);
     if (isValidIban(prefix)) return prefix;
-    if (prefix.replace(/\s/g, "").length <= IBAN_LENGTH.min) break;
+    if (prefix.replace(/[\s-]/g, "").length <= IBAN_LENGTH.min) break;
   }
   return null;
 }

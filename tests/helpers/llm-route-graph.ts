@@ -7,6 +7,19 @@ import path from "node:path";
  * (`getLlmClient(` / `createLlmClient(`) ulaşan route'ları bulur (v5#12 meta testi).
  */
 
+/**
+ * LLM modülünü import eden ama bu route'un isteğinde LLM ÇAĞIRMAYAN (ya da çağrısı
+ * varsayılan kapalı bir bayrağa bağlı yan sinyal olan) route'lar — gerekçeli istisna.
+ */
+export const LLM_IMPORT_ONLY_ROUTES: Readonly<Record<string, string>> = {
+  "/api/bookings/[id]/messages":
+    "Mesaj gönderimi; LLM risk sinyali MESSAGE_SCAN_LLM_ENABLED (varsayılan kapalı) ve bütçeye tabi, kova booking (fail-closed)",
+  "/api/bookings/[id]/messages/stream": "Yalnız resolveThreadAccess (SSE); LLM çağrısı yok",
+  "/api/host/revenue": "getRevenueOverview deterministik KPI; LLM açıklaması yalnız suggestions",
+  "/api/host/revenue/suggestions/[id]/accept": "acceptSuggestion deterministik; LLM çağrısı yok",
+  "/api/host/revenue/suggestions/[id]/reject": "rejectSuggestion deterministik; LLM çağrısı yok",
+};
+
 const ROOT = path.resolve(__dirname, "../..");
 const SRC = path.join(ROOT, "src");
 const API_DIR = path.join(SRC, "app", "api");
@@ -76,11 +89,18 @@ export function routePathOf(file: string): string {
   return `/${rel}`;
 }
 
-/** LLM çağıran modüllere statik olarak ulaşan tüm API route yolları (sıralı). */
+/** `/api/a/[id]/b` → route dosyasının mutlak yolu. */
+export function routeFileOf(route: string): string {
+  return path.join(SRC, "app", ...route.split("/").filter(Boolean), "route.ts");
+}
+
+let memo: string[] | null = null;
+/** LLM çağıran modüllere statik olarak ulaşan tüm API route yolları (sıralı, önbellekli). */
 export function llmCallingRoutes(): string[] {
-  return walk(API_DIR)
+  memo ??= walk(API_DIR)
     .filter((f) => path.basename(f) === "route.ts")
     .filter(reachesLlm)
     .map(routePathOf)
     .sort();
+  return [...memo];
 }

@@ -1,25 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { categorize } from "@/lib/security/rate-limit";
-import { llmCallingRoutes } from "../../helpers/llm-route-graph";
+import { LLM_IMPORT_ONLY_ROUTES as NOT_AI, llmCallingRoutes } from "../../helpers/llm-route-graph";
 
 /**
  * regression: v5#12 — `/api/ucp/*` ajan kovasında; LLM çağıran her route `ai` kovasında.
  * Liste elle değil, `src/lib/llm` istemcisini çağıran modüllere statik import grafiğiyle
  * ulaşan route'lardan türetilir; yeni bir LLM route'u eklenip `ai`'ye alınmazsa test kırılır.
  */
-
-/**
- * LLM modülünü import eden ama bu route'un isteğinde LLM ÇAĞIRMAYAN (ya da çağrısı
- * varsayılan kapalı bir bayrağa bağlı yan sinyal olan) route'lar — gerekçeli istisna.
- */
-const NOT_AI: Readonly<Record<string, string>> = {
-  "/api/bookings/[id]/messages":
-    "Mesaj gönderimi; LLM risk sinyali MESSAGE_SCAN_LLM_ENABLED (varsayılan kapalı) ve bütçeye tabi, kova booking (fail-closed)",
-  "/api/bookings/[id]/messages/stream": "Yalnız resolveThreadAccess (SSE); LLM çağrısı yok",
-  "/api/host/revenue": "getRevenueOverview deterministik KPI; LLM açıklaması yalnız suggestions",
-  "/api/host/revenue/suggestions/[id]/accept": "acceptSuggestion deterministik; LLM çağrısı yok",
-  "/api/host/revenue/suggestions/[id]/reject": "rejectSuggestion deterministik; LLM çağrısı yok",
-};
 
 /** Statik grafik ~150 route dosyasını okur; yavaş CI diskinde varsayılan 5 sn dar kalabilir. */
 const META_TIMEOUT_MS = 30_000;

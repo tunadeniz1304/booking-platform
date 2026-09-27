@@ -33,6 +33,8 @@ x-common-env: &common-env
   COOKIE_SECURE: ${COOKIE_SECURE:-true}
   # v3#11: açık demo bayrağı (false → demo seed reddedilir, /dev/mailbox 404).
   DEMO_MODE: ${DEMO_MODE:-false}
+  # v5#6: uygulamanın önünde her zaman Caddy var (tek halka); .env'deki değer ezilir.
+  TRUSTED_PROXY_HOPS: "1"
 
 x-app-env: &app-env
   env_file:
@@ -108,10 +110,26 @@ services:
     image: booking-platform-web
     <<: *app-env
     restart: unless-stopped
-    ports:
-      - "${APP_PORT:-3000}:3000"
+    # v5#6: host'a açılmaz; trafik yalnızca Caddy üzerinden (istemci IP'si güvenilir kalır).
+    expose:
+      - "3000"
     depends_on:
       migrate: { condition: service_completed_successfully }
+
+  # Ters vekil (v5#6, ADR 0034): tek giriş noktası; istemci IP'sini X-Forwarded-For'a yazar.
+  # Alan adıyla otomatik HTTPS: SITE_ADDRESS=booking.example.com + 80/443 portları.
+  caddy:
+    image: caddy:2.8-alpine
+    restart: unless-stopped
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+    ports:
+      - "${APP_PORT:-3000}:80"
+    volumes:
+      - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    depends_on:
+      app: { condition: service_started }
 
   worker:
     image: booking-platform-worker
@@ -168,6 +186,7 @@ services:
       - "127.0.0.1:${GRAFANA_PORT:-3001}:3000"
 
 volumes:
+  caddy_data:
   postgres_data:
   redis_data:
   booking_secrets:

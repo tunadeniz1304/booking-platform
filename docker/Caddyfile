@@ -1,0 +1,17 @@
+# Ters vekil (v5#6, ADR 0034): uygulama yalnız compose iç ağında; tek giriş noktası Caddy.
+#
+# - İstemci IP'si: Caddy, istemcinin gönderdiği X-Forwarded-For / X-Real-IP'yi YOK SAYAR ve
+#   yalnızca TCP soket adresini yazar → uygulamada TRUSTED_PROXY_HOPS=1 (zincirin son halkası).
+# - SITE_ADDRESS bir alan adıysa (ör. booking.example.com) Caddy otomatik HTTPS (ACME) açar;
+#   o durumda compose'da 80 ve 443 portlarını yayımlayın. Varsayılan ":80" = düz HTTP.
+{
+	admin off
+}
+
+{$SITE_ADDRESS::80} {
+	encode zstd gzip
+	reverse_proxy app:3000 {
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Real-IP {remote_host}
+	}
+}

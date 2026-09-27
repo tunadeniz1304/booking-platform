@@ -19,6 +19,7 @@ import {
 import { getConfig } from "@/lib/config/app-config";
 import { setPaymentProviderForTests } from "@/lib/payment";
 import { MockPsp } from "@/lib/payment/mock-psp";
+import { ALREADY_CAPTURED_CODE, PaymentProviderError } from "@/lib/payment/provider";
 import { runPayouts } from "@/worker/jobs/payouts";
 import {
   isTrialBalanced,
@@ -290,7 +291,9 @@ describeInt("F2c defter bağlama: rezervasyon → ödeme → iade → iptal → 
       return res;
     }
     async void(ref?: string): ReturnType<MockPsp["void"]> {
-      if (ref && this.captured.has(ref)) throw new Error("already captured");
+      if (ref && this.captured.has(ref)) {
+        throw new PaymentProviderError(ALREADY_CAPTURED_CODE, "already captured");
+      }
       return super.void();
     }
     async refund(...args: Parameters<MockPsp["refund"]>) {

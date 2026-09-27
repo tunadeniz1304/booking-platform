@@ -13,7 +13,7 @@ import type { WebhookEvent } from "@/lib/payment/webhook";
 import { WebhookMismatchError } from "@/lib/payment/payment-service";
 import { holdUnits, InventoryUnavailableError } from "@/lib/booking/inventory";
 import { reclaimPromotionRedemptions } from "@/lib/pricing/promotion-redemption";
-import { CompensationMarkers, postCaptureCompensation } from "@/lib/ledger";
+import { CompensationMarkers, markCompensationIntent, postCaptureCompensation } from "@/lib/ledger";
 import { assertCurrency, minorFromDb, money } from "@/lib/money/money";
 import { counter } from "@/lib/observability/metrics";
 import { errorFields, logger } from "@/lib/observability/logger";
@@ -176,6 +176,8 @@ async function shareSucceeded(event: WebhookEvent, shareId: string): Promise<Res
     where: { id: shareId },
     select: { amountMinor: true, currency: true, cartId: true, status: true, failureCode: true },
   });
+  // v5#1: PSP başarı bildirdi (capture kesin) → niyet işareti iadeden ÖNCE.
+  await markCompensationIntent(ref, CompensationMarkers.splitShareLate);
   await getPaymentProvider().refund(
     ref,
     money(minorFromDb(share.amountMinor), assertCurrency(share.currency)),
@@ -194,15 +196,6 @@ async function shareSucceeded(event: WebhookEvent, shareId: string): Promise<Res
         refundedAt: new Date(),
         failureCode: "LATE_SUCCESS",
       },
-    });
-    await tx.paymentEvent.upsert({
-      where: { id: `comp:${ref}` },
-      create: {
-        id: `comp:${ref}`,
-        type: CompensationMarkers.splitShareLate,
-        providerRef: ref,
-      },
-      update: {},
     });
     // v2-P0-3: payın tahsilatı + iadesi jurnale (anahtar ref'e bağlı, yalnız ilk işaretlemede).
     if (marked.count === 1) {
@@ -396,6 +389,9 @@ async function refundCartPayment(
     where: { id: cartPaymentId },
     select: { cartId: true, amountMinor: true, currency: true, status: true },
   });
+  // v5#1: PSP başarı bildirdi (capture kesin) → niyet işareti iadeden ÖNCE; jurnal düşerse
+  // mutabakat farkı görür, webhook yeniden teslimi aynı anahtarlarla tamamlar.
+  await markCompensationIntent(ref, CompensationMarkers.cartLate);
   await getPaymentProvider().refund(
     ref,
     money(minorFromDb(cp.amountMinor), assertCurrency(cp.currency)),
@@ -417,11 +413,6 @@ async function refundCartPayment(
         refundedAt: now,
         failureCode: reason,
       },
-    });
-    await tx.paymentEvent.upsert({
-      where: { id: `comp:${ref}` },
-      create: { id: `comp:${ref}`, type: "compensation.cart_late", providerRef: ref },
-      update: {},
     });
     // v2-P0-3: sepet ödemesinin tahsilatı + iadesi jurnale (tekil yoldaki telafi deseni).
     if (marked.count === 1) {

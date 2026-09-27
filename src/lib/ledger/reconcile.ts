@@ -10,11 +10,11 @@ type Db = PrismaClient | Prisma.TransactionClient;
  * v2-P0-3: PSP'de tahsil edilip tamamen iade edilen (telafi) ödemelerin `PaymentEvent` işaretleri
  * (`comp:<providerRef>`). Mutabakat bu ödemelerin PSP tarafını jurnalden değil işaretten bilir.
  *
- * Devir işareti PSP iadesinden ÖNCE, ayrı yazılır (`refundTransferCapture`): iade işlenip jurnal
- * yazılamazsa "işaret var, jurnal yok" farkı gerçekten oluşur ve süpürücü tamamlayana dek
- * raporlanır. Pay işaretleri jurnalle aynı işlemde yazılır; iade sonrası işlem düşerse pay
- * telafisi `saga-compensation-retry` ile, geç pay iadesi webhook yeniden teslimiyle yeniden
- * koşar (işaret yalnızca jurnalle birlikte oluşur → bu yollarda fark kalıcı değildir).
+ * v5#1: tüm işaretler (devir, pay, sepet) PSP iadesinden ÖNCE ve yalnız capture kesinken yazılır
+ * (`markCompensationIntent`): iade işlenip jurnal yazılamazsa "işaret var, jurnal yok" farkı
+ * gerçekten oluşur ve tamamlanana dek raporlanır — devirde süpürücü (`rejournalTransferRefunds`),
+ * sepet/pay telafisinde `saga-compensation-retry`, geç başarı iadesinde webhook yeniden teslimi
+ * aynı iade + jurnal anahtarlarıyla tamamlar.
  */
 export const CompensationMarkers = {
   /** Devir capture'ı iade edildi (saga telafisi ya da takılı devir süpürücüsü). */
@@ -23,9 +23,33 @@ export const CompensationMarkers = {
   splitShare: "compensation.split_share",
   /** Plan kapandıktan sonra gelen pay başarısı iade edildi. */
   splitShareLate: "compensation.split_share_late",
+  /** Sepet ödemesi tahsil edildi ama sepet onaylanamadı (saga telafisi). */
+  cart: "compensation.cart",
+  /** Sepet süresi dolduktan sonra gelen ödeme başarısı iade edildi. */
+  cartLate: "compensation.cart_late",
 } as const;
 
 const SHARE_MARKERS = [CompensationMarkers.splitShare, CompensationMarkers.splitShareLate];
+const CART_MARKERS = [CompensationMarkers.cart, CompensationMarkers.cartLate];
+
+export type CompensationMarker = (typeof CompensationMarkers)[keyof typeof CompensationMarkers];
+
+/**
+ * v5#1: telafi niyet işareti — PSP iadesinden ÖNCE ve YALNIZ capture kesinken çağrılır (void
+ * edilen / capture'ı olmayan provizyon işaretlenmez). İdempotent (`comp:<providerRef>`).
+ */
+export async function markCompensationIntent(
+  providerRef: string,
+  type: CompensationMarker,
+  db: Db = prisma
+): Promise<void> {
+  const id = `comp:${providerRef}`;
+  await db.paymentEvent.upsert({
+    where: { id },
+    create: { id, type, providerRef },
+    update: {},
+  });
+}
 
 export const reconciliationRunsTotal = counter(
   "ledger_reconciliation_runs_total",
@@ -113,7 +137,7 @@ export async function reconcile(
   const dayMarkers = await db.paymentEvent.findMany({
     where: {
       receivedAt: inDay,
-      type: { in: [CompensationMarkers.transferCapture, ...SHARE_MARKERS] },
+      type: { in: [CompensationMarkers.transferCapture, ...SHARE_MARKERS, ...CART_MARKERS] },
       providerRef: { not: null },
     },
     select: { type: true, providerRef: true },
@@ -131,7 +155,13 @@ export async function reconcile(
     select: { id: true },
   });
   const pspCartPayments = await db.cartPayment.findMany({
-    where: { OR: [{ paidAt: inDay }, { refundedAt: inDay }] },
+    where: {
+      OR: [
+        { paidAt: inDay },
+        { refundedAt: inDay },
+        { providerRef: { in: markerRefs(CART_MARKERS) } },
+      ],
+    },
     select: { id: true },
   });
 
@@ -328,28 +358,26 @@ async function reconcileCartPayments(db: Db, ids: string[], out: ReconDiffRow[])
       amountMinor: true,
       refundedAmountMinor: true,
       paidAt: true,
+      providerRef: true,
     },
   });
   if (carts.length === 0) return 0;
-  const journal = await pspSums(
-    db,
-    "paymentId",
-    carts.map((c) => c.id)
-  );
+  const [journal, marked] = await Promise.all([
+    pspSums(
+      db,
+      "paymentId",
+      carts.map((c) => c.id)
+    ),
+    markedRefs(db, CART_MARKERS, unique(carts.map((c) => c.providerRef))),
+  ]);
   for (const c of carts) {
     const j = journal.get(c.id);
-    const captured = c.paidAt ? c.amountMinor : 0n;
+    // v5#1: telafi işareti varsa PSP'de tahsil + tam iade kesindir (durum henüz yazılmamış olsa da).
+    const compensated = c.providerRef !== null && marked.has(c.providerRef);
+    const captured = compensated || c.paidAt ? c.amountMinor : 0n;
+    const refundedMinor = compensated ? c.amountMinor : c.refundedAmountMinor;
     push(out, "cart_payment", c.id, null, "capture", c.currency, captured, j?.capture ?? 0n);
-    push(
-      out,
-      "cart_payment",
-      c.id,
-      null,
-      "refund",
-      c.currency,
-      c.refundedAmountMinor,
-      j?.refund ?? 0n
-    );
+    push(out, "cart_payment", c.id, null, "refund", c.currency, refundedMinor, j?.refund ?? 0n);
   }
   return carts.length * 2;
 }

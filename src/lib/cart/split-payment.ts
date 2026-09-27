@@ -32,7 +32,7 @@ import { invalidatePropertySearchCache } from "@/lib/search";
 import { counter, histogram } from "@/lib/observability/metrics";
 import { errorFields, logger } from "@/lib/observability/logger";
 import { audit } from "@/lib/admin/audit";
-import { CompensationMarkers, postCaptureCompensation } from "@/lib/ledger";
+import { CompensationMarkers, markCompensationIntent, postCaptureCompensation } from "@/lib/ledger";
 import { getQueue, QUEUE_NAMES } from "@/lib/queue";
 import { fromDate } from "@/lib/time/nights";
 import {
@@ -923,6 +923,9 @@ async function refundCapturedShares(planId: string, reason: string): Promise<num
     const amount = minorFromDb(share.amountMinor) - minorFromDb(share.refundedAmountMinor);
     if (amount > 0) {
       try {
+        // v5#1: pay CAPTURED (capture kesin) → niyet işareti PSP iadesinden ÖNCE; iade işlenip
+        // jurnal düşerse mutabakat farkı görür, `saga-compensation-retry` aynı anahtarla tamamlar.
+        await markCompensationIntent(share.providerRef, CompensationMarkers.splitShare);
         await getPaymentProvider().refund(
           share.providerRef,
           money(amount, assertCurrency(share.currency)),
@@ -945,11 +948,6 @@ async function refundCapturedShares(planId: string, reason: string): Promise<num
           refundedAt: now,
           failureCode: reason,
         },
-      });
-      await tx.paymentEvent.upsert({
-        where: { id: `comp:${ref}` },
-        create: { id: `comp:${ref}`, type: CompensationMarkers.splitShare, providerRef: ref },
-        update: {},
       });
       // v2-P0-3: payın tahsilatı + iadesi jurnale (geç pay iadesiyle aynı anahtar → çoğalmaz).
       if (marked.count === 1) {

@@ -1,6 +1,11 @@
 import Stripe from "stripe";
 import type { Money } from "@/lib/money/money";
-import { PaymentProviderError, type AuthorizeResult, type PaymentProvider } from "./provider";
+import {
+  ALREADY_CAPTURED_CODE,
+  PaymentProviderError,
+  type AuthorizeResult,
+  type PaymentProvider,
+} from "./provider";
 
 /**
  * Stripe (test mode) sağlayıcısı — resmî `stripe` SDK'sı, PaymentIntent akışı:
@@ -248,8 +253,26 @@ export class StripeProvider implements PaymentProvider {
     }
   }
 
+  /**
+   * v5#1: iptal `payment_intent_unexpected_state` ile reddedilirse intent'in gerçek durumu okunur —
+   * `succeeded` → `already_captured` (capture kesin), `canceled` → zaten void (idempotent).
+   */
   async void(providerRef: string) {
-    await this.call(() => this.stripe.paymentIntents.cancel(providerRef));
+    try {
+      await this.call(() => this.stripe.paymentIntents.cancel(providerRef));
+    } catch (error) {
+      if (
+        !(error instanceof PaymentProviderError) ||
+        error.code !== "payment_intent_unexpected_state"
+      )
+        throw error;
+      const intent = await this.call(() => this.stripe.paymentIntents.retrieve(providerRef));
+      if (intent.status === "canceled") return { status: "voided" as const };
+      if (intent.status === "succeeded") {
+        throw new PaymentProviderError(ALREADY_CAPTURED_CODE, "Ödeme zaten tahsil edilmiş");
+      }
+      throw error;
+    }
     return { status: "voided" as const };
   }
 }

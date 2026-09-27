@@ -83,3 +83,14 @@ export class PaymentProviderError extends Error {
     this.name = "PaymentProviderError";
   }
 }
+
+/**
+ * v5#1: void reddinin nedeni "ödeme zaten tahsil edildi" ise sağlayıcılar bu kodu fırlatır
+ * (Stripe: iptal edilemeyen `succeeded` PaymentIntent). Yalnız bu durumda capture KESİNDİR;
+ * diğer void hataları (ağ, zaman aşımı, `psp_unavailable`) capture hakkında bilgi vermez.
+ */
+export const ALREADY_CAPTURED_CODE = "already_captured";
+
+export function isAlreadyCapturedError(error: unknown): boolean {
+  return error instanceof PaymentProviderError && error.code === ALREADY_CAPTURED_CODE;
+}

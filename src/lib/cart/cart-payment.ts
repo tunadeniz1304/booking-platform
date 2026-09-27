@@ -7,7 +7,7 @@ import {
   withConfirmRetry,
   withSerializableRetry,
 } from "@/lib/db/transactions";
-import { postCaptureCompensation } from "@/lib/ledger";
+import { CompensationMarkers, markCompensationIntent, postCaptureCompensation } from "@/lib/ledger";
 import { createRedlock, LockError } from "@/lib/distributed-lock/redlock";
 import { rerunCompensations, runSaga, type SagaStep } from "@/lib/saga/saga";
 import { scheduleCompensationRetry } from "@/lib/saga/compensation-retry";
@@ -465,6 +465,9 @@ const CART_SAGA_STEPS: SagaStep<CartSagaCtx, CartPayOutcome>[] = [
     },
     compensate: async (ctx) => {
       if (!ctx.captured) return false;
+      // v5#1: niyet işareti PSP iadesinden ÖNCE (capture kesin): iade işlenip jurnal düşerse
+      // mutabakat farkı görür, `saga-compensation-retry` aynı anahtarlarla tamamlar.
+      await markCompensationIntent(ctx.providerRef, CompensationMarkers.cart);
       // İade anahtarı providerRef'e bağlı → tekrar çağrılsa da PSP tek iade yapar.
       await getPaymentProvider().refund(
         ctx.providerRef,
@@ -486,15 +489,6 @@ const CART_SAGA_STEPS: SagaStep<CartSagaCtx, CartPayOutcome>[] = [
             refundedAt: now,
             failureCode: "CART_NOT_CONFIRMABLE",
           },
-        });
-        await tx.paymentEvent.upsert({
-          where: { id: `comp:${ctx.providerRef}` },
-          create: {
-            id: `comp:${ctx.providerRef}`,
-            type: "compensation.cart",
-            providerRef: ctx.providerRef,
-          },
-          update: {},
         });
         // v2-P0-3: tahsilat + iade jurnali (anahtar providerRef'e bağlı → tekrar telafide yazılmaz).
         if (marked.count === 1) {

@@ -17,8 +17,10 @@ export { listBookingLedger, netChargedMinor, toMinorBigint, type LedgerViewRow }
 export {
   dayWindow,
   CompensationMarkers,
+  markCompensationIntent,
   reconcile,
   serializeReport,
+  type CompensationMarker,
   type ReconciliationReport,
   type ReconDiffRow,
 } from "./reconcile";

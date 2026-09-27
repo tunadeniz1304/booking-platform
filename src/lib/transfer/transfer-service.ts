@@ -21,7 +21,7 @@ import {
 } from "@/lib/money/money";
 import { fromDate } from "@/lib/time/nights";
 import { getPaymentProvider } from "@/lib/payment";
-import type { PaymentProvider } from "@/lib/payment/provider";
+import { isAlreadyCapturedError, type PaymentProvider } from "@/lib/payment/provider";
 import { runSaga, type SagaStep } from "@/lib/saga/saga";
 import { logger, errorFields } from "@/lib/observability/logger";
 import { counter } from "@/lib/observability/metrics";
@@ -283,23 +283,33 @@ async function loadTransferableBooking(
  * ÖNCE yazılır. İade PSP'de işlenip jurnal yazılamazsa (yanıt kaybı, çökme, serileştirme
  * tükenmesi) işaret kalır → mutabakat jurnalsiz capture/iadeyi fark olarak raporlar ve
  * süpürücü (`rejournalTransferRefunds`) iadeyi aynı anahtarla yeniden deneyip jurnali tamamlar.
+ *
+ * v5#1: işaret YALNIZ capture kesinken önceden yazılır (`captureCertain`: saga capture'ı gördü
+ * ya da PSP void'i `already_captured` ile reddetti). Capture belirsizse (void geçici hatayla
+ * düştü) önce iade denenir; iade başarılıysa capture kanıtlanmıştır → işaret + jurnal. İade
+ * reddedilirse (capture yok) işaret yazılmaz → mutabakatta hayali fark, süpürücüde sonsuz
+ * yeniden deneme olmaz.
  */
 async function refundTransferCapture(
   provider: PaymentProvider,
-  i: { transferId: string; bookingId: string; buyerPaymentRef: string; ask: Money }
+  i: { transferId: string; bookingId: string; buyerPaymentRef: string; ask: Money },
+  captureCertain = true
 ): Promise<void> {
   const refundRef = `transfer-refund:${i.transferId}`;
   const markerId = `comp:${i.buyerPaymentRef}`;
-  await prisma.paymentEvent.upsert({
-    where: { id: markerId },
-    create: {
-      id: markerId,
-      type: CompensationMarkers.transferCapture,
-      providerRef: i.buyerPaymentRef,
-    },
-    update: {},
-  });
+  const mark = () =>
+    prisma.paymentEvent.upsert({
+      where: { id: markerId },
+      create: {
+        id: markerId,
+        type: CompensationMarkers.transferCapture,
+        providerRef: i.buyerPaymentRef,
+      },
+      update: {},
+    });
+  if (captureCertain) await mark();
   await provider.refund(i.buyerPaymentRef, i.ask, refundRef);
+  if (!captureCertain) await mark();
   await withSerializableRetry((tx) =>
     postCaptureCompensation(tx, {
       refundRef,
@@ -753,12 +763,16 @@ export async function sweepStuckTransfers(
       } catch (voidError) {
         try {
           const currency = assertCurrency(t.currency);
-          await refundTransferCapture(provider, {
-            transferId: t.id,
-            bookingId: t.bookingId,
-            buyerPaymentRef: t.buyerPaymentRef,
-            ask: money(minorFromDb(t.askPriceMinor), currency),
-          });
+          await refundTransferCapture(
+            provider,
+            {
+              transferId: t.id,
+              bookingId: t.bookingId,
+              buyerPaymentRef: t.buyerPaymentRef,
+              ask: money(minorFromDb(t.askPriceMinor), currency),
+            },
+            isAlreadyCapturedError(voidError)
+          );
           outcome = "refunded";
         } catch (refundError) {
           logger.error(

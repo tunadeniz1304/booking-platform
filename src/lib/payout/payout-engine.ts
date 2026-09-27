@@ -27,6 +27,13 @@ export const payoutsTotal = counter("payouts_total", "Payout sonuçları", [
   "outcome",
 ] as const);
 
+/** v5#4: kapıda bekletilen payout'lar (hesap yok, durdurulmuş, sağlayıcı kapalı, KYC eksik). */
+export const payoutBlockedTotal = counter(
+  "payout_blocked_total",
+  "Payout kapısında bekletilen payout'lar (kind, reason)",
+  ["kind", "reason"] as const
+);
+
 const BATCH_SIZE = 100;
 const DAY_MS = 86_400_000;
 
@@ -108,9 +115,18 @@ async function sendTransferPayouts(now: Date, opts: PayoutRunOptions): Promise<n
   let paid = 0;
   for (const p of pending) {
     const account = await prisma.hostAccount.findUnique({ where: { userId: p.userId } });
-    if (account?.payoutsPaused) continue;
+    // v5#4: ev sahibi yoluyla AYNI kapı — hesap yoksa / durdurulmuşsa / KYC gerekip yoksa
+    // devir bedeli gönderilmez, PENDING bekler (AML vektörü; başarısız sayılmaz).
+    const blocked = await payoutBlockReason(account);
+    if (blocked) {
+      payoutBlockedTotal.inc({ kind: "transfer", reason: blocked });
+      continue;
+    }
     const destination = account?.connectedAccountRef ?? null;
-    if (provider.name === "stripe" && !destination) continue;
+    if (provider.name === "stripe" && !destination) {
+      payoutBlockedTotal.inc({ kind: "transfer", reason: "NO_DESTINATION" });
+      continue;
+    }
     // Bakiye koruması: devir bedeli host_payable'a transferSettled ile girmiş olmalı.
     if ((await payableMinor(prisma, p.userId, p.currency)) < p.amountMinor) {
       logger.warn({ payoutId: p.id }, "transfer payout exceeds payable balance; skipped");
@@ -237,7 +253,10 @@ async function sendHostPayouts(
     const account = await prisma.hostAccount.findUnique({ where: { userId: p.userId } });
     const blocked = await payoutBlockReason(account);
     // Durdurulmuş / uygunluğu düşmüş hesabın bekleyen payout'u bekler (başarısız sayılmaz).
-    if (blocked) continue;
+    if (blocked) {
+      payoutBlockedTotal.inc({ kind: "host", reason: blocked });
+      continue;
+    }
     const available =
       (await payableMinor(prisma, p.userId, p.currency)) -
       (await pendingMinor(prisma, p.userId, p.currency, p.id));

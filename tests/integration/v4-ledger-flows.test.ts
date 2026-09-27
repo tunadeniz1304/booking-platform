@@ -21,6 +21,7 @@ import { setPaymentProviderForTests } from "@/lib/payment";
 import { MockPsp } from "@/lib/payment/mock-psp";
 import { ALREADY_CAPTURED_CODE, PaymentProviderError } from "@/lib/payment/provider";
 import { runPayouts } from "@/worker/jobs/payouts";
+import { onboardHostAccount } from "@/lib/payout/host-account";
 import {
   isTrialBalanced,
   ledgerImbalanceTotal,
@@ -41,6 +42,8 @@ describeInt("F2c defter bağlama: rezervasyon → ödeme → iade → iptal → 
 
   beforeAll(async () => {
     fx = await createStayFixture(prisma, { tag: "v4-ledger-flows", days: 160, country: "Türkiye" });
+    // v5#4: devir payout'u satıcının ödeme hesabı kapısından geçer.
+    await onboardHostAccount(fx.userId);
     buyer = (
       await prisma.user.create({
         data: {

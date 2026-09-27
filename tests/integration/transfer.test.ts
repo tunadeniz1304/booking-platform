@@ -12,6 +12,7 @@ import { cancelAndRefund } from "@/lib/payment/payment-service";
 import { MockPsp } from "@/lib/payment/mock-psp";
 import { setPaymentProviderForTests } from "@/lib/payment";
 import { runPayouts } from "@/worker/jobs/payouts";
+import { onboardHostAccount } from "@/lib/payout/host-account";
 import type { Money } from "@/lib/money/money";
 
 /** İadelerin hangi ödemeye gittiğini kaydeden MockPsp. */
@@ -69,6 +70,8 @@ describeInt("regression: #3 P2P devir (integration)", () => {
         },
       });
     seller = (await mk("satici")).id;
+    // v5#4: devir payout'u satıcının ödeme hesabı kapısından geçer.
+    await onboardHostAccount(seller);
     buyer = (await mk("alici")).id;
     buyer2 = (await mk("alici2")).id;
     const location = await prisma.location.create({

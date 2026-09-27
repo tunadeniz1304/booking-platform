@@ -474,7 +474,7 @@ export async function claimTransfer(input: {
   buyerId: string;
   cardToken: string;
   /**
-   * İsteğin Idempotency-Key'i (varsa): aynı isteğin tekrarı aynı provizyonu kullanır.
+   * İsteğin Idempotency-Key'i (varsa): aynı isteğin (aynı kartla) tekrarı aynı provizyonu kullanır.
    * Yoksa deneme başına rastgele — reddedilen karttan sonra başka kartla yeniden deneme mümkün.
    */
   idempotencyKey?: string;
@@ -512,7 +512,11 @@ async function claimLocked(
 
   const currency = assertCurrency(transfer.currency);
   const ask = money(minorFromDb(transfer.askPriceMinor), currency);
-  const attempt = input.idempotencyKey ?? randomUUID();
+  // İstemci anahtarı kart özetiyle birleşir: aynı istek tekrarı aynı provizyonu kullanır,
+  // aynı anahtarla başka kart ise yeni deneme sayılır (PSP idempotency çakışması olmaz).
+  const attempt = input.idempotencyKey
+    ? `${input.idempotencyKey}:${createHash("sha256").update(input.cardToken).digest("hex").slice(0, 16)}`
+    : randomUUID();
   const ctx: ClaimContext = {
     transfer: { id: transfer.id, bookingId: transfer.bookingId, sellerId: transfer.sellerId },
     buyerId: input.buyerId,

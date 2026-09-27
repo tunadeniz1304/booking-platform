@@ -2,7 +2,12 @@ import { Prisma, BookingStatus, CartStatus, PaymentStatus } from "@prisma/client
 import { prisma } from "@/lib/prisma";
 import { redis } from "@/lib/redis";
 import { ConflictError, HttpError } from "@/lib/http/errors";
-import { isSerializationFailure, withConfirmRetry } from "@/lib/db/transactions";
+import {
+  isSerializationFailure,
+  withConfirmRetry,
+  withSerializableRetry,
+} from "@/lib/db/transactions";
+import { postCaptureCompensation } from "@/lib/ledger";
 import { createRedlock, LockError } from "@/lib/distributed-lock/redlock";
 import { rerunCompensations, runSaga, type SagaStep } from "@/lib/saga/saga";
 import { scheduleCompensationRetry } from "@/lib/saga/compensation-retry";
@@ -466,9 +471,9 @@ const CART_SAGA_STEPS: SagaStep<CartSagaCtx, CartPayOutcome>[] = [
         ctx.cart.amount,
         `compensate:${ctx.providerRef}`
       );
-      const now = new Date();
-      await prisma.$transaction([
-        prisma.cartPayment.updateMany({
+      await withSerializableRetry(async (tx) => {
+        const now = new Date();
+        const marked = await tx.cartPayment.updateMany({
           where: {
             cartId: ctx.cart.id,
             providerRef: ctx.providerRef,
@@ -481,8 +486,8 @@ const CART_SAGA_STEPS: SagaStep<CartSagaCtx, CartPayOutcome>[] = [
             refundedAt: now,
             failureCode: "CART_NOT_CONFIRMABLE",
           },
-        }),
-        prisma.paymentEvent.upsert({
+        });
+        await tx.paymentEvent.upsert({
           where: { id: `comp:${ctx.providerRef}` },
           create: {
             id: `comp:${ctx.providerRef}`,
@@ -490,8 +495,22 @@ const CART_SAGA_STEPS: SagaStep<CartSagaCtx, CartPayOutcome>[] = [
             providerRef: ctx.providerRef,
           },
           update: {},
-        }),
-      ]);
+        });
+        // v2-P0-3: tahsilat + iade jurnali (anahtar providerRef'e bağlı → tekrar telafide yazılmaz).
+        if (marked.count === 1) {
+          const cp = await tx.cartPayment.findUniqueOrThrow({
+            where: { cartId: ctx.cart.id },
+            select: { id: true, currency: true },
+          });
+          await postCaptureCompensation(tx, {
+            refundRef: `compensate:${ctx.providerRef}`,
+            paymentId: cp.id,
+            currency: cp.currency,
+            amountMinor: minorToDb(ctx.cart.amount.amount),
+            occurredAt: now,
+          });
+        }
+      });
       cartPaymentsTotal.inc({ outcome: "compensated" });
       await audit("system:payment", "cart.payment_compensated", "Cart", ctx.cart.id, {
         providerRef: ctx.providerRef,

@@ -6,6 +6,9 @@ import { JournalKinds } from "./templates";
 
 type Db = PrismaClient | Prisma.TransactionClient;
 
+/** Devir sagasında capture alınıp commit düştüğünde yazılan hata kodu (tahsilat iade edildi). */
+const TRANSFER_REFUNDED_FAILURE = "COMMIT_FAILED";
+
 export const reconciliationRunsTotal = counter(
   "ledger_reconciliation_runs_total",
   "Günlük mutabakat koşuları (clean = fark yok)",
@@ -15,7 +18,7 @@ export const reconciliationRunsTotal = counter(
 export type ReconKind = "capture" | "refund" | "transfer" | "deposit" | "chargeback";
 
 export interface ReconDiffRow {
-  subject: "payment" | "transfer" | "deposit" | "claim";
+  subject: "payment" | "cart_payment" | "transfer" | "deposit" | "claim";
   subjectId: string;
   bookingId: string | null;
   kind: ReconKind;
@@ -59,7 +62,10 @@ export function dayWindow(date: string | Date): { date: string; from: Date; to: 
  *
  * - capture: Payment.amountMinor (paidAt doluysa) ↔ BOOKING_CAPTURED Dr psp_clearing
  * - refund:  Payment.refundedAmountMinor ↔ REFUND_ISSUED Cr psp_clearing (krediye iade hariç)
- * - transfer: COMPLETED devrin askPriceMinor'ı ↔ TRANSFER_SETTLED Dr psp_clearing
+ * - transfer: COMPLETED devrin askPriceMinor'ı ↔ TRANSFER_SETTLED Dr psp_clearing; capture sonrası
+ *   commit'i düşüp iade edilen (FAILED + COMMIT_FAILED) devrin ask'ı ↔ telafi capture/refund (v2-P0-3)
+ * - cart_payment: kalem `Payment`'ı olmayan (onaylanmamış) sepet ödemesinin capture/refund'u ↔
+ *   telafi jurnali (v2-P0-3); onaylanmış sepet kalem `Payment`'ları üzerinden mutabık
  * - deposit: hasar depozitosunun capturedMinor'ı ↔ DEPOSIT_CAPTURED Dr psp_clearing (P1-5)
  * - chargeback: kaybedilen itirazın (CHARGEBACK talebi) awardedMinor'ı ↔ CHARGEBACK_LOST
  *   Cr psp_clearing (fix-sweep-2)
@@ -85,7 +91,11 @@ export async function reconcile(
     select: { id: true },
   });
   const pspTransfers = await db.bookingTransfer.findMany({
-    where: { completedAt: inDay },
+    where: { OR: [{ completedAt: inDay }, { failedAt: inDay }] },
+    select: { id: true },
+  });
+  const pspCartPayments = await db.cartPayment.findMany({
+    where: { OR: [{ paidAt: inDay }, { refundedAt: inDay }] },
     select: { id: true },
   });
 
@@ -100,6 +110,7 @@ export async function reconcile(
 
   const differences: ReconDiffRow[] = [];
   let checked = 0;
+  const bookingPaymentIds = new Set<string>();
 
   if (paymentIds.length > 0) {
     const payments = await db.payment.findMany({
@@ -115,6 +126,7 @@ export async function reconcile(
     });
     const journal = await pspSums(db, "paymentId", paymentIds);
     for (const p of payments) {
+      bookingPaymentIds.add(p.id);
       const captured = p.paidAt ? p.amountMinor : 0n;
       const refunded = p.refundedAmountMinor;
       const j = journal.get(p.id);
@@ -142,15 +154,35 @@ export async function reconcile(
     }
   }
 
+  checked += await reconcileCartPayments(
+    db,
+    unique([
+      ...pspCartPayments.map((c) => c.id),
+      ...paymentIds.filter((id) => !bookingPaymentIds.has(id)),
+    ]),
+    differences
+  );
+
   if (transferIds.length > 0) {
     const transfers = await db.bookingTransfer.findMany({
       where: { id: { in: transferIds } },
-      select: { id: true, bookingId: true, currency: true, askPriceMinor: true, status: true },
+      select: {
+        id: true,
+        bookingId: true,
+        currency: true,
+        askPriceMinor: true,
+        status: true,
+        failureCode: true,
+      },
     });
     const journal = await pspSums(db, "transferId", transferIds);
     for (const t of transfers) {
       const settled = t.status === "COMPLETED" ? t.askPriceMinor : 0n;
-      checked += 1;
+      // Capture alındı, commit düştü → saga tahsilatı iade etti (transfer-service capture telafisi).
+      const compensated =
+        t.status === "FAILED" && t.failureCode === TRANSFER_REFUNDED_FAILURE ? t.askPriceMinor : 0n;
+      const j = journal.get(t.id);
+      checked += t.status === "FAILED" ? 3 : 1;
       push(
         differences,
         "transfer",
@@ -159,7 +191,27 @@ export async function reconcile(
         "transfer",
         t.currency,
         settled,
-        journal.get(t.id)?.transfer ?? 0n
+        j?.transfer ?? 0n
+      );
+      push(
+        differences,
+        "transfer",
+        t.id,
+        t.bookingId,
+        "capture",
+        t.currency,
+        compensated,
+        j?.capture ?? 0n
+      );
+      push(
+        differences,
+        "transfer",
+        t.id,
+        t.bookingId,
+        "refund",
+        t.currency,
+        compensated,
+        j?.refund ?? 0n
       );
     }
   }
@@ -214,6 +266,47 @@ export async function reconcile(
   const ok = differences.length === 0 && imbalancedEntries === 0 && orphanEvents.length === 0;
   reconciliationRunsTotal.inc({ outcome: ok ? "clean" : "diff" });
   return { date: day, from, to, checked, differences, imbalancedEntries, orphanEvents, ok };
+}
+
+/**
+ * v2-P0-3 sepet ödemesi mutabakatı: kalem `Payment`'ı olmayan (onaylanmamış; saga telafisi ya da
+ * geç başarı iadesi) sepet ödemesinde PSP capture/refund ↔ `paymentId = CartPayment.id` jurnali.
+ * Onaylanmış sepet ödemesi kalem `Payment`'ları (`booking-captured:<paymentId>`) ile mutabıktır.
+ */
+async function reconcileCartPayments(db: Db, ids: string[], out: ReconDiffRow[]): Promise<number> {
+  if (ids.length === 0) return 0;
+  const carts = await db.cartPayment.findMany({
+    where: { id: { in: ids }, payments: { none: {} } },
+    select: {
+      id: true,
+      currency: true,
+      amountMinor: true,
+      refundedAmountMinor: true,
+      paidAt: true,
+    },
+  });
+  if (carts.length === 0) return 0;
+  const journal = await pspSums(
+    db,
+    "paymentId",
+    carts.map((c) => c.id)
+  );
+  for (const c of carts) {
+    const j = journal.get(c.id);
+    const captured = c.paidAt ? c.amountMinor : 0n;
+    push(out, "cart_payment", c.id, null, "capture", c.currency, captured, j?.capture ?? 0n);
+    push(
+      out,
+      "cart_payment",
+      c.id,
+      null,
+      "refund",
+      c.currency,
+      c.refundedAmountMinor,
+      j?.refund ?? 0n
+    );
+  }
+  return carts.length * 2;
 }
 
 /**

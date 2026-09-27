@@ -26,7 +26,7 @@ import { runSaga, type SagaStep } from "@/lib/saga/saga";
 import { logger, errorFields } from "@/lib/observability/logger";
 import { counter } from "@/lib/observability/metrics";
 import { audit } from "@/lib/admin/audit";
-import { post } from "@/lib/ledger";
+import { post, postCaptureCompensation } from "@/lib/ledger";
 
 /**
  * P2P rezervasyon devri (ikincil pazar).
@@ -357,7 +357,18 @@ function claimSteps(provider: PaymentProvider): SagaStep<ClaimContext, string>[]
       },
       async compensate(ctx) {
         if (!ctx.captured || !ctx.providerRef) return false;
-        await provider.refund(ctx.providerRef, ctx.ask, `transfer-refund:${ctx.transfer.id}`);
+        const refundRef = `transfer-refund:${ctx.transfer.id}`;
+        await provider.refund(ctx.providerRef, ctx.ask, refundRef);
+        // v2-P0-3: alıcının tahsilatı + iadesi jurnale (iade anahtarıyla → tekrar telafide yazılmaz).
+        await withSerializableRetry((tx) =>
+          postCaptureCompensation(tx, {
+            refundRef,
+            bookingId: ctx.transfer.bookingId,
+            transferId: ctx.transfer.id,
+            currency: ctx.ask.currency,
+            amountMinor: minorToDb(ctx.ask.amount),
+          })
+        );
       },
     },
     {

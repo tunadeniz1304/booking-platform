@@ -2,7 +2,7 @@ import type { Prisma } from "@prisma/client";
 import { account } from "./accounts";
 import { getAccountBalance } from "./balance";
 import { postJournal, type PostResult } from "./journal";
-import { bookingCaptured, chargebackLost, refundIssued } from "./templates";
+import { bookingCaptured, chargebackLost, JournalKinds, refundIssued } from "./templates";
 
 /**
  * Servis bağlama yardımcıları (F2c). Para hareketinin jurnal girdisini iş kaydından
@@ -306,4 +306,75 @@ export async function postChargebackLost(
     })
   );
   return { ...res, recovery };
+}
+
+export interface CaptureCompensationInput {
+  /** Telafi iadesinin doğal anahtarı — PSP iade anahtarıyla aynı (`compensate:<providerRef>`, …). */
+  refundRef: string;
+  currency: string;
+  amountMinor: bigint;
+  bookingId?: string | null;
+  /** Sepet ödemesi / pay kimliği (mutabakat öznesi). */
+  paymentId?: string | null;
+  transferId?: string | null;
+  occurredAt?: Date;
+}
+
+/**
+ * v2-P0-3: rezervasyona bağlanamayan (sepet, pay, devir) ama PSP'de tahsil edilip iade edilen
+ * ödemenin jurnali — tekil yoldaki telafi deseni: tahsilat (Dr psp_clearing / Cr escrow) + aynı
+ * tutarın emanetten iadesi (Dr escrow / Cr psp_clearing) → psp_clearing net 0. Tek rezervasyon
+ * kırılımı olmadığından vergi ayrıştırılmaz (iki kayıt birbirini sıfırlar). Anahtarlar
+ * `refundRef`'e bağlı → telafi tekrar çalışırsa jurnal yeniden yazılmaz. `true` = ilk yazım.
+ */
+export async function postCaptureCompensation(
+  tx: Tx,
+  i: CaptureCompensationInput
+): Promise<boolean> {
+  if (i.amountMinor <= 0n) return false;
+  const meta = {
+    bookingId: i.bookingId ?? null,
+    paymentId: i.paymentId ?? null,
+    transferId: i.transferId ?? null,
+    occurredAt: i.occurredAt,
+  };
+  const capture = await postJournal(tx, {
+    ...meta,
+    idempotencyKey: `booking-captured:${i.refundRef}`,
+    kind: JournalKinds.BookingCaptured,
+    lines: [
+      {
+        account: account.pspClearing(),
+        side: "DEBIT",
+        amountMinor: i.amountMinor,
+        currency: i.currency,
+      },
+      {
+        account: account.escrow(),
+        side: "CREDIT",
+        amountMinor: i.amountMinor,
+        currency: i.currency,
+      },
+    ],
+  });
+  const refund = await postJournal(tx, {
+    ...meta,
+    idempotencyKey: `refund-issued:${i.refundRef}`,
+    kind: JournalKinds.RefundIssued,
+    lines: [
+      {
+        account: account.escrow(),
+        side: "DEBIT",
+        amountMinor: i.amountMinor,
+        currency: i.currency,
+      },
+      {
+        account: account.pspClearing(),
+        side: "CREDIT",
+        amountMinor: i.amountMinor,
+        currency: i.currency,
+      },
+    ],
+  });
+  return capture.created || refund.created;
 }

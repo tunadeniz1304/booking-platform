@@ -23,12 +23,14 @@ export {
 } from "./reconcile";
 export {
   postBookingCapture,
+  postCaptureCompensation,
   postChargebackLost,
   postRefundFromEscrow,
   refundTaxMinor,
   releasedSplitOf,
   splitHostRecovery,
   taxShareMinor,
+  type CaptureCompensationInput,
   type CaptureJournalInput,
   type ChargebackJournalInput,
   type HostRecoverySplit,

@@ -13,6 +13,7 @@ import type { WebhookEvent } from "@/lib/payment/webhook";
 import { WebhookMismatchError } from "@/lib/payment/payment-service";
 import { holdUnits, InventoryUnavailableError } from "@/lib/booking/inventory";
 import { reclaimPromotionRedemptions } from "@/lib/pricing/promotion-redemption";
+import { postCaptureCompensation } from "@/lib/ledger";
 import { assertCurrency, minorFromDb, money } from "@/lib/money/money";
 import { counter } from "@/lib/observability/metrics";
 import { errorFields, logger } from "@/lib/observability/logger";
@@ -199,6 +200,15 @@ async function shareSucceeded(event: WebhookEvent, shareId: string): Promise<Res
       create: { id: `comp:${ref}`, type: "compensation.split_share_late", providerRef: ref },
       update: {},
     });
+    // v2-P0-3: payın tahsilatı + iadesi jurnale (anahtar ref'e bağlı, yalnız ilk işaretlemede).
+    if (marked.count === 1) {
+      await postCaptureCompensation(tx, {
+        refundRef: `compensate:${ref}`,
+        paymentId: shareId,
+        currency: share.currency,
+        amountMinor: share.amountMinor,
+      });
+    }
     return marked.count === 1;
   });
   // fix-sweep-3: sayaç ödemeyi sayar, teslimatı değil → tekrar teslim ayrı etiket.
@@ -409,6 +419,16 @@ async function refundCartPayment(
       create: { id: `comp:${ref}`, type: "compensation.cart_late", providerRef: ref },
       update: {},
     });
+    // v2-P0-3: sepet ödemesinin tahsilatı + iadesi jurnale (tekil yoldaki telafi deseni).
+    if (marked.count === 1) {
+      await postCaptureCompensation(tx, {
+        refundRef: `compensate:${ref}`,
+        paymentId: cartPaymentId,
+        currency: cp.currency,
+        amountMinor: cp.amountMinor,
+        occurredAt: now,
+      });
+    }
     return marked.count === 1;
   });
   cartLateSuccessTotal.inc({ subject: "cart", outcome: firstRefund ? "refunded" : "redelivered" });

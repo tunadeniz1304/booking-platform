@@ -6,32 +6,49 @@
  * Yanıt geri geldiğinde `restore()` ile gerekirse orijinal değerlere döndürülür.
  *
  * Kapsam: e-posta, IBAN (ISO 13616, mod-97), kart numarası (Luhn), TCKN
- * (checksum), telefon (TR cep +90 / 0 / 5xx, TR sabit hat 0 2xx–4xx, uluslararası
- * +<ülke kodu> E.164), bilinen kişi adları (kullanıcı, ev sahibi, yorum yazarı).
- * Uygulama sırası çakışmaları önler (ör. 11 haneli TCKN telefon sanılmaz).
+ * (checksum), telefon (uluslararası +/00 <ülke kodu> E.164, TR cep +90 / 0 / 5xx,
+ * TR sabit hat 0 2xx–4xx), bilinen kişi adları (kullanıcı, ev sahibi, yorum yazarı).
+ * Uygulama sırası çakışmaları önler (ör. 11 haneli TCKN telefon sanılmaz; `+` önekli
+ * numara TR cep kalıbından önce bütün olarak etiketlenir).
  */
 
 export type PiiKind = "EPOSTA" | "IBAN" | "KART" | "TCKN" | "TELEFON" | "KISI";
 
 export const EMAIL_RE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
+/**
+ * Yalnız TR IBAN biçimi (checksum'sız). Redaksiyonda KULLANILMAZ (orada
+ * `IBAN_CANDIDATE_RE` + `isValidIban`); `messaging/mask.ts` ve `trust/message-scan.ts`
+ * platform dışı ödeme yönlendirmesini engellemek için mod-97 geçersiz TR IBAN'ı da
+ * yakalamak istediğinden bilerek ayrı tutulur.
+ */
 export const IBAN_RE = /\bTR\d{2}(?:\s?\d{4}){5}\s?\d{2}\b/gi;
-/** ISO 13616 adayı: ülke kodu + 2 kontrol hanesi + 4'lü (boşluklu/bitişik) BBAN grupları. */
+/** ISO 13616 adayı: ülke kodu + 2 kontrol hanesi + 4'lü (herhangi boşlukla/bitişik) BBAN grupları. */
 export const IBAN_CANDIDATE_RE =
-  /(?<![A-Za-z0-9])[A-Za-z]{2}\d{2}(?: ?[A-Z0-9]{4}){2,7}(?: ?[A-Z0-9]{1,4})?(?![A-Za-z0-9])/g;
+  /(?<![A-Za-z0-9])[A-Za-z]{2}\d{2}(?:\s?[A-Za-z0-9]{4}){2,7}(?:\s?[A-Za-z0-9]{1,4})?(?![A-Za-z0-9])/g;
 export const CARD_CANDIDATE_RE = /(?<!\d)(?:\d[ -]?){12,18}\d(?!\d)/g;
 export const TCKN_CANDIDATE_RE = /(?<!\d)[1-9]\d{10}(?!\d)/g;
 export const PHONE_RE =
   /(?<![\d+])(?:\+90[\s-]?|0)?\(?5\d{2}\)?[\s-]?\d{3}[\s-]?\d{2}[\s-]?\d{2}(?!\d)/g;
-/** TR sabit hat: 0 veya +90 önekli, 2xx–4xx alan kodu + 7 hane (TCKN 0 ile başlamaz). */
+/**
+ * TR sabit hat: 0 veya +90 önekli, 2xx–4xx alan kodu + 7 hane (TCKN 0 ile başlamaz).
+ * Sabit 3-3-2-2 yapısı sayesinde nokta da ayraç sayılır ("0216.555.12.34").
+ */
 export const LANDLINE_RE =
-  /(?<![\d+])\(?(?:\+90[\s-]?|0)\(?[2-4]\d{2}\)?[\s-]?\d{3}[\s-]?\d{2}[\s-]?\d{2}(?!\d)/g;
-/** Uluslararası (E.164): + ülke kodu ve ayraçlı rakamlar; hane sayısı `E164_DIGITS` ile sınanır. */
-export const INTL_PHONE_RE = /(?<![\w+])\+[1-9](?:[ .-]?\(?\d\)?){6,14}(?!\d)/g;
+  /(?<![\d+.])\(?(?:\+90[\s.-]?|0[\s.-]?)\(?[2-4]\d{2}\)?[\s.-]?\d{3}[\s.-]?\d{2}[\s.-]?\d{2}(?![\d.]?\d)/g;
+/**
+ * Uluslararası (E.164): `+` veya `00` önekli ülke kodu ve boşluk/tire/parantez ayraçlı
+ * rakamlar; hane sayısı `E164_DIGITS` ile sınanır. Nokta ayraç DEĞİL ("+12.345.678" tutar);
+ * `00` bir rakam grubunun devamıysa önek sayılmaz ("3704 0044 0532" IBAN/hesap parçası).
+ */
+export const INTL_PHONE_RE =
+  /(?<![\w+])(?:\+|(?<!\d[\s-])00)[1-9](?:[\s-]?\(?\d\)?){6,14}(?![\d.]?\d)/g;
 
 /** ISO 13616 toplam uzunluk sınırları ve E.164 hane sınırları (ülke kodu dahil). */
 const IBAN_LENGTH = { min: 15, max: 34 } as const;
 const E164_DIGITS = { min: 8, max: 15 } as const;
 const IBAN_CHECK_MODULUS = 97;
+/** Uluslararası aramada `+` yerine yazılan önek (hane sayısına dahil edilmez). */
+const INTL_ZERO_PREFIX = "00";
 
 /** Luhn (mod 10) doğrulaması — kart numaraları için. */
 export function isLuhnValid(digits: string): boolean {
@@ -50,9 +67,9 @@ export function isLuhnValid(digits: string): boolean {
   return sum % 10 === 0;
 }
 
-/** ISO 13616 IBAN doğrulaması: biçim + mod-97 (kalan 1). Boşluklar yok sayılır. */
+/** ISO 13616 IBAN doğrulaması: biçim + mod-97 (kalan 1). Boşluklar (NBSP dahil) yok sayılır. */
 export function isValidIban(value: string): boolean {
-  const iban = value.replace(/ /g, "").toUpperCase();
+  const iban = value.replace(/\s/g, "").toUpperCase();
   if (iban.length < IBAN_LENGTH.min || iban.length > IBAN_LENGTH.max) return false;
   if (!/^[A-Z]{2}\d{2}[A-Z0-9]+$/.test(iban)) return false;
   let rem = 0;
@@ -69,10 +86,10 @@ export function isValidIban(value: string): boolean {
  */
 function longestIbanPrefix(candidate: string): string | null {
   for (let end = candidate.length; end > 0; end--) {
-    if (candidate[end - 1] === " ") continue;
+    if (/\s/.test(candidate[end - 1])) continue;
     const prefix = candidate.slice(0, end);
     if (isValidIban(prefix)) return prefix;
-    if (prefix.replace(/ /g, "").length <= IBAN_LENGTH.min) break;
+    if (prefix.replace(/\s/g, "").length <= IBAN_LENGTH.min) break;
   }
   return null;
 }
@@ -130,12 +147,13 @@ export class Redactor {
       return isLuhnValid(digits) ? this.token("KART", m) : m;
     });
     out = out.replace(TCKN_CANDIDATE_RE, (m) => (isValidTckn(m) ? this.token("TCKN", m) : m));
-    out = out.replace(PHONE_RE, (m) => this.token("TELEFON", m));
-    out = out.replace(LANDLINE_RE, (m) => this.token("TELEFON", m));
     out = out.replace(INTL_PHONE_RE, (m) => {
-      const digits = m.replace(/\D/g, "").length;
+      const prefix = m.startsWith("+") ? 0 : INTL_ZERO_PREFIX.length;
+      const digits = m.replace(/\D/g, "").length - prefix;
       return digits >= E164_DIGITS.min && digits <= E164_DIGITS.max ? this.token("TELEFON", m) : m;
     });
+    out = out.replace(PHONE_RE, (m) => this.token("TELEFON", m));
+    out = out.replace(LANDLINE_RE, (m) => this.token("TELEFON", m));
     for (const name of this.names) {
       const re = new RegExp(`(?<![\\p{L}\\p{N}])${escapeRegExp(name)}(?![\\p{L}\\p{N}])`, "giu");
       out = out.replace(re, (m) => this.token("KISI", m));

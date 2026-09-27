@@ -1,5 +1,5 @@
 import { randomBytes } from "crypto";
-import { BookingStatus, TransferStatus } from "@prisma/client";
+import { BookingStatus, ClaimStatus, PayoutStatus, TransferStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/auth";
 import { bumpTokenVersion, publishTokenVersion } from "@/lib/auth/token-version";
@@ -8,6 +8,7 @@ import { cancelTransferListing } from "@/lib/transfer/transfer-service";
 import { listMandates } from "@/lib/agentic/mandate";
 import { logger, errorFields } from "@/lib/observability/logger";
 import { getConfig } from "@/lib/config/app-config";
+import { ConflictError } from "@/lib/http/errors";
 import type { ConsentValue } from "@/lib/privacy/consent";
 
 /**
@@ -346,18 +347,65 @@ export interface DeleteAccountResult {
   cancelledTransfers: string[];
 }
 
+const OPEN_CLAIM_STATUSES = [
+  ClaimStatus.OPEN,
+  ClaimStatus.AWAITING_RESPONSE,
+  ClaimStatus.ESCALATED,
+] as const;
+
 /**
- * Hesap silme (v3#5):
+ * Silmeyi engelleyen yükümlülükler (v5#9): ev sahibi olarak aldığı gelecekteki CONFIRMED
+ * rezervasyonlar, bekleyen (PENDING) payout'lar ve taraf olduğu açık talepler (claim).
+ */
+async function accountObligations(userId: string, now: Date) {
+  const [hostedBookings, pendingPayouts, pendingTransferPayouts, openClaims] = await Promise.all([
+    prisma.booking.count({
+      where: {
+        property: { hostId: userId },
+        status: BookingStatus.CONFIRMED,
+        checkOut: { gt: now },
+      },
+    }),
+    prisma.hostPayout.count({ where: { userId, status: PayoutStatus.PENDING } }),
+    prisma.payout.count({ where: { userId, status: PayoutStatus.PENDING } }),
+    prisma.claim.count({
+      where: {
+        status: { in: [...OPEN_CLAIM_STATUSES] },
+        OR: [{ openedById: userId }, { respondentId: userId }],
+      },
+    }),
+  ]);
+  return {
+    hostedBookings,
+    pendingPayouts: pendingPayouts + pendingTransferPayouts,
+    openClaims,
+  };
+}
+
+/**
+ * Hesap silme (v3#5, v5#9):
+ *  0. Yükümlülük varsa (ev sahibi olarak gelecek CONFIRMED rezervasyon, bekleyen payout, açık
+ *     talep) 409 `ACCOUNT_HAS_OBLIGATIONS` — hiçbir şey değişmez.
  *  1. Gelecekteki aktif rezervasyonlar (HELD/CONFIRMED) rezervasyon anındaki iptal
- *     politikasına göre iptal edilir (iade `cancelAndRefund` ile).
- *  2. Açık devir ilanları geri çekilir.
- *  3. Kişisel alanlar pseudonimleştirilir, passkey'ler ve tek kullanımlık token'lar silinir.
+ *     politikasına göre iptal edilir (iade `cancelAndRefund` ile). Biri düşerse silme DURUR
+ *     (409; yarım silme yok — hesap anonimleşmez, kullanıcı tekrar deneyebilir).
+ *  2. Açık devir ilanları geri çekilir (aynı kural).
+ *  3. İlanlar pasife alınır; kişisel alanlar pseudonimleştirilir, passkey'ler, tek kullanımlık
+ *     token'lar, push abonelikleri ve oturum kayıtları silinir.
  *  4. `tokenVersion` artırılır → TÜM cihazlardaki erişim/yenileme token'ları geçersiz.
  */
 export async function deleteAccount(
   userId: string,
   now = new Date()
 ): Promise<DeleteAccountResult> {
+  const obligations = await accountObligations(userId, now);
+  if (Object.values(obligations).some((n) => n > 0)) {
+    throw new ConflictError(
+      "Hesap silinemiyor: devam eden ev sahibi rezervasyonları, bekleyen ödemeler veya açık talepler var",
+      "ACCOUNT_HAS_OBLIGATIONS",
+      obligations
+    );
+  }
   const active = await prisma.booking.findMany({
     where: {
       userId,
@@ -372,8 +420,13 @@ export async function deleteAccount(
       await cancelAndRefund(b.id, userId, now);
       cancelledBookings.push(b.id);
     } catch (error) {
-      // Silme durdurulmaz; iptal edilemeyen rezervasyon loglanır (yönetici takibi).
+      // v5#9: silme durur — misafir kimsesiz bir rezervasyonla kalmasın.
       logger.error({ bookingId: b.id, ...errorFields(error) }, "account deletion: cancel failed");
+      throw new ConflictError(
+        "Hesap silinemiyor: bir rezervasyon iptal edilemedi, lütfen tekrar deneyin",
+        "ACCOUNT_HAS_OBLIGATIONS",
+        { failedBookingId: b.id, cancelledBookings }
+      );
     }
   }
   const listings = await prisma.bookingTransfer.findMany({
@@ -382,10 +435,17 @@ export async function deleteAccount(
   });
   const cancelledTransfers: string[] = [];
   for (const t of listings) {
-    await cancelTransferListing(t.id, userId).then(
-      () => cancelledTransfers.push(t.id),
-      (error) => logger.error({ transferId: t.id, ...errorFields(error) }, "transfer cancel failed")
-    );
+    try {
+      await cancelTransferListing(t.id, userId);
+      cancelledTransfers.push(t.id);
+    } catch (error) {
+      logger.error({ transferId: t.id, ...errorFields(error) }, "transfer cancel failed");
+      throw new ConflictError(
+        "Hesap silinemiyor: bir devir ilanı geri çekilemedi, lütfen tekrar deneyin",
+        "ACCOUNT_HAS_OBLIGATIONS",
+        { failedTransferId: t.id, cancelledBookings, cancelledTransfers }
+      );
+    }
   }
 
   const pseudo = `silinmis-${userId.slice(-8)}`;
@@ -408,6 +468,10 @@ export async function deleteAccount(
     await tx.favorite.deleteMany({ where: { userId } });
     await tx.webAuthnCredential.deleteMany({ where: { userId } });
     await tx.authToken.deleteMany({ where: { userId } });
+    // v5#9: ilanlar yeni rezervasyon almaz; push ve oturum meta verisi kalmaz.
+    await tx.property.updateMany({ where: { hostId: userId }, data: { isActive: false } });
+    await tx.pushSubscription.deleteMany({ where: { userId } });
+    await tx.userSession.deleteMany({ where: { userId } });
     await tx.notification.updateMany({
       where: { userId },
       data: { to: `${pseudo}@anon.invalid`, text: "", html: "" },

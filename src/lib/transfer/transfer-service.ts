@@ -275,36 +275,40 @@ async function loadTransferableBooking(
 }
 
 /**
- * Capture'ı alınmış devir ödemesinin iadesi (saga capture telafisi ve takılı devir süpürücüsü).
- * İki yol da AYNI iade anahtarını (`transfer-refund:<id>`) kullanır → PSP'de çift iade yok.
- * v2-P0-3: iade sonrası tek işlemde telafi işareti (`comp:<buyerPaymentRef>`, mutabakatın PSP
- * tarafı) + tahsilat/iade jurnali; anahtarlar aynı olduğundan yarışan ikinci yol yeniden yazmaz.
+ * Capture'ı alınmış devir ödemesinin iadesi (saga capture telafisi, takılı devir süpürücüsü ve
+ * jurnal tamamlama). Tüm yollar AYNI iade anahtarını (`transfer-refund:<id>`) kullanır → PSP'de
+ * çift iade yok; jurnal anahtarları da aynı olduğundan yarışan ikinci yol yeniden yazmaz.
+ *
+ * v2-P0-3: telafi işareti (`comp:<buyerPaymentRef>`, mutabakatın PSP tarafı) PSP çağrısından
+ * ÖNCE yazılır. İade PSP'de işlenip jurnal yazılamazsa (yanıt kaybı, çökme, serileştirme
+ * tükenmesi) işaret kalır → mutabakat jurnalsiz capture/iadeyi fark olarak raporlar ve
+ * süpürücü (`rejournalTransferRefunds`) iadeyi aynı anahtarla yeniden deneyip jurnali tamamlar.
  */
 async function refundTransferCapture(
   provider: PaymentProvider,
   i: { transferId: string; bookingId: string; buyerPaymentRef: string; ask: Money }
 ): Promise<void> {
   const refundRef = `transfer-refund:${i.transferId}`;
-  await provider.refund(i.buyerPaymentRef, i.ask, refundRef);
   const markerId = `comp:${i.buyerPaymentRef}`;
-  await withSerializableRetry(async (tx) => {
-    await tx.paymentEvent.upsert({
-      where: { id: markerId },
-      create: {
-        id: markerId,
-        type: CompensationMarkers.transferCapture,
-        providerRef: i.buyerPaymentRef,
-      },
-      update: {},
-    });
-    await postCaptureCompensation(tx, {
+  await prisma.paymentEvent.upsert({
+    where: { id: markerId },
+    create: {
+      id: markerId,
+      type: CompensationMarkers.transferCapture,
+      providerRef: i.buyerPaymentRef,
+    },
+    update: {},
+  });
+  await provider.refund(i.buyerPaymentRef, i.ask, refundRef);
+  await withSerializableRetry((tx) =>
+    postCaptureCompensation(tx, {
       refundRef,
       bookingId: i.bookingId,
       transferId: i.transferId,
       currency: i.ask.currency,
       amountMinor: minorToDb(i.ask.amount),
-    });
-  });
+    })
+  );
 }
 
 /**
@@ -700,6 +704,9 @@ export const transferSweepTotal = counter(
 
 export type SweepOutcome = "voided" | "refunded" | "unresolved";
 
+/** Süpürücünün tek koşuda işlediği azami kayıt (takılı devir / jurnal tamamlama ayrı ayrı). */
+const SWEEP_BATCH = 100;
+
 /**
  * Takılı devir süpürücüsü (v4#1 ek): süreç capture ile commit arasında çökerse ilan
  * `CAPTURE_PENDING`'de kalır ve yeniden listelemeyi bloklar. Eşikten
@@ -707,19 +714,20 @@ export type SweepOutcome = "voided" | "refunded" | "unresolved";
  * çekilir (geç biten bir saga commit'i artık tutmaz; kendi telafisiyle iade eder), sonra
  * yetkilendirme void edilir; void olmazsa (capture yapılmış) saga ile AYNI idempotency
  * anahtarıyla iade edilir — çift iade olmaz; iade saga ile aynı anahtarlarla jurnale yazılır
- * (v2-P0-3). Sahiplik hiç değişmemiştir. Her kayıt audit'lenir.
+ * (v2-P0-3). Sahiplik hiç değişmemiştir. Her kayıt audit'lenir. Ardından iadesi jurnale
+ * yazılamamış (telafi işareti var, jurnal yok) eşikten eski FAILED devirlerin jurnali tamamlanır.
  */
 export async function sweepStuckTransfers(
   now = new Date(),
   provider: PaymentProvider = getPaymentProvider()
-): Promise<{ swept: number; outcomes: Record<SweepOutcome, number> }> {
+): Promise<{ swept: number; outcomes: Record<SweepOutcome, number>; rejournaled: number }> {
   const cutoff = new Date(
     now.getTime() - getConfig().TRANSFER_CAPTURE_PENDING_TIMEOUT_SECONDS * 1000
   );
   const stuck = await prisma.bookingTransfer.findMany({
     where: { status: TransferStatus.CAPTURE_PENDING, claimedAt: { lt: cutoff } },
     orderBy: { claimedAt: "asc" },
-    take: 100,
+    take: SWEEP_BATCH,
     select: {
       id: true,
       bookingId: true,
@@ -774,5 +782,56 @@ export async function sweepStuckTransfers(
     });
   }
   if (swept > 0) logger.warn({ swept, outcomes }, "stuck CAPTURE_PENDING transfers swept");
-  return { swept, outcomes };
+  const rejournaled = await rejournalTransferRefunds(cutoff, provider);
+  return { swept, outcomes, rejournaled };
+}
+
+/**
+ * v2-P0-3: telafi işareti olup iade jurnali olmayan FAILED devirler (iade PSP'de işlendi ya da
+ * yarıda kaldı, jurnal yazılamadı). Eşikten (`cutoff`) önce düşmüş olanlar — sürmekte olan saga
+ * telafisiyle yarışılmaz — aynı iade anahtarıyla yeniden iade edilip jurnale yazılır; PSP iadeyi
+ * en fazla bir kez uygular, jurnal anahtarları çift kaydı engeller. Düşen kayıt işaretli kalır
+ * (mutabakat farkı + bir sonraki süpürmede yeniden deneme).
+ */
+async function rejournalTransferRefunds(cutoff: Date, provider: PaymentProvider): Promise<number> {
+  const pending = await prisma.$queryRaw<
+    Array<{
+      id: string;
+      bookingId: string;
+      askPriceMinor: bigint;
+      currency: string;
+      buyerPaymentRef: string;
+    }>
+  >`
+    SELECT t."id", t."bookingId", t."askPriceMinor", t."currency", t."buyerPaymentRef"
+      FROM "BookingTransfer" t
+      JOIN "PaymentEvent" e
+        ON e."id" = 'comp:' || t."buyerPaymentRef" AND e."type" = ${CompensationMarkers.transferCapture}
+     WHERE t."status" = 'FAILED'
+       AND t."failedAt" < ${cutoff}
+       AND NOT EXISTS (
+         SELECT 1 FROM "JournalEntry" j
+          WHERE j."idempotencyKey" = 'refund-issued:transfer-refund:' || t."id"
+       )
+     ORDER BY t."failedAt" ASC
+     LIMIT ${SWEEP_BATCH}`;
+  let done = 0;
+  for (const t of pending) {
+    try {
+      await refundTransferCapture(provider, {
+        transferId: t.id,
+        bookingId: t.bookingId,
+        buyerPaymentRef: t.buyerPaymentRef,
+        ask: money(minorFromDb(t.askPriceMinor), assertCurrency(t.currency)),
+      });
+      done += 1;
+    } catch (error) {
+      logger.error(
+        { transferId: t.id, ...errorFields(error) },
+        "transfer refund journal completion failed; will retry on next sweep"
+      );
+    }
+  }
+  if (done > 0) logger.warn({ rejournaled: done }, "transfer refund journals completed");
+  return done;
 }

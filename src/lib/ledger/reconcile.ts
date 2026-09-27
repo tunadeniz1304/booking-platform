@@ -9,6 +9,12 @@ type Db = PrismaClient | Prisma.TransactionClient;
 /**
  * v2-P0-3: PSP'de tahsil edilip tamamen iade edilen (telafi) ödemelerin `PaymentEvent` işaretleri
  * (`comp:<providerRef>`). Mutabakat bu ödemelerin PSP tarafını jurnalden değil işaretten bilir.
+ *
+ * Devir işareti PSP iadesinden ÖNCE, ayrı yazılır (`refundTransferCapture`): iade işlenip jurnal
+ * yazılamazsa "işaret var, jurnal yok" farkı gerçekten oluşur ve süpürücü tamamlayana dek
+ * raporlanır. Pay işaretleri jurnalle aynı işlemde yazılır; iade sonrası işlem düşerse pay
+ * telafisi `saga-compensation-retry` ile, geç pay iadesi webhook yeniden teslimiyle yeniden
+ * koşar (işaret yalnızca jurnalle birlikte oluşur → bu yollarda fark kalıcı değildir).
  */
 export const CompensationMarkers = {
   /** Devir capture'ı iade edildi (saga telafisi ya da takılı devir süpürücüsü). */

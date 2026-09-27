@@ -31,6 +31,10 @@ export interface ThreadAccess {
   status: string;
   propertyTitle: string;
   guestName: string;
+  /** Yalnız LLM redaksiyonu (`knownNames`) için; yanıtlarda/olaylarda dışarı verilmez. */
+  guestLastName: string;
+  hostFirstName: string;
+  hostLastName: string;
   checkIn: Date;
   checkOut: Date;
   guestCount: number;
@@ -49,8 +53,14 @@ export async function resolveThreadAccess(
       checkIn: true,
       checkOut: true,
       guestCount: true,
-      user: { select: { firstName: true } },
-      property: { select: { hostId: true, title: true } },
+      user: { select: { firstName: true, lastName: true } },
+      property: {
+        select: {
+          hostId: true,
+          title: true,
+          host: { select: { firstName: true, lastName: true } },
+        },
+      },
     },
   });
   const role: ThreadRole | null = !b
@@ -67,6 +77,9 @@ export async function resolveThreadAccess(
     status: b.status,
     propertyTitle: b.property.title,
     guestName: b.user.firstName || "Misafir",
+    guestLastName: b.user.lastName,
+    hostFirstName: b.property.host.firstName,
+    hostLastName: b.property.host.lastName,
     checkIn: b.checkIn,
     checkOut: b.checkOut,
     guestCount: b.guestCount,
@@ -190,7 +203,8 @@ export async function draftHostReply(bookingId: string, userId: string) {
     access.guestCount,
   ]);
   // v4#3: misafirin adı modele GİTMEZ — yer tutucuyla gönderilir, yanıtta geri konur.
-  // Geçmiş mesajlardaki ad da (≥3 harf) istemci redaksiyonunda `knownNames` ile maskelenir.
+  // Geçmiş mesajlardaki adlar (≥3 harf) istemci redaksiyonunda `knownNames` ile maskelenir:
+  // v2-P0-8 — misafirin ve ev sahibinin adı, soyadı ve tam adı (en uzun eşleşme önce).
   const llmFacts = {
     ...facts,
     guestName: GUEST_NAME_PLACEHOLDER,
@@ -215,7 +229,14 @@ export async function draftHostReply(bookingId: string, userId: string) {
     ],
     {
       demo: () => demoMessageDraft(facts),
-      knownNames: [access.guestName],
+      knownNames: [
+        access.guestName,
+        access.guestLastName,
+        `${access.guestName} ${access.guestLastName}`,
+        access.hostFirstName,
+        access.hostLastName,
+        `${access.hostFirstName} ${access.hostLastName}`,
+      ],
       validate: (data) => assertNumbersGrounded(data.reply, factSet),
     }
   );

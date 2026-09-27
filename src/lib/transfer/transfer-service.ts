@@ -235,6 +235,8 @@ interface ClaimContext {
   ask: Money;
   now: Date;
   providerRef?: string;
+  /** Bu denemenin provizyonu telafide void edildi (anahtarı bir daha kullanılamaz). */
+  authVoided: boolean;
   reserved: boolean;
   captured: boolean;
   failureCode: string;
@@ -297,7 +299,16 @@ function claimSteps(provider: PaymentProvider): SagaStep<ClaimContext, string>[]
       },
       async compensate(ctx) {
         if (!ctx.providerRef || ctx.captured) return false;
+        // Aynı anahtarla gelen başka bir deneme bu provizyonla ilanı ayırdıysa o denemenin
+        // provizyonudur (PSP aynı anahtara aynı provizyonu döner) — kaybeden ona dokunamaz.
+        if (!ctx.reserved) {
+          const owned = await prisma.bookingTransfer.count({
+            where: { id: ctx.transfer.id, buyerPaymentRef: ctx.providerRef },
+          });
+          if (owned > 0) return false;
+        }
         await provider.void(ctx.providerRef);
+        ctx.authVoided = true;
       },
     },
     {
@@ -514,8 +525,16 @@ async function claimLocked(
   const ask = money(minorFromDb(transfer.askPriceMinor), currency);
   // İstemci anahtarı kart özetiyle birleşir: aynı istek tekrarı aynı provizyonu kullanır,
   // aynı anahtarla başka kart ise yeni deneme sayılır (PSP idempotency çakışması olmaz).
-  const attempt = input.idempotencyKey
+  // Nesil sayacı: provizyonu telafide void edilen anahtar yakılır; aynı anahtarla yeniden
+  // deneme void edilmiş provizyonu PSP önbelleğinden geri almaz, yeni provizyon açar.
+  const clientAttempt = input.idempotencyKey
     ? `${input.idempotencyKey}:${createHash("sha256").update(input.cardToken).digest("hex").slice(0, 16)}`
+    : null;
+  const generationKey = clientAttempt
+    ? `transfer:claim:gen:${transfer.id}:${input.buyerId}:${clientAttempt}`
+    : null;
+  const attempt = generationKey
+    ? `${clientAttempt}:${(await redis.get(generationKey)) ?? "0"}`
     : randomUUID();
   const ctx: ClaimContext = {
     transfer: { id: transfer.id, bookingId: transfer.bookingId, sellerId: transfer.sellerId },
@@ -524,6 +543,7 @@ async function claimLocked(
     authorizeKey: `transfer:${transfer.id}:${input.buyerId}:${attempt}`,
     ask,
     now,
+    authVoided: false,
     reserved: false,
     captured: false,
     failureCode: "RESERVE_FAILED",
@@ -536,6 +556,13 @@ async function claimLocked(
       isOutcome: (e) => e instanceof HttpError && e.code === "PAYMENT_DECLINED",
     });
   } catch (error) {
+    if (ctx.authVoided && generationKey) {
+      await redis
+        .incrWithTtl(generationKey, getConfig().TRANSFER_LINK_TTL_HOURS * 3600)
+        .catch((e) =>
+          logger.error({ transferId: transfer.id, ...errorFields(e) }, "claim key burn failed")
+        );
+    }
     if (error instanceof HttpError) throw error;
     logger.error({ transferId: transfer.id, ...errorFields(error) }, "transfer saga failed");
     throw new TransferError(

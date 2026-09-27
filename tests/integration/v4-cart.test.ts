@@ -7,6 +7,7 @@ import { createStayFixture, type StayFixture } from "./fixtures";
 import {
   addCartItem,
   CART_PAYMENT_SAGA,
+  compensateCartPayment,
   confirmCartChallenge,
   expireCarts,
   holdCart,
@@ -418,6 +419,152 @@ describeInt("P1-1 grup sepeti: tümü-ya-hiç tutma + tek ödeme", () => {
     const discount = breakdown.discounts?.find((d) => d.promotionId === y.promoId);
     expect(discount?.amount).toBeGreaterThan(0);
     expect(rows[0].amountMinor).toBe(BigInt(discount!.amount));
+  });
+
+  /** Sepet ödemesine (`paymentId`) bağlı jurnal türleri, psp_clearing neti ve tahsilat tutarı. */
+  async function cartJournal(cartPaymentId: string) {
+    const entries = await prisma.journalEntry.findMany({
+      where: { paymentId: cartPaymentId },
+      select: {
+        kind: true,
+        lines: { select: { side: true, amountMinor: true, account: { select: { kind: true } } } },
+      },
+    });
+    let psp = 0n;
+    let captured = 0n;
+    for (const e of entries) {
+      for (const l of e.lines) {
+        if (l.account.kind !== "PSP_CLEARING") continue;
+        psp += l.side === "DEBIT" ? l.amountMinor : -l.amountMinor;
+        if (l.side === "DEBIT") captured += l.amountMinor;
+      }
+    }
+    return { kinds: entries.map((e) => e.kind).sort(), psp, captured };
+  }
+
+  async function expectCartBooksClean(cartPaymentIds: string[]) {
+    expect(isTrialBalanced(await trialBalance(prisma))).toBe(true);
+    expect(await imbalanceCount()).toBe(0);
+    const report = await reconcile(iso(new Date()), prisma);
+    expect(report.imbalancedEntries).toBe(0);
+    expect(report.differences.filter((d) => cartPaymentIds.includes(d.subjectId))).toEqual([]);
+  }
+
+  it("regression: v2-P0-3 sepet saga telafisi jurnale yazılır (capture + iade, psp net 0); tekrar telafi jurnali çoğaltmaz", async () => {
+    const a = await createStayFixture(prisma, { tag: "cart-p03-comp", units: 2 });
+    const user = await newUser("p03-comp");
+    await addCartItem(user, item(a, 70));
+    const held = await holdCart(user);
+    injectSagaFaultForTests(CART_PAYMENT_SAGA, "confirm");
+    await expect(
+      payCart({
+        cartId: held.id,
+        userId: user,
+        cardToken: "tok_mock_ok_4242",
+        idempotencyKey: "p03-comp",
+      })
+    ).rejects.toThrow();
+    injectSagaFaultForTests(CART_PAYMENT_SAGA, null);
+
+    const cp = await prisma.cartPayment.findUniqueOrThrow({ where: { cartId: held.id } });
+    expect(cp.status).toBe("REFUNDED");
+    const expected = {
+      kinds: ["BOOKING_CAPTURED", "REFUND_ISSUED"],
+      psp: 0n,
+      captured: cp.amountMinor,
+    };
+    expect(await cartJournal(cp.id)).toEqual(expected);
+    await expectCartBooksClean([cp.id]);
+
+    // Telafi yeniden çalışır (compensation-retry işi) → PSP iadesi ve jurnal tek.
+    expect(
+      await compensateCartPayment({ cartId: held.id, providerRef: cp.providerRef!, captured: true })
+    ).toBe("compensated");
+    expect(await cartJournal(cp.id)).toEqual(expected);
+    await expectCartBooksClean([cp.id]);
+  });
+
+  it("regression: v2-P0-3 sepet geç ödeme iadesi jurnale yazılır; tekrar teslim jurnali çoğaltmaz", async () => {
+    const fx = await createStayFixture(prisma, { tag: "cart-p03-late", units: 1 });
+    const user = await newUser("p03-late");
+    await addCartItem(user, item(fx, 22));
+    const held = await holdCart(user);
+    const pending = await payCart({
+      cartId: held.id,
+      userId: user,
+      cardToken: "tok_mock_3ds_3220",
+      idempotencyKey: "p03-late",
+    });
+    expect(pending.status).toBe("requires_action");
+    await prisma.cart.update({
+      where: { id: held.id },
+      data: { holdExpiresAt: new Date(Date.now() - 1000) },
+    });
+    expect(await expireCarts(new Date(), 10_000)).toBeGreaterThanOrEqual(1);
+    // Tek oda bu arada başkasına gitti → geç başarı onaylanamaz, iade.
+    const rival = await newUser("p03-rival");
+    await addCartItem(rival, item(fx, 22));
+    await holdCart(rival);
+
+    const cp = await prisma.cartPayment.findUniqueOrThrow({ where: { cartId: held.id } });
+    const succeeded = (id: string) =>
+      handleWebhookEvent({
+        id,
+        type: "payment.succeeded",
+        data: { providerRef: cp.providerRef!, amount: Number(cp.amountMinor), currency: "TRY" },
+      });
+    expect((await succeeded(`evt_p03_late_${cp.providerRef}`)).compensated).toBe(true);
+    const after = await prisma.cartPayment.findUniqueOrThrow({ where: { id: cp.id } });
+    expect(after.status).toBe("REFUNDED");
+    const expected = {
+      kinds: ["BOOKING_CAPTURED", "REFUND_ISSUED"],
+      psp: 0n,
+      captured: cp.amountMinor,
+    };
+    expect(await cartJournal(cp.id)).toEqual(expected);
+    await expectCartBooksClean([cp.id]);
+
+    // Aynı PSP başarısı farklı olay kimliğiyle yeniden gelir → jurnal tek.
+    await succeeded(`evt_p03_late_again_${cp.providerRef}`);
+    expect(await cartJournal(cp.id)).toEqual(expected);
+    await expectCartBooksClean([cp.id]);
+  });
+
+  it("regression: v2-P0-3 mutabakat jurnalsiz sepet ödemesi iadesini fark olarak raporlar", async () => {
+    const user = await newUser("p03-orphan");
+    const cart = await prisma.cart.create({ data: { userId: user, currency: "TRY" } });
+    const now = new Date();
+    // PSP'de tahsil + iade edilmiş, deftere hiç yazılmamış sepet ödemesi.
+    const cp = await prisma.cartPayment.create({
+      data: {
+        cartId: cart.id,
+        userId: user,
+        amountMinor: 12_345n,
+        currency: "TRY",
+        provider: "mock",
+        providerRef: `pi_p03_orphan_${cart.id}`,
+        status: "REFUNDED",
+        paidAt: now,
+        refundedAmountMinor: 12_345n,
+        refundedAt: now,
+        failureCode: "CART_NOT_CONFIRMABLE",
+      },
+    });
+    try {
+      const report = await reconcile(iso(now), prisma);
+      const diff = report.differences.filter((d) => d.subjectId === cp.id);
+      expect(diff).toHaveLength(2);
+      expect(diff).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ kind: "capture", pspMinor: 12_345n, journalMinor: 0n }),
+          expect.objectContaining({ kind: "refund", pspMinor: 12_345n, journalMinor: 0n }),
+        ])
+      );
+      expect(report.ok).toBe(false);
+    } finally {
+      // Paylaşımlı DB: sonraki mutabakat testleri bu kasıtlı farkı görmesin.
+      await prisma.cart.delete({ where: { id: cart.id } });
+    }
   });
 
   it("sahiplik: başkasının sepeti 404", async () => {

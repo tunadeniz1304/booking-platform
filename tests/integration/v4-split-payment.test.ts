@@ -820,4 +820,72 @@ describeInt("P1-2 bölünmüş ödeme: paylar, süre sonu, yarışlar, geç webh
     expect(psp.refunded.length).toBe(refundsBefore);
     await expectLedgerClean(cart.id);
   });
+
+  it("regression: v2-P0-3 plan kapandıktan sonra gelen pay başarısının iadesi jurnale yazılır; tekrar teslim çoğaltmaz", async () => {
+    psp = new SpyPsp();
+    setPaymentProviderForTests(psp);
+    const { organizer, cart } = await heldCart("p03-share", 110);
+    const p1 = await newUser("p03-share-p1");
+    const plan = await createSplitPlan({
+      cartId: cart.id,
+      userId: organizer.id,
+      mode: "equal",
+      participants: [{ email: p1.email }],
+    });
+    const out = await payShare({
+      token: tokenOf(plan, 1),
+      userId: p1.id,
+      cardToken: "tok_mock_3ds_4101",
+      idempotencyKey: "p03-share-1",
+      context: ctx(),
+    });
+    expect(out.status).toBe("requires_action");
+    // Organizatör bırakır → plan kapanır, p1'in 3DS'i void.
+    await releaseCartWithSplit(organizer.id, cart.id);
+    const share = await prisma.paymentShare.findFirstOrThrow({
+      where: { planId: plan.id, position: 1 },
+    });
+    const succeeded = (id: string) =>
+      handleWebhookEvent({
+        id,
+        type: "payment.succeeded",
+        data: {
+          providerRef: share.providerRef!,
+          amount: Number(share.amountMinor),
+          currency: "TRY",
+        },
+      });
+    expect((await succeeded(`evt_p03_share_${share.providerRef}`)).compensated).toBe(true);
+
+    const shareJournal = async () => {
+      const entries = await prisma.journalEntry.findMany({
+        where: { paymentId: share.id },
+        select: {
+          kind: true,
+          lines: { select: { side: true, amountMinor: true, account: { select: { kind: true } } } },
+        },
+      });
+      let pspNet = 0n;
+      let captured = 0n;
+      for (const l of entries.flatMap((e) => e.lines)) {
+        if (l.account.kind !== "PSP_CLEARING") continue;
+        pspNet += l.side === "DEBIT" ? l.amountMinor : -l.amountMinor;
+        if (l.side === "DEBIT") captured += l.amountMinor;
+      }
+      return { kinds: entries.map((e) => e.kind).sort(), pspNet, captured };
+    };
+    const expected = {
+      kinds: ["BOOKING_CAPTURED", "REFUND_ISSUED"],
+      pspNet: 0n,
+      captured: share.amountMinor,
+    };
+    expect(await shareJournal()).toEqual(expected);
+    expect(isTrialBalanced(await trialBalance(prisma))).toBe(true);
+    expect(await imbalanceCount()).toBe(0);
+
+    // Aynı PSP başarısı farklı olay kimliğiyle yeniden → ikinci jurnal yok.
+    await succeeded(`evt_p03_share_again_${share.providerRef}`);
+    expect(await shareJournal()).toEqual(expected);
+    expect(await imbalanceCount()).toBe(0);
+  });
 });

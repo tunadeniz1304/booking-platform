@@ -13,10 +13,12 @@ import {
 import { MOCK_3DS_CODE } from "@/lib/payment/card-token";
 import { claimTransfer, listBookingForTransfer } from "@/lib/transfer/transfer-service";
 import { setPaymentProviderForTests } from "@/lib/payment";
+import { MockPsp } from "@/lib/payment/mock-psp";
 import { runPayouts } from "@/worker/jobs/payouts";
 import {
   isTrialBalanced,
   ledgerImbalanceTotal,
+  postCaptureCompensation,
   reconcile,
   taxShareMinor,
   trialBalance,
@@ -96,12 +98,12 @@ describeInt("F2c defter bağlama: rezervasyon → ödeme → iade → iptal → 
     });
     const transfers = await prisma.bookingTransfer.findMany({
       where: { id: { in: [...touched.transfers] } },
-      select: { completedAt: true },
+      select: { completedAt: true, failedAt: true },
     });
     const days = new Set<string>();
     for (const d of [
       ...payments.flatMap((p) => [p.paidAt, p.refundedAt]),
-      ...transfers.map((t) => t.completedAt),
+      ...transfers.flatMap((t) => [t.completedAt, t.failedAt]),
     ]) {
       if (d) days.add(d.toISOString().slice(0, 10));
     }
@@ -186,6 +188,67 @@ describeInt("F2c defter bağlama: rezervasyon → ödeme → iade → iptal → 
     netC = await netByKind([c.id]);
     expect(netC.PSP_CLEARING).toBe(pc.amountMinor - refundC);
     expect(netC.ESCROW! + netC.TAX_PAYABLE!).toBe(pc.amountMinor - refundC);
+    await assertBooksClean();
+  });
+
+  it("regression: v2-P0-3 devir capture telafisi jurnale yazılır (capture + iade, psp net 0); tekrar yazılmaz", async () => {
+    const bk = await fx.hold({ nights: 1 });
+    await pay(bk.id);
+    const ask = Math.max(1, Math.floor(bk.totalMinor / 2));
+    const listed = await listBookingForTransfer(bk.id, fx.userId, ask);
+    touched.transfers.add(listed.id);
+    // Tahsilat sürerken satıcı rezervasyonu iptal eder → commit düşer, saga tahsilatı iade eder.
+    class CancellingPsp extends MockPsp {
+      async capture(...args: Parameters<MockPsp["capture"]>) {
+        await prisma.booking.update({ where: { id: bk.id }, data: { status: "CANCELLED" } });
+        return super.capture(...args);
+      }
+    }
+    setPaymentProviderForTests(new CancellingPsp());
+    await expect(
+      claimTransfer({ token: listed.claimToken, buyerId: buyer, cardToken: "tok_mock_ok_4242" })
+    ).rejects.toMatchObject({ status: 409, code: "BOOKING_CHANGED" });
+    const transfer = await prisma.bookingTransfer.findUniqueOrThrow({ where: { id: listed.id } });
+    expect(transfer.status).toBe("FAILED");
+    expect(transfer.failureCode).toBe("COMMIT_FAILED");
+
+    const transferJournal = async () => {
+      const entries = await prisma.journalEntry.findMany({
+        where: { transferId: listed.id },
+        select: {
+          kind: true,
+          lines: { select: { side: true, amountMinor: true, account: { select: { kind: true } } } },
+        },
+      });
+      let psp = 0n;
+      let captured = 0n;
+      for (const l of entries.flatMap((e) => e.lines)) {
+        if (l.account.kind !== "PSP_CLEARING") continue;
+        psp += l.side === "DEBIT" ? l.amountMinor : -l.amountMinor;
+        if (l.side === "DEBIT") captured += l.amountMinor;
+      }
+      return { kinds: entries.map((e) => e.kind).sort(), psp, captured };
+    };
+    const expected = {
+      kinds: ["BOOKING_CAPTURED", "REFUND_ISSUED"],
+      psp: 0n,
+      captured: BigInt(ask),
+    };
+    expect(await transferJournal()).toEqual(expected);
+    await assertBooksClean();
+
+    // Aynı telafi yeniden (aynı iade anahtarı) → jurnal yeniden yazılmaz.
+    const replayed = await prisma.$transaction((tx) =>
+      postCaptureCompensation(tx, {
+        refundRef: `transfer-refund:${listed.id}`,
+        currency: transfer.currency,
+        amountMinor: transfer.askPriceMinor,
+        bookingId: bk.id,
+        transferId: listed.id,
+      })
+    );
+    expect(replayed).toBe(false);
+    expect(await transferJournal()).toEqual(expected);
     await assertBooksClean();
   });
 

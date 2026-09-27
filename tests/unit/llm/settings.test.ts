@@ -79,4 +79,47 @@ describe("LLM ayarları — öncelik sırası ve varsayılanlar", () => {
       false
     );
   });
+
+  it("v5 yeni adları: varsayılanlar, coerce ve geçersiz değer → varsayılan", () => {
+    const d = parseLlmSettings({});
+    expect(d.jsonModeRetryMinutes).toBe(60);
+    expect(d.otelCaptureContent).toBe(false);
+    expect(d.supportAgentEnabled).toBe(true);
+    expect(d.supportHandoffMinConfidence).toBe(0.6);
+    expect(d.supportMaxToolSteps).toBe(4);
+
+    const s = parseLlmSettings({
+      LLM_JSON_MODE_RETRY_MINUTES: "15",
+      LLM_OTEL_CAPTURE_CONTENT: "TRUE",
+      SUPPORT_AGENT_ENABLED: "false",
+      SUPPORT_HANDOFF_MIN_CONFIDENCE: "0.75",
+      SUPPORT_MAX_TOOL_STEPS: "3",
+    });
+    expect(s.jsonModeRetryMinutes).toBe(15);
+    expect(s.otelCaptureContent).toBe(true);
+    expect(s.supportAgentEnabled).toBe(false);
+    expect(s.supportHandoffMinConfidence).toBe(0.75);
+    expect(s.supportMaxToolSteps).toBe(3);
+    expect(s.invalidKeys).toEqual([]);
+
+    const bad = parseLlmSettings({
+      LLM_JSON_MODE_RETRY_MINUTES: "0",
+      LLM_OTEL_CAPTURE_CONTENT: "evet",
+      SUPPORT_AGENT_ENABLED: "belki",
+      SUPPORT_HANDOFF_MIN_CONFIDENCE: "1.5",
+      SUPPORT_MAX_TOOL_STEPS: "99",
+    });
+    expect(bad.jsonModeRetryMinutes).toBe(60);
+    expect(bad.otelCaptureContent).toBe(false);
+    expect(bad.supportAgentEnabled).toBe(true);
+    expect(bad.supportHandoffMinConfidence).toBe(0.6);
+    expect(bad.supportMaxToolSteps).toBe(4);
+    expect(bad.invalidKeys.sort()).toEqual([
+      "jsonModeRetryMinutes",
+      "otelCaptureContent",
+      "supportAgentEnabled",
+      "supportHandoffMinConfidence",
+      "supportMaxToolSteps",
+    ]);
+  });
 });

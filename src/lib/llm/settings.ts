@@ -12,6 +12,9 @@ import { loadEnv } from "@/lib/config/load-env";
  *  - Bütçe: LLM_DAILY_TOKEN_BUDGET_PER_USER, LLM_DAILY_TOKEN_BUDGET_SYSTEM,
  *    LLM_PROMPT_CHARS_PER_TOKEN (rezervasyon tahmini)
  *  - v2-P0-5: LLM_MAX_QUEUE (varsayılan 32), LLM_QUEUE_TIMEOUT_MS (varsayılan 10000)
+ *  - v5#18: LLM_JSON_MODE_RETRY_MINUTES (json_object reddi sonrası yeniden deneme süresi)
+ *  - v5 P1-5: LLM_OTEL_CAPTURE_CONTENT (varsayılan false; true iken yalnız redakte içerik)
+ *  - v5 P1-4: SUPPORT_AGENT_ENABLED, SUPPORT_HANDOFF_MIN_CONFIDENCE, SUPPORT_MAX_TOOL_STEPS
  *
  * Anahtarın kendisi yalnızca istemci oluşturulurken kullanılır; log, hata
  * mesajı, durum yanıtı veya telemetride asla yer almaz (yalnızca `hasKey`).
@@ -38,7 +41,27 @@ export const LLM_DEFAULTS = {
   maxQueue: 32,
   /** Kuyrukta azami bekleme (ms); aşılırsa fallback "concurrency" (v2-P0-5). */
   queueTimeoutMs: 10_000,
+  /**
+   * Sağlayıcı `response_format` isteğini reddettikten sonra JSON modunun kapalı tutulduğu
+   * süre (dk); sonra yeniden denenir (v5#18).
+   */
+  jsonModeRetryMinutes: 60,
+  /** OTel span'lerine prompt/yanıt içeriği (redakte) yazılsın mı (v5 P1-5). */
+  otelCaptureContent: false,
+  /** Misafir destek ajanı açık mı (v5 P1-4; demo modunda da deterministik çalışır). */
+  supportAgentEnabled: true,
+  /** Bu güvenin altındaki destek yanıtları insana devredilir (0–1). */
+  supportHandoffMinConfidence: 0.6,
+  /** Destek ajanının tek konuşma turundaki azami araç adımı. */
+  supportMaxToolSteps: 4,
 } as const;
+
+/** Ortamdan gelen "true"/"false" (ve 1/0) bayrağını boolean'a çevirir; başka değer geçersiz. */
+const envFlag = (fallback: boolean) =>
+  z
+    .enum(["true", "false", "1", "0"])
+    .default(fallback ? "true" : "false")
+    .transform((v) => v === "true" || v === "1");
 
 const KEY_VARS = ["LLM_API_KEY", "DEEPSEEK_API_KEY", "EVREN_API_KEY", "OPENAI_API_KEY"] as const;
 const BASE_URL_VARS = [
@@ -79,6 +102,25 @@ const settingsSchema = z.object({
   /** Opsiyonel görsel (vision) model; yoksa görsel özellikler deterministik yola düşer. */
   visionModel: z.string().min(1).optional(),
   logPrompts: z.boolean().default(false),
+  jsonModeRetryMinutes: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(24 * 60)
+    .default(LLM_DEFAULTS.jsonModeRetryMinutes),
+  otelCaptureContent: envFlag(LLM_DEFAULTS.otelCaptureContent),
+  supportAgentEnabled: envFlag(LLM_DEFAULTS.supportAgentEnabled),
+  supportHandoffMinConfidence: z.coerce
+    .number()
+    .min(0)
+    .max(1)
+    .default(LLM_DEFAULTS.supportHandoffMinConfidence),
+  supportMaxToolSteps: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(10)
+    .default(LLM_DEFAULTS.supportMaxToolSteps),
 });
 
 export type LlmSettings = z.infer<typeof settingsSchema> & {
@@ -132,6 +174,11 @@ export function parseLlmSettings(env: Env): LlmSettings {
     queueTimeoutMs: env.LLM_QUEUE_TIMEOUT_MS || undefined,
     visionModel: env.LLM_VISION_MODEL?.trim() || undefined,
     logPrompts: env.LLM_LOG_PROMPTS === "true" && env.NODE_ENV !== "production",
+    jsonModeRetryMinutes: env.LLM_JSON_MODE_RETRY_MINUTES || undefined,
+    otelCaptureContent: env.LLM_OTEL_CAPTURE_CONTENT?.trim().toLowerCase() || undefined,
+    supportAgentEnabled: env.SUPPORT_AGENT_ENABLED?.trim().toLowerCase() || undefined,
+    supportHandoffMinConfidence: env.SUPPORT_HANDOFF_MIN_CONFIDENCE || undefined,
+    supportMaxToolSteps: env.SUPPORT_MAX_TOOL_STEPS || undefined,
   };
 
   const invalidKeys: string[] = [];

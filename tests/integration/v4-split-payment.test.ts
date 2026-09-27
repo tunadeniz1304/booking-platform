@@ -973,16 +973,26 @@ describeInt("P1-2 bölünmüş ödeme: paylar, süre sonu, yarışlar, geç webh
         receivedAt: now,
       },
     });
-    const report = await reconcile(iso(now), prisma);
-    const mine = report.differences
-      .filter((d) => d.subjectId === share.id)
-      .map((d) => ({ subject: d.subject, kind: d.kind, psp: d.pspMinor, journal: d.journalMinor }))
-      .sort((a, b) => a.kind.localeCompare(b.kind));
-    expect(mine).toEqual([
-      { subject: "payment_share", kind: "capture", psp: share.amountMinor, journal: 0n },
-      { subject: "payment_share", kind: "refund", psp: share.amountMinor, journal: 0n },
-    ]);
-    // Sepeti serbest bırak (sonraki testlerin envanteri etkilenmesin).
-    await releaseCartWithSplit(organizer.id, cart.id).catch(() => undefined);
+    try {
+      const report = await reconcile(iso(now), prisma);
+      const mine = report.differences
+        .filter((d) => d.subjectId === share.id)
+        .map((d) => ({
+          subject: d.subject,
+          kind: d.kind,
+          psp: d.pspMinor,
+          journal: d.journalMinor,
+        }))
+        .sort((a, b) => a.kind.localeCompare(b.kind));
+      expect(mine).toEqual([
+        { subject: "payment_share", kind: "capture", psp: share.amountMinor, journal: 0n },
+        { subject: "payment_share", kind: "refund", psp: share.amountMinor, journal: 0n },
+      ]);
+    } finally {
+      // Sepeti serbest bırak (sonraki testlerin envanteri etkilenmesin).
+      await releaseCartWithSplit(organizer.id, cart.id).catch(() => undefined);
+      // Paylaşımlı DB: sonraki mutabakat testleri bu kasıtlı farkı görmesin.
+      await prisma.paymentEvent.delete({ where: { id: `comp:${share.providerRef}` } });
+    }
   });
 });

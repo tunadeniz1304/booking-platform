@@ -368,6 +368,88 @@ describeInt("F2c defter bağlama: rezervasyon → ödeme → iade → iptal → 
     await assertBooksClean();
   });
 
+  /** PSP iadeyi işler ama yanıt kaybolur (zaman aşımı/çökme) → çağıran jurnal yazamadan düşer. */
+  class LostRefundPsp extends CapturedPsp {
+    async refund(...args: Parameters<MockPsp["refund"]>): ReturnType<MockPsp["refund"]> {
+      await super.refund(...args);
+      throw new Error("refund response lost");
+    }
+  }
+
+  /** Devrin bugünkü mutabakat farkları (tür sırasıyla). */
+  async function transferDiffs(transferId: string) {
+    const report = await reconcile(new Date().toISOString().slice(0, 10), prisma);
+    return report.differences
+      .filter((d) => d.subjectId === transferId)
+      .map((d) => ({ subject: d.subject, kind: d.kind, psp: d.pspMinor, journal: d.journalMinor }))
+      .sort((a, b) => a.kind.localeCompare(b.kind));
+  }
+
+  it("regression: v2-P0-3 süpürücü iadesinden sonra jurnal yazılamazsa mutabakat raporlar, sonraki süpürme tamamlar", async () => {
+    const stuck = await stuckCapturedTransfer();
+    const lost = new LostRefundPsp();
+    lost.captured.add(stuck.ref);
+    await sweepStuckTransfers(new Date(), lost);
+    expect(lost.refundKeys).toContain(`transfer-refund:${stuck.transferId}`);
+    expect((await transferJournalOf(stuck.transferId)).kinds).toEqual([]);
+    // PSP'de iade var, defterde yok → fark görünür olmalı (sessizce kaybolmamalı).
+    expect(await transferDiffs(stuck.transferId)).toEqual([
+      { subject: "transfer", kind: "capture", psp: BigInt(stuck.ask), journal: 0n },
+      { subject: "transfer", kind: "refund", psp: BigInt(stuck.ask), journal: 0n },
+    ]);
+
+    // Sonraki süpürme aynı iade anahtarıyla yeniden dener ve jurnali tamamlar (tek çift).
+    const psp = new CapturedPsp();
+    psp.captured.add(stuck.ref);
+    await sweepStuckTransfers(new Date(), psp);
+    expect(psp.refundKeys).toContain(`transfer-refund:${stuck.transferId}`);
+    const expected = {
+      kinds: ["BOOKING_CAPTURED", "REFUND_ISSUED"],
+      psp: 0n,
+      captured: BigInt(stuck.ask),
+    };
+    expect(await transferJournalOf(stuck.transferId)).toEqual(expected);
+    await sweepStuckTransfers(new Date(), psp);
+    expect(await transferJournalOf(stuck.transferId)).toEqual(expected);
+    touched.transfers.add(stuck.transferId);
+    await assertBooksClean();
+  });
+
+  it("regression: v2-P0-3 saga capture telafisinde iade yanıtı kaybolursa süpürücü jurnali tamamlar", async () => {
+    const bk = await fx.hold({ nights: 1 });
+    await pay(bk.id);
+    const ask = Math.max(1, Math.floor(bk.totalMinor / 2));
+    const listed = await listBookingForTransfer(bk.id, fx.userId, ask);
+    // Tahsilat sürerken satıcı rezervasyonu iptal eder → commit düşer; iade PSP'de işlenir ama
+    // yanıt kaybolur → saga jurnal yazamaz.
+    const lost: LostRefundPsp = new LostRefundPsp(async () => {
+      await prisma.booking.update({ where: { id: bk.id }, data: { status: "CANCELLED" } });
+    });
+    setPaymentProviderForTests(lost);
+    await expect(
+      claimTransfer({ token: listed.claimToken, buyerId: buyer, cardToken: "tok_mock_ok_4242" })
+    ).rejects.toBeTruthy();
+    expect(lost.refundKeys).toContain(`transfer-refund:${listed.id}`);
+    const transfer = await prisma.bookingTransfer.findUniqueOrThrow({ where: { id: listed.id } });
+    expect(transfer.status).toBe("FAILED");
+    expect((await transferJournalOf(listed.id)).kinds).toEqual([]);
+    expect(await transferDiffs(listed.id)).toEqual([
+      { subject: "transfer", kind: "capture", psp: BigInt(ask), journal: 0n },
+      { subject: "transfer", kind: "refund", psp: BigInt(ask), journal: 0n },
+    ]);
+
+    const psp = new CapturedPsp();
+    psp.captured.add(transfer.buyerPaymentRef!);
+    await sweepStuckTransfers(new Date(), psp);
+    expect(await transferJournalOf(listed.id)).toEqual({
+      kinds: ["BOOKING_CAPTURED", "REFUND_ISSUED"],
+      psp: 0n,
+      captured: BigInt(ask),
+    });
+    touched.transfers.add(listed.id);
+    await assertBooksClean();
+  });
+
   it("regression: v2-P0-3 mutabakat jurnalsiz devir iadesini fark olarak raporlar", async () => {
     const stuck = await stuckCapturedTransfer();
     const now = new Date();
@@ -384,16 +466,26 @@ describeInt("F2c defter bağlama: rezervasyon → ödeme → iade → iptal → 
         receivedAt: now,
       },
     });
-    const report = await reconcile(now.toISOString().slice(0, 10), prisma);
-    const mine = report.differences
-      .filter((d) => d.subjectId === stuck.transferId)
-      .map((d) => ({ subject: d.subject, kind: d.kind, psp: d.pspMinor, journal: d.journalMinor }))
-      .sort((a, b) => a.kind.localeCompare(b.kind));
-    expect(mine).toEqual([
-      { subject: "transfer", kind: "capture", psp: BigInt(stuck.ask), journal: 0n },
-      { subject: "transfer", kind: "refund", psp: BigInt(stuck.ask), journal: 0n },
-    ]);
-    expect(report.ok).toBe(false);
+    try {
+      const report = await reconcile(now.toISOString().slice(0, 10), prisma);
+      const mine = report.differences
+        .filter((d) => d.subjectId === stuck.transferId)
+        .map((d) => ({
+          subject: d.subject,
+          kind: d.kind,
+          psp: d.pspMinor,
+          journal: d.journalMinor,
+        }))
+        .sort((a, b) => a.kind.localeCompare(b.kind));
+      expect(mine).toEqual([
+        { subject: "transfer", kind: "capture", psp: BigInt(stuck.ask), journal: 0n },
+        { subject: "transfer", kind: "refund", psp: BigInt(stuck.ask), journal: 0n },
+      ]);
+      expect(report.ok).toBe(false);
+    } finally {
+      // Paylaşımlı DB: sonraki mutabakat testleri bu kasıtlı farkı görmesin.
+      await prisma.paymentEvent.delete({ where: { id: `comp:${stuck.ref}` } });
+    }
   });
 
   it("property: rastgele akış dizileri sonrası defter dengede, mutabakat farkı 0", async () => {

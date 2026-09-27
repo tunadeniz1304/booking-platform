@@ -5,6 +5,7 @@ import { z } from "zod";
 import type { IdentityVerificationStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getConfig } from "@/lib/config/app-config";
+import { isDemoMode } from "@/lib/config/demo";
 import { ConflictError, HttpError } from "@/lib/http/errors";
 import { getJwtSecret } from "@/lib/auth/tokens";
 import { counter } from "@/lib/observability/metrics";
@@ -262,17 +263,44 @@ export class StripeIdentityProvider implements IdentityProvider {
 
 type Env = Record<string, string | undefined>;
 
-/** Aktif sağlayıcı adı: Stripe yalnızca anahtar + Identity webhook sırrı varken. */
+/** v5#3: gerçek KYC sağlayıcısı yokken (demo dışı) seçim sonucu — istekler 503 alır. */
+export type KycSelection = KycProviderName | "unavailable";
+
+/**
+ * Aktif sağlayıcı adı. Stripe yalnızca anahtar + Identity webhook sırrı varken (ve açık
+ * `KYC_PROVIDER=mock` istenmemişken). v5#3 fail-closed: mock (herkesi anında VERIFIED yapar)
+ * YALNIZ demo modunda; demo dışında Stripe hazır değilse `unavailable` → 503 KYC_UNAVAILABLE.
+ */
 export function resolveKycProviderName(
   env: Env = process.env,
   mode = getConfig().KYC_PROVIDER
-): KycProviderName {
+): KycSelection {
   const stripeReady = Boolean(env.STRIPE_SECRET_KEY && env.STRIPE_IDENTITY_WEBHOOK_SECRET);
-  if (mode === "mock") return "mock";
-  if (mode === "stripe" && !stripeReady) {
-    logger.warn("KYC_PROVIDER=stripe ama Stripe Identity yapılandırılmamış; mock kullanılıyor");
+  if (stripeReady && mode !== "mock") return "stripe";
+  if (isDemoMode(env)) return "mock";
+  return "unavailable";
+}
+
+export class KycUnavailableError extends HttpError {
+  constructor() {
+    super(503, "KYC_UNAVAILABLE", "Kimlik doğrulama hizmeti şu anda kullanılamıyor");
+    this.name = "KycUnavailableError";
   }
-  return stripeReady ? "stripe" : "mock";
+}
+
+let announced: KycSelection | null = null;
+
+/** Seçilen sağlayıcıyı bir kez loglar (`KYC: <provider>`); `unavailable` ERROR seviyesinde. */
+function announce(name: KycSelection): void {
+  if (announced === name) return;
+  announced = name;
+  if (name === "unavailable") {
+    logger.error(
+      "KYC: unavailable — demo dışında Stripe Identity yapılandırılmamış; doğrulama 503 döner"
+    );
+  } else {
+    logger.info({ provider: name }, `KYC: ${name}`);
+  }
 }
 
 let override: IdentityProvider | null = null;
@@ -284,7 +312,10 @@ export function setIdentityProviderForTests(provider: IdentityProvider | null): 
 
 export function getIdentityProvider(): IdentityProvider {
   if (override) return override;
-  return resolveKycProviderName() === "stripe"
+  const name = resolveKycProviderName();
+  announce(name);
+  if (name === "unavailable") throw new KycUnavailableError();
+  return name === "stripe"
     ? new StripeIdentityProvider(
         process.env.STRIPE_SECRET_KEY ?? "",
         process.env.STRIPE_IDENTITY_WEBHOOK_SECRET ?? ""
@@ -321,7 +352,8 @@ export async function assertIdentityRequirement(
 
 export async function getIdentityStatus(userId: string) {
   const cfg = getConfig();
-  const provider = getIdentityProvider().name;
+  // Sağlayıcı yoksa durum yine okunabilir (503 yalnız başlatma/webhook'ta).
+  const provider: KycSelection = override?.name ?? resolveKycProviderName();
   const [verified, latest] = await Promise.all([
     prisma.identityVerification.findFirst({
       where: { userId, status: "VERIFIED" },
@@ -368,12 +400,14 @@ export async function startIdentityVerification(
     );
   }
   const provider = getIdentityProvider();
+  const testDocument = isDemoMode() ? input.testDocument : undefined;
   const verificationId = randomUUID();
   const session = await provider.start({
     userId,
     verificationId,
     returnUrl: `${appUrl()}/account?kyc=return`,
-    testDocument: input.testDocument,
+    // v5#3: test belgesi yalnız demo modunda anlamlı; demo dışında yok sayılır.
+    testDocument,
   });
   const row = await prisma.identityVerification.create({
     data: { userId, provider: provider.name, providerRef: session.providerRef },
@@ -389,7 +423,7 @@ export async function startIdentityVerification(
   });
   kycEvents.inc({ provider: provider.name, outcome: "started" });
   if (provider.name === "mock") {
-    const hook = buildMockKycWebhook(session.providerRef, input.testDocument ?? "valid");
+    const hook = buildMockKycWebhook(session.providerRef, testDocument ?? "valid");
     await handleIdentityWebhook(hook.rawBody, hook.headers);
   }
   const fresh = await prisma.identityVerification.findUniqueOrThrow({ where: { id: row.id } });

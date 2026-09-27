@@ -80,6 +80,17 @@ describe("P1-6 KYC mock sağlayıcı + imza", () => {
     expect(resolveKycProviderName(env, "mock")).toBe("mock");
     expect(resolveKycProviderName({}, "stripe")).toBe("mock");
   });
+
+  it("regression: v5#3 demo dışında Stripe yoksa mock'a düşmez → unavailable", () => {
+    const prod = { DEMO_MODE: "false" };
+    expect(resolveKycProviderName(prod, "auto")).toBe("unavailable");
+    expect(resolveKycProviderName(prod, "stripe")).toBe("unavailable");
+    expect(resolveKycProviderName(prod, "mock")).toBe("unavailable");
+    expect(resolveKycProviderName({ NODE_ENV: "production" }, "auto")).toBe("unavailable");
+    const ready = { ...prod, STRIPE_SECRET_KEY: "sk_test_x", STRIPE_IDENTITY_WEBHOOK_SECRET: "w" };
+    expect(resolveKycProviderName(ready, "auto")).toBe("stripe");
+    expect(resolveKycProviderName({ DEMO_MODE: "true" }, "mock")).toBe("mock");
+  });
 });
 
 describe("P1-6 Stripe Identity adaptörü (ağsız)", () => {

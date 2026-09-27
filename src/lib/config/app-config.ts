@@ -520,7 +520,10 @@ const schema = z.object({
   DSA_APPEAL_WINDOW_DAYS: int(180, 180, 3650),
 
   // P1-6 KYC ve güven-emniyet (karar kodda; LLM yalnızca ek sinyal)
-  /** Kimlik doğrulama sağlayıcısı: auto → Stripe anahtarı + STRIPE_IDENTITY_WEBHOOK_SECRET varsa stripe, yoksa mock. */
+  /**
+   * Kimlik doğrulama sağlayıcısı: auto → Stripe anahtarı + STRIPE_IDENTITY_WEBHOOK_SECRET varsa
+   * stripe; mock yalnız demo modunda, demo dışında Stripe yoksa 503 KYC_UNAVAILABLE (v5#3).
+   */
   KYC_PROVIDER: z.enum(["auto", "mock", "stripe"]).default("auto"),
   /** Ev sahibi yeni ilan oluşturmadan önce kimliğini doğrulamış olmalı. */
   KYC_REQUIRED_FOR_HOSTS: bool(false),

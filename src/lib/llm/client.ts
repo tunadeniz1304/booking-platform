@@ -40,8 +40,10 @@ import { createLimiter, LimiterRejectedError, type Limiter } from "@/lib/resilie
  *   demo üreticisi çalışır (`llmMode: "demo"`).
  * - Canlı çağrıda timeout / 429 / 5xx / ağ / geçersiz JSON / şema / guard hatası →
  *   o çağrı için demo çıktısı, `llmMode: "fallback"` + kısa `reason` kodu. Asla fırlatmaz.
- * - Önce `response_format: json_object` denenir; sağlayıcı 400 dönerse aynı çağrı
- *   onsuz tekrarlanır ve sonuç süreç ömrü boyunca önbelleğe alınır.
+ * - Önce `response_format: json_object` denenir; sağlayıcı `response_format` ile ilgili
+ *   400 dönerse aynı çağrı onsuz tekrarlanır ve JSON modu `LLM_JSON_MODE_RETRY_MINUTES`
+ *   boyunca kapalı tutulur (v5#18). Başka 400'ler (ör. bağlam taşması) JSON modunu
+ *   kapatmaz; yalnız o çağrı fallback'e düşer.
  * - Yalnızca `message.content` kullanılır (`reasoning_content` vb. yok sayılır).
  * - LLM'e giden her mesaj KVKK redaksiyonundan geçer (`Redactor`).
  * - LLM bağlayıcı karar VERMEZ: çıktılar öneri/açıklama/çeviridir.
@@ -176,7 +178,15 @@ interface LlmRuntimeStatus {
 }
 
 const runtimeStatus: LlmRuntimeStatus = { jsonModeSupported: null, lastError: null };
-const jsonModeUnsupported = new Set<string>();
+const MS_PER_MINUTE = 60_000;
+/** `host|model` → JSON modunun yeniden deneneceği an (epoch ms). */
+const jsonModeUnsupportedUntil = new Map<string, number>();
+
+/** 400'ün sebebi `response_format` (json_object desteklenmiyor) mu? Param veya mesajdan. */
+function isResponseFormatRejection(error: InstanceType<typeof APIError>): boolean {
+  if (error.param === "response_format") return true;
+  return /response_format|json_object|json[ _-]?mode/i.test(error.message ?? "");
+}
 
 export function getLlmRuntimeStatus(): Readonly<LlmRuntimeStatus> {
   return { ...runtimeStatus };
@@ -186,7 +196,7 @@ export function getLlmRuntimeStatus(): Readonly<LlmRuntimeStatus> {
 export function resetLlmRuntimeForTests(): void {
   runtimeStatus.jsonModeSupported = null;
   runtimeStatus.lastError = null;
-  jsonModeUnsupported.clear();
+  jsonModeUnsupportedUntil.clear();
 }
 
 // --- Eşzamanlılık (v4#3) --------------------------------------------------------
@@ -411,7 +421,10 @@ export function createLlmClient(options: CreateLlmClientOptions = {}): LlmClient
     signal?: AbortSignal
   ): Promise<Completion> {
     const base: ChatCompletionCreateParamsNonStreaming = { ...params, model: settings.model };
-    const useJsonMode = wantJson && !jsonModeUnsupported.has(jsonKey);
+    const now = Date.now();
+    const retryAt = jsonModeUnsupportedUntil.get(jsonKey);
+    if (retryAt !== undefined && now >= retryAt) jsonModeUnsupportedUntil.delete(jsonKey);
+    const useJsonMode = wantJson && !jsonModeUnsupportedUntil.has(jsonKey);
     if (useJsonMode) {
       try {
         const res = await limit(() =>
@@ -423,11 +436,15 @@ export function createLlmClient(options: CreateLlmClientOptions = {}): LlmClient
         runtimeStatus.jsonModeSupported = true;
         return res;
       } catch (error) {
-        if (error instanceof APIError && error.status === 400) {
-          // Sağlayıcı json_object desteklemiyor → süreç ömrü boyunca hatırla, düz metinle dene.
-          jsonModeUnsupported.add(jsonKey);
+        if (error instanceof APIError && error.status === 400 && isResponseFormatRejection(error)) {
+          // Sağlayıcı json_object desteklemiyor → TTL boyunca hatırla, bu çağrıyı düz metinle dene.
+          jsonModeUnsupportedUntil.set(
+            jsonKey,
+            Date.now() + settings.jsonModeRetryMinutes * MS_PER_MINUTE
+          );
           runtimeStatus.jsonModeSupported = false;
         } else {
+          // Diğer hatalar (bağlam taşması dahil) → çağıran fallback'e düşer; JSON modu açık kalır.
           throw error;
         }
       }

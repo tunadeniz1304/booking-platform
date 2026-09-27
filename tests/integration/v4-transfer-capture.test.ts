@@ -44,6 +44,75 @@ class ScriptedPsp implements PaymentProvider {
   }
 }
 
+/**
+ * Stripe davranışını taklit eden PSP: aynı idempotency anahtarı → aynı provizyon (önbellek);
+ * aynı anahtar farklı kartla → idempotency hatası; void edilmiş provizyon capture edilemez.
+ * `gate` verilirse authorize, eşzamanlı istekler buluşana kadar (en çok `gateMs`) bekler.
+ */
+class StripeLikePsp implements PaymentProvider {
+  readonly name = "mock";
+  private readonly byKey = new Map<
+    string,
+    { cardToken: string; result: Awaited<ReturnType<PaymentProvider["authorize"]>> }
+  >();
+  private readonly voided = new Set<string>();
+  private seq = 0;
+  private arrivals = 0;
+  keys: string[] = [];
+  captures: string[] = [];
+  voids: string[] = [];
+  refunds: Array<{ ref: string; amount: number }> = [];
+  constructor(
+    private readonly gate = 0,
+    private readonly gateMs = 300
+  ) {}
+  async authorize(input: Parameters<PaymentProvider["authorize"]>[0]) {
+    this.keys.push(input.idempotencyKey);
+    if (this.gate > 0) {
+      this.arrivals += 1;
+      const until = Date.now() + this.gateMs;
+      while (this.arrivals < this.gate && Date.now() < until) {
+        await new Promise((r) => setTimeout(r, 5));
+      }
+    }
+    const cached = this.byKey.get(input.idempotencyKey);
+    if (cached) {
+      if (cached.cardToken !== input.cardToken) {
+        throw new Error("idempotency_error: key reused with different parameters");
+      }
+      return cached.result;
+    }
+    this.seq += 1;
+    const providerRef = `pi_stripelike_${this.seq}`;
+    const result: Awaited<ReturnType<PaymentProvider["authorize"]>> = input.cardToken.includes(
+      "decline"
+    )
+      ? { status: "declined", providerRef, declineCode: "card_declined" }
+      : { status: "authorized", providerRef };
+    this.byKey.set(input.idempotencyKey, { cardToken: input.cardToken, result });
+    return result;
+  }
+  async confirmChallenge(): Promise<never> {
+    throw new Error("3DS yok");
+  }
+  async capture(ref: string): Promise<{ status: "captured" }> {
+    // Gerçek PSP gecikmesi: eşzamanlı kaybedenin telafisi bu arada koşar.
+    await new Promise((r) => setTimeout(r, 50));
+    if (this.voided.has(ref)) throw new Error(`cannot capture voided authorization ${ref}`);
+    this.captures.push(ref);
+    return { status: "captured" };
+  }
+  async void(ref: string): Promise<{ status: "voided" }> {
+    this.voided.add(ref);
+    this.voids.push(ref);
+    return { status: "voided" };
+  }
+  async refund(ref: string, amount: Money, key: string) {
+    this.refunds.push({ ref, amount: amount.amount });
+    return { status: "refunded" as const, refundRef: `re_${ref}_${key}` };
+  }
+}
+
 describeInt("regression: v4#1 devir capture hatası (integration)", () => {
   const prisma = new PrismaClient();
   const stamp = Date.now();
@@ -311,5 +380,65 @@ describeInt("regression: v4#1 devir capture hatası (integration)", () => {
         where: { action: "transfer.capture_timeout", entityId: stuck.transferId },
       })
     ).toMatchObject({ meta: { outcome: "refunded" } });
+  });
+
+  it("regression: aynı alıcının eşzamanlı iki claim'i → biri COMPLETED, diğeri 409; kazananın provizyonu void edilmez", async () => {
+    const psp = new StripeLikePsp(2);
+    setPaymentProviderForTests(psp);
+    const bookingId = await confirmedBooking();
+    const listed = await listBookingForTransfer(bookingId, seller, 150_000);
+
+    const claim = () =>
+      claimTransfer({ token: listed.claimToken, buyerId: buyer, cardToken: "tok_mock_ok_4242" });
+    const results = await Promise.allSettled([claim(), claim()]);
+
+    const ok = results.filter((r) => r.status === "fulfilled");
+    const failed = results.filter((r): r is PromiseRejectedResult => r.status === "rejected");
+    expect(ok).toHaveLength(1);
+    expect(failed).toHaveLength(1);
+    expect(failed[0]!.reason).toMatchObject({ status: 409 });
+
+    const transfer = await prisma.bookingTransfer.findUniqueOrThrow({ where: { id: listed.id } });
+    expect(transfer.status).toBe("COMPLETED");
+    expect(psp.captures).toEqual([transfer.buyerPaymentRef]);
+    expect(psp.voids).not.toContain(transfer.buyerPaymentRef);
+    expect(psp.refunds).toEqual([]);
+    expect((await prisma.booking.findUniqueOrThrow({ where: { id: bookingId } })).userId).toBe(
+      buyer
+    );
+    expect(await prisma.payout.count({ where: { transferId: listed.id } })).toBe(1);
+    expect(await transferLedger(bookingId)).toEqual({ count: 2, net: 0 });
+  });
+
+  it("regression: kart reddinden sonra farklı kartla yeniden deneme yeni anahtarla başarılı olur", async () => {
+    const psp = new StripeLikePsp();
+    setPaymentProviderForTests(psp);
+    const bookingId = await confirmedBooking();
+    const listed = await listBookingForTransfer(bookingId, seller, 150_000);
+
+    await expect(
+      claimTransfer({
+        token: listed.claimToken,
+        buyerId: buyer,
+        cardToken: "tok_mock_decline_0002",
+      })
+    ).rejects.toMatchObject({ status: 402, code: "PAYMENT_DECLINED" });
+
+    const res = await claimTransfer({
+      token: listed.claimToken,
+      buyerId: buyer,
+      cardToken: "tok_mock_ok_4242",
+    });
+    expect(res.status).toBe("COMPLETED");
+    expect(psp.keys).toHaveLength(2);
+    expect(new Set(psp.keys).size).toBe(2);
+
+    const transfer = await prisma.bookingTransfer.findUniqueOrThrow({ where: { id: listed.id } });
+    expect(transfer.status).toBe("COMPLETED");
+    expect(transfer.claimedById).toBe(buyer);
+    expect(psp.captures).toEqual([transfer.buyerPaymentRef]);
+    expect((await prisma.booking.findUniqueOrThrow({ where: { id: bookingId } })).userId).toBe(
+      buyer
+    );
   });
 });

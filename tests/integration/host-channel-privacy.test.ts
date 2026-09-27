@@ -6,6 +6,7 @@ import { applyAriMessage, exportRoomCalendar, importCalendar } from "@/lib/chann
 import { deleteAccount, exportUserData } from "@/lib/privacy/privacy-service";
 import { issueMandate, revokeMandate } from "@/lib/agentic/mandate";
 import { hashPassword } from "@/lib/auth";
+import { resetConfigForTests } from "@/lib/config/app-config";
 import type { AccessClaims } from "@/lib/auth";
 
 const claims = (userId: string, role: AccessClaims["role"]): AccessClaims => ({
@@ -409,5 +410,132 @@ describeInt("F7 host / kanal / KVKK (integration)", () => {
     expect(hostExport).not.toContain(guest.lastName);
     expect(hostExport).not.toContain(strangerText);
     await prisma.$disconnect();
+  });
+
+  it("regression: v5#8 dışa aktarım push/KYC/bölünmüş pay/rıza içerir, sırları sızdırmaz, rezervasyonlar sınırlı", async () => {
+    const prisma = new PrismaClient();
+    const stamp = `${Date.now().toString(36)}b`;
+    const user = await prisma.user.create({
+      data: {
+        email: `v5-8-${stamp}@t.test`,
+        passwordHash: "x",
+        firstName: "Kvkk",
+        lastName: `Sınır${stamp}`,
+      },
+    });
+    const host = await prisma.user.create({
+      data: {
+        email: `v5-8h-${stamp}@t.test`,
+        passwordHash: "x",
+        firstName: "H",
+        lastName: "H",
+        role: "HOST",
+      },
+    });
+    const loc = await prisma.location.create({ data: { city: `Kvkk8-${stamp}`, country: "TEST" } });
+    const property = await prisma.property.create({
+      data: {
+        licenseStatus: "VERIFIED",
+        hostId: host.id,
+        title: "Kvkk8",
+        description: "kvkk8",
+        propertyType: "HOTEL",
+        locationId: loc.id,
+        basePriceMinor: 50000n,
+      },
+    });
+    const room = await prisma.roomType.create({
+      data: { propertyId: property.id, name: "K", maxOccupancy: 2, bedType: "Ç" },
+    });
+    for (let i = 0; i < 3; i++) {
+      await prisma.booking.create({
+        data: {
+          userId: user.id,
+          propertyId: property.id,
+          roomId: room.id,
+          checkIn: utcDay(40 + i * 3),
+          checkOut: utcDay(41 + i * 3),
+          guestCount: 1,
+          totalPriceMinor: 10000n,
+          status: "CONFIRMED",
+        },
+      });
+    }
+    const pushAuth = `pushauth-${stamp}`;
+    const pushP256 = `p256dh-${stamp}`;
+    await prisma.pushSubscription.create({
+      data: {
+        userId: user.id,
+        endpoint: `https://fcm.googleapis.com/fcm/send/${stamp}`,
+        p256dh: pushP256,
+        auth: pushAuth,
+      },
+    });
+    const kycRef = `vs_${stamp}`;
+    const kyc = await prisma.identityVerification.create({
+      data: { userId: user.id, provider: "mock", providerRef: kycRef, status: "VERIFIED" },
+    });
+    const cart = await prisma.cart.create({ data: { userId: user.id, currency: "TRY" } });
+    const cartPayment = await prisma.cartPayment.create({
+      data: {
+        cartId: cart.id,
+        userId: user.id,
+        amountMinor: 20000n,
+        currency: "TRY",
+        provider: "mock",
+        providerRef: `cp_${stamp}`,
+      },
+    });
+    const plan = await prisma.splitPlan.create({
+      data: {
+        cartId: cart.id,
+        cartPaymentId: cartPayment.id,
+        organizerId: user.id,
+        fallbackMode: "ORGANIZER_PAYS",
+        deadlineAt: new Date(Date.now() + 3_600_000),
+      },
+    });
+    const shareNonce = `nonce-${stamp}`;
+    const shareRef = `ps_${stamp}`;
+    const share = await prisma.paymentShare.create({
+      data: {
+        planId: plan.id,
+        cartPaymentId: cartPayment.id,
+        cartId: cart.id,
+        position: 0,
+        isOrganizer: true,
+        payerUserId: user.id,
+        amountMinor: 20000n,
+        currency: "TRY",
+        providerRef: shareRef,
+        inviteNonce: shareNonce,
+      },
+    });
+
+    const prev = process.env.PRIVACY_EXPORT_MAX_ROWS;
+    process.env.PRIVACY_EXPORT_MAX_ROWS = "2";
+    resetConfigForTests();
+    try {
+      const exported = await exportUserData(user.id, { cookieConsent: "necessary,analytics" });
+      const text = JSON.stringify(exported, (_k, v) => (typeof v === "bigint" ? v.toString() : v));
+      // Rezervasyonlar sınırlı ve kesinti işaretli
+      expect(exported.user.bookings).toHaveLength(2);
+      expect(exported.truncated.bookings).toBe(true);
+      // Push / KYC / bölünmüş pay / rıza kayıtları mevcut
+      expect(exported.pushSubscriptions).toHaveLength(1);
+      expect(exported.identityVerifications.map((v) => v.id)).toContain(kyc.id);
+      expect(exported.paymentShares.map((s) => s.id)).toContain(share.id);
+      expect(exported.consents.cookie).toBe("necessary,analytics");
+      // Gizli alanlar dışarıda
+      for (const secret of [pushAuth, pushP256, kycRef, shareNonce, shareRef, `cp_${stamp}`]) {
+        expect(text).not.toContain(secret);
+      }
+      expect(text).not.toContain("fcm.googleapis.com");
+    } finally {
+      if (prev === undefined) delete process.env.PRIVACY_EXPORT_MAX_ROWS;
+      else process.env.PRIVACY_EXPORT_MAX_ROWS = prev;
+      resetConfigForTests();
+      await prisma.$disconnect();
+    }
   });
 });

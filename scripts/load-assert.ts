@@ -10,6 +10,8 @@
  *  3. Çift capture = 0: ödeme başına tek BOOKING_CAPTURED jurnali, rezervasyon başına tek
  *     CHARGE kaydı; bölünmüş ödemede SETTLED olmayan planda CAPTURED pay yok ve settled
  *     planda Σ tahsil edilen pay = sepet ödemesi.
+ *  4. RNPL (v5 P2-3): CAPTURED plan ↔ ödeme PAID/iade ↔ tek BOOKING_CAPTURED jurnali; iptal
+ *     edilmiş rezervasyonda iade edilmemiş tahsilat yok; CANCELLED planın ödemesi tahsil edilmemiş.
  *
  * Çıktı tek satır JSON; herhangi bir ihlal varsa çıkış kodu 1.
  */
@@ -83,6 +85,29 @@ async function main(): Promise<void> {
              <> c."amountMinor"
     ) t`);
 
+  // 4) RNPL zamanlanmış tahsilat (v5 P2-3).
+  const rnplCapturedNotPaid = await count(`
+    SELECT count(*) AS n FROM "PaymentSchedule" s JOIN "Payment" p ON p."bookingId" = s."bookingId"
+    WHERE s.status = 'CAPTURED' AND p.status NOT IN ('PAID','PARTIALLY_REFUNDED','REFUNDED')`);
+  const rnplCapturedJournalMismatch = await count(`
+    SELECT count(*) AS n FROM "PaymentSchedule" s JOIN "Payment" p ON p."bookingId" = s."bookingId"
+    WHERE s.status = 'CAPTURED' AND (
+      SELECT count(*) FROM "JournalEntry" j WHERE j.kind = 'BOOKING_CAPTURED' AND j."paymentId" = p.id
+    ) <> 1`);
+  const rnplChargedOnCancelled = await count(`
+    SELECT count(*) AS n FROM "PaymentSchedule" s
+    JOIN "Payment" p ON p."bookingId" = s."bookingId"
+    JOIN "Booking" b ON b.id = s."bookingId"
+    WHERE (s.status = 'CANCELLED' AND p.status IN ('PAID','PARTIALLY_REFUNDED'))
+       OR (b.status = 'CANCELLED' AND s.status = 'CAPTURED' AND p.status = 'PAID')`);
+  const rnplStats: Row = Object.fromEntries(
+    (
+      await prisma.$queryRawUnsafe<Array<{ k: string; n: bigint }>>(
+        `SELECT lower(status::text) AS k, count(*) AS n FROM "PaymentSchedule" GROUP BY status`
+      )
+    ).map((r) => [r.k, Number(r.n)])
+  );
+
   const stats: Row = Object.fromEntries(
     (
       await prisma.$queryRawUnsafe<Array<{ k: string; n: bigint }>>(`
@@ -115,6 +140,12 @@ async function main(): Promise<void> {
       capturedOnOpenPlan,
       settledMismatch,
     },
+    rnpl: {
+      rnplCapturedNotPaid,
+      rnplCapturedJournalMismatch,
+      rnplChargedOnCancelled,
+      schedules: rnplStats,
+    },
     stats,
   };
   const violations = [
@@ -125,6 +156,9 @@ async function main(): Promise<void> {
     doubleCaptureByBooking,
     capturedOnOpenPlan,
     settledMismatch,
+    rnplCapturedNotPaid,
+    rnplCapturedJournalMismatch,
+    rnplChargedOnCancelled,
     ...recon.map((r) => r.differences.length + r.imbalancedEntries),
   ].reduce((a, b) => a + b, 0);
   const ok = violations === 0 && result.ledger.trialBalanced;

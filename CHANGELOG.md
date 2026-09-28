@@ -6,6 +6,9 @@ Bu dosyadaki tüm önemli değişiklikler burada belgelenir. Biçim [Keep a Chan
 
 ### Added
 
+- v5 P0-6 kaos kanıtı: `docker-compose.load.yml` içinde Toxiproxy (`chaos` profili; Postgres ve Redis önünde), `load/chaos-redis.js` / `load/chaos-pg.js` (gecikme, kesinti, bağlantı kopması, `reset_peer`); sonuçlar `docs/perf/v5-chaos.md`.
+- v5 P2-3 RNPL tahsilat fırtınası: `load/rnpl-charge-storm.js` + `scripts/rnpl-storm.ts` (aynı anda vadesi gelen ~1000 tahsilat, iptal yarışı); `scripts/load-assert.ts` RNPL değişmezleri; `docs/perf/v5-rnpl-storm.md`.
+- v5 P1-8: `cart_hold_phase_seconds{phase=reprice|lock_wait|critical}` metriği; `CART_HOLD_SOLDOUT_CHECK_MS` (varsayılan 250, 0 = kapalı).
 - **P1-3 (ADR 0028)** Şimdi rezerve et, sonra öde (RNPL): `PaymentSchedule` modeli (migration `20261003100000_payment_schedule`), PSP arayüzüne opsiyonel `setupCard`/`chargeSaved` (MockPsp, ChaosPsp, Stripe SetupIntent), `POST /api/bookings/{id}/pay` `paymentOption: "rnpl"` + `GET /api/bookings/{id}/rnpl`, `rnpl` kuyruğu (`rnpl-charge` gecikmeli iş, `rnpl-sweep`), başarısızlıkta bildirim + `RNPL_GRACE_HOURS` sonra otomatik iptal, tahsilatta `booking-captured` jurnali, `rnpl_charge_total{outcome}`; checkout'ta iptal zaman çizelgeli seçenek (tr/en); seed'e `PAY_LATER` tarifesi. Yeni ayarlar: `RNPL_ENABLED`, `RNPL_CHARGE_DAYS_BEFORE_DEADLINE`, `RNPL_MIN_LEAD_HOURS`, `RNPL_GRACE_HOURS`, `RNPL_RETRY_INTERVAL_HOURS`, `RNPL_SWEEP_CRON`.
 - **P1-7 (ADR 0032)** Pazar bazlı uyum kural motoru `src/lib/compliance/market-rules.ts` + `data/market-rules.json` (`MARKET_RULES_JSON` ile değiştirilebilir): ülke → indirim referans penceresi (TR 10, AB 30, varsayılan 30 gün), "önceki fiyat" kuralı, kayıt no zorunluluğu/biçimi (TR 7464, AB 2024/1028), toplam fiyat gösterimi (ABD FTC). İlan yayın kontrolü kayıt noyu pazar biçimine göre doğrular; PDP kayıt noyu gösterir. Kaynak ve tarihler docs/COMPLIANCE.md §8.
 - **P1-1 (ADR 0035)** Mandate nonce'u Redis'e ek olarak kalıcı `AgentMandateUse` tablosunda (migration `20261002100000_agent_mandate_use`): Redis kaybında aynı mandate ikinci checkout'a bağlanamaz. Opsiyonel RFC 9421 HTTP Message Signatures doğrulaması (`AGENT_HTTP_SIGNATURE_KEYS`; `/api/ucp/*`, `/api/agentic/*`). UCP profili `signing.jwks_uri` + `mandate_alg` + imza bilgisini ilan eder. `scripts/verify-mandate.ts` (`npm run mandate:verify`): yalnız JWKS URL'si ile harici mandate doğrulaması. SD-JWT (`@sd-jwt/core`, Apache-2.0) değerlendirildi, gerekçesiyle ertelendi.
@@ -29,6 +32,8 @@ Bu dosyadaki tüm önemli değişiklikler burada belgelenir. Biçim [Keep a Chan
 
 ### Fixed
 
+- v5 P0-6: Postgres/Redis geçici olarak erişilemezken route yanıtı 500 yerine 503 `SERVICE_UNAVAILABLE` + `Retry-After` (Prisma P1001/P1017/P2024…, ioredis bağlantı kopması).
+- v5 P1-8: sepet tutması stok tükendiğinde oda kilidi kuyruğunda bütçe sonunu beklemiyor ve kilit altında işlem açmadan SOLD_OUT dönüyor (20 VU p95 6.05 → 1.87 s; `docs/perf/v5-cart.md`).
 - **v5#17** Alarmlarda runbook ve birim testi yoktu (P0-5).
 - **v5#13** CI yalnız `main`'de tetikleniyor, action'lar etiketle pinliydi; SAST/secret/SBOM/provenance yoktu (P1-6).
 - Mühürlü bağlantı çözümü (`openLink`) AES-GCM etiket uzunluğunu 16 bayta sabitler; kısaltılmış etiket reddedilir (Semgrep `gcm-no-tag-length`).
@@ -41,6 +46,7 @@ Bu dosyadaki tüm önemli değişiklikler burada belgelenir. Biçim [Keep a Chan
 
 ### Dependencies
 
+- Yük/kaos ortamı: `ghcr.io/shopify/toxiproxy:2.9.0` Docker imajı (MIT; yalnız `docker-compose.load.yml` `chaos` profili, npm bağımlılığı değil).
 - `yaml` (ISC; zaten promptfoo üzerinden kuruluydu) doğrudan devDependency: iş akışı ve alarm YAML'larını ayrıştıran regresyon testleri (v5#13, v5#17).
 - `madge` (MIT) devDependency: `npm run deps:circular` ödeme modüllerinde içe aktarma döngüsü olmadığını doğrular (ADR 0027); `.madgerc` yalnız-tip içe aktarmaları yok sayar.
 - `zod-to-json-schema` (ISC; zaten `@modelcontextprotocol/sdk` üzerinden kuruluydu) doğrudan bağımlılık oldu: `/api/openapi.json` gövde/sorgu şemaları route'ların zod şemalarından üretilir (v5#16).

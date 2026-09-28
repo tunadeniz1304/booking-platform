@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { maxDiscountReferenceDays } from "@/lib/compliance/market-rules";
 import { prisma } from "@/lib/prisma";
 import { getConfig, type AppConfig } from "@/lib/config/app-config";
 import { addDays, todayUtc, toDbDate } from "@/lib/time/nights";
@@ -61,13 +62,19 @@ type RetentionConfig = Pick<
   | "RETENTION_AUTH_TOKEN_DAYS"
   | "RETENTION_BATCH_SIZE"
   | "RETENTION_MAX_BATCHES"
-  | "PRICE_OMNIBUS_DAYS"
 >;
 
-/** Tablo başına kesim anları. Fiyat geçmişi Omnibus penceresinden kısa tutulamaz. */
-export function retentionCutoffs(config: RetentionConfig, now: Date) {
+/**
+ * Tablo başına kesim anları. Fiyat geçmişi en uzun pazar indirim referans penceresinden
+ * (P1-7 `maxDiscountReferenceDays`) kısa tutulamaz.
+ */
+export function retentionCutoffs(
+  config: RetentionConfig,
+  now: Date,
+  omnibusDays: number = maxDiscountReferenceDays()
+) {
   const ago = (days: number) => new Date(now.getTime() - days * DAY_MS);
-  const priceDays = Math.max(config.RETENTION_PRICE_HISTORY_DAYS, config.PRICE_OMNIBUS_DAYS + 1);
+  const priceDays = Math.max(config.RETENTION_PRICE_HISTORY_DAYS, omnibusDays + 1);
   return {
     auditLog: ago(config.RETENTION_AUDIT_LOG_DAYS),
     paymentEvent: ago(config.RETENTION_PAYMENT_EVENT_DAYS),

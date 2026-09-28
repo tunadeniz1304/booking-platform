@@ -81,7 +81,7 @@ const schema = z.object({
   RETENTION_PAYMENT_EVENT_DAYS: int(90, 35, 3650),
   /** İşlenmiş (DONE) outbox mesajları; FAILED/DEAD admin yeniden kuyruğu için kalır. */
   RETENTION_OUTBOX_DAYS: int(30, 7, 3650),
-  /** Gece fiyat geçmişi; Omnibus penceresinden (PRICE_OMNIBUS_DAYS) kısa olamaz. */
+  /** Gece fiyat geçmişi; en uzun pazar indirim referans penceresinden (data/market-rules.json) kısa olamaz. */
   RETENTION_PRICE_HISTORY_DAYS: int(400, 60, 3650),
   /** Engellenmemiş mesaj risk bayrakları (engellenenler moderasyon kararı → silinmez). */
   RETENTION_MESSAGE_RISK_DAYS: int(365, 30, 3650),
@@ -151,8 +151,6 @@ const schema = z.object({
   PRICE_INSIGHT_MIN_CALIBRATION: int(20, 1, 100_000),
   /** Kalibrasyon için bugünden geriye/ileriye bakılan gün sayısı (aynı konum). */
   PRICE_INSIGHT_WINDOW_DAYS: int(90, 7, 400),
-  /** Omnibus referans fiyatı: son N günün en düşük gözlenen fiyatı ("önceki fiyat"). */
-  PRICE_OMNIBUS_DAYS: int(30, 1, 365),
   /** Günlük fiyat alarmı işi (cron, UTC). */
   PRICE_ALERT_CRON: z.string().min(1).default("15 6 * * *"),
   /** Kullanıcı başına azami aktif fiyat alarmı. */

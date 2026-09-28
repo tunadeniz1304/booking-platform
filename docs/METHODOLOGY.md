@@ -113,7 +113,7 @@ etiket = fiyat < alt → "low" (Düşük); fiyat > üst → "high" (Yüksek); ak
 AB Omnibus direktifine uygun "önceki fiyat" gösterimi:
 
 ```
-referans = min{ gözlem.total : bugün − PRICE_OMNIBUS_DAYS ≤ gözlem.on < bugün }   # 30 gün; bugün hariç
+referans = min{ gözlem.total : bugün − N ≤ gözlem.on < bugün }   # N = pazar penceresi (TR 10, AB 30; ADR 0032); bugün hariç
          = null (pencerede gözlem yoksa)
 ```
 
@@ -131,7 +131,7 @@ Kural motoru `src/lib/pricing/promotions.ts` (saf, deterministik). Türler: `EAR
 5. `priceStay`: `total = brüt geceler − Σ promosyon + ücretler + hariç vergiler`; indirim gecelere orantılı (en büyük kalan) dağıtılır ve vergiler indirimli gece tutarından hesaplanır. Defter (`taxShareMinor`) bu kırılımdan okur → indirimli tahsilat da dengeli jurnal üretir.
 6. Kupon/limitli promosyon kullanımı rezervasyon (tutma) işleminde koşullu `UPDATE … usageCount < usageLimit` ile sayılır; tutma düşerse (süre dolumu, ödeme hatası, onay öncesi iptal) iade edilir.
 
-Teklifte Omnibus: `InventoryDay.priceMinor` her değiştiğinde DB tetiği `InventoryPriceHistory`'ye yazar. Her gece için `[şimdi − PRICE_OMNIBUS_DAYS, şimdi]` penceresinde herhangi bir anda yürürlükte olan taban fiyatların en düşüğü (pencere başında yürürlükteki fiyat + penceredeki değişiklikler + şu anki fiyat) alınır, konaklama bu fiyatlarla **promosyonsuz** fiyatlanır → `lowestPrice30dMinor` (vergi dahil, tesis para birimi). Arayüz indirim gösterirken üstü çizili fiyat olarak yalnız bunu kullanır (toplamdan yüksekse) ve "son 30 günün en düşük fiyatı" etiketini gösterir. Sınır: geçmiş promosyonlu fiyatlar referansa katılmaz (yalnız taban fiyat geçmişi); arama kartı fiyatı promosyonsuzdur (promosyon teklif/checkout'ta uygulanır).
+Teklifte Omnibus: `InventoryDay.priceMinor` her değiştiğinde DB tetiği `InventoryPriceHistory`'ye yazar. Her gece için `[şimdi − N, şimdi]` (N = tesis pazarının `discountReferenceDays`, ADR 0032) penceresinde herhangi bir anda yürürlükte olan taban fiyatların en düşüğü (pencere başında yürürlükteki fiyat + penceredeki değişiklikler + şu anki fiyat) alınır, konaklama bu fiyatlarla **promosyonsuz** fiyatlanır → `lowestPrice30dMinor` (vergi dahil, tesis para birimi). Arayüz indirim gösterirken üstü çizili fiyat olarak yalnız bunu kullanır (toplamdan yüksekse) ve "son 30 günün en düşük fiyatı" etiketini gösterir. Sınır: geçmiş promosyonlu fiyatlar referansa katılmaz (yalnız taban fiyat geçmişi); arama kartı fiyatı promosyonsuzdur (promosyon teklif/checkout'ta uygulanır).
 
 ## 5. Fraud v2 (`src/lib/risk/fraud.ts`)
 

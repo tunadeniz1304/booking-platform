@@ -1,0 +1,42 @@
+{
+  "default": {
+    "discountReferenceDays": 30,
+    "previousPriceRule": "lowest-in-window",
+    "registration": { "required": false, "scheme": "platform" },
+    "totalPriceDisplay": "recommended"
+  },
+  "markets": [
+    {
+      "id": "TR",
+      "countries": ["TR", "TÜRKİYE", "TURKIYE", "TURKEY"],
+      "discountReferenceDays": 10,
+      "previousPriceRule": "lowest-in-window",
+      "registration": {
+        "required": true,
+        "scheme": "tr-7464",
+        "pattern": "^(0[1-9]|[1-7][0-9]|8[01])-[0-9]{3,6}(-[0-9]{4})?$"
+      },
+      "totalPriceDisplay": "required"
+    },
+    {
+      "id": "EU",
+      "countries": ["@EU"],
+      "discountReferenceDays": 30,
+      "previousPriceRule": "lowest-in-window",
+      "registration": {
+        "required": true,
+        "scheme": "eu-2024-1028",
+        "pattern": "^[A-Z]{2}-[A-Z0-9]{6,20}$"
+      },
+      "totalPriceDisplay": "required"
+    },
+    {
+      "id": "US",
+      "countries": ["US", "USA", "UNITED STATES", "ABD", "AMERİKA BİRLEŞİK DEVLETLERİ"],
+      "discountReferenceDays": 30,
+      "previousPriceRule": "lowest-in-window",
+      "registration": { "required": false, "scheme": "platform" },
+      "totalPriceDisplay": "required"
+    }
+  ]
+}

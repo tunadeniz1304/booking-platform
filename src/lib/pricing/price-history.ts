@@ -1,21 +1,24 @@
 import { prisma } from "@/lib/prisma";
 import { minorFromDb } from "@/lib/money/money";
 import { fromDate, toDbDate } from "@/lib/time/nights";
-import { lowestPriceInWindow, type PricePoint } from "@/lib/pricing/omnibus";
+import { referencePrice, type PricePoint } from "@/lib/pricing/omnibus";
+import type { PreviousPriceRule } from "@/lib/compliance/market-rules";
 import type { NightInput } from "@/lib/pricing/quote";
 
 const DAY_MS = 86_400_000;
 
 /**
- * P1-8 Omnibus: her gece için son `days` günde uygulanmış en düşük taban fiyat
- * (`InventoryPriceHistory`, DB tetiği yazar). Şu anki fiyat (`current`) her zaman adaydır →
- * sonuç hiçbir gece için güncel fiyatın üstünde olamaz.
+ * P1-8 Omnibus / P1-7 pazar kuralı: her gece için son `days` günün referans taban fiyatı
+ * (varsayılan: pencerede uygulanmış en düşük; `InventoryPriceHistory`, DB tetiği yazar).
+ * `lowest-in-window` için şu anki fiyat (`current`) her zaman adaydır → sonuç hiçbir gece için
+ * güncel fiyatın üstünde olamaz.
  */
 export async function lowestNightInputs(
   roomTypeId: string,
   current: readonly NightInput[],
   now: Date,
-  days: number
+  days: number,
+  rule: PreviousPriceRule = "lowest-in-window"
 ): Promise<NightInput[]> {
   if (current.length === 0) return [];
   const dates = current.map((n) => toDbDate(n.date));
@@ -42,6 +45,6 @@ export async function lowestNightInputs(
   }
   return current.map((n) => ({
     date: n.date,
-    baseMinor: lowestPriceInWindow(byDate.get(n.date) ?? [], n.baseMinor, now, days),
+    baseMinor: referencePrice(byDate.get(n.date) ?? [], n.baseMinor, now, days, rule),
   }));
 }

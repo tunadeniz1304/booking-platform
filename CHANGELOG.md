@@ -6,6 +6,7 @@ Bu dosyadaki tüm önemli değişiklikler burada belgelenir. Biçim [Keep a Chan
 
 ### Added
 
+- **P1-7 (ADR 0032)** Pazar bazlı uyum kural motoru `src/lib/compliance/market-rules.ts` + `data/market-rules.json` (`MARKET_RULES_JSON` ile değiştirilebilir): ülke → indirim referans penceresi (TR 10, AB 30, varsayılan 30 gün), "önceki fiyat" kuralı, kayıt no zorunluluğu/biçimi (TR 7464, AB 2024/1028), toplam fiyat gösterimi (ABD FTC). İlan yayın kontrolü kayıt noyu pazar biçimine göre doğrular; PDP kayıt noyu gösterir. Kaynak ve tarihler docs/COMPLIANCE.md §8.
 - **P1-1 (ADR 0035)** Mandate nonce'u Redis'e ek olarak kalıcı `AgentMandateUse` tablosunda (migration `20261002100000_agent_mandate_use`): Redis kaybında aynı mandate ikinci checkout'a bağlanamaz. Opsiyonel RFC 9421 HTTP Message Signatures doğrulaması (`AGENT_HTTP_SIGNATURE_KEYS`; `/api/ucp/*`, `/api/agentic/*`). UCP profili `signing.jwks_uri` + `mandate_alg` + imza bilgisini ilan eder. `scripts/verify-mandate.ts` (`npm run mandate:verify`): yalnız JWKS URL'si ile harici mandate doğrulaması. SD-JWT (`@sd-jwt/core`, Apache-2.0) değerlendirildi, gerekçesiyle ertelendi.
 - **P1-2** OpenAPI 3.1 kapsamı sepet, devir, ACP/UCP ajan ticareti, mandate, keşif belgeleri (`/.well-known/ucp`, `/.well-known/jwks.json`), ilan/yorum, hesap ve ops uçlarına genişletildi; tüm 2xx yanıtlar için şema (`src/lib/http/openapi-schemas.ts`). `tests/helpers/openapi-assert.ts` integration testlerinde gerçek yanıt gövdelerini şemaya karşı doğrular (≥ 20 uç işlemi). Yeni geliştirme bağımlılıkları: `ajv` 8 ve `ajv-formats` 3 (MIT). `ERROR_CATALOG`'a `HTTP_SIGNATURE_*` kodları eklendi.
 - **P1-9 (ADR 0036)** MCP Apps arayüz kaynağı `ui://booking/stay-card` (`text/html;profile=mcp-app`): CSP ile ağa kapalı, ilan adı sunucuda HTML-kaçışlı, vergi dahil toplam fiyat + AI etiketi; `search_stays` sonucu kartı gömülü kaynak olarak da taşır. `npm run mcp:smoke` kaynağı listeler/okur (ve demo dışı ortamda geçici ES256 mandate anahtarıyla çalışır). Eski `ui://stay-card` URI'si kaldırıldı.
@@ -16,12 +17,14 @@ Bu dosyadaki tüm önemli değişiklikler burada belgelenir. Biçim [Keep a Chan
 
 ### Removed
 
+- **P1-7** Global `PRICE_OMNIBUS_DAYS` ayarı: pencere pazar kuralından gelir (ADR 0032).
 - **P0-3 (ADR 0033)** Eski `LedgerEntry` defteri ve `LedgerKind` enum'u (migration `20261001100000_drop_legacy_ledger`): dual-write kaldırıldı, tek para kaydı çift girişli jurnal; `listBookingLedger` v3 görünümünü yalnız jurnalden türetir.
 - **P0-3 (kırıcı API değişikliği)** Yanıtlardaki kullanımdan kalkmış ondalık para alanları: `totalPrice` (rezervasyon, `BookingDTO`, ev sahibi listesi), `amount`/`refundedAmount` (ödeme, admin iade kuyruğu), `basePrice` (arama, ilan, favoriler, ev sahibi ilanları, MCP `search_stays`), `priceModifier` (oda), arama kartı `totalPrice` (yerine `quote.total`), devir `askPrice`/`originalPrice` (yerine `askPriceMinor`/`originalPriceMinor`). İstemciler `*Minor` + `currency` okur. gRPC: `ReserveRoomResponse.total_price` → `total_price_minor`, `ChargeResponse.charged_amount` ve `ChargeRequest.amount` kaldırıldı (alan numaraları `reserved`). İstek gövdelerindeki ondalık girişler (ilan formu `basePrice`) değişmedi.
 - **P0-3** Ölü minor-unit backfill aracı: `src/lib/money/backfill.ts`, `scripts/money-backfill.ts`, `npm run money:backfill` ve `tests/integration/v4-money-backfill.test.ts`. Gerekçe: ADR 0019 contract'ı v4'te tamamlandı, Decimal kolon kalmadı; `regression: v4#15` korunur ve şemada Decimal para kolonu olmadığını denetler (v4 regresyonlarını koruma kuralının tek bilinçli istisnası).
 
 ### Fixed
 
+- **v5#14** Teklifteki indirim referans penceresi tesis ülkesine göre (TR ilanı 10 gün, AB ilanı 30 gün); `omnibusDays` yanıtta pazar değerini taşır.
 - **P0-7** Arama kartı toplamı artık ev sahibi promosyonlarını (erken rezervasyon, son dakika, uzun konaklama; kupon hariç) teklif motoruyla aynı biçimde uygular; promosyon eklenince/değişince/silinince etkilenen ilanların teklif önbelleği geçersiz kılınır. `tests/integration/v5-price-invariant.test.ts`: fast-check 200 örnekte arama kartı = `/api/quote` = PSP capture (+ kredi) = tahsilat jurnali.
 
 ### Changed

@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { prisma } from "@/lib/prisma";
+import { marketRulesFor } from "@/lib/compliance/market-rules";
 import { LISTABLE_PROPERTY } from "@/lib/compliance/listing";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
@@ -27,6 +28,7 @@ interface PropertyDetail {
   description: string;
   propertyType: string;
   location: { city: string; country: string };
+  licenseNumber: string | null;
   basePriceMinor: number;
   currency: string;
   ratingAvg: number;
@@ -44,6 +46,7 @@ async function getProperty(id: string): Promise<PropertyDetail | null> {
       title: true,
       description: true,
       propertyType: true,
+      licenseNumber: true,
       basePriceMinor: true,
       currency: true,
       ratingAvg: true,
@@ -119,6 +122,14 @@ export default async function PropertyPage({ params, searchParams }: PropertyPag
   }
   // P1-13(e): yalnız doğrulanmış erişilebilirlik özellikleri.
   const accessibility = await listPublicFeatures(property.id);
+  // P1-7: kayıt no gösterimi ve toplam fiyat notu tesis pazarının kuralından.
+  const market = marketRulesFor(property.location.country);
+  const registrationLabel =
+    market.registration.scheme === "tr-7464"
+      ? t("registration.trPermit")
+      : market.registration.scheme === "eu-2024-1028"
+        ? t("registration.euRegistration")
+        : t("registration.platform");
 
   return (
     <div className="min-h-screen bg-white">
@@ -137,6 +148,14 @@ export default async function PropertyPage({ params, searchParams }: PropertyPag
               {t("ratingCount", { count: property.ratingCount })}
             </span>
           </div>
+          {property.licenseNumber && (
+            <p className="mt-2 text-sm text-gray-600" data-testid="registration-number">
+              {registrationLabel}: <span className="font-mono">{property.licenseNumber}</span>
+            </p>
+          )}
+          {market.totalPriceDisplay === "required" && (
+            <p className="mt-1 text-xs text-gray-500">{t("totalPriceNote")}</p>
+          )}
         </div>
 
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">

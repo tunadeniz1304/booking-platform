@@ -546,6 +546,6 @@ describeInt("P1-8 promosyon motoru + Omnibus (integration)", () => {
     const at90 = await computeTotal(stay);
     await setPrice(120_000n);
     expect(windowed.lowestPrice30dMinor).toBe(at90.total);
-    expect(windowed.omnibusDays).toBe(30);
+    expect(windowed.omnibusDays).toBe(10); // P1-7: TR pazarı 10 gün (v5#14)
   });
 });

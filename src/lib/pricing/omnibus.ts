@@ -37,3 +37,22 @@ export function lowestPriceInWindow(
   if (atStart && atStart.priceMinor < lowest) lowest = atStart.priceMinor;
   return lowest;
 }
+
+/**
+ * P1-7 pazar kuralına göre referans fiyat. `lowest-in-window`: pencerenin en düşüğü (AB
+ * Omnibus, TR 10 gün). `previous-price`: pencerede indirimden hemen önce yürürlükte olan fiyat
+ * (son değişiklikten önceki kayıt); geçmiş yoksa mevcut fiyat.
+ */
+export function referencePrice(
+  history: readonly PricePoint[],
+  current: number,
+  now: Date,
+  days: number,
+  rule: "lowest-in-window" | "previous-price"
+): number {
+  if (rule === "lowest-in-window") return lowestPriceInWindow(history, current, now, days);
+  const past = history
+    .filter((p) => p.effectiveAt.getTime() <= now.getTime())
+    .sort((a, b) => a.effectiveAt.getTime() - b.effectiveAt.getTime());
+  return past.length >= 2 ? past[past.length - 2].priceMinor : current;
+}

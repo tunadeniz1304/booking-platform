@@ -35,8 +35,8 @@ describe("P0-5 saklama politikası (config + kesimler)", () => {
   });
 
   it("fiyat geçmişi Omnibus penceresinden kısa tutulamaz", () => {
-    const c = { ...parseAppConfig({}), RETENTION_PRICE_HISTORY_DAYS: 60, PRICE_OMNIBUS_DAYS: 90 };
-    const cut = retentionCutoffs(c, NOW);
+    const c = { ...parseAppConfig({}), RETENTION_PRICE_HISTORY_DAYS: 60 };
+    const cut = retentionCutoffs(c, NOW, 90);
     expect(NOW.getTime() - cut.priceHistory.getTime()).toBe(91 * DAY_MS);
   });
 

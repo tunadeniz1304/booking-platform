@@ -1,5 +1,6 @@
 import type { AuthEmailRequestedPayload, PriceDroppedPayload } from "@/lib/events/events";
 import { getConfig } from "@/lib/config/app-config";
+import { marketRulesFor } from "@/lib/compliance/market-rules";
 import { sendEmail } from "./notifier";
 import { openLink } from "@/lib/auth/link-crypto";
 import { prisma } from "@/lib/prisma";
@@ -67,7 +68,7 @@ export async function notifyPriceDrop(p: PriceDroppedPayload) {
         currency: p.currency,
         previousMinor: p.previousMinor,
         currentMinor: p.currentMinor,
-        omnibusDays: getConfig().PRICE_OMNIBUS_DAYS,
+        omnibusDays: p.omnibusDays ?? marketRulesFor("").discountReferenceDays,
         link: `${appBaseUrl()}/property/${encodeURIComponent(p.propertyId)}?checkIn=${p.checkIn}&checkOut=${p.checkOut}`,
       },
       locale

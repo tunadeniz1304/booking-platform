@@ -3,6 +3,12 @@
   "notFoundTitle": "Property Bulunamadı",
   "ratingCount": "{count} değerlendirme",
   "description": "Açıklama",
+  "registration": {
+    "trPermit": "Turizm tesisi izin belgesi no (7464)",
+    "euRegistration": "Kısa dönem kiralama kayıt no (AB 2024/1028)",
+    "platform": "Belge/kayıt no"
+  },
+  "totalPriceNote": "Gösterilen fiyatlar vergi ve zorunlu ücretler dahil toplamdır.",
   "amenities": "Olanaklar",
   "gallery": {
     "imageAlt": "{title} - görsel {index}",

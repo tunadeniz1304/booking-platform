@@ -7,7 +7,12 @@ import { assertIdentityRequirement } from "@/lib/trust/kyc";
 import { ValidationError, toErrorResponse } from "@/lib/http/errors";
 import { httpsUrl } from "@/lib/security/url";
 import { withAiSubject } from "@/lib/http/ai";
-import { DEFAULT_RATE_PLANS, licenseSchema, roomSchema } from "@/lib/host/host-service";
+import {
+  DEFAULT_RATE_PLANS,
+  assertRegistrationFormat,
+  licenseSchema,
+  roomSchema,
+} from "@/lib/host/host-service";
 import { CURRENCIES, minorFromDb, minorToDb, toMinor } from "@/lib/money/money";
 import {
   SearchParamsSchema,
@@ -107,6 +112,7 @@ export async function POST(req: NextRequest) {
     }
 
     // P1-10: kayıt no ülkeye göre (TR Bakanlık / AB STR) doğrulanır; yalnızca VERIFIED yayınlanır.
+    if (licenseNumber) assertRegistrationFormat(country, licenseNumber);
     const license = licenseNumber ? await verifyLicense(licenseNumber, country) : null;
 
     const property = await prisma.$transaction(async (tx) => {

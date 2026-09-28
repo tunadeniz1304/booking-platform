@@ -38,6 +38,7 @@ import {
 } from "@/lib/pricing/promotions";
 import { loadPromotionRules } from "@/lib/pricing/promotion-rules";
 import { lowestNightInputs } from "@/lib/pricing/price-history";
+import { marketRulesFor } from "@/lib/compliance/market-rules";
 
 /**
  * Fiyatın TEK kaynağı.
@@ -398,7 +399,15 @@ export async function computeTotal(req: QuoteRequest, now: Date = new Date()): P
     },
   });
   // Omnibus referansı: her gece için pencerede uygulanmış en düşük taban fiyat, promosyonsuz.
-  const lowestNights = await lowestNightInputs(room.id, nights, now, config.PRICE_OMNIBUS_DAYS);
+  // P1-7: pencere ve "önceki fiyat" kuralı tesis ülkesinin pazar kuralından (v5#14).
+  const market = marketRulesFor(room.property.location.country);
+  const lowestNights = await lowestNightInputs(
+    room.id,
+    nights,
+    now,
+    market.discountReferenceDays,
+    market.previousPriceRule
+  );
   const lowestPrice30dMinor = priceStay({ ...stayPricing, nights: lowestNights }).total;
   const chargeCurrency = resolveChargeCurrency(currency, req.currency);
   const fx = await getCurrentFx(now);
@@ -419,7 +428,7 @@ export async function computeTotal(req: QuoteRequest, now: Date = new Date()): P
     channel,
     couponCode: priced.coupon?.code ?? null,
     lowestPrice30dMinor,
-    omnibusDays: config.PRICE_OMNIBUS_DAYS,
+    omnibusDays: market.discountReferenceDays,
     createdAt: now.toISOString(),
     expiresAt: expiresAt.toISOString(),
   };

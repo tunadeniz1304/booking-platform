@@ -14,6 +14,7 @@ import {
 } from "@/lib/time/nights";
 import type { AccessClaims } from "@/lib/auth";
 import { LICENSE_RE, isLicenseFormatValid, verifyLicense } from "@/lib/compliance/license-registry";
+import { isRegistrationFormatValid, marketRulesFor } from "@/lib/compliance/market-rules";
 import { assertNoOpenTakedown } from "@/lib/compliance/takedown";
 import { assertNoActiveDsaRestriction } from "@/lib/compliance/dsa-appeal";
 import { noteAvailabilityChanged } from "@/lib/pricing/price-calendar-jobs";
@@ -25,6 +26,14 @@ import { noteAvailabilityChanged } from "@/lib/pricing/price-calendar-jobs";
 
 export { LICENSE_RE };
 /** TR belge no (ör. 34-12345) veya AB STR kayıt no (ör. FR-75056ABC123); varlığı kayıtta ayrıca doğrulanır. */
+/** P1-7 ilan yayın kontrolü: kayıt no tesis pazarının biçimine uymalı (TR 7464 / AB 2024/1028). */
+export function assertRegistrationFormat(country: string, licenseNumber: string): void {
+  if (!isRegistrationFormatValid(country, licenseNumber)) {
+    const { scheme } = marketRulesFor(country).registration;
+    throw new ValidationError(`Kayıt numarası bu pazarın biçimine uymuyor (${scheme})`);
+  }
+}
+
 export const licenseSchema = z
   .string()
   .trim()
@@ -96,6 +105,7 @@ export async function updateProperty(
     isActive?: boolean;
   } = {};
   if (patch.licenseNumber !== undefined && patch.licenseNumber !== property.licenseNumber) {
+    assertRegistrationFormat(property.location.country, patch.licenseNumber);
     const result = await verifyLicense(patch.licenseNumber, property.location.country);
     licenseStatus = result.status;
     licenseData = { licenseStatus, licenseCheckedAt: new Date() };

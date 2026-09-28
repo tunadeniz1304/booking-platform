@@ -7,11 +7,12 @@ import { ConflictError, HttpError, NotFoundError } from "@/lib/http/errors";
 import { logger } from "@/lib/observability/logger";
 import { fromDate, toDbDate, todayUtc } from "@/lib/time/nights";
 import { computeTotal } from "./quote";
+import { marketRulesFor } from "@/lib/compliance/market-rules";
 import { omnibusReferencePrice, recordObservation, type PriceObservation } from "./insight";
 
 /**
  * Fiyat alarmları (P1-4). Günlük iş her aktif alarm için konaklama toplamını (vergiler
- * dahil, tesis para birimi) gözlemler; toplam Omnibus referansının (son PRICE_OMNIBUS_DAYS
+ * dahil, tesis para birimi) gözlemler; toplam Omnibus referansının (pazar kuralının indirim referans penceresi; son N
  * günün en düşüğü) altına inerse outbox'a `price.dropped` yazar → e-posta (dedupe'lu).
  * Aynı gün tekrar çalışmak güvenlidir: gözlem üzerine yazılır, e-posta anahtarı günlüktür.
  */
@@ -97,7 +98,7 @@ export async function createPriceAlert(input: {
   const observations = recordObservation(
     parseObservations(existing?.observations ?? []),
     { on: today, total: quote.total },
-    cfg.PRICE_OMNIBUS_DAYS
+    quote.omnibusDays
   );
   const row = await prisma.priceAlert.upsert({
     where,
@@ -113,17 +114,19 @@ export async function createPriceAlert(input: {
       observations: toJson(observations),
     },
   });
-  return toView(row, today, cfg.PRICE_OMNIBUS_DAYS);
+  return toView(row, today, quote.omnibusDays);
 }
 
 export async function listPriceAlerts(userId: string): Promise<PriceAlertView[]> {
-  const cfg = getConfig();
   const rows = await prisma.priceAlert.findMany({
     where: { userId, active: true },
     orderBy: { checkIn: "asc" },
+    include: { roomType: { select: { property: { select: { location: true } } } } },
   });
   const today = todayUtc();
-  return rows.map((r) => toView(r, today, cfg.PRICE_OMNIBUS_DAYS));
+  return rows.map((r) =>
+    toView(r, today, marketRulesFor(r.roomType.property.location.country).discountReferenceDays)
+  );
 }
 
 export async function deletePriceAlert(userId: string, id: string): Promise<void> {
@@ -143,7 +146,6 @@ export interface PriceAlertRun {
 
 /** Günlük iş gövdesi (idempotent). */
 export async function runPriceAlerts(now: Date = new Date()): Promise<PriceAlertRun> {
-  const cfg = getConfig();
   const today = todayUtc(now);
   const { count: expired } = await prisma.priceAlert.updateMany({
     where: { active: true, checkIn: { lte: toDbDate(today) } },
@@ -165,13 +167,14 @@ export async function runPriceAlerts(now: Date = new Date()): Promise<PriceAlert
     const checkIn = fromDate(alert.checkIn);
     const checkOut = fromDate(alert.checkOut);
     let total: number;
+    let days: number;
     try {
-      total = (
-        await computeTotal(
-          { roomId: alert.roomTypeId, checkIn, checkOut, guests: alert.guests },
-          now
-        )
-      ).total;
+      const quote = await computeTotal(
+        { roomId: alert.roomTypeId, checkIn, checkOut, guests: alert.guests },
+        now
+      );
+      total = quote.total;
+      days = quote.omnibusDays;
     } catch (error) {
       // Dolu / kısıtlı / fiyatsız → bugün gözlem yok (alarm aktif kalır).
       if (error instanceof HttpError) {
@@ -182,8 +185,8 @@ export async function runPriceAlerts(now: Date = new Date()): Promise<PriceAlert
     }
     result.checked++;
     const previous = parseObservations(alert.observations);
-    const reference = omnibusReferencePrice(previous, today, cfg.PRICE_OMNIBUS_DAYS);
-    const observations = recordObservation(previous, { on: today, total }, cfg.PRICE_OMNIBUS_DAYS);
+    const reference = omnibusReferencePrice(previous, today, days);
+    const observations = recordObservation(previous, { on: today, total }, days);
     const dropped = reference !== null && total < reference;
     const notifiedToday = alert.lastNotifiedAt && fromDate(alert.lastNotifiedAt) === today;
     await prisma.$transaction(async (tx) => {
@@ -211,6 +214,7 @@ export async function runPriceAlerts(now: Date = new Date()): Promise<PriceAlert
             currency: alert.currency,
             previousMinor: reference,
             currentMinor: total,
+            omnibusDays: days,
             observedOn: today,
           })
         );

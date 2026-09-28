@@ -3,6 +3,12 @@
   "notFoundTitle": "Property not found",
   "ratingCount": "{count, plural, one {# review} other {# reviews}}",
   "description": "Description",
+  "registration": {
+    "trPermit": "Tourism accommodation permit no. (Law 7464)",
+    "euRegistration": "Short-term rental registration no. (EU 2024/1028)",
+    "platform": "Licence/registration no."
+  },
+  "totalPriceNote": "Prices shown are totals including taxes and mandatory fees.",
   "amenities": "Amenities",
   "gallery": {
     "imageAlt": "{title} - image {index}",

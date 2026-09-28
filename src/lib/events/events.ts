@@ -144,6 +144,8 @@ export interface PriceDroppedPayload {
   /** Omnibus referansı (son N günün en düşüğü), minor unit. */
   previousMinor: number;
   currentMinor: number;
+  /** P1-7: tesis pazarının indirim referans penceresi (gün); eski olaylarda yok → 30. */
+  omnibusDays?: number;
   /** Gözlem günü (YYYY-MM-DD) — e-posta tekilliği için. */
   observedOn: string;
 }

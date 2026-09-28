@@ -4,6 +4,10 @@ Bu dosyadaki tüm önemli değişiklikler burada belgelenir. Biçim [Keep a Chan
 
 ## [Unreleased]
 
+### Added
+
+- **P1-1 (ADR 0035)** Mandate nonce'u Redis'e ek olarak kalıcı `AgentMandateUse` tablosunda (migration `20261002100000_agent_mandate_use`): Redis kaybında aynı mandate ikinci checkout'a bağlanamaz. Opsiyonel RFC 9421 HTTP Message Signatures doğrulaması (`AGENT_HTTP_SIGNATURE_KEYS`; `/api/ucp/*`, `/api/agentic/*`). UCP profili `signing.jwks_uri` + `mandate_alg` + imza bilgisini ilan eder. `scripts/verify-mandate.ts` (`npm run mandate:verify`): yalnız JWKS URL'si ile harici mandate doğrulaması. SD-JWT (`@sd-jwt/core`, Apache-2.0) değerlendirildi, gerekçesiyle ertelendi.
+
 ### Removed
 
 - **P0-3 (ADR 0033)** Eski `LedgerEntry` defteri ve `LedgerKind` enum'u (migration `20261001100000_drop_legacy_ledger`): dual-write kaldırıldı, tek para kaydı çift girişli jurnal; `listBookingLedger` v3 görünümünü yalnız jurnalden türetir.

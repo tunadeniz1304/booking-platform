@@ -2,7 +2,7 @@
  * Her entegrasyon test dosyasından ÖNCE çalışır: container adreslerini
  * `process.env`'e yazar (Prisma/ioredis modülleri import anında okur).
  */
-import { inject } from "vitest";
+import { beforeAll, inject } from "vitest";
 
 const skipReason = inject("integrationSkipReason");
 if (skipReason) {
@@ -31,3 +31,22 @@ process.env.TAX_RULES_JSON ??= JSON.stringify([
     rateBps: 100,
   },
 ]);
+
+// Paylaşımlı DB'de önceki dosyaların işlenmemiş outbox birikimi, sonraki dosyalardaki
+// `relayOutbox(n)` çağrılarını kendi olaylarına ulaşmadan meşgul eder (tam koşuda 90 sn
+// zaman aşımı; tek başına yeşil). Dosyalar sıralı koşar (`fileParallelism: false`), bu
+// yüzden her dosyanın başında yalnız ÖNCEKİ dosyaların bekleyen mesajları ertelenir.
+if (!skipReason) {
+  beforeAll(async () => {
+    const [{ PrismaClient }, { parkOutboxBacklog }] = await Promise.all([
+      import("@prisma/client"),
+      import("./helpers"),
+    ]);
+    const prisma = new PrismaClient();
+    try {
+      await parkOutboxBacklog(prisma);
+    } finally {
+      await prisma.$disconnect();
+    }
+  });
+}

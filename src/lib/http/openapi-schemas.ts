@@ -290,6 +290,38 @@ export const RESPONSE_SCHEMAS: Record<string, JsonSchema> = {
     { available: bool, dueTodayMinor: { const: 0 }, amountMinor: minor, currency },
     { reason: str, dueAt: str, freeCancellationUntil: str }
   ),
+  SupportChatResult: obj(
+    {
+      reply: str,
+      intent: str,
+      confidence: num,
+      handoff: nullable(obj({ ticketId: str, reason: str })),
+      disclosure: str,
+      llmMode: str,
+      toolsUsed: arrayOf(str),
+      ai_generated: { const: true },
+    },
+    {}
+  ),
+  SupportTicketList: obj({
+    tickets: arrayOf(
+      obj(
+        {
+          id: str,
+          userId: str,
+          status: str,
+          reason: str,
+          intent: str,
+          confidence: num,
+          summary: str,
+          locale: str,
+          createdAt: dateTime,
+        },
+        { bookingId: nullable(str), resolvedAt: nullable(dateTime) }
+      )
+    ),
+  }),
+  SupportTicketStatus: obj({ id: str, status: str }),
   SearchHit: searchHit,
   SearchResult: obj(searchPage, { cached: bool, semantic: bool, ranking: str }),
   SmartSearchResult: obj(

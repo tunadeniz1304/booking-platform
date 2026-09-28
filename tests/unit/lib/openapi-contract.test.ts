@@ -8,6 +8,8 @@ import {
   listBookingsQuerySchema,
   payBookingSchema,
   quoteQuerySchema,
+  supportChatSchema,
+  supportTicketStatusSchema,
 } from "@/lib/http/api-schemas";
 import { SearchParamsSchema, searchParamsFromUrl } from "@/lib/search/params";
 import {
@@ -67,6 +69,8 @@ const ROUTE_SCHEMAS: Record<string, Partial<Record<string, [string, ZodTypeAny]>
     post: ["createBookingSchema", createBookingSchema],
   },
   "/api/bookings/{id}/pay": { post: ["payBookingSchema", payBookingSchema] },
+  "/api/support/chat": { post: ["supportChatSchema", supportChatSchema] },
+  "/api/admin/support/{id}": { patch: ["supportTicketStatusSchema", supportTicketStatusSchema] },
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- belge JSON olarak gezilir

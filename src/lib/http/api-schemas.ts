@@ -69,3 +69,17 @@ export const payBookingSchema = z.object({
   // v4#13: `cardBin` / `deviceId` artık istemciden ALINMAZ (gönderilirse yok sayılır):
   // BIN PSP token metadata'sından, cihaz kimliği sunucu imzalı `did` çerezinden gelir.
 });
+
+/** v5 P1-4: POST /api/support/chat gövdesi (AI destek ajanı, tek tur). */
+export const supportChatSchema = z
+  .object({
+    message: z.string().trim().min(1).max(1000),
+    bookingId: z.string().min(1).max(64).optional(),
+    locale: z.enum(["tr", "en"]).optional(),
+  })
+  .strict();
+
+/** v5 P1-4: PATCH /api/admin/support/{id} gövdesi (insan temsilci durum geçişi). */
+export const supportTicketStatusSchema = z
+  .object({ status: z.enum(["OPEN", "IN_PROGRESS", "RESOLVED"]) })
+  .strict();

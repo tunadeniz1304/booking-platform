@@ -7,6 +7,8 @@ import {
   listBookingsQuerySchema,
   payBookingSchema,
   quoteQuerySchema,
+  supportChatSchema,
+  supportTicketStatusSchema,
 } from "@/lib/http/api-schemas";
 import { SearchParamsSchema } from "@/lib/search/params";
 import { RESPONSE_SCHEMAS } from "@/lib/http/openapi-schemas";
@@ -706,6 +708,7 @@ export function buildOpenApiDocument() {
       { name: "account" },
       { name: "reviews" },
       { name: "ops" },
+      { name: "support" },
     ],
     paths: {
       "/api/search": {
@@ -989,6 +992,75 @@ export function buildOpenApiDocument() {
               content: jsonContent(ref("schemas", "Success")),
             },
             ...common,
+          },
+        },
+      },
+      "/api/support/chat": {
+        post: {
+          operationId: "supportChat",
+          tags: ["support"],
+          summary:
+            "P1-4: AI destek ajanı (tek tur; salt-okur araçlar, iade/iptal yapamaz; para/hukuki talep → insan kuyruğu; AI kovası)",
+          security: secured,
+          requestBody: {
+            required: true,
+            content: jsonContent(toJsonSchema(supportChatSchema), {
+              message: "İptal edersem ne kadar iade alırım?",
+              locale: "tr",
+            }),
+          },
+          responses: {
+            "200": {
+              description:
+                "Yanıt + AI bildirimi (`disclosure`, `ai_generated: true`); devredildiyse `handoff`",
+              content: jsonContent(ref("schemas", "SupportChatResult")),
+            },
+            ...authed,
+            "503": ref("responses", "ServiceUnavailable"),
+          },
+        },
+      },
+      "/api/admin/support": {
+        get: {
+          operationId: "listSupportTickets",
+          tags: ["support"],
+          summary: "P1-4: insan destek kuyruğu (ADMIN; `?status=OPEN|IN_PROGRESS|RESOLVED`)",
+          security: secured,
+          responses: {
+            "200": {
+              description: "Kuyruk (en eskiden yeniye, en fazla 100)",
+              content: jsonContent(ref("schemas", "SupportTicketList")),
+            },
+            ...authed,
+          },
+        },
+      },
+      "/api/admin/support/{id}": {
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            required: true,
+            description: "Talep kimliği",
+            schema: { type: "string" },
+          },
+        ],
+        patch: {
+          operationId: "updateSupportTicket",
+          tags: ["support"],
+          summary: "P1-4: talep durumunu güncelle (insan kararı; ADMIN)",
+          security: secured,
+          requestBody: {
+            required: true,
+            content: jsonContent(toJsonSchema(supportTicketStatusSchema), { status: "RESOLVED" }),
+          },
+          responses: {
+            "200": {
+              description: "Güncellenen talep",
+              content: jsonContent(ref("schemas", "SupportTicketStatus")),
+            },
+            ...authed,
+            "404": ref("responses", "NotFound"),
           },
         },
       },

@@ -10,6 +10,14 @@ Bu dosyadaki tüm önemli değişiklikler burada belgelenir. Biçim [Keep a Chan
 - **P0-3 (kırıcı API değişikliği)** Yanıtlardaki kullanımdan kalkmış ondalık para alanları: `totalPrice` (rezervasyon, `BookingDTO`, ev sahibi listesi), `amount`/`refundedAmount` (ödeme, admin iade kuyruğu), `basePrice` (arama, ilan, favoriler, ev sahibi ilanları, MCP `search_stays`), `priceModifier` (oda), arama kartı `totalPrice` (yerine `quote.total`), devir `askPrice`/`originalPrice` (yerine `askPriceMinor`/`originalPriceMinor`). İstemciler `*Minor` + `currency` okur. gRPC: `ReserveRoomResponse.total_price` → `total_price_minor`, `ChargeResponse.charged_amount` ve `ChargeRequest.amount` kaldırıldı (alan numaraları `reserved`). İstek gövdelerindeki ondalık girişler (ilan formu `basePrice`) değişmedi.
 - **P0-3** Ölü minor-unit backfill aracı: `src/lib/money/backfill.ts`, `scripts/money-backfill.ts`, `npm run money:backfill` ve `tests/integration/v4-money-backfill.test.ts`. Gerekçe: ADR 0019 contract'ı v4'te tamamlandı, Decimal kolon kalmadı; `regression: v4#15` korunur ve şemada Decimal para kolonu olmadığını denetler (v4 regresyonlarını koruma kuralının tek bilinçli istisnası).
 
+### Fixed
+
+- **P0-7** Arama kartı toplamı artık ev sahibi promosyonlarını (erken rezervasyon, son dakika, uzun konaklama; kupon hariç) teklif motoruyla aynı biçimde uygular; promosyon eklenince/değişince/silinince etkilenen ilanların teklif önbelleği geçersiz kılınır. `tests/integration/v5-price-invariant.test.ts`: fast-check 200 örnekte arama kartı = `/api/quote` = PSP capture (+ kredi) = tahsilat jurnali.
+
+### Changed
+
+- **P0-4 (ADR 0027)** `src/lib/payment/payment-service.ts` sorumluluklara bölündü (`payment-core`, `confirm`, `pay`, `webhook-handler`, `late-success`, `refund`); dosya yalnız yeniden-export eder, davranış değişmedi.
+
 ### Dependencies
 
 - `madge` (MIT) devDependency: `npm run deps:circular` ödeme modüllerinde içe aktarma döngüsü olmadığını doğrular (ADR 0027); `.madgerc` yalnız-tip içe aktarmaları yok sayar.

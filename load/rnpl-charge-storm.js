@@ -28,7 +28,7 @@ const MODE = __ENV.MODE || "seed";
 const N = Number(__ENV.N || 1000);
 const VUS = Number(__ENV.VUS || 20);
 const LOAD_ACCOUNTS = Number(__ENV.LOAD_ACCOUNTS || 120);
-const PASSWORD = __ENV.PASSWORD || "Password123!";
+const loginPassword = __ENV.PASSWORD || "Password123!";
 const DAY_FROM = Number(__ENV.DAY_FROM || 60);
 const DAY_SPAN = Number(__ENV.DAY_SPAN || 180);
 const CANCEL_RATIO = Number(__ENV.CANCEL_RATIO || 0.1);
@@ -86,7 +86,7 @@ function loginAll() {
         `${BASE}/api/auth/login`,
         JSON.stringify({
           email: `load-${String(i).padStart(3, "0")}@load.test`,
-          password: PASSWORD,
+          password: loginPassword,
         }),
         { headers: { "content-type": "application/json" }, jar: new http.CookieJar() },
       ]);

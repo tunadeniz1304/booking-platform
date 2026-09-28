@@ -19,7 +19,7 @@ import { Counter, Trend } from "k6/metrics";
 export const BASE = __ENV.BASE_URL || "http://caddy:80";
 export const TOXI = __ENV.TOXIPROXY_URL || "http://toxiproxy:8474";
 const LOAD_ACCOUNTS = Number(__ENV.LOAD_ACCOUNTS || 60);
-const PASSWORD = __ENV.PASSWORD || "Password123!"; // seed-load parolası (README)
+const loginPassword = __ENV.PASSWORD || "Password123!"; // seed-load parolası (README)
 const DAY_OFFSET = Number(__ENV.DAY_OFFSET || 300);
 const DAY_SPREAD = Number(__ENV.DAY_SPREAD || 30);
 const ROOMS = (__ENV.LOAD_ROOMS || "")
@@ -144,7 +144,7 @@ export function chaosSetup() {
         `${BASE}/api/auth/login`,
         JSON.stringify({
           email: `load-${String(i).padStart(3, "0")}@load.test`,
-          password: PASSWORD,
+          password: loginPassword,
         }),
         { headers: { "content-type": "application/json" }, jar: new http.CookieJar() },
       ]);

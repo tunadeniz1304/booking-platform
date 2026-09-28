@@ -1,7 +1,13 @@
 import { createHash } from "crypto";
 import type { Money } from "@/lib/money/money";
 import { MOCK_3DS_CODE, parseMockToken } from "./card-token";
-import { PaymentProviderError, type AuthorizeResult, type PaymentProvider } from "./provider";
+import {
+  PaymentProviderError,
+  type AuthorizeResult,
+  type ChargeSavedResult,
+  type PaymentProvider,
+  type SetupCardResult,
+} from "./provider";
 
 /**
  * Deterministik sahte PSP (ağ yok). Aynı idempotency anahtarı → aynı providerRef.
@@ -88,6 +94,40 @@ export class MockPsp implements PaymentProvider {
       return { status: "declined", providerRef, declineCode: "card_declined" };
     }
     return { status: "authorized", providerRef };
+  }
+
+  /**
+   * P1-3 RNPL kart kaydı (SetupIntent eşdeğeri). `decline` → ret; `3ds` → off-session
+   * kullanılamaz (authentication_required). Referans `pm_mock_<özet>` (kart verisi yok).
+   */
+  async setupCard(input: { cardToken: string; idempotencyKey: string }): Promise<SetupCardResult> {
+    const parsed = parseMockToken(input.cardToken);
+    if (!parsed) throw new PaymentProviderError("invalid_token", "Geçersiz kart token'ı");
+    if (parsed.scenario === "decline") return { status: "declined", declineCode: "card_declined" };
+    if (parsed.scenario === "3ds") {
+      return { status: "declined", declineCode: "authentication_required" };
+    }
+    return {
+      status: "succeeded",
+      paymentMethodRef: refFor("pm_mock", `${input.idempotencyKey}:${input.cardToken}`),
+    };
+  }
+
+  /** P1-3 RNPL off-session tahsilat: durumsuz; aynı anahtar → aynı providerRef. */
+  async chargeSaved(input: {
+    amount: Money;
+    paymentMethodRef: string;
+    idempotencyKey: string;
+  }): Promise<ChargeSavedResult> {
+    if (input.amount.amount <= 0)
+      throw new PaymentProviderError("invalid_amount", "Tutar pozitif olmalı");
+    if (!input.paymentMethodRef.startsWith("pm_mock_")) {
+      throw new PaymentProviderError("invalid_payment_method", "Kayıtlı kart bulunamadı");
+    }
+    return {
+      status: "captured",
+      providerRef: refFor("pi_mockrnpl", `${input.idempotencyKey}:${input.paymentMethodRef}`),
+    };
   }
 
   async refund(providerRef: string, amount: Money, idempotencyKey: string) {

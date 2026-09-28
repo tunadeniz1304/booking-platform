@@ -196,6 +196,20 @@ const schema = z.object({
   /** Escrow + rezerv serbest bırakma süpürme işinin cron'u (UTC). */
   ESCROW_RELEASE_CRON: z.string().min(1).default("*/30 * * * *"),
 
+  // Şimdi rezerve et, sonra öde (P1-3 RNPL, ADR 0028)
+  /** false → checkout'ta seçenek görünmez, `/pay` `paymentOption: "rnpl"` isteğini reddeder. */
+  RNPL_ENABLED: bool(true),
+  /** Tahsilat, ücretsiz iptal süresinin bitiminden bu kadar gün ÖNCE yapılır. */
+  RNPL_CHARGE_DAYS_BEFORE_DEADLINE: int(2, 0, 60),
+  /** Tahsilat vadesi şu andan en az bu kadar saat sonra olmalı; değilse RNPL sunulmaz. */
+  RNPL_MIN_LEAD_HOURS: int(24, 0, 24 * 30),
+  /** İlk başarısız tahsilattan sonra misafire tanınan ek süre; sonunda otomatik iptal. */
+  RNPL_GRACE_HOURS: int(48, 1, 24 * 14),
+  /** Ek süre içinde yeniden deneme aralığı (saat). */
+  RNPL_RETRY_INTERVAL_HOURS: int(12, 1, 24 * 7),
+  /** Vadesi gelmiş / yeniden denenecek tahsilatların yedek süpürücüsü (UTC cron). */
+  RNPL_SWEEP_CRON: z.string().min(1).default("*/15 * * * *"),
+
   // Hasar depozitosu + çözüm merkezi (P1-5, ADR 0021 §Depozito)
   /** Depozito ön provizyonu tesisin yerel giriş anından bu kadar saat ÖNCE alınır. */
   DEPOSIT_PREAUTH_HOURS_BEFORE: int(24, 0, 24 * 7),

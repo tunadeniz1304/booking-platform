@@ -15,7 +15,15 @@ export interface ChaosSettings {
   failureOps: ReadonlySet<string>;
 }
 
-type Op = "authorize" | "confirmChallenge" | "capture" | "refund" | "void" | "authorizeHold";
+type Op =
+  | "authorize"
+  | "confirmChallenge"
+  | "capture"
+  | "refund"
+  | "void"
+  | "authorizeHold"
+  | "setupCard"
+  | "chargeSaved";
 
 export function parseChaosOps(raw: string): ReadonlySet<string> {
   return new Set(
@@ -76,6 +84,20 @@ export function withChaos(
     wrapped.authorizeHold = async (input) => {
       await disturb("authorizeHold");
       return hold(input);
+    };
+  }
+  if (inner.setupCard) {
+    const setup = inner.setupCard.bind(inner);
+    wrapped.setupCard = async (input) => {
+      await disturb("setupCard");
+      return setup(input);
+    };
+  }
+  if (inner.chargeSaved) {
+    const charge = inner.chargeSaved.bind(inner);
+    wrapped.chargeSaved = async (input) => {
+      await disturb("chargeSaved");
+      return charge(input);
     };
   }
   return wrapped;

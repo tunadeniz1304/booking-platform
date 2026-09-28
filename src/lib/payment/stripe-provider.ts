@@ -4,7 +4,9 @@ import {
   ALREADY_CAPTURED_CODE,
   PaymentProviderError,
   type AuthorizeResult,
+  type ChargeSavedResult,
   type PaymentProvider,
+  type SetupCardResult,
 } from "./provider";
 
 /**
@@ -244,6 +246,83 @@ export class StripeProvider implements PaymentProvider {
       return result.status === "requires_action"
         ? { status: "declined", providerRef: intent.id, declineCode: "authentication_required" }
         : result;
+    } catch (error) {
+      if (error instanceof Stripe.errors.StripeCardError) {
+        const raw = error.raw as { payment_intent?: { id?: string } } | undefined;
+        return {
+          status: "declined",
+          providerRef: raw?.payment_intent?.id ?? `declined:${input.idempotencyKey}`,
+          declineCode: error.decline_code ?? error.code ?? "card_declined",
+        };
+      }
+      return this.call(() => Promise.reject(error));
+    }
+  }
+
+  /**
+   * P1-3 RNPL: SetupIntent ile kartı müşteriye off-session kullanım için bağlar (tahsilat yok).
+   * Doğrulama (3DS) gerekiyorsa RNPL sunulmaz: `authentication_required` reddi.
+   */
+  async setupCard(input: {
+    cardToken: string;
+    idempotencyKey: string;
+    customerRef?: string;
+    metadata?: Record<string, string>;
+  }): Promise<SetupCardResult> {
+    try {
+      const intent = await this.stripe.setupIntents.create(
+        {
+          payment_method: input.cardToken,
+          ...(input.customerRef ? { customer: input.customerRef } : {}),
+          usage: "off_session",
+          confirm: true,
+          metadata: { ...input.metadata, purpose: "rnpl" },
+        },
+        { idempotencyKey: input.idempotencyKey }
+      );
+      const paymentMethodRef = refId(intent.payment_method);
+      if (intent.status === "succeeded" && paymentMethodRef) {
+        return { status: "succeeded", paymentMethodRef, customerRef: input.customerRef };
+      }
+      return { status: "declined", declineCode: "authentication_required" };
+    } catch (error) {
+      if (error instanceof Stripe.errors.StripeCardError) {
+        return {
+          status: "declined",
+          declineCode: error.decline_code ?? error.code ?? "card_declined",
+        };
+      }
+      return this.call(() => Promise.reject(error));
+    }
+  }
+
+  /** P1-3 RNPL: kayıtlı kartla off-session, otomatik capture'lı PaymentIntent. */
+  async chargeSaved(input: {
+    amount: Money;
+    paymentMethodRef: string;
+    customerRef?: string;
+    idempotencyKey: string;
+    metadata?: Record<string, string>;
+  }): Promise<ChargeSavedResult> {
+    try {
+      const intent = await this.stripe.paymentIntents.create(
+        {
+          amount: input.amount.amount,
+          currency: input.amount.currency.toLowerCase(),
+          payment_method: input.paymentMethodRef,
+          ...(input.customerRef ? { customer: input.customerRef } : {}),
+          off_session: true,
+          confirm: true,
+          metadata: { ...input.metadata, purpose: "rnpl" },
+        },
+        { idempotencyKey: input.idempotencyKey }
+      );
+      if (intent.status === "succeeded") return { status: "captured", providerRef: intent.id };
+      return {
+        status: "declined",
+        providerRef: intent.id,
+        declineCode: "authentication_required",
+      };
     } catch (error) {
       if (error instanceof Stripe.errors.StripeCardError) {
         const raw = error.raw as { payment_intent?: { id?: string } } | undefined;

@@ -80,7 +80,38 @@ export interface PaymentProvider {
     idempotencyKey: string;
     metadata?: Record<string, string>;
   }): Promise<AuthorizeResult>;
+  /**
+   * P1-3 RNPL: kartı tahsilat yapmadan sonraki off-session kullanım için kaydeder (Stripe
+   * SetupIntent eşdeğeri). Kart doğrulaması (3DS) gerekiyorsa `declined` +
+   * `authentication_required` döner (RNPL sunulmaz; misafir şimdi öder). Desteklemeyen
+   * sağlayıcı → metot yok (RNPL kapalı).
+   */
+  setupCard?(input: {
+    cardToken: string;
+    idempotencyKey: string;
+    customerRef?: string;
+    metadata?: Record<string, string>;
+  }): Promise<SetupCardResult>;
+  /**
+   * P1-3 RNPL: kayıtlı kartla off-session tek adımda tahsilat (authorize + capture). Aynı
+   * `idempotencyKey` → aynı sonuç (yeniden deneme çift tahsilat yapmaz).
+   */
+  chargeSaved?(input: {
+    amount: Money;
+    paymentMethodRef: string;
+    customerRef?: string;
+    idempotencyKey: string;
+    metadata?: Record<string, string>;
+  }): Promise<ChargeSavedResult>;
 }
+
+export type SetupCardResult =
+  | { status: "succeeded"; paymentMethodRef: string; customerRef?: string }
+  | { status: "declined"; declineCode: string };
+
+export type ChargeSavedResult =
+  | { status: "captured"; providerRef: string }
+  | { status: "declined"; providerRef: string; declineCode: string };
 
 export class PaymentProviderError extends Error {
   constructor(

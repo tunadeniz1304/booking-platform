@@ -40,10 +40,13 @@ test("i18n: NEXT_LOCALE=en İngilizce arayüz ve en-US biçimi", async ({ page, 
 });
 
 test.describe("i18n: ilk ziyarette Accept-Language müzakeresi", () => {
-  test.use({ extraHTTPHeaders: { "Accept-Language": "en-GB,en;q=0.9,tr;q=0.5" } });
+  // playwright.config `locale: "tr-TR"` Chromium’da extraHTTPHeaders Accept-Language’ini ezer;
+  // tarayıcı dili bağlam yereliyle verilir (gerçek tarayıcı davranışı).
+  test.use({ locale: "en-GB" });
 
   test("çerez yokken İngilizce tarayıcı İngilizce sayfa alır", async ({ page }) => {
     const response = await page.goto("/");
+    expect(await response!.request().headerValue("accept-language")).toMatch(/^en/i);
     expect(response?.headers()["vary"]).toMatch(/accept-language/i);
     await expect(page.locator("html")).toHaveAttribute("lang", "en");
     await expect(page.getByRole("link", { name: "Sign in" }).first()).toBeVisible();
@@ -57,7 +60,7 @@ test.describe("i18n: ilk ziyarette Accept-Language müzakeresi", () => {
 });
 
 test.describe("i18n: desteklenmeyen tarayıcı dili", () => {
-  test.use({ extraHTTPHeaders: { "Accept-Language": "ja-JP,ja;q=0.9" } });
+  test.use({ locale: "ja-JP" });
 
   test("varsayılan Türkçeye düşer", async ({ page }) => {
     await page.goto("/");

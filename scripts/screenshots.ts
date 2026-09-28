@@ -118,7 +118,7 @@ async function accessToken(context: BrowserContext, email: string): Promise<stri
 }
 
 /**
- * MCP `ui://stay-card` widget'ı: şablon ve `search_stays` çıktısı gerçek `POST /api/mcp`
+ * MCP `ui://booking/stay-card` widget'ı: şablon ve `search_stays` çıktısı gerçek `POST /api/mcp`
  * (streamable HTTP, JSON-RPC) üzerinden alınır; şablon, ChatGPT Apps SDK'nın sağladığı
  * `window.openai.toolOutput` ile aynı biçimde beslenerek boş bir sayfada çizilir.
  * (ChatGPT/Claude istemcisinin kendisinin ekran görüntüsü DEĞİLDİR.)
@@ -146,7 +146,7 @@ async function renderStayCard(
     if (body.error) throw new Error(`mcp ${method}: ${body.error.message}`);
     return body.result as Record<string, unknown>;
   };
-  const resource = await rpc(1, "resources/read", { uri: "ui://stay-card" });
+  const resource = await rpc(1, "resources/read", { uri: "ui://booking/stay-card" });
   const html = (resource.contents as Array<{ text: string }>)[0].text;
   const call = await rpc(2, "tools/call", {
     name: "search_stays",

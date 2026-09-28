@@ -288,7 +288,7 @@ RRF adayları `src/lib/search/ranking.ts` ile açıklanabilir ağırlıklı skor
 ## 7. Ajan kanalı: MCP HTTP + ACP + UCP ([ADR 0015](adr/0015-agentic-booking-channel-revenue.md), [ADR 0023](adr/0023-agentic-commerce-mandates.md))
 
 - **MCP HTTP:** `/api/mcp` (`src/app/api/mcp/route.ts` → `src/lib/mcp/http.ts`). Durumsuz `WebStandardStreamableHTTPServerTransport`, JSON yanıt; yalnızca `POST` (diğerleri 405). `Authorization: Bearer <JWT>` zorunludur; yoksa 401 + `WWW-Authenticate: Bearer realm="booking-mcp"`. stdio'daki `MCP_ACCESS_TOKEN` ortam fallback'i HTTP'de kapalıdır.
-- **Araçlar** (`src/lib/mcp/server.ts`): `search_stays`, `get_quote`, `create_hold`, `checkout_stay` (SPT + mandate, v4), `get_price_insight`, `list_my_bookings`, `cancel_booking` (`confirm: true` zorunlu). `create_hold` ve `checkout_stay` doğrulanmış e-posta ister. `ui://stay-card` kaynağı yalnızca görüntüleme içindir.
+- **Araçlar** (`src/lib/mcp/server.ts`): `search_stays`, `get_quote`, `create_hold`, `checkout_stay` (SPT + mandate, v4), `get_price_insight`, `list_my_bookings`, `cancel_booking` (`confirm: true` zorunlu). `create_hold` ve `checkout_stay` doğrulanmış e-posta ister. `ui://booking/stay-card` kaynağı (MCP Apps, `text/html;profile=mcp-app`; CSP ile ağa kapalı, ilan adı kaçışlı, vergi dahil toplam + AI etiketi — ADR 0036) yalnızca görüntüleme içindir.
 - **ACP** (`src/lib/agentic/checkout.ts`):
   - `POST /api/agentic/checkout_sessions`, `GET`/`POST /api/agentic/checkout_sessions/[id]`, `POST /api/agentic/checkout_sessions/[id]/complete`.
   - Durumlar: `ready_for_payment`, `in_progress`, `completed`, `canceled`. Oturum ömrü `CHECKOUT_SESSION_TTL_MINUTES` (30).

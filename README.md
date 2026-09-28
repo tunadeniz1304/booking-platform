@@ -239,13 +239,13 @@ Tüm LLM erişimi `src/lib/llm/` sözleşmesinden geçer ([ADR 0005](docs/adr/00
 
 ### Ajanlar için: MCP, ACP, UCP ve mandate
 
-| Kanal                                                   | Kimlik                                                   | Araçlar / uçlar                                                                                                                                           |
-| ------------------------------------------------------- | -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `POST /api/mcp` (streamable HTTP)                       | `Authorization: Bearer <access token>`                   | `search_stays`, `get_quote`, `create_hold`, `checkout_stay` (SPT + mandate), `get_price_insight`, `list_my_bookings`, `cancel_booking` + `ui://stay-card` |
-| `npm run mcp:server` (stdio)                            | `MCP_ACCESS_TOKEN` ortam değişkeni                       | Aynı araç kümesi (`services/mcp/`)                                                                                                                        |
-| `/api/agentic/checkout_sessions` (ACP)                  | Giriş + `Idempotency-Key`; tamamlamada `mandate`         | Oluştur → güncelle → `…/[id]/complete`; ödeme `spt_…` (Stripe) veya `spt_mock_*`; insan checkout'uyla aynı saga                                           |
-| `/.well-known/ucp` + `/api/ucp/checkout-sessions` (UCP) | Profil herkese açık; oturum uçları giriş ister           | UCP lodging şemasını ACP servislerine eşler                                                                                                               |
-| `/api/account/agent-mandates`                           | Doğrulanmış e-posta + recent-auth (verme); giriş (liste) | AP2 intent mandate verme, listeleme, `DELETE …/[nonce]` ile iptal                                                                                         |
+| Kanal                                                   | Kimlik                                                   | Araçlar / uçlar                                                                                                                                                   |
+| ------------------------------------------------------- | -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /api/mcp` (streamable HTTP)                       | `Authorization: Bearer <access token>`                   | `search_stays`, `get_quote`, `create_hold`, `checkout_stay` (SPT + mandate), `get_price_insight`, `list_my_bookings`, `cancel_booking` + `ui://booking/stay-card` |
+| `npm run mcp:server` (stdio)                            | `MCP_ACCESS_TOKEN` ortam değişkeni                       | Aynı araç kümesi (`services/mcp/`)                                                                                                                                |
+| `/api/agentic/checkout_sessions` (ACP)                  | Giriş + `Idempotency-Key`; tamamlamada `mandate`         | Oluştur → güncelle → `…/[id]/complete`; ödeme `spt_…` (Stripe) veya `spt_mock_*`; insan checkout'uyla aynı saga                                                   |
+| `/.well-known/ucp` + `/api/ucp/checkout-sessions` (UCP) | Profil herkese açık; oturum uçları giriş ister           | UCP lodging şemasını ACP servislerine eşler                                                                                                                       |
+| `/api/account/agent-mandates`                           | Doğrulanmış e-posta + recent-auth (verme); giriş (liste) | AP2 intent mandate verme, listeleme, `DELETE …/[nonce]` ile iptal                                                                                                 |
 
 Access token `POST /api/auth/login` yanıtındaki `accessToken` alanından alınır. Mandate'siz, süresi dolmuş, limiti aşan, başka kullanıcıya ait, iptal edilmiş veya tekrar oynatılan mandate PSP'ye gitmeden reddedilir (403/402/409 `MANDATE_*`). Duman testi: `npm run mcp:smoke` (mandate'li başarı + ret yolları). Karar: [ADR 0023](docs/adr/0023-agentic-commerce-mandates.md).
 
@@ -287,7 +287,7 @@ Access token `POST /api/auth/login` yanıtındaki `accessToken` alanından alın
 | **Ana sayfa**                                               | **Admin paneli (outbox, moderasyon, deney, fraud)**     |
 | ![Ana sayfa](docs/img/home.png)                             | ![Admin](docs/img/admin.png)                            |
 
-**MCP `ui://stay-card` widget'ı:**
+**MCP `ui://booking/stay-card` widget'ı:**
 
 ![MCP stay card](docs/img/mcp-stay-card.png)
 
@@ -295,7 +295,7 @@ Access token `POST /api/auth/login` yanıtındaki `accessToken` alanından alın
 
 Görüntüler compose demo yığınından (seed'li, LLM demo modu) `npm run docs:screenshots` ile üretilir ([scripts/screenshots.ts](scripts/screenshots.ts)). Dürüstlük notları:
 
-- MCP kartı gerçek `POST /api/mcp` yanıtlarından (`resources/read ui://stay-card` + `tools/call search_stays`) çizilir, ancak ChatGPT/Claude istemcisinin ekran görüntüsü **değildir**: şablon, Apps SDK'nın sağladığı `window.openai.toolOutput` ile aynı biçimde beslenerek boş bir sayfada render edilir.
+- MCP kartı gerçek `POST /api/mcp` yanıtlarından (`resources/read ui://booking/stay-card` + `tools/call search_stays`) çizilir, ancak ChatGPT/Claude istemcisinin ekran görüntüsü **değildir**: şablon, Apps SDK'nın sağladığı `window.openai.toolOutput` ile aynı biçimde beslenerek boş bir sayfada render edilir.
 - v4 kümesi `SCREENSHOT_SET=v4 npm run docs:screenshots` ile üretilir; betik demo yığınında örnek bir sepet ve bölünmüş ödeme planı oluşturur (bir katılımcı payını ödemiştir). Çözüm merkezi görüntüsündeki hasar talebi `npm run demo:scenarios` senaryo 10'dan gelir (canlı demoda konaklama başlamadan talep açılamaz). Demo misafirinin tamamlanmış konaklaması olmadığından cüzdan boş görünür; cashback → kredi akışı senaryo 14'te doğrulanır. Seed fiyatları düz olduğundan fiyat takviminde tüm günler aynı seviyededir.
 - Gelir paneli görüntüsündeki mülkte seçilen pencerede satış olmadığı için metrikler sıfırdır.
 

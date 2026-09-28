@@ -11,8 +11,11 @@
  *    teklif/rezervasyon/ödeme sabit bir sahte checkout'tur (DB gerekmez). Mandate'li ödeme
  *    başarılı; mandate'siz / süresi dolmuş / tutarı aşan / tekrar kullanılan mandate ve
  *    doğrulanmamış e-posta reddedilir. Gerçek DB'li akış: tests/integration/p1-11-*.
+ * 4. MCP Apps (v5 P1-9): `ui://booking/stay-card` kaynağı stdio'da listelenir ve okunur
+ *    (`text/html;profile=mcp-app`, CSP'li, AI etiketli); HTTP'de `search_stays` (sahte arama,
+ *    HTML içeren ilan adı) gömülü kartı kaçışlı döner.
  */
-import { randomBytes } from "node:crypto";
+import { generateKeyPairSync, randomBytes } from "node:crypto";
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -30,6 +33,10 @@ const EXPECTED_TOOLS = [
   "list_my_bookings",
   "search_stays",
 ];
+
+const STAY_CARD_URI = "ui://booking/stay-card";
+const STAY_CARD_MIME = "text/html;profile=mcp-app";
+const XSS_TITLE = `<img src=x onerror="alert(1)">Loft`;
 
 const HOLD_ARGS = {
   propertyId: "p",
@@ -63,8 +70,22 @@ async function smokeStdio(): Promise<boolean> {
   process.stdout.write(
     `[stdio] create_hold (token yok): isError=${String(res.isError)} ${first.text}\n`
   );
+  const { resources } = await client.listResources();
+  const listed = resources.find((r) => r.uri === STAY_CARD_URI);
+  const read = await client.readResource({ uri: STAY_CARD_URI });
+  const [card] = read.contents as Array<{ mimeType?: string; text?: string }>;
+  const text = card?.text ?? "";
+  const cardOk =
+    listed?.mimeType === STAY_CARD_MIME &&
+    card?.mimeType === STAY_CARD_MIME &&
+    text.includes("Content-Security-Policy") &&
+    text.includes('data-ai-label="true"');
+  process.stdout.write(
+    `[stdio] resources: ${resources.map((r) => `${r.uri} (${r.mimeType})`).join(", ")}; ` +
+      `read ${STAY_CARD_URI}: ${text.length} bayt, csp+ai=${cardOk}\n`
+  );
   await client.close();
-  return sameTools(tools.map((t) => t.name)) && res.isError === true;
+  return sameTools(tools.map((t) => t.name)) && res.isError === true && cardOk;
 }
 
 /** Node http isteğini Web `Request`'e çevirip `handleMcpHttp` yanıtını geri yazar. */
@@ -102,7 +123,34 @@ async function smokeHttp(): Promise<boolean> {
   const { handleMcpHttp } = await import("@/lib/mcp/http");
   const { defaultDeps } = await import("@/lib/mcp/server");
   const { signAccessToken, verifyAccessToken } = await import("@/lib/auth/tokens");
-  const deps = { ...defaultDeps, authenticate: (t: string) => verifyAccessToken(t) };
+  const deps: McpDeps = {
+    ...defaultDeps,
+    authenticate: (t: string) => verifyAccessToken(t),
+    // DB'siz: ilan adı HTML içeren sahte arama (kart kaçışı denetimi).
+    search: async () => ({
+      results: [
+        {
+          id: "p-smoke",
+          title: XSS_TITLE,
+          description: "",
+          propertyType: "APARTMENT",
+          basePriceMinor: 150_000,
+          currency: "TRY",
+          ratingAvg: 4.6,
+          ratingCount: 3,
+          location: { city: "İstanbul", country: "TR" },
+          amenities: [],
+          availableRooms: 1,
+          quote: { roomId: "r", ratePlanId: "rp", total: 151_500, currency: "TRY", nights: 1 },
+        },
+      ],
+      total: 1,
+      page: 1,
+      pageSize: 10,
+      totalPages: 1,
+      cached: false,
+    }),
+  };
 
   const server = http.createServer(adapt((req) => handleMcpHttp(req, deps)));
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -137,8 +185,21 @@ async function smokeHttp(): Promise<boolean> {
     );
     const { tools } = await client.listTools();
     process.stdout.write(`[http] tools: ${tools.map((t) => t.name).join(", ")}\n`);
+    const found = await client.callTool({ name: "search_stays", arguments: {} });
+    const embedded = (
+      found.content as Array<{ type: string; resource?: { uri: string; text?: string } }>
+    ).find((c) => c.type === "resource")?.resource;
+    const html = embedded?.text ?? "";
+    const escaped =
+      embedded?.uri === STAY_CARD_URI && html.includes("&lt;img src=x") && !html.includes("<img");
+    process.stdout.write(
+      `[http] search_stays -> ${STAY_CARD_URI} gömülü kart: kaçışlı=${escaped}, ` +
+        `toplam=${html.includes("toplam (vergi dahil)")}\n`
+    );
     await client.close();
-    return anon.status === 401 && bad.status === 401 && sameTools(tools.map((t) => t.name));
+    return (
+      anon.status === 401 && bad.status === 401 && sameTools(tools.map((t) => t.name)) && escaped
+    );
   } finally {
     server.close();
   }
@@ -150,6 +211,14 @@ const SMOKE_PROPERTY = "p-smoke";
 
 async function smokeMandate(): Promise<boolean> {
   process.env.JWT_SECRET ||= randomBytes(32).toString("hex");
+  // Geçici ES256 imza anahtarı (yalnız bu süreçte): ortam demo değilse türetilmiş anahtar
+  // kullanılmaz (ADR 0025, fail-closed); yapılandırılmış anahtar varsa ona dokunulmaz.
+  if (!process.env.AGENT_MANDATE_PRIVATE_KEY?.trim()) {
+    const { privateKey } = generateKeyPairSync("ec", { namedCurve: "prime256v1" });
+    process.env.AGENT_MANDATE_PRIVATE_KEY = privateKey
+      .export({ format: "pem", type: "pkcs8" })
+      .toString();
+  }
   const { handleMcpHttp } = await import("@/lib/mcp/http");
   const { defaultDeps } = await import("@/lib/mcp/server");
   const { signAccessToken, verifyAccessToken } = await import("@/lib/auth/tokens");

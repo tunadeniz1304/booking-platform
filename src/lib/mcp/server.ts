@@ -16,8 +16,9 @@
  *    AP2 intent mandate ile (P1-11). Mandate yok/dolmuş/aşan tutar → reddedilir.
  *  `create_hold` ve `checkout_stay` doğrulanmış e-posta ister (v4#6, F7).
  *
- * Kaynak: `ui://stay-card` — `search_stays` sonucunu kart olarak çizen HTML şablonu
- * (MCP Apps `ui.resourceUri` / Apps SDK `outputTemplate`). Şablon veri üretmez.
+ * Kaynak: `ui://booking/stay-card` (v5 P1-9) — `search_stays` sonucunu kart olarak çizen MCP
+ * Apps arayüzü (`text/html;profile=mcp-app`, CSP'li, kaçışlı; `stay-card.ts`). Araç sonucu
+ * aynı kartı sunucuda çizilmiş gömülü kaynak olarak da taşır. Kart veri üretmez.
  *
  * Kimlik (v3#12): kimlik bilgisi ASLA araç argümanı değildir (argümanlar modelin
  * bağlamına girer → token modele sızar). Kimlik transport seviyesinden gelir:
@@ -54,6 +55,13 @@ import {
   type CheckoutSessionView,
 } from "@/lib/agentic/checkout";
 import { logger, errorFields } from "@/lib/observability/logger";
+import {
+  STAY_CARD_MIME,
+  STAY_CARD_UI_META,
+  STAY_CARD_URI,
+  renderStayCardHtml,
+  type StayCardItem,
+} from "./stay-card";
 
 export interface BookingSummary {
   id: string;
@@ -159,35 +167,7 @@ export const defaultDeps: McpDeps = {
   checkout: agentCheckout,
 };
 
-export const STAY_CARD_URI = "ui://stay-card";
-const STAY_CARD_MIME = "text/html;profile=mcp-app";
-
-/** `ui://stay-card` şablonu: araç çıktısını (`structuredContent`) textContent ile çizer (XSS yok). */
-const STAY_CARD_HTML = `<!doctype html>
-<html lang="tr"><head><meta charset="utf-8"><title>Konaklama kartı</title>
-<style>
-body{font:14px system-ui,sans-serif;margin:0;padding:8px;color:#111;background:#fff}
-.card{border:1px solid #ddd;border-radius:12px;padding:12px;margin-bottom:8px}
-.t{font-weight:600}.m{color:#555}.p{font-weight:600;margin-top:4px}
-@media (prefers-color-scheme:dark){body{background:#111;color:#eee}.card{border-color:#333}.m{color:#aaa}}
-</style></head><body><div id="root" class="m">Sonuç yok</div>
-<script>
-(function(){
-  function fmt(minor,cur){try{return new Intl.NumberFormat("tr-TR",{style:"currency",currency:cur}).format(minor/100)}catch(e){return (minor/100)+" "+cur}}
-  function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;e.textContent=text;return e}
-  function render(data){
-    var list=(data&&data.results)||[];var root=document.getElementById("root");
-    if(!list.length)return;root.textContent="";root.className="";
-    list.forEach(function(r){var c=el("div","card","");c.appendChild(el("div","t",r.title));
-      c.appendChild(el("div","m",(r.city||"")+" · "+(r.rating!=null?r.rating+"★":"yeni")));
-      if(r.quote)c.appendChild(el("div","p",fmt(r.quote.total,r.quote.currency)+" toplam"));
-      root.appendChild(c)});
-  }
-  if(window.openai&&window.openai.toolOutput)render(window.openai.toolOutput);
-  window.addEventListener("message",function(ev){var d=ev.data;
-    if(d&&d.method==="ui/notifications/tool-result"&&d.params)render(d.params.structuredContent)});
-})();
-</script></body></html>`;
+export { STAY_CARD_URI } from "./stay-card";
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "YYYY-MM-DD bekleniyor");
 const id = z.string().min(1).max(64);
@@ -261,11 +241,20 @@ export function createMcpServer(
     STAY_CARD_URI,
     {
       title: "Konaklama kartı",
-      description: "search_stays sonuçlarını kart olarak gösteren arayüz şablonu",
+      description:
+        "search_stays sonuçlarını kart olarak gösteren MCP Apps arayüzü (CSP'li, ağa kapalı; toplam fiyat + AI etiketi)",
       mimeType: STAY_CARD_MIME,
+      _meta: STAY_CARD_UI_META,
     },
     async (uri) => ({
-      contents: [{ uri: uri.href, mimeType: STAY_CARD_MIME, text: STAY_CARD_HTML }],
+      contents: [
+        {
+          uri: uri.href,
+          mimeType: STAY_CARD_MIME,
+          text: renderStayCardHtml(),
+          _meta: STAY_CARD_UI_META,
+        },
+      ],
     })
   );
 
@@ -291,19 +280,29 @@ export function createMcpServer(
     (args) =>
       guarded("search_stays", async () => {
         const res = await deps.search({ ...args, pageSize: args.pageSize ?? 10 });
-        return okStructured({
-          total: res.total,
-          results: res.results.map((r) => ({
-            propertyId: r.id,
-            title: r.title,
-            city: r.location.city,
-            propertyType: r.propertyType,
-            rating: r.ratingAvg,
-            basePriceMinor: r.basePriceMinor,
-            currency: r.currency,
-            quote: r.quote ?? null,
-          })),
+        const results = res.results.map((r) => ({
+          propertyId: r.id,
+          title: r.title,
+          city: r.location.city,
+          propertyType: r.propertyType,
+          rating: r.ratingAvg,
+          basePriceMinor: r.basePriceMinor,
+          currency: r.currency,
+          quote: r.quote ?? null,
+        }));
+        const out = okStructured({ total: res.total, results });
+        // v5 P1-9: sunucuda çizilmiş (kaçışlı) kart; MCP Apps ana makinesi olmayan istemciler de
+        // gömülü kaynağı gösterebilir.
+        const cards: StayCardItem[] = results;
+        out.content.push({
+          type: "resource",
+          resource: {
+            uri: STAY_CARD_URI,
+            mimeType: STAY_CARD_MIME,
+            text: renderStayCardHtml(cards),
+          },
         });
+        return out;
       })
   );
 

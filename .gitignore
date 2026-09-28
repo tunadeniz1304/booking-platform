@@ -61,3 +61,7 @@ scripts/ltr/out/
 
 # P1-10: CLIP model önbelleği (npm run vision:download) repoya girmez
 /models/transformers/
+
+# v5 P1-5: LLM eval çıktıları ve promptfoo yerel durumu (npm run llm:eval üretir)
+/evals/results/
+/evals/.promptfoo/

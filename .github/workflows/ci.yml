@@ -20,7 +20,7 @@ env:
 
 jobs:
   quality:
-    name: Lint · Typecheck · Format · i18n · MCP smoke · Unit
+    name: Lint · Typecheck · Format · i18n · MCP smoke · Unit · LLM eval
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -37,6 +37,8 @@ jobs:
       # MCP stdio + streamable HTTP duman testi (P1-11); DB gerektirmez.
       - run: npm run mcp:smoke
       - run: npm run test:unit
+      # v5 P1-5: LLM eval (promptfoo, demo sağlayıcı — ağsız); geçme oranı < %95 → kırmızı.
+      - run: npm run llm:eval
 
   integration:
     name: Integration (testcontainers · pgvector + redis)

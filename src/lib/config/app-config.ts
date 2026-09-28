@@ -573,6 +573,10 @@ const schema = z.object({
   MESSAGE_SCAN_BLOCK_HIGH_RISK: bool(false),
   /** Opsiyonel LLM sınıflandırması — yalnızca ek sinyal (denetim kaydı), kararı değiştirmez. */
   MESSAGE_SCAN_LLM_ENABLED: bool(false),
+  /** v5 P1-5: `npm run llm:eval` geçme eşiği (0–1); altında süreç 1 ile çıkar (CI kırmızı). */
+  LLM_EVAL_MIN_PASS_RATE: z.coerce.number().min(0).max(1).default(0.95),
+  /** v5 P1-5: eval özet dosyası (`llm_eval_score` göstergesinin kaynağı; yoksa gösterge boş). */
+  LLM_EVAL_SUMMARY_PATH: z.string().min(1).default("evals/results/summary.json"),
   /** Link kısaltıcı alan adları (virgülle ayrılmış). */
   MESSAGE_SCAN_SHORTENER_DOMAINS: z
     .string()

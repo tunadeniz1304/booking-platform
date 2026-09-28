@@ -1,0 +1,30 @@
+# v5 P1-5 (ADR 0030): LLM eval paketi. Çalıştırma: `npm run llm:eval` (demo, ağsız, CI)
+# veya `npm run llm:eval -- --live` (yalnız yerel; uygulamanın canlı LLM ayarlarıyla).
+# Sağlayıcı uygulamanın GERÇEK LLM çekirdeklerini çağırır (evals/provider.ts); prompt
+# metni kullanılmaz — vaka kimliği `case` değişkeniyle geçer.
+description: booking LLM eval (yorum özeti, mesaj taslağı, trip-plan, destek ajanı)
+providers:
+  - id: file://provider.ts
+    label: booking-app
+prompts:
+  - "{{task}}:{{case}}"
+tests: file://tests.ts
+defaultTest:
+  assert:
+    - type: javascript
+      value: file://assertions.ts:schemaValid
+      metric: schema
+    - type: javascript
+      value: file://assertions.ts:numbersGrounded
+      metric: grounding
+    - type: javascript
+      value: file://assertions.ts:noPii
+      metric: pii
+    - type: javascript
+      value: file://assertions.ts:turkish
+      metric: language
+    - type: javascript
+      value: file://assertions.ts:redTeam
+      metric: red_team
+evaluateOptions:
+  maxConcurrency: 2

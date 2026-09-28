@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 import { logger, errorFields } from "@/lib/observability/logger";
 import { isSerializationFailure } from "@/lib/db/serialization";
 import { PaymentProviderError } from "@/lib/payment/provider";
+import { isDependencyUnavailable } from "./dependency-unavailable";
 
 /**
  * HTTP'ye eşlenen alan hataları. Route handler'lar ince kalır: iş mantığı bu
@@ -184,6 +185,17 @@ export function toErrorResponse(error: unknown, context = "request"): NextRespon
         details: { providerCode: error.code },
       },
       { status: 502, headers: { "Retry-After": "5" } }
+    );
+  }
+  // v5 P0-6: veritabanı / Redis geçici olarak erişilemez → 503 (500 değil); istemci yeniden dener.
+  if (isDependencyUnavailable(error)) {
+    logger.warn({ context, ...errorFields(error) }, "dependency unavailable");
+    return NextResponse.json(
+      {
+        error: "Hizmet geçici olarak kullanılamıyor, lütfen biraz sonra tekrar deneyin",
+        code: "SERVICE_UNAVAILABLE",
+      },
+      { status: 503, headers: { "Retry-After": "5" } }
     );
   }
   if (error instanceof SyntaxError) {

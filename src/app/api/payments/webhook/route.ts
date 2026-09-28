@@ -7,6 +7,7 @@ import {
 } from "@/lib/payment/webhook-verify";
 import { getPaymentProvider } from "@/lib/payment";
 import { toErrorResponse } from "@/lib/http/errors";
+import { observed } from "@/lib/http/observed";
 import { logger } from "@/lib/observability/logger";
 import { handleDisputeEvent, isDisputeEvent } from "@/lib/resolution/disputes";
 
@@ -15,8 +16,11 @@ import { handleDisputeEvent, isDisputeEvent } from "@/lib/resolution/disputes";
  * aktifken `Stripe-Signature` (`constructEvent`), mock aktifken `x-psp-signature` (HMAC,
  * timing-safe, 5 dk tolerans). Diğer sağlayıcının imzası → 401; geçersiz imza → 400.
  * Olay kimliği tekildir: replay 200 döner ama ikinci kez etki etmez.
+ *
+ * v5 P0-5: `observed` ile `http_request_duration_seconds{route="payments.webhook"}` — webhook
+ * gecikmesi burn-rate SLO'su bu seriden hesaplanır (docs/runbooks/webhook-latency-burn-rate.md).
  */
-export async function POST(req: NextRequest) {
+const handleWebhook = observed("payments.webhook", async function webhookHandler(req: NextRequest) {
   const raw = await req.text();
   let event;
   try {
@@ -50,6 +54,10 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     return toErrorResponse(error, "payments.webhook");
   }
+});
+
+export async function POST(req: NextRequest) {
+  return handleWebhook(req, undefined);
 }
 
 export const dynamic = "force-dynamic";

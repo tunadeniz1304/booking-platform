@@ -38,9 +38,7 @@ export default function SupportChat() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const send = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const text = message.trim();
+  const ask = async (text: string, requestHuman = false) => {
     if (!text || busy) return;
     setBusy(true);
     setError(null);
@@ -49,7 +47,11 @@ export default function SupportChat() {
     try {
       const res = await apiFetch<ChatReply>("/api/support/chat", {
         method: "POST",
-        body: JSON.stringify({ message: text, locale: locale === "en" ? "en" : "tr" }),
+        body: JSON.stringify({
+          message: text,
+          locale: locale === "en" ? "en" : "tr",
+          ...(requestHuman ? { requestHuman: true } : {}),
+        }),
       });
       setTurns((prev) => [
         ...prev,
@@ -66,6 +68,15 @@ export default function SupportChat() {
       setBusy(false);
     }
   };
+
+  const send = (e: React.FormEvent) => {
+    e.preventDefault();
+    void ask(message.trim());
+  };
+
+  /** P2-1 "İnsana bağlan": metinden bağımsız, doğrudan insan kuyruğuna devir. */
+  const connectHuman = () => void ask(t("humanMessage"), true);
+  const handedOff = turns.some((turn) => turn.ticketId);
 
   return (
     <Card id="support-chat">
@@ -120,9 +131,21 @@ export default function SupportChat() {
         <p id={hintId} className="text-xs text-gray-600">
           {t("hint")}
         </p>
-        <Button type="submit" disabled={busy || message.trim() === ""}>
-          {busy ? t("sending") : t("send")}
-        </Button>
+        <div className="flex flex-wrap items-center gap-3">
+          <Button type="submit" disabled={busy || message.trim() === ""}>
+            {busy ? t("sending") : t("send")}
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={connectHuman}
+            disabled={busy || handedOff}
+            data-testid="support-connect-human"
+          >
+            {t("connectHuman")}
+          </Button>
+        </div>
+        <p className="text-xs text-gray-600">{handedOff ? t("humanPending") : t("humanHint")}</p>
       </form>
       <Status error={error} />
     </Card>

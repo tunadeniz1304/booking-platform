@@ -38,6 +38,8 @@ export interface SupportChatInput {
   message: string;
   bookingId?: string;
   locale?: SupportLocale;
+  /** P2-1: "İnsana bağlan" düğmesi — metinden bağımsız, LLM'siz USER_REQUEST devri. */
+  requestHuman?: boolean;
 }
 
 export interface SupportChatResult {
@@ -253,7 +255,8 @@ export async function runSupportChat(
   };
 
   // 2) Deterministik devir: LLM'e hiç gidilmez.
-  const forced = handoffReasonFor(intent);
+  // Para/hukuk sinyali açık istekten önce gelir (kuyrukta doğru önceliklendirme).
+  const forced = handoffReasonFor(intent) ?? (input.requestHuman ? "USER_REQUEST" : null);
   if (forced) {
     const ticket = await openTicket(ctx, forced, input.message);
     return finish({

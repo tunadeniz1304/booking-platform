@@ -232,6 +232,26 @@ describe("P1-4 devir eşiği ve grounding", () => {
     ).toThrow(/Kaynakta olmayan sayı/);
   });
 
+  it("P2-1 'insana bağlan' düğmesi (requestHuman) → LLM'siz USER_REQUEST devri", async () => {
+    const { repo, deps } = setup();
+    const r = await runSupportChat(
+      { userId: "u_guest", message: "Check-in saati kaçta?", requestHuman: true },
+      deps
+    );
+    expect(r.handoff?.reason).toBe("USER_REQUEST");
+    expect(r.llmMode).toBe("demo");
+    expect(repo.tickets).toHaveLength(1);
+  });
+
+  it("requestHuman para talebini ezmez: iade isteği yine MONEY_REQUEST", async () => {
+    const { deps } = setup();
+    const r = await runSupportChat(
+      { userId: "u_guest", message: "Paramı iade edin lütfen", requestHuman: true },
+      deps
+    );
+    expect(r.handoff?.reason).toBe("MONEY_REQUEST");
+  });
+
   it("İngilizce yanıt ve bildirim", async () => {
     const { deps } = setup();
     const r = await runSupportChat(

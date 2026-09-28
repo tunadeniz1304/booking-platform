@@ -11,7 +11,11 @@
     "assistant": "Asistan",
     "log": "Destek konuşması",
     "handoff": "Konu insan destek ekibine devredildi (talep: {id}).",
-    "empty": "Henüz mesaj yok."
+    "empty": "Henüz mesaj yok.",
+    "connectHuman": "İnsana bağlan",
+    "humanMessage": "Bir insan temsilciyle görüşmek istiyorum.",
+    "humanHint": "AI yanıtı yetmezse konuyu doğrudan insan destek ekibine aktarabilirsiniz.",
+    "humanPending": "Talebiniz insan destek ekibine iletildi; bir temsilci size dönecek."
   },
   "admin": {
     "link": "Destek kuyruğu",

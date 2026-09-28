@@ -76,6 +76,8 @@ export const supportChatSchema = z
     message: z.string().trim().min(1).max(1000),
     bookingId: z.string().min(1).max(64).optional(),
     locale: z.enum(["tr", "en"]).optional(),
+    /** P2-1: "İnsana bağlan" — doğrudan insan kuyruğuna devir. */
+    requestHuman: z.boolean().optional(),
   })
   .strict();
 

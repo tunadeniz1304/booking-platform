@@ -8,7 +8,7 @@ import { fetchCurrentUser, logout, type SessionUser } from "@/lib/api-client";
 import LocaleSwitcher from "./LocaleSwitcher";
 import ThemeToggle from "./ThemeToggle";
 
-type NavKey = "stays" | "plan" | "transfers" | "cart" | "host" | "admin" | "mailbox";
+type NavKey = "stays" | "plan" | "transfers" | "cart" | "support" | "host" | "admin" | "mailbox";
 
 interface NavItem {
   key: NavKey;
@@ -22,6 +22,8 @@ const NAV_ITEMS: readonly NavItem[] = [
   { key: "transfers", href: "/transfers" },
   // P1-1 grup sepeti: yalnızca oturum açmış kullanıcıya.
   { key: "cart", href: "/cart", roles: ["USER", "HOST", "ADMIN"] },
+  // v5 P2-1: AI destek asistanı oturum ister.
+  { key: "support", href: "/support", roles: ["USER", "HOST", "ADMIN"] },
   { key: "host", href: "/host", roles: ["HOST", "ADMIN"] },
   { key: "admin", href: "/admin", roles: ["ADMIN"] },
   { key: "mailbox", href: "/dev/mailbox" },

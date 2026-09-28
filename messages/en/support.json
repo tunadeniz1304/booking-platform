@@ -11,7 +11,11 @@
     "assistant": "Assistant",
     "log": "Support conversation",
     "handoff": "Handed over to our human support team (ticket: {id}).",
-    "empty": "No messages yet."
+    "empty": "No messages yet.",
+    "connectHuman": "Talk to a human",
+    "humanMessage": "I would like to talk to a human agent.",
+    "humanHint": "If the AI answer is not enough, you can hand the conversation straight to our human support team.",
+    "humanPending": "Your request was forwarded to our human support team; an agent will get back to you."
   },
   "admin": {
     "link": "Support queue",

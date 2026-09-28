@@ -642,3 +642,8 @@ Depozito capture hataları (karar sırasında): 422 `DEPOSIT_NOT_AUTHORIZED`, `D
 | 502  | `PAYMENT_PROVIDER_ERROR` (`Retry-After: 5`, `details.providerCode`)                                                                                               | PSP hatası; ödeme `OPEN` kalır, deneme hakkı düşmez                                      |
 | 502  | `TRANSFER_PAYMENT_FAILED`, `CLAIM_REFUND_FAILED`, `REFUND_RETRY_FAILED`                                                                                           | Devir capture'ı / talep iadesi / iade yeniden denemesi PSP'de başarısız                  |
 | 503  | `PUSH_DISABLED`, `SPLIT_PAY_UNAVAILABLE`, `TRANSFER_UNAVAILABLE`                                                                                                  | Özellik yapılandırılmamış (VAPID / imza sırrı yok)                                       |
+
+## v5 P1-3 — Şimdi rezerve et, sonra öde (RNPL)
+
+- `GET /api/bookings/{id}/rnpl` (oturum, yalnız sahibi): `{ available, reason?, dueTodayMinor: 0, amountMinor, currency, dueAt?, freeCancellationUntil? }`. `reason`: `DISABLED` (RNPL_ENABLED=false), `PROVIDER_UNSUPPORTED`, `NON_REFUNDABLE`, `NO_FREE_CANCELLATION`, `TOO_LATE`, `CART_BOOKING`, `NOT_PAYABLE`.
+- `POST /api/bookings/{id}/pay` gövdesinde `paymentOption: "rnpl"` → 200 `{ status: "scheduled", bookingId, paymentId, amount: 0, currency, scheduledAmount, dueAt, freeCancellationUntil }`; rezervasyon CONFIRMED, tahsilat `dueAt`'te kayıtlı karttan. Uygun değilse / risk `allow` değilse 409 `RNPL_UNAVAILABLE` (`details.reason`), kart kaydı reddedilirse 402 `PAYMENT_DECLINED`. Ayrıntı: ADR 0028.

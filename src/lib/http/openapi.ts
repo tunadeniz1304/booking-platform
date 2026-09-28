@@ -858,7 +858,8 @@ export function buildOpenApiDocument() {
           },
           responses: {
             "200": {
-              description: "Ödeme tamamlandı (`status: confirmed`)",
+              description:
+                "Ödeme tamamlandı (`status: confirmed`) ya da RNPL planlandı (`status: scheduled`, bugün 0)",
               content: jsonContent(ref("schemas", "PayOutcome")),
             },
             "202": {
@@ -872,10 +873,29 @@ export function buildOpenApiDocument() {
               "INVALID_STATE",
               "CONCURRENT_UPDATE",
               "TRANSACTION_CONFLICT",
+              "RNPL_UNAVAILABLE",
             ]),
             "402": errorResponse("Kart reddedildi; rezervasyon HELD kalır.", ["PAYMENT_DECLINED"]),
             "422": errorResponse("Kart token'ı reddedildi.", ["INVALID_CARD_TOKEN"]),
             "502": ref("responses", "PaymentProviderError"),
+          },
+        },
+      },
+      "/api/bookings/{id}/rnpl": {
+        parameters: [bookingId],
+        get: {
+          operationId: "getRnplOffer",
+          tags: ["payments"],
+          summary:
+            "P1-3: 'şimdi rezerve et, sonra öde' teklifi (uygunluk, vade, ücretsiz iptal bitişi)",
+          security: secured,
+          responses: {
+            "200": {
+              description: "Teklif; uygun değilse `available: false` + `reason`",
+              content: jsonContent(ref("schemas", "RnplOffer")),
+            },
+            ...authed,
+            "404": ref("responses", "NotFound"),
           },
         },
       },

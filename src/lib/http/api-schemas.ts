@@ -60,6 +60,12 @@ export const payBookingSchema = z.object({
   stepUpToken: z.string().min(16).max(64).optional(),
   /** P1-7: cüzdan kredisinden kullanılacak tutar (minor-unit); kalan kartla ödenir. */
   creditMinor: z.number().int().min(0).max(1_000_000_000_000).optional(),
+  /**
+   * P1-3 RNPL: `rnpl` → bugün 0; kart kaydedilir, tahsilat ücretsiz iptal bitiminden önce
+   * (yalnız iade edilebilir tarife + ücretsiz iptal süresi + risk `allow`; RNPL_ENABLED).
+   * Varsayılan `now`.
+   */
+  paymentOption: z.enum(["now", "rnpl"]).optional(),
   // v4#13: `cardBin` / `deviceId` artık istemciden ALINMAZ (gönderilirse yok sayılır):
   // BIN PSP token metadata'sından, cihaz kimliği sunucu imzalı `did` çerezinden gelir.
 });

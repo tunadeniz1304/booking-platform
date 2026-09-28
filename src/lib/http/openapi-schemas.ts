@@ -273,8 +273,23 @@ export const RESPONSE_SCHEMAS: Record<string, JsonSchema> = {
         bookingId: str,
         challenge: obj({ type: str }, { hint: str }),
       }),
+      // P1-3 RNPL: bugün 0 tahsil edildi; `scheduledAmount` `dueAt`'te kayıtlı karttan.
+      obj({
+        status: { const: "scheduled" },
+        bookingId: str,
+        paymentId: str,
+        amount: { const: 0 },
+        currency,
+        scheduledAmount: minor,
+        dueAt: str,
+        freeCancellationUntil: str,
+      }),
     ],
   },
+  RnplOffer: obj(
+    { available: bool, dueTodayMinor: { const: 0 }, amountMinor: minor, currency },
+    { reason: str, dueAt: str, freeCancellationUntil: str }
+  ),
   SearchHit: searchHit,
   SearchResult: obj(searchPage, { cached: bool, semantic: bool, ranking: str }),
   SmartSearchResult: obj(

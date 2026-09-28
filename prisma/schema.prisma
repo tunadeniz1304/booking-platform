@@ -686,7 +686,7 @@ model PriceHistory {
 }
 
 /// Fiyat alarmı (P1-4): kullanıcı bir konaklamayı izler; günlük iş fiyatı gözlemler ve
-/// son PRICE_OMNIBUS_DAYS günün en düşüğünün altına inerse e-posta gönderir (outbox).
+/// pazar kuralının indirim referans penceresindeki (P1-7) en düşüğün altına inerse e-posta gönderir (outbox).
 model PriceAlert {
   id             String    @id @default(cuid())
   userId         String

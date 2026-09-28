@@ -26,7 +26,10 @@ export function sealLink(plain: string): string {
 export function openLink(sealed: string): string {
   if (!sealed.startsWith("v1.")) throw new Error("Bilinmeyen bağlantı şifre sürümü");
   const raw = Buffer.from(sealed.slice(3), "base64url");
-  const decipher = createDecipheriv("aes-256-gcm", key(), raw.subarray(0, 12));
+  // Etiket uzunluğu sabit: kısaltılmış GCM etiketi (ör. 4 bayt) kabul edilmez (Semgrep).
+  const decipher = createDecipheriv("aes-256-gcm", key(), raw.subarray(0, 12), {
+    authTagLength: 16,
+  });
   decipher.setAuthTag(raw.subarray(12, 28));
   return Buffer.concat([decipher.update(raw.subarray(28)), decipher.final()]).toString("utf8");
 }

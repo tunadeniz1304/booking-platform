@@ -886,13 +886,30 @@ export async function releaseHold(bookingId: string): Promise<boolean> {
  * önbelleklenir ve durum olaylarında outbox tüketicisi siler; ödeme durumu (iade/capture
  * commit sonrası değişebilir) önbelleğe ALINMAZ, her okumada taze okunur (v4#14).
  */
-const bookingDetailInclude = {
+/**
+ * İstemciye dönen rezervasyon sütunları: idempotency anahtarı ve istek özeti İÇ alandır
+ * (anahtar tekrar oynatmaya, özet gövde tahminine hizmet eder); liste/detay yanıtlarına ve
+ * detay önbelleğine girmez. Yeni sütunlar varsayılan olarak dahildir; gizli olanı buraya ekleyin.
+ */
+const INTERNAL_BOOKING_FIELDS = ["idempotencyKey", "idempotencyRequestHash"] as const;
+type PublicBookingField = Exclude<
+  Prisma.BookingScalarFieldEnum,
+  (typeof INTERNAL_BOOKING_FIELDS)[number]
+>;
+const bookingPublicScalars = Object.fromEntries(
+  Object.values(Prisma.BookingScalarFieldEnum)
+    .filter((f) => !(INTERNAL_BOOKING_FIELDS as readonly string[]).includes(f))
+    .map((f) => [f, true])
+) as { [K in PublicBookingField]: true };
+
+const bookingDetailSelect = {
+  ...bookingPublicScalars,
   property: { include: { location: true } },
   room: true,
   payment: true,
-} satisfies Prisma.BookingInclude;
+} satisfies Prisma.BookingSelect;
 
-export type BookingDetail = Prisma.BookingGetPayload<{ include: typeof bookingDetailInclude }>;
+export type BookingDetail = Prisma.BookingGetPayload<{ select: typeof bookingDetailSelect }>;
 
 export async function getBooking(bookingId: string, userId: string): Promise<BookingDetail> {
   const cacheKey = bookingCacheKey(bookingId);
@@ -901,6 +918,9 @@ export async function getBooking(bookingId: string, userId: string): Promise<Boo
     if (cached) {
       // Önbellekteki JSON'da tarih/Decimal alanları serileştirilmiş hâldedir (yanıt JSON'u ile aynı).
       const parsed = JSON.parse(cached) as BookingDetail;
+      // Düzeltmeden önce yazılmış (TTL dolmamış) girdilerde iç alanlar olabilir → at.
+      for (const field of INTERNAL_BOOKING_FIELDS)
+        delete (parsed as Record<string, unknown>)[field];
       if (parsed.id === bookingId && parsed.userId === userId) {
         const payment = await prisma.payment.findUnique({ where: { bookingId } });
         return { ...parsed, payment };
@@ -912,7 +932,7 @@ export async function getBooking(bookingId: string, userId: string): Promise<Boo
 
   const booking = await prisma.booking.findUnique({
     where: { id: bookingId },
-    include: bookingDetailInclude,
+    select: bookingDetailSelect,
   });
   if (!booking) throw new BookingNotFoundError();
 
@@ -930,12 +950,13 @@ export async function getBooking(bookingId: string, userId: string): Promise<Boo
   return booking;
 }
 
-const bookingListInclude = {
+const bookingListSelect = {
+  ...bookingPublicScalars,
   property: { include: { location: true } },
   room: { select: { name: true } },
-} satisfies Prisma.BookingInclude;
+} satisfies Prisma.BookingSelect;
 
-export type UserBookingRow = Prisma.BookingGetPayload<{ include: typeof bookingListInclude }>;
+export type UserBookingRow = Prisma.BookingGetPayload<{ select: typeof bookingListSelect }>;
 
 export interface UserBookingsPage {
   items: UserBookingRow[];
@@ -994,7 +1015,7 @@ export async function listUserBookingsPage(
     },
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     take: limit + 1,
-    include: bookingListInclude,
+    select: bookingListSelect,
   });
   const items = rows.slice(0, limit);
   const last = items[items.length - 1];

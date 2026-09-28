@@ -6,10 +6,13 @@
  *    bölünmüş ödeme, hasar talebi + depozito, 7565 kaldırma + SLA, ajan mandate'i, devir
  *    capture hatası, cüzdan (cashback → kredi → iptal); her biri sonunda mizan + mutabakat denetimi. `DATABASE_URL`,
  *    `REDIS_URL` ve `DEMO_MODE=true` gerekir (MockPsp, LLM yok → anahtarsız).
+ *  - v5 (15–20): aynı süreç içi desen (`scripts/demo/v5-scenarios.ts`) — RNPL zamanında +
+ *    başarısız tahsilat, sepet telafisi, KYC'siz devir payout'u, destek ajanı insana devir,
+ *    üçüncü taraf mandate doğrulaması + OpenAPI keşfi, TR/AB indirim referansı.
  *
  *   npm run demo:scenarios                 # hepsi
  *   npm run demo:scenarios -- --only=1     # tek senaryo (virgülle birden çok: --only=2,4)
- *   npm run demo:scenarios -- --suite=v4   # yalnız v3 | v4
+ *   npm run demo:scenarios -- --suite=v4   # yalnız v3 | v4 | v5
  *
  * Ortam: BASE_URL (varsayılan http://localhost:3000), DAY_OFFSET (bugünden kaç gün sonra;
  * yoksa 150–339 arası rastgele → tekrar çalıştırmalar birbirinin envanterine çarpmaz).
@@ -61,6 +64,9 @@ const DAY_OFFSET = (() => {
   return 150 + Math.floor(Math.random() * 190);
 })();
 
+/** v3: 1–7, v4: 8–14, v5: 15–20. */
+const LAST_SCENARIO = 20;
+
 const ONLY: Set<number> | null = (() => {
   const arg = process.argv.find((a) => a.startsWith("--only="));
   if (!arg) return null;
@@ -68,16 +74,18 @@ const ONLY: Set<number> | null = (() => {
     .slice("--only=".length)
     .split(",")
     .map((s) => Number(s.trim()))
-    .filter((n) => Number.isInteger(n) && n >= 1 && n <= 14);
-  if (ids.length === 0) throw new Error(`Geçersiz --only değeri: ${arg} (1..14)`);
+    .filter((n) => Number.isInteger(n) && n >= 1 && n <= LAST_SCENARIO);
+  if (ids.length === 0) throw new Error(`Geçersiz --only değeri: ${arg} (1..${LAST_SCENARIO})`);
   return new Set(ids);
 })();
 
-const SUITE: "v3" | "v4" | null = (() => {
+const SUITE: "v3" | "v4" | "v5" | null = (() => {
   const arg = process.argv.find((a) => a.startsWith("--suite="));
   if (!arg) return null;
   const v = arg.slice("--suite=".length);
-  if (v !== "v3" && v !== "v4") throw new Error(`Geçersiz --suite değeri: ${v} (v3|v4)`);
+  if (v !== "v3" && v !== "v4" && v !== "v5") {
+    throw new Error(`Geçersiz --suite değeri: ${v} (v3|v4|v5)`);
+  }
   return v;
 })();
 
@@ -850,9 +858,11 @@ function printTable(rows: readonly Row[]): void {
 
 async function main(): Promise<void> {
   const wanted = (id: number) =>
-    (!ONLY || ONLY.has(id)) && (!SUITE || (SUITE === "v3" ? id <= 7 : id >= 8));
+    (!ONLY || ONLY.has(id)) &&
+    (!SUITE || (SUITE === "v3" ? id <= 7 : SUITE === "v4" ? id >= 8 && id <= 14 : id >= 15));
   const v3 = SCENARIOS.filter((s) => wanted(s.id));
   const v4Wanted = [8, 9, 10, 11, 12, 13, 14].some(wanted);
+  const v5Wanted = [15, 16, 17, 18, 19, 20].some(wanted);
   console.log(
     `Demo senaryoları — BASE_URL=${BASE_URL}, DAY_OFFSET=${DAY_OFFSET}, çalıştırma=${RUN_ID}`
   );
@@ -885,11 +895,13 @@ async function main(): Promise<void> {
     report(s.id, s.title, outcome.ok, Date.now() - started, outcome.detail);
   }
 
-  if (v4Wanted) {
-    // Süreç içi modüller (Prisma/Redis) yalnız v4 istenince yüklenir.
+  if (v4Wanted || v5Wanted) {
+    // Süreç içi modüller (Prisma/Redis) yalnız v4/v5 istenince yüklenir.
     const v4 = await import("./demo/v4-scenarios");
+    const v5 = v5Wanted ? await import("./demo/v5-scenarios") : null;
     const problem = v4.prepareV4();
-    for (const s of v4.V4_SCENARIOS.filter((x) => wanted(x.id))) {
+    const inProcess = [...v4.V4_SCENARIOS, ...(v5?.V5_SCENARIOS ?? [])];
+    for (const s of inProcess.filter((x) => wanted(x.id))) {
       const title = `(${s.key}) ${s.title}`;
       if (problem) {
         report(s.id, title, false, 0, `atlandı: ${problem}`);

@@ -63,11 +63,17 @@ export interface V4Scenario {
 
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
-const RUN = randomBytes(3).toString("hex");
+export const RUN = randomBytes(3).toString("hex");
 let seq = 0;
 
+/** Demo verisinin etiketi (e-posta/ilan adı): v4 senaryoları "v4", v5 senaryoları "v5". */
+let demoLabel = "v4";
+export function setDemoLabel(label: string): void {
+  demoLabel = label;
+}
+
 let prismaClient: PrismaClient | null = null;
-function db(): PrismaClient {
+export function db(): PrismaClient {
   prismaClient ??= new PrismaClient();
   return prismaClient;
 }
@@ -76,13 +82,13 @@ function db(): PrismaClient {
 // Assert + defter denetimi
 // ---------------------------------------------------------------------------
 
-class ScenarioAssertion extends Error {}
+export class ScenarioAssertion extends Error {}
 
-function check(cond: unknown, message: string): asserts cond {
+export function check(cond: unknown, message: string): asserts cond {
   if (!cond) throw new ScenarioAssertion(message);
 }
 
-async function expectRejects(
+export async function expectRejects(
   promise: Promise<unknown>,
   expected: { status?: number; code?: string },
   label: string
@@ -101,14 +107,14 @@ async function expectRejects(
   throw new ScenarioAssertion(`${label}: hata bekleniyordu, işlem başarılı oldu`);
 }
 
-interface Touched {
+export interface Touched {
   payments: Set<string>;
   deposits: Set<string>;
   transfers: Set<string>;
   days: Set<string>;
 }
 
-const touched = (): Touched => ({
+export const touched = (): Touched => ({
   payments: new Set(),
   deposits: new Set(),
   transfers: new Set(),
@@ -120,7 +126,7 @@ const touched = (): Touched => ({
  * jurnal 0 ve senaryonun ödeme/depozito/devir öznelerinde fark 0. Aynı günlerdeki diğer
  * (senaryo dışı) farklar bilgi olarak raporlanır.
  */
-async function assertBooks(t: Touched): Promise<string> {
+export async function assertBooks(t: Touched): Promise<string> {
   const prisma = db();
   const balanced = isTrialBalanced(await trialBalance(prisma));
   check(balanced, "mizan dengesiz");
@@ -149,27 +155,27 @@ async function assertBooks(t: Touched): Promise<string> {
 // Fixture'lar
 // ---------------------------------------------------------------------------
 
-function utcDay(offset: number): Date {
+export function utcDay(offset: number): Date {
   const d = new Date();
   d.setUTCHours(0, 0, 0, 0);
   d.setUTCDate(d.getUTCDate() + offset);
   return d;
 }
-const iso = (d: Date) => d.toISOString().slice(0, 10);
+export const iso = (d: Date) => d.toISOString().slice(0, 10);
 
-interface DemoUser {
+export interface DemoUser {
   id: string;
   email: string;
 }
 
-async function demoUser(
+export async function demoUser(
   tag: string,
   role: "USER" | "HOST" | "ADMIN" = "USER",
   firstName = "Demo"
 ): Promise<DemoUser> {
   const u = await db().user.create({
     data: {
-      email: `demo-v4-${tag}-${RUN}-${++seq}@demo.test`,
+      email: `demo-${demoLabel}-${tag}-${RUN}-${++seq}@demo.test`,
       passwordHash: "x",
       firstName,
       lastName: tag,
@@ -180,7 +186,7 @@ async function demoUser(
   return { id: u.id, email: u.email };
 }
 
-interface DemoStay {
+export interface DemoStay {
   hostId: string;
   propertyId: string;
   roomIds: string[];
@@ -189,22 +195,35 @@ interface DemoStay {
 const createdProperties: string[] = [];
 
 /** Doğrulanmış belgeli, `rooms` oda tipli, 90 günlük envanterli demo ilanı. */
-async function demoStay(
+export async function demoStay(
   tag: string,
-  opts: { rooms?: number; units?: number; nightlyMinor?: bigint; host?: DemoUser } = {}
+  opts: {
+    rooms?: number;
+    units?: number;
+    nightlyMinor?: bigint;
+    host?: DemoUser;
+    /** Varsayılan "Demo Senaryo" / Türkiye (v5: AB pazarı için başka ülke). */
+    location?: { city: string; country: string; latitude: number; longitude: number };
+  } = {}
 ): Promise<DemoStay> {
   const prisma = db();
   const host = opts.host ?? (await demoUser(`${tag}-host`, "HOST", "Ev Sahibi"));
+  const place = opts.location ?? {
+    city: "Demo Senaryo",
+    country: "Türkiye",
+    latitude: 41.01,
+    longitude: 28.97,
+  };
   const location = await prisma.location.upsert({
-    where: { city_country: { city: "Demo Senaryo", country: "Türkiye" } },
+    where: { city_country: { city: place.city, country: place.country } },
     update: {},
-    create: { city: "Demo Senaryo", country: "Türkiye", latitude: 41.01, longitude: 28.97 },
+    create: place,
   });
   const price = opts.nightlyMinor ?? 150_000n;
   const property = await prisma.property.create({
     data: {
       hostId: host.id,
-      title: `Demo v4 ${tag} (${RUN})`,
+      title: `Demo ${demoLabel} ${tag} (${RUN})`,
       description: "P2-2 demo senaryosu için otomatik oluşturuldu.",
       propertyType: "HOTEL",
       locationId: location.id,
@@ -258,10 +277,10 @@ const claimsOf = (userId: string, role: AccessClaims["role"]): AccessClaims => (
 });
 
 /** Rastgele son 4 hane → kart hız kuralı tekrar koşularda 3DS/ret üretmez. */
-const card = () => `tok_mock_ok_${String(1000 + Math.floor(Math.random() * 9000))}`;
-const ctx = () => ({ ip: `10.77.${seq % 250}.${++seq % 250}` });
+export const card = () => `tok_mock_ok_${String(1000 + Math.floor(Math.random() * 9000))}`;
+export const ctx = () => ({ ip: `10.77.${seq % 250}.${++seq % 250}` });
 
-async function holdAndPay(
+export async function holdAndPay(
   userId: string,
   stay: DemoStay,
   start: number,
@@ -280,7 +299,7 @@ async function holdAndPay(
     bookingId: booking.id,
     userId,
     cardToken: card(),
-    idempotencyKey: `demo-v4-pay-${RUN}-${booking.id}`,
+    idempotencyKey: `demo-${demoLabel}-pay-${RUN}-${booking.id}`,
     context: ctx(),
     creditMinor,
   });

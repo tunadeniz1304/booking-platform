@@ -1,20 +1,32 @@
-# Yük & kaos testi override'ı (P2-3) — YALNIZCA demo yığınının ÜSTÜNE, yerelde:
+# Yük & kaos testi override'ı (P2-3, v5 P0-6/P1-8) — YALNIZCA demo yığınının ÜSTÜNE, yerelde:
 #
-#   docker compose -p p23 -f docker-compose.yml -f docker-compose.demo.yml \
-#     -f docker-compose.load.yml up -d --build
+#   docker compose -p booking-load -f docker-compose.yml -f docker-compose.demo.yml \
+#     -f docker-compose.load.yml up -d app worker grpc caddy
 #
-# Tüm k6 trafiği tek konteyner IP'sinden ve ~100 hesaptan gelir; bu yüzden rate-limit ve
-# fraud hız sınırları gevşetilir, bölünmüş ödeme süresi deadline yarışı ölçülebilsin diye
-# en kısa değere (5 dk) indirilir. MockPsp kaos ayarları (gecikme/hata) host ortamından
-# geçirilir; varsayılanları 0'dır. Prod varsayılanları (docker-compose.yml, app-config) DEĞİŞMEZ;
-# bu dosya DEMO_MODE'u da açık tutar (MockPsp yalnız demo/mock'ta).
+# Tüm k6 trafiği tek konteyner IP'sinden (Caddy arkasında, TRUSTED_PROXY_HOPS=1 → istemci IP'si
+# k6 konteyneri) ve ~100 hesaptan gelir; bu yüzden rate-limit ve fraud hız sınırları gevşetilir,
+# bölünmüş ödeme süresi deadline yarışı ölçülebilsin diye en kısa değere (5 dk) indirilir. MockPsp
+# kaos ayarları (gecikme/hata) host ortamından geçirilir; varsayılanları 0'dır. Prod varsayılanları
+# (docker-compose.yml, app-config) DEĞİŞMEZ; bu dosya DEMO_MODE'u da açık tutar (MockPsp ve
+# gevşetme çarpanı yalnız demo/mock'ta etkindir).
+#
+# Kaos (v5 P0-6): Toxiproxy, Postgres ve Redis'in ÖNÜNE girer. Yalnız `chaos` profiliyle ve
+# uygulama servisleri proxy'ye yönlendirilerek açılır (varsayılan koşumda araya girmez):
+#
+#   LOAD_POSTGRES_HOST=toxiproxy LOAD_REDIS_HOST=toxiproxy docker compose -p booking-load \
+#     -f docker-compose.yml -f docker-compose.demo.yml -f docker-compose.load.yml \
+#     --profile chaos up -d toxiproxy app worker grpc caddy
+#
+# `load/chaos-*.js` toksinleri k6 içinden http://toxiproxy:8474 API'siyle ekler/kaldırır.
 x-load-env: &load-env
   DEMO_MODE: "true"
   COOKIE_SECURE: "false"
   PAYMENT_PROVIDER: "mock"
   # Tüm rate-limit kategorileri + hesap başına giriş limiti ×1000 (yalnız DEMO_MODE'da etkin;
-  # docker-compose.demo.yml'deki RATE_LIMIT_DEMO_RELAX_MULTIPLIER'ı ezer).
+  # docker-compose.demo.yml'deki RATE_LIMIT_DEMO_RELAX_MULTIPLIER'ı ezer). Tek k6 IP'si yüzünden.
   RATE_LIMIT_DEMO_RELAX_MULTIPLIER: "${RATE_LIMIT_DEMO_RELAX_MULTIPLIER:-1000}"
+  # Fraud hız sınırları: tüm ödemeler aynı IP'den ve aynı mock kart(lar)dan gelir; prod
+  # varsayılanlarında ilk birkaç ödemeden sonra risk motoru bloklar. Yalnız bu yük profilinde.
   FRAUD_VELOCITY_USER_MAX: "1000"
   FRAUD_VELOCITY_IP_MAX: "10000"
   FRAUD_VELOCITY_CARD_MAX: "1000"
@@ -24,6 +36,9 @@ x-load-env: &load-env
   MOCK_PSP_JITTER_MS: "${MOCK_PSP_JITTER_MS:-0}"
   MOCK_PSP_FAILURE_RATE: "${MOCK_PSP_FAILURE_RATE:-0}"
   MOCK_PSP_FAILURE_OPS: "${MOCK_PSP_FAILURE_OPS:-capture,refund}"
+  # Kaos: varsayılan doğrudan db/redis; `LOAD_*_HOST=toxiproxy` ile proxy üzerinden.
+  POSTGRES_HOST: "${LOAD_POSTGRES_HOST:-db}"
+  REDIS_HOST: "${LOAD_REDIS_HOST:-redis}"
 
 services:
   migrate:
@@ -34,3 +49,15 @@ services:
     environment: *load-env
   grpc:
     environment: *load-env
+
+  # v5 P0-6: Postgres (5432) ve Redis (6379) önünde TCP kaos vekili (MIT, Shopify).
+  # API: 8474 (yalnız compose iç ağı). Proxy tanımları docker/toxiproxy/toxiproxy.json.
+  toxiproxy:
+    image: ghcr.io/shopify/toxiproxy:2.9.0
+    profiles: ["chaos"]
+    command: ["-host=0.0.0.0", "-config=/config/toxiproxy.json"]
+    volumes:
+      - ./docker/toxiproxy/toxiproxy.json:/config/toxiproxy.json:ro
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_healthy }

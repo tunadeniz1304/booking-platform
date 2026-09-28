@@ -32,5 +32,16 @@
     "waiting": "Waiting...",
     "verify": "Verify with passkey",
     "cancel": "Cancel"
+  },
+  "rnpl": {
+    "legend": "When to pay",
+    "payNow": "Pay now: {amount}",
+    "payLater": "Reserve now, pay later: {today} today, {amount} on {date}",
+    "timeline": "Cancellation timeline",
+    "stepToday": "Today: {today} is charged; your card is only saved.",
+    "stepCharge": "{date}: {amount} is charged to your saved card.",
+    "stepFreeCancel": "Free cancellation until {date}; cancel before the charge and you pay nothing.",
+    "stepFailure": "If the charge fails we notify you and retry; if unpaid within the grace period, the booking is cancelled automatically.",
+    "reserve": "Reserve now (no payment today)"
   }
 }

@@ -9,6 +9,7 @@ import { useFormat } from "@/i18n/use-format";
 import type { PayResponse } from "./StripePaymentForm";
 import StepUpDialog from "./StepUpDialog";
 import WalletCreditOption from "./WalletCreditOption";
+import RnplOption from "./RnplOption";
 
 // Stripe.js yalnızca `PAYMENT_PROVIDER=stripe` iken ve istemcide yüklenir.
 const StripePaymentForm = dynamic(() => import("./StripePaymentForm"), { ssr: false });
@@ -58,6 +59,8 @@ export default function BookingActions({
   const [stepUpToken, setStepUpToken] = useState<string | null>(null);
   /** P1-7: cüzdan kredisinden kullanılacak tutar (minor-unit; 0 = yalnız kart). */
   const [creditMinor, setCreditMinor] = useState(0);
+  /** P1-3: "şimdi rezerve et, sonra öde" seçili mi (kredi ile birlikte kullanılamaz). */
+  const [rnpl, setRnpl] = useState(false);
   const [idemKey] = useState(() =>
     typeof crypto !== "undefined" ? crypto.randomUUID() : String(Date.now())
   );
@@ -85,7 +88,7 @@ export default function BookingActions({
       body: JSON.stringify({
         cardToken,
         ...(verifiedToken ? { stepUpToken: verifiedToken } : {}),
-        ...(creditMinor > 0 ? { creditMinor } : {}),
+        ...(rnpl ? { paymentOption: "rnpl" } : creditMinor > 0 ? { creditMinor } : {}),
       }),
     });
   }
@@ -232,7 +235,10 @@ export default function BookingActions({
   const input = "mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm";
   return (
     <div className="space-y-4 border-t border-gray-100 pt-6">
-      {status === "HELD" && !challenge && (
+      {status === "HELD" && !challenge && !useStripeForm && (
+        <RnplOption bookingId={bookingId} disabled={busy} selected={rnpl} onChange={setRnpl} />
+      )}
+      {status === "HELD" && !challenge && !rnpl && (
         <WalletCreditOption
           bookingId={bookingId}
           totalMinor={amountMinor}
@@ -309,7 +315,7 @@ export default function BookingActions({
             disabled={busy}
             className="w-full rounded-lg bg-[#003580] px-4 py-3 text-sm font-semibold text-white disabled:bg-gray-300 disabled:text-gray-700"
           >
-            {busy ? t("processing") : t("payAndConfirm")}
+            {busy ? t("processing") : rnpl ? t("rnpl.reserve") : t("payAndConfirm")}
           </button>
         </form>
       )}

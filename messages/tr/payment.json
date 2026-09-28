@@ -32,5 +32,16 @@
     "waiting": "Bekleniyor...",
     "verify": "Passkey ile doğrula",
     "cancel": "Vazgeç"
+  },
+  "rnpl": {
+    "legend": "Ödeme zamanı",
+    "payNow": "Şimdi öde: {amount}",
+    "payLater": "Şimdi rezerve et, sonra öde: bugün {today}, {date} tarihinde {amount}",
+    "timeline": "İptal zaman çizelgesi",
+    "stepToday": "Bugün: {today} tahsil edilir; kartınız yalnızca kaydedilir.",
+    "stepCharge": "{date}: {amount} kayıtlı kartınızdan tahsil edilir.",
+    "stepFreeCancel": "{date} tarihine kadar ücretsiz iptal; tahsilattan önce iptal ederseniz hiç ödeme alınmaz.",
+    "stepFailure": "Tahsilat başarısız olursa size bildirir ve yeniden deneriz; ek süre içinde ödenmezse rezervasyon otomatik iptal edilir.",
+    "reserve": "Şimdi rezerve et (bugün ödeme yok)"
   }
 }

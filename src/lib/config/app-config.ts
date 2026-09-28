@@ -317,6 +317,14 @@ const schema = z.object({
   AGENT_MANDATE_MAX_TTL_MINUTES: int(10_080, 5, 43_200),
   /** `/.well-known/jwks.json` önbellek süresi (sn); anahtar rotasyonunda eski kid bu süreden uzun tutulmalı. */
   AGENT_MANDATE_JWKS_MAX_AGE_SECONDS: int(300, 0, 86_400),
+  /**
+   * v5 P1-1 (ADR 0035): ajan HTTP isteği için RFC 9421 HTTP Message Signatures anahtar dizini
+   * (JWKS JSON: `{"keys":[…]}`; her JWK'de `kid` = `keyid`, P-256 ya da Ed25519 açık anahtar).
+   * Boşsa doğrulama kapalıdır; doluysa `/api/ucp/*` ve `/api/agentic/*` imza ister.
+   */
+  AGENT_HTTP_SIGNATURE_KEYS: z.string().default(""),
+  /** İmzanın `created` parametresi için kabul penceresi (sn; saat kayması dahil). */
+  AGENT_HTTP_SIGNATURE_MAX_AGE_SECONDS: int(300, 10, 3_600),
 
   // Güvenlik / ağ
   TRUSTED_PROXY_HOPS: int(0, 0, 10),

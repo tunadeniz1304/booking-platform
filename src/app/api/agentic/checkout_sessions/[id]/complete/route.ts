@@ -4,6 +4,7 @@ import { toErrorResponse } from "@/lib/http/errors";
 import { observed } from "@/lib/http/observed";
 import { completeCheckoutSchema, completeCheckoutSession } from "@/lib/agentic/checkout";
 import { mandateHeader, requireIdempotencyKey, riskContext } from "@/lib/agentic/http";
+import { assertAgentHttpSignature } from "@/lib/agentic/http-signature";
 
 /**
  * Ödemeyi tamamlar: web checkout ile aynı saga (teklif → HELD → ödeme). 3DS gerekiyorsa
@@ -15,6 +16,7 @@ export const POST = observed(
   "agentic.checkout.complete",
   async function postHandler(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
+      await assertAgentHttpSignature(req);
       const { id } = await params;
       const { userId } = await requireVerifiedEmail(req);
       const idempotencyKey = requireIdempotencyKey(req);

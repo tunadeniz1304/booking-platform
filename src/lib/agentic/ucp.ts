@@ -3,6 +3,7 @@ import { createCheckoutSchema, type CheckoutSessionView, type CheckoutStatus } f
 import { activeSptProvider } from "./spt";
 import { MANDATE_TYP } from "./mandate";
 import { MANDATE_ALG } from "./mandate-keys";
+import { httpSignaturesEnabled } from "./http-signature";
 import { getConfig } from "@/lib/config/app-config";
 
 /**
@@ -180,6 +181,18 @@ export function ucpProfile(origin: string) {
     authentication: {
       type: "bearer",
       note: "Kullanıcının OAuth/erişim token'ı; kimlik argüman değildir",
+    },
+    signing: {
+      // v5 P1-1 (ADR 0025/0035): mandate doğrulama anahtarları platforma sormadan buradan.
+      jwks_uri: `${origin}/.well-known/jwks.json`,
+      mandate_alg: MANDATE_ALG,
+      http_message_signatures: {
+        spec: "RFC 9421",
+        required: httpSignaturesEnabled(),
+        algorithms: ["ecdsa-p256-sha256", "ed25519"],
+        covered_components: ["@method", "@target-uri", "content-digest"],
+        scope: [`${origin}/api/ucp/*`, `${origin}/api/agentic/*`],
+      },
     },
     payment: { handlers: paymentHandlers() },
     ap2: {

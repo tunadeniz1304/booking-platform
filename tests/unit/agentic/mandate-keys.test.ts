@@ -224,5 +224,11 @@ describe("AP2 mandate ES256 anahtar halkası + JWKS (v2-P1-1)", () => {
       alg: "ES256",
       jwks_uri: "https://stay.example/.well-known/jwks.json",
     });
+    // v5 P1-1: manifest üst düzeyinde de jwks_uri + mandate alg + RFC 9421 bilgisi.
+    expect(profile.signing).toMatchObject({
+      jwks_uri: "https://stay.example/.well-known/jwks.json",
+      mandate_alg: "ES256",
+      http_message_signatures: { spec: "RFC 9421", required: false },
+    });
   });
 });

@@ -5,6 +5,7 @@ import { observed } from "@/lib/http/observed";
 import { completeCheckoutSession } from "@/lib/agentic/checkout";
 import { mandateHeader, requireIdempotencyKey, riskContext } from "@/lib/agentic/http";
 import { toAcpComplete, toUcpView } from "@/lib/agentic/ucp";
+import { assertAgentHttpSignature } from "@/lib/agentic/http-signature";
 
 /**
  * UCP tamamlama: `payment_data.credential` (SPT) + `ap2.intent_mandate` → ACP tamamlama
@@ -14,6 +15,7 @@ export const POST = observed(
   "ucp.checkout.complete",
   async function postHandler(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
+      await assertAgentHttpSignature(req);
       const { id } = await params;
       const { userId } = await requireVerifiedEmail(req);
       const idempotencyKey = requireIdempotencyKey(req);

@@ -9,6 +9,7 @@ import {
 } from "@/lib/agentic/checkout";
 import { requireIdempotencyKey } from "@/lib/agentic/http";
 import { toAcpUpdate, toUcpView } from "@/lib/agentic/ucp";
+import { assertAgentHttpSignature } from "@/lib/agentic/http-signature";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -17,6 +18,7 @@ export const GET = observed(
   "ucp.checkout.get",
   async function getHandler(req: NextRequest, { params }: Ctx) {
     try {
+      await assertAgentHttpSignature(req);
       const { id } = await params;
       const { userId } = await requireAuth(req);
       return NextResponse.json(toUcpView(await getCheckoutSession(userId, id)));
@@ -31,6 +33,7 @@ export const PUT = observed(
   "ucp.checkout.update",
   async function putHandler(req: NextRequest, { params }: Ctx) {
     try {
+      await assertAgentHttpSignature(req);
       const { id } = await params;
       const { userId } = await requireVerifiedEmail(req);
       requireIdempotencyKey(req);

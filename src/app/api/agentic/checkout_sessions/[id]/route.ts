@@ -8,6 +8,7 @@ import {
   updateCheckoutSession,
 } from "@/lib/agentic/checkout";
 import { requireIdempotencyKey } from "@/lib/agentic/http";
+import { assertAgentHttpSignature } from "@/lib/agentic/http-signature";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -16,6 +17,7 @@ export const GET = observed(
   "agentic.checkout.get",
   async function getHandler(req: NextRequest, { params }: Ctx) {
     try {
+      await assertAgentHttpSignature(req);
       const { id } = await params;
       const { userId } = await requireAuth(req);
       return NextResponse.json(await getCheckoutSession(userId, id));
@@ -30,6 +32,7 @@ export const POST = observed(
   "agentic.checkout.update",
   async function postHandler(req: NextRequest, { params }: Ctx) {
     try {
+      await assertAgentHttpSignature(req);
       const { id } = await params;
       const { userId } = await requireVerifiedEmail(req);
       requireIdempotencyKey(req);

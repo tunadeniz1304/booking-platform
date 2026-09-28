@@ -5,10 +5,12 @@ import { observed } from "@/lib/http/observed";
 import { createCheckoutSession } from "@/lib/agentic/checkout";
 import { requireIdempotencyKey } from "@/lib/agentic/http";
 import { toAcpCreate, toUcpView } from "@/lib/agentic/ucp";
+import { assertAgentHttpSignature } from "@/lib/agentic/http-signature";
 
 /** UCP lodging checkout oluşturma — ACP servisinin ince adaptörü (P1-11). */
 export const POST = observed("ucp.checkout.create", async function postHandler(req: NextRequest) {
   try {
+    await assertAgentHttpSignature(req);
     const { userId } = await requireVerifiedEmail(req);
     const idempotencyKey = requireIdempotencyKey(req);
     const input = toAcpCreate(await req.json());

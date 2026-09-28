@@ -1,4 +1,5 @@
-import { afterAll, afterEach, beforeAll, beforeEach, expect, it } from "vitest";
+import { generateKeyPairSync } from "node:crypto";
+import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { describeInt, iso, utcDay } from "./helpers";
@@ -11,6 +12,8 @@ import { setPaymentProviderForTests } from "@/lib/payment";
 import { StripeProvider } from "@/lib/payment/stripe-provider";
 import { isTrialBalanced, trialBalance } from "@/lib/ledger";
 import { redis } from "@/lib/redis";
+import { signHttpRequest } from "@/lib/agentic/http-signature";
+import { resetConfigForTests } from "@/lib/config/app-config";
 import { POST as issuePost } from "@/app/api/account/agent-mandates/route";
 import { POST as acpCreate } from "@/app/api/agentic/checkout_sessions/route";
 import { POST as acpComplete } from "@/app/api/agentic/checkout_sessions/[id]/complete/route";
@@ -312,6 +315,50 @@ describeInt("P1-11 ajan ticareti: AP2 mandate + UCP + Stripe SPT (integration)",
       req("/api/ucp/checkout-sessions", "POST", { line_items: [], lodging: stay })
     );
     expect(invalid.status).toBe(400);
+  });
+
+  it("RFC 9421 (v5 P1-1): anahtar dizini varsa imzasız UCP isteği 401, imzalı istek 201", async () => {
+    const agent = generateKeyPairSync("ec", { namedCurve: "prime256v1" });
+    const jwk = { ...agent.publicKey.export({ format: "jwk" }), kid: "agent-it" };
+    vi.stubEnv("AGENT_HTTP_SIGNATURE_KEYS", JSON.stringify({ keys: [jwk] }));
+    resetConfigForTests();
+    try {
+      const body = { line_items: [{ item: { id: fx.roomId }, quantity: 1 }], lodging: nextStay() };
+      const unsigned = await call0(ucpCreate, req("/api/ucp/checkout-sessions", "POST", body));
+      expect(unsigned.status).toBe(401);
+      expect(await unsigned.json()).toMatchObject({ code: "HTTP_SIGNATURE_REQUIRED" });
+
+      const url = "http://localhost:3000/api/ucp/checkout-sessions";
+      const raw = JSON.stringify(body);
+      const headers = signHttpRequest(
+        {
+          method: "POST",
+          url,
+          body: raw,
+          headers: {
+            "content-type": "application/json",
+            authorization: `Bearer ${token}`,
+            "idempotency-key": `p111-sig-${Date.now()}`,
+          },
+        },
+        { keyid: "agent-it", privateKey: agent.privateKey, alg: "ecdsa-p256-sha256" }
+      );
+      const signed = await call0(
+        ucpCreate,
+        new NextRequest(url, { method: "POST", headers, body: raw })
+      );
+      expect(signed.status).toBe(201);
+
+      // Gövde imzadan sonra değişirse (digest uyuşmaz) 401.
+      const tampered = await call0(
+        ucpCreate,
+        new NextRequest(url, { method: "POST", headers, body: raw.replace("quantity", "quantitx") })
+      );
+      expect(tampered.status).toBe(401);
+    } finally {
+      vi.unstubAllEnvs();
+      resetConfigForTests();
+    }
   });
 
   it("Stripe SPT yolu: token kaydı doğrulanır, PaymentIntent shared_payment_granted_token ile; defter dengede", async () => {

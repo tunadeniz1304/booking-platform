@@ -6,6 +6,7 @@ Bu dosyadaki tüm önemli değişiklikler burada belgelenir. Biçim [Keep a Chan
 
 ### Dependencies
 
+- `madge` (MIT) devDependency: `npm run deps:circular` ödeme modüllerinde içe aktarma döngüsü olmadığını doğrular (ADR 0027); `.madgerc` yalnız-tip içe aktarmaları yok sayar.
 - `zod-to-json-schema` (ISC; zaten `@modelcontextprotocol/sdk` üzerinden kuruluydu) doğrudan bağımlılık oldu: `/api/openapi.json` gövde/sorgu şemaları route'ların zod şemalarından üretilir (v5#16).
 
 ## [4.0.0] - 2026-09-27

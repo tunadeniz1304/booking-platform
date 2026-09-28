@@ -15,6 +15,9 @@ import "@/lib/payout/payout-engine";
 import "@/lib/payout/escrow";
 import "@/lib/resolution/deposit";
 import { primeBusinessMetrics } from "@/lib/observability/business-metrics";
+// v5 P1-4/P1-5: destek ajanı metrikleri + son eval skoru (`llm_eval_score`).
+import "@/lib/support/metrics";
+import { refreshLlmEvalScore } from "@/lib/llm/eval-score";
 
 /** Prometheus metrikleri — `Authorization: Bearer <METRICS_TOKEN>`. */
 export async function GET(req: NextRequest) {
@@ -26,6 +29,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Yetkisiz" }, { status: 401 });
   }
   primeBusinessMetrics();
+  refreshLlmEvalScore();
   return new NextResponse(await registry.metrics(), {
     headers: { "content-type": registry.contentType },
   });

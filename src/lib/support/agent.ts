@@ -4,9 +4,10 @@ import { getLlmClient, type LlmClient, type LlmMode } from "@/lib/llm/client";
 import { getLlmSettings } from "@/lib/llm/settings";
 import { GuardError, assertNumbersGrounded, buildFactSet } from "@/lib/llm/guards";
 import { ServiceUnavailableError } from "@/lib/http/errors";
-import { counter, histogram } from "@/lib/observability/metrics";
+import { supportChatLatencySeconds, supportChatTotal, supportHandoffTotal } from "./metrics";
 import { classifyIntent, normalizeForIntent, type IntentResult } from "./intent";
 import { prismaSupportRepo, type SupportRepo } from "./repo";
+export { supportHandoffTotal } from "./metrics";
 import {
   bookingSummary,
   cancellationQuote,
@@ -61,25 +62,6 @@ export const SUPPORT_DISCLOSURE: Record<SupportLocale, string> = {
   tr: "Bir yapay zekâ (AI) asistanıyla konuşuyorsunuz. İade, iptal veya ödeme kararı veremez; gerektiğinde konuyu insan destek ekibine devreder.",
   en: "You are chatting with an AI assistant. It cannot approve refunds, cancellations or payments; when needed it hands the conversation to our human support team.",
 };
-
-// --- Metrikler ---------------------------------------------------------------------------
-
-export const supportHandoffTotal = counter(
-  "support_handoff_total",
-  "Destek ajanının insana devrettiği konuşmalar (neden bazında)",
-  ["reason"] as const
-);
-export const supportChatTotal = counter(
-  "support_chat_total",
-  "Destek ajanı konuşma turları (niyet + sonuç)",
-  ["intent", "outcome"] as const
-);
-export const supportChatLatencySeconds = histogram(
-  "support_chat_latency_seconds",
-  "Destek ajanı yanıt süresi (saniye)",
-  ["outcome"] as const,
-  [0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10, 20]
-);
 
 // --- Şablonlar ---------------------------------------------------------------------------
 

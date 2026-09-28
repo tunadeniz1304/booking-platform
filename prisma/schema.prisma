@@ -356,6 +356,8 @@ model Booking {
   cartId                 String?
   cart                   Cart?                 @relation(fields: [cartId], references: [id], onDelete: SetNull)
   payment                Payment?
+  /// P1-3 RNPL: zamanlanmış tahsilat (yalnız "şimdi rezerve et, sonra öde" rezervasyonlarında).
+  paymentSchedule        PaymentSchedule?
   reviews                Review[]
   transfers              BookingTransfer[]
   payouts                Payout[]
@@ -431,6 +433,49 @@ model Payment {
   @@index([userId])
   @@index([status])
   @@index([provider, status])
+}
+
+/// P1-3 RNPL tahsilat planı durumu.
+enum PaymentScheduleStatus {
+  /// Vadesi bekleniyor
+  SCHEDULED
+  /// Tahsilat başarısız; RNPL_GRACE_HOURS içinde yeniden denenecek
+  RETRYING
+  /// Tahsil edildi (booking-captured jurnali yazıldı)
+  CAPTURED
+  /// Misafir ücretsiz iptal süresinde iptal etti; tahsilat yok
+  CANCELLED
+  /// Ek süre doldu; rezervasyon otomatik iptal, envanter bırakıldı
+  DEFAULTED
+}
+
+/// P1-3 RNPL (ADR 0028): kayıtlı kartla, ücretsiz iptal bitiminden önce zamanlanmış tahsilat.
+model PaymentSchedule {
+  id                    String                @id @default(cuid())
+  bookingId             String                @unique
+  booking               Booking               @relation(fields: [bookingId], references: [id])
+  userId                String
+  dueAt                 DateTime
+  amountMinor           BigInt
+  currency              String
+  status                PaymentScheduleStatus @default(SCHEDULED)
+  attempts              Int                   @default(0)
+  /// PSP'de kayıtlı ödeme yöntemi (mock: pm_mock_…, stripe: pm_…); kart verisi değil.
+  paymentMethodRef      String
+  /// PSP müşterisi (Stripe Customer); mock'ta yok.
+  customerRef           String?
+  freeCancellationUntil DateTime
+  firstFailedAt         DateTime?
+  nextAttemptAt         DateTime?
+  lastFailureCode       String?
+  /// Tahsilatın PSP kimliği (başarılı tahsilattan sonra).
+  providerRef           String?
+  capturedAt            DateTime?
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @default(now()) @updatedAt
+
+  @@index([status, dueAt])
+  @@index([status, nextAttemptAt])
 }
 
 /// PSP webhook olayları — olay kimliği benzersiz: replay ikinci kez etki etmez.

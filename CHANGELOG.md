@@ -13,6 +13,7 @@ Bu dosyadaki tüm önemli değişiklikler burada belgelenir. Biçim [Keep a Chan
 - **P1-9 (ADR 0036)** MCP Apps arayüz kaynağı `ui://booking/stay-card` (`text/html;profile=mcp-app`): CSP ile ağa kapalı, ilan adı sunucuda HTML-kaçışlı, vergi dahil toplam fiyat + AI etiketi; `search_stays` sonucu kartı gömülü kaynak olarak da taşır. `npm run mcp:smoke` kaynağı listeler/okur (ve demo dışı ortamda geçici ES256 mandate anahtarıyla çalışır). Eski `ui://stay-card` URI'si kaldırıldı.
 - **P1-4 (ADR 0029)** AI destek ajanı + insana devir: `POST /api/support/chat` (misafir; `ai` rate-limit kovası, `withAiSubject` bütçesi) — salt-okur araçlar `get_my_booking`, `explain_cancellation_quote` (`computeRefund`, yazmaz), `get_property_policy` ve tek "yazma" `open_support_ticket`. Deterministik niyet sınıflandırıcı: para/iade talebi, hukuki/şikâyet sinyali, insan isteği → LLM'e gitmeden `SupportTicket` (migration `20261004100000_support_ticket`); prompt-injection → şablon ret; güven < `SUPPORT_HANDOFF_MIN_CONFIDENCE` → devir. Canlı yanıtta sayı grounding'i + "yetkisiz eylem iddiası" guard'ı. "AI ile konuşuyorsunuz" bildirimi (API `disclosure` + UI), `/support` misafir sayfası, `/admin/support` kuyruğu + `GET /api/admin/support`, `PATCH /api/admin/support/{id}` (denetim kayıtlı). Metrikler: `support_handoff_total{reason}`, `support_chat_total{intent,outcome}`, `support_chat_latency_seconds`.
 - **P1-5 (ADR 0030)** LLM eval + GenAI telemetrisi: `evals/` promptfoo paketi (yorum özeti, mesaj taslağı, trip-plan, destek ajanı; iddialar şema, sayı grounding'i, PII, Türkçe, red-team), uygulamanın saf LLM çekirdeklerini çağıran özel sağlayıcı; `npm run llm:eval` (demo, ağsız, CI) / `-- --live` (yalnız yerel), eşik `LLM_EVAL_MIN_PASS_RATE` (0.95), özet → `llm_eval_score{task,mode}` göstergesi. `client.ts` her çıkarım isteğinde OTel GenAI span'i (semconv 1.37.0: `gen_ai.operation.name`, `gen_ai.request.model`, `gen_ai.usage.input_tokens/output_tokens`, `gen_ai.response.finish_reasons`); içerik yalnız `LLM_OTEL_CAPTURE_CONTENT=true` iken ve redakte. Yeni geliştirme bağımlılığı: `promptfoo` 0.123.1 (MIT; Node ≥ 22.22).
+- **P1-6 (ADR 0031)** Tedarik zinciri CI'ı: `ci.yml` tüm dallarda her push/PR; tüm action'lar tam commit SHA, container imajları digest ile pinli; yeni `security.yml`: Semgrep CE SAST, gitleaks (tüm geçmiş, `.gitleaksignore` yalnız test sabitleri), CycloneDX SBOM artefaktı (`@cyclonedx/cyclonedx-npm` 6.0.1, Apache-2.0, `npx`), OSV-Scanner geçidi (`osv-scanner.toml` gerekçeli/süreli istisna), CodeQL + `actions/attest-build-provenance` + OpenSSF Scorecard (repo private olduğu için `private == false` koşullu; Scorecard rozeti konmadı). `.github/dependabot.yml` (npm, github-actions, docker), kökte `SECURITY.md` bildirim politikası; CI'da `actionlint`.
 
 ### Notes
 
@@ -27,6 +28,8 @@ Bu dosyadaki tüm önemli değişiklikler burada belgelenir. Biçim [Keep a Chan
 
 ### Fixed
 
+- **v5#13** CI yalnız `main`'de tetikleniyor, action'lar etiketle pinliydi; SAST/secret/SBOM/provenance yoktu (P1-6).
+- Mühürlü bağlantı çözümü (`openLink`) AES-GCM etiket uzunluğunu 16 bayta sabitler; kısaltılmış etiket reddedilir (Semgrep `gcm-no-tag-length`).
 - **v5#14** Teklifteki indirim referans penceresi tesis ülkesine göre (TR ilanı 10 gün, AB ilanı 30 gün); `omnibusDays` yanıtta pazar değerini taşır.
 - **P0-7** Arama kartı toplamı artık ev sahibi promosyonlarını (erken rezervasyon, son dakika, uzun konaklama; kupon hariç) teklif motoruyla aynı biçimde uygular; promosyon eklenince/değişince/silinince etkilenen ilanların teklif önbelleği geçersiz kılınır. `tests/integration/v5-price-invariant.test.ts`: fast-check 200 örnekte arama kartı = `/api/quote` = PSP capture (+ kredi) = tahsilat jurnali.
 
@@ -36,6 +39,7 @@ Bu dosyadaki tüm önemli değişiklikler burada belgelenir. Biçim [Keep a Chan
 
 ### Dependencies
 
+- `yaml` (ISC; zaten promptfoo üzerinden kuruluydu) doğrudan devDependency: iş akışı ve alarm YAML'larını ayrıştıran regresyon testleri (v5#13, v5#17).
 - `madge` (MIT) devDependency: `npm run deps:circular` ödeme modüllerinde içe aktarma döngüsü olmadığını doğrular (ADR 0027); `.madgerc` yalnız-tip içe aktarmaları yok sayar.
 - `zod-to-json-schema` (ISC; zaten `@modelcontextprotocol/sdk` üzerinden kuruluydu) doğrudan bağımlılık oldu: `/api/openapi.json` gövde/sorgu şemaları route'ların zod şemalarından üretilir (v5#16).
 

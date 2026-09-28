@@ -1,0 +1,9 @@
+# OSV-Scanner istisnaları (v5 P1-6). Her istisna gerekçeli ve süreli olmalıdır;
+# süresi dolan istisna CI geçidini yeniden kırmızıya çevirir.
+
+[[IgnoredVulns]]
+id = "GHSA-8988-4f7v-96qf"
+ignoreUntil = 2026-12-31
+reason = """@opentelemetry/core@1.30.1 yalnız @prisma/instrumentation@5.22 (Prisma 5) altından \
+geliyor; bu kopya W3C Baggage propagator olarak kullanılmıyor (yayılım @vercel/otel → core 2.x). \
+Düzeltme Prisma 6 geçişini gerektiriyor — ADR 0031."""

@@ -1,0 +1,7 @@
+# gitleaks bulgu parmak izleri — yalnız test sabitleri (gerçek sır değil):
+# stripe.test.ts:178 mock PSP kart token'ı; v4-push-pwa.test.ts:52 sahte Web Push p256dh/auth anahtarı.
+# Biçim: <commit>:<dosya>:<kural>:<satır> (git geçmişi taraması) ve <dosya>:<kural>:<satır> (--no-git).
+038b3fca40e842214e36f522a9ee855df85274ec:tests/unit/payment/stripe.test.ts:generic-api-key:178
+tests/unit/payment/stripe.test.ts:generic-api-key:178
+4dbe7d04178daa4ce60bced4f355542c12333ca6:tests/integration/v4-push-pwa.test.ts:generic-api-key:52
+tests/integration/v4-push-pwa.test.ts:generic-api-key:52

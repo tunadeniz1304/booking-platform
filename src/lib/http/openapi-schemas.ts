@@ -58,7 +58,11 @@ const searchHit = obj(
     amenities: { type: "array" },
     images: { type: "array" },
     availableRooms: int,
-    display: obj({ amount: minor, currency }),
+    // Görüntü para biriminde ONDALIK ana birim (yalnız gösterim/filtre; minor-unit değil).
+    display: obj({
+      amount: { type: "number", description: "Görüntü birimi, ana birim (ondalık)" },
+      currency,
+    }),
     quote: obj({ total: minor, currency }),
   }
 );

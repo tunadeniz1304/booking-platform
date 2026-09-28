@@ -8,14 +8,7 @@ import { ValidationError, toErrorResponse } from "@/lib/http/errors";
 import { httpsUrl } from "@/lib/security/url";
 import { withAiSubject } from "@/lib/http/ai";
 import { DEFAULT_RATE_PLANS, licenseSchema, roomSchema } from "@/lib/host/host-service";
-import {
-  CURRENCIES,
-  minorFromDb,
-  minorToDb,
-  moneyFromDb,
-  toDecimalString,
-  toMinor,
-} from "@/lib/money/money";
+import { CURRENCIES, minorFromDb, minorToDb, toMinor } from "@/lib/money/money";
 import {
   SearchParamsSchema,
   searchParamsFromUrl,
@@ -183,13 +176,9 @@ export async function POST(req: NextRequest) {
       return created;
     });
 
-    // API sözleşmesi: `basePrice` ondalık string (görüntüleme), `basePriceMinor` hesaplama için.
+    // API sözleşmesi (ADR 0033): para yalnız minor-unit (`basePriceMinor`).
     return NextResponse.json(
-      {
-        ...property,
-        basePriceMinor: minorFromDb(property.basePriceMinor),
-        basePrice: toDecimalString(moneyFromDb(property.basePriceMinor, property.currency)),
-      },
+      { ...property, basePriceMinor: minorFromDb(property.basePriceMinor) },
       { status: 201 }
     );
   } catch (error) {

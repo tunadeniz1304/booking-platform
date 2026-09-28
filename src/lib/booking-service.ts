@@ -1,5 +1,5 @@
 import { Prisma, BookingStatus } from "@prisma/client";
-import { withLegacyDecimals } from "@/lib/money/legacy-json";
+import { withMinorNumbers } from "@/lib/money/minor-json";
 import { prisma } from "@/lib/prisma";
 import { redis } from "@/lib/redis";
 import { invalidatePropertySearchCache } from "@/lib/search";
@@ -29,7 +29,7 @@ import {
   type FxTable,
 } from "@/lib/fx/store";
 import { taxRulesFor } from "@/lib/pricing/tax";
-import { money, toDecimalString, assertCurrency, minorToDb, minorFromDb } from "@/lib/money/money";
+import { money, assertCurrency, minorToDb, minorFromDb } from "@/lib/money/money";
 import {
   clockOf,
   DateRangeError,
@@ -149,8 +149,6 @@ export interface BookingDTO {
   checkIn: string;
   checkOut: string;
   guestCount: number;
-  /** Görüntüleme için ana birim (ör. 1234.5); hesaplamada `totalMinor` kullanılır. */
-  totalPrice: number;
   totalMinor: number;
   currency: string;
   status: BookingStatus;
@@ -193,7 +191,6 @@ function toDto(row: BookingRow): BookingDTO {
     checkIn: fromDate(row.checkIn),
     checkOut: fromDate(row.checkOut),
     guestCount: row.guestCount,
-    totalPrice: Number(toDecimalString(money(totalMinor, currency))),
     totalMinor,
     currency,
     status: row.status,
@@ -1010,25 +1007,23 @@ export async function listUserBookings(userId: string): Promise<UserBookingRow[]
 }
 
 /**
- * API sunumu (ADR 0019): `*Minor` BigInt alanlar `number` olur ve yanlarına geriye uyumlu
- * ondalık string'ler eklenir (`totalPrice`, `payment.amount`, `property.basePrice`, …).
+ * API sunumu (ADR 0019, ADR 0033): `*Minor` BigInt alanlar `number` olur; ondalık kopya yok.
  */
 export function presentBooking<
   T extends {
     currency: string;
     totalPriceMinor: bigint | number;
-    property?: ({ currency: string } & object) | null;
+    property?: object | null;
     room?: object | null;
-    payment?: ({ currency: string } & object) | null;
+    payment?: object | null;
   },
 >(row: T) {
-  const propertyCurrency = row.property?.currency ?? row.currency;
   return {
-    ...withLegacyDecimals(row),
-    ...(row.property ? { property: withLegacyDecimals(row.property) } : {}),
-    ...(row.room ? { room: withLegacyDecimals(row.room, propertyCurrency) } : {}),
+    ...withMinorNumbers(row),
+    ...(row.property ? { property: withMinorNumbers(row.property) } : {}),
+    ...(row.room ? { room: withMinorNumbers(row.room) } : {}),
     ...(row.payment !== undefined
-      ? { payment: row.payment ? withLegacyDecimals(row.payment) : null }
+      ? { payment: row.payment ? withMinorNumbers(row.payment) : null }
       : {}),
   };
 }

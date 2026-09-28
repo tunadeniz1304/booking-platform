@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { minorFromDb, moneyFromDb, toDecimalString } from "@/lib/money/money";
+import { minorFromDb } from "@/lib/money/money";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/auth";
@@ -35,8 +35,6 @@ export async function GET(req: NextRequest) {
         ...p,
         amountMinor: minorFromDb(p.amountMinor),
         refundedAmountMinor: minorFromDb(p.refundedAmountMinor),
-        amount: toDecimalString(moneyFromDb(p.amountMinor, p.currency)),
-        refundedAmount: toDecimalString(moneyFromDb(p.refundedAmountMinor, p.currency)),
       })),
     });
   } catch (error) {

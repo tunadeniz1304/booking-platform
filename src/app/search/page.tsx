@@ -17,6 +17,7 @@ import { parseAccessibilityParam } from "@/lib/compliance/accessibility-codes";
 import type { MapPoint } from "@/components/search/ResultsMap";
 import { apiFetch } from "@/lib/api-client";
 import { useFormat } from "@/i18n/use-format";
+import { toMajorNumber } from "@/lib/money/money";
 import { focusRing } from "@/components/ui/ui";
 
 // Harita yalnızca istemcide ve yalnızca istenince yüklenir (maplibre ağır, SSR'siz).
@@ -35,7 +36,8 @@ interface SearchResultItem {
   id: string;
   title: string;
   propertyType: string;
-  basePrice: number;
+  /** Taban gece fiyatı (minor-unit). */
+  basePriceMinor: number;
   currency: string;
   ratingAvg: number;
   ratingCount: number;
@@ -48,7 +50,6 @@ interface SearchResultItem {
   amenities: string[];
   images?: string[];
   availableRooms: number;
-  totalPrice?: number;
   /** Tarih seçiliyse sunucu teklifi (vergi + ücret dahil, minor-unit). */
   quote?: { roomId: string; ratePlanId: string; total: number; currency: string; nights: number };
   score?: number;
@@ -246,7 +247,8 @@ function SearchPageContent() {
   };
 
   const visibleResults = results.filter((p) => {
-    const price = p.basePrice;
+    // Fiyat aralığı süzgeci ana birimde (kaydırıcı); tutar minor-unit'ten türetilir.
+    const price = toMajorNumber(p.basePriceMinor, p.currency);
     if (price < priceRange[0] || price > priceRange[1]) return false;
     if (selectedTypes.length > 0 && !selectedTypes.includes(p.propertyType)) return false;
     return true;
@@ -261,7 +263,7 @@ function SearchPageContent() {
             city: p.location.city,
             latitude: p.location.latitude,
             longitude: p.location.longitude,
-            priceLabel: f.decimal(p.basePrice, p.currency),
+            priceLabel: f.money(p.basePriceMinor, p.currency),
           },
         ]
       : []
@@ -510,7 +512,7 @@ function SearchPageContent() {
                         property.images?.[0] ??
                         "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=600&h=400&fit=crop"
                       }
-                      price={property.basePrice}
+                      priceMinor={property.basePriceMinor}
                       currency={property.currency}
                       rating={property.ratingAvg}
                       reviewCount={property.ratingCount}

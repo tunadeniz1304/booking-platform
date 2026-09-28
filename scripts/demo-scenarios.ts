@@ -15,8 +15,8 @@
  * yoksa 150–339 arası rastgele → tekrar çalıştırmalar birbirinin envanterine çarpmaz).
  * Hesaplar seed'dekilerdir (guest/host@booking.test, parola Password123!).
  *
- * Tutarlar her yerde tamsayı minor-unit'tir (kuruş). Veritabanından `Decimal` olarak dönen
- * alanlar (`totalPrice`, `payment.amount`) `toMinor` ile string üzerinden çevrilir.
+ * Tutarlar her yerde tamsayı minor-unit'tir (kuruş); API yalnız `*Minor` alanları döner
+ * (`totalPriceMinor`, `payment.amountMinor`; ADR 0033).
  *
  * Önkoşul: senaryo 1 tek kullanıcıdan 100 eşzamanlı rezervasyon ister → varsayılan
  * `RATE_LIMIT_BOOKING_MAX=30` ile 429 alınır. Yükseltilmiş limitlerle çalıştırın
@@ -29,7 +29,7 @@ import {
   type PolicySnapshot,
   type RefundDecision,
 } from "../src/lib/booking/cancellation";
-import { assertCurrency, toMinor } from "../src/lib/money/money";
+import { assertCurrency } from "../src/lib/money/money";
 import { clockOf, parseIsoDate } from "../src/lib/time/nights";
 import { loadEnv } from "../src/lib/config/load-env";
 
@@ -302,10 +302,10 @@ interface BookingRow {
   checkIn: string;
   createdAt: string;
   currency: string;
-  totalPrice: string | number;
+  totalPriceMinor: number;
   policySnapshot: unknown;
   property: { timeZone?: string | null; checkInTime?: string | null; checkOutTime?: string | null };
-  payment: { id: string; status: string; amount: string | number } | null;
+  payment: { id: string; status: string; amountMinor: number } | null;
 }
 
 async function getBooking(token: string, id: string): Promise<BookingRow> {
@@ -456,8 +456,8 @@ async function scenario2(): Promise<Outcome> {
 
   const row = await getBooking(token, booking.id);
   const currency = assertCurrency(row.currency);
-  const bookingMinor = toMinor(row.totalPrice, currency);
-  const paidMinor = row.payment ? toMinor(row.payment.amount, currency) : 0;
+  const bookingMinor = row.totalPriceMinor;
+  const paidMinor = row.payment ? row.payment.amountMinor : 0;
   const paymentIds = new Set(confirmed.map((r) => r.json.paymentId));
   const ok =
     confirmed.length >= 1 &&
@@ -550,7 +550,7 @@ async function scenario4(): Promise<Outcome> {
   const input = {
     checkIn: parseIsoDate(row.checkIn.slice(0, 10)),
     createdAt: new Date(row.createdAt),
-    paidMinor: row.payment ? toMinor(row.payment.amount, currency) : 0,
+    paidMinor: row.payment ? row.payment.amountMinor : 0,
     currency,
   };
   const tokyoClock = clockOf(row.property);

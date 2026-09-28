@@ -1,5 +1,5 @@
 import { Prisma } from "@prisma/client";
-import { minorFromDb, minorToDb, moneyFromDb, toDecimalString, toMinor } from "@/lib/money/money";
+import { minorFromDb, minorToDb, toMinor } from "@/lib/money/money";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { NotFoundError, ValidationError } from "@/lib/http/errors";
@@ -136,7 +136,6 @@ export async function updateProperty(
   return {
     ...updated,
     basePriceMinor: minorFromDb(updated.basePriceMinor),
-    basePrice: toDecimalString(moneyFromDb(updated.basePriceMinor, property.currency)),
   };
 }
 
@@ -395,12 +394,8 @@ export async function listHostProperties(actor: AccessClaims) {
     orderBy: { createdAt: "desc" },
     take: 100,
   });
-  // API sözleşmesi: `basePrice` ondalık string (görüntüleme), `basePriceMinor` hesaplama için.
-  return rows.map((p) => ({
-    ...p,
-    basePriceMinor: minorFromDb(p.basePriceMinor),
-    basePrice: toDecimalString(moneyFromDb(p.basePriceMinor, p.currency)),
-  }));
+  // API sözleşmesi (ADR 0033): para yalnız minor-unit (`basePriceMinor`).
+  return rows.map((p) => ({ ...p, basePriceMinor: minorFromDb(p.basePriceMinor) }));
 }
 
 export async function listHostBookings(actor: AccessClaims) {
@@ -423,6 +418,5 @@ export async function listHostBookings(actor: AccessClaims) {
   return rows.map((b) => ({
     ...b,
     totalPriceMinor: minorFromDb(b.totalPriceMinor),
-    totalPrice: toDecimalString(moneyFromDb(b.totalPriceMinor, b.currency)),
   }));
 }

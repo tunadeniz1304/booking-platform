@@ -25,7 +25,7 @@ export interface RoomAvailabilityResponse {
 export interface ReserveRoomResponse {
   booking_id: string;
   status: string;
-  total_price: number;
+  total_price_minor: string | number;
   currency: string;
 }
 

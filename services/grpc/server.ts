@@ -197,8 +197,8 @@ const handlers = {
     return {
       booking_id: result.booking.id,
       status: result.booking.status,
-      total_price: result.booking.totalPrice,
       currency: result.booking.currency,
+      total_price_minor: result.booking.totalMinor,
     };
   }, "booking"),
 
@@ -218,17 +218,13 @@ const handlers = {
       return {
         payment_id: "",
         status: "REQUIRES_ACTION",
-        charged_amount: 0,
         charged_amount_minor: 0,
         currency: "",
       };
     }
-    const charged = money(outcome.amount, outcome.currency);
     return {
       payment_id: outcome.paymentId,
       status: "PAID",
-      // v3#9: float bölme yok — minor-unit'ten kesin ondalık dizgiye.
-      charged_amount: Number(toDecimalString(charged)),
       charged_amount_minor: outcome.amount,
       currency: outcome.currency,
     };

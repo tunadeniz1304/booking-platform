@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { minorFromDb, toMajorNumber } from "@/lib/money/money";
+import { minorFromDb } from "@/lib/money/money";
 import { requireRole } from "@/lib/auth";
 import { toErrorResponse } from "@/lib/http/errors";
 import { propertyPatchSchema, updateProperty } from "@/lib/host/host-service";
@@ -65,13 +65,11 @@ export async function GET(_req: Request, { params }: Props) {
     return NextResponse.json({
       ...property,
       basePriceMinor: minorFromDb(property.basePriceMinor),
-      basePrice: toMajorNumber(property.basePriceMinor, property.currency),
       // `capacity`: bir sürüm boyunca `maxOccupancy`'nin geriye uyumlu adı (ADR 0010).
       rooms: property.rooms.map((r) => ({
         ...r,
         capacity: r.maxOccupancy,
         priceModifierMinor: minorFromDb(r.priceModifierMinor),
-        priceModifier: toMajorNumber(r.priceModifierMinor, property.currency),
       })),
     });
   } catch (error) {

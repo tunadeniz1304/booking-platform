@@ -12,7 +12,8 @@ export interface PropertyCardProps {
   title: string;
   location: string;
   imageUrl: string;
-  price: number;
+  /** Taban gece fiyatı (minor-unit, `currency` biriminde). */
+  priceMinor: number;
   currency?: string;
   rating: number;
   reviewCount: number;
@@ -38,7 +39,7 @@ export default function PropertyCard({
   title,
   location,
   imageUrl,
-  price,
+  priceMinor,
   currency = "TRY",
   rating,
   reviewCount,
@@ -182,9 +183,7 @@ export default function PropertyCard({
           ) : (
             <div data-testid="card-price">
               <p className="text-xs text-gray-500">{t("card.fromPerNight")}</p>
-              <p className="text-lg font-bold text-gray-900">
-                {f.number(price, { style: "currency", currency, maximumFractionDigits: 0 })}
-              </p>
+              <p className="text-lg font-bold text-gray-900">{f.money(priceMinor, currency)}</p>
               <p className="text-xs text-gray-500">{t("card.taxesOnDates")}</p>
             </div>
           )}

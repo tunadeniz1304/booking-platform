@@ -9,7 +9,6 @@ import {
   assertCurrency,
   type CurrencyCode,
   minorFromDb,
-  moneyFromDb,
 } from "@/lib/money/money";
 import { convert, type FxSnapshot } from "@/lib/money/fx";
 import { getCurrentFx } from "@/lib/fx/store";
@@ -76,7 +75,8 @@ export interface SearchResult {
   title: string;
   description: string;
   propertyType: string;
-  basePrice: number;
+  /** Taban gece fiyatı (minor-unit, mülk para birimi). */
+  basePriceMinor: number;
   currency: string;
   ratingAvg: number;
   ratingCount: number;
@@ -89,8 +89,6 @@ export interface SearchResult {
   amenities: string[];
   images?: string[];
   availableRooms: number;
-  /** Görüntüleme (ana birim, mülk para birimi); tahsilat için `quote.total` (minor-unit). */
-  totalPrice?: number;
   /** Seçilen tarihler için en ucuz uygun oda tipi + planın vergi dahil toplamı. */
   quote?: SearchQuote;
   /** Görüntü para birimindeki karşılık (fiyat filtresi bu sayı üzerinden uygulanır). */
@@ -539,7 +537,7 @@ export async function searchProperties(
       title: e.title,
       description: e.description,
       propertyType: e.propertyType,
-      basePrice: Number(toDecimalString(money(e.basePriceMinor, e.currency))),
+      basePriceMinor: e.basePriceMinor,
       currency: e.currency,
       ratingAvg: e.ratingAvg,
       ratingCount: e.ratingCount,
@@ -547,12 +545,7 @@ export async function searchProperties(
       amenities: e.amenities,
       images: e.images,
       availableRooms: e.rooms.length,
-      ...(quote
-        ? {
-            quote,
-            totalPrice: Number(toDecimalString(money(quote.total, quote.currency))),
-          }
-        : {}),
+      ...(quote ? { quote } : {}),
       display: { amount, currency },
     });
   }
@@ -777,7 +770,7 @@ export async function getPopularProperties(limit = 10): Promise<SearchResult[]> 
     title: p.title,
     description: p.description,
     propertyType: p.propertyType,
-    basePrice: Number(toDecimalString(moneyFromDb(p.basePriceMinor, p.currency))),
+    basePriceMinor: minorFromDb(p.basePriceMinor),
     currency: p.currency,
     ratingAvg: p.ratingAvg,
     ratingCount: p.ratingCount,

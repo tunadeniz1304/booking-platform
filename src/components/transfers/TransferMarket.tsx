@@ -20,8 +20,8 @@ import {
 
 interface DiscoverItem {
   id: string;
-  askPrice: number;
-  originalPrice: number;
+  askPriceMinor: number;
+  originalPriceMinor: number;
   currency: string;
   expiresAt: string;
   seller: string;
@@ -36,7 +36,7 @@ interface MyBooking {
   status: string;
   checkIn: string;
   checkOut: string;
-  totalPrice: string;
+  totalPriceMinor: number;
   currency: string;
   property: { title: string };
 }
@@ -70,8 +70,8 @@ export default function TransferMarket() {
                 {t("discover.guests", { count: item.guestCount })}
                 <span className="block">
                   {t.rich("discover.terms", {
-                    ask: f.decimal(item.askPrice, item.currency),
-                    original: f.decimal(item.originalPrice, item.currency),
+                    ask: f.money(item.askPriceMinor, item.currency),
+                    original: f.money(item.originalPriceMinor, item.currency),
                     seller: item.seller,
                     expires: f.date(item.expiresAt),
                     b: (chunks) => <strong>{chunks}</strong>,
@@ -120,13 +120,13 @@ function SellPanel() {
     setCopied(false);
     try {
       const askPriceMinor = toMinor(ask.replace(",", "."), selected.currency);
-      const res = await apiFetch<{ claimUrl: string; askPrice: number; currency: string }>(
+      const res = await apiFetch<{ claimUrl: string; askPriceMinor: number; currency: string }>(
         "/api/transfers",
         { method: "POST", body: JSON.stringify({ bookingId: selected.id, askPriceMinor }) }
       );
       setClaimUrl(res.claimUrl);
       setFeedback({
-        message: t("sell.created", { amount: f.money(res.askPrice, res.currency) }),
+        message: t("sell.created", { amount: f.money(res.askPriceMinor, res.currency) }),
       });
     } catch (err) {
       setFeedback({ error: errorMessage(err) });
@@ -158,7 +158,8 @@ function SellPanel() {
             >
               {confirmed.map((b) => (
                 <option key={b.id} value={b.id}>
-                  {b.property.title} · {f.date(b.checkIn)} · {f.decimal(b.totalPrice, b.currency)}
+                  {b.property.title} · {f.date(b.checkIn)} ·{" "}
+                  {f.money(b.totalPriceMinor, b.currency)}
                 </option>
               ))}
             </select>

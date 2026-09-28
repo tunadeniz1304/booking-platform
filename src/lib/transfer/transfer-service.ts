@@ -17,7 +17,6 @@ import {
   type Money,
   minorToDb,
   minorFromDb,
-  moneyFromDb,
 } from "@/lib/money/money";
 import { fromDate } from "@/lib/time/nights";
 import { getPaymentProvider } from "@/lib/payment";
@@ -109,7 +108,7 @@ export interface ListedTransfer {
   id: string;
   bookingId: string;
   status: TransferStatus;
-  askPrice: number;
+  askPriceMinor: number;
   currency: string;
   expiresAt: string;
   /** Yalnızca listeleme yanıtında BİR KEZ döner; tekrar üretilemez. */
@@ -202,7 +201,7 @@ export async function listBookingForTransfer(
       id: transfer.id,
       bookingId,
       status: transfer.status,
-      askPrice: askPriceMinor,
+      askPriceMinor,
       currency,
       expiresAt: expiresAt.toISOString(),
       claimToken: token,
@@ -807,8 +806,8 @@ export async function discoverTransfers(now = new Date()) {
   });
   return rows.map((r) => ({
     id: r.id,
-    askPrice: Number(toDecimalString(moneyFromDb(r.askPriceMinor, r.currency))),
-    originalPrice: Number(toDecimalString(moneyFromDb(r.booking.totalPriceMinor, r.currency))),
+    askPriceMinor: minorFromDb(r.askPriceMinor),
+    originalPriceMinor: minorFromDb(r.booking.totalPriceMinor),
     currency: r.currency,
     expiresAt: r.expiresAt.toISOString(),
     seller: maskName(r.seller.firstName, r.seller.lastName),

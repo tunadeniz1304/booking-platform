@@ -20,6 +20,7 @@ import {
 import DepositSettings from "./DepositSettings";
 import PromotionsPanel from "./PromotionsPanel";
 import AccessibilityPanel from "./AccessibilityPanel";
+import { toMajorNumber } from "@/lib/money/money";
 
 interface HostRoom {
   id: string;
@@ -35,7 +36,7 @@ interface HostProperty {
   isActive: boolean;
   licenseNumber: string | null;
   licenseStatus: "PENDING" | "VERIFIED" | "REJECTED";
-  basePrice: string;
+  basePriceMinor: number;
   currency: string;
   ratingAvg: number;
   rooms: HostRoom[];
@@ -46,7 +47,7 @@ interface HostBooking {
   status: string;
   checkIn: string;
   checkOut: string;
-  totalPrice: string;
+  totalPriceMinor: number;
   currency: string;
   propertyId: string;
   roomId: string;
@@ -163,7 +164,7 @@ export default function HostDashboard() {
                     <td className="py-2 pr-4">{f.date(b.checkIn, "short")}</td>
                     <td className="py-2 pr-4">{f.date(b.checkOut, "short")}</td>
                     <td className="py-2 pr-4">{b.guestCount}</td>
-                    <td className="py-2 pr-4">{f.decimal(b.totalPrice, b.currency)}</td>
+                    <td className="py-2 pr-4">{f.money(b.totalPriceMinor, b.currency)}</td>
                     <td className="py-2 pr-4">{statusLabel(b.status)}</td>
                     <td className="py-2">
                       {(b.status === "CONFIRMED" || b.status === "COMPLETED") && (
@@ -194,7 +195,8 @@ function PropertyPanel({ property, onChanged }: { property: HostProperty; onChan
   const [form, setForm] = useState({
     title: p.title,
     description: p.description,
-    basePrice: String(Number(p.basePrice)),
+    // Form girişi ana birimde (istek sözleşmesi `basePrice`); gösterim minor-unit'ten türetilir.
+    basePrice: String(toMajorNumber(p.basePriceMinor, p.currency)),
     licenseNumber: p.licenseNumber ?? "",
     isActive: p.isActive,
   });
@@ -226,7 +228,7 @@ function PropertyPanel({ property, onChanged }: { property: HostProperty; onChan
   return (
     <Card title={p.title} id={pid}>
       <p className="mb-4 text-sm text-gray-700">
-        {t("property.basePrice", { price: f.decimal(p.basePrice, p.currency) })} ·{" "}
+        {t("property.basePrice", { price: f.money(p.basePriceMinor, p.currency) })} ·{" "}
         {t("property.rating", { rating: p.ratingAvg.toFixed(1) })} ·{" "}
         {p.isActive ? t("property.published") : t("property.unpublished")} · {t("property.license")}{" "}
         {/* P1-10: kayıt doğrulaması yapılmamış ilan yayına alınamaz ve aramada görünmez. */}

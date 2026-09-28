@@ -105,7 +105,7 @@ describeInt("ödeme, iptal, iade ve bildirim (integration)", () => {
     });
     expect(row.status).toBe("CONFIRMED");
     expect(row.payment?.status).toBe("PAID");
-    expect(Number(row.payment?.amountMinor) / 100).toBe(b.totalPrice); // Payment.amount = gösterilen toplam
+    expect(Number(row.payment?.amountMinor)).toBe(b.totalMinor); // Payment.amount = gösterilen toplam
     expect((row.policySnapshot as { kind: string }).kind).toBe("MODERATE");
     expect((await listBookingLedger(prisma, b.id)).filter((r) => r.kind === "CHARGE")).toHaveLength(
       1

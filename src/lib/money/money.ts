@@ -239,8 +239,8 @@ if (typeof bigintProto.toJSON !== "function") {
 }
 
 /**
- * Görüntüleme DTO'ları için ana birim sayısı (ör. 1234.5). Hesaplamada KULLANILMAZ; API'lerin
- * geriye uyumlu `basePrice`/`totalPrice` alanları bunu, hesap yapanlar `*Minor`'u okur.
+ * Ana birim sayısı (ör. 1234.5): yalnız UI girişleri/kaydırıcıları için. Hesaplamada ve API
+ * yanıtlarında KULLANILMAZ (ADR 0033: API yalnız `*Minor` döner).
  */
 export function toMajorNumber(amountMinor: bigint | number, currency: string): number {
   return Number(toDecimalString(moneyFromDb(amountMinor, currency)));

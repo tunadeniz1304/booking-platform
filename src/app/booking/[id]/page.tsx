@@ -10,7 +10,6 @@ import { ApiError, apiFetch } from "@/lib/api-client";
 import BookingActions from "@/components/booking/BookingActions";
 import BookingMessages from "@/components/booking/BookingMessages";
 import BookingResolutionPanel from "@/components/resolution/BookingResolutionPanel";
-import { toMinor } from "@/lib/money/money";
 import { useFormat } from "@/i18n/use-format";
 
 interface BookingDetail {
@@ -18,7 +17,7 @@ interface BookingDetail {
   checkIn: string;
   checkOut: string;
   guestCount: number;
-  totalPrice: number;
+  totalPriceMinor: number;
   currency: string;
   status: string;
   holdExpiresAt?: string | null;
@@ -152,7 +151,7 @@ export default function BookingConfirmationPage() {
               <div className="flex items-center justify-between border-t border-gray-100 pt-4">
                 <span className="text-sm text-gray-600">{t("detail.total")}</span>
                 <span className="text-xl font-bold text-gray-900">
-                  {f.decimal(booking.totalPrice, booking.currency)}
+                  {f.money(booking.totalPriceMinor, booking.currency)}
                 </span>
               </div>
 
@@ -160,7 +159,7 @@ export default function BookingConfirmationPage() {
                 bookingId={booking.id}
                 status={booking.status}
                 holdExpiresAt={booking.holdExpiresAt}
-                amountMinor={toMinor(booking.totalPrice, booking.currency)}
+                amountMinor={booking.totalPriceMinor}
                 currency={booking.currency}
                 onChanged={() => void load()}
               />

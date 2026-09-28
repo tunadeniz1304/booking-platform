@@ -299,7 +299,7 @@ export function createMcpServer(
             city: r.location.city,
             propertyType: r.propertyType,
             rating: r.ratingAvg,
-            basePrice: r.basePrice,
+            basePriceMinor: r.basePriceMinor,
             currency: r.currency,
             quote: r.quote ?? null,
           })),

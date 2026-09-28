@@ -116,14 +116,20 @@ Public. Sorgu parametreleri:
       "title": "Grand Deluxe Hotel",
       "description": "...",
       "propertyType": "HOTEL",
-      "basePrice": 2450,
+      "basePriceMinor": 245000,
       "currency": "TRY",
       "ratingAvg": 8.9,
       "ratingCount": 1240,
       "location": { "city": "İstanbul", "country": "Türkiye" },
       "amenities": ["Ücretsiz WiFi", "Havuz"],
       "availableRooms": 3,
-      "totalPrice": 7350
+      "quote": {
+        "roomId": "cuid",
+        "ratePlanId": "cuid",
+        "total": 735000,
+        "currency": "TRY",
+        "nights": 3
+      }
     }
   ],
   "total": 10,
@@ -134,7 +140,7 @@ Public. Sorgu parametreleri:
 }
 ```
 
-`cached: true` ise Redis'ten döndü. `totalPrice` yalnız checkIn+checkOut+guests verildiğinde hesaplanır (gece başına ortalama müsaitlik fiyatı × gece sayısı).
+`cached: true` ise Redis'ten döndü. `quote` yalnız checkIn+checkOut+guests verildiğinde hesaplanır (teklif motoru, vergi + promosyon dahil; `/api/quote` ile aynı toplam). Para alanları minor-unit'tir (v5, ADR 0033: ondalık `basePrice`/`totalPrice` kaldırıldı).
 
 ### 2.2 GET /api/properties — /api/search alias'ı
 
@@ -154,10 +160,10 @@ Auth + rol HOST veya ADMIN.
   "rooms": [ { "name": "Standart", "capacity": 2, "bedType": "Çift Kişilik Yatak", "priceModifier": 0 } ]
 }
 // 201
-{ "id": "cuid", "title": "Yeni Otel", "propertyType": "HOTEL", "basePrice": 2000, "isActive": true }
+{ "id": "cuid", "title": "Yeni Otel", "propertyType": "HOTEL", "basePriceMinor": 200000, "isActive": true }
 ```
 
-`city/country` için Location upsert yapılır. Amenity adları upsert edilir. Room oluşturulur; `money` (`basePrice`, `priceModifier`) Decimal olarak saklanır.
+`city/country` için Location upsert yapılır. Amenity adları upsert edilir. Room oluşturulur; istekteki ondalık `basePrice`/`priceModifier` sunucuda minor-unit'e çevrilip `BigInt *Minor` olarak saklanır; yanıt yalnız `*Minor` döner.
 
 ### 2.4 GET /api/properties/:id — Detay
 
@@ -168,12 +174,12 @@ Public.
 {
   "id": "cuid", "title": "...", "description": "...", "propertyType": "HOTEL",
   "location": { "city": "İstanbul", "country": "Türkiye" },
-  "basePrice": 2450, "currency": "TRY", "ratingAvg": 8.9, "ratingCount": 1240,
+  "basePriceMinor": 245000, "currency": "TRY", "ratingAvg": 8.9, "ratingCount": 1240,
   "amenities": [ { "name": "Ücretsiz WiFi", "icon": "wifi" } ],
   "images": ["https://..."],
   "rooms": [
     { "id": "cuid", "name": "Standart Oda", "description": null, "capacity": 2,
-      "bedType": "Çift Kişilik Yatak", "priceModifier": 0, "available": true }
+      "bedType": "Çift Kişilik Yatak", "priceModifierMinor": 0, "available": true }
   ]
 }
 // 404
@@ -217,7 +223,7 @@ Zod: `checkIn/checkOut` ISO tarih, `guestCount` pozitif. Servis: checkOut>checkI
     "checkIn": "2026-10-01T00:00:00.000Z",
     "checkOut": "2026-10-04T00:00:00.000Z",
     "guestCount": 2,
-    "totalPrice": 7350,
+    "totalMinor": 735000,
     "currency": "TRY",
     "status": "PENDING"
   },
@@ -242,7 +248,7 @@ Auth.
     "checkIn": "...",
     "checkOut": "...",
     "guestCount": 2,
-    "totalPrice": 7350,
+    "totalPriceMinor": 735000,
     "currency": "TRY",
     "status": "CONFIRMED",
     "property": { "id": "cuid", "title": "...", "location": { "city": "...", "country": "..." } },

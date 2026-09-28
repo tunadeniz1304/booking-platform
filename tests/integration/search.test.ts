@@ -166,9 +166,9 @@ describeInt("arama (integration)", () => {
 
   it("fiyat sıralamaları ve fiyat/tip/olanak filtreleri DB tarafında uygulanır", async () => {
     const asc = await searchProperties({ city, sort: "price_asc" });
-    expect(asc.results.map((r) => r.basePrice)).toEqual([500, 900, 2000]);
+    expect(asc.results.map((r) => r.basePriceMinor)).toEqual([500_00, 900_00, 2000_00]);
     const desc = await searchProperties({ city, sort: "price_desc" });
-    expect(desc.results.map((r) => r.basePrice)).toEqual([2000, 900, 500]);
+    expect(desc.results.map((r) => r.basePriceMinor)).toEqual([2000_00, 900_00, 500_00]);
     const rating = await searchProperties({ city, sort: "rating" });
     expect(rating.results[0].id).toBe(pricey.id);
 
@@ -195,7 +195,7 @@ describeInt("arama (integration)", () => {
     expect(card.quote).toMatchObject({ roomId: cheap.roomId, currency: "TRY", nights: 2 });
     // 2 gece × 500 TRY = 100000 minor; %1 konaklama vergisi → 101000
     expect(card.quote!.total).toBe(101000);
-    expect(card.totalPrice).toBe(1010);
+    expect(card).not.toHaveProperty("totalPrice");
   });
 
   it("serbest metin sorgusu başlık/açıklama/şehirde arar; sayfalama uygulanır", async () => {
@@ -204,7 +204,7 @@ describeInt("arama (integration)", () => {
 
     const paged = await searchProperties({ city, sort: "price_asc", page: 2, pageSize: 2 });
     expect(paged.totalPages).toBe(2);
-    expect(paged.results.map((r) => r.basePrice)).toEqual([2000]);
+    expect(paged.results.map((r) => r.basePriceMinor)).toEqual([2000_00]);
   });
 
   it("semantik yol: pgvector adaylarını keyword + kişiselleştirme ile harmanlar", async () => {

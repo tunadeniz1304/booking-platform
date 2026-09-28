@@ -92,7 +92,7 @@ export default async function HomePage() {
                     property.images?.[0] ??
                     "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=600&h=400&fit=crop"
                   }
-                  price={property.basePrice}
+                  priceMinor={property.basePriceMinor}
                   rating={property.ratingAvg}
                   reviewCount={property.ratingCount}
                   propertyType={property.propertyType}

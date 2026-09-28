@@ -104,7 +104,7 @@ describe("regression: v3#13 gRPC sertleştirme", () => {
     });
   });
 
-  it("regression: v3#1 Charge idempotency_key zorunlu; tutar minor-unit + kesin ondalık (v3#9)", async () => {
+  it("regression: v3#1 Charge idempotency_key zorunlu; tutar yalnız minor-unit (v3#9, ADR 0033)", async () => {
     const { token } = await signAccessToken("u-grpc2", "USER", 300);
     await withServer(async (address) => {
       const missing = await charge(address, token, { booking_id: "b1", card_token: "t" });
@@ -117,10 +117,10 @@ describe("regression: v3#13 gRPC sertleştirme", () => {
       expect(ok.err).toBeNull();
       expect(ok.res).toMatchObject({
         status: "PAID",
-        charged_amount: 1234.56,
         charged_amount_minor: "123456",
         currency: "TRY",
       });
+      expect(ok.res).not.toHaveProperty("charged_amount");
     });
   });
 });

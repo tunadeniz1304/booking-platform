@@ -50,16 +50,20 @@ message ReserveRoomRequest {
 message ReserveRoomResponse {
   string booking_id = 1;
   string status = 2;
-  double total_price = 3;
+  // v5 (ADR 0033): ondalık `total_price` kaldırıldı; tutar yalnız minor-unit.
+  reserved 3;
+  reserved "total_price";
   string currency = 4;
+  int64 total_price_minor = 5;
 }
 
 // --- PaymentService ------------------------------------------------------
 
 message ChargeRequest {
   string booking_id = 1;
-  // Kullanımdan kalktı: tutar daima rezervasyondan alınır (istemci belirleyemez).
-  double amount = 2;
+  // v5 (ADR 0033): `amount` kaldırıldı; tutar daima rezervasyondan alınır.
+  reserved 2;
+  reserved "amount";
   string currency = 3;
   // Geriye dönük uyumluluk: doluysa token'daki kullanıcıyla aynı olmalıdır.
   string requester_id = 4;
@@ -72,8 +76,9 @@ message ChargeRequest {
 message ChargeResponse {
   string payment_id = 1;
   string status = 2;
-  // Kullanımdan kalkıyor: ana birim (ör. 1234.5). Hesaplama için `charged_amount_minor`.
-  double charged_amount = 3;
+  // v5 (ADR 0033): ondalık `charged_amount` kaldırıldı; `charged_amount_minor` kullanılır.
+  reserved 3;
+  reserved "charged_amount";
   int64 charged_amount_minor = 4;
   string currency = 5;
 }

@@ -7,7 +7,7 @@
  * her rezervasyonda en fazla BİR tahsilat; diğer yarışçılar 409 PAYMENT_IN_PROGRESS /
  * ALREADY_PAID ya da idempotent 200 "confirmed" alır. 202 (3DS) gelirse mock kodla
  * (123456) onaylanır. teardown() her rezervasyonu tekrar okur ve değişmezleri doğrular:
- *   - CONFIRMED ⇒ payment.status == PAID, payment.amount == totalPrice, refundedAmount == 0
+ *   - CONFIRMED ⇒ payment.status == PAID, payment.amountMinor == totalPriceMinor, refundedAmountMinor == 0
  *   - (METRICS_TOKEN verilirse) payment_attempts_total{outcome="confirmed"} artışı
  *     CONFIRMED rezervasyon sayısını aşmamalı; fark double_charges'a eklenir.
  * Kesin kontrol ayrıca SQL ile yapılır (load/chaos.md ve aşağıdaki komut).
@@ -211,11 +211,11 @@ export function teardown(data) {
     const bad =
       !p ||
       p.status !== "PAID" ||
-      Number(p.amount) !== Number(b.totalPrice) ||
-      Number(p.refundedAmount) !== 0;
+      p.amountMinor !== b.totalPriceMinor ||
+      p.refundedAmountMinor !== 0;
     if (bad) {
       doubleCharges.add(1);
-      console.error(`değişmez bozuldu ${id}: ${JSON.stringify(p)} total=${b.totalPrice}`);
+      console.error(`değişmez bozuldu ${id}: ${JSON.stringify(p)} total=${b.totalPriceMinor}`);
     }
   }
 

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { minorFromDb, toMajorNumber } from "@/lib/money/money";
+import { minorFromDb } from "@/lib/money/money";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
@@ -27,7 +27,6 @@ interface PropertyDetail {
   description: string;
   propertyType: string;
   location: { city: string; country: string };
-  basePrice: number;
   basePriceMinor: number;
   currency: string;
   ratingAvg: number;
@@ -84,12 +83,10 @@ async function getProperty(id: string): Promise<PropertyDetail | null> {
   return {
     ...property,
     basePriceMinor: minorFromDb(property.basePriceMinor),
-    basePrice: toMajorNumber(property.basePriceMinor, property.currency),
     rooms: property.rooms.map((room) => ({
       ...room,
       capacity: room.maxOccupancy,
       priceModifierMinor: minorFromDb(room.priceModifierMinor),
-      priceModifier: toMajorNumber(room.priceModifierMinor, property.currency),
     })),
   };
 }
@@ -189,7 +186,7 @@ export default async function PropertyPage({ params, searchParams }: PropertyPag
               <BookingWidget
                 propertyId={property.id}
                 rooms={property.rooms}
-                basePrice={property.basePrice}
+                basePriceMinor={property.basePriceMinor}
                 currency={property.currency}
                 initial={initial}
               />

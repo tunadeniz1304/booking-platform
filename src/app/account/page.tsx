@@ -31,7 +31,7 @@ interface Property {
   id: string;
   title: string;
   location: Location;
-  basePrice: number;
+  basePriceMinor: number;
   currency: string;
   ratingAvg: number;
   ratingCount: number;
@@ -45,7 +45,7 @@ interface Booking {
   checkIn: string;
   checkOut: string;
   guestCount: number;
-  totalPrice: number;
+  totalPriceMinor: number;
   currency: string;
   status: string;
 }
@@ -155,7 +155,7 @@ export default function AccountPage() {
 
   const formatDate = (dateStr: string) => fmt.date(dateStr, "long");
 
-  const formatPrice = (price: number, currency: string) => fmt.decimal(price, currency);
+  const formatPrice = (minor: number, currency: string) => fmt.money(minor, currency);
 
   const getStatusLabel = (status: string) => {
     const labels: Record<string, string> = {
@@ -317,7 +317,7 @@ export default function AccountPage() {
                       <div>
                         <p className="text-gray-500">{t("bookings.total")}</p>
                         <p className="font-medium text-gray-900">
-                          {formatPrice(booking.totalPrice, booking.currency)}
+                          {formatPrice(booking.totalPriceMinor, booking.currency)}
                         </p>
                       </div>
                     </div>
@@ -384,7 +384,10 @@ export default function AccountPage() {
                           </span>
                         </div>
                         <p className="mt-2 text-lg font-semibold text-gray-900">
-                          {formatPrice(favorite.property.basePrice, favorite.property.currency)}
+                          {formatPrice(
+                            favorite.property.basePriceMinor,
+                            favorite.property.currency
+                          )}
                           <span className="text-sm font-normal text-gray-500">
                             {" "}
                             {t("favorites.perNight")}

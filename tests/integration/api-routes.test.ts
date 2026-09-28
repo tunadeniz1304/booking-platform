@@ -298,7 +298,8 @@ describeInt("API route handler'ları (integration)", () => {
         expect(res.status).toBe(201);
         const fav = await res.json();
         expect(fav.propertyId).toBe(fx.propertyId);
-        expect(fav.property.basePrice).toBe(1000); // Decimal → number
+        expect(fav.property.basePriceMinor).toBe(100_000);
+        expect(fav.property).not.toHaveProperty("basePrice");
       }
 
       const list = await (await favoritesGet(call("/api/favorites", { token }))).json();
@@ -785,7 +786,7 @@ describeInt("API route handler'ları (integration)", () => {
       expect(body.total).toBeGreaterThanOrEqual(1);
       expect(body.results.length).toBeLessThanOrEqual(50);
       expect(body.pageSize).toBe(50);
-      expect(body.results[0].basePrice).toBe(1000);
+      expect(body.results[0].basePriceMinor).toBe(100_000);
 
       // Oturumlu istek de aynı sonucu verir (kişiselleştirme yalnız sıralamayı etkiler).
       const authed = await searchGet(
@@ -893,7 +894,7 @@ describeInt("API route handler'ları (integration)", () => {
       const d = await draft.json();
       expect(d.isActive).toBe(false);
       // v4 P0-2: kolon BigInt minor-unit; API ondalık string'i para biriminin üssüyle verir.
-      expect(d.basePrice).toBe("1500.00");
+      expect(d).not.toHaveProperty("basePrice");
       expect(d.basePriceMinor).toBe(150_000);
       expect(d.location).toEqual({ city: `Yenikent-${stamp}`, country: "TEST" });
 
@@ -928,9 +929,9 @@ describeInt("API route handler'ları (integration)", () => {
       expect(res.status).toBe(200);
       const p = await res.json();
       expect(p.id).toBe(fx.propertyId);
-      expect(p.basePrice).toBe(1000);
+      expect(p.basePriceMinor).toBe(100_000);
       expect(p.rooms[0].id).toBe(fx.roomId);
-      expect(p.rooms[0].priceModifier).toBe(0);
+      expect(p.rooms[0].priceModifierMinor).toBe(0);
 
       expect((await propertyGet(call("/api/properties/yok"), ctx({ id: "yok" }))).status).toBe(404);
       const inactive = await createStayFixture(prisma, { tag: "inact", days: 1 });
@@ -979,7 +980,7 @@ describeInt("API route handler'ları (integration)", () => {
       expect(ok.status).toBe(200);
       const updated = await ok.json();
       expect(updated.title).toBe(`Güncel Otel ${stamp}`);
-      expect(Number(updated.basePrice)).toBe(1250);
+      expect(updated.basePriceMinor).toBe(125_000);
 
       // Yönetici her mülkü düzenleyebilir.
       const byAdmin = await propertyPatch(
@@ -1563,7 +1564,7 @@ describeInt("API route handler'ları (integration)", () => {
       expect(first.status).toBe(201);
       const listed = await first.json();
       expect(listed.status).toBe("LISTED");
-      expect(listed.askPrice).toBe(150_000);
+      expect(listed.askPriceMinor).toBe(150_000);
       expect(listed.claimUrl).toContain("/transfers/claim#token=");
 
       const del = (id: string, token: string) =>
@@ -1593,7 +1594,8 @@ describeInt("API route handler'ları (integration)", () => {
       const discover = await (await transferDiscoverGet()).json();
       const pub = discover.find((t: { id: string }) => t.id === second.id);
       expect(pub).toBeDefined();
-      expect(pub.askPrice).toBe(1800);
+      expect(pub.askPriceMinor).toBe(180_000);
+      expect(pub).not.toHaveProperty("askPrice");
       expect(JSON.stringify(pub)).not.toContain(token);
 
       const claim = (t: string, body: Record<string, unknown>) =>

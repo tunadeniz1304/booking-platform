@@ -27,7 +27,7 @@ export interface BookingWidgetRoom {
   /** Fiyat planları (iade edilebilir / edilemez, kahvaltılı…); yoksa sunucu varsayılanı. */
   ratePlans?: BookingWidgetRatePlan[];
   bedType: string;
-  priceModifier: number;
+  priceModifierMinor: number;
   available: boolean;
 }
 
@@ -35,7 +35,7 @@ interface BookingWidgetProps {
   propertyId: string;
   rooms: BookingWidgetRoom[];
   /** Yalnızca "başlangıç fiyatı" gösterimi için; toplam daima sunucu teklifinden gelir. */
-  basePrice?: number;
+  basePriceMinor?: number;
   currency?: string;
   /** Arama kartından gelen seçim (kartta gösterilen toplamla aynı teklif için). */
   initial?: {

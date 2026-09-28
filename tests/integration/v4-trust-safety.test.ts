@@ -2,7 +2,7 @@ import { afterAll, afterEach, beforeAll, expect, it } from "vitest";
 import { NextRequest } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import Stripe from "stripe";
-import { describeInt, iso, utcDay } from "./helpers";
+import { describeInt, iso, parkOutboxBacklog, utcDay } from "./helpers";
 import { createStayFixture, type StayFixture } from "./fixtures";
 import { signAccessToken, type Role } from "@/lib/auth/tokens";
 import { resetConfigForTests } from "@/lib/config/app-config";
@@ -270,6 +270,8 @@ describeInt("P1-6 KYC ve güven-emniyet (integration)", () => {
   });
 
   it("parti riski: riskli rezervasyonda host'a outbox bildirimi + host paneli; düşük riskte yok", async () => {
+    // Tam koşuda önceki dosyaların outbox birikimi relayOutbox'u meşgul ediyordu (90 sn).
+    await parkOutboxBacklog(prisma);
     // Genç hesap + tek gece + kalabalık grup + yakın tarih → ≥ 90 (eşik 60).
     const risky = await createBooking({
       userId: fx.userId,

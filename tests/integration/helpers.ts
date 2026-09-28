@@ -1,4 +1,5 @@
 import { describe } from "vitest";
+import type { PrismaClient } from "@prisma/client";
 
 /** Docker yoksa entegrasyon suite'ini açık gerekçeyle atlayan `describe`. */
 export const describeInt: typeof describe = process.env.INTEGRATION_SKIP_REASON
@@ -35,4 +36,21 @@ export async function awayFromWindowEdge(windowSeconds: number, marginMs = 15_00
   const windowMs = windowSeconds * 1000;
   const left = windowMs - (Date.now() % windowMs);
   if (left < marginMs) await new Promise((r) => setTimeout(r, left + 50));
+}
+
+/**
+ * Paylaşımlı DB'de önceki test dosyalarının işlenmemiş outbox birikimi (tam koşuda binlerce
+ * mesaj) `relayOutbox(n)` çağrısını bu testin olaylarına ulaşmadan dakikalarca meşgul eder
+ * (tam koşuda 90 sn zaman aşımı; tek başına yeşil). `before`'dan önce yazılmış bekleyen
+ * mesajlar ertelenir: bu testin kendi olayları aynen aktarılır ve doğrulanır, yabancı birikim
+ * işlenmez. İddialar gevşemez; yalnız ilgisiz iş yükü dışarıda kalır.
+ */
+export async function parkOutboxBacklog(
+  prisma: PrismaClient,
+  before: Date = new Date()
+): Promise<number> {
+  return prisma.$executeRaw`
+    UPDATE "OutboxMessage"
+    SET "availableAfter" = now() + interval '1 day'
+    WHERE status IN ('PENDING', 'FAILED') AND "createdAt" < ${before}`;
 }

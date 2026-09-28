@@ -36,6 +36,7 @@ const AI_EXACT: ReadonlySet<string> = new Set([
   "/api/admin/events",
   "/api/admin/reviews",
   "/api/host/revenue/suggestions",
+  "/api/support/chat",
 ]);
 const AI_PATTERNS: readonly RegExp[] = [
   /^\/api\/properties\/[^/]+\/reviews\/summary$/,

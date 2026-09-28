@@ -13,15 +13,21 @@
 
 export class GuardError extends Error {
   constructor(
-    readonly code: "ungrounded_number" | "ungrounded_citation" | "ungrounded_quote",
+    readonly code:
+      | "ungrounded_number"
+      | "ungrounded_citation"
+      | "ungrounded_quote"
+      | "unauthorized_action_claim",
     readonly offenders: string[]
   ) {
     super(
-      code === "ungrounded_number"
-        ? `Kaynakta olmayan sayı: ${offenders.slice(0, 5).join(", ")}`
-        : code === "ungrounded_quote"
-          ? `Kaynakta birebir bulunmayan alıntı: ${offenders.slice(0, 3).join(" | ")}`
-          : `Geçersiz atıf: ${offenders.slice(0, 5).join(", ")}`
+      code === "unauthorized_action_claim"
+        ? `Yetkisiz eylem iddiası: ${offenders.slice(0, 3).join(" | ")}`
+        : code === "ungrounded_number"
+          ? `Kaynakta olmayan sayı: ${offenders.slice(0, 5).join(", ")}`
+          : code === "ungrounded_quote"
+            ? `Kaynakta birebir bulunmayan alıntı: ${offenders.slice(0, 3).join(" | ")}`
+            : `Geçersiz atıf: ${offenders.slice(0, 5).join(", ")}`
     );
     this.name = "GuardError";
   }

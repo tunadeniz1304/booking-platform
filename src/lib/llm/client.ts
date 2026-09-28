@@ -71,6 +71,7 @@ export type LlmTask =
   | "review_highlights"
   | "listing_compare"
   | "message_risk"
+  | "support_agent"
   | "smoke";
 
 export type LlmMode = "live" | "demo" | "fallback";
@@ -168,6 +169,8 @@ export interface LlmClient {
     opts: LlmCallOptions<T> & {
       /** Nihai veri, araç sonuçlarıyla doğrulanır (ör. sayı guard'ı). */
       validateWithTools?: (data: T, calls: LlmToolRunResult<T>["toolCalls"]) => T | void;
+      /** Görev özel araç adımı üst sınırı (varsayılan `LLM_MAX_TOOL_STEPS`; küçüğü geçerli). */
+      maxToolSteps?: number;
     }
   ): Promise<LlmToolRunResult<T>>;
 }
@@ -695,6 +698,7 @@ export function createLlmClient(options: CreateLlmClientOptions = {}): LlmClient
       tools: LlmTool[],
       opts: LlmCallOptions<T> & {
         validateWithTools?: (data: T, calls: LlmToolRunResult<T>["toolCalls"]) => T | void;
+        maxToolSteps?: number;
       }
     ): Promise<LlmToolRunResult<T>> {
       const started = Date.now();
@@ -712,9 +716,10 @@ export function createLlmClient(options: CreateLlmClientOptions = {}): LlmClient
       const convo: ChatCompletionMessageParam[] = redactMessages(messages, redactor);
       logPrompt(task, convo);
       const usage: LlmUsage = { promptTokens: 0, completionTokens: 0 };
+      const maxSteps = Math.min(settings.maxToolSteps, opts.maxToolSteps ?? settings.maxToolSteps);
 
       try {
-        for (let step = 0; step <= settings.maxToolSteps; step++) {
+        for (let step = 0; step <= maxSteps; step++) {
           // Her adım ayrı rezervasyon: bütçe adım ortasında dolarsa sonraki istek yapılmaz.
           const { res, usage: u } = await metered(
             task,
@@ -752,7 +757,7 @@ export function createLlmClient(options: CreateLlmClientOptions = {}): LlmClient
               toolCalls,
             };
           }
-          if (step === settings.maxToolSteps) break;
+          if (step === maxSteps) break;
           convo.push({
             role: "assistant",
             content: message?.content ?? null,

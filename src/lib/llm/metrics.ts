@@ -33,6 +33,7 @@ export const LLM_TASK_ROUTE: Readonly<Record<string, string>> = {
   review_highlights: "/api/properties/[id]/review-highlights",
   listing_compare: "/api/compare",
   message_risk: "/api/bookings/[id]/messages",
+  support_agent: "/api/support/chat",
   smoke: "cli:llm-smoke",
 };
 

@@ -22,7 +22,7 @@ import { scheduleCompensationRetry } from "@/lib/saga/compensation-retry";
 import { SAGA_STEPS } from "@/lib/saga/booking-saga";
 import { getPaymentProvider } from "@/lib/payment";
 import type { PaymentChallenge } from "@/lib/payment/provider";
-import { CaptureRaceLostError, PaymentDeclinedError } from "@/lib/payment/payment-service";
+import { CaptureRaceLostError, PaymentDeclinedError } from "@/lib/payment/payment-core";
 import { assessPayment } from "@/lib/risk/fraud";
 import { getConfig } from "@/lib/config/app-config";
 import { assertCurrency, minorFromDb, minorToDb, money } from "@/lib/money/money";

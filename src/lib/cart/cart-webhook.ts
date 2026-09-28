@@ -10,7 +10,7 @@ import { ConflictError } from "@/lib/http/errors";
 import { withSerializableRetry } from "@/lib/db/transactions";
 import { getPaymentProvider } from "@/lib/payment";
 import type { WebhookEvent } from "@/lib/payment/webhook";
-import { WebhookMismatchError } from "@/lib/payment/payment-service";
+import { WebhookMismatchError } from "@/lib/payment/payment-core";
 import { holdUnits, InventoryUnavailableError } from "@/lib/booking/inventory";
 import { reclaimPromotionRedemptions } from "@/lib/pricing/promotion-redemption";
 import { CompensationMarkers, markCompensationIntent, postCaptureCompensation } from "@/lib/ledger";

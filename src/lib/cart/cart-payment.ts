@@ -16,13 +16,15 @@ import { getPaymentProvider, type AuthorizeResult } from "@/lib/payment";
 import { PaymentProviderError, type PaymentChallenge } from "@/lib/payment/provider";
 import {
   applyConfirmation,
-  CaptureRaceLostError,
   confirmableBookingSelect,
   nextConfirmedState,
+} from "@/lib/payment/confirm";
+import {
+  CaptureRaceLostError,
   PaymentDeclinedError,
   PaymentInProgressError,
   PROVIDER_ERROR_PREFIX,
-} from "@/lib/payment/payment-service";
+} from "@/lib/payment/payment-core";
 import { assessPayment } from "@/lib/risk/fraud";
 import { getConfig } from "@/lib/config/app-config";
 import { assertCurrency, minorFromDb, minorToDb, money, type Money } from "@/lib/money/money";

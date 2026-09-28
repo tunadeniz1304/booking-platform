@@ -2005,3 +2005,41 @@ model PaymentCustomer {
 
   @@unique([userId, provider])
 }
+
+/// v5 P1-4 (ADR 0029): destek ajanının insana devrettiği talep durumu.
+enum SupportTicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+}
+
+/// v5 P1-4: devir nedeni (deterministik kural; LLM karar vermez).
+enum SupportHandoffReason {
+  LOW_CONFIDENCE
+  MONEY_REQUEST
+  LEGAL_OR_COMPLAINT
+  USER_REQUEST
+}
+
+/// v5 P1-4: AI destek ajanının açtığı insan kuyruğu kaydı. `summary` KVKK redakte edilmiş
+/// kısa özettir (ham sohbet saklanmaz); ajan bu tabloya yazmaktan başka yazma yapamaz.
+model SupportTicket {
+  id           String               @id @default(cuid())
+  userId       String
+  bookingId    String?
+  status       SupportTicketStatus  @default(OPEN)
+  reason       SupportHandoffReason
+  /// Deterministik niyet etiketi (ör. refund_request, cancellation_quote).
+  intent       String               @db.VarChar(64)
+  /// Niyet sınıflandırıcı güveni (0..1).
+  confidence   Float
+  summary      String               @db.VarChar(1000)
+  locale       String               @default("tr") @db.VarChar(8)
+  resolvedById String?
+  resolvedAt   DateTime?
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+
+  @@index([status, createdAt])
+  @@index([userId, createdAt])
+}

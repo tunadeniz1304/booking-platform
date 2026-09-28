@@ -472,6 +472,8 @@ export async function deleteAccount(
     await tx.property.updateMany({ where: { hostId: userId }, data: { isActive: false } });
     await tx.pushSubscription.deleteMany({ where: { userId } });
     await tx.userSession.deleteMany({ where: { userId } });
+    // v5 P1-4: destek kuyruğu özetleri hesapla birlikte silinir.
+    await tx.supportTicket.deleteMany({ where: { userId } });
     await tx.notification.updateMany({
       where: { userId },
       data: { to: `${pseudo}@anon.invalid`, text: "", html: "" },

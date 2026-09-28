@@ -38,6 +38,7 @@ export const NAMESPACES = [
   "support",
   "transfers",
   "trust",
+  "trustCenter",
   "wallet",
 ] as const;
 

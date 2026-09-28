@@ -1,0 +1,31 @@
+{
+  "pageTitle": "Güven merkezi",
+  "pageIntro": "Platformun güvenlik, tedarik zinciri ve şeffaflık belgeleri. Buradaki her bağlantı kamuya açık bilgi içerir; kişisel veri yoktur.",
+  "supplyChain": {
+    "title": "Tedarik zinciri",
+    "sbom": "SBOM (CycloneDX) indir",
+    "sbomNote": "SBOM, her main dalı çalıştırmasında \"Security\" CI iş akışının sbom-cyclonedx artefaktı olarak üretilir; uygulama sunucusundan servis edilmez. İndirmek için iş akışının son başarılı çalıştırmasını açıp Artifacts bölümünden alın (depo erişimi gerekir).",
+    "provenance": "SLSA provenance (build kanıtı)",
+    "provenanceNote": "Standalone derleme çıktısı için SLSA provenance aynı iş akışında üretilir ve artefakt olarak saklanır.",
+    "scorecard": "OpenSSF Scorecard",
+    "scorecardNote": "Yayınlanmadı: depo şu an özel (private) ve Scorecard yalnız herkese açık depolarda puan yayınlar. İş akışı hazırdır; depo açıldığında sonuç otomatik yayımlanır."
+  },
+  "apis": {
+    "title": "Doğrulama uçları",
+    "jwks": "JWKS — /.well-known/jwks.json",
+    "jwksNote": "Ajan yetkilerini (mandate) ve imzalı belirteçleri üçüncü tarafların doğrulayabilmesi için ES256 açık anahtarları. Özel anahtar hiçbir zaman yayımlanmaz.",
+    "openapi": "OpenAPI 3.1 sözleşmesi — /api/openapi.json",
+    "openapiNote": "Tüm herkese açık ve kimlikli API uçlarının makine tarafından okunabilir tanımı; ajanlar ve entegrasyonlar keşif için kullanır."
+  },
+  "policies": {
+    "title": "Politikalar ve şeffaflık",
+    "securityPolicy": "Güvenlik politikası ve açık bildirimi",
+    "securityNote": "Açıkları herkese açık issue yerine GitHub özel güvenlik bildirimiyle iletin; ilk yanıt hedefi 5 iş günü.",
+    "transparency": "DSA şeffaflık raporu",
+    "transparencyNote": "Bildirim, kaldırma ve itiraz sayıları (kişisel veri içermez) uyum panelinden JSON/CSV olarak dışa aktarılır; yönetici yetkisi gerekir.",
+    "ranking": "Sıralama nasıl çalışır?",
+    "report": "Yasa dışı içerik bildir (DSA)",
+    "privacy": "Gizlilik ve KVKK bildirimi"
+  },
+  "footnote": "Portföy/demo projesidir; bağlantılar kaynak depodaki gerçek iş akışlarını ve uçları gösterir."
+}

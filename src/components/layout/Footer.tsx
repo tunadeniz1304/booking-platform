@@ -55,6 +55,12 @@ export default function Footer() {
               {t("privacyNotice")}
             </Link>
             <Link
+              href="/trust"
+              className="text-xs text-gray-600 transition hover:text-[#003580] hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003580]"
+            >
+              {t("trustCenter")}
+            </Link>
+            <Link
               href="/account/privacy"
               className="text-xs text-gray-600 transition hover:text-[#003580] hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003580]"
             >

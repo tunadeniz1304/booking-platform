@@ -22,6 +22,8 @@ import { POST as ucpCreate } from "@/app/api/ucp/checkout-sessions/route";
 import { GET as ucpGet, PUT as ucpPut } from "@/app/api/ucp/checkout-sessions/[id]/route";
 import { POST as ucpComplete } from "@/app/api/ucp/checkout-sessions/[id]/complete/route";
 import { intent, stripeFake } from "../support/stripe-fake";
+import { expectMatchesOpenApi } from "../helpers/openapi-assert";
+import { GET as jwksGet } from "@/app/.well-known/jwks.json/route";
 
 type Handler = (req: NextRequest, ctx: { params: Promise<{ id: string }> }) => Promise<Response>;
 const call0 = (handler: unknown, r: NextRequest) =>
@@ -61,6 +63,7 @@ describeInt("P1-11 ajan ticareti: AP2 mandate + UCP + Stripe SPT (integration)",
       req("/api/agentic/checkout_sessions", "POST", { room_id: fx.roomId, ...nextStay() })
     );
     expect(res.status).toBe(201);
+    await expectMatchesOpenApi(res, "POST", "/api/agentic/checkout_sessions");
     const view = (await res.json()) as {
       id: string;
       currency: string;
@@ -98,10 +101,12 @@ describeInt("P1-11 ajan ticareti: AP2 mandate + UCP + Stripe SPT (integration)",
     const body = { maxAmountMinor: 500_000, currency: "TRY", expiresInMinutes: 30 };
     const denied = await call0(issuePost, req("/api/account/agent-mandates", "POST", body, stale));
     expect(denied.status).toBe(403);
+    await expectMatchesOpenApi(denied, "POST", "/api/account/agent-mandates");
     expect(await denied.json()).toMatchObject({ code: "REAUTH_REQUIRED" });
 
     const res = await call0(issuePost, req("/api/account/agent-mandates", "POST", body));
     expect(res.status).toBe(201);
+    await expectMatchesOpenApi(res, "POST", "/api/account/agent-mandates");
     const out = (await res.json()) as { mandate: string; claims: { nonce: string; sub: string } };
     expect(out.claims.sub).toBe(fx.userId);
     expect(out.mandate.split(".")).toHaveLength(3);
@@ -130,6 +135,7 @@ describeInt("P1-11 ajan ticareti: AP2 mandate + UCP + Stripe SPT (integration)",
       mandate,
     });
     expect(res.status).toBe(200);
+    await expectMatchesOpenApi(res, "POST", "/api/agentic/checkout_sessions/{id}/complete");
     const view = (await res.json()) as { status: string; order: { id: string } };
     expect(view.status).toBe("completed");
     const booking = await prisma.booking.findUniqueOrThrow({ where: { id: view.order.id } });
@@ -154,6 +160,7 @@ describeInt("P1-11 ajan ticareti: AP2 mandate + UCP + Stripe SPT (integration)",
       mandate,
     });
     expect(replay.status).toBe(409);
+    await expectMatchesOpenApi(replay, "POST", "/api/agentic/checkout_sessions/{id}/complete");
     expect(await replay.json()).toMatchObject({ code: "MANDATE_REPLAYED" });
     const row = await prisma.checkoutSession.findUniqueOrThrow({ where: { id: other.id } });
     expect(row.bookingId).toBeNull();
@@ -232,6 +239,8 @@ describeInt("P1-11 ajan ticareti: AP2 mandate + UCP + Stripe SPT (integration)",
       new NextRequest("http://localhost:3000/.well-known/ucp")
     );
     expect(discovery.status).toBe(200);
+    await expectMatchesOpenApi(discovery, "GET", "/.well-known/ucp");
+    await expectMatchesOpenApi(jwksGet(), "GET", "/.well-known/jwks.json");
     const profile = (await discovery.json()) as {
       ucp: { capabilities: { name: string }[] };
       endpoints: { checkout_sessions: string };
@@ -257,6 +266,7 @@ describeInt("P1-11 ajan ticareti: AP2 mandate + UCP + Stripe SPT (integration)",
       })
     );
     expect(created.status).toBe(201);
+    await expectMatchesOpenApi(created, "POST", "/api/ucp/checkout-sessions");
     const v1 = (await created.json()) as {
       id: string;
       status: string;
@@ -274,6 +284,7 @@ describeInt("P1-11 ajan ticareti: AP2 mandate + UCP + Stripe SPT (integration)",
       ctx(v1.id)
     );
     expect(upd.status).toBe(200);
+    await expectMatchesOpenApi(upd, "PUT", "/api/ucp/checkout-sessions/{id}");
     const v2 = (await upd.json()) as { totals: { type: string; amount: number }[] };
     const total = v2.totals.find((t) => t.type === "total")!.amount;
 
@@ -286,6 +297,7 @@ describeInt("P1-11 ajan ticareti: AP2 mandate + UCP + Stripe SPT (integration)",
       ctx(v1.id)
     );
     expect(noMandate.status).toBe(403);
+    await expectMatchesOpenApi(noMandate, "POST", "/api/ucp/checkout-sessions/{id}/complete");
 
     const { mandate } = await signMandate(fx.userId, {
       maxAmountMinor: total,
@@ -299,6 +311,7 @@ describeInt("P1-11 ajan ticareti: AP2 mandate + UCP + Stripe SPT (integration)",
       ctx(v1.id)
     );
     expect(done.status).toBe(200);
+    await expectMatchesOpenApi(done, "POST", "/api/ucp/checkout-sessions/{id}/complete");
     const v3 = (await done.json()) as { status: string; order: { id: string } };
     expect(v3.status).toBe("completed");
     const booking = await prisma.booking.findUniqueOrThrow({ where: { id: v3.order.id } });
@@ -308,13 +321,16 @@ describeInt("P1-11 ajan ticareti: AP2 mandate + UCP + Stripe SPT (integration)",
       req(`/api/ucp/checkout-sessions/${v1.id}`, "GET"),
       ctx(v1.id)
     );
-    expect(await read.json()).toMatchObject({ status: "completed" });
+    expect(
+      await expectMatchesOpenApi(read, "GET", "/api/ucp/checkout-sessions/{id}")
+    ).toMatchObject({ status: "completed" });
 
     const invalid = await call0(
       ucpCreate,
       req("/api/ucp/checkout-sessions", "POST", { line_items: [], lodging: stay })
     );
     expect(invalid.status).toBe(400);
+    await expectMatchesOpenApi(invalid, "POST", "/api/ucp/checkout-sessions");
   });
 
   it("RFC 9421 (v5 P1-1): anahtar dizini varsa imzasız UCP isteği 401, imzalı istek 201", async () => {
@@ -326,6 +342,7 @@ describeInt("P1-11 ajan ticareti: AP2 mandate + UCP + Stripe SPT (integration)",
       const body = { line_items: [{ item: { id: fx.roomId }, quantity: 1 }], lodging: nextStay() };
       const unsigned = await call0(ucpCreate, req("/api/ucp/checkout-sessions", "POST", body));
       expect(unsigned.status).toBe(401);
+      await expectMatchesOpenApi(unsigned, "POST", "/api/ucp/checkout-sessions");
       expect(await unsigned.json()).toMatchObject({ code: "HTTP_SIGNATURE_REQUIRED" });
 
       const url = "http://localhost:3000/api/ucp/checkout-sessions";

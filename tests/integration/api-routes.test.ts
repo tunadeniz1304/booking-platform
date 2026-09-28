@@ -58,6 +58,7 @@ import { GET as hostPropertiesGet } from "@/app/api/host/properties/route";
 import { POST as listingCopyPost } from "@/app/api/ai/listing-copy/route";
 import { POST as tripPlanPost } from "@/app/api/ai/trip-plan/route";
 import { GET as mailboxGet } from "@/app/api/dev/mailbox/route";
+import { expectMatchesOpenApi } from "../helpers/openapi-assert";
 
 const BASE = "http://localhost:3000";
 
@@ -177,6 +178,7 @@ describeInt("API route handler'ları (integration)", () => {
     it("health: süreç ayakta → 200 ok", async () => {
       const res = healthGet();
       expect(res.status).toBe(200);
+      await expectMatchesOpenApi(res, "GET", "/api/health");
       const body = await res.json();
       expect(body.status).toBe("ok");
       expect(typeof body.uptimeSeconds).toBe("number");
@@ -185,6 +187,7 @@ describeInt("API route handler'ları (integration)", () => {
     it("ready: veritabanı ve Redis erişilebilir → 200 ready", async () => {
       const res = await readyGet();
       expect(res.status).toBe(200);
+      await expectMatchesOpenApi(res, "GET", "/api/ready");
       const body = await res.json();
       expect(body.ready).toBe(true);
       expect(body.checks.database.ok).toBe(true);
@@ -195,6 +198,7 @@ describeInt("API route handler'ları (integration)", () => {
       expect((await llmStatusGet(call("/api/llm/status"))).status).toBe(401);
       const res = await llmStatusGet(call("/api/llm/status", { token: strangerToken }));
       expect(res.status).toBe(200);
+      await expectMatchesOpenApi(res, "GET", "/api/llm/status");
       const body = await res.json();
       expect(body.mode).toBe("demo");
       expect(typeof body.hasKey).toBe("boolean");
@@ -221,6 +225,7 @@ describeInt("API route handler'ları (integration)", () => {
     it("locations: q ile şehir araması, eşleşme yoksa boş liste", async () => {
       const res = await locationsGet(call(`/api/locations?q=${encodeURIComponent(cityA)}`));
       expect(res.status).toBe(200);
+      await expectMatchesOpenApi(res, "GET", "/api/locations");
       expect(await res.json()).toEqual([{ city: cityA, country: "TEST" }]);
 
       const none = await locationsGet(call(`/api/locations?q=yok-${stamp}`));
@@ -296,13 +301,17 @@ describeInt("API route handler'ları (integration)", () => {
           call("/api/favorites", { token, body: { propertyId: fx.propertyId } })
         );
         expect(res.status).toBe(201);
+        await expectMatchesOpenApi(res, "POST", "/api/favorites");
         const fav = await res.json();
         expect(fav.propertyId).toBe(fx.propertyId);
         expect(fav.property.basePriceMinor).toBe(100_000);
         expect(fav.property).not.toHaveProperty("basePrice");
       }
 
-      const list = await (await favoritesGet(call("/api/favorites", { token }))).json();
+      const favRes = await favoritesGet(call("/api/favorites", { token }));
+      const list = await expectMatchesOpenApi<
+        Array<{ property: { location: { country: string } } }>
+      >(favRes, "GET", "/api/favorites");
       expect(list).toHaveLength(1);
       expect(list[0].property.location.country).toBe("TEST");
 
@@ -326,6 +335,7 @@ describeInt("API route handler'ları (integration)", () => {
       expect((await meGet(call("/api/user/me"))).status).toBe(401);
       const res = await meGet(call("/api/user/me", { token }));
       expect(res.status).toBe(200);
+      await expectMatchesOpenApi(res, "GET", "/api/user/me");
       const me = await res.json();
       expect(me.id).toBe(fx.userId);
       expect(me.role).toBe("USER");
@@ -364,6 +374,7 @@ describeInt("API route handler'ları (integration)", () => {
         undefined
       );
       expect(res.status).toBe(200);
+      await expectMatchesOpenApi(res, "GET", "/api/quote");
       const q = await res.json();
       expect(q.quoteId).toMatch(/^[0-9a-f-]{36}$/);
       expect(q.nights).toHaveLength(2);
@@ -381,6 +392,7 @@ describeInt("API route handler'ları (integration)", () => {
           .status
       ).toBe(400);
       const unknown = await quoteGet(call(quoteUrl({ ...base, roomId: "oda-yok" })), undefined);
+      await expectMatchesOpenApi(unknown, "GET", "/api/quote");
       expect(unknown.status).toBe(404);
       expect((await quoteGet(call(quoteUrl({ ...base, guests: "5" })), undefined)).status).toBe(
         400
@@ -423,6 +435,7 @@ describeInt("API route handler'ları (integration)", () => {
         undefined
       );
       expect(first.status).toBe(201);
+      await expectMatchesOpenApi(first, "POST", "/api/bookings");
       const created = await first.json();
       expect(created.paymentRequired).toBe(true);
       expect(created.booking.status).toBe("HELD");
@@ -441,9 +454,15 @@ describeInt("API route handler'ları (integration)", () => {
         undefined
       );
       expect(clash.status).toBe(409);
+      await expectMatchesOpenApi(clash, "POST", "/api/bookings");
 
       expect((await bookingsGet(call("/api/bookings"), undefined)).status).toBe(401);
-      const list = await (await bookingsGet(call("/api/bookings", { token }), undefined)).json();
+      const listRes = await bookingsGet(call("/api/bookings", { token }), undefined);
+      const list = await expectMatchesOpenApi<Array<{ id: string }>>(
+        listRes,
+        "GET",
+        "/api/bookings"
+      );
       expect(list.map((b: { id: string }) => b.id)).toContain(created.booking.id);
       const strangerList = await (
         await bookingsGet(call("/api/bookings", { token: strangerToken }), undefined)
@@ -487,6 +506,7 @@ describeInt("API route handler'ları (integration)", () => {
       const b = await fx.hold({ startInDays: 30 });
       const byOwner = await bookingGet(call(`/api/bookings/${b.id}`, { token }), ctx({ id: b.id }));
       expect(byOwner.status).toBe(200);
+      await expectMatchesOpenApi(byOwner, "GET", "/api/bookings/{id}");
       expect((await byOwner.json()).booking.status).toBe("HELD");
 
       expect((await bookingGet(call(`/api/bookings/${b.id}`), ctx({ id: b.id }))).status).toBe(401);
@@ -495,6 +515,7 @@ describeInt("API route handler'ları (integration)", () => {
         ctx({ id: b.id })
       );
       expect(foreign.status).toBe(404);
+      await expectMatchesOpenApi(foreign, "GET", "/api/bookings/{id}");
       expect((await foreign.json()).code).toBe("BOOKING_NOT_FOUND");
       expect(
         (
@@ -510,6 +531,7 @@ describeInt("API route handler'ları (integration)", () => {
         ctx({ id: b.id })
       );
       expect(cancel.status).toBe(200);
+      await expectMatchesOpenApi(cancel, "DELETE", "/api/bookings/{id}");
       const outcome = await cancel.json();
       expect(outcome.status).toBe("CANCELLED");
       expect(outcome.refund.currency).toBe("TRY");
@@ -565,6 +587,7 @@ describeInt("API route handler'ları (integration)", () => {
       const card = nextCard();
       const res = await payPost(payRequest(b.id, b.token, card), ctx({ id: b.id }));
       expect(res.status).toBe(200);
+      await expectMatchesOpenApi(res, "POST", "/api/bookings/{id}/pay");
       const out = await res.json();
       expect(out.status).toBe("confirmed");
       expect(out.amount).toBe(b.totalMinor);
@@ -581,6 +604,7 @@ describeInt("API route handler'ları (integration)", () => {
       const b = await guestHold();
       const res = await payPost(payRequest(b.id, b.token, nextCard("decline")), ctx({ id: b.id }));
       expect(res.status).toBe(402);
+      await expectMatchesOpenApi(res, "POST", "/api/bookings/{id}/pay");
       const body = await res.json();
       expect(body.code).toBe("PAYMENT_DECLINED");
       expect(body.details.declineCode).toBe("card_declined");
@@ -599,6 +623,7 @@ describeInt("API route handler'ları (integration)", () => {
       await bookingGet(call(`/api/bookings/${b.id}`, { token: b.token }), ctx({ id: b.id }));
       const res = await payPost(payRequest(b.id, b.token, nextCard("3ds")), ctx({ id: b.id }));
       expect(res.status).toBe(202);
+      await expectMatchesOpenApi(res, "POST", "/api/bookings/{id}/pay");
       const out = await res.json();
       expect(out.status).toBe("requires_action");
       expect(out.challenge.type).toBe("3ds_otp");
@@ -779,6 +804,7 @@ describeInt("API route handler'ları (integration)", () => {
         undefined
       );
       expect(res.status).toBe(200);
+      await expectMatchesOpenApi(res, "GET", "/api/search");
       const body = await res.json();
       // Hibrit arama (v3#19) sıralı geri getirir: tam başlık eşleşmesi ilk sıradadır, benzer
       // ilanlar (ortak "Otel" sözcüğü) ardından gelebilir.
@@ -797,6 +823,7 @@ describeInt("API route handler'ları (integration)", () => {
         undefined
       );
       expect(authed.status).toBe(200);
+      await expectMatchesOpenApi(authed, "GET", "/api/search");
       const withDates = await authed.json();
       expect(withDates.results[0]?.id).toBe(fx.propertyId);
       expect(Number.isInteger(withDates.results[0].quote.total)).toBe(true);
@@ -812,6 +839,7 @@ describeInt("API route handler'ları (integration)", () => {
         undefined
       );
       expect(res.status).toBe(200);
+      await expectMatchesOpenApi(res, "POST", "/api/search/smart");
       const body = await res.json();
       expect(body.ai_generated).toBe(true);
       expect(body.filters.ai_generated).toBe(true);
@@ -825,10 +853,12 @@ describeInt("API route handler'ları (integration)", () => {
         call(`/api/properties?query=${encodeURIComponent(title)}${cityQ}`)
       );
       expect(list.status).toBe(200);
+      await expectMatchesOpenApi(list, "GET", "/api/properties");
       expect((await list.json()).results[0]?.id).toBe(fx.propertyId);
 
       const popular = await propertiesGet(call("/api/properties?popular=true&limit=3"));
       expect(popular.status).toBe(200);
+      await expectMatchesOpenApi(popular, "GET", "/api/properties");
       const body = await popular.json();
       expect(body.page).toBe(1);
       expect(body.total).toBe(body.results.length);
@@ -927,6 +957,7 @@ describeInt("API route handler'ları (integration)", () => {
         ctx({ id: fx.propertyId })
       );
       expect(res.status).toBe(200);
+      await expectMatchesOpenApi(res, "GET", "/api/properties/{id}");
       const p = await res.json();
       expect(p.id).toBe(fx.propertyId);
       expect(p.basePriceMinor).toBe(100_000);
@@ -1140,7 +1171,11 @@ describeInt("API route handler'ları (integration)", () => {
       expect(dup.status).toBe(409);
       expect((await dup.json()).code).toBe("REVIEW_EXISTS");
 
-      const list = await (await reviewsGet(call(url), c)).json();
+      const list = await expectMatchesOpenApi<unknown[]>(
+        await reviewsGet(call(url), c),
+        "GET",
+        "/api/properties/{id}/reviews"
+      );
       expect(list).toHaveLength(1);
       expect(list[0]).toMatchObject({
         id: reviewId,
@@ -1159,6 +1194,7 @@ describeInt("API route handler'ları (integration)", () => {
         ctx({ id: fx.propertyId })
       );
       expect(res.status).toBe(200);
+      await expectMatchesOpenApi(res, "GET", "/api/properties/{id}/reviews/summary");
       const body = await res.json();
       expect(body.ai_generated).toBe(true);
       expect(body.llmMode).toBe("demo");
@@ -1203,6 +1239,7 @@ describeInt("API route handler'ları (integration)", () => {
         call("/api/auth/refresh", { body: { refreshToken: session.refreshToken } })
       );
       expect(rotated.status).toBe(200);
+      await expectMatchesOpenApi(rotated, "POST", "/api/auth/refresh");
       const body = await rotated.json();
       expect(body.user.id).toBe(user.id);
       expect(typeof body.accessToken).toBe("string");
@@ -1228,6 +1265,7 @@ describeInt("API route handler'ları (integration)", () => {
       const token = await tokenFor(user.id, "USER");
       const res = await logoutPost(call("/api/auth/logout", { method: "POST", token }));
       expect(res.status).toBe(200);
+      await expectMatchesOpenApi(res, "POST", "/api/auth/logout");
       expect(await res.json()).toEqual({ success: true });
       expect(res.headers.get("set-cookie")).toBeTruthy();
       const again = new NextRequest(`${BASE}/api/x`, {
@@ -1554,6 +1592,7 @@ describeInt("API route handler'ları (integration)", () => {
         })
       );
       expect(tooHigh.status).toBe(400);
+      await expectMatchesOpenApi(tooHigh, "POST", "/api/transfers");
       expect((await tooHigh.json()).code).toBe("ASK_TOO_HIGH");
     });
 
@@ -1562,6 +1601,7 @@ describeInt("API route handler'ları (integration)", () => {
         call("/api/transfers", { token: sellerToken, body: { bookingId, askPriceMinor: 150_000 } })
       );
       expect(first.status).toBe(201);
+      await expectMatchesOpenApi(first, "POST", "/api/transfers");
       const listed = await first.json();
       expect(listed.status).toBe("LISTED");
       expect(listed.askPriceMinor).toBe(150_000);
@@ -1583,18 +1623,24 @@ describeInt("API route handler'ları (integration)", () => {
       ).json();
       const token: string = second.claimToken;
 
-      const mine = await (
-        await transfersGet(call("/api/transfers", { token: sellerToken }))
-      ).json();
+      const mine = await expectMatchesOpenApi<Array<{ id: string }>>(
+        await transfersGet(call("/api/transfers", { token: sellerToken })),
+        "GET",
+        "/api/transfers"
+      );
       expect(mine.map((t: { id: string }) => t.id)).toEqual(
         expect.arrayContaining([listed.id, second.id])
       );
       expect(JSON.stringify(mine)).not.toContain(token);
 
-      const discover = await (await transferDiscoverGet()).json();
+      const discover = await expectMatchesOpenApi<Array<{ id: string; askPriceMinor: number }>>(
+        await transferDiscoverGet(),
+        "GET",
+        "/api/transfers/discover"
+      );
       const pub = discover.find((t: { id: string }) => t.id === second.id);
       expect(pub).toBeDefined();
-      expect(pub.askPriceMinor).toBe(180_000);
+      expect(pub!.askPriceMinor).toBe(180_000);
       expect(pub).not.toHaveProperty("askPrice");
       expect(JSON.stringify(pub)).not.toContain(token);
 
@@ -1617,6 +1663,7 @@ describeInt("API route handler'ları (integration)", () => {
 
       const ok = await claim(buyerToken, { token, cardToken: nextCard() });
       expect(ok.status).toBe(200);
+      await expectMatchesOpenApi(ok, "POST", "/api/transfers/claim");
       const result = await ok.json();
       expect(result).toMatchObject({
         transferId: second.id,

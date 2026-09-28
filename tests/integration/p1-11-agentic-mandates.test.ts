@@ -4,7 +4,7 @@ import { PrismaClient } from "@prisma/client";
 import { describeInt, iso, utcDay } from "./helpers";
 import { createStayFixture, type StayFixture } from "./fixtures";
 import { signAccessToken } from "@/lib/auth/tokens";
-import { signMandate } from "@/lib/agentic/mandate";
+import { signMandate, verifyMandateToken } from "@/lib/agentic/mandate";
 import { registerEventHandlers } from "@/lib/events/register";
 import { inlineFlow, setFulfilmentFlowForTests } from "@/lib/saga/booking-saga";
 import { setPaymentProviderForTests } from "@/lib/payment";
@@ -154,6 +154,19 @@ describeInt("P1-11 ajan ticareti: AP2 mandate + UCP + Stripe SPT (integration)",
     expect(await replay.json()).toMatchObject({ code: "MANDATE_REPLAYED" });
     const row = await prisma.checkoutSession.findUniqueOrThrow({ where: { id: other.id } });
     expect(row.bookingId).toBeNull();
+
+    // v5 P1-1: nonce DB'de de kalıcı (AgentMandateUse). Redis verisi kaybolsa bile replay 409.
+    const { nonce } = (await verifyMandateToken(mandate)) as { nonce: string };
+    const use = await prisma.agentMandateUse.findUniqueOrThrow({ where: { nonce } });
+    expect(use).toMatchObject({ checkoutSessionId: s.id, userId: fx.userId });
+    await redis.del(`agent-mandate:nonce:${nonce}`);
+    const third = await acpSession();
+    const afterLoss = await complete(third.id, {
+      payment_data: { token: "spt_mock_ok", provider: "mock" },
+      mandate,
+    });
+    expect(afterLoss.status).toBe(409);
+    expect(await afterLoss.json()).toMatchObject({ code: "MANDATE_REPLAYED" });
   });
 
   it("ACP ret yolları: mandate yok 403, süresi dolmuş 403, aşan tutar 402 + step-up, başka ilan 403", async () => {

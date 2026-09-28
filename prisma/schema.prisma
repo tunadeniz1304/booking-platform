@@ -94,52 +94,52 @@ enum UserRole {
 }
 
 model Property {
-  id                   String                      @id @default(cuid())
-  hostId               String
-  host                 User                        @relation(fields: [hostId], references: [id])
-  title                String
-  description          String
-  propertyType         PropertyType
-  locationId           String
-  location             Location                    @relation(fields: [locationId], references: [id])
-  amenities            Amenity[]                   @relation("PropertyAmenities")
+  id                    String                      @id @default(cuid())
+  hostId                String
+  host                  User                        @relation(fields: [hostId], references: [id])
+  title                 String
+  description           String
+  propertyType          PropertyType
+  locationId            String
+  location              Location                    @relation(fields: [locationId], references: [id])
+  amenities             Amenity[]                   @relation("PropertyAmenities")
   /// Oda tipleri (v3 P0-2): satış birimi oda tipidir; `units` adet oda.
-  rooms                RoomType[]
+  rooms                 RoomType[]
   /// IANA saat dilimi; gece, iade penceresi, iCal ve checkout sonrası tamamlama bu dilimde (ADR 0011).
-  timeZone             String                      @default("Europe/Istanbul")
+  timeZone              String                      @default("Europe/Istanbul")
   /// Yerel giriş/çıkış saati (SS:DD).
-  checkInTime          String                      @default("15:00")
-  checkOutTime         String                      @default("11:00")
-  bookings             Booking[]
-  reviews              Review[]
-  favorites            Favorite[]
-  basePriceMinor       BigInt
-  currency             String                      @default("TRY")
-  ratingAvg            Float                       @default(0)
-  ratingCount          Int                         @default(0)
-  isActive             Boolean                     @default(true)
-  images               String[]                    @default([])
-  embedding            Unsupported("vector(128)")?
+  checkInTime           String                      @default("15:00")
+  checkOutTime          String                      @default("11:00")
+  bookings              Booking[]
+  reviews               Review[]
+  favorites             Favorite[]
+  basePriceMinor        BigInt
+  currency              String                      @default("TRY")
+  ratingAvg             Float                       @default(0)
+  ratingCount           Int                         @default(0)
+  isActive              Boolean                     @default(true)
+  images                String[]                    @default([])
+  embedding             Unsupported("vector(128)")?
   /// P1-1 hibrit arama: başlık + açıklamadan üretilen tsvector (GENERATED ALWAYS, `simple` +
   /// `turkish` yapılandırması, GIN indeksli). Yalnızca SQL'de okunur; migration'da tanımlı.
-  searchVector         Unsupported("tsvector")?
-  priceHistory         PriceHistory[]
+  searchVector          Unsupported("tsvector")?
+  priceHistory          PriceHistory[]
   /// P1-10: yüklenen fotoğraflar (kalite skoru, pHash, CLIP embedding).
-  photos               PropertyPhoto[]
+  photos                PropertyPhoto[]
   /// P1-13(e): erişilebilirlik özellikleri (yalnız admin doğrulamalılar herkese gösterilir).
   accessibilityFeatures AccessibilityFeature[]
   /// P1-8: yalnız bu ilana özel promosyonlar (ev sahibi geneli olanlar propertyId=null).
   promotions            Promotion[]
   /// İptal politikası (yoksa varsayılan MODERATE); rezervasyonda snapshot'ı alınır.
   /// Turizm İşletme Belgesi / 7464 izin belgesi no (ör. 34-12345); boşsa ilan yayınlanmaz.
-  licenseNumber        String?
+  licenseNumber         String?
   /// P1-10: kayıt no doğrulama durumu (TR 7565 / AB 2024/1028 mock kayıtları). Yayın için VERIFIED şart.
-  licenseStatus        LicenseStatus               @default(PENDING)
-  licenseCheckedAt     DateTime?
-  cancellationPolicyId String?
-  cancellationPolicy   CancellationPolicy?         @relation(fields: [cancellationPolicyId], references: [id])
-  createdAt            DateTime                    @default(now())
-  updatedAt            DateTime                    @updatedAt
+  licenseStatus         LicenseStatus               @default(PENDING)
+  licenseCheckedAt      DateTime?
+  cancellationPolicyId  String?
+  cancellationPolicy    CancellationPolicy?         @relation(fields: [cancellationPolicyId], references: [id])
+  createdAt             DateTime                    @default(now())
+  updatedAt             DateTime                    @updatedAt
 
   @@index([locationId, isActive])
   @@index([hostId])
@@ -209,26 +209,26 @@ model Amenity {
 
 /// Oda tipi (v3 P0-2, ADR 0010): "Standart Çift × 12". API'de `roomId` = oda tipi kimliği.
 model RoomType {
-  id               String            @id @default(cuid())
-  propertyId       String
-  property         Property          @relation(fields: [propertyId], references: [id])
-  name             String
-  description      String?
+  id                    String                 @id @default(cuid())
+  propertyId            String
+  property              Property               @relation(fields: [propertyId], references: [id])
+  name                  String
+  description           String?
   /// Bir odada kalabilecek azami kişi.
-  maxOccupancy     Int
+  maxOccupancy          Int
   /// Bu tipten kaç oda satılabilir (günlük `InventoryDay.total` varsayılanı).
-  units            Int               @default(1)
-  bedType          String
-  priceModifierMinor BigInt @default(0)
-  available        Boolean           @default(true)
-  inventory        InventoryDay[]
-  ratePlans        RatePlan[]
-  restrictions     Restriction[]
-  externalBlocks   ExternalBlock[]
-  bookings         Booking[]
-  cartItems        CartItem[]
-  priceAlerts      PriceAlert[]
-  priceSuggestions PriceSuggestion[]
+  units                 Int                    @default(1)
+  bedType               String
+  priceModifierMinor    BigInt                 @default(0)
+  available             Boolean                @default(true)
+  inventory             InventoryDay[]
+  ratePlans             RatePlan[]
+  restrictions          Restriction[]
+  externalBlocks        ExternalBlock[]
+  bookings              Booking[]
+  cartItems             CartItem[]
+  priceAlerts           PriceAlert[]
+  priceSuggestions      PriceSuggestion[]
   accessibilityFeatures AccessibilityFeature[]
 
   @@index([propertyId])
@@ -314,28 +314,28 @@ model ExternalBlock {
 }
 
 model Booking {
-  id                     String            @id @default(cuid())
+  id                     String                @id @default(cuid())
   userId                 String
-  user                   User              @relation(fields: [userId], references: [id])
+  user                   User                  @relation(fields: [userId], references: [id])
   propertyId             String
-  property               Property          @relation(fields: [propertyId], references: [id])
+  property               Property              @relation(fields: [propertyId], references: [id])
   /// Oda tipi kimliği (geriye uyum için alan adı `roomId`).
   roomId                 String
-  room                   RoomType          @relation(fields: [roomId], references: [id])
+  room                   RoomType              @relation(fields: [roomId], references: [id])
   ratePlanId             String?
-  ratePlan               RatePlan?         @relation(fields: [ratePlanId], references: [id])
+  ratePlan               RatePlan?             @relation(fields: [ratePlanId], references: [id])
   /// Rezerve edilen oda adedi (sayaçlardan bu kadar düşülür).
-  units                  Int               @default(1)
-  checkIn                DateTime          @db.Date
-  checkOut               DateTime          @db.Date
+  units                  Int                   @default(1)
+  checkIn                DateTime              @db.Date
+  checkOut               DateTime              @db.Date
   guestCount             Int
   totalPriceMinor        BigInt
-  currency               String            @default("TRY")
-  status                 BookingStatus     @default(PENDING)
+  currency               String                @default("TRY")
+  status                 BookingStatus         @default(PENDING)
   /// HELD durumundaki geçici tutma süresi; dolunca expire-holds işi envanteri iade eder.
   holdExpiresAt          DateTime?
   /// İyimser eşzamanlılık sürümü: her durum geçişinde +1 (koşullu güncelleme).
-  version                Int               @default(0)
+  version                Int                   @default(0)
   /// computeTotal() kırılımının anlık görüntüsü (geceler, ara toplam, vergiler, toplam; minor-unit).
   priceBreakdown         Json?
   quoteId                String?
@@ -345,7 +345,7 @@ model Booking {
   fxSnapshot             Json?
   /// Kullanılan kalıcı kur tablosu (P0-5); statik yedek tablo kullanıldıysa null.
   fxSnapshotId           String?
-  fxRate                 FxRate?           @relation(fields: [fxSnapshotId], references: [id], onDelete: SetNull)
+  fxRate                 FxRate?               @relation(fields: [fxSnapshotId], references: [id], onDelete: SetNull)
   confirmedAt            DateTime?
   cancelledAt            DateTime?
   expiredAt              DateTime?
@@ -354,7 +354,7 @@ model Booking {
   idempotencyRequestHash String?
   /// P1-1: sepetten doğan rezervasyon (grup kimliği = sepet); tek rezervasyonda null.
   cartId                 String?
-  cart                   Cart?             @relation(fields: [cartId], references: [id], onDelete: SetNull)
+  cart                   Cart?                 @relation(fields: [cartId], references: [id], onDelete: SetNull)
   payment                Payment?
   reviews                Review[]
   transfers              BookingTransfer[]
@@ -363,8 +363,8 @@ model Booking {
   promotionRedemptions   PromotionRedemption[]
   invoice                Invoice?
   messageThread          MessageThread?
-  createdAt              DateTime          @default(now())
-  updatedAt              DateTime          @updatedAt
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @updatedAt
 
   @@unique([userId, idempotencyKey])
   @@index([propertyId, checkIn, checkOut])
@@ -405,28 +405,28 @@ enum BookingStatus {
 }
 
 model Payment {
-  id             String        @id @default(cuid())
-  bookingId      String        @unique
-  booking        Booking       @relation(fields: [bookingId], references: [id])
+  id                  String        @id @default(cuid())
+  bookingId           String        @unique
+  booking             Booking       @relation(fields: [bookingId], references: [id])
   /// Ödemenin sahibi = rezervasyonun güncel sahibi (devirde alıcıya geçer).
-  userId         String
-  user           User          @relation(fields: [userId], references: [id])
-  amountMinor    BigInt
-  currency       String        @default("TRY")
-  provider       String
+  userId              String
+  user                User          @relation(fields: [userId], references: [id])
+  amountMinor         BigInt
+  currency            String        @default("TRY")
+  provider            String
   /// PSP tarafındaki ödeme kimliği (mock: pi_mock_…, stripe: pi_…).
-  providerRef    String?       @unique
-  status         PaymentStatus @default(PENDING)
-  refundedAmountMinor BigInt @default(0)
-  failureCode    String?
-  authorizedAt   DateTime?
-  paidAt         DateTime?
-  refundedAt     DateTime?
+  providerRef         String?       @unique
+  status              PaymentStatus @default(PENDING)
+  refundedAmountMinor BigInt        @default(0)
+  failureCode         String?
+  authorizedAt        DateTime?
+  paidAt              DateTime?
+  refundedAt          DateTime?
   /// P1-1: sepetin tek PSP tahsilatından bu rezervasyona düşen pay (providerRef sepet ödemesinde).
-  cartPaymentId  String?
-  cartPayment    CartPayment?  @relation(fields: [cartPaymentId], references: [id])
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @default(now()) @updatedAt
+  cartPaymentId       String?
+  cartPayment         CartPayment?  @relation(fields: [cartPaymentId], references: [id])
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @default(now()) @updatedAt
 
   @@index([userId])
   @@index([status])
@@ -628,13 +628,13 @@ model OutboxMessage {
 }
 
 model PriceHistory {
-  id              String   @id @default(cuid())
-  propertyId      String
-  property        Property @relation(fields: [propertyId], references: [id])
-  month           DateTime @db.Date
+  id                   String   @id @default(cuid())
+  propertyId           String
+  property             Property @relation(fields: [propertyId], references: [id])
+  month                DateTime @db.Date
   avgNightlyPriceMinor BigInt
-  demandIndex     Float    @default(50)
-  createdAt       DateTime @default(now())
+  demandIndex          Float    @default(50)
+  createdAt            DateTime @default(now())
 
   @@unique([propertyId, month])
   @@index([propertyId, month])
@@ -713,18 +713,18 @@ enum PayoutStatus {
 /// Devir sonrası satıcıya yapılacak ödeme (#4). Talep anında PENDING açılır; mock payout işi
 /// PAID'e çeker (`po_mock_…` referansı). Defterde karşılığı TRANSFER_PAYOUT satırıdır.
 model Payout {
-  id         String       @id @default(cuid())
-  userId     String
-  bookingId  String
-  booking    Booking      @relation(fields: [bookingId], references: [id])
-  transferId String       @unique
+  id          String       @id @default(cuid())
+  userId      String
+  bookingId   String
+  booking     Booking      @relation(fields: [bookingId], references: [id])
+  transferId  String       @unique
   amountMinor BigInt
-  currency   String
-  status     PayoutStatus @default(PENDING)
-  reference  String?
-  attempts   Int          @default(0)
-  createdAt  DateTime     @default(now())
-  paidAt     DateTime?
+  currency    String
+  status      PayoutStatus @default(PENDING)
+  reference   String?
+  attempts    Int          @default(0)
+  createdAt   DateTime     @default(now())
+  paidAt      DateTime?
 
   @@index([status, createdAt])
   @@index([userId])
@@ -732,15 +732,15 @@ model Payout {
 
 /// Mock e-Arşiv fatura kaydı (DEMO — mali değeri yoktur). Rezervasyon başına bir fatura.
 model Invoice {
-  id        String   @id @default(cuid())
-  bookingId String   @unique
-  booking   Booking  @relation(fields: [bookingId], references: [id])
-  number    String   @unique
-  amountMinor BigInt
+  id             String   @id @default(cuid())
+  bookingId      String   @unique
+  booking        Booking  @relation(fields: [bookingId], references: [id])
+  number         String   @unique
+  amountMinor    BigInt
   taxAmountMinor BigInt
-  currency  String
-  buyerName String
-  issuedAt  DateTime @default(now())
+  currency       String
+  buyerName      String
+  issuedAt       DateTime @default(now())
 }
 
 /// Yönetici eylemleri denetim kaydı (değiştirilemez; yalnızca ekleme).
@@ -890,6 +890,20 @@ model CheckoutSession {
   @@index([userId, createdAt])
 }
 
+/// Mandate nonce kullanımı (v5 P1-1, ADR 0035): nonce ilk checkout oturumuna kalıcı olarak
+/// bağlanır. Redis hızlı yoldur; Redis verisi kaybolsa bile aynı mandate başka bir oturumda
+/// ikinci kez kullanılamaz (birincil anahtar = nonce).
+model AgentMandateUse {
+  nonce             String   @id @db.VarChar(128)
+  userId            String
+  checkoutSessionId String
+  /// Mandate'in imzalı son geçerlilik anı (saklama/temizlik için).
+  expiresAt         DateTime
+  createdAt         DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
 enum PriceSuggestionStatus {
   PENDING
   ACCEPTED
@@ -1000,32 +1014,32 @@ model JournalLine {
 /// (EXIF/GPS silinmiş, uzun kenar sınırlı). Skorlar 0..1; `pHash` 64-bit DCT perceptual hash
 /// (16 hex). `embedding` CLIP ViT-B/32 (L2-normalize, 512-d); model/bayrak yoksa null.
 model PropertyPhoto {
-  id                String                      @id @default(cuid())
-  propertyId        String
-  property          Property                    @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  uploadedById      String?
-  contentType       String
-  data              Bytes
-  width             Int
-  height            Int
-  byteSize          Int
+  id                    String                      @id @default(cuid())
+  propertyId            String
+  property              Property                    @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  uploadedById          String?
+  contentType           String
+  data                  Bytes
+  width                 Int
+  height                Int
+  byteSize              Int
   /// Laplacian varyansı (ham) ve 0..1 normalize netlik skoru.
-  blurVariance      Float?
-  blurScore         Float?
+  blurVariance          Float?
+  blurScore             Float?
   /// Histogram tabanlı pozlama skoru (0..1; orta ton + kırpılmamış uçlar = yüksek).
-  exposureScore     Float?
-  qualityScore      Float?
-  pHash             String?                     @db.Char(16)
+  exposureScore         Float?
+  qualityScore          Float?
+  pHash                 String?                     @db.Char(16)
   /// Yüklemede bulunan en yakın perceptual duplikat (Hamming ≤ eşik); yoksa null.
-  duplicateOfId     String?
-  duplicateOf       PropertyPhoto?              @relation("PhotoDuplicates", fields: [duplicateOfId], references: [id], onDelete: SetNull)
-  duplicates        PropertyPhoto[]             @relation("PhotoDuplicates")
+  duplicateOfId         String?
+  duplicateOf           PropertyPhoto?              @relation("PhotoDuplicates", fields: [duplicateOfId], references: [id], onDelete: SetNull)
+  duplicates            PropertyPhoto[]             @relation("PhotoDuplicates")
   /// P1-13(e): bu fotoğrafı kanıt gösteren erişilebilirlik özellikleri.
   accessibilityEvidence AccessibilityFeature[]
-  duplicateDistance Int?
-  embedding         Unsupported("vector(512)")?
-  embeddingModel    String?
-  createdAt         DateTime                    @default(now())
+  duplicateDistance     Int?
+  embedding             Unsupported("vector(512)")?
+  embeddingModel        String?
+  createdAt             DateTime                    @default(now())
 
   @@index([propertyId, createdAt])
   @@index([pHash])

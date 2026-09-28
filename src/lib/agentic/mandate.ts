@@ -203,7 +203,18 @@ export async function verifyMandateToken(token: string, now = new Date()): Promi
 /** Tek kullanımlık nonce deposu: nonce ilk checkout oturumuna bağlanır. */
 export interface NonceStore {
   /** Bağlar; zaten başka bir oturuma bağlıysa o oturumun kimliğini döner. */
-  bind(nonce: string, sessionId: string, ttlSeconds: number): Promise<{ boundTo: string }>;
+  bind(
+    nonce: string,
+    sessionId: string,
+    ttlSeconds: number,
+    meta?: NonceBindMeta
+  ): Promise<{ boundTo: string }>;
+}
+
+/** Kalıcı kayıt için bağlam (DB deposu kullanır; Redis/bellek deposu yok sayar). */
+export interface NonceBindMeta {
+  userId: string;
+  expiresAt: Date;
 }
 
 const nonceKey = (nonce: string) => `agent-mandate:nonce:${nonce}`;
@@ -214,6 +225,33 @@ export const redisNonceStore: NonceStore = {
     const set = await redis.set(key, sessionId, { ex: ttlSeconds, nx: true });
     if (set) return { boundTo: sessionId };
     return { boundTo: (await redis.get(key)) ?? sessionId };
+  },
+};
+
+/**
+ * Kalıcı nonce deposu (v5 P1-1, ADR 0035): `AgentMandateUse` birincil anahtarı nonce'tur;
+ * `INSERT … ON CONFLICT DO NOTHING` ile ilk bağlanan oturum kazanır ve kaybedenler kaydı okur.
+ * DB kaynak doğrudur — Redis yalnız önbellektir (yazılamazsa uyarı; karar değişmez). Redis
+ * verisi kaybolsa bile aynı mandate başka bir checkout'a ikinci kez bağlanamaz.
+ */
+export const durableNonceStore: NonceStore = {
+  async bind(nonce, sessionId, ttlSeconds, meta) {
+    const expiresAt = meta?.expiresAt ?? new Date(Date.now() + ttlSeconds * 1000);
+    await prisma.agentMandateUse.createMany({
+      data: [{ nonce, checkoutSessionId: sessionId, userId: meta?.userId ?? "", expiresAt }],
+      skipDuplicates: true,
+    });
+    const row = await prisma.agentMandateUse.findUnique({
+      where: { nonce },
+      select: { checkoutSessionId: true },
+    });
+    const boundTo = row?.checkoutSessionId ?? sessionId;
+    try {
+      await redis.set(nonceKey(nonce), boundTo, { ex: ttlSeconds, nx: true });
+    } catch (error) {
+      logger.warn({ err: String(error) }, "mandate nonce cache write failed; DB holds it");
+    }
+    return { boundTo };
   },
 };
 
@@ -283,7 +321,7 @@ export interface MandateSummary {
   issuedAt: string;
   revokedAt: string | null;
   status: MandateStatus;
-  /** Nonce bir checkout oturumuna bağlandı mı (Redis erişilemezse null). */
+  /** Nonce bir checkout oturumuna bağlandı mı (kalıcı `AgentMandateUse` kaydından). */
   used: boolean | null;
 }
 
@@ -296,7 +334,7 @@ interface IssuedMeta {
 
 /**
  * Kullanıcının verdiği mandate'ler (P2-1a). Mandate'ler DB'de ayrı tabloda tutulmaz
- * (ADR 0023): verme/iptal denetim kaydından, kullanım Redis nonce bağından okunur.
+ * (ADR 0023): verme/iptal denetim kaydından, kullanım `AgentMandateUse`'tan okunur (ADR 0035).
  * `limit: null` → tümü (KVKK dışa aktarımı).
  */
 export async function listMandates(
@@ -323,13 +361,12 @@ export async function listMandates(
       })
     ).map((r) => [r.entityId!, r.createdAt])
   );
-  let bound: Array<string | null> | null = null;
-  try {
-    bound = await redis.mget(nonces.map(nonceKey));
-  } catch {
-    bound = null;
-  }
-  const usedByNonce = new Map(nonces.map((n, i) => [n, bound ? bound[i] !== null : null]));
+  const usedRows = await prisma.agentMandateUse.findMany({
+    where: { nonce: { in: nonces } },
+    select: { nonce: true },
+  });
+  const usedSet = new Set(usedRows.map((r) => r.nonce));
+  const usedByNonce = new Map(nonces.map((n) => [n, usedSet.has(n)]));
   const out: MandateSummary[] = [];
   for (const row of issued) {
     if (!row.entityId) continue;
@@ -446,7 +483,7 @@ export async function authorizeMandate(
 ): Promise<MandateClaims | null> {
   const now = deps.now ?? new Date();
   const record = deps.record ?? auditRecord;
-  const nonces = deps.nonces ?? redisNonceStore;
+  const nonces = deps.nonces ?? durableNonceStore;
   const revocations = deps.revocations ?? redisRevocationStore;
   const trimmed = token?.trim();
   try {
@@ -458,7 +495,10 @@ export async function authorizeMandate(
     if (await revocations.isRevoked(claims.nonce)) throw new MandateError("MANDATE_REVOKED");
     assertWithinMandate(claims, charge);
     const ttl = Math.max(60, Math.ceil((Date.parse(claims.expiresAt) - now.getTime()) / 1000));
-    const { boundTo } = await nonces.bind(claims.nonce, charge.checkoutSessionId, ttl + 3600);
+    const { boundTo } = await nonces.bind(claims.nonce, charge.checkoutSessionId, ttl + 3600, {
+      userId: charge.userId,
+      expiresAt: new Date(claims.expiresAt),
+    });
     if (boundTo !== charge.checkoutSessionId) {
       throw new MandateError("MANDATE_REPLAYED");
     }

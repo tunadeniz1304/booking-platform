@@ -31,6 +31,8 @@ import {
   type LlmBudget,
 } from "./budget";
 import { redis } from "@/lib/redis";
+import type { Tracer } from "@opentelemetry/api";
+import { getGenAiTracer, recordGenAiResult, withGenAiSpan } from "./telemetry";
 import { createLimiter, LimiterRejectedError, type Limiter } from "@/lib/resilience/limit";
 
 /**
@@ -351,6 +353,8 @@ export interface CreateLlmClientOptions {
   budget?: LlmBudget;
   /** Eşzamanlılık sınırlayıcı (varsayılan: `LLM_MAX_CONCURRENCY` süreç havuzu). */
   limiter?: Limiter;
+  /** Testler için: GenAI span'lerini alacak tracer (varsayılan: global OTel sağlayıcısı). */
+  tracer?: Tracer;
 }
 
 type Completion = Pick<ChatCompletion, "choices" | "usage" | "model">;
@@ -362,6 +366,7 @@ export function createLlmClient(options: CreateLlmClientOptions = {}): LlmClient
     options.budget ??
     createRedisBudget(redis, settings.dailyTokenBudgetPerUser, settings.dailyTokenBudgetSystem);
   const limit = options.limiter ?? getLlmLimiter(settings);
+  const tracer = (): Tracer => options.tracer ?? getGenAiTracer();
 
   /**
    * `LLM_LOG_PROMPTS=true` (production dışı) iken YALNIZCA redakte edilmiş prompt debug
@@ -477,7 +482,39 @@ export function createLlmClient(options: CreateLlmClientOptions = {}): LlmClient
     const res = await withBudgetHold(
       budget,
       hold,
-      () => create(params, wantJson, signal),
+      () =>
+        withGenAiSpan(
+          tracer(),
+          {
+            task,
+            model: settings.model,
+            provider: "openai",
+            serverAddress: settings.baseUrlHost,
+            mode: "live",
+            temperature: params.temperature ?? undefined,
+            maxTokens: params.max_tokens ?? undefined,
+            messages: params.messages,
+            captureContent: settings.otelCaptureContent,
+          },
+          async (span) => {
+            const r = await create(params, wantJson, signal);
+            const u = usageOf(r);
+            recordGenAiResult(
+              span,
+              { captureContent: settings.otelCaptureContent },
+              {
+                responseModel: r.model,
+                finishReasons: (r.choices ?? [])
+                  .map((c) => c.finish_reason)
+                  .filter((f): f is NonNullable<typeof f> => typeof f === "string"),
+                inputTokens: u?.promptTokens,
+                outputTokens: u?.completionTokens,
+                output: r.choices?.[0]?.message?.content ?? null,
+              }
+            );
+            return r;
+          }
+        ),
       (r) => {
         const u = usageOf(r);
         return u ? u.promptTokens + u.completionTokens : undefined;
@@ -509,7 +546,20 @@ export function createLlmClient(options: CreateLlmClientOptions = {}): LlmClient
     started: number,
     reason?: FallbackReason
   ): Promise<LlmResult<T>> {
-    const data = await demo();
+    const data =
+      mode === "demo"
+        ? await withGenAiSpan(
+            tracer(),
+            {
+              task,
+              model: settings.model,
+              provider: "booking.demo",
+              mode: "demo",
+              captureContent: false,
+            },
+            async () => demo()
+          )
+        : await demo();
     const latencyMs = Date.now() - started;
     record(
       task,

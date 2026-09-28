@@ -2,7 +2,7 @@
 import { beforeAll, afterAll, describe, it, expect } from "vitest";
 import { NextRequest } from "next/server";
 import { PrismaClient } from "@prisma/client";
-import { describeInt, iso, utcDay } from "./helpers";
+import { describeInt, iso, parkOutboxBacklog, utcDay } from "./helpers";
 import { createStayFixture, type StayFixture } from "./fixtures";
 import { createBooking, getBooking, listUserBookingsPage } from "@/lib/booking-service";
 import { bookingCacheKey } from "@/lib/booking/booking-cache";
@@ -34,6 +34,7 @@ describeInt("regression: v4#14 rezervasyon önbelleği ve sayfalama (integration
     expect((await getBooking(held.id, fx.userId)).status).toBe("HELD");
     expect(await redis.get(bookingCacheKey(held.id))).not.toBeNull();
 
+    await parkOutboxBacklog(prisma); // tam koşuda önceki dosyaların outbox birikimi
     // Yazan tarafın doğrudan silmesi düşmüş gibi: yalnızca DB + outbox.
     await prisma.$transaction(async (tx) => {
       const b = await tx.booking.update({ where: { id: held.id }, data: { status: "EXPIRED" } });

@@ -108,7 +108,9 @@ export async function loadPayableCart(cartId: string, userId: string): Promise<P
       currency: true,
       holdExpiresAt: true,
       items: { select: { bookingId: true } },
+      // Kararlı sıra: idempotent tekrar aynı yanıtı döner (yığın sırası güncellemeyle değişir).
       bookings: {
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
         select: { id: true, status: true, totalPriceMinor: true, currency: true, propertyId: true },
       },
       payment: { select: { status: true, providerRef: true, failureCode: true } },

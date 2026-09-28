@@ -1,10 +1,10 @@
 // v4#14: bayat rezervasyon durumu (outbox ile önbellek silme) + cursor pagination.
-import { beforeAll, afterAll, it, expect } from "vitest";
+import { beforeAll, afterAll, describe, it, expect } from "vitest";
 import { NextRequest } from "next/server";
 import { PrismaClient } from "@prisma/client";
-import { describeInt } from "./helpers";
+import { describeInt, iso, utcDay } from "./helpers";
 import { createStayFixture, type StayFixture } from "./fixtures";
-import { getBooking, listUserBookingsPage } from "@/lib/booking-service";
+import { createBooking, getBooking, listUserBookingsPage } from "@/lib/booking-service";
 import { bookingCacheKey } from "@/lib/booking/booking-cache";
 import { appendOutbox, relayOutbox } from "@/lib/cqrs";
 import { EventTypes, makeEvent, type BookingExpiredPayload } from "@/lib/events/events";
@@ -13,6 +13,7 @@ import { inlineFlow, setFulfilmentFlowForTests } from "@/lib/saga/booking-saga";
 import { redis } from "@/lib/redis";
 import { signAccessToken } from "@/lib/auth/tokens";
 import { GET as bookingsGet } from "@/app/api/bookings/route";
+import { GET as bookingGet } from "@/app/api/bookings/[id]/route";
 
 describeInt("regression: v4#14 rezervasyon önbelleği ve sayfalama (integration)", () => {
   const prisma = new PrismaClient();
@@ -132,5 +133,44 @@ describeInt("regression: v4#14 rezervasyon önbelleği ve sayfalama (integration
     ).json()) as unknown[];
     expect(unpaged.length).toBeGreaterThanOrEqual(5);
     expect((await bookingsGet(req("/api/bookings?limit=0"), undefined)).status).toBe(400);
+  });
+
+  describe("regression: v5-F3#3 rezervasyon yanıtları idempotency iç alanlarını sızdırmaz", () => {
+    it("GET /api/bookings ve GET /api/bookings/{id} (soğuk + önbellekten) iç alan içermez", async () => {
+      const created = await createBooking({
+        userId: fx.userId,
+        propertyId: fx.propertyId,
+        roomId: fx.roomId,
+        checkIn: iso(utcDay(60)),
+        checkOut: iso(utcDay(62)),
+        guestCount: 1,
+        idempotencyKey: `leak-${Date.now()}`,
+      });
+      const id = created.booking.id;
+      const token = (await signAccessToken(fx.userId, "USER", 300)).token;
+      const req = (path: string) =>
+        new NextRequest(`http://localhost:3000${path}`, {
+          headers: { authorization: `Bearer ${token}` },
+        });
+      const internal = /idempotencyKey|idempotencyRequestHash/;
+
+      const list = (await (
+        await bookingsGet(req("/api/bookings?limit=50"), undefined)
+      ).json()) as Array<Record<string, unknown>>;
+      const row = list.find((b) => b.id === id);
+      expect(row).toBeDefined();
+      expect(Object.keys(row!).join(",")).not.toMatch(internal);
+      expect(JSON.stringify(list)).not.toMatch(internal);
+
+      await redis.del(bookingCacheKey(id));
+      for (const pass of ["soğuk", "önbellek"]) {
+        const res = await bookingGet(req(`/api/bookings/${id}`), {
+          params: Promise.resolve({ id }),
+        });
+        expect(res.status, pass).toBe(200);
+        expect(JSON.stringify(await res.json()), pass).not.toMatch(internal);
+      }
+      expect(await redis.get(bookingCacheKey(id))).not.toMatch(internal);
+    });
   });
 });

@@ -12,6 +12,11 @@ x-demo-env: &demo-env
   # Tam e2e koşusu tek IP'den art arda istek atar; yalnız demo modunda etkin gevşetme çarpanı
   # (ör. `RATE_LIMIT_DEMO_RELAX_MULTIPLIER=20 docker compose ... up`). Varsayılan 1 = kapalı.
   RATE_LIMIT_DEMO_RELAX_MULTIPLIER: "${RATE_LIMIT_DEMO_RELAX_MULTIPLIER:-1}"
+  # Fraud IP hız kuralı (prod varsayılanı 10 ödeme/saat, app-config.ts): yerel demoda tüm
+  # trafik Caddy arkasında tek istemci IP'sinden gelir; ardışık e2e/demo koşuları aksi hâlde
+  # `velocity_ip` ile 3DS/ret alır. YALNIZ bu demo override'ında yükseltilir; temel compose ve
+  # üretim davranışı değişmez (kullanıcı/kart hız kuralları prod değerinde kalır).
+  FRAUD_VELOCITY_IP_MAX: "${FRAUD_VELOCITY_IP_MAX:-1000}"
   # P2-2: seed fotoğraflarının embedding'leriyle "benzerlerini göster" araması açık
   # (CLIP modeli imajda yoksa yeni yüklemeler embedding'siz kalır; arama yine çalışır).
   VISION_CLIP_ENABLED: "true"

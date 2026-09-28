@@ -40,6 +40,15 @@ describe("regression: v4#5 güvensiz compose varsayılanları", () => {
     );
   });
 
+  it("fraud IP hız gevşetmesi yalnız demo override'ında (e2e tekrar koşuları, tek IP)", () => {
+    expect(read("docker-compose.demo.yml")).toMatch(
+      /FRAUD_VELOCITY_IP_MAX: "\$\{FRAUD_VELOCITY_IP_MAX:-\d+\}"/
+    );
+    expect(read("docker-compose.yml")).not.toMatch(/FRAUD_VELOCITY_IP_MAX/);
+    // Üretim varsayılanı değişmedi.
+    expect(read("src/lib/config/app-config.ts")).toMatch(/FRAUD_VELOCITY_IP_MAX: int\(10, /);
+  });
+
   it("JWT_SECRET gücü test dışındaki her ortamda (development dahil) kontrol edilir", () => {
     setSecret("change-me");
     env.NODE_ENV = "development";

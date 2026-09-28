@@ -390,6 +390,8 @@ docker compose --profile observability up --build
 
 Prometheus <http://127.0.0.1:9090>, Grafana <http://127.0.0.1:3001> (dashboard: `docs/observability/grafana-dashboard.json`), Tempo (OTLP). `/api/metrics` `METRICS_TOKEN` ile korunur; worker metrikleri 9464 portundadır (ör. `saga_compensation_total`, `ledger_imbalance_total`, `takedown_sla_breach_total`). `/api/health` (liveness) ve `/api/ready` (DB + Redis) açıktır.
 
+Alarmlar (`docker/observability/alerts.yml`): SLO'lar için çok pencereli burn-rate alarmları; her alarmın runbook'u [docs/runbooks/](docs/runbooks/README.md), birim testleri `alerts.test.yml` (`promtool test rules`, CI). Tedarik zinciri: `security.yml` (Semgrep, gitleaks, OSV-Scanner, CycloneDX SBOM) — bildirim politikası [SECURITY.md](SECURITY.md), karar [ADR 0031](docs/adr/0031-supply-chain-provenance.md).
+
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## Yol haritası

@@ -1,0 +1,43 @@
+{
+  "chat": {
+    "pageTitle": "Destek asistanı",
+    "pageIntro": "Rezervasyonunuz, iptal durumunda tahmini iade ve tesis kuralları hakkında soru sorun.",
+    "disclosure": "Bir yapay zekâ (AI) asistanıyla konuşuyorsunuz. İade, iptal veya ödeme kararı veremez; gerektiğinde konuyu insan destek ekibine devreder.",
+    "label": "Mesajınız",
+    "hint": "Kişisel verilerinizi (TCKN, kart, IBAN) yazmayın.",
+    "send": "Gönder",
+    "sending": "Gönderiliyor…",
+    "you": "Siz",
+    "assistant": "Asistan",
+    "log": "Destek konuşması",
+    "handoff": "Konu insan destek ekibine devredildi (talep: {id}).",
+    "empty": "Henüz mesaj yok."
+  },
+  "admin": {
+    "link": "Destek kuyruğu",
+    "pageTitle": "Destek kuyruğu",
+    "pageIntro": "AI destek asistanının insana devrettiği talepler. Kararları insan temsilci verir.",
+    "title": "Talepler",
+    "filter": "Duruma göre filtrele",
+    "all": "Tümü",
+    "empty": "Kuyrukta talep yok.",
+    "loading": "Yükleniyor…",
+    "updated": "Talep güncellendi.",
+    "confidence": "Güven: {value}",
+    "booking": "Rezervasyon: {id}",
+    "markInProgress": "İncelemeye al",
+    "markResolved": "Çözüldü olarak işaretle",
+    "reopen": "Yeniden aç",
+    "status": {
+      "OPEN": "Açık",
+      "IN_PROGRESS": "İnceleniyor",
+      "RESOLVED": "Çözüldü"
+    },
+    "reason": {
+      "LOW_CONFIDENCE": "Düşük güven",
+      "MONEY_REQUEST": "Para/iade talebi",
+      "LEGAL_OR_COMPLAINT": "Hukuki/şikâyet",
+      "USER_REQUEST": "Kullanıcı insan istedi"
+    }
+  }
+}

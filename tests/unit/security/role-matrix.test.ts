@@ -60,6 +60,8 @@ import * as bookings from "@/app/api/bookings/route";
 import * as claimsRoute from "@/app/api/claims/route";
 import * as claimById from "@/app/api/claims/[id]/route";
 import * as adminClaims from "@/app/api/admin/claims/route";
+import * as adminSupport from "@/app/api/admin/support/route";
+import * as adminSupportTicket from "@/app/api/admin/support/[id]/route";
 import * as adminClaimDecision from "@/app/api/admin/claims/[id]/decision/route";
 import * as hostDeposit from "@/app/api/host/properties/[id]/deposit/route";
 import * as account from "@/app/api/account/route";
@@ -254,6 +256,14 @@ const MATRIX: Array<[string, string, Handler, Role[]]> = [
   ["POST /api/claims", "POST", claimsRoute.POST as unknown as Handler, ALL],
   ["GET /api/claims/[id]", "GET", claimById.GET as unknown as Handler, ALL],
   ["GET /api/admin/claims", "GET", adminClaims.GET as unknown as Handler, ["ADMIN"]],
+  // v5 P1-4: insan destek kuyruğu yalnız ADMIN.
+  ["GET /api/admin/support", "GET", adminSupport.GET as unknown as Handler, ["ADMIN"]],
+  [
+    "PATCH /api/admin/support/[id]",
+    "PATCH",
+    adminSupportTicket.PATCH as unknown as Handler,
+    ["ADMIN"],
+  ],
   [
     "POST /api/admin/claims/[id]/decision",
     "POST",

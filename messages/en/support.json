@@ -1,0 +1,43 @@
+{
+  "chat": {
+    "pageTitle": "Support assistant",
+    "pageIntro": "Ask about your booking, the estimated refund if you cancel, or property rules.",
+    "disclosure": "You are chatting with an AI assistant. It cannot approve refunds, cancellations or payments; when needed it hands the conversation to our human support team.",
+    "label": "Your message",
+    "hint": "Do not share personal data (ID number, card, IBAN).",
+    "send": "Send",
+    "sending": "Sending…",
+    "you": "You",
+    "assistant": "Assistant",
+    "log": "Support conversation",
+    "handoff": "Handed over to our human support team (ticket: {id}).",
+    "empty": "No messages yet."
+  },
+  "admin": {
+    "link": "Support queue",
+    "pageTitle": "Support queue",
+    "pageIntro": "Tickets the AI support assistant handed over to humans. Decisions are made by a human agent.",
+    "title": "Tickets",
+    "filter": "Filter by status",
+    "all": "All",
+    "empty": "No tickets in the queue.",
+    "loading": "Loading…",
+    "updated": "Ticket updated.",
+    "confidence": "Confidence: {value}",
+    "booking": "Booking: {id}",
+    "markInProgress": "Start review",
+    "markResolved": "Mark resolved",
+    "reopen": "Reopen",
+    "status": {
+      "OPEN": "Open",
+      "IN_PROGRESS": "In progress",
+      "RESOLVED": "Resolved"
+    },
+    "reason": {
+      "LOW_CONFIDENCE": "Low confidence",
+      "MONEY_REQUEST": "Money/refund request",
+      "LEGAL_OR_COMPLAINT": "Legal/complaint",
+      "USER_REQUEST": "User asked for a human"
+    }
+  }
+}

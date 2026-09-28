@@ -14,6 +14,7 @@
   "discountTotal": "Toplam indirim",
   "lowest30d": "Son {days} günün en düşük fiyatı: {amount}",
   "lowest30dHint": "Üstü çizili fiyat, indirimden önceki son {days} günde uygulanan en düşük fiyattır.",
+  "previousPrice": "Önceki fiyat",
   "couponLabel": "Kupon kodu",
   "couponApply": "Uygula",
   "couponRemove": "Kaldır",

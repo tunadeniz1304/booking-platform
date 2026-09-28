@@ -74,14 +74,19 @@ export default function QuoteBreakdown({ quote }: { quote: QuoteView }) {
           ))}
         <div className="flex justify-between border-t border-gray-200 pt-2 text-base font-semibold text-gray-900">
           <dt>{t("total")}</dt>
-          <dd data-testid="quote-total">
-            {/* Omnibus: üstü çizili referans yalnız son N günün en düşüğü toplamdan yüksekse. */}
+          <dd>
+            {/* Omnibus: üstü çizili referans yalnız son N günün en düşüğü toplamdan yüksekse.
+                Referans, tahsil edilecek toplamın KARDEŞİ; quote-total yalnız toplamı sarar
+                (kart toplamı = PDP toplamı karşılaştırması, v3#9). */}
             {strike && (
-              <s className="mr-2 text-sm font-normal text-gray-500" data-testid="quote-reference">
-                {fmt(reference!, quote.currency)}
-              </s>
+              <>
+                <span className="sr-only">{t("previousPrice")}</span>
+                <s className="mr-2 text-sm font-normal text-gray-500" data-testid="quote-reference">
+                  {fmt(reference!, quote.currency)}
+                </s>
+              </>
             )}
-            {fmt(quote.total, quote.currency)}
+            <span data-testid="quote-total">{fmt(quote.total, quote.currency)}</span>
           </dd>
         </div>
       </dl>

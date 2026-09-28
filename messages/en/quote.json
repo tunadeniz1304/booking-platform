@@ -14,6 +14,7 @@
   "discountTotal": "Total discount",
   "lowest30d": "Lowest price in the last {days} days: {amount}",
   "lowest30dHint": "The struck-through price is the lowest price applied in the {days} days before the discount.",
+  "previousPrice": "Previous price",
   "couponLabel": "Coupon code",
   "couponApply": "Apply",
   "couponRemove": "Remove",

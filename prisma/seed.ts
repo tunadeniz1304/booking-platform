@@ -242,7 +242,10 @@ function unitsFor(type: string, priceModifier: number): number {
   return 1;
 }
 
-/** Fiyat planları: standart (iade edilebilir), iade edilemez −%10, otel/pansiyonda kahvaltılı +%12. */
+/**
+ * Fiyat planları: standart (iade edilebilir), RNPL uygun esnek plan +%3 (P1-3), iade edilemez
+ * −%10, otel/pansiyonda kahvaltılı +%12.
+ */
 function ratePlansFor(type: string) {
   const plans: Array<{
     code: string;
@@ -251,8 +254,19 @@ function ratePlansFor(type: string) {
     priceModifierBps: number;
     isDefault: boolean;
     mealPlan?: "BREAKFAST";
+    cancellationPolicyId?: string;
   }> = [
     { code: "STANDARD", name: "Standart", refundable: true, priceModifierBps: 0, isDefault: true },
+    // P1-3 RNPL: iade edilebilir + ücretsiz iptal süreli (orta politika: girişten 5 gün önceye
+    // kadar tam iade) → checkout'ta "şimdi rezerve et, sonra öde" sunulur.
+    {
+      code: "PAY_LATER",
+      name: "Esnek — şimdi rezerve et, sonra öde",
+      refundable: true,
+      priceModifierBps: 300,
+      isDefault: false,
+      cancellationPolicyId: "policy_moderate_v1",
+    },
     {
       code: "NONREF",
       name: "İade edilemez",

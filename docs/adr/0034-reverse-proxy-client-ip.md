@@ -54,3 +54,7 @@ kovayı doldurarak herkes için giriş/kayıt/şifre sıfırlamayı ve anonim AI
   artırılmalı ve Caddy'de `trusted_proxies` tanımlanmalıdır.
 - Demo e2e koşusu tek istemci IP'sinden gelir; etkin sınır değişmez (önceden de aynı UA'nın
   ikincil kovası 1× idi, şimdi IP kovası 1×). Gerekirse `RATE_LIMIT_DEMO_RELAX_MULTIPLIER`.
+- Sayfa yanıtlarındaki `Vary: Accept-Language, Cookie` (v5#15) da Caddy'de eklenir: Next'in
+  app-page işleyicisi `Vary`'yi `setHeader` ile ezdiği için `proxy.ts`'ten eklenen değer yanıta
+  ulaşmaz. Caddy'siz dağıtımda eşdeğer başlığı öndeki vekil eklemelidir (sayfalar zaten
+  `private, no-store` olduğundan paylaşılan önbellek riski düşüktür).

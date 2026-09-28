@@ -4,12 +4,25 @@
 #   yalnızca TCP soket adresini yazar → uygulamada TRUSTED_PROXY_HOPS=1 (zincirin son halkası).
 # - SITE_ADDRESS bir alan adıysa (ör. booking.example.com) Caddy otomatik HTTPS (ACME) açar;
 #   o durumda compose'da 80 ve 443 portlarını yayımlayın. Varsayılan ":80" = düz HTTP.
+# - Vary (v5#15): sayfa dili NEXT_LOCALE çerezinden, yoksa Accept-Language'ten çözülür.
+#   Next'in app-page işleyicisi Vary'yi `setHeader` ile ezdiği için proxy.ts'de eklenen
+#   değer kaybolur; bu yüzden başlık burada, yanıt yazılırken (defer) EKLENİR (+).
 {
 	admin off
 }
 
 {$SITE_ADDRESS::80} {
 	encode zstd gzip
+
+	@pages {
+		not path /_next/static/* /_next/image* /api/* /demo/* /vendor/*
+		not path /favicon.ico /sw.js *.png *.jpg *.jpeg *.svg *.webp *.ico
+	}
+	header @pages {
+		+Vary "Accept-Language, Cookie"
+		defer
+	}
+
 	reverse_proxy app:3000 {
 		header_up X-Forwarded-For {remote_host}
 		header_up X-Real-IP {remote_host}

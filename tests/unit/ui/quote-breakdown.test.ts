@@ -58,6 +58,17 @@ describe("P1-8 QuoteBreakdown: promosyon satırı + Omnibus referansı", () => {
     expect(html).toContain("Son 30 günün en düşük fiyatı");
   });
 
+  it("regression: v3#9 quote-total yalnız tahsil edilecek toplamı sarar; referans kardeş öğe", () => {
+    const html = render(base);
+    expect(html).toMatch(/<[a-z]+ [^>]*data-testid="quote-total"[^>]*>[^<]*1\.800,00[^<]*<\//);
+    const total = html.indexOf('data-testid="quote-total"');
+    const reference = html.indexOf('data-testid="quote-reference"');
+    expect(reference).toBeGreaterThan(-1);
+    expect(reference).toBeLessThan(total);
+    // Ekran okuyucu için üstü çizili tutarın önünde "Önceki fiyat" etiketi.
+    expect(html).toMatch(/<span class="sr-only">Önceki fiyat<\/span><s /);
+  });
+
   it("referans toplamdan yüksek değilse üstü çizilmez; indirim yoksa etiket yok", () => {
     expect(render({ ...base, lowestPrice30dMinor: 170_000 })).not.toContain("quote-reference");
     const plain = render({ ...base, discounts: [], discountTotal: 0, total: 200_000 });

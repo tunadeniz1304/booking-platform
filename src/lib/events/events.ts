@@ -43,6 +43,8 @@ export const EventTypes = {
   ClaimEscalated: "resolution.claim_escalated",
   /** Talep karara bağlandı → taraflara sonuç (P1-5). */
   ClaimResolved: "resolution.claim_resolved",
+  /** RNPL tahsilatı başarısız → misafire ek süre + yeniden deneme bildirimi (P1-3). */
+  RnplChargeFailed: "payment.rnpl_charge_failed",
 } as const;
 
 export type EventType = (typeof EventTypes)[keyof typeof EventTypes];
@@ -200,4 +202,16 @@ export function makeEvent<T>(
 /** Çözüm merkezi olayları (P1-5): tüketici talebi kimlikten yeniden okur. */
 export interface ClaimEventPayload {
   claimId: string;
+}
+
+/** P1-3 RNPL: zamanlanmış tahsilat başarısız; `cancelAt`'e kadar ödenmezse otomatik iptal. */
+export interface RnplChargeFailedPayload {
+  scheduleId: string;
+  bookingId: string;
+  userId: string;
+  attempt: number;
+  amountMinor: number;
+  currency: string;
+  retryAt: string;
+  cancelAt: string;
 }

@@ -143,34 +143,7 @@ async function payLocked(input: Parameters<typeof payForBooking>[0]): Promise<Pa
   assertPayable(booking);
   await assertAttemptsLeft(booking.id);
 
-  // P1-8 fraud v2: allow / challenge_3ds / step_up_passkey / review / deny (yalnızca kurallar).
-  const [account, recentFailed] = await Promise.all([
-    prisma.user.findUnique({ where: { id: input.userId }, select: { createdAt: true } }),
-    prisma.payment.count({
-      where: {
-        userId: input.userId,
-        status: PaymentStatus.FAILED,
-        updatedAt: { gte: new Date(Date.now() - 86_400_000) },
-        // PSP kesintisi kullanıcının risk puanını artırmaz.
-        OR: [
-          { failureCode: null },
-          { NOT: { failureCode: { startsWith: PROVIDER_ERROR_PREFIX } } },
-        ],
-      },
-    }),
-  ]);
-  const risk = await assessPayment(redis, {
-    userId: input.userId,
-    ip: input.context?.ip ?? "unknown",
-    cardToken: input.cardToken,
-    amountMinor: amountOf(booking).amount,
-    accountCreatedAt: account?.createdAt ?? new Date(),
-    recentFailedPayments: recentFailed,
-    ipCountry: input.context?.ipCountry,
-    billingCountry: input.context?.billingCountry,
-    cardBin: await tokenBin(input.cardToken),
-    deviceId: input.context?.deviceId,
-  });
+  const risk = await assessBookingRisk(booking, input);
   const gate = await resolveStepUp(
     input.userId,
     { bookingId: booking.id, amountMinor: amountOf(booking).amount },
@@ -279,6 +252,43 @@ async function payLocked(input: Parameters<typeof payForBooking>[0]): Promise<Pa
     return { status: "requires_action", bookingId: booking.id, challenge: result.challenge };
   }
   return captureAndConfirm(booking, result.providerRef);
+}
+
+/**
+ * P1-8 fraud v2: allow / challenge_3ds / step_up_passkey / review / deny (yalnızca kurallar).
+ * Tek ödeme ve RNPL (P1-3; yalnız `allow`) aynı sinyallerle değerlendirilir.
+ */
+export async function assessBookingRisk(
+  booking: PayableBooking,
+  input: Pick<Parameters<typeof payForBooking>[0], "userId" | "cardToken" | "context">
+) {
+  const [account, recentFailed] = await Promise.all([
+    prisma.user.findUnique({ where: { id: input.userId }, select: { createdAt: true } }),
+    prisma.payment.count({
+      where: {
+        userId: input.userId,
+        status: PaymentStatus.FAILED,
+        updatedAt: { gte: new Date(Date.now() - 86_400_000) },
+        // PSP kesintisi kullanıcının risk puanını artırmaz.
+        OR: [
+          { failureCode: null },
+          { NOT: { failureCode: { startsWith: PROVIDER_ERROR_PREFIX } } },
+        ],
+      },
+    }),
+  ]);
+  return assessPayment(redis, {
+    userId: input.userId,
+    ip: input.context?.ip ?? "unknown",
+    cardToken: input.cardToken,
+    amountMinor: amountOf(booking).amount,
+    accountCreatedAt: account?.createdAt ?? new Date(),
+    recentFailedPayments: recentFailed,
+    ipCountry: input.context?.ipCountry,
+    billingCountry: input.context?.billingCountry,
+    cardBin: await tokenBin(input.cardToken),
+    deviceId: input.context?.deviceId,
+  });
 }
 
 type StepUpGate = "proceed" | "force_3ds" | "fallback_3ds" | "required";

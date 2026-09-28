@@ -365,7 +365,9 @@ export async function applyConfirmation(
   tx: Prisma.TransactionClient,
   booking: ConfirmableBooking,
   next: BookingState,
-  payment: { id: string; amountMinor: bigint }
+  payment: { id: string; amountMinor: bigint },
+  /** P1-3 RNPL: `journal: false` → tahsilat yok, `booking-captured` jurnali vade tahsilatında. */
+  opts: { journal?: boolean } = {}
 ): Promise<void> {
   const updated = await tx.booking.updateMany({
     where: { id: booking.id, status: booking.status, version: booking.version },
@@ -388,13 +390,15 @@ export async function applyConfirmation(
   });
   const amount = amountOf(booking);
   // Çift girişli defter (ADR 0020): tahsilat emanete + vergi payı tax_payable'a.
-  await postBookingCapture(tx, {
-    bookingId: booking.id,
-    paymentId: payment.id,
-    currency: amount.currency,
-    grossMinor: payment.amountMinor,
-    priceBreakdown: booking.priceBreakdown,
-  });
+  if (opts.journal !== false) {
+    await postBookingCapture(tx, {
+      bookingId: booking.id,
+      paymentId: payment.id,
+      currency: amount.currency,
+      grossMinor: payment.amountMinor,
+      priceBreakdown: booking.priceBreakdown,
+    });
+  }
   await appendOutbox(
     tx,
     makeEvent<BookingConfirmedPayload>(EventTypes.BookingConfirmed, booking.id, "booking", {

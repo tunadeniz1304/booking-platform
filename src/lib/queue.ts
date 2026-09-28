@@ -25,6 +25,8 @@ export const QUEUE_NAMES = {
   priceCalendar: "price-calendar",
   /** P1-5 çözüm merkezi: talep yanıt SLA'sı ve depozito void (gecikmeli işler). */
   resolution: "resolution",
+  /** P1-3 RNPL: zamanlanmış tahsilat (gecikmeli `rnpl-charge`) + yedek süpürücü. */
+  rnpl: "rnpl",
 } as const;
 
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];

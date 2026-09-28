@@ -14,6 +14,7 @@ import {
   type PropertyAvailabilityChangedPayload,
   type PartyRiskFlaggedPayload,
   type ClaimEventPayload,
+  type RnplChargeFailedPayload,
   type BookingCompletedPayload,
 } from "./events";
 import { onStayCompleted } from "@/lib/wallet/wallet-service";
@@ -49,6 +50,7 @@ import {
   notifyClaimOpened,
   notifyClaimResolved,
 } from "@/lib/notifications/resolution-notifications";
+import { notifyRnplChargeFailed } from "@/lib/notifications/rnpl-notifications";
 
 /**
  * Outbox'tan yayınlanan domain olaylarının tüketicileri (worker sürecinde).
@@ -123,6 +125,8 @@ export function registerEventHandlers(): void {
   on<ClaimEventPayload>(EventTypes.ClaimOpened, notifyClaimOpened);
   on<ClaimEventPayload>(EventTypes.ClaimEscalated, notifyClaimEscalated);
   on<ClaimEventPayload>(EventTypes.ClaimResolved, notifyClaimResolved);
+  // P1-3 RNPL: başarısız zamanlanmış tahsilat → ek süre bildirimi.
+  on<RnplChargeFailedPayload>(EventTypes.RnplChargeFailed, notifyRnplChargeFailed);
   on<NoticeAppealEventPayload>(EventTypes.NoticeAppealReceived, notifyNoticeAppealReceived);
   on<NoticeAppealEventPayload>(EventTypes.NoticeAppealDecided, notifyNoticeAppealDecided);
   // P1-7: konaklama tamamlandı → sadakat seviyesi + (iade penceresi sonrası) cashback kaydı.

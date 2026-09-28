@@ -17,6 +17,15 @@ export const PRIMED_COUNTER_SERIES: Readonly<
   Record<string, ReadonlyArray<Record<string, string>>>
 > = {
   ledger_imbalance_total: [{ source: "app" }, { source: "db" }, { source: "reconciliation" }],
+  // P1-3 RNPL zamanlanmış tahsilat.
+  rnpl_charge_total: [
+    { outcome: "scheduled" },
+    { outcome: "captured" },
+    { outcome: "failed" },
+    { outcome: "defaulted" },
+    { outcome: "cancelled" },
+    { outcome: "risk_rejected" },
+  ],
   refund_retry_total: [
     { outcome: "scheduled" },
     { outcome: "succeeded" },

@@ -28,6 +28,7 @@ import {
 } from "@/lib/wallet/wallet-service";
 import { splitRefund as splitCardCreditRefund } from "@/lib/wallet/rules";
 import { lostChargebackMinor } from "./refundable";
+import { cancelRnplScheduleInTx, rnplChargeTotal } from "./rnpl";
 import { SETTLED_STATUSES, afterBookingWrite, withPaymentLock } from "./payment-core";
 
 /** BullMQ `refund-retry` kuyruğundaki iş adı (v4#7). */
@@ -117,8 +118,10 @@ async function cancelLocked(
   now: Date
 ): Promise<CancellationOutcome> {
   let splitRefund = false;
+  let rnplCancelled = false;
   const result = await withSerializableRetry(async (tx) => {
     splitRefund = false;
+    rnplCancelled = false;
     // Satır kilidi: kilit (Redlock) kaybolsa bile eşzamanlı onay/iptal bu satırda sıralanır.
     await tx.$queryRaw`SELECT id FROM "Booking" WHERE id = ${bookingId} FOR UPDATE`;
     const booking = await tx.booking.findUnique({
@@ -213,6 +216,8 @@ async function cancelLocked(
       throw new ConflictError("Rezervasyon eşzamanlı olarak değişti", "CONCURRENT_UPDATE");
     }
     await releaseInventory(tx, booking);
+    // P1-3 RNPL: tahsil edilmemiş plan iptal → hiç tahsilat yok (ödeme satırı aşağıda VOIDED).
+    rnplCancelled = await cancelRnplScheduleInTx(tx, booking.id);
 
     if (booking.payment) {
       if (settledPayment) {
@@ -298,6 +303,7 @@ async function cancelLocked(
   });
 
   const { booking, decision, currency, target, cardRefundMinor } = result;
+  if (rnplCancelled) rnplChargeTotal.inc({ outcome: "cancelled" });
   const provider = getPaymentProvider();
   if (splitRefund) {
     try {

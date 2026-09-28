@@ -34,6 +34,57 @@ export interface SummaryResponse extends ReviewSummary {
   version: string;
 }
 
+export interface ReviewInput {
+  id: string;
+  rating: number;
+  comment: string | null;
+}
+
+/**
+ * Saf çekirdek (P1-5 eval'leri de çağırır): verilen yorumlardan atıflı özet. DB/önbellek yok;
+ * LLM istemcisi üzerinden (demo modunda deterministik `demoReviewSummary`).
+ */
+export async function generateReviewSummary(
+  reviews: readonly ReviewInput[],
+  knownNames: readonly string[] = []
+): Promise<{ data: ReviewSummary; llmMode: LlmMode }> {
+  const ids = reviews.map((r) => r.id);
+  const avg = reviews.length ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length : 0;
+  const facts = buildFactSet([
+    reviews.length,
+    avg,
+    5,
+    ...reviews.map((r) => r.rating),
+    ...reviews.map((r) => r.comment ?? ""),
+  ]);
+  const result = await getLlmClient().completeJson(
+    "review_summary",
+    schema,
+    [
+      {
+        role: "system",
+        content:
+          "Doğrulanmış misafir yorumlarını Türkçe özetle. Yalnızca JSON: {summary, pros[], cons[], citations[]}. " +
+          "Her iddiayı dayandığı yorumun kimliğiyle [r:<id>] biçiminde atıfla. Yorumlarda olmayan bilgi veya sayı YAZMA.",
+      },
+      {
+        role: "user",
+        content: reviews.map((r) => `[r:${r.id}] (${r.rating}/5) ${r.comment ?? ""}`).join("\n"),
+      },
+    ],
+    {
+      demo: () => demoReviewSummary([...reviews]),
+      knownNames,
+      validate: (data) => {
+        const text = [data.summary, ...data.pros, ...data.cons].join("\n");
+        assertCitationsGrounded([...data.citations, ...extractCitations(text)], ids);
+        assertNumbersGrounded(text.replace(/\[r:[^\]]+\]/g, ""), facts);
+      },
+    }
+  );
+  return { data: result.data, llmMode: result.llmMode };
+}
+
 export async function summarizeReviews(propertyId: string): Promise<SummaryResponse> {
   const version = await reviewsVersion(propertyId);
   const cacheKey = `review-summary:${propertyId}:${version}`;
@@ -52,40 +103,9 @@ export async function summarizeReviews(propertyId: string): Promise<SummaryRespo
     },
   });
   const reviews = rows.map((r) => ({ id: r.id, rating: r.rating, comment: r.comment }));
-  const ids = reviews.map((r) => r.id);
-  const avg = reviews.length ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length : 0;
-  const facts = buildFactSet([
-    reviews.length,
-    avg,
-    5,
-    ...reviews.map((r) => r.rating),
-    ...reviews.map((r) => r.comment ?? ""),
-  ]);
-
-  const result = await getLlmClient().completeJson(
-    "review_summary",
-    schema,
-    [
-      {
-        role: "system",
-        content:
-          "Doğrulanmış misafir yorumlarını Türkçe özetle. Yalnızca JSON: {summary, pros[], cons[], citations[]}. " +
-          "Her iddiayı dayandığı yorumun kimliğiyle [r:<id>] biçiminde atıfla. Yorumlarda olmayan bilgi veya sayı YAZMA.",
-      },
-      {
-        role: "user",
-        content: reviews.map((r) => `[r:${r.id}] (${r.rating}/5) ${r.comment ?? ""}`).join("\n"),
-      },
-    ],
-    {
-      demo: () => demoReviewSummary(reviews),
-      knownNames: rows.map((r) => `${r.user.firstName} ${r.user.lastName}`),
-      validate: (data) => {
-        const text = [data.summary, ...data.pros, ...data.cons].join("\n");
-        assertCitationsGrounded([...data.citations, ...extractCitations(text)], ids);
-        assertNumbersGrounded(text.replace(/\[r:[^\]]+\]/g, ""), facts);
-      },
-    }
+  const result = await generateReviewSummary(
+    reviews,
+    rows.map((r) => `${r.user.firstName} ${r.user.lastName}`)
   );
 
   const response: SummaryResponse = {

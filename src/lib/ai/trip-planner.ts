@@ -154,8 +154,22 @@ function demoNarrative(plan: Omit<TripPlan, "narrative" | "llmMode">, guests: nu
   ].join("\n");
 }
 
+export type TripPlanCore = Omit<TripPlan, "narrative" | "llmMode">;
+
 export async function planTrip(req: TripRequest): Promise<TripPlan> {
   const plan = await buildTripPlan(req);
+  const { narrative, llmMode } = await narrateTripPlan(req, plan);
+  return { ...plan, narrative, llmMode };
+}
+
+/**
+ * Saf çekirdek (P1-5 eval'leri de çağırır): deterministik plandan araç çağrılı anlatım.
+ * DB/arama yok; sayı guard'ı ihlali → demo anlatımı.
+ */
+export async function narrateTripPlan(
+  req: TripRequest,
+  plan: TripPlanCore
+): Promise<{ narrative: string; llmMode: LlmMode }> {
   const demo = () => ({ narrative: demoNarrative(plan, req.guests) });
   const tools: LlmTool[] = [
     {
@@ -210,5 +224,5 @@ export async function planTrip(req: TripRequest): Promise<TripPlan> {
       },
     }
   );
-  return { ...plan, narrative: result.data.narrative, llmMode: result.llmMode };
+  return { narrative: result.data.narrative, llmMode: result.llmMode };
 }

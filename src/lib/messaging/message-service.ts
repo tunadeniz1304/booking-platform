@@ -3,7 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getConfig } from "@/lib/config/app-config";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/http/errors";
-import { getLlmClient } from "@/lib/llm/client";
+import { getLlmClient, type LlmMode } from "@/lib/llm/client";
 import { demoMessageDraft } from "@/lib/llm/demo";
 import { assertNumbersGrounded, buildFactSet } from "@/lib/llm/guards";
 import { maskMessage } from "./mask";
@@ -167,6 +167,87 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 /** LLM'e misafir adı yerine giden takma ad (pseudonim). */
 export const GUEST_NAME_PLACEHOLDER = "[MISAFIR]";
 
+export interface HostReplyDraftInput {
+  propertyTitle: string;
+  guestName: string;
+  guestLastName: string;
+  hostFirstName: string;
+  hostLastName: string;
+  checkIn: Date;
+  checkOut: Date;
+  guestCount: number;
+  /** Son mesajlar, EN YENİDEN eskiye. */
+  recent: ReadonlyArray<{ senderRole: string; body: string }>;
+}
+
+/**
+ * Saf çekirdek (P1-5 eval'leri de çağırır): rezervasyon olgularından yanıt taslağı. DB yok.
+ */
+export async function generateHostReplyDraft(
+  input: HostReplyDraftInput
+): Promise<{ draft: string; llmMode: LlmMode }> {
+  const lastGuest = input.recent.find((m) => m.senderRole === "GUEST")?.body ?? null;
+  const facts = {
+    propertyTitle: input.propertyTitle,
+    guestName: input.guestName,
+    checkIn: input.checkIn.toISOString().slice(0, 10),
+    checkOut: input.checkOut.toISOString().slice(0, 10),
+    lastGuestMessage: lastGuest,
+  };
+  const nights = Math.round((input.checkOut.getTime() - input.checkIn.getTime()) / DAY_MS);
+  // v2-P0-7: taslaktaki her sayı/tarih rezervasyon olgularından gelmeli (tarihler, gece ve
+  // misafir sayısı koddan). Mesaj geçmişi bilerek olgu sayılmaz: misafirin yazdığı bir
+  // tutar ("1500 TL iade") modele tekrar ettirilip taahhüde dönüşemez → demo taslağı.
+  const factSet = buildFactSet([
+    input.propertyTitle,
+    facts.checkIn,
+    facts.checkOut,
+    nights,
+    input.guestCount,
+  ]);
+  // v4#3: misafirin adı modele GİTMEZ — yer tutucuyla gönderilir, yanıtta geri konur.
+  // Geçmiş mesajlardaki adlar (≥3 harf) istemci redaksiyonunda `knownNames` ile maskelenir:
+  // v2-P0-8 — misafirin ve ev sahibinin adı, soyadı ve tam adı (en uzun eşleşme önce).
+  const llmFacts = {
+    ...facts,
+    guestName: GUEST_NAME_PLACEHOLDER,
+    nights,
+    guestCount: input.guestCount,
+  };
+  const res = await getLlmClient().completeJson(
+    "message_draft",
+    z.object({ reply: z.string().min(5).max(getConfig().MESSAGE_MAX_LENGTH) }),
+    [
+      {
+        role: "system",
+        content: `Ev sahibi adına misafire kısa, nazik bir Türkçe yanıt taslağı yaz. Misafire hitap ederken adı yerine ${GUEST_NAME_PLACEHOLDER} yer tutucusunu aynen kullan. Söz verme, fiyat/iade taahhüdü verme, iletişim bilgisi veya harici bağlantı ekleme. JSON: {reply}`,
+      },
+      {
+        role: "user",
+        content: JSON.stringify({
+          ...llmFacts,
+          history: [...input.recent].reverse().map((m) => `${m.senderRole}: ${m.body}`),
+        }),
+      },
+    ],
+    {
+      demo: () => demoMessageDraft(facts),
+      knownNames: [
+        input.guestName,
+        input.guestLastName,
+        `${input.guestName} ${input.guestLastName}`,
+        input.hostFirstName,
+        input.hostLastName,
+        `${input.hostFirstName} ${input.hostLastName}`,
+      ],
+      validate: (data) => assertNumbersGrounded(data.reply, factSet),
+    }
+  );
+  const reply = res.data.reply.split(GUEST_NAME_PLACEHOLDER).join(input.guestName);
+  // Taslak da platform dışı iletişim içeremez.
+  return { draft: maskMessage(reply).text, llmMode: res.llmMode };
+}
+
 /**
  * Ev sahibi için yanıt TASLAĞI: yalnızca öneridir, KAYDEDİLMEZ ve GÖNDERİLMEZ.
  * Ev sahibi metni düzenleyip `sendMessage(..., fromAiDraft: true)` ile kendisi gönderir.
@@ -183,64 +264,15 @@ export async function draftHostReply(bookingId: string, userId: string) {
         select: { senderRole: true, body: true },
       })
     : [];
-  const lastGuest = recent.find((m) => m.senderRole === "GUEST")?.body ?? null;
-  const facts = {
+  return generateHostReplyDraft({
     propertyTitle: access.propertyTitle,
     guestName: access.guestName,
-    checkIn: access.checkIn.toISOString().slice(0, 10),
-    checkOut: access.checkOut.toISOString().slice(0, 10),
-    lastGuestMessage: lastGuest,
-  };
-  const nights = Math.round((access.checkOut.getTime() - access.checkIn.getTime()) / DAY_MS);
-  // v2-P0-7: taslaktaki her sayı/tarih rezervasyon olgularından gelmeli (tarihler, gece ve
-  // misafir sayısı koddan). Mesaj geçmişi bilerek olgu sayılmaz: misafirin yazdığı bir
-  // tutar ("1500 TL iade") modele tekrar ettirilip taahhüde dönüşemez → demo taslağı.
-  const factSet = buildFactSet([
-    access.propertyTitle,
-    facts.checkIn,
-    facts.checkOut,
-    nights,
-    access.guestCount,
-  ]);
-  // v4#3: misafirin adı modele GİTMEZ — yer tutucuyla gönderilir, yanıtta geri konur.
-  // Geçmiş mesajlardaki adlar (≥3 harf) istemci redaksiyonunda `knownNames` ile maskelenir:
-  // v2-P0-8 — misafirin ve ev sahibinin adı, soyadı ve tam adı (en uzun eşleşme önce).
-  const llmFacts = {
-    ...facts,
-    guestName: GUEST_NAME_PLACEHOLDER,
-    nights,
+    guestLastName: access.guestLastName,
+    hostFirstName: access.hostFirstName,
+    hostLastName: access.hostLastName,
+    checkIn: access.checkIn,
+    checkOut: access.checkOut,
     guestCount: access.guestCount,
-  };
-  const res = await getLlmClient().completeJson(
-    "message_draft",
-    z.object({ reply: z.string().min(5).max(getConfig().MESSAGE_MAX_LENGTH) }),
-    [
-      {
-        role: "system",
-        content: `Ev sahibi adına misafire kısa, nazik bir Türkçe yanıt taslağı yaz. Misafire hitap ederken adı yerine ${GUEST_NAME_PLACEHOLDER} yer tutucusunu aynen kullan. Söz verme, fiyat/iade taahhüdü verme, iletişim bilgisi veya harici bağlantı ekleme. JSON: {reply}`,
-      },
-      {
-        role: "user",
-        content: JSON.stringify({
-          ...llmFacts,
-          history: recent.reverse().map((m) => `${m.senderRole}: ${m.body}`),
-        }),
-      },
-    ],
-    {
-      demo: () => demoMessageDraft(facts),
-      knownNames: [
-        access.guestName,
-        access.guestLastName,
-        `${access.guestName} ${access.guestLastName}`,
-        access.hostFirstName,
-        access.hostLastName,
-        `${access.hostFirstName} ${access.hostLastName}`,
-      ],
-      validate: (data) => assertNumbersGrounded(data.reply, factSet),
-    }
-  );
-  const reply = res.data.reply.split(GUEST_NAME_PLACEHOLDER).join(access.guestName);
-  // Taslak da platform dışı iletişim içeremez.
-  return { draft: maskMessage(reply).text, llmMode: res.llmMode };
+    recent,
+  });
 }

@@ -333,7 +333,7 @@ Aşağıdaki iddiaların her biri gerçek PostgreSQL + Redis (testcontainers) ü
 | Escrow süresinden önce payout yok; iade/serbest bırakma sonrası host eksiye düşmez | [v4-payouts.test.ts](tests/integration/v4-payouts.test.ts), [v4-resolution.test.ts](tests/integration/v4-resolution.test.ts), [v4-fix-sweep-2.test.ts](tests/integration/v4-fix-sweep-2.test.ts)                                        |
 | Mandate'siz / aşan / tekrar oynatılan ajan ödemesi reddedilir                      | [p1-11-agentic-mandates.test.ts](tests/integration/p1-11-agentic-mandates.test.ts)                                                                                                                                                      |
 | Çalınan oturum hassas işlem yapamaz; kurban onu uzaktan kapatır                    | [v4-sessions.test.ts](tests/integration/v4-sessions.test.ts), [v4-recent-auth.test.ts](tests/integration/v4-recent-auth.test.ts)                                                                                                        |
-| Minor-unit geçişi toplamları korur (KWD/JPY dahil)                                 | [v4-money-backfill.test.ts](tests/integration/v4-money-backfill.test.ts), [currencies.test.ts](tests/unit/money/currencies.test.ts)                                                                                                     |
+| Para yalnız BigInt minor-unit (KWD/JPY dahil; şemada Decimal yok)                  | [v4-15-minor-unit-money.test.ts](tests/unit/regressions/v4-15-minor-unit-money.test.ts), [currencies.test.ts](tests/unit/money/currencies.test.ts)                                                                                      |
 
 Yük ve kaos ölçümleri: [docs/perf/](docs/perf/). Arama kalitesi ([docs/perf/ltr.md](docs/perf/ltr.md)): 30 sorguluk altın kümede nDCG@10 v2 0.2377 → hibrit RRF 0.8733; sentetik tıklama verisinde LTR 0.7343 → 0.8130. **LTR verisi sentetiktir**, gerçek kullanıcı davranışını temsil etmez.
 
@@ -372,7 +372,6 @@ npm run test:e2e       # Playwright + axe, çalışan demo yığınına karşı
 | `vision:download` / `vision:backfill`            | CLIP modelini indirir (opsiyonel) / fotoğraf kalite, pHash ve embedding'lerini doldurur |
 | `ltr:clicks` / `ltr:train`                       | Sentetik tıklama günlüğü üretir / LightGBM lambdarank → ONNX eğitir (Python)            |
 | `availability:rollover`                          | Envanter ufkunu ileri taşır                                                             |
-| `money:backfill`                                 | Ondalık → minor-unit kolon backfill'i (idempotent; eski kolon yoksa atlar)              |
 | `data:retention`                                 | Saklama politikası budaması (denetim, webhook, outbox, fiyat geçmişi …)                 |
 | `sdep:export` / `dac7:export`                    | AB 2024/1028 SDEP CSV / DAC7 ev sahibi raporu (JSON/CSV, takma adlı seçenek)            |
 | `i18n:check`                                     | tr/en mesaj anahtarı eşitliği                                                           |

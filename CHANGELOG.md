@@ -4,6 +4,11 @@ Bu dosyadaki tüm önemli değişiklikler burada belgelenir. Biçim [Keep a Chan
 
 ## [Unreleased]
 
+### Removed
+
+- **P0-3 (ADR 0033)** Eski `LedgerEntry` defteri ve `LedgerKind` enum'u (migration `20261001100000_drop_legacy_ledger`): dual-write kaldırıldı, tek para kaydı çift girişli jurnal; `listBookingLedger` v3 görünümünü yalnız jurnalden türetir.
+- **P0-3** Ölü minor-unit backfill aracı: `src/lib/money/backfill.ts`, `scripts/money-backfill.ts`, `npm run money:backfill` ve `tests/integration/v4-money-backfill.test.ts`. Gerekçe: ADR 0019 contract'ı v4'te tamamlandı, Decimal kolon kalmadı; `regression: v4#15` korunur ve şemada Decimal para kolonu olmadığını denetler (v4 regresyonlarını koruma kuralının tek bilinçli istisnası).
+
 ### Dependencies
 
 - `madge` (MIT) devDependency: `npm run deps:circular` ödeme modüllerinde içe aktarma döngüsü olmadığını doğrular (ADR 0027); `.madgerc` yalnız-tip içe aktarmaları yok sayar.

@@ -24,3 +24,8 @@ ADR 0004 hesaplamayı tamsayı minor-unit'e taşıdı, ancak veritabanı hâlâ 
 
 - Her ISO birimi kayıpsız saklanır; "×100" varsayımı tek tabloya indi.
 - Kolon adları değişti: ham SQL ve dış raporlar `*Minor` kolonlarını okumalı. Eski ondalık API alanları bir sürüm boyunca korunur, sonra kaldırılabilir.
+
+> **Güncelleme (v5, ADR 0033):** contract tamamlandı; ölü `src/lib/money/backfill.ts`,
+> `scripts/money-backfill.ts`, `npm run money:backfill` ve `tests/integration/v4-money-backfill.test.ts`
+> kaldırıldı; eski ondalık API alanları (`totalPrice`, `amount`, `basePrice`, …) v5'te kaldırıldı.
+> v4#15 regresyonu şemayı doğrudan denetler (Decimal para kolonu yok).

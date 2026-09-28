@@ -37,7 +37,6 @@
     "llm:smoke": "tsx --conditions=react-server scripts/llm-smoke.ts",
     "availability:rollover": "tsx scripts/availability-rollover.ts",
     "data:retention": "tsx scripts/data-retention.ts",
-    "money:backfill": "tsx scripts/money-backfill.ts",
     "sdep:export": "tsx scripts/sdep-export.ts",
     "dac7:export": "tsx scripts/dac7-export.ts",
     "i18n:check": "tsx scripts/i18n-check.ts",

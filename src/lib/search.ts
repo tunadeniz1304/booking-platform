@@ -18,7 +18,17 @@ import { RANKING_WEIGHTS, RANKING_WEIGHTS_WITH_QUERY, rankResults } from "@/lib/
 import { hybridSearch, type HybridHit } from "@/lib/search/hybrid";
 import { coverPhotoIds, visualSearchStatus, type VisionStatus } from "@/lib/vision/visual-search";
 import { rankWithLtr } from "@/lib/search/ltr";
-import { addDays, fromDate, nightsBetween, toDbDate, type IsoDate } from "@/lib/time/nights";
+import {
+  addDays,
+  clockOf,
+  fromDate,
+  nightsBetween,
+  todayIn,
+  toDbDate,
+  type IsoDate,
+} from "@/lib/time/nights";
+import { promotionRuleSelect, toPromotionRule } from "@/lib/pricing/promotion-rules";
+import type { PromotionRule } from "@/lib/pricing/promotions";
 import { computeAffinity, affinityBoostFor } from "@/lib/search/vector";
 import { breakers, BreakerOpenError } from "@/lib/resilience/circuit-breaker";
 import { taxRulesFor } from "@/lib/pricing/tax";
@@ -353,7 +363,8 @@ async function computeQuotes(
   const available = fullRooms.map((r) => r.roomTypeId);
   if (available.length === 0) return out;
 
-  const [inventory, restrictions, plans] = await Promise.all([
+  const propertyIds = [...new Set(available.map((id) => roomToProperty.get(id)!.id))];
+  const [inventory, restrictions, plans, owners] = await Promise.all([
     prisma.inventoryDay.findMany({
       where: { roomTypeId: { in: available }, date: { gte: from, lt: to } },
       select: {
@@ -372,7 +383,16 @@ async function computeQuotes(
       where: { roomTypeId: { in: available }, active: true },
       select: { id: true, roomTypeId: true, priceModifierBps: true },
     }),
+    prisma.property.findMany({
+      where: { id: { in: propertyIds } },
+      select: { id: true, hostId: true, timeZone: true },
+    }),
   ]);
+  // P0-7: kart toplamı teklif motoruyla aynı promosyonları uygular (kuponsuz, web kanalı).
+  const promotions = await searchPromotionRules(owners);
+  const ownerOf = new Map(owners.map((o) => [o.id, o]));
+  const config = getConfig();
+  const now = new Date();
   const group = <T extends { roomTypeId: string }>(rows: T[]) => {
     const m = new Map<string, T[]>();
     for (const r of rows) m.set(r.roomTypeId, [...(m.get(r.roomTypeId) ?? []), r]);
@@ -400,6 +420,18 @@ async function computeQuotes(
         currency: entry.currency,
         taxRules: taxRulesFor(entry.location.country),
         guests,
+        promotions: {
+          rules: promotions.get(entry.id) ?? [],
+          context: {
+            now,
+            today: todayIn(clockOf(ownerOf.get(entry.id) ?? {}).timeZone, now),
+            checkIn: stay.checkIn,
+            nights,
+            channel: "web",
+            couponCode: null,
+            maxDiscountBps: config.PROMOTION_MAX_DISCOUNT_BPS,
+          },
+        },
       });
       const best = out.get(entry.id);
       if (!best || priced.total < best.total) {
@@ -412,6 +444,36 @@ async function computeQuotes(
         });
       }
     }
+  }
+  return out;
+}
+
+/**
+ * Arama kartı promosyonları (P0-7): `loadPromotionRules` ile aynı kapsam (ev sahibinin tüm
+ * ilanları ya da bu ilan, aktif, kupon hariç) ve aynı sıra (`id` artan); tek sorguda.
+ */
+async function searchPromotionRules(
+  owners: ReadonlyArray<{ id: string; hostId: string }>
+): Promise<Map<string, PromotionRule[]>> {
+  const out = new Map<string, PromotionRule[]>();
+  if (owners.length === 0) return out;
+  const rows = await prisma.promotion.findMany({
+    where: {
+      hostId: { in: [...new Set(owners.map((o) => o.hostId))] },
+      active: true,
+      type: { not: "COUPON" },
+      OR: [{ propertyId: null }, { propertyId: { in: owners.map((o) => o.id) } }],
+    },
+    select: { ...promotionRuleSelect, hostId: true, propertyId: true },
+    orderBy: { id: "asc" },
+  });
+  for (const o of owners) {
+    out.set(
+      o.id,
+      rows
+        .filter((r) => r.hostId === o.hostId && (r.propertyId === null || r.propertyId === o.id))
+        .map((r) => toPromotionRule(r))
+    );
   }
   return out;
 }

@@ -8,6 +8,7 @@ import { assertPropertyAccess } from "@/lib/host/host-service";
 import { minorFromDb, minorToDb } from "@/lib/money/money";
 import { withSerializableRetry } from "@/lib/db/transactions";
 import { computeTotal } from "@/lib/pricing/quote";
+import { invalidatePropertySearchCache } from "@/lib/search";
 import {
   normalizeCouponCode,
   PROMOTION_TYPES,
@@ -181,7 +182,7 @@ export async function createPromotion(
   const scope = await resolveScope(actor, input.propertyId);
   checkCurrency(input, scope.currency);
   const cfg = getConfig();
-  return withSerializableRetry(async (tx) => {
+  const dto = await withSerializableRetry(async (tx) => {
     const count = await tx.promotion.count({ where: { hostId: scope.hostId } });
     if (count >= cfg.PROMOTION_MAX_PER_HOST) {
       throw new ConflictError("Promosyon sayısı sınırına ulaşıldı", "PROMOTION_LIMIT");
@@ -194,6 +195,22 @@ export async function createPromotion(
       .catch(uniqueCoupon);
     return presentPromotion(row);
   });
+  await invalidatePromotionScope(scope.hostId, [scope.propertyId]);
+  return dto;
+}
+
+/**
+ * P0-7: arama kartı toplamı promosyonları içerir → promosyon değişince etkilenen ilanların
+ * teklif önbelleği (mülk sürümü) geçersiz kılınır. `null` kapsam: ev sahibinin tüm ilanları.
+ */
+async function invalidatePromotionScope(
+  hostId: string,
+  propertyIds: ReadonlyArray<string | null>
+): Promise<void> {
+  const ids = propertyIds.includes(null)
+    ? (await prisma.property.findMany({ where: { hostId }, select: { id: true } })).map((p) => p.id)
+    : [...new Set(propertyIds.filter((id): id is string => id !== null))];
+  await Promise.all(ids.map((id) => invalidatePropertySearchCache(id)));
 }
 
 async function findOwned(actor: AccessClaims, id: string) {
@@ -239,6 +256,7 @@ export async function updatePromotion(
       select: dtoSelect,
     })
     .catch(uniqueCoupon);
+  await invalidatePromotionScope(existing.hostId, [existing.propertyId, scope.propertyId]);
   return presentPromotion(row);
 }
 
@@ -247,13 +265,15 @@ export async function deletePromotion(
   actor: AccessClaims,
   id: string
 ): Promise<{ deleted: boolean; deactivated: boolean }> {
-  await findOwned(actor, id);
+  const existing = await findOwned(actor, id);
   const used = await prisma.promotionRedemption.count({ where: { promotionId: id } });
   if (used > 0) {
     await prisma.promotion.update({ where: { id }, data: { active: false } });
+    await invalidatePromotionScope(existing.hostId, [existing.propertyId]);
     return { deleted: false, deactivated: true };
   }
   await prisma.promotion.delete({ where: { id } });
+  await invalidatePromotionScope(existing.hostId, [existing.propertyId]);
   return { deleted: true, deactivated: false };
 }
 

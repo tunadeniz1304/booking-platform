@@ -14,9 +14,16 @@ type Rule = {
 };
 type RuleFile = { groups: { name: string; rules: Rule[] }[] };
 
-const rules = (parse(readFileSync(path.join(obsDir, "alerts.yml"), "utf8")) as RuleFile).groups
-  .flatMap((g) => g.rules)
-  .filter((r): r is Rule & { alert: string } => typeof r.alert === "string");
+const allRules = (
+  parse(readFileSync(path.join(obsDir, "alerts.yml"), "utf8")) as RuleFile
+).groups.flatMap((g) => g.rules);
+const rules = allRules.filter((r): r is Rule & { alert: string } => typeof r.alert === "string");
+const records = new Map(allRules.flatMap((r) => (r.record ? [[r.record, r.expr] as const] : [])));
+
+/** Kaydedilmiş kural adlarını (recording rule) ifadeleriyle açar — tek seviye yeterli. */
+function expand(expr: string): string {
+  return expr.replace(/[a-z_]+:[a-z_]+:[a-z0-9_]+/g, (name) => records.get(name) ?? name);
+}
 
 const RUNBOOK_SECTIONS = ["Belirti", "Panel", "Sorgu", "Müdahale", "Geri alma"];
 
@@ -65,7 +72,7 @@ describe("regression: v5#17 her alarmın runbook'u ve promtool birim testi var",
 
   it("SLO'lar için çok pencereli burn-rate alarmları var (booking başarı, ödeme onay p99, webhook)", () => {
     const burn = rules.filter((r) => /BurnRate/.test(r.alert));
-    const exprs = burn.map((r) => r.expr).join("\n");
+    const exprs = burn.map((r) => expand(r.expr)).join("\n");
     expect(exprs).toMatch(/booking/);
     expect(exprs).toMatch(/pay\.confirm/);
     expect(exprs).toMatch(/payments\.webhook/);

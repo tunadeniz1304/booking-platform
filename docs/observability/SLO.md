@@ -19,14 +19,17 @@ Metrik uçları:
 
 ## Özet tablo
 
-| #   | SLO                         | Hedef                             | Pencere | Alarm (alerts.yml)                                | Önem   |
-| --- | --------------------------- | --------------------------------- | ------- | ------------------------------------------------- | ------ |
-| 1   | Rezervasyon/tutma gecikmesi | p99 < 1 s                         | 5 dk    | `BookingLatencyP99High` (10 dk sürerse)           | page   |
-| 2   | Ödeme başarı oranı          | ≥ %97 (sistem kaynaklı hatalar)   | 30 dk   | `PaymentSuccessRatioLow` (15 dk, ≥ 20 deneme)     | page   |
-| 3   | Defter dengesi              | `ledger_imbalance_total` artışı 0 | 15 dk   | `LedgerImbalanceDetected` (beklemesiz)            | page   |
-| 3b  | Günlük mutabakat koşuyor    | 26 saatte ≥ 1 koşu                | 26 s    | `LedgerReconciliationNotRunning`                  | ticket |
-| 4   | 7565 kaldırma SLA'sı        | ihlal 0 (varsayılan 24 saat)      | 1 s     | `TakedownSlaBreached` (beklemesiz)                | page   |
-| —   | Para hijyeni (bilgi)        | —                                 | —       | `RefundRetryFailing`, `LatePaymentRefundSpike`, … | ticket |
+| #   | SLO                         | Hedef                             | Pencere | Alarm (alerts.yml)                                | Önem          |
+| --- | --------------------------- | --------------------------------- | ------- | ------------------------------------------------- | ------------- |
+| 1   | Rezervasyon/tutma gecikmesi | p99 < 1 s                         | 5 dk    | `BookingLatencyP99High` (10 dk sürerse)           | page          |
+| 2   | Ödeme başarı oranı          | ≥ %97 (sistem kaynaklı hatalar)   | 30 dk   | `PaymentSuccessRatioLow` (15 dk, ≥ 20 deneme)     | page          |
+| 3   | Defter dengesi              | `ledger_imbalance_total` artışı 0 | 15 dk   | `LedgerImbalanceDetected` (beklemesiz)            | page          |
+| 3b  | Günlük mutabakat koşuyor    | 26 saatte ≥ 1 koşu                | 26 s    | `LedgerReconciliationNotRunning`                  | ticket        |
+| 4   | 7565 kaldırma SLA'sı        | ihlal 0 (varsayılan 24 saat)      | 1 s     | `TakedownSlaBreached` (beklemesiz)                | page          |
+| 5   | Rezervasyon başarısı        | 5xx olmayan ≥ %99,5               | 30 gün  | `BookingSuccessBurnRateFast` / `…Slow`            | page / ticket |
+| 6   | 3DS ödeme onayı gecikmesi   | %99'u < 2,5 s (p99 < 2,5 s)       | 30 gün  | `PaymentConfirmLatencyBurnRateFast` / `…Slow`     | page / ticket |
+| 7   | PSP webhook gecikmesi       | %99'u < 1 s (p99 < 1 s)           | 30 gün  | `WebhookLatencyBurnRateFast` / `…Slow`            | page / ticket |
+| —   | Para hijyeni (bilgi)        | —                                 | —       | `RefundRetryFailing`, `LatePaymentRefundSpike`, … | ticket        |
 
 Hata bütçesi: SLO-1 ve SLO-2 için aylık %1 (≈ 7 saat 18 dk) ihlal süresi. SLO-3 ve SLO-4
 **sıfır toleranslıdır**: tek olay bütçeyi tüketir ve olay sonrası inceleme (postmortem)
@@ -97,6 +100,29 @@ sum by (source) (increase(takedown_sla_breach_total[1h])) > 0
 
 **İlk müdahale:** `/admin/compliance` kuyruğundaki açık talebi işleyin; ihlal kaydı denetim
 izine (AuditLog) yazılmıştır.
+
+## SLO-5..7 — Çok pencereli burn-rate alarmları (v5 P0-5)
+
+Eşik alarmı yerine hata bütçesinin **yanma hızı** (hata oranı / bütçe) izlenir (Google SRE
+Workbook, "Alerting on SLOs"). Her SLO için `slo:<sli>:rate{5m,30m,1h,2h,6h,1d}` kayıt
+kuralları; alarmlar uzun ve kısa pencereyi birlikte ister — uzun pencere gürültüyü, kısa
+pencere sorun bitince hızlı susmayı sağlar:
+
+| Alarm   | Koşul                                                                         | Bütçe tüketimi                                    | Önem   |
+| ------- | ----------------------------------------------------------------------------- | ------------------------------------------------- | ------ |
+| `*Fast` | (1 s > 14,4x **ve** 5 dk > 14,4x) **veya** (6 s > 6x **ve** 30 dk > 6x), 2 dk | 30 günlük bütçenin %2'si 1 saatte / %5'i 6 saatte | page   |
+| `*Slow` | 1 g > 3x **ve** 2 s > 3x, 1 saat                                              | %10'u 1 günde                                     | ticket |
+
+- **SLO-5 rezervasyon başarısı:** `POST bookings|cart.hold` isteklerinin 5xx oranı; bütçe
+  %0,5. 409 (dolu/meşgul) iş sonucudur, sayılmaz.
+- **SLO-6 3DS ödeme onayı:** `bookings.pay.confirm|cart.pay.confirm` isteklerinden 2,5 s
+  kovasını aşanların oranı (`count − bucket{le="2.5"}`); bütçe %1 ⇔ p99 < 2,5 s.
+- **SLO-7 webhook:** `payments.webhook` isteklerinden 1 s kovasını aşanlar; bütçe %1.
+  Webhook ve `bookings.pay.confirm` rotaları v5'te `observed()` ile ölçülmeye başladı.
+
+Her alarmın `annotations.runbook_url` alanı `docs/runbooks/<alarm>.md` dosyasını gösterir
+(dizin: [docs/runbooks/README.md](../runbooks/README.md)); tüm alarmlar
+`docker/observability/alerts.test.yml`'de `promtool test rules` ile birim testlidir (CI).
 
 ## Saga telafisi ve ertelenen onay (fix-sweep-3)
 

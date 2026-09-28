@@ -383,6 +383,12 @@ const schema = z.object({
    * Aşılırsa doluluk yeniden kontrol edilir: dolu → 409 SOLD_OUT, değilse 409 ROOM_BUSY.
    */
   LOCK_WAIT_BUDGET_MS: int(7_500, 100, 60_000),
+  /**
+   * v5 P1-8: sepet tutması oda kilidini beklerken bu aralıkla (ms) kalemlerin hâlâ sığıp
+   * sığmadığını sayaçtan kontrol eder; biri artık sığmıyorsa beklemeyi bırakıp hemen
+   * 409 SOLD_OUT döner (bütçenin sonuna kadar kuyrukta beklemez). 0 → kapalı (eski davranış).
+   */
+  CART_HOLD_SOLDOUT_CHECK_MS: int(250, 0, 10_000),
 
   // Rate-limit (pencere başına istek)
   RATE_LIMIT_WINDOW_SECONDS: int(60, 1, 3600),

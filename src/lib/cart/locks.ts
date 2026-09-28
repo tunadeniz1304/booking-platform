@@ -23,6 +23,9 @@ export interface OrderedLockOptions {
   retryDelayMs?: number;
   /** Kilit başına toplam bekleme bütçesi (ms); verilirse `retryCount` yerine geçer. */
   waitMs?: number;
+  /** Beklerken true dönerse (ör. stok tükendi) bekleme `LockAbortedError` ile biter (v5 P1-8). */
+  abortIf?: () => Promise<boolean>;
+  abortCheckEveryMs?: number;
 }
 
 /**

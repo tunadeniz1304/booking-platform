@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { LockError, Redlock } from "@/lib/distributed-lock/redlock";
+import { LockAbortedError, LockError, Redlock } from "@/lib/distributed-lock/redlock";
 import { FakeRedis } from "../../helpers/fake-redis";
 
 /** İlk `failAfterApply` SET çağrısı sunucuda uygulanır ama istemciye hata döner. */
@@ -69,5 +69,51 @@ describe("Redlock.acquire — belirsiz SET sonrası sahiplik", () => {
     // retryCount=1 (≈2 deneme) yerine bütçe boyunca denenir; bütçe aşılmaz.
     expect(redis.calls.filter((c) => c === "set").length).toBeGreaterThan(3);
     expect(elapsed).toBeLessThan(1_000);
+  });
+});
+
+describe("Redlock.acquire — abortIf ile erken vazgeçme (v5 P1-8)", () => {
+  it("beklerken abortIf true dönerse bütçe dolmadan LockAbortedError (LockError alt sınıfı)", async () => {
+    const redis = new FakeRedis();
+    await redis.set("lock:room:9", "other-owner");
+    const lock = new Redlock(redis, { ttlMs: 15_000, retryDelayMs: 1 });
+    let checks = 0;
+    const started = Date.now();
+
+    const err = await lock
+      .acquire("lock:room:9", undefined, {
+        waitMs: 5_000,
+        retryDelayMs: 5,
+        abortCheckEveryMs: 20,
+        abortIf: async () => ++checks >= 2,
+      })
+      .catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(LockAbortedError);
+    expect(err).toBeInstanceOf(LockError);
+    expect(checks).toBe(2);
+    expect(Date.now() - started).toBeLessThan(2_000);
+  });
+
+  it("abortIf false ya da hata verirse bekleme sürer; kilit boşalınca edinilir", async () => {
+    const redis = new FakeRedis();
+    await redis.set("lock:room:10", "other-owner");
+    const lock = new Redlock(redis, { ttlMs: 15_000, retryDelayMs: 1 });
+    let checks = 0;
+    setTimeout(() => void redis.del("lock:room:10"), 60);
+
+    const handle = await lock.acquire("lock:room:10", undefined, {
+      waitMs: 5_000,
+      retryDelayMs: 5,
+      abortCheckEveryMs: 10,
+      abortIf: async () => {
+        checks += 1;
+        if (checks % 2 === 0) throw new Error("sorgu hatası");
+        return false;
+      },
+    });
+
+    expect(redis.store.get("lock:room:10")).toBe(handle.token);
+    expect(checks).toBeGreaterThan(0);
   });
 });

@@ -45,6 +45,17 @@ const cartHoldItems = histogram(
   [],
   [1, 2, 3, 4, 5, 6, 8, 10, 20, 50]
 );
+/**
+ * v5 P1-8: tutma süresinin evreleri — `reprice` (kilitsiz yeniden fiyatlama), `lock_wait`
+ * (oda kilitlerinin kuyruğu), `critical` (kilit altındaki SERIALIZABLE işlem). Sıcak noktada
+ * gecikmenin nereden geldiğini gösterir.
+ */
+const cartHoldPhaseSeconds = histogram(
+  "cart_hold_phase_seconds",
+  "Sepet tutma evre süreleri (saniye)",
+  ["phase"] as const,
+  [0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2, 4, 8]
+);
 const cartReleaseTotal = counter("cart_release_total", "Sepet tutmasının bırakılması", [
   "reason",
 ] as const);
@@ -473,6 +484,7 @@ export async function holdCart(
   }
 
   // 1) Kilitsiz yeniden fiyatlama (fiyat değişimi / dolu kalem erken yakalanır).
+  const repriceStarted = performance.now();
   const quotes = new Map<string, Quote>();
   const changes: PriceChange[] = [];
   for (const item of cart.items) {
@@ -530,12 +542,32 @@ export async function holdCart(
     a.roomTypeId !== b.roomTypeId ? (a.roomTypeId < b.roomTypeId ? -1 : 1) : a.id < b.id ? -1 : 1
   );
   const cartRow = cart;
+  const lockWaitStarted = performance.now();
+  cartHoldPhaseSeconds.observe({ phase: "reprice" }, (lockWaitStarted - repriceStarted) / 1000);
+  let criticalStarted = 0;
+  const fastSoldOut = config.CART_HOLD_SOLDOUT_CHECK_MS > 0;
+  let soldOutUnderLock = false;
   try {
     const bookings = await withOrderedLocks(
       redlock,
       cart.items.map((i) => i.roomTypeId),
-      () =>
-        withSerializableRetry(
+      async () => {
+        criticalStarted = performance.now();
+        cartHoldPhaseSeconds.observe(
+          { phase: "lock_wait" },
+          (criticalStarted - lockWaitStarted) / 1000
+        );
+        // P1-8: kuyruktan çıkan bekleyen, stok bu arada tükendiyse SERIALIZABLE işlemi (≈20 gidiş-
+        // dönüş) kilidi tutarak boşuna koşmaz; tek sayaç sorgusuyla hemen SOLD_OUT. Kilit altında
+        // bu oda tiplerinde tutma yapılamaz, sayaç yalnız bırakma ile artabilir → karar tutucu.
+        if (fastSoldOut) {
+          const fullItemId = await firstSoldOutItem(cartRow.items);
+          if (fullItemId) {
+            soldOutUnderLock = true;
+            throw withItem(new SoldOutError(), fullItemId);
+          }
+        }
+        return withSerializableRetry(
           async (tx) => {
             const moved = await tx.cart.updateMany({
               where: { id: cartRow.id, status: CartStatus.OPEN, version: cartRow.version },
@@ -587,8 +619,23 @@ export async function holdCart(
             return out;
           },
           { timeout: 30_000, maxWait: 10_000 }
-        ),
-      { ttlMs: 15_000, retryDelayMs: 25, waitMs: config.LOCK_WAIT_BUDGET_MS }
+        ).finally(() =>
+          cartHoldPhaseSeconds.observe(
+            { phase: "critical" },
+            (performance.now() - criticalStarted) / 1000
+          )
+        );
+      },
+      {
+        ttlMs: 15_000,
+        retryDelayMs: 25,
+        waitMs: config.LOCK_WAIT_BUDGET_MS,
+        // P1-8: kuyrukta beklerken stok tükendiyse bütçe sonunu beklemeden SOLD_OUT.
+        abortIf: fastSoldOut
+          ? async () => (await firstSoldOutItem(cartRow.items)) !== null
+          : undefined,
+        abortCheckEveryMs: config.CART_HOLD_SOLDOUT_CHECK_MS,
+      }
     );
     cartHoldTotal.inc({ outcome: "held" });
     cartHoldItems.observe(bookings.length);
@@ -611,7 +658,7 @@ export async function holdCart(
       // Aynı anahtarla eşzamanlı ikinci istek: ilk tutmanın sonucu döner.
       return presentCart(await loadOwnedCart(cartRow.id, userId));
     }
-    cartHoldTotal.inc({ outcome: "failed" });
+    cartHoldTotal.inc({ outcome: soldOutUnderLock ? "unavailable" : "failed" });
     throw error;
   }
   return presentCart(await loadCart(cart.id));

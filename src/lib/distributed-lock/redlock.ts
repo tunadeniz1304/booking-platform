@@ -19,6 +19,33 @@ export class LockError extends Error {
   }
 }
 
+/**
+ * Bekleme sırasında `abortIf` "artık beklemeye değmez" dediğinde fırlatılır (ör. beklenen
+ * envanter bu arada tükendi). `LockError` alt sınıfıdır: mevcut eşlemeler aynen çalışır.
+ */
+export class LockAbortedError extends LockError {
+  constructor(resource: string) {
+    super(`Lock "${resource}" wait aborted`);
+    this.name = "LockAbortedError";
+  }
+}
+
+/** Edinim seçenekleri (bekleme bütçesi / deneme sayısı + erken vazgeçme). */
+export interface AcquireOptions {
+  retryCount?: number;
+  retryDelayMs?: number;
+  /** Toplam bekleme bütçesi (ms); verilirse `retryCount` yerine geçer. */
+  waitMs?: number;
+  /**
+   * Beklerken (başarısız denemelerden sonra, en sık `abortCheckEveryMs`'de bir) çağrılır;
+   * true dönerse bekleme `LockAbortedError` ile biter. Kontrolün kendi hatası "vazgeçme"
+   * sayılmaz (bekleme sürer).
+   */
+  abortIf?: () => Promise<boolean>;
+  /** `abortIf` kontrol aralığı (ms, varsayılan 250). */
+  abortCheckEveryMs?: number;
+}
+
 /** Kilit edinildikten sonra sahibin elindeki bağlam. */
 export interface LockHandle {
   readonly resource: string;
@@ -65,11 +92,7 @@ export class Redlock {
    * Kaynağı kilitler. `waitMs` verilirse deneme sayısı yerine toplam bekleme bütçesi
    * (ms) uygulanır; bütçe ya da `retryCount` dolmadan edinilemezse LockError fırlatır.
    */
-  async acquire(
-    resource: string,
-    ttlMs?: number,
-    opts: { retryCount?: number; retryDelayMs?: number; waitMs?: number } = {}
-  ): Promise<LockHandle> {
+  async acquire(resource: string, ttlMs?: number, opts: AcquireOptions = {}): Promise<LockHandle> {
     const ttl = ttlMs ?? this.defaults.ttlMs ?? 30000;
     const retryCount = opts.retryCount ?? this.defaults.retryCount ?? 5;
     const retryDelayMs = opts.retryDelayMs ?? this.defaults.retryDelayMs ?? 100;
@@ -82,6 +105,8 @@ export class Redlock {
     let uncertainSet = false;
     const deadline = opts.waitMs === undefined ? undefined : Date.now() + opts.waitMs;
     let attempts = 0;
+    const abortEveryMs = opts.abortCheckEveryMs ?? 250;
+    let nextAbortCheck = Date.now() + abortEveryMs;
 
     for (let attempt = 0; deadline !== undefined || attempt <= retryCount; attempt++) {
       attempts += 1;
@@ -95,6 +120,10 @@ export class Redlock {
         // deneme başarısız → jitter'lı bekle ve yeniden dene; SET sunucuda
         // uygulanmış olabileceği için sonraki turda sahiplik kontrolü yapılır
         uncertainSet = true;
+      }
+      if (opts.abortIf && Date.now() >= nextAbortCheck) {
+        nextAbortCheck = Date.now() + abortEveryMs;
+        if (await opts.abortIf().catch(() => false)) throw new LockAbortedError(resource);
       }
       // jitter'lı bekleme → thundering herd azalt
       const jitter = Math.floor(Math.random() * retryDelayMs);
@@ -134,18 +163,14 @@ export class Redlock {
   async withLock<T>(
     resource: string,
     fn: (handle: LockHandle) => Promise<T>,
-    opts?: {
-      ttlMs?: number;
-      retryCount?: number;
-      retryDelayMs?: number;
-      waitMs?: number;
-      renewEveryMs?: number;
-    }
+    opts?: AcquireOptions & { ttlMs?: number; renewEveryMs?: number }
   ): Promise<T> {
     const handle = await this.acquire(resource, opts?.ttlMs, {
       retryCount: opts?.retryCount,
       retryDelayMs: opts?.retryDelayMs,
       waitMs: opts?.waitMs,
+      abortIf: opts?.abortIf,
+      abortCheckEveryMs: opts?.abortCheckEveryMs,
     });
     return this.runGuarded(handle, fn, opts?.renewEveryMs);
   }

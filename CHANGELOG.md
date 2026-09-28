@@ -7,6 +7,11 @@ Bu dosyadaki tüm önemli değişiklikler burada belgelenir. Biçim [Keep a Chan
 ### Added
 
 - **P1-1 (ADR 0035)** Mandate nonce'u Redis'e ek olarak kalıcı `AgentMandateUse` tablosunda (migration `20261002100000_agent_mandate_use`): Redis kaybında aynı mandate ikinci checkout'a bağlanamaz. Opsiyonel RFC 9421 HTTP Message Signatures doğrulaması (`AGENT_HTTP_SIGNATURE_KEYS`; `/api/ucp/*`, `/api/agentic/*`). UCP profili `signing.jwks_uri` + `mandate_alg` + imza bilgisini ilan eder. `scripts/verify-mandate.ts` (`npm run mandate:verify`): yalnız JWKS URL'si ile harici mandate doğrulaması. SD-JWT (`@sd-jwt/core`, Apache-2.0) değerlendirildi, gerekçesiyle ertelendi.
+- **P1-2** OpenAPI 3.1 kapsamı sepet, devir, ACP/UCP ajan ticareti, mandate, keşif belgeleri (`/.well-known/ucp`, `/.well-known/jwks.json`), ilan/yorum, hesap ve ops uçlarına genişletildi; tüm 2xx yanıtlar için şema (`src/lib/http/openapi-schemas.ts`). `tests/helpers/openapi-assert.ts` integration testlerinde gerçek yanıt gövdelerini şemaya karşı doğrular (≥ 20 uç işlemi). Yeni geliştirme bağımlılıkları: `ajv` 8 ve `ajv-formats` 3 (MIT). `ERROR_CATALOG`'a `HTTP_SIGNATURE_*` kodları eklendi.
+
+### Notes
+
+- `zod-to-json-schema` (ISC) bakımı Kasım 2025'te bırakıldı; proje zod 3.25'te kaldığı sürece çalışır ve çıktısı sözleşme testleriyle sabitlenmiştir. zod 4'e geçişte yerleşik `z.toJSONSchema()` kullanılacak ve bu bağımlılık kaldırılacak (bu sürümde geçiş yapılmadı).
 
 ### Removed
 

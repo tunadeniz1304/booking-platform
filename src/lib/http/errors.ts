@@ -89,6 +89,21 @@ export const ERROR_CATALOG = {
   },
   INVALID_JSON: { status: 400, description: "Gövde geçerli JSON değil" },
   UNAUTHORIZED: { status: 401, description: "Oturum yok ya da token geçersiz" },
+  // v5 P1-1 (ADR 0035): ajan isteği RFC 9421 imzası (yalnız anahtar dizini yapılandırılmışsa).
+  HTTP_SIGNATURE_REQUIRED: { status: 401, description: "Ajan isteği RFC 9421 imzası taşımıyor" },
+  HTTP_SIGNATURE_INVALID: {
+    status: 401,
+    description: "İmza doğrulanamadı ya da zorunlu bileşenler imzalı değil",
+  },
+  HTTP_SIGNATURE_EXPIRED: {
+    status: 401,
+    description: "İmzanın `created`/`expires` penceresi dışı",
+  },
+  HTTP_SIGNATURE_UNKNOWN_KEY: { status: 401, description: "İmza `keyid`'si anahtar dizininde yok" },
+  HTTP_SIGNATURE_DIGEST_MISMATCH: {
+    status: 401,
+    description: "`Content-Digest` istek gövdesiyle eşleşmiyor",
+  },
   FORBIDDEN: { status: 403, description: "Kaynağa ya da işleme yetki yok" },
   EMAIL_NOT_VERIFIED: { status: 403, description: "Hassas işlem için e-posta doğrulanmalı" },
   CSRF_REJECTED: { status: 403, description: "Çerezli istekte Origin doğrulanamadı" },

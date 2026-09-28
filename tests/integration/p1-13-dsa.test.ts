@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { NextRequest } from "next/server";
 import { PrismaClient } from "@prisma/client";
-import { describeInt } from "./helpers";
+import { describeInt, parkOutboxBacklog } from "./helpers";
 import { createStayFixture, type StayFixture } from "./fixtures";
 import { relayOutbox } from "@/lib/cqrs/outbox";
 import { registerEventHandlers } from "@/lib/events/register";
@@ -75,6 +75,7 @@ describeInt("P1-13b DSA bildirim-ve-eylem", () => {
   });
 
   it("herkese açık form: oturumsuz bildirim kaydedilir ve alındı onayı e-postalanır", async () => {
+    await parkOutboxBacklog(prisma); // tam koşuda önceki dosyaların outbox birikimi
     const res = await noticePost(json("POST", "/api/notices", validNotice()));
     expect(res.status).toBe(201);
     const { id } = (await res.json()) as { id: string };
@@ -103,6 +104,7 @@ describeInt("P1-13b DSA bildirim-ve-eylem", () => {
   });
 
   it("kaldırma kararı: ilan pasif, gerekçeli karar bildirimi bildirene ve ev sahibine gider", async () => {
+    await parkOutboxBacklog(prisma); // tam koşuda önceki dosyaların outbox birikimi
     const created = await noticePost(json("POST", "/api/notices", validNotice()));
     const { id } = (await created.json()) as { id: string };
 
@@ -164,6 +166,7 @@ describeInt("P1-13b DSA bildirim-ve-eylem", () => {
   });
 
   it("ilansız bildirim: kaldırma 400, işlem yapmama kararı yalnız bildirene gider", async () => {
+    await parkOutboxBacklog(prisma); // tam koşuda önceki dosyaların outbox birikimi
     const created = await noticePost(
       json("POST", "/api/notices", validNotice({ propertyId: undefined, locale: "en" }))
     );

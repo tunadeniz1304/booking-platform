@@ -11,6 +11,7 @@ import { cancelAndRefund } from "@/lib/payment/payment-service";
 import {
   chargeRnplSchedule,
   getRnplOffer,
+  getRnplPlan,
   reserveNowPayLater,
   sweepRnplCharges,
 } from "@/lib/payment/rnpl";
@@ -97,6 +98,11 @@ describeInt("P1-3 şimdi rezerve et, sonra öde (RNPL)", () => {
     expect(booking.paymentSchedule?.status).toBe("SCHEDULED");
     expect(await soldOn(fx.roomId, start)).toBe(1);
     expect(await ledgerNetMinor(prisma, held.id)).toBe(0);
+    // P2-1: rezervasyon detayı planı — bugün 0, vadede toplam; başkasına görünmez.
+    const plan = await getRnplPlan(held.id, fx.userId);
+    expect(plan).toMatchObject({ status: "SCHEDULED", paidTodayMinor: 0 });
+    expect(plan?.amountMinor).toBeGreaterThan(0);
+    expect(await getRnplPlan(held.id, "someone-else")).toBeNull();
 
     // Tekrar çağrı idempotent.
     const again = await reserveNowPayLater({

@@ -243,17 +243,35 @@ export const RESPONSE_SCHEMAS: Record<string, JsonSchema> = {
       property: obj({ id: str, title: str }),
     }
   ),
-  BookingDetail: obj({
-    booking: {
-      allOf: [
-        ref("Booking"),
-        obj(
-          { room: obj({ id: str, name: str }) },
-          { payment: nullable(obj({ status: str }, { amountMinor: minor })) }
-        ),
-      ],
+  BookingDetail: obj(
+    {
+      booking: {
+        allOf: [
+          ref("Booking"),
+          obj(
+            { room: obj({ id: str, name: str }) },
+            { payment: nullable(obj({ status: str }, { amountMinor: minor })) }
+          ),
+        ],
+      },
     },
-  }),
+    {
+      // P2-1: "şimdi rezerve et, sonra öde" planı; RNPL değilse null.
+      paymentPlan: nullable(
+        obj(
+          {
+            status: { enum: ["SCHEDULED", "RETRYING", "CAPTURED", "CANCELLED", "DEFAULTED"] },
+            paidTodayMinor: { const: 0 },
+            amountMinor: minor,
+            currency,
+            dueAt: dateTime,
+            freeCancellationUntil: dateTime,
+          },
+          { nextAttemptAt: nullable(dateTime), capturedAt: nullable(dateTime) }
+        )
+      ),
+    }
+  ),
   CancelOutcome: obj({
     bookingId: str,
     status: { const: "CANCELLED" },

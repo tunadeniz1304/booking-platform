@@ -42,6 +42,19 @@
     "stepCharge": "{date}: {amount} is charged to your saved card.",
     "stepFreeCancel": "Free cancellation until {date}; cancel before the charge and you pay nothing.",
     "stepFailure": "If the charge fails we notify you and retry; if unpaid within the grace period, the booking is cancelled automatically.",
-    "reserve": "Reserve now (no payment today)"
+    "reserve": "Reserve now (no payment today)",
+    "plan": {
+      "title": "Payment plan: reserve now, pay later",
+      "summary": "{today} paid today; {amount} will be charged to your saved card on {date}.",
+      "retry": "The charge failed; next attempt: {date}. Please check your card.",
+      "captured": "{amount} was charged on {date}.",
+      "status": {
+        "SCHEDULED": "Scheduled",
+        "RETRYING": "Retrying",
+        "CAPTURED": "Charged",
+        "CANCELLED": "Cancelled — no charge",
+        "DEFAULTED": "Unpaid — booking cancelled"
+      }
+    }
   }
 }

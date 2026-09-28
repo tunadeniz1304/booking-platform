@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getBooking, presentBooking } from "@/lib/booking-service";
 import { cancelAndRefund } from "@/lib/payment/payment-service";
+import { getRnplPlan } from "@/lib/payment/rnpl";
 import { requireAuth } from "@/lib/auth";
 import { toErrorResponse } from "@/lib/http/errors";
 import { observed } from "@/lib/http/observed";
@@ -11,7 +12,9 @@ export const GET = observed(
     try {
       const { id } = await params;
       const { userId } = await requireAuth(req);
-      return NextResponse.json({ booking: presentBooking(await getBooking(id, userId)) });
+      const booking = presentBooking(await getBooking(id, userId));
+      // P2-1: RNPL planı önbelleğe alınmaz (tahsilat durumu işçide değişir).
+      return NextResponse.json({ booking, paymentPlan: await getRnplPlan(id, userId) });
     } catch (error) {
       return toErrorResponse(error, "bookings.get");
     }

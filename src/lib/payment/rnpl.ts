@@ -136,6 +136,54 @@ export async function getRnplOffer(
   };
 }
 
+/** P2-1: rezervasyon detayında gösterilen RNPL planı (kart/PSP referansı içermez). */
+export interface RnplPlanView {
+  status: PaymentSchedule["status"];
+  /** Rezervasyon anında tahsil edilen tutar (her zaman 0). */
+  paidTodayMinor: 0;
+  amountMinor: number;
+  currency: string;
+  dueAt: string;
+  freeCancellationUntil: string;
+  /** Başarısız tahsilattan sonra planlanan yeniden deneme (RETRYING). */
+  nextAttemptAt: string | null;
+  capturedAt: string | null;
+}
+
+export function presentRnplPlan(
+  schedule: Pick<
+    PaymentSchedule,
+    | "status"
+    | "amountMinor"
+    | "currency"
+    | "dueAt"
+    | "freeCancellationUntil"
+    | "nextAttemptAt"
+    | "capturedAt"
+  >
+): RnplPlanView {
+  return {
+    status: schedule.status,
+    paidTodayMinor: 0,
+    amountMinor: minorFromDb(schedule.amountMinor),
+    currency: schedule.currency,
+    dueAt: schedule.dueAt.toISOString(),
+    freeCancellationUntil: schedule.freeCancellationUntil.toISOString(),
+    nextAttemptAt: schedule.nextAttemptAt?.toISOString() ?? null,
+    capturedAt: schedule.capturedAt?.toISOString() ?? null,
+  };
+}
+
+/**
+ * Rezervasyonun RNPL planı; plan yoksa null. Sahiplik çağıranda (`getBooking`) doğrulanır;
+ * burada ayrıca `userId` eşleşmesi aranır (başkasının planı hiç okunmaz).
+ */
+export async function getRnplPlan(bookingId: string, userId: string): Promise<RnplPlanView | null> {
+  const schedule = await prisma.paymentSchedule.findUnique({ where: { bookingId } });
+  if (!schedule || schedule.userId !== userId) return null;
+  return presentRnplPlan(schedule);
+}
+
 export class RnplUnavailableError extends HttpError {
   constructor(reason: RnplUnavailableReason | "RISK") {
     super(

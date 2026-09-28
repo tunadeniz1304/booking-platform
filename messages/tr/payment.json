@@ -42,6 +42,19 @@
     "stepCharge": "{date}: {amount} kayıtlı kartınızdan tahsil edilir.",
     "stepFreeCancel": "{date} tarihine kadar ücretsiz iptal; tahsilattan önce iptal ederseniz hiç ödeme alınmaz.",
     "stepFailure": "Tahsilat başarısız olursa size bildirir ve yeniden deneriz; ek süre içinde ödenmezse rezervasyon otomatik iptal edilir.",
-    "reserve": "Şimdi rezerve et (bugün ödeme yok)"
+    "reserve": "Şimdi rezerve et (bugün ödeme yok)",
+    "plan": {
+      "title": "Ödeme planı: şimdi rezerve et, sonra öde",
+      "summary": "Bugün {today} ödendi; {date} tarihinde {amount} kayıtlı kartınızdan tahsil edilecek.",
+      "retry": "Tahsilat başarısız oldu; sonraki deneme: {date}. Kartınızı kontrol edin.",
+      "captured": "{amount}, {date} tarihinde tahsil edildi.",
+      "status": {
+        "SCHEDULED": "Planlandı",
+        "RETRYING": "Yeniden denenecek",
+        "CAPTURED": "Tahsil edildi",
+        "CANCELLED": "İptal — tahsilat yok",
+        "DEFAULTED": "Ödenmedi — rezervasyon iptal"
+      }
+    }
   }
 }

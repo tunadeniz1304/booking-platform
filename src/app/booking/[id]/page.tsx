@@ -8,6 +8,7 @@ import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import { ApiError, apiFetch } from "@/lib/api-client";
 import BookingActions from "@/components/booking/BookingActions";
+import RnplPlanCard, { type RnplPlan } from "@/components/booking/RnplPlan";
 import BookingMessages from "@/components/booking/BookingMessages";
 import BookingResolutionPanel from "@/components/resolution/BookingResolutionPanel";
 import { useFormat } from "@/i18n/use-format";
@@ -42,6 +43,7 @@ export default function BookingConfirmationPage() {
   const t = useTranslations("booking");
   const f = useFormat();
   const [booking, setBooking] = useState<BookingDetail | null>(null);
+  const [plan, setPlan] = useState<RnplPlan | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [needsLogin, setNeedsLogin] = useState(false);
@@ -49,8 +51,11 @@ export default function BookingConfirmationPage() {
   const load = useCallback(async () => {
     if (!id) return;
     try {
-      const data = await apiFetch<{ booking: BookingDetail }>(`/api/bookings/${id}`);
+      const data = await apiFetch<{ booking: BookingDetail; paymentPlan?: RnplPlan | null }>(
+        `/api/bookings/${id}`
+      );
       setBooking(data.booking);
+      setPlan(data.paymentPlan ?? null);
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) setNeedsLogin(true);
       setError(err instanceof Error ? err.message : t("detail.loadFailed"));
@@ -154,6 +159,8 @@ export default function BookingConfirmationPage() {
                   {f.money(booking.totalPriceMinor, booking.currency)}
                 </span>
               </div>
+
+              <RnplPlanCard plan={plan} />
 
               <BookingActions
                 bookingId={booking.id}

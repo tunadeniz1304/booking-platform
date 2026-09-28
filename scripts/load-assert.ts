@@ -63,9 +63,11 @@ async function main(): Promise<void> {
       SELECT "paymentId" FROM "JournalEntry" WHERE kind = 'BOOKING_CAPTURED' AND "paymentId" IS NOT NULL
       GROUP BY "paymentId" HAVING count(*) > 1
     ) t`);
-  const doubleChargeLegacy = await count(`
+  const doubleCaptureByBooking = await count(`
     SELECT count(*) AS n FROM (
-      SELECT "bookingId" FROM "LedgerEntry" WHERE kind = 'CHARGE' GROUP BY "bookingId" HAVING count(*) > 1
+      SELECT "bookingId" FROM "JournalEntry"
+      WHERE kind = 'BOOKING_CAPTURED' AND "idempotencyKey" = 'booking-captured:' || "paymentId"
+      GROUP BY "bookingId" HAVING count(*) > 1
     ) t`);
   const capturedOnOpenPlan = await count(`
     SELECT count(*) AS n FROM "PaymentShare" s JOIN "SplitPlan" p ON p.id = s."planId"
@@ -109,7 +111,7 @@ async function main(): Promise<void> {
     },
     doubleCapture: {
       doubleCaptureJournal,
-      doubleChargeLegacy,
+      doubleCaptureByBooking,
       capturedOnOpenPlan,
       settledMismatch,
     },
@@ -120,7 +122,7 @@ async function main(): Promise<void> {
     bookingOverbooked,
     imbalancedJournals,
     doubleCaptureJournal,
-    doubleChargeLegacy,
+    doubleCaptureByBooking,
     capturedOnOpenPlan,
     settledMismatch,
     ...recon.map((r) => r.differences.length + r.imbalancedEntries),

@@ -11,7 +11,7 @@ import { counter } from "@/lib/observability/metrics";
  * partileri (kısa kilitler, tek dev işlem yok); her tablo çalıştırma başına en çok
  * `RETENTION_MAX_BATCHES` parti siler, kalan birikim sonraki gece erir.
  *
- * YASAL SAKLAMA — bu modül ASLA dokunmaz: `Invoice`, `JournalEntry/JournalLine`, `LedgerEntry`,
+ * YASAL SAKLAMA — bu modül ASLA dokunmaz: `Invoice`, `JournalEntry/JournalLine`,
  * `Payment`, `HostPayout` (VUK/TTK, DAC7), `Notice`/`TakedownRequest`/`NoticeAppeal` (DSA),
  * `IdentityVerification` (KYC/MASAK), `Claim*` (çözüm merkezi). Denetim kaydında bu alanlara ait
  * eylemler `LEGAL_HOLD_AUDIT_PREFIXES` ile korunur. Gerekçe: docs/COMPLIANCE.md.

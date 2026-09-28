@@ -127,8 +127,8 @@ export async function createStayFixture(
 }
 
 /**
- * Defter bakiyesi (CHARGE − REFUND), minor-unit (TRY: kuruş). Eski `LedgerEntry` ∪ jurnal
- * (dual-write) uyum görünümünden okunur → aynı olay iki kez sayılmaz (F2c).
+ * Defter bakiyesi (CHARGE − REFUND), minor-unit (TRY: kuruş). Jurnalden türetilen v3 görünümünden
+ * okunur (`listBookingLedger`, ADR 0033).
  */
 export async function ledgerNetMinor(prisma: PrismaClient, bookingId: string): Promise<number> {
   const rows = await listBookingLedger(prisma, bookingId);

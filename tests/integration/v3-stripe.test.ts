@@ -1,3 +1,4 @@
+import { listBookingLedger } from "@/lib/ledger";
 import { beforeAll, afterAll, afterEach, it, expect } from "vitest";
 import { NextRequest } from "next/server";
 import { PrismaClient } from "@prisma/client";
@@ -80,8 +81,8 @@ describeInt("regression: v3#10 gerçek Stripe akışı (kayıtlı yanıtlar, ağ
 
     const booking = await prisma.booking.findUniqueOrThrow({ where: { id: b.id } });
     expect(booking.status).toBe("CONFIRMED");
-    const charges = await prisma.ledgerEntry.count({ where: { bookingId: b.id, kind: "CHARGE" } });
-    expect(charges).toBe(1);
+    const charges = (await listBookingLedger(prisma, b.id)).filter((r) => r.kind === "CHARGE");
+    expect(charges).toHaveLength(1);
     expect(await prisma.paymentEvent.count({ where: { id: `evt_${piId}` } })).toBe(1);
   });
 

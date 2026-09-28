@@ -71,10 +71,12 @@ describeInt("v3 ödeme doğruluğu: çift tahsilat ve webhook (integration)", ()
     expect(await ledgerNetMinor(prisma, b.id)).toBe(b.totalMinor);
     const payment = await prisma.payment.findUniqueOrThrow({ where: { bookingId: b.id } });
     expect(payment.status).toBe("PAID");
-    // SQL çift-capture sorgusu: aynı rezervasyon için birden fazla CHARGE satırı yok.
+    // SQL çift-capture sorgusu: aynı rezervasyon için birden fazla onay tahsilatı jurnali yok
+    // (telafi kayıtları `booking-captured:compensate:*` anahtarlıdır, sayılmaz).
     const dup = await prisma.$queryRaw<Array<{ n: bigint }>>`
       SELECT count(*)::bigint AS n FROM (
-        SELECT "bookingId" FROM "LedgerEntry" WHERE kind = 'CHARGE'
+        SELECT "bookingId" FROM "JournalEntry"
+        WHERE kind = 'BOOKING_CAPTURED' AND "idempotencyKey" = 'booking-captured:' || "paymentId"
         GROUP BY "bookingId" HAVING count(*) > 1
       ) t`;
     expect(Number(dup[0].n)).toBe(0);

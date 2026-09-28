@@ -101,7 +101,7 @@ docker run --rm -i --network <proj>_default -e BASE_URL=http://app:3000 \
 # 5) Değişmez kontrolleri (ikisi de 0 dönmeli)
 docker compose -p <proj> exec -T db psql -U booking -d booking -At < overbook.sql   # docs/perf/k6-results.md
 docker compose -p <proj> exec -T db psql -U booking -d booking -At -c \
-  "SELECT count(*) FROM (SELECT \"bookingId\" FROM \"LedgerEntry\" WHERE kind='CHARGE' GROUP BY \"bookingId\" HAVING count(*)>1) t"
+  "SELECT count(*) FROM (SELECT \"bookingId\" FROM \"JournalEntry\" WHERE kind='BOOKING_CAPTURED' AND \"idempotencyKey\"='booking-captured:'||\"paymentId\" GROUP BY \"bookingId\" HAVING count(*)>1) t"
 ```
 
 ### Kaydedilecek metrikler

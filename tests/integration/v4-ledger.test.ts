@@ -378,18 +378,8 @@ describeInt("P0-3 çift girişli defter (jurnal, tetik, idempotency, mutabakat)"
     expect(summary).toMatchObject({ date: DIFF_DAY, differences: 2, orphanEvents: 1 });
   });
 
-  it("eski LedgerEntry uyumluluğu: dual-write çift sayılmaz, jurnal-yalnız iade türetilir", async () => {
+  it("v3 defter görünümü yalnız jurnalden türetilir (ADR 0033: LedgerEntry kaldırıldı)", async () => {
     const p = await paidPayment({ amount: "300.00", paidAt: at("2031-04-01") });
-    await prisma.ledgerEntry.create({
-      data: {
-        bookingId: p.bookingId,
-        userId: fx.userId,
-        kind: "CHARGE",
-        amountMinor: 30_000n,
-        currency: "TRY",
-        reference: p.providerRef,
-      },
-    });
     await withSerializableRetry(async (tx) => {
       await post.bookingCaptured(tx, {
         bookingId: p.bookingId,
@@ -412,7 +402,7 @@ describeInt("P0-3 çift girişli defter (jurnal, tetik, idempotency, mutabakat)"
     });
     const rows = await listBookingLedger(prisma, p.bookingId);
     expect(rows.map((r) => [r.source, r.kind, r.amountMinor])).toEqual([
-      ["legacy", "CHARGE", 300_00n],
+      ["journal", "CHARGE", 300_00n],
       ["journal", "REFUND", 120_00n],
     ]);
     expect(netChargedMinor(rows, "TRY")).toBe(180_00n);

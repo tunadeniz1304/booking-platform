@@ -30,7 +30,7 @@
  *
  * Kesin SQL doğrulaması (0 dönmeli):
  *   docker compose -p <proj> exec -T db psql -U booking -d booking -At -c \
- *     "SELECT count(*) FROM (SELECT \"bookingId\" FROM \"LedgerEntry\" WHERE kind='CHARGE' \
+ *     "SELECT count(*) FROM (SELECT \"bookingId\" FROM \"JournalEntry\" WHERE kind='BOOKING_CAPTURED' AND \"idempotencyKey\"='booking-captured:'||\"paymentId\" \
  *      GROUP BY \"bookingId\" HAVING count(*)>1) t"
  *
  * Önkoşul: RATE_LIMIT_BOOKING_MAX, RATE_LIMIT_AUTH_MAX, RATE_LIMIT_SEARCH_MAX yükseltilmeli;

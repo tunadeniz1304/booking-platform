@@ -1194,7 +1194,7 @@ export async function confirmSplitInTransaction(
     data: { status: SplitPlanStatus.SETTLED, settledAt: now },
   });
   if (moved.count !== 1) throw splitClosed();
-  return confirmCartBookingsInTx(tx, plan.cartId, bookings, plan.cartPayment, `split:${plan.id}`);
+  return confirmCartBookingsInTx(tx, plan.cartId, bookings, plan.cartPayment);
 }
 
 // ─────────────────────────── süre sonu ───────────────────────────

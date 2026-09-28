@@ -1,17 +1,18 @@
-import type { LedgerKind, Prisma, PrismaClient } from "@prisma/client";
+import type { Prisma, PrismaClient } from "@prisma/client";
 import { toMinor } from "@/lib/money/money";
 import { JournalKinds } from "./templates";
 
 type Db = PrismaClient | Prisma.TransactionClient;
 
 /**
- * Eski `LedgerEntry` okuma uyumluluğu (ADR 0020). v3 okuyucuları (CHARGE − REFUND net,
- * devir satırları) tek biçimde okur: eski tablodaki satırlar + jurnalden türetilen
- * eşdeğerleri. Geçiş boyunca servisler iki yere de yazabilir (dual-write); aynı olay iki
- * kez sayılmasın diye (tür, referans, tutar) eşleşen türetilmiş satır atlanır.
+ * v3 biçiminde rezervasyon para hareketleri görünümü (ADR 0020, ADR 0033). Eski `LedgerEntry`
+ * tablosu kaldırıldı (contract adımı); satırlar yalnız çift girişli jurnalden türetilir:
+ * CHARGE / REFUND (PSP parası) ve devirde TRANSFER_PAYMENT / TRANSFER_PAYOUT.
  */
+export type LedgerKind = "CHARGE" | "REFUND" | "TRANSFER_PAYMENT" | "TRANSFER_PAYOUT";
+
 export interface LedgerViewRow {
-  source: "legacy" | "journal";
+  source: "journal";
   bookingId: string;
   userId: string | null;
   kind: LedgerKind;
@@ -28,32 +29,7 @@ export function toMinorBigint(value: unknown, currency: string): bigint {
 }
 
 export async function listBookingLedger(db: Db, bookingId: string): Promise<LedgerViewRow[]> {
-  const legacy = await db.ledgerEntry.findMany({
-    where: { bookingId },
-    orderBy: { createdAt: "asc" },
-  });
-  const rows: LedgerViewRow[] = legacy.map((r) => ({
-    source: "legacy",
-    bookingId: r.bookingId,
-    userId: r.userId,
-    kind: r.kind,
-    amountMinor: r.amountMinor,
-    currency: r.currency,
-    reference: r.reference,
-    createdAt: r.createdAt,
-  }));
-  const derived = await deriveFromJournal(db, bookingId);
-  const unmatched = [...rows];
-  const same = (r: LedgerViewRow, d: LedgerViewRow) =>
-    r.kind === d.kind && r.amountMinor === d.amountMinor && r.currency === d.currency;
-  for (const d of derived) {
-    // Önce referans da eşleşen satır; yoksa (ör. devredilmiş rezervasyonun iadesi eski
-    // defterde alıcının devir ödemesine referanslı) aynı tür + tutar + para birimi.
-    let i = unmatched.findIndex((r) => same(r, d) && r.reference === d.reference);
-    if (i < 0) i = unmatched.findIndex((r) => same(r, d));
-    if (i >= 0) unmatched.splice(i, 1);
-    else rows.push(d);
-  }
+  const rows = await deriveFromJournal(db, bookingId);
   return rows.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
 }
 
@@ -95,6 +71,19 @@ async function deriveFromJournal(db: Db, bookingId: string): Promise<LedgerViewR
     where: { id: { in: transferIds } },
     select: { id: true, claimedById: true, buyerPaymentRef: true },
   });
+  // Devredilmiş rezervasyonun iptal iadesi alıcının devir ödemesine yapılır (refundTarget).
+  const handedOver = booking
+    ? await db.bookingTransfer.findFirst({
+        where: {
+          bookingId,
+          status: "COMPLETED",
+          claimedById: booking.userId,
+          buyerPaymentRef: { not: null },
+        },
+        orderBy: { completedAt: "desc" },
+        select: { claimedById: true, buyerPaymentRef: true, completedAt: true },
+      })
+    : null;
 
   const out: LedgerViewRow[] = [];
   for (const e of entries) {
@@ -116,12 +105,14 @@ async function deriveFromJournal(db: Db, bookingId: string): Promise<LedgerViewR
         reference: payment?.providerRef ?? null,
       });
     } else if (e.kind === JournalKinds.RefundIssued) {
+      const toBuyer =
+        handedOver?.completedAt && e.occurredAt >= handedOver.completedAt ? handedOver : null;
       out.push({
         ...base,
         kind: "REFUND",
-        userId: payment?.userId ?? booking?.userId ?? null,
+        userId: toBuyer?.claimedById ?? payment?.userId ?? booking?.userId ?? null,
         amountMinor: sumSide("CREDIT"),
-        reference: payment?.providerRef ?? null,
+        reference: toBuyer?.buyerPaymentRef ?? payment?.providerRef ?? null,
       });
     } else {
       const transfer = transfers.find((t) => t.id === e.transferId);

@@ -1,3 +1,4 @@
+import { listBookingLedger } from "@/lib/ledger";
 import { afterAll, afterEach, beforeAll, expect, it } from "vitest";
 import { NextRequest } from "next/server";
 import { PrismaClient } from "@prisma/client";
@@ -72,9 +73,7 @@ describeInt("regression: v4#7 iptal–capture yarışı ve iade yeniden denemesi
     expect(cancelled.refund.refundMinor).toBeGreaterThan(0);
     const payment = await prisma.payment.findUniqueOrThrow({ where: { bookingId: b.id } });
     expect(["REFUNDED", "PARTIALLY_REFUNDED"]).toContain(payment.status);
-    const kinds = (await prisma.ledgerEntry.findMany({ where: { bookingId: b.id } })).map(
-      (e) => e.kind
-    );
+    const kinds = (await listBookingLedger(prisma, b.id)).map((e) => e.kind);
     expect(kinds.sort()).toEqual(["CHARGE", "REFUND"]);
     expect(psp.refundCalls).toEqual([`refund:${b.id}`]);
   });

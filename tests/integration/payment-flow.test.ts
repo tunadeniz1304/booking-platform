@@ -1,3 +1,4 @@
+import { listBookingLedger } from "@/lib/ledger";
 import { beforeAll, beforeEach, afterAll, it, expect } from "vitest";
 import { PrismaClient } from "@prisma/client";
 import { describeInt, iso, utcDay } from "./helpers";
@@ -106,7 +107,9 @@ describeInt("ödeme, iptal, iade ve bildirim (integration)", () => {
     expect(row.payment?.status).toBe("PAID");
     expect(Number(row.payment?.amountMinor) / 100).toBe(b.totalPrice); // Payment.amount = gösterilen toplam
     expect((row.policySnapshot as { kind: string }).kind).toBe("MODERATE");
-    expect(await prisma.ledgerEntry.count({ where: { bookingId: b.id, kind: "CHARGE" } })).toBe(1);
+    expect((await listBookingLedger(prisma, b.id)).filter((r) => r.kind === "CHARGE")).toHaveLength(
+      1
+    );
     // Tekrar ödeme idempotent
     const again = await payForBooking({
       bookingId: b.id,
@@ -197,7 +200,9 @@ describeInt("ödeme, iptal, iade ve bildirim (integration)", () => {
       "CONFIRMED"
     );
     expect(await handleWebhookEvent(event)).toEqual({ duplicate: true });
-    expect(await prisma.ledgerEntry.count({ where: { bookingId: b.id, kind: "CHARGE" } })).toBe(1);
+    expect((await listBookingLedger(prisma, b.id)).filter((r) => r.kind === "CHARGE")).toHaveLength(
+      1
+    );
   });
 
   it("DELETE: iptal iade tutarını politikaya göre döner; tek onay + tek iptal e-postası", async () => {

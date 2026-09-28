@@ -1,4 +1,5 @@
 // v4#1: devir ödemesi capture'dan önce commit edilmemeli (iki aşamalı devir sagası).
+import { listBookingLedger } from "@/lib/ledger";
 import { beforeAll, afterAll, afterEach, it, expect } from "vitest";
 import { PrismaClient, BookingStatus } from "@prisma/client";
 import { describeInt, utcDay } from "./helpers";
@@ -151,9 +152,9 @@ describeInt("regression: v4#1 devir capture hatası (integration)", () => {
 
   /** Devir defteri dengesi: alıcı ödemesi − satıcı payout'u (minor) ve satır sayısı. */
   async function transferLedger(bookingId: string) {
-    const rows = await prisma.ledgerEntry.findMany({
-      where: { bookingId, kind: { in: ["TRANSFER_PAYMENT", "TRANSFER_PAYOUT"] } },
-    });
+    const rows = (await listBookingLedger(prisma, bookingId)).filter((r) =>
+      r.kind.startsWith("TRANSFER_")
+    );
     const net = rows.reduce((sum, r) => {
       const minor = Number(r.amountMinor);
       return r.kind === "TRANSFER_PAYMENT" ? sum + minor : sum - minor;

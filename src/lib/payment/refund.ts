@@ -246,16 +246,6 @@ async function cancelLocked(
           );
         }
         if (cardRefundMinor > 0) {
-          await tx.ledgerEntry.create({
-            data: {
-              bookingId: booking.id,
-              userId: booking.userId,
-              kind: "REFUND",
-              amountMinor: minorToDb(cardRefundMinor),
-              currency,
-              reference: target.providerRef,
-            },
-          });
           // Jurnal: iade yükümlülüğü iptal anında yazılır (PSP çağrısı düşse bile, retry
           // aynı anahtarla tekrarlar). Devredilmiş rezervasyonda da para emanetten döner.
           await postCancellationRefund(tx, {

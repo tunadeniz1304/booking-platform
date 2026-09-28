@@ -457,27 +457,7 @@ function claimSteps(provider: PaymentProvider): SagaStep<ClaimContext, string>[]
               currency,
             },
           });
-          await tx.ledgerEntry.createMany({
-            data: [
-              {
-                bookingId: booking.id,
-                userId: buyerId,
-                kind: "TRANSFER_PAYMENT",
-                amountMinor: amount,
-                currency,
-                reference: ctx.providerRef,
-              },
-              {
-                bookingId: booking.id,
-                userId: transfer.sellerId,
-                kind: "TRANSFER_PAYOUT",
-                amountMinor: amount,
-                currency,
-                reference: transfer.id,
-              },
-            ],
-          });
-          // Çift girişli defter (ADR 0020, dual-write): alıcının ödemesi satıcıya borç.
+          // Çift girişli defter (ADR 0020): alıcının ödemesi satıcıya borç.
           await post.transferSettled(tx, {
             transferId: transfer.id,
             bookingId: booking.id,

@@ -317,7 +317,7 @@ export async function confirmInTransaction(
     priceBreakdown: booking.priceBreakdown,
     currency: booking.currency,
   });
-  await applyConfirmation(tx, booking, next, payment, providerRef);
+  await applyConfirmation(tx, booking, next, payment);
   return payment.id;
 }
 
@@ -358,15 +358,14 @@ export function nextConfirmedState(booking: ConfirmableBooking): BookingState {
 
 /**
  * Ödeme satırı PAID yazıldıktan sonra: durum geçişi (sürüm koşullu) + envanter held→sold +
- * eski defter (dual-write) + çift girişli jurnal + outbox. Tek rezervasyon ödemesi ve sepet
+ * çift girişli jurnal + outbox. Tek rezervasyon ödemesi ve sepet
  * (P1-1) onayı bu adımı AYNI işlem içinde paylaşır.
  */
 export async function applyConfirmation(
   tx: Prisma.TransactionClient,
   booking: ConfirmableBooking,
   next: BookingState,
-  payment: { id: string; amountMinor: bigint },
-  providerRef: string
+  payment: { id: string; amountMinor: bigint }
 ): Promise<void> {
   const updated = await tx.booking.updateMany({
     where: { id: booking.id, status: booking.status, version: booking.version },
@@ -388,19 +387,7 @@ export async function applyConfirmation(
     units: booking.units,
   });
   const amount = amountOf(booking);
-  // Eski defter PSP tahsilatını izler (P1-7: kredi payı hariç; tek kart ödemesinde = toplam).
-  const legacyCharge = minorToDb(amount.amount);
-  await tx.ledgerEntry.create({
-    data: {
-      bookingId: booking.id,
-      userId: booking.userId,
-      kind: "CHARGE",
-      amountMinor: payment.amountMinor < legacyCharge ? payment.amountMinor : legacyCharge,
-      currency: amount.currency,
-      reference: providerRef,
-    },
-  });
-  // Çift girişli defter (ADR 0020, dual-write): tahsilat emanete + vergi payı tax_payable'a.
+  // Çift girişli defter (ADR 0020): tahsilat emanete + vergi payı tax_payable'a.
   await postBookingCapture(tx, {
     bookingId: booking.id,
     paymentId: payment.id,

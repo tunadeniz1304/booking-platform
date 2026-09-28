@@ -346,7 +346,6 @@ model Booking {
   /// Kullanılan kalıcı kur tablosu (P0-5); statik yedek tablo kullanıldıysa null.
   fxSnapshotId           String?
   fxRate                 FxRate?           @relation(fields: [fxSnapshotId], references: [id], onDelete: SetNull)
-  ledgerEntries          LedgerEntry[]
   confirmedAt            DateTime?
   cancelledAt            DateTime?
   expiredAt              DateTime?
@@ -444,29 +443,6 @@ model PaymentEvent {
   @@index([providerRef])
   /// P0-5: saklama bakımının parti silme taraması
   @@index([receivedAt])
-}
-
-enum LedgerKind {
-  CHARGE
-  REFUND
-  TRANSFER_PAYMENT
-  TRANSFER_PAYOUT
-}
-
-/// Para hareketleri defteri (escrow/devir izlenebilirliği).
-model LedgerEntry {
-  id        String     @id @default(cuid())
-  bookingId String
-  booking   Booking    @relation(fields: [bookingId], references: [id])
-  userId    String
-  kind      LedgerKind
-  amountMinor BigInt
-  currency  String
-  reference String?
-  createdAt DateTime   @default(now())
-
-  @@index([bookingId])
-  @@index([userId])
 }
 
 enum CancellationPolicyKind {

@@ -67,7 +67,7 @@ erDiagram
   RatePlan ||--o{ Booking : fiyatlar
   Booking }o--o| FxRate : "fxSnapshotId"
   Booking ||--o| Payment : ödenir
-  Booking ||--o{ LedgerEntry : "para hareketleri"
+  Booking ||--o{ JournalEntry : "para hareketleri"
   Booking ||--o| MessageThread : mesajlaşma
 
   Property {

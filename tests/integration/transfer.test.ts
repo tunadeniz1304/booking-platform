@@ -1,4 +1,5 @@
 // P1-8 / hata #3: imzalı claim linki, escrow ödemesi, tek kullanımlık token, yarış güvenliği.
+import { listBookingLedger } from "@/lib/ledger";
 import { beforeAll, afterAll, afterEach, it, expect } from "vitest";
 import { PrismaClient, BookingStatus } from "@prisma/client";
 import { describeInt, utcDay } from "./helpers";
@@ -137,10 +138,9 @@ describeInt("regression: #3 P2P devir (integration)", () => {
     const payout = await prisma.payout.findUniqueOrThrow({ where: { transferId: listed.id } });
     expect(payout).toMatchObject({ userId: seller, status: "PENDING", currency: "TRY" });
     expect(Number(payout.amountMinor)).toBe(200000);
-    const ledger = await prisma.ledgerEntry.findMany({
-      where: { bookingId },
-      orderBy: { kind: "asc" },
-    });
+    const ledger = (await listBookingLedger(prisma, bookingId)).filter((l) =>
+      l.kind.startsWith("TRANSFER_")
+    );
     expect(ledger.map((l) => l.kind).sort()).toEqual(["TRANSFER_PAYMENT", "TRANSFER_PAYOUT"]);
     await expect(
       claimTransfer({ token: listed.claimToken, buyerId: buyer2, cardToken: "tok_mock_ok_4242" })
@@ -220,9 +220,7 @@ describeInt("regression: #3 P2P devir (integration)", () => {
     ]);
     expect(psp.refunds[0].ref).not.toBe(`pi_seller_${bookingId}`);
 
-    const refund = await prisma.ledgerEntry.findFirstOrThrow({
-      where: { bookingId, kind: "REFUND" },
-    });
+    const refund = (await listBookingLedger(prisma, bookingId)).find((l) => l.kind === "REFUND")!;
     expect(refund.userId).toBe(buyer);
     expect(refund.reference).toBe(transfer.buyerPaymentRef);
 

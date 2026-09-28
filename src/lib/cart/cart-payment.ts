@@ -609,7 +609,7 @@ export async function compensateCartPayment(input: {
 
 /**
  * Pivot (tek işlem): sepet HELD→CHECKED_OUT, sepet ödemesi AUTHORIZED→PAID ve HER kalem için
- * pay `Payment`'ı + `applyConfirmation` (HELD→CONFIRMED, held→sold, defter, jurnal, outbox).
+ * pay `Payment`'ı + `applyConfirmation` (HELD→CONFIRMED, held→sold, jurnal, outbox).
  * Bir kalem onaylanamazsa (süre doldu, eşzamanlı değişiklik) HİÇBİRİ onaylanmaz → saga iade eder.
  */
 export async function confirmCartInTransaction(
@@ -647,7 +647,7 @@ export async function confirmCartInTransaction(
     data: { status: PaymentStatus.PAID, paidAt: new Date(), failureCode: null },
   });
   if (claimed.count !== 1) throw new CaptureRaceLostError();
-  return confirmCartBookingsInTx(tx, cartId, bookings, cart.payment, providerRef);
+  return confirmCartBookingsInTx(tx, cartId, bookings, cart.payment);
 }
 
 type ConfirmableCartBooking = Prisma.BookingGetPayload<{ select: typeof confirmableBookingSelect }>;
@@ -680,15 +680,14 @@ export async function loadConfirmableCartBookings(
 
 /**
  * Onay çekirdeği (tek sepet ödemesi ve bölünmüş ödeme ortak): HER kalem için pay `Payment`'ı
- * + `applyConfirmation` (HELD→CONFIRMED, held→sold, defter, jurnal, outbox) ve sepet
- * HELD→CHECKED_OUT. `ledgerRef` eski defter satırının referansıdır (PSP işlemi ya da plan).
+ * + `applyConfirmation` (HELD→CONFIRMED, held→sold, jurnal, outbox) ve sepet
+ * HELD→CHECKED_OUT.
  */
 export async function confirmCartBookingsInTx(
   tx: Prisma.TransactionClient,
   cartId: string,
   bookings: ConfirmableCartBooking[],
-  cartPayment: { id: string; provider: string },
-  ledgerRef: string
+  cartPayment: { id: string; provider: string }
 ): Promise<string[]> {
   const nexts = bookings.map((b) => nextConfirmedState(b));
   const now = new Date();
@@ -709,7 +708,7 @@ export async function confirmCartBookingsInTx(
       },
       select: { id: true, amountMinor: true },
     });
-    await applyConfirmation(tx, booking, nexts[i], payment, ledgerRef);
+    await applyConfirmation(tx, booking, nexts[i], payment);
     paymentIds.push(payment.id);
   }
   const moved = await tx.cart.updateMany({

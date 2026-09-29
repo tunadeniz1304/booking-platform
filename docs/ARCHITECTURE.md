@@ -522,39 +522,213 @@ UCP uçları (`/api/ucp/checkout-sessions/*`) yalnız şema eşler ve ACP servis
 
 ## 17. Mimari karar kayıtları
 
-| ADR                                                 | Konu                                                |
-| --------------------------------------------------- | --------------------------------------------------- |
-| [0001](adr/0001-modular-monolith.md)                | Modüler monolit                                     |
-| [0002](adr/0002-two-layer-locking.md)               | İki katmanlı kilit (Redlock + SERIALIZABLE)         |
-| [0003](adr/0003-transactional-outbox.md)            | Transactional outbox                                |
-| [0004](adr/0004-minor-unit-money-quote.md)          | Minor-unit para ve quote                            |
-| [0005](adr/0005-llm-contract.md)                    | LLM sözleşmesi                                      |
-| [0006](adr/0006-availability-partitioning.md)       | Availability partisyonu (v3'te kaldırıldı)          |
-| [0007](adr/0007-transfer-claim-link-escrow.md)      | Devir claim linki ve escrow                         |
-| [0008](adr/0008-hash-vs-real-embedding.md)          | Hash vs gerçek embedding                            |
-| [0009](adr/0009-framework-upgrade-next16.md)        | Next.js 16 yükseltmesi                              |
-| [0010](adr/0010-room-type-inventory-counters.md)    | Oda tipi envanter sayaçları                         |
-| [0011](adr/0011-property-time-zone-temporal.md)     | Tesis saat dilimi (Temporal)                        |
-| [0012](adr/0012-tax-engine-and-persistent-fx.md)    | Vergi motoru ve kalıcı FX                           |
-| [0013](adr/0013-payment-saga.md)                    | Ödeme sagası                                        |
-| [0014](adr/0014-hybrid-search-ltr-experiments.md)   | Hibrit arama, LTR, deneyler                         |
-| [0015](adr/0015-agentic-booking-channel-revenue.md) | Ajan rezervasyon kanalı ve gelir paneli             |
-| [0016](adr/0016-legacy-pricing-and-negotiation.md)  | Legacy fiyat ve pazarlık                            |
-| [0017](adr/0017-messaging-moderation-step-up.md)    | Mesajlaşma, moderasyon, step-up                     |
-| [0018](adr/0018-i18n-namespaces-and-formatting.md)  | i18n ad alanları ve biçimlendirme                   |
-| [0019](adr/0019-minor-unit-bigint-money.md)         | `BigInt` minor-unit para ve ISO 4217 üs tablosu     |
-| [0020](adr/0020-double-entry-ledger.md)             | Çift girişli defter ve günlük mutabakat             |
-| [0021](adr/0021-escrow-payout-deposit.md)           | Escrow, payout, rezerv, hasar depozitosu            |
-| [0022](adr/0022-multimodal-search.md)               | Görsel zekâ ve çok-modlu arama                      |
-| [0023](adr/0023-agentic-commerce-mandates.md)       | Ajan ticareti: ACP SPT, UCP, AP2 mandate            |
-| [0024](adr/0024-recent-auth-step-up-binding.md)     | Recent-auth, işleme bağlı step-up, oturum yönetimi  |
-| [0025](adr/0025-asymmetric-mandate-signing.md)      | AP2 mandate ES256 imzası, JWKS ve anahtar rotasyonu |
+| ADR                                                    | Konu                                                 |
+| ------------------------------------------------------ | ---------------------------------------------------- |
+| [0001](adr/0001-modular-monolith.md)                   | Modüler monolit                                      |
+| [0002](adr/0002-two-layer-locking.md)                  | İki katmanlı kilit (Redlock + SERIALIZABLE)          |
+| [0003](adr/0003-transactional-outbox.md)               | Transactional outbox                                 |
+| [0004](adr/0004-minor-unit-money-quote.md)             | Minor-unit para ve quote                             |
+| [0005](adr/0005-llm-contract.md)                       | LLM sözleşmesi                                       |
+| [0006](adr/0006-availability-partitioning.md)          | Availability partisyonu (v3'te kaldırıldı)           |
+| [0007](adr/0007-transfer-claim-link-escrow.md)         | Devir claim linki ve escrow                          |
+| [0008](adr/0008-hash-vs-real-embedding.md)             | Hash vs gerçek embedding                             |
+| [0009](adr/0009-framework-upgrade-next16.md)           | Next.js 16 yükseltmesi                               |
+| [0010](adr/0010-room-type-inventory-counters.md)       | Oda tipi envanter sayaçları                          |
+| [0011](adr/0011-property-time-zone-temporal.md)        | Tesis saat dilimi (Temporal)                         |
+| [0012](adr/0012-tax-engine-and-persistent-fx.md)       | Vergi motoru ve kalıcı FX                            |
+| [0013](adr/0013-payment-saga.md)                       | Ödeme sagası                                         |
+| [0014](adr/0014-hybrid-search-ltr-experiments.md)      | Hibrit arama, LTR, deneyler                          |
+| [0015](adr/0015-agentic-booking-channel-revenue.md)    | Ajan rezervasyon kanalı ve gelir paneli              |
+| [0016](adr/0016-legacy-pricing-and-negotiation.md)     | Legacy fiyat ve pazarlık                             |
+| [0017](adr/0017-messaging-moderation-step-up.md)       | Mesajlaşma, moderasyon, step-up                      |
+| [0018](adr/0018-i18n-namespaces-and-formatting.md)     | i18n ad alanları ve biçimlendirme                    |
+| [0019](adr/0019-minor-unit-bigint-money.md)            | `BigInt` minor-unit para ve ISO 4217 üs tablosu      |
+| [0020](adr/0020-double-entry-ledger.md)                | Çift girişli defter ve günlük mutabakat              |
+| [0021](adr/0021-escrow-payout-deposit.md)              | Escrow, payout, rezerv, hasar depozitosu             |
+| [0022](adr/0022-multimodal-search.md)                  | Görsel zekâ ve çok-modlu arama                       |
+| [0023](adr/0023-agentic-commerce-mandates.md)          | Ajan ticareti: ACP SPT, UCP, AP2 mandate             |
+| [0024](adr/0024-recent-auth-step-up-binding.md)        | Recent-auth, işleme bağlı step-up, oturum yönetimi   |
+| [0025](adr/0025-asymmetric-mandate-signing.md)         | AP2 mandate ES256 imzası, JWKS ve anahtar rotasyonu  |
+| [0026](adr/0026-compensation-journal-intent-marker.md) | Telafi iadelerinin jurnali ve niyet işareti          |
+| [0027](adr/0027-payment-service-split.md)              | `payment-service.ts`'in sorumluluklara bölünmesi     |
+| [0028](adr/0028-reserve-now-pay-later.md)              | Şimdi rezerve et, sonra öde (RNPL)                   |
+| [0029](adr/0029-support-agent-human-handoff.md)        | AI destek ajanı ve insana devir                      |
+| [0030](adr/0030-llm-evals-genai-telemetry.md)          | LLM eval paketi ve GenAI telemetrisi                 |
+| [0031](adr/0031-supply-chain-provenance.md)            | Tedarik zinciri: SHA pin, SAST, SBOM, provenance     |
+| [0032](adr/0032-market-rules-engine.md)                | Pazar bazlı uyum kural motoru                        |
+| [0033](adr/0033-legacy-ledger-contract.md)             | Eski defter ve ondalık para alanlarının kaldırılması |
+| [0034](adr/0034-reverse-proxy-client-ip.md)            | Ters vekil (Caddy) ve güvenilir istemci IP'si        |
+| [0035](adr/0035-verifiable-agent-commerce.md)          | Kalıcı nonce, RFC 9421, harici mandate doğrulayıcı   |
+| [0036](adr/0036-mcp-apps-stay-card.md)                 | MCP Apps arayüz kaynağı `ui://booking/stay-card`     |
 
 ## 18. Bilinen sınırlamalar
 
 - Ödeme sağlayıcısı (MockPsp), payout sağlayıcısı, KYC, e-Arşiv entegratörü ve lisans/kayıt servisleri varsayılan olarak mock/demo'dur; Stripe SPT, Connect ve depozito (Customer + `setup_future_usage`) yolları yalnız ağsız fake ile test edildi (§5.2, §7, §15).
 - Sepet ve bölünmüş ödemede Stripe Payment Element, passkey step-up ve cüzdan kredisi yoktur; sepette kupon yoktur.
 - Sepet tahsilatında itiraz ilk rezervasyona bağlanır; aşan tutar `uncollectedMinor` olarak elle işlenir.
-- AP2 mandate ES256 + `kid` ile imzalanır; açık anahtarlar `/.well-known/jwks.json`'da, ajan/PSP bağımsız doğrular ([ADR 0025](adr/0025-asymmetric-mandate-signing.md)); mandate kaydı ayrı tablo değil, `AuditLog` + Redis nonce'tur.
+- AP2 mandate ES256 + `kid` ile imzalanır; açık anahtarlar `/.well-known/jwks.json`'da, ajan/PSP bağımsız doğrular ([ADR 0025](adr/0025-asymmetric-mandate-signing.md)); verme/iptal `AuditLog`'da, kullanım kalıcı `AgentMandateUse` tablosunda tutulur (Redis yalnız önbellek, [ADR 0035](adr/0035-verifiable-agent-commerce.md)); SD-JWT + key binding ertelendi.
+- RNPL yalnız tekil (sepetsiz), iade edilebilir tarifede ve fraud kararı `allow` iken sunulur; cüzdan kredisiyle birleşmez; tahsilat off-session kart kaydına dayanır, gerçek Stripe SetupIntent yalnız fake ile test edildi (§19).
+- Telafi niyet işareti yalnız capture kesinken ya da iade başarılı olduktan sonra yazılır; "işaret var, jurnal yok" farkı süpürücü/yeniden deneme tamamlayana dek mutabakat raporunda görünür (§20).
+- Destek ajanı tek turludur, ham sohbet saklanmaz; iade/iptal kararı her zaman insandadır (§21).
+- IP bilinemeyen doğrudan dağıtımda (`ALLOW_DIRECT_EXPOSURE=true`) auth uçları IP kovası yerine e-posta kovası + PoW ile yavaşlatılır; `Vary` başlığı yalnız Caddy arkasında doğru eklenir (§22).
+- RFC 9421 HTTP imzası opsiyoneldir (`AGENT_HTTP_SIGNATURE_KEYS` boşsa kapalı) ve kimlik yerine geçmez (§23).
 - LTR modeli sentetik tıklamalarla eğitilmiştir; embedding varsayılanı hash tabanlıdır; CLIP opsiyoneldir ([MODEL_CARD](MODEL_CARD.md)).
 - Yük ve kaos testleri tek makinede koşuldu; sonuçlar [docs/perf/](perf/) ve `load/chaos.md` altında.
+
+## 19. RNPL: şimdi rezerve et, sonra öde ([ADR 0028](adr/0028-reserve-now-pay-later.md))
+
+Amaç: ücretsiz iptal süresi bitmeden kartı kaydedip tahsilatı son güvenli ana ertelemek. Uygunluk saf fonksiyondadır (`src/lib/payment/rnpl-terms.ts`: `rnplTerms`, `freeCancellationDeadline`); vade = ücretsiz iptal bitişi − `RNPL_CHARGE_DAYS_BEFORE_DEADLINE` gün. Akış `src/lib/payment/rnpl.ts`'tedir (`reserveNowPayLater`, `scheduleRnplCharge`, `chargeRnplSchedule`, `sweepRnplCharges`, `cancelRnplScheduleInTx`).
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor G as Misafir
+  participant API as /api/bookings/{id}/pay (paymentOption: rnpl)
+  participant R as payment/rnpl.ts
+  participant PSP as PaymentProvider
+  participant DB as PostgreSQL
+  participant Q as rnpl kuyruğu (BullMQ)
+
+  G->>API: POST {paymentOption: "rnpl"}
+  API->>R: reserveNowPayLater (uygun değilse 409 RNPL_UNAVAILABLE)
+  R->>PSP: setupCard (off-session kart kaydı)
+  R->>DB: tek SERIALIZABLE tx: HELD→CONFIRMED, held→sold, Payment PENDING, PaymentSchedule SCHEDULED (jurnal yok, Σ=0)
+  R->>Q: rnpl-charge (vade zamanına gecikmeli iş)
+  Note over Q: rnpl-sweep cron'u kaçan/planlanamayan işleri yakalar
+  Q->>R: chargeRnplSchedule (ödeme kilidi altında)
+  R->>DB: deneme numarası + in_flight işareti PSP'den ÖNCE
+  R->>PSP: chargeSaved (anahtar rnpl:<plan>:<deneme>)
+  alt başarı
+    R->>DB: tek tx: Payment PAID + plan CAPTURED + booking-captured jurnali
+  else ret
+    R->>DB: plan RETRYING, outbox payment.rnpl_charge_failed (e-posta)
+    R->>Q: RNPL_RETRY_INTERVAL_HOURS sonra yeniden dene
+    alt ilk başarısızlıktan RNPL_GRACE_HOURS geçti
+      R->>DB: BookingCancelled (rnpl_payment_failed), envanter bırakılır, Payment VOIDED, plan DEFAULTED
+    end
+  end
+```
+
+Çökme sonrası aynı deneme numarası ve aynı idempotency anahtarı kullanılır (çift tahsilat yok); başarısız denemeden sonra yeni anahtar alınır. Tahsilattan önce misafir iptali açık planı aynı işlemde `CANCELLED` yapar ve PSP çağrılmaz. Metrik: `rnpl_charge_total{outcome}`.
+
+## 20. Telafi-jurnal akışı ([ADR 0026](adr/0026-compensation-journal-intent-marker.md))
+
+Amaç: capture edilmiş paranın iadesi (telafi) PSP'de gerçekleşip defterde kaybolmasın. Tüm telafiler `postCaptureCompensation` (`src/lib/ledger/booking-money.ts`) ile capture + iadeyi tek jurnalde yazar; niyet işareti `markCompensationIntent` (`src/lib/ledger/reconcile.ts`) `PaymentEvent` satırı `comp:<providerRef>` olarak idempotent yazılır. Çağıranlar: `src/lib/cart/cart-payment.ts`, `src/lib/cart/cart-webhook.ts`, `src/lib/cart/split-payment.ts`, `src/lib/transfer/transfer-service.ts`.
+
+```mermaid
+flowchart TD
+  A[Saga adımı düştü, telafi gerekiyor] --> B{"Capture kesin mi?<br/>saga capture'ı gördü ya da void already_captured"}
+  B -- evet --> C["markCompensationIntent: comp:ref"]
+  C --> D[PSP refund, sabit anahtar]
+  D --> E[postCaptureCompensation jurnali]
+  B -- "belirsiz: void geçici hata" --> F[Önce PSP refund]
+  F -- "başarılı: capture kanıtlandı" --> C2[İşaret + jurnal]
+  F -- "reddedildi: capture yok" --> G[İşaret yazılmaz, hayali fark yok]
+  B -- "hayır: void edildi / capture yok" --> H[İşaret yok]
+  D -. "yanıt kaybı / çökme" .-> I[İşaret var, jurnal yok]
+  I --> J["Tamamlama aynı anahtarlarla:<br/>rejournalTransferRefunds, saga-compensation-retry,<br/>webhook yeniden teslimi"]
+  J --> E
+  E --> K["reconcile: günün işaretlerini okur;<br/>Payment + CartPayment + PaymentShare + FAILED devir"]
+```
+
+Mutabakat (`reconcile`) telafi edilen ödemenin PSP tarafını jurnalden değil işaretten bilir; fark yalnız tamamlama gerçekten başarısızsa raporlanır. Sepet/pay telafisinin yeniden denemesi `src/lib/saga/compensation-retry.ts`, devir süpürücüsü `sweepStuckTransfers` içindeki `rejournalTransferRefunds`'tur.
+
+**Hasar depozitosu iki aşamalı capture** (`src/lib/resolution/deposit.ts`, `captureDeposit`): tx1 `AUTHORIZED → CAPTURING` (tutar + talep), PSP `capture(ref, tutar, "deposit-capture:<id>")`, tx2 `CAPTURING → CAPTURED(_PARTIAL)` + `depositCaptured` jurnali + çağıranın `finalize`'ı. PSP belirsiz düşerse ya da tx2 başarısız olursa kayıt `CAPTURING` kalır; `deposit-capture-sweep` işi (`sweepCapturingDeposits`) aynı anahtarla capture'ı yineler (PSP tek işlem sayar) ve tx2'yi tamamlar. PSP kesin reddederse niyet `AUTHORIZED`'a geri alınır.
+
+## 21. Destek ajanı ve insana devir ([ADR 0029](adr/0029-support-agent-human-handoff.md))
+
+Amaç: sık soruları (rezervasyon durumu, iptal iadesi tahmini, tesis kuralları) AI ile yanıtlamak; para, hukuk ve belirsiz durumları insana devretmek. Kod: `src/lib/support/*` (`intent.ts`, `agent.ts`, `tools.ts`, `repo.ts`, `metrics.ts`), uç `src/app/api/support/chat/route.ts`, kuyruk `src/app/admin/support/page.tsx` + `src/app/api/admin/support/*`.
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor G as Misafir (/support)
+  participant API as POST /api/support/chat
+  participant I as support/intent.ts (deterministik)
+  participant A as support/agent.ts
+  participant T as support/tools.ts
+  participant DB as SupportTicket
+  actor H as Yönetici (/admin/support)
+
+  G->>API: mesaj (oturumlu, ai rate-limit kovası, withAiSubject)
+  API->>A: runSupportChat
+  A->>I: classifyIntent (LLM'den ÖNCE)
+  alt para/iade, hukuki/şikâyet, insan isteği
+    A->>DB: openTicket (LLM çağrılmaz)
+  else yalnız prompt-injection
+    A-->>G: şablon ret (araç/LLM yok)
+  else normal soru
+    A->>T: salt-okur araçlar: get_my_booking, explain_cancellation_quote, get_property_policy
+    A->>A: şema {reply, confidence} + sayı grounding + yetkisiz eylem iddiası guard'ı
+    alt guard ihlali
+      A-->>G: deterministik şablon yanıt (llmMode: fallback)
+    else güven < SUPPORT_HANDOFF_MIN_CONFIDENCE
+      A->>T: open_support_ticket (tek yazma aracı)
+    end
+  end
+  A-->>G: reply + disclosure + ai_generated: true
+  H->>DB: PATCH /api/admin/support/{id} (ADMIN, denetim kaydı)
+```
+
+Ajan iade/iptal/ödeme eylemi yapamaz (`SUPPORT_TOOL_ACCESS` kodda sabit, birim testiyle korunur); iade tahmini politika anlık görüntüsü + `computeRefund` ile hesaplanır. Talep KVKK redakte özet saklar, ham sohbet saklanmaz. Metrikler: `support_handoff_total{reason}`, `support_chat_total{intent,outcome}`.
+
+## 22. Ters vekil ve istemci IP'si ([ADR 0034](adr/0034-reverse-proxy-client-ip.md))
+
+Amaç: rate-limit ve denetim kayıtlarında istemci IP'sinin sahtelenememesi. Compose'da tek giriş noktası Caddy'dir (`docker/Caddyfile`); uygulama host'a port açmaz. IP çözümü `src/lib/security/ip.ts` (`resolveClientIp`, `clientKey`), yapılandırma denetimi `src/lib/security/exposure.ts` (`directExposureProblem`), auth yavaşlatması `src/lib/security/auth-degraded.ts`, giriş kapısı `src/proxy.ts`.
+
+```mermaid
+flowchart LR
+  C[İstemci] -->|XFF / X-Real-IP yok sayılır| CD["Caddy<br/>yalnız TCP soket adresi yazar<br/>+Vary: Accept-Language, Cookie"]
+  CD --> P[src/proxy.ts]
+  P --> IP{"resolveClientIp<br/>TRUSTED_PROXY_HOPS=1"}
+  IP -- IP bilinir --> RL[IP anahtarlı rate-limit]
+  IP -- "IP bilinmez (ALLOW_DIRECT_EXPOSURE)" --> DG{Auth ucu ve paylaşılan kova dolu?}
+  DG -- evet --> PW["x-auth-degraded: 1<br/>e-posta kovası + PoW"]
+  DG -- hayır --> RL
+  RD["/api/ready"] --> EX{directExposureProblem}
+  EX -- "üretim, HOPS=0, real-ip kapalı, izin yok" --> E503[503 DIRECT_EXPOSURE_UNSAFE]
+```
+
+`TRUSTED_PROXY_HOPS` zincirin sondan kaçıncı halkasına güvenileceğini söyler; compose ortak ortamında `"1"` sabittir. Yanlış yapılandırılmış üretim örneği `/api/ready`'de 503 döner ve başlangıçta ERROR loglanır, böylece orkestratör trafiği ona yönlendirmez. İstemcinin gönderdiği `x-auth-degraded` başlığı proxy'de silinir. `Vary` başlığı Caddy'de (`header @pages { +Vary … defer }`) eklenir: Next 16 app-page işleyicisi `Vary`'yi `setHeader` ile ezdiği için `proxy.ts`'te eklenen değer kaybolur.
+
+## 23. Mandate doğrulama sekansı ([ADR 0025](adr/0025-asymmetric-mandate-signing.md), [ADR 0035](adr/0035-verifiable-agent-commerce.md))
+
+Amaç: AP2 intent mandate'inin ajan/PSP tarafından sır paylaşmadan doğrulanabilmesi ve tekrar oynatılamaması. İmza ve anahtarlar `src/lib/agentic/mandate-keys.ts` (`MANDATE_ALG = "ES256"`, `mandateKeyRing`, `publicJwks`), JWKS ucu `src/app/.well-known/jwks.json/route.ts`, doğrulama/bağlama `src/lib/agentic/mandate.ts` (`verifyMandateToken`, `authorizeMandate`), opsiyonel RFC 9421 `src/lib/agentic/http-signature.ts` (`assertAgentHttpSignature`), harici doğrulayıcı `scripts/verify-mandate.ts` (`npm run mandate:verify`).
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant A as Ajan
+  participant V as scripts/verify-mandate.ts (harici)
+  participant J as /.well-known/jwks.json
+  participant HS as http-signature.ts
+  participant M as agentic/mandate.ts
+  participant DB as AgentMandateUse
+  participant R as Redis (önbellek)
+
+  A->>V: mandate (JWS, kid)
+  V->>J: JWKS al, kid ile anahtar seç
+  V-->>A: alg=ES256, typ, iss, aud?, süre doğrulandı
+  A->>HS: /api/ucp/* veya /api/agentic/* (Signature, Signature-Input, Content-Digest)
+  alt AGENT_HTTP_SIGNATURE_KEYS dolu
+    HS->>HS: @method + hedef, created penceresi, content-digest (RFC 9530)
+    HS-->>A: geçersiz/eksik → 401
+  end
+  HS->>M: authorizeMandate(mandate, güncel toplam)
+  M->>M: verifyMandateToken: ES256 + kid, süre, sub, para birimi, ilan, tutar
+  M->>DB: createMany(skipDuplicates) + findUnique (nonce birincil anahtar)
+  M->>R: önbelleğe yaz (başarısızlık kararı değiştirmez)
+  alt nonce başka oturuma bağlı
+    M-->>A: 409 MANDATE_REPLAYED
+  else ilk oturum
+    M-->>A: kabul → ödeme sagası (§16)
+  end
+```
+
+HTTP imzası kimlik değildir; kullanıcı kimliği bearer token'dan gelir. UCP profili (`/.well-known/ucp`) `signing.jwks_uri`, `signing.mandate_alg` ve `signing.http_message_signatures` alanlarıyla bu yetenekleri ilan eder.
+
+## 24. Payment modül bölünmesi ve LLM eval/telemetri
+
+**Payment modül bölünmesi ([ADR 0027](adr/0027-payment-service-split.md)).** `src/lib/payment/payment-service.ts` davranış değişikliği olmadan sorumluluklara bölündü ve artık yalnız yeniden-export eder: `payment-core.ts` (hatalar, `PayOutcome`, void/iade yardımcıları, tekil telafi jurnali, `pay:<bookingId>` kilidi), `confirm.ts` (saga, `captureAndConfirm`, `applyConfirmation`), `pay.ts` (`payForBooking`, step-up/3DS), `webhook-handler.ts`, `late-success.ts`, `refund.ts` (`cancelAndRefund`). Bağımlılık yönü `payment-core ← confirm ← {pay, late-success} ← webhook-handler` ve `payment-core ← refund`'tur; sepet modülleri barrel yerine doğrudan `payment-core`/`confirm`'ü içe aktarır. Döngüsüzlük `npm run deps:circular` (madge) ile kapıdadır.
+
+**LLM eval ve GenAI telemetrisi ([ADR 0030](adr/0030-llm-evals-genai-telemetry.md)).** `npm run llm:eval` promptfoo ile `evals/provider.ts` üzerinden uygulamanın saf LLM çekirdeklerini (yorum özeti, ev sahibi yanıt taslağı, gezi planı anlatımı, destek ajanı) varsayılan olarak ağsız demo modunda koşar; aynı vakalar `tests/unit/evals/llm-eval.test.ts`'te süreç içi de çalışır. İddialar şema, sayı grounding'i, PII yokluğu, dil ve red-team'dir; `LLM_EVAL_MIN_PASS_RATE` altı CI'ı kırar, sonuç `llm_eval_score{task,mode}` göstergesine yansır. Telemetride (`src/lib/llm/telemetry.ts`) her SDK isteği `chat <model>` CLIENT span'i içinde çalışır ve OpenTelemetry GenAI semantic conventions v1.37.0 öznitelikleri (`gen_ai.operation.name`, `gen_ai.provider.name`, `gen_ai.request.model`, `gen_ai.usage.input_tokens` …) yazılır.

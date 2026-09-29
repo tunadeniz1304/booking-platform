@@ -211,6 +211,8 @@ Sonuç: 7/7 senaryo geçti.
 - **Senaryo 7:** `GET /api/properties/{id}` yalnızca `isActive` alanına bakar; bu nedenle belgesiz ilan doğrudan id ile hâlâ okunabilir. Senaryo yalnızca aramadaki gizlenmeyi doğrular.
 - **Docker Desktop (Windows/macOS):** host'tan `localhost:3000`'e 100 eşzamanlı bağlantıda port yönlendiricisi bazı soketleri `ECONNRESET` ile kesebilir (sunucu isteği yine işler). Betik yalnızca tekrarı güvenli istekleri (GET veya `idempotency-key` taşıyan) en çok 2 kez yeniden dener ve bunu sonda bir `Not:` satırıyla bildirir. Alternatif: betiği compose ağı içinden çalıştırın: `docker compose run --rm --no-deps -e BASE_URL=http://app:3000 migrate npx tsx scripts/demo-scenarios.ts`.
 - **Son doğrulama (2026-09-25):** hem host'tan hem compose ağından **7/7 PASS**; senaryo 1: 100 istek → 3 HELD + 97 × 409 `SOLD_OUT`, idempotency tekrarı aynı kaydı döndürdü.
+- **Senaryo 1 ve e2e aynı yığında:** e2e rezervasyonları 60–300 gün ilerisine düşer; senaryo 1 aynı tesisin 3 birimini kullandığından e2e'den hemen sonra `DAY_OFFSET=340` gibi bu aralığın dışında bir gün verin (aksi hâlde bir birim önceden dolu olabilir → HELD=2).
+- **Son doğrulama (2026-09-29, v5):** host'ta `next start` + worker, Caddy önünde; **20/20 PASS** (15–20 dahil her süreç içi senaryoda mizan dengede, mutabakat farkı 0).
 - **Ödeme:** tekrarlanan koşularda guest hesabının ödeme hızı fraud skorunu yükseltip 3DS isteyebilir. Betik bu durumda mock 3DS koduyla onaylar.
 
 ---

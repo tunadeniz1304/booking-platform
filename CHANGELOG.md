@@ -4,52 +4,98 @@ Bu dosyadaki tüm önemli değişiklikler burada belgelenir. Biçim [Keep a Chan
 
 ## [Unreleased]
 
+## [5.0.0] - 2026-09-29
+
+v4.0.0'dan sonra 167 commit (59 test · 48 fix · 28 feat · 19 docs · 7 refactor · 4 chore · 1 perf · 1 revert), 5 yeni migration. v5 denetiminin 20 bulgusu kapatıldı ve her biri `regression: v5#N` etiketli testle korunuyor (tablo: `docs/SECURITY.md`). Tek para kaydı artık çift girişli jurnal; ondalık para yanıt alanları kaldırıldı (kırıcı). Şimdi rezerve et sonra öde (RNPL), AI destek ajanı, LLM eval + GenAI telemetrisi, pazar bazlı uyum kuralları, ES256/JWKS mandate'ler, OpenAPI 3.1 sözleşmesi, Caddy ters vekil ve tedarik zinciri CI'ı geldi.
+
+### Security
+
+- **v5#3** KYC üretimde sessizce mock'a düşmüyor: demo dışında gerçek sağlayıcı yoksa 503 `KYC_UNAVAILABLE` (fail-closed), `testDocument` yok sayılır.
+- **v5#4** Devir satıcı payout'u `payoutBlockReason` kapısından geçer (hesap/KYC); hesap yoksa `PENDING` + `payout_blocked_total{reason}`.
+- **v5#5** Devir talebi yolunda fraud risk skoru ve deneme sınırları (429 `ATTEMPTS_EXHAUSTED`); talepler devir başına serileştirilir, istemci `Idempotency-Key` kart token özetine bağlı, void sonrası anahtar yakılır.
+- **v5#6 (ADR 0034)** Uygulama Caddy ters vekilin arkasında (`TRUSTED_PROXY_HOPS=1`); üretimde güvenilir vekil yoksa `DIRECT_EXPOSURE_UNSAFE` ready kapısı; anonimler artık tek rate-limit/LLM kovasını paylaşmaz, auth'ta ikincil kova + PoW'a düşüş.
+- **v5#8** KVKK/GDPR dışa aktarımı tüm kişisel veri modellerini kapsar (mesajlar, mandate'ler, talepler, cüzdan, oturumlar, paylar, rıza kayıtları), satır sınırlı; gizli alanlar (token hash, açık anahtar, push anahtarı, `providerRef`) hariç.
+- **v5#9** Aktif ev sahibi yükümlülüğü varken hesap silme 409 `ACCOUNT_HAS_OBLIGATIONS`; yoksa ilanlar pasife alınır, push/oturumlar silinir.
+- **v5#10 (ADR 0025)** AP2 mandate'leri ES256 + `kid` ile imzalanır ve `/.well-known/jwks.json` üzerinden yayımlanır; HS256 reddedilir.
+- **v5#11** Yükleme gövdesi `content-length`'e güvenmeden akışta sayılır (`readBodyLimited`), aşımda 413.
+- **v5#12** `/api/ucp/*` `agentic`, LLM çağıran tüm route'lar `ai` rate-limit kovasında (meta testle).
+- **v5#13 (ADR 0031)** CI her dalda her push/PR'da; action'lar tam commit SHA, imajlar digest ile pinli; SAST, secret taraması, SBOM ve OSV geçidi (ayrıntı: Added).
+- **v5#19** IBAN redaksiyonu tire, tekrarlı ayraç, NBSP dahil her boşluk ve büyük/küçük harfi kabul eder; yabancı IBAN, uluslararası/sabit hat telefonları (önek duyarlı) ve ev sahibi adı da redakte edilir.
+- **v5§3** AI yanıtları `ai_generated` ile işaretlenir; mandate özel anahtarı loglarda redakte.
+- Mühürlü bağlantı çözümü (`openLink`) AES-GCM etiket uzunluğunu 16 bayta sabitler; kısaltılmış etiket reddedilir (Semgrep `gcm-no-tag-length` bulgusu).
+- LLM: öznesiz çağrı fail-closed, token bütçesi atomik rezerve edilir; sınırlayıcı kuyruğu sınırlı (taşma/zaman aşımında geri düşüş); reddedilen embedding indeksi güncellemez, sorgu embedding'i fail-closed olursa vektör kanalı atlanır; mesaj taslağı ve moderasyon açıklamasında sayı grounding'i.
+- **P1-1 (ADR 0035)** Mandate nonce'u Redis'e ek olarak kalıcı `AgentMandateUse` tablosunda: Redis kaybında aynı mandate ikinci checkout'a bağlanamaz. Opsiyonel RFC 9421 HTTP Message Signatures doğrulaması (`AGENT_HTTP_SIGNATURE_KEYS`; `/api/ucp/*`, `/api/agentic/*`).
+
 ### Added
 
-- v5 P0-6 kaos kanıtı: `docker-compose.load.yml` içinde Toxiproxy (`chaos` profili; Postgres ve Redis önünde), `load/chaos-redis.js` / `load/chaos-pg.js` (gecikme, kesinti, bağlantı kopması, `reset_peer`); sonuçlar `docs/perf/v5-chaos.md`.
-- v5 P2-3 RNPL tahsilat fırtınası: `load/rnpl-charge-storm.js` + `scripts/rnpl-storm.ts` (aynı anda vadesi gelen ~1000 tahsilat, iptal yarışı); `scripts/load-assert.ts` RNPL değişmezleri; `docs/perf/v5-rnpl-storm.md`.
-- v5 P1-8: `cart_hold_phase_seconds{phase=reprice|lock_wait|critical}` metriği; `CART_HOLD_SOLDOUT_CHECK_MS` (varsayılan 250, 0 = kapalı).
-- **P1-3 (ADR 0028)** Şimdi rezerve et, sonra öde (RNPL): `PaymentSchedule` modeli (migration `20261003100000_payment_schedule`), PSP arayüzüne opsiyonel `setupCard`/`chargeSaved` (MockPsp, ChaosPsp, Stripe SetupIntent), `POST /api/bookings/{id}/pay` `paymentOption: "rnpl"` + `GET /api/bookings/{id}/rnpl`, `rnpl` kuyruğu (`rnpl-charge` gecikmeli iş, `rnpl-sweep`), başarısızlıkta bildirim + `RNPL_GRACE_HOURS` sonra otomatik iptal, tahsilatta `booking-captured` jurnali, `rnpl_charge_total{outcome}`; checkout'ta iptal zaman çizelgeli seçenek (tr/en); seed'e `PAY_LATER` tarifesi. Yeni ayarlar: `RNPL_ENABLED`, `RNPL_CHARGE_DAYS_BEFORE_DEADLINE`, `RNPL_MIN_LEAD_HOURS`, `RNPL_GRACE_HOURS`, `RNPL_RETRY_INTERVAL_HOURS`, `RNPL_SWEEP_CRON`.
-- **P1-7 (ADR 0032)** Pazar bazlı uyum kural motoru `src/lib/compliance/market-rules.ts` + `data/market-rules.json` (`MARKET_RULES_JSON` ile değiştirilebilir): ülke → indirim referans penceresi (TR 10, AB 30, varsayılan 30 gün), "önceki fiyat" kuralı, kayıt no zorunluluğu/biçimi (TR 7464, AB 2024/1028), toplam fiyat gösterimi (ABD FTC). İlan yayın kontrolü kayıt noyu pazar biçimine göre doğrular; PDP kayıt noyu gösterir. Kaynak ve tarihler docs/COMPLIANCE.md §8.
-- **P1-1 (ADR 0035)** Mandate nonce'u Redis'e ek olarak kalıcı `AgentMandateUse` tablosunda (migration `20261002100000_agent_mandate_use`): Redis kaybında aynı mandate ikinci checkout'a bağlanamaz. Opsiyonel RFC 9421 HTTP Message Signatures doğrulaması (`AGENT_HTTP_SIGNATURE_KEYS`; `/api/ucp/*`, `/api/agentic/*`). UCP profili `signing.jwks_uri` + `mandate_alg` + imza bilgisini ilan eder. `scripts/verify-mandate.ts` (`npm run mandate:verify`): yalnız JWKS URL'si ile harici mandate doğrulaması. SD-JWT (`@sd-jwt/core`, Apache-2.0) değerlendirildi, gerekçesiyle ertelendi.
-- **P1-2** OpenAPI 3.1 kapsamı sepet, devir, ACP/UCP ajan ticareti, mandate, keşif belgeleri (`/.well-known/ucp`, `/.well-known/jwks.json`), ilan/yorum, hesap ve ops uçlarına genişletildi; tüm 2xx yanıtlar için şema (`src/lib/http/openapi-schemas.ts`). `tests/helpers/openapi-assert.ts` integration testlerinde gerçek yanıt gövdelerini şemaya karşı doğrular (≥ 20 uç işlemi). Yeni geliştirme bağımlılıkları: `ajv` 8 ve `ajv-formats` 3 (MIT). `ERROR_CATALOG`'a `HTTP_SIGNATURE_*` kodları eklendi.
-- **P1-9 (ADR 0036)** MCP Apps arayüz kaynağı `ui://booking/stay-card` (`text/html;profile=mcp-app`): CSP ile ağa kapalı, ilan adı sunucuda HTML-kaçışlı, vergi dahil toplam fiyat + AI etiketi; `search_stays` sonucu kartı gömülü kaynak olarak da taşır. `npm run mcp:smoke` kaynağı listeler/okur (ve demo dışı ortamda geçici ES256 mandate anahtarıyla çalışır). Eski `ui://stay-card` URI'si kaldırıldı.
-- **P1-4 (ADR 0029)** AI destek ajanı + insana devir: `POST /api/support/chat` (misafir; `ai` rate-limit kovası, `withAiSubject` bütçesi) — salt-okur araçlar `get_my_booking`, `explain_cancellation_quote` (`computeRefund`, yazmaz), `get_property_policy` ve tek "yazma" `open_support_ticket`. Deterministik niyet sınıflandırıcı: para/iade talebi, hukuki/şikâyet sinyali, insan isteği → LLM'e gitmeden `SupportTicket` (migration `20261004100000_support_ticket`); prompt-injection → şablon ret; güven < `SUPPORT_HANDOFF_MIN_CONFIDENCE` → devir. Canlı yanıtta sayı grounding'i + "yetkisiz eylem iddiası" guard'ı. "AI ile konuşuyorsunuz" bildirimi (API `disclosure` + UI), `/support` misafir sayfası, `/admin/support` kuyruğu + `GET /api/admin/support`, `PATCH /api/admin/support/{id}` (denetim kayıtlı). Metrikler: `support_handoff_total{reason}`, `support_chat_total{intent,outcome}`, `support_chat_latency_seconds`.
-- **P1-5 (ADR 0030)** LLM eval + GenAI telemetrisi: `evals/` promptfoo paketi (yorum özeti, mesaj taslağı, trip-plan, destek ajanı; iddialar şema, sayı grounding'i, PII, Türkçe, red-team), uygulamanın saf LLM çekirdeklerini çağıran özel sağlayıcı; `npm run llm:eval` (demo, ağsız, CI) / `-- --live` (yalnız yerel), eşik `LLM_EVAL_MIN_PASS_RATE` (0.95), özet → `llm_eval_score{task,mode}` göstergesi. `client.ts` her çıkarım isteğinde OTel GenAI span'i (semconv 1.37.0: `gen_ai.operation.name`, `gen_ai.request.model`, `gen_ai.usage.input_tokens/output_tokens`, `gen_ai.response.finish_reasons`); içerik yalnız `LLM_OTEL_CAPTURE_CONTENT=true` iken ve redakte. Yeni geliştirme bağımlılığı: `promptfoo` 0.123.1 (MIT; Node ≥ 22.22).
-- **P0-5** Gözlemlenebilirlik v2: SLO-5..7 için çok pencereli burn-rate alarmları (rezervasyon başarısı, 3DS ödeme onayı p99, PSP webhook p99; `slo:*` kayıt kuralları), v5 metrikleri için alarmlar (`PayoutBlockedSpike`, `DepositCaptureSweepFailing`, `RnplChargeFailures`, `SupportHandoffRatioHigh`, `LlmEvalScoreLow`); 29 alarmın hepsinde `runbook_url` → `docs/runbooks/` (belirti, panel, sorgu, müdahale, geri alma); `docker/observability/alerts.test.yml` promtool birim testleri (CI'da `promtool check/test rules`); Grafana panosuna burn-rate ve v5 para/destek/LLM satırları. `POST /api/payments/webhook` ve `POST /api/bookings/{id}/pay/confirm` artık `observed()` ile ölçülüyor.
-- **P1-6 (ADR 0031)** Tedarik zinciri CI'ı: `ci.yml` tüm dallarda her push/PR; tüm action'lar tam commit SHA, container imajları digest ile pinli; yeni `security.yml`: Semgrep CE SAST, gitleaks (tüm geçmiş, `.gitleaksignore` yalnız test sabitleri), CycloneDX SBOM artefaktı (`@cyclonedx/cyclonedx-npm` 6.0.1, Apache-2.0, `npx`), OSV-Scanner geçidi (`osv-scanner.toml` gerekçeli/süreli istisna), CodeQL + `actions/attest-build-provenance` + OpenSSF Scorecard (repo private olduğu için `private == false` koşullu; Scorecard rozeti konmadı). `.github/dependabot.yml` (npm, github-actions, docker), kökte `SECURITY.md` bildirim politikası; CI'da `actionlint`.
-
-### Notes
-
-- `zod-to-json-schema` (ISC) bakımı Kasım 2025'te bırakıldı; proje zod 3.25'te kaldığı sürece çalışır ve çıktısı sözleşme testleriyle sabitlenmiştir. zod 4'e geçişte yerleşik `z.toJSONSchema()` kullanılacak ve bu bağımlılık kaldırılacak (bu sürümde geçiş yapılmadı).
-
-### Removed
-
-- **P1-7** Global `PRICE_OMNIBUS_DAYS` ayarı: pencere pazar kuralından gelir (ADR 0032).
-- **P0-3 (ADR 0033)** Eski `LedgerEntry` defteri ve `LedgerKind` enum'u (migration `20261001100000_drop_legacy_ledger`): dual-write kaldırıldı, tek para kaydı çift girişli jurnal; `listBookingLedger` v3 görünümünü yalnız jurnalden türetir.
-- **P0-3 (kırıcı API değişikliği)** Yanıtlardaki kullanımdan kalkmış ondalık para alanları: `totalPrice` (rezervasyon, `BookingDTO`, ev sahibi listesi), `amount`/`refundedAmount` (ödeme, admin iade kuyruğu), `basePrice` (arama, ilan, favoriler, ev sahibi ilanları, MCP `search_stays`), `priceModifier` (oda), arama kartı `totalPrice` (yerine `quote.total`), devir `askPrice`/`originalPrice` (yerine `askPriceMinor`/`originalPriceMinor`). İstemciler `*Minor` + `currency` okur. gRPC: `ReserveRoomResponse.total_price` → `total_price_minor`, `ChargeResponse.charged_amount` ve `ChargeRequest.amount` kaldırıldı (alan numaraları `reserved`). İstek gövdelerindeki ondalık girişler (ilan formu `basePrice`) değişmedi.
-- **P0-3** Ölü minor-unit backfill aracı: `src/lib/money/backfill.ts`, `scripts/money-backfill.ts`, `npm run money:backfill` ve `tests/integration/v4-money-backfill.test.ts`. Gerekçe: ADR 0019 contract'ı v4'te tamamlandı, Decimal kolon kalmadı; `regression: v4#15` korunur ve şemada Decimal para kolonu olmadığını denetler (v4 regresyonlarını koruma kuralının tek bilinçli istisnası).
-
-### Fixed
-
-- v5 P0-6: Postgres/Redis geçici olarak erişilemezken route yanıtı 500 yerine 503 `SERVICE_UNAVAILABLE` + `Retry-After` (Prisma P1001/P1017/P2024…, ioredis bağlantı kopması).
-- v5 P1-8: sepet tutması stok tükendiğinde oda kilidi kuyruğunda bütçe sonunu beklemiyor ve kilit altında işlem açmadan SOLD_OUT dönüyor (20 VU p95 6.05 → 1.87 s; `docs/perf/v5-cart.md`).
-- **v5#17** Alarmlarda runbook ve birim testi yoktu (P0-5).
-- **v5#13** CI yalnız `main`'de tetikleniyor, action'lar etiketle pinliydi; SAST/secret/SBOM/provenance yoktu (P1-6).
-- Mühürlü bağlantı çözümü (`openLink`) AES-GCM etiket uzunluğunu 16 bayta sabitler; kısaltılmış etiket reddedilir (Semgrep `gcm-no-tag-length`).
-- **v5#14** Teklifteki indirim referans penceresi tesis ülkesine göre (TR ilanı 10 gün, AB ilanı 30 gün); `omnibusDays` yanıtta pazar değerini taşır.
-- **P0-7** Arama kartı toplamı artık ev sahibi promosyonlarını (erken rezervasyon, son dakika, uzun konaklama; kupon hariç) teklif motoruyla aynı biçimde uygular; promosyon eklenince/değişince/silinince etkilenen ilanların teklif önbelleği geçersiz kılınır. `tests/integration/v5-price-invariant.test.ts`: fast-check 200 örnekte arama kartı = `/api/quote` = PSP capture (+ kredi) = tahsilat jurnali.
+- **P1-3 (ADR 0028) — Şimdi rezerve et, sonra öde (RNPL):** `PaymentSchedule` modeli (migration `20261003100000_payment_schedule`), PSP arayüzüne opsiyonel `setupCard`/`chargeSaved` (MockPsp, ChaosPsp, Stripe SetupIntent), `POST /api/bookings/{id}/pay` `paymentOption: "rnpl"` + `GET /api/bookings/{id}/rnpl`, `rnpl` kuyruğu (`rnpl-charge` gecikmeli iş, `rnpl-sweep`), başarısızlıkta bildirim + `RNPL_GRACE_HOURS` sonra otomatik iptal, tahsilatta `booking-captured` jurnali, `rnpl_charge_total{outcome}`; checkout'ta iptal zaman çizelgeli seçenek (tr/en), rezervasyon detayında planlı tahsilat; seed'e `PAY_LATER` tarifesi. Yeni ayarlar: `RNPL_ENABLED`, `RNPL_CHARGE_DAYS_BEFORE_DEADLINE`, `RNPL_MIN_LEAD_HOURS`, `RNPL_GRACE_HOURS`, `RNPL_RETRY_INTERVAL_HOURS`, `RNPL_SWEEP_CRON`.
+- **P1-4 (ADR 0029) — AI destek ajanı + insana devir:** `POST /api/support/chat` (misafir; `ai` kovası, `withAiSubject` bütçesi); salt-okur araçlar `get_my_booking`, `explain_cancellation_quote` (`computeRefund`, yazmaz), `get_property_policy` ve tek "yazma" `open_support_ticket`. Deterministik niyet sınıflandırıcı: para/iade talebi, hukuki/şikâyet sinyali, insan isteği → LLM'e gitmeden `SupportTicket` (migration `20261004100000_support_ticket`); prompt-injection → şablon ret; güven < `SUPPORT_HANDOFF_MIN_CONFIDENCE` → devir. Canlı yanıtta sayı grounding'i + "yetkisiz eylem iddiası" guard'ı. "AI ile konuşuyorsunuz" bildirimi (API `disclosure` + UI), `/support` sayfası ve "insana bağlan" düğmesi, `/admin/support` kuyruğu + `GET /api/admin/support`, `PATCH /api/admin/support/{id}` (denetim kayıtlı). Metrikler: `support_handoff_total{reason}`, `support_chat_total{intent,outcome}`, `support_chat_latency_seconds`.
+- **P1-5 (ADR 0030) — LLM eval + GenAI telemetrisi:** `evals/` promptfoo paketi (yorum özeti, mesaj taslağı, trip-plan, destek ajanı; iddialar şema, sayı grounding'i, PII, Türkçe, red-team), uygulamanın saf LLM çekirdeklerini çağıran özel sağlayıcı; `npm run llm:eval` (demo, ağsız, CI) / `-- --live` (yalnız yerel), eşik `LLM_EVAL_MIN_PASS_RATE` (0.95), özet → `llm_eval_score{task,mode}`. `client.ts` her çıkarım isteğinde OTel GenAI span'i (semconv 1.37.0: `gen_ai.operation.name`, `gen_ai.request.model`, `gen_ai.usage.input_tokens/output_tokens`, `gen_ai.response.finish_reasons`); içerik yalnız `LLM_OTEL_CAPTURE_CONTENT=true` iken ve redakte.
+- **P1-7 (ADR 0032) — Pazar bazlı uyum kural motoru:** `src/lib/compliance/market-rules.ts` + `data/market-rules.json` (`MARKET_RULES_JSON` ile değiştirilebilir): ülke → indirim referans penceresi (TR 10, AB 30, varsayılan 30 gün), "önceki fiyat" kuralı, kayıt no zorunluluğu/biçimi (TR 7464, AB 2024/1028), toplam fiyat gösterimi (ABD FTC). İlan yayın kontrolü kayıt noyu pazar biçimine göre doğrular; PDP kayıt noyu gösterir. Kaynak ve tarihler `docs/COMPLIANCE.md` §8.
+- **P1-1 — Mandate doğrulama araçları:** UCP profili `signing.jwks_uri` + `mandate_alg` + imza bilgisini ilan eder; `scripts/verify-mandate.ts` (`npm run mandate:verify`) yalnız JWKS URL'si ile harici mandate doğrular. SD-JWT (`@sd-jwt/core`) değerlendirildi, gerekçesiyle ertelendi.
+- **P1-2 — OpenAPI 3.1 sözleşmesi:** `/api/openapi.json` (v5#16); kapsam sepet, devir, ACP/UCP ajan ticareti, mandate, keşif belgeleri (`/.well-known/ucp`, `/.well-known/jwks.json`), ilan/yorum, hesap ve ops uçlarını içerir; tüm 2xx yanıtlar için şema (`src/lib/http/openapi-schemas.ts`), gövde/sorgu şemaları route'ların zod şemalarından üretilir. Kontrat testleri: `tests/helpers/openapi-assert.ts` integration testlerinde gerçek yanıt gövdelerini şemaya karşı doğrular (≥ 20 uç işlemi) + yol/metot senkron testi. `ERROR_CATALOG`'a `HTTP_SIGNATURE_*` kodları.
+- **P1-9 (ADR 0036) — MCP Apps stay-card:** `ui://booking/stay-card` (`text/html;profile=mcp-app`) kaynağı: CSP ile ağa kapalı, ilan adı sunucuda HTML-kaçışlı, vergi dahil toplam fiyat + AI etiketi; `search_stays` sonucu kartı gömülü kaynak olarak da taşır. `npm run mcp:smoke` kaynağı listeler/okur.
+- **v5#6 (ADR 0034) — Caddy ters vekil:** compose'da uygulamanın önünde Caddy; `Vary: Accept-Language, Cookie` başlığı Caddy'de de korunur.
+- **P1-6 (ADR 0031) — Tedarik zinciri CI'ı:** yeni `security.yml`: Semgrep CE SAST, gitleaks (tüm geçmiş, `.gitleaksignore` yalnız test sabitleri), CycloneDX SBOM artefaktı, OSV-Scanner geçidi (`osv-scanner.toml` gerekçeli/süreli istisna), CodeQL + `actions/attest-build-provenance` + OpenSSF Scorecard (`private == false` koşullu). `.github/dependabot.yml` (npm, github-actions, docker), kökte `SECURITY.md` bildirim politikası; CI'da `actionlint`.
+- **P0-5 — Gözlemlenebilirlik v2:** SLO-5..7 için çok pencereli burn-rate alarmları (rezervasyon başarısı, 3DS ödeme onayı p99, PSP webhook p99; `slo:*` kayıt kuralları), v5 metrik alarmları (`PayoutBlockedSpike`, `DepositCaptureSweepFailing`, `RnplChargeFailures`, `SupportHandoffRatioHigh`, `LlmEvalScoreLow`); 29 alarmın hepsinde `runbook_url` → `docs/runbooks/` (belirti, panel, sorgu, müdahale, geri alma); `docker/observability/alerts.test.yml` promtool birim testleri (CI'da `promtool check/test rules`); Grafana panosuna burn-rate ve v5 para/destek/LLM satırları.
+- **P0-6 — Kaos kanıtı:** `docker-compose.load.yml` içinde Toxiproxy (`chaos` profili; Postgres ve Redis önünde), `load/chaos-redis.js` / `load/chaos-pg.js` (gecikme, kesinti, bağlantı kopması, `reset_peer`); sonuçlar `docs/perf/v5-chaos.md`.
+- **P2-3 — RNPL tahsilat fırtınası:** `load/rnpl-charge-storm.js` + `scripts/rnpl-storm.ts` (aynı anda vadesi gelen ~1000 tahsilat, iptal yarışı; `STORM_TIMEOUT_S`); `scripts/load-assert.ts` RNPL değişmezleri; `docs/perf/v5-rnpl-storm.md`.
+- **P1-8** `cart_hold_phase_seconds{phase=reprice|lock_wait|critical}` metriği; `CART_HOLD_SOLDOUT_CHECK_MS` (varsayılan 250, 0 = kapalı).
+- `/trust` herkese açık güven merkezi sayfası (tedarik zinciri bağlantıları); ilk ziyarette `Accept-Language` ile dil müzakeresi (v5#15).
+- Demo: v5 süreç içi senaryoları 15–20, v5 ekran görüntüleri; e2e'de trust, destek, admin destek ve RNPL sayfaları axe ile taranır.
+- Dokümantasyon: ADR 0025–0036, SECURITY v5 tehdit modeli + v5#1–#20 düzeltme tablosu, ARCHITECTURE v5 akışları (RNPL, telafi, destek), COMPLIANCE v5 kural tarihleri/kaynakları, `docs/perf/v5-cart.md`, `v5-chaos.md`, `v5-rnpl-storm.md`, README v5.
+- Bağımlılıklar: `ajv` 8 ve `ajv-formats` 3 (MIT, dev), `promptfoo` 0.123.1 (MIT, dev; Node ≥ 22.22), `madge` (MIT, dev; `npm run deps:circular`, `.madgerc` yalnız-tip içe aktarmaları yok sayar), `yaml` (ISC, dev; iş akışı ve alarm YAML regresyon testleri), `zod-to-json-schema` (ISC; doğrudan bağımlılık), `@cyclonedx/cyclonedx-npm` 6.0.1 (Apache-2.0, yalnız `npx`), `ghcr.io/shopify/toxiproxy:2.9.0` Docker imajı (MIT; yalnız `chaos` profili).
 
 ### Changed
 
-- **P0-4 (ADR 0027)** `src/lib/payment/payment-service.ts` sorumluluklara bölündü (`payment-core`, `confirm`, `pay`, `webhook-handler`, `late-success`, `refund`); dosya yalnız yeniden-export eder, davranış değişmedi.
+- **P0-4 (ADR 0027)** `src/lib/payment/payment-service.ts` sorumluluklara bölündü (`payment-core`, `confirm`, `pay`, `webhook-handler`, `late-success`, `refund`); dosya yalnız yeniden-export eder, davranış değişmedi; `madge` içe aktarma döngüsü olmadığını doğrular.
+- Mandate'ler artık ES256; HS256 ile imzalı mandate'ler reddedilir (v5#10).
+- MCP stay-card URI'si `ui://stay-card` → `ui://booking/stay-card`; `mcp:smoke` demo dışı ortamda geçici ES256 mandate anahtarıyla çalışır.
+- İndirim referans penceresi tesis ülkesine göre (TR ilanı 10 gün, AB ilanı 30 gün); `omnibusDays` yanıtta pazar değerini taşır (v5#14).
+- Sayfa yanıtları `Accept-Language` ve dil çerezine göre `Vary` taşır; geçerli çerez müzakereden önceliklidir (v5#15).
+- **P1-8** Sepet tutması stok tükendiğinde oda kilidi kuyruğunda bütçe sonunu beklemez ve kilit altında işlem açmadan `SOLD_OUT` döner.
+- `POST /api/payments/webhook`, `POST /api/bookings/{id}/pay/confirm` ve admin/gelir LLM route'ları `observed()` ile ölçülür.
+- Rezervasyon liste/detay yanıtlarında idempotency alanları artık yok.
+- LLM JSON modu geri çekilmesi yalnız `response_format` 400 hatasında ve TTL'li (`LLM_JSON_MODE_RETRY_MINUTES`) (v5#18).
+- Demo override'ında fraud hız ve başarısız ödeme eşikleri gevşetilir (e2e yeniden koşuları); başarısız ödeme eşiği yapılandırılabilir.
 
-### Dependencies
+### Removed
 
-- Yük/kaos ortamı: `ghcr.io/shopify/toxiproxy:2.9.0` Docker imajı (MIT; yalnız `docker-compose.load.yml` `chaos` profili, npm bağımlılığı değil).
-- `yaml` (ISC; zaten promptfoo üzerinden kuruluydu) doğrudan devDependency: iş akışı ve alarm YAML'larını ayrıştıran regresyon testleri (v5#13, v5#17).
-- `madge` (MIT) devDependency: `npm run deps:circular` ödeme modüllerinde içe aktarma döngüsü olmadığını doğrular (ADR 0027); `.madgerc` yalnız-tip içe aktarmaları yok sayar.
-- `zod-to-json-schema` (ISC; zaten `@modelcontextprotocol/sdk` üzerinden kuruluydu) doğrudan bağımlılık oldu: `/api/openapi.json` gövde/sorgu şemaları route'ların zod şemalarından üretilir (v5#16).
+- **P0-3 (ADR 0033)** Eski `LedgerEntry` defteri ve `LedgerKind` enum'u (migration `20261001100000_drop_legacy_ledger`): dual-write kaldırıldı, tek para kaydı çift girişli jurnal; `listBookingLedger` v3 görünümünü yalnız jurnalden türetir.
+- **P0-3 (kırıcı API değişikliği)** Yanıtlardaki kullanımdan kalkmış ondalık para alanları: `totalPrice` (rezervasyon, `BookingDTO`, ev sahibi listesi), `amount`/`refundedAmount` (ödeme, admin iade kuyruğu), `basePrice` (arama, ilan, favoriler, ev sahibi ilanları, MCP `search_stays`), `priceModifier` (oda), arama kartı `totalPrice` (yerine `quote.total`), devir `askPrice`/`originalPrice` (yerine `askPriceMinor`/`originalPriceMinor`). İstemciler `*Minor` + `currency` okur. gRPC: `ReserveRoomResponse.total_price` → `total_price_minor`, `ChargeResponse.charged_amount` ve `ChargeRequest.amount` kaldırıldı (alan numaraları `reserved`). İstek gövdelerindeki ondalık girişler (ilan formu `basePrice`) değişmedi.
+- **P0-3** Ölü minor-unit backfill aracı: `src/lib/money/backfill.ts`, `scripts/money-backfill.ts`, `npm run money:backfill` ve `tests/integration/v4-money-backfill.test.ts`. Gerekçe: ADR 0019 contract'ı v4'te tamamlandı, Decimal kolon kalmadı; `regression: v4#15` korunur ve artık şemada Decimal para kolonu olmadığını iddia eder (v4 regresyonlarını koruma kuralının tek bilinçli istisnası).
+- **P1-7** Global `PRICE_OMNIBUS_DAYS` ayarı: pencere pazar kuralından gelir (ADR 0032).
+
+### Fixed
+
+- Ödeme onay saga'sında capture claim'i kaybedildiğinde kazanan ödemenin rezervasyonu HELD → EXPIRED yapılıyor ve kaybeden provizyon iki kez void ediliyordu; artık hold korunur, telafi çalışmaz, kaybeden tek kez void edilir (`regression: v5-F9 lost claim`, `tests/integration/v5-payment-confirm.test.ts`).
+- Telafi edilmiş (REFUNDED) sepet ödemesi satırının tutarı, sepet yeniden tutulup ödendiğinde `payLocked` upsert'ünde yeni toplamla eziliyor ve mutabakatta hayali capture/iade farkı doğuyordu (Postgres kaos tekrar koşumunda bulundu); tutar artık dondurulur, deneme alanları yalnız açık statülerde yazılır (`regression: v5-F9 partial cart journal`).
+- Aynı ezme `createSplitPlan`'da: kapanmış (REFUNDED/PARTIALLY_REFUNDED) sepet ödemesinde bölünmüş ödeme planı artık 409 `CART_PAYMENT_CLOSED` ile reddedilir (`regression: v5-F9 split plan on refunded cart`).
+- Kaos tekrar koşumu (düzeltmeler sonrası): Postgres ve Redis kesintisinde pencere dışı 5xx 0, `load-assert` 1 298 / 1 388 mutabakat kontrolünde 0 fark (`docs/perf/v5-chaos.md`).
+- **v5#1** Sepet, pay ve devir telafi iadeleri deftere yazılıyor: ortak `postCaptureCompensation` jurnali, PSP iadesinden önce niyet işareti (yalnız capture kesinken; ADR 0026), süpürücü tamamlar; mutabakat işarete göre `CartPayment`, `PaymentShare` ve FAILED devirleri kapsar.
+- **v5#2** Hasar depozitosu capture'ı iki aşamalı niyetle (`CAPTURING` → `deposit-capture:<id>` idempotency anahtarı → `CAPTURED` + jurnal) ve `deposit-capture-sweep` süpürücüsüyle.
+- **v5#7** Anonim ziyaretçiler aktif ilan fotoğraflarını ve PDP içgörülerini görür (`/api/photos/` GET public; pasif ilan → 404).
+- **v5#14–#18** Pazar bazlı indirim penceresi, `Accept-Language` müzakeresi, eksik OpenAPI uçları (akıllı arama, devir talebi, auth, LLM), runbook'suz/testsiz alarmlar, fazla geniş JSON modu geri çekilmesi (ayrıntı: Added/Changed).
+- **v5#20** Cashback sonradan gelen iade ve kaybedilen itirazda `creditClawback` jurnaliyle geri alınır: harcanmamış kısımdan düşer, yetmezse `platform_loss`.
+- **P0-6** Postgres/Redis geçici olarak erişilemezken route yanıtı 500 yerine 503 `SERVICE_UNAVAILABLE` + `Retry-After` (Prisma P1001/P1017/P2024…, ioredis bağlantı kopması).
+- **P1-8** Sepet sıcak noktası: 20 VU tutma p95 6,05 → 1,87 s (`docs/perf/v5-cart.md`).
+- **P0-7** Arama kartı toplamı ev sahibi promosyonlarını (erken rezervasyon, son dakika, uzun konaklama; kupon hariç) teklif motoruyla aynı biçimde uygular; promosyon değişince etkilenen ilanların teklif önbelleği geçersiz kılınır. `tests/integration/v5-price-invariant.test.ts`: fast-check 200 örnekte arama kartı = `/api/quote` = PSP capture (+ kredi) = tahsilat jurnali.
+- Geç başarılı ödemede kupon kullanımı tutulan indirimle geri alınır.
+- Rezervasyon başlığı kontrastı WCAG AA'yı karşılar (axe bulgusu).
+- OpenAPI'de arama görüntüleme tutarı ondalık ana birim olarak tiplenir; `quote-total` test kimliği yalnız tahsil edilen toplamı kapsar; sepet rezervasyon kimlikleri kararlı sırada döner.
+- `npm run llm:smoke` kontroller bitince çıkar; integration testlerinde yabancı outbox birikimi her dosyadan önce park edilir.
+
+### Known limitations
+
+- Sepet ani yükünde tutma p95 hedefi (2 s) hâlâ aşılıyor: 100 VU'da 8,40 s (v4: 10,07 s); para/değişmez ihlali yok.
+- Repo private olduğu için CodeQL, build provenance ve OpenSSF Scorecard CI'da atlanıyor (`private == false` koşulu); Scorecard rozeti yok.
+- RNPL yalnız mock ödeme formunda uçtan uca doğrulandı.
+- Destek ajanı tek turlu (konuşma geçmişi tutmaz).
+- OSV-Scanner istisnası `GHSA-8988-4f7v-96qf` (süre sonu 2026-12-31).
+- Hesap silmede mesaj gövdeleri kalıyor.
+- `/api/auth/refresh` için PoW'a düşüş yok (yalnız giriş/sıfırlamada).
+- `zod-to-json-schema` bakımı Kasım 2025'te bırakıldı; zod 3.25'te çalışır ve çıktısı kontrat testleriyle sabit. zod 4'e geçişte yerleşik `z.toJSONSchema()` kullanılacak.
+- Tam liste: `docs/SECURITY.md` ve `README.md`.
 
 ## [4.0.0] - 2026-09-27
 
@@ -275,7 +321,8 @@ v1'in prototip çekirdeği üretim kalitesinde bir rezervasyon platformuna dön�
 
 - İlk prototip: Next.js 14 arayüzü, Redlock + `FOR UPDATE` rezervasyon, çarpımsal fiyat motoru, pazarlık motoru, gRPC tanımları, deterministik seed.
 
-[Unreleased]: https://github.com/tunadeniz1304/booking-platform/compare/v4.0.0...HEAD
+[Unreleased]: https://github.com/tunadeniz1304/booking-platform/compare/v5.0.0...HEAD
+[5.0.0]: https://github.com/tunadeniz1304/booking-platform/compare/v4.0.0...v5.0.0
 [4.0.0]: https://github.com/tunadeniz1304/booking-platform/compare/v3.0.0...v4.0.0
 [3.0.0]: https://github.com/tunadeniz1304/booking-platform/compare/v2.0.0...v3.0.0
 [2.0.0]: https://github.com/tunadeniz1304/booking-platform/releases/tag/v2.0.0

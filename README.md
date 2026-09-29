@@ -13,10 +13,10 @@
 ![PostgreSQL 16](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)
 ![Redis 7](https://img.shields.io/badge/Redis-7-DC382D?logo=redis&logoColor=white)
 <br />
-![Unit tests](https://img.shields.io/badge/unit%20tests-1282%20passing-brightgreen)
-![Integration tests (v4)](https://img.shields.io/badge/integration%20tests%20%28v4%29-342%20passing-brightgreen)
-![E2E tests (v4)](https://img.shields.io/badge/e2e%20tests%20%28v4%29-35%20passing-brightgreen)
-![Coverage (v4)](https://img.shields.io/badge/coverage%20%28v4%29-lines%2090.35%25%20%C2%B7%20branches%2079.13%25-green)
+![Unit tests](https://img.shields.io/badge/unit%20tests-1302%20passing-brightgreen)
+![Integration tests](https://img.shields.io/badge/integration%20tests-418%20passing-brightgreen)
+![E2E tests](https://img.shields.io/badge/e2e%20tests-43%20passing-brightgreen)
+![Coverage](https://img.shields.io/badge/coverage-lines%2090.25%25%20%C2%B7%20branches%2079.27%25-green)
 ![Price invariant](https://img.shields.io/badge/g%C3%B6sterilen%20%3D%20tahsil%20edilen%20%3D%20defter-200%20%C3%B6rnek%20%C2%B7%200%20kar%C5%9F%C4%B1%20%C3%B6rnek-brightgreen)
 ![LLM eval](https://img.shields.io/badge/LLM%20eval%20%28demo%29-28%2F28%20%C2%B7%20red--team%2010%2F10-brightgreen)
 
@@ -402,13 +402,13 @@ Yük ve kaos ölçümleri: [docs/perf/](docs/perf/). Arama kalitesi ([docs/perf/
 
 ## Testler ve betikler
 
-| Paket                       | Sonuç                                                      |
-| --------------------------- | ---------------------------------------------------------- |
-| Unit                        | 1282 test (v5, `npm run test:unit`)                        |
-| Integration                 | 342 test (v4 ölçümü; v5 sayısı bu README'de güncellenmedi) |
-| E2E (+ axe)                 | 35 test (v4 ölçümü)                                        |
-| Kapsam (unit + integration) | satır %90,35 · dal %79,13 (v4 ölçümü)                      |
-| LLM eval (demo sağlayıcı)   | 28/28 vaka, 10/10 red-team (`evals/results/summary.json`)  |
+| Paket                       | Sonuç                                                     |
+| --------------------------- | --------------------------------------------------------- |
+| Unit                        | 1282 test (v5, `npm run test:unit`)                       |
+| Integration                 | 418 test (90 dosya)                                       |
+| E2E (+ axe)                 | 43 test (7 dosya, axe dahil)                              |
+| Kapsam (unit + integration) | satır %90,25 · dal %79,27 (v5 ölçümü)                     |
+| LLM eval (demo sağlayıcı)   | 28/28 vaka, 10/10 red-team (`evals/results/summary.json`) |
 
 ```bash
 npm run check          # lint + typecheck + prettier --check + unit testler (altyapısız)

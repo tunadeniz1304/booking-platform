@@ -1,7 +1,181 @@
 # booking-platform — Final raporu
 
 > Portföy/demo projesidir; gerçek ödeme alınmaz, gerçek konaklama satılmaz.
-> v4 bölümü en üstte; v3.0.0 ve v2.0.0 raporları aşağıda değiştirilmeden korunur.
+> v5 bölümü en üstte; v4.0.0, v3.0.0 ve v2.0.0 raporları aşağıda değiştirilmeden korunur.
+
+# v5
+
+## 1. Özet (v5.0.0, 2026-09-29)
+
+v4.0.0'dan sonra 170 civarı commit (59 test · 48 fix · 28 feat · 19 docs · 7 refactor · 4 chore ·
+1 perf · 1 revert, sürüm commit'i hariç; `git log v4.0.0..v5.0.0 --format=%s`), 5 yeni migration,
+~414 dosya. Başlangıç: `v4.0.0` + yerel `release/v2` dalındaki 26 v2 döngüsü düzeltmesi (F0'da
+`main`'e fast-forward edildi) ve askıda kalan döngü commit'leri (P0-3 telafi jurnali, KVKK export,
+ES256/JWKS, OpenAPI, Accept-Language — cherry-pick, çakışmasız). `booking-v5.md` §1'deki 20
+bilinen hatanın tamamı kapatıldı; #20 (cashback clawback) kırmızı testle **gerçek hata** olarak
+doğrulandı:
+
+```bash
+grep -rhoE "regression: v5#[0-9]+" tests | sort -u | wc -l   # 20 (#1–#20)
+grep -rl "regression: v5#" tests | wc -l                      # 24 dosya
+```
+
+Farklılaşma iddiası ve kanıtı: "gösterilen = tahsil edilen = deftere yazılan" fast-check property
+testi (200 örnek, 0 karşı örnek; ilk koşuda gerçek bir hata buldu), ES256 + herkese açık JWKS ile
+üçüncü tarafça doğrulanabilir ajan mandate'i (`scripts/verify-mandate.ts` yalnız `jose` kullanır),
+SAST/secret/SBOM/OSV tedarik zinciri CI'ı ve CI'da koşan LLM eval'leri (28 vaka, 10 red-team).
+
+## 2. Faz faz yapılanlar
+
+| Faz | İçerik                                                                                                                                                                                            | Son commit |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| F0  | `release/v2` → `main` ff, askıdaki commit'ler `rescue/*` dallarına sabitlendi, `.loop` ignore; taban: unit 1067, int 349                                                                          | `3fea778`  |
+| F1a | §3 LLM sözleşmesi doğrulaması; yeni config adları; `ai_generated` eksik 3 route; v5#12 (LLM çağıran her route `ai` kovasında, statik import grafiğinden), #18 (JSON modu TTL'li), #19 (IBAN)      | `88add32`  |
+| F1b | v5#1 telafi jurnali (+ inceleme bulgusu), #2 depozito iki aşamalı capture + süpürücü, #3 KYC fail-closed, #4 devir payout KYC kapısı, #5 devir fraud + deneme sınırı, #20 cashback clawback       | `9bb9420`  |
+| F1c | cherry-pick #8/#10/#15/#16; #6 Caddy ters vekil + `DIRECT_EXPOSURE_UNSAFE` + auth PoW düşüşü, #7 public fotoğraflar, #9 hepsi-ya-hiç hesap silme, #11 akıştan sayılan yükleme sınırı              | `ed92718`  |
+| F2  | P0-4 `payment-service.ts` bölünmesi (en büyük dosya 514 satır, madge 0 döngü), P0-3 `LedgerEntry` kontrat adımı, P0-7 fiyat invariantı property testi                                             | `5bdbe88`  |
+| F3  | P1-1 `AgentMandateUse` + RFC 9421 + verify-mandate, P1-2 OpenAPI 3.1 (~40 uç ajv ile doğrulanıyor), P1-9 MCP Apps `ui://booking/stay-card`; e2e düzeltmeleri (Vary, quote-total, sızıntı)         | `e775a10`  |
+| F4  | P1-3 RNPL (PaymentSchedule, rnpl-charge/sweep, grace + otomatik iptal), P1-7 pazar kural motoru (v5#14: TR 10 gün / AB 30 gün)                                                                    | `2941e3c`  |
+| F5  | P1-4 AI destek ajanı + insana devir, P1-5 promptfoo eval + `gen_ai.*` OTel span'leri                                                                                                              | `122fa2f`  |
+| F6  | P1-6 tedarik zinciri CI (v5#13), P0-5 runbook'lu alarmlar + burn-rate + promtool (v5#17)                                                                                                          | `85a5f4d`  |
+| F7  | P1-8 sepet sıcak noktası, P0-6 Toxiproxy chaos, P2-3 RNPL tahsilat fırtınası                                                                                                                      | `1f4a142`  |
+| F8  | P2-1 UI (/trust, RNPL planı, insana bağlan, axe), P2-2 demo senaryoları 15–20, P2-4 ekran görüntüleri                                                                                             | `8a0feee`  |
+| F9  | Dokümanlar, `observed()` + ölü `req.ip` temizliği, `llm:smoke` çıkışı, e2e LLM demo katmanı, kapsam testleri, 3 para/yarış hatası (claim kaybı, sepet tutarı ezme ×2), chaos tekrar koşumu, sürüm | `v5.0.0`   |
+
+## 3. Bitiş tanımı (DoD, `booking-v5.md` §8) — durum ve kanıt
+
+| #   | Madde                                           | Durum | Kanıt                                                                                                                                                                                                                                                        |
+| --- | ----------------------------------------------- | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | lint · typecheck · format · i18n · unit         | ✅    | unit 1302 test; i18n 34 ad alanı tr/en eşit                                                                                                                                                                                                                  |
+| 2   | coverage eşikleri                               | ✅    | satır %90,25 · dal %79,27 (eşik 80/70)                                                                                                                                                                                                                       |
+| 3   | ≥ 19 `regression: v5#` + v3/v4 yeşil            | ✅    | 20 benzersiz etiket; v4#15 bilinçli olarak şema iddiasına uyarlandı (ADR 0033)                                                                                                                                                                               |
+| 4   | build · docker compose build · audit high 0     | ✅    | `npm run build` ✓; `docker compose build` ✓ (F9, ağ düzelince); audit: 0 high, 4 moderate                                                                                                                                                                    |
+| 5   | demo compose + e2e + demo:scenarios 1–20        | ✅    | e2e 43/43 (demo + `docker-compose.e2e.yml`); demo:scenarios 20/20, mizan + mutabakat temiz                                                                                                                                                                   |
+| 6   | mcp:smoke + verify-mandate                      | ✅    | `MCP smoke OK` (stay-card dahil); verify-mandate: senaryo 19 + loopback JWKS testleri (geçerli kabul; kurcalanmış/HS256/yanlış `aud` red)                                                                                                                    |
+| 7   | `/api/openapi.json` 3.1 + senkron testi         | ✅    | canlı yığında `openapi: 3.1.0`, 42 yol; senkron testi yeşil                                                                                                                                                                                                  |
+| 8   | llm:eval ≥ %95 + llm:smoke canlı                | ✅    | eval 28/28 (%100), red-team 10/10; smoke CANLI: JSON ~1,4 s, metin 0,4–0,8 s                                                                                                                                                                                 |
+| 9   | promtool check/test + runbook_url               | ✅    | 47 kural SUCCESS, test rules SUCCESS; 29 alarmın hepsinde runbook (24 dosya)                                                                                                                                                                                 |
+| 10  | GitHub Actions yeşil + SBOM + provenance        | ⚠️    | **CI sonucu yerelden doğrulanamadı**: repo private (API 404), `gh` yok; actionlint yerelde temiz. Private repo → provenance/Scorecard/CodeQL `if: private == false` ile atlanıyor (V-6); şart SBOM artefaktına indirgendi                                    |
+| 11  | `docs/perf/v5-cart.md`, `v5-chaos.md` + ihlal 0 | ✅    | raporlar mevcut; düzeltmeler sonrası chaos tekrar koşumu (PG + Redis) invariant ihlali 0 (1 298 / 1 388 kontrol, 0 fark); 100 VU hold p95 hedefi (≤ 2 s) **tutmadı** (8,40 s, analiz v5-cart.md'de — P1-8 KK'sının "ulaşılan değer + darboğaz analizi" dalı) |
+| 12  | `ledgerEntry.` = 0, payment dosyaları ≤ 600     | ✅    | 0; en büyük `refund.ts` 514 satır                                                                                                                                                                                                                            |
+| 13  | 5.0.0 + CHANGELOG + tag                         | ✅    | `chore(release): 5.0.0`, `v5.0.0` origin'de                                                                                                                                                                                                                  |
+| 14  | `git status` temiz, `origin/main..main` boş     | ✅    | release sonrası                                                                                                                                                                                                                                              |
+| 15  | FINAL_REPORT v5                                 | ✅    | bu bölüm                                                                                                                                                                                                                                                     |
+
+## 4. Ölçümler
+
+| Ölçüm                         | v4.0.0 / F0 tabanı                                       | v5.0.0                                                     |
+| ----------------------------- | -------------------------------------------------------- | ---------------------------------------------------------- |
+| Unit testler                  | 1067                                                     | 1302                                                       |
+| Integration testler           | 349 (75 dosya)                                           | 418 (90 dosya)                                             |
+| e2e                           | 36 (7 dosya)                                             | 43 (7 dosya, axe dahil)                                    |
+| Coverage (unit + integration) | satır 90,35 · dal 79,13                                  | satır %90,25 · dal %79,27                                  |
+| LLM eval (demo)               | —                                                        | 28/28 (%100), red-team 10/10                               |
+| Canlı LLM smoke               | —                                                        | JSON 1364–1407 ms, metin 417–799 ms (`deepseek-v4-flash`)  |
+| Sepet hold p95, 20 VU         | 6,05 s (host, v5 öncesi kod)                             | **1,87 s**                                                 |
+| Sepet hold p95, 100 VU        | 8,69 s host / 8,51–8,80 s konteyner (v4 raporu: 10,07 s) | 8,40 s (medyan 7,90 → 2,66 s)                              |
+| Chaos (Redis/PG kesintisi)    | —                                                        | kesintide 500 → 503; pencere dışı 5xx 0; 0 mutabakat farkı |
+| RNPL fırtınası                | —                                                        | 1006 vade 22,4 s'de (44,8/s), p95 21,4 s, ihlal 0          |
+| Alarmlar                      | 16, runbook yok                                          | 29 + 18 `slo:*` kaydı, hepsi runbook'lu, promtool testli   |
+| Mutabakat (load-assert)       | —                                                        | 7300 kontrol / 0 fark, aşırı satış 0, çift capture 0       |
+
+## 5. Hâlâ mock / sentetik olanlar
+
+PSP varsayılanı `MockPsp` (Stripe sağlayıcısı kodda, SetupIntent dahil); payout ve e-fatura mock;
+KYC yalnız demo'da mock (dışında fail-closed 503); embedding varsayılanı hash; LTR modeli sentetik
+tıklamalarla; MCP Apps kartı istemci desteğine bağlı (SDK 1.30.1'de yardımcı yok, elle kayıt);
+RNPL yalnız mock ödeme formunda uçtan uca (Stripe istemci SetupIntent UI'ı yok); canlı LLM yalnız
+`llm:smoke` ile doğrulandı — e2e ve eval deterministik demo modunda.
+
+## 6. Bilinen sınırlamalar, elenen ve ertelenenler
+
+- **Sepet 100 VU p95 ≤ 2 s tutmadı (8,40 s).** Kalan darboğaz uygulama süreci (event loop doygun,
+  kalem başına ~12 sorgu, başarılı kritik bölge ~0,63 s); DB sorgusu 0,49 ms. Adaylar
+  `docs/perf/v5-cart.md`'de (salt-okur sorguları kilit dışına almak `reserveBookingInTx`
+  refaktörü ister). 2 s kilit bütçesi deneyi `ROOM_BUSY`'yi 34 → 435'e çıkardığı için reddedildi.
+- Chaos tekrar koşumunda PG `reset_peer` penceresi içinde 1 × 500 kaldı (bağlantı sıfırlanırken
+  yarıda kalan tek istek); pencere dışı 5xx 0.
+- **GitHub Actions sonucu doğrulanamadı** (private repo, `gh` yok). Semgrep/OSV/gitleaks yerelde
+  koşturuldu (Semgrep gerçek bir GCM tag kesme hatası buldu, düzeltildi).
+- **OSV istisnası** GHSA-8988-4f7v-96qf: `@opentelemetry/core@1.30.1` yalnız
+  `@prisma/instrumentation@5.22` üzerinden; düzeltme Prisma 6 ister; istisna 2026-12-31'de biter.
+- Destek ajanı tek turlu (konuşma geçmişi taşınmıyor); hesap silmede mesaj gövdeleri kalıyor;
+  `/api/auth/refresh` için PoW düşüşü yok; PENDING lisanslı aktif ilan fotoğrafları public;
+  ADR 0035'teki "Caddy Host'u korur" varsayımı TLS sonlandırmalı kurulumda doğrulanmadı; admin
+  rolünde 1280 px'de nav etiketleri iki satıra kayıyor; Tempo `gen_ai` ekran görüntüsü alınmadı
+  (bellek).
+- P0-7 invariantı tekil `/api/bookings/[id]/pay` yolunda; kupon (arama kartı bilemez) ve mobil
+  kanal tarifesi jeneratör dışında; `guest_receivable` capture yolunda kullanılmadığı için iddia
+  "`psp_clearing` borcu = PSP capture" biçiminde.
+- Sepet/bölünmüş ödeme telafilerinde özel süpürücü yok (saga-compensation-retry + webhook yeniden
+  teslimi); boşluk marker tabanlı mutabakatta görünür.
+- e2e tam koşuları yüklü makinede ara sıra tek bir zaman aşımı veriyor (her seferinde farklı test,
+  tek başına yeşil); son tam koşu 43/43.
+- **Ertelenenler** (V-3): zod 4 / Prisma 6+ / Tailwind 4 yükseltmeleri; SD-JWT + key binding
+  (`@sd-jwt/core` 0.x, ADR 0035); kart ağı ajan token'ları; `zod-to-json-schema` bakımı bırakıldı
+  (zod 4'e geçişte kaldırılacak).
+- **Bilinçli istisna**: `tests/integration/v4-money-backfill.test.ts` silindi, `regression: v4#15`
+  etiketi şema iddiasıyla korunuyor (Decimal para kolonu yok) — backfill aracı ölü koddu.
+
+## 7. Sürüm kontrolleri
+
+```bash
+git tag -l v5.0.0                     # v5.0.0
+grep '"version"' package.json         # "5.0.0"
+git log origin/main..main             # boş
+git status --short                    # boş
+```
+
+Ortam notları: 16 GB RAM makinede Claude Code bellek baskısında uzun arka plan komutlarını
+durdurdu; ağ uzun süre ~26–30 KB/s kaldı (F7–F8 Docker imajı yerine host modu, F9'da imaj
+derlendi). Kullanıcının varsayılan `booking` compose projesinin eski Postgres volume'u sırlar
+volume'uyla uyumsuz (P1000) — volume'lara dokunulmadı, testler ayrı proje adlarıyla
+(`-p booking-v5*`) temiz volume'larda koştu.
+
+## 8. Öğrenme notları
+
+- **F0 — Taban önce.** Başlangıçta tam kapı koşuldu (unit 1067 / int 349); sonraki her faz bu
+  tabana göre ölçüldü. Askıdaki commit'ler cherry-pick'ten önce `rescue/*` dallarına sabitlendi.
+- **F1a — Kural listeden değil grafikten.** "LLM çağıran her route `ai` kovasında" kuralı statik
+  import grafiğinden türetildi; elle tutulan liste yerine bayatlama testi olan bir istisna listesi
+  kaldı (admin/events böyle bulundu). JSON modu geri çekilmesi hata nedenine bağlandı + TTL.
+- **F1b — "Capture kesin mi?" yalnız net PSP sinyalinden.** Belirsiz void işaret bırakmaz; önce
+  iade, sonra işaret. Depozito aynı deseni aldı: niyet durumu + PSP idempotency anahtarı +
+  süpürücü. Kart test kahinine karşı sınırlar PSP çağrısından önce.
+- **F1c — Platform sınırı mimariyi belirler.** Next 16'da `req.ip` yok; doğru çözüm kodda değil,
+  zorunlu güvenilir ters vekilde. Yanlış yapılandırma hazır olma kontrolünde fail-closed.
+- **F2 — Property testi gerçek hata buldu.** Arama kartı promosyonu yok sayıyordu (13 635 vs
+  13 130); düzeltme teklif motoruyla aynı kural kümesini kullanır. Flaky testlerin kök nedeni
+  paylaşılan DB'de outbox birikimi ve sırasız ilişki sorgusuydu (ikincisi gerçek hata).
+- **F3 — Kontrat testi dokümanı doğrular.** ajv ile gerçek yanıt gövdeleri şemaya karşı
+  doğrulandı; iki doküman hatası çıktı. Next 16 app-page handler `Vary`'yi eziyor → başlık
+  Caddy'de. Playwright `locale`, `Accept-Language` başlığını eziyor → bir test aslında hiçbir şey
+  test etmiyordu.
+- **F4 — Kural veri, karar kod.** Pazar pencereleri JSON (tek satırla düzeltilebilir). RNPL'de
+  çift tahsilat koruması PSP öncesi yazılan deneme no + `in_flight` işareti; reddedilen denemede
+  yeni anahtar (Stripe reddi anahtara önbellekler).
+- **F5 — Tehlikeli kararlar LLM'den önce.** Para/hukuk/insan/injection devri deterministik
+  sınıflandırıcıda; LLM yalnız açıklar. Eval sağlayıcısı uygulamanın gerçek saf fonksiyonlarını
+  çağırır, böylece guard/fallback zinciri ölçülür.
+- **F6 — SAST ilk koşuda işe yaradı.** Semgrep kesik GCM tag kabulünü buldu. SLO'dan önce rota
+  ölçülmeli: webhook ve 3DS onayında `observed()` yoktu. SHA pin'de annotated tag'in `^{}`
+  satırı kullanılmalı.
+- **F7 — Önce profil.** Kilit kuyruğunu stoksuz tutma denemeleri işgal ediyordu (146'nın 124'ü);
+  DB hızlıydı. Kuyruktayken stok kontrolü 20 VU p95'i 6,05 → 1,87 s'ye indirdi. Chaos bir veri
+  hatası değil, yanıt kodu hatası buldu (500 → 503).
+- **F8 — Erişilebilirlik testini genişletmek hemen bir hata yakaladı** (kontrast 3:1). e2e tekrar
+  koşularını bozan şey yalnız IP değil, cihaz/kart/kullanıcı hız kurallarının toplamıydı;
+  gevşetme yalnız demo katmanında, üretim varsayılanları değişmedi.
+- **F9 — Deterministik e2e için LLM modu sabitlenmeli.** Yerel `.env`'de anahtar varken demo
+  yığını canlı LLM kullanıyor, Smart Filter e2e'si kararsızlaşıyordu → `docker-compose.e2e.yml`.
+  "Yeni dosyada satır ≥ %80" kuralı için `payment/confirm.ts`'e yazılan kapsam testi gerçek bir
+  yarış hatası buldu: capture claim'i kaybeden istek saga telafisiyle kazananın hold'unu
+  bırakıyor (HELD → EXPIRED) ve kaybeden provizyonu iki kez void ediyordu; claim kaybı artık
+  telafi gerektiren bir hata değil, "sonuç" olarak ele alınıyor. Chaos'u düzeltilmiş imajla
+  yeniden koşmak ikinci bir hata buldu: telafi edilmiş sepet ödemesinin tutarı yeniden ödemede
+  eziliyordu (defter doğruydu, satır yanlıştı) — "tekrar koş" adımı atlanmamalı.
+  Orkestrasyon: kullanıcı geri bildirimiyle faz başına tek büyük ajan yerine küçük paralel
+  ajanlara geçildi (doküman ajanları ~80k token; önceki faz ajanları 200–370k).
 
 # v4
 

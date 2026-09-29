@@ -1,6 +1,6 @@
 {
   "name": "booking-platform",
-  "version": "4.0.0",
+  "version": "5.0.0",
   "private": true,
   "description": "Çift rezervasyonu kanıtlı biçimde engelleyen, parayı tamsayı minor-unit ile hesaplayan ve GenAI'ı yalnızca açıklama/özet için kullanan konaklama rezervasyon (OTA) platformu — portföy/demo projesi",
   "scripts": {

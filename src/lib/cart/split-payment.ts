@@ -117,6 +117,18 @@ export class ShareAlreadyPaidError extends ConflictError {
 
 const deadlinePassed = () =>
   new ConflictError("Bölünmüş ödemenin süresi doldu", "SPLIT_DEADLINE_PASSED");
+/** Bölünmüş plan kurulabilen (yeniden ödenebilir) sepet ödemesi statüleri; gerisi terminal. */
+const SPLIT_OPEN_STATUSES: PaymentStatus[] = [
+  PaymentStatus.PENDING,
+  PaymentStatus.REQUIRES_ACTION,
+  PaymentStatus.FAILED,
+  PaymentStatus.VOIDED,
+];
+const paymentClosed = () =>
+  new ConflictError(
+    "Sepetin ödemesi kapanmış (iade edilmiş); bölünmüş ödeme başlatılamaz",
+    "CART_PAYMENT_CLOSED"
+  );
 const splitClosed = () => new ConflictError("Bölünmüş ödeme artık açık değil", "SPLIT_CLOSED");
 
 const newNonce = () => randomBytes(16).toString("base64url");
@@ -276,6 +288,9 @@ export async function createSplitPlan(input: {
     ) {
       throw new ConflictError("Sepet için ödeme sürüyor", "CART_PAYMENT_IN_PROGRESS");
     }
+    if (cart.payment && !SPLIT_OPEN_STATUSES.includes(cart.payment.status as PaymentStatus)) {
+      throw paymentClosed();
+    }
     let amounts: { organizer: number; participants: number[] };
     try {
       amounts = resolveSplitAmounts(
@@ -331,14 +346,22 @@ export async function createSplitPlan(input: {
             currency,
             provider,
           },
-          update: {
+          update: {},
+          select: { id: true, status: true },
+        });
+        // v5-F9: telafi edilmiş (REFUNDED) satırın tutarı PSP'de tahsil + iade edilip jurnallenen
+        // tutardır; ezilirse mutabakat telafi jurnalini yeni sepet toplamıyla karşılaştırır.
+        // Deneme alanları yalnız açık satırda yazılır (tekil ödemeyle aynı kural).
+        if (!SPLIT_OPEN_STATUSES.includes(cp.status)) throw paymentClosed();
+        await tx.cartPayment.update({
+          where: { id: cp.id },
+          data: {
             amountMinor: minorToDb(cart.amount.amount),
             currency,
             provider,
             status: PaymentStatus.PENDING,
             failureCode: null,
           },
-          select: { id: true },
         });
         const plan = await tx.splitPlan.create({
           data: {

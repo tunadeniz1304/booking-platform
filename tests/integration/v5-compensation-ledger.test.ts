@@ -227,6 +227,52 @@ describeInt("v5#1 telafi iadeleri defterde (regression: v5#1)", () => {
     expect(isTrialBalanced(await trialBalance(prisma))).toBe(true);
   });
 
+  // regression: v5-F9 split plan on refunded cart — `createSplitPlan` aynı CartPayment satırını
+  // upsert edip telafi edilmiş (REFUNDED) satırda bile `amountMinor`'ı yeni toplamla ezip
+  // `PENDING`'e çekiyordu → mutabakat telafi jurnalini yeni tutarla karşılaştırır. Tekil ödemeyle
+  // tutarlı: açık olmayan satırla bölünmüş plan kurulamaz, satır olduğu gibi kalır.
+  it("regression: v5-F9 split plan on refunded cart — telafi edilmiş sepette bölünmüş plan reddedilir, fark 0", async () => {
+    const f = await createStayFixture(prisma, { tag: "v5-f9-split", units: 2 });
+    const user = await newUser("f9-split");
+    const p1 = await newUser("f9-split-p1");
+    const p1Email = (await prisma.user.findUniqueOrThrow({ where: { id: p1 } })).email;
+    await addCartItem(user, item(f, 60));
+    const held = await holdCart(user);
+    injectSagaFaultForTests(CART_PAYMENT_SAGA, "confirm");
+    await expect(
+      payCart({
+        cartId: held.id,
+        userId: user,
+        cardToken: "tok_mock_ok_4242",
+        idempotencyKey: `v5-f9-split-${seq}-1`,
+      })
+    ).rejects.toThrow();
+    injectSagaFaultForTests(CART_PAYMENT_SAGA, null);
+    const first = await prisma.cartPayment.findUniqueOrThrow({ where: { cartId: held.id } });
+    expect(first.status).toBe("REFUNDED");
+
+    await addCartItem(user, item(f, 70, 3));
+    const again = await holdCart(user);
+    expect(again.id).toBe(held.id);
+    await expect(
+      createSplitPlan({
+        cartId: held.id,
+        userId: user,
+        mode: "equal",
+        participants: [{ email: p1Email }],
+      })
+    ).rejects.toMatchObject({ status: 409, code: "CART_PAYMENT_CLOSED" });
+
+    const cp = await prisma.cartPayment.findUniqueOrThrow({ where: { cartId: held.id } });
+    expect(cp.status).toBe("REFUNDED");
+    expect(cp.amountMinor).toBe(first.amountMinor);
+    expect(cp.providerRef).toBe(first.providerRef);
+    expect(await prisma.splitPlan.count({ where: { cartId: held.id } })).toBe(0);
+    expect(await journalOf({ paymentId: cp.id })).toEqual(paired(cp.amountMinor));
+    expect(await diffsOf(cp.id)).toEqual([]);
+    expect(isTrialBalanced(await trialBalance(prisma))).toBe(true);
+  });
+
   it("pay: tahsil edilmiş payların iadesi yanıtsız kalırsa fark görünür; telafi tekrarı Σ=0, fark 0", async () => {
     const a = await createStayFixture(prisma, { tag: "v5-comp-share-a", units: 2 });
     const organizer = await newUser("share-org");

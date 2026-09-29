@@ -56,7 +56,10 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((error: unknown) => {
-  console.error("llm:smoke hata:", (error as Error).message);
-  process.exitCode = 1;
-});
+main()
+  .catch((error: unknown) => {
+    console.error("llm:smoke hata:", (error as Error).message);
+    process.exitCode = 1;
+  })
+  // Bütçe/limiter Redis bağlantısı açık kalır; CLI iş bitince beklemeden çıkar.
+  .finally(() => process.exit(process.exitCode ?? 0));

@@ -113,11 +113,11 @@ export default function BookingConfirmationPage() {
           </div>
         ) : booking ? (
           <div className="overflow-hidden rounded-2xl bg-white shadow-sm">
-            <div className="bg-green-600 px-8 py-6 text-white">
+            <div className="bg-green-700 px-8 py-6 text-white">
               <h1 className="text-2xl font-bold">
                 {isStatusKey(booking.status) ? t(`status.${booking.status}`) : booking.status}
               </h1>
-              <p className="mt-1 text-sm text-green-100">
+              <p className="mt-1 text-sm text-green-50">
                 {t.rich("detail.bookingNumber", {
                   id: booking.id,
                   b: (chunks) => <span className="font-semibold">{chunks}</span>,

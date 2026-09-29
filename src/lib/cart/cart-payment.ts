@@ -308,20 +308,23 @@ async function payLocked(input: Parameters<typeof payCart>[0]): Promise<CartPayO
   const force3ds = risk.decision === "challenge_3ds" || risk.decision === "step_up_passkey";
 
   const provider = getPaymentProvider();
+  const attempt = {
+    amountMinor: minorToDb(cart.amount.amount),
+    currency: cart.amount.currency,
+    provider: provider.name,
+  };
   await prisma.cartPayment.upsert({
     where: { cartId: cart.id },
-    create: {
-      cartId: cart.id,
-      userId: input.userId,
-      amountMinor: minorToDb(cart.amount.amount),
-      currency: cart.amount.currency,
-      provider: provider.name,
-    },
-    update: {
-      amountMinor: minorToDb(cart.amount.amount),
-      currency: cart.amount.currency,
-      provider: provider.name,
-    },
+    create: { cartId: cart.id, userId: input.userId, ...attempt },
+    update: {},
+  });
+  // v5-F9: tutar yalnız açık (yeniden ödenebilir) satırda güncellenir. Telafi edilmiş (REFUNDED)
+  // satırın tutarı PSP'de tahsil + iade edilen tutardır ve telafi jurnaliyle mutabıktır; sepet
+  // OPEN'a dönüp büyüyünce ezilirse mutabakat yeni toplamı eski jurnalle karşılaştırır. Bu satır
+  // yeniden tahsil hakkı vermez (capture claim'i OPEN_STATUSES ister → provizyon void edilir).
+  await prisma.cartPayment.updateMany({
+    where: { cartId: cart.id, status: { in: OPEN_STATUSES } },
+    data: attempt,
   });
 
   // fix-sweep-2: sepette depozito gereken kalem varsa kart müşteriye kaydedilir (Stripe).

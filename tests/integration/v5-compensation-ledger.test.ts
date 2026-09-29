@@ -183,6 +183,50 @@ describeInt("v5#1 telafi iadeleri defterde (regression: v5#1)", () => {
     expect(isTrialBalanced(await trialBalance(prisma))).toBe(true);
   });
 
+  // regression: v5-F9 partial cart journal — PG chaos: telafi edilen (REFUNDED) sepet ödemesinin
+  // sepeti OPEN'a döner; kullanıcı kalem ekleyip yeniden öderse `payCart` upsert'i terminal satırın
+  // `amountMinor`'ını yeni toplamla eziyordu → mutabakat PSP'yi yeni tutardan (tam) görür, telafi
+  // jurnali eski (kısmi) tutarda kalır: capture/refund farkı.
+  it("regression: v5-F9 partial cart journal — telafi edilmiş sepet yeniden ödenince tutar ezilmez, fark 0", async () => {
+    const f = await createStayFixture(prisma, { tag: "v5-f9-cart", units: 2 });
+    const user = await newUser("f9-cart");
+    await addCartItem(user, item(f, 60));
+    const held = await holdCart(user);
+    injectSagaFaultForTests(CART_PAYMENT_SAGA, "confirm");
+    await expect(
+      payCart({
+        cartId: held.id,
+        userId: user,
+        cardToken: "tok_mock_ok_4242",
+        idempotencyKey: `v5-f9-cart-${seq}-1`,
+      })
+    ).rejects.toThrow();
+    injectSagaFaultForTests(CART_PAYMENT_SAGA, null);
+    const first = await prisma.cartPayment.findUniqueOrThrow({ where: { cartId: held.id } });
+    expect(first.status).toBe("REFUNDED");
+    expect(await journalOf({ paymentId: first.id })).toEqual(paired(first.amountMinor));
+
+    // Sepet OPEN'a döndü → ikinci kalem eklenip yeniden tutulur ve ödenmeye çalışılır.
+    await addCartItem(user, item(f, 70, 3));
+    const again = await holdCart(user);
+    expect(again.id).toBe(held.id);
+    await payCart({
+      cartId: held.id,
+      userId: user,
+      cardToken: "tok_mock_ok_4242",
+      idempotencyKey: `v5-f9-cart-${seq}-2`,
+    }).catch(() => undefined);
+
+    const cp = await prisma.cartPayment.findUniqueOrThrow({ where: { cartId: held.id } });
+    expect(cp.providerRef).toBe(first.providerRef);
+    expect(cp.amountMinor).toBe(first.amountMinor);
+    const j = await journalOf({ paymentId: cp.id });
+    expect(j.psp).toBe(0n);
+    expect(j.captured).toBe(cp.amountMinor);
+    expect(await diffsOf(cp.id)).toEqual([]);
+    expect(isTrialBalanced(await trialBalance(prisma))).toBe(true);
+  });
+
   it("pay: tahsil edilmiş payların iadesi yanıtsız kalırsa fark görünür; telafi tekrarı Σ=0, fark 0", async () => {
     const a = await createStayFixture(prisma, { tag: "v5-comp-share-a", units: 2 });
     const organizer = await newUser("share-org");

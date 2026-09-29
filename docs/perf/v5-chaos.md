@@ -86,10 +86,44 @@ Redis `RedisUnavailableError` / `MaxRetriesPerRequestError` / "Connection is clo
 **503 `SERVICE_UNAVAILABLE` + `Retry-After: 5`** (500 değil, iç ayrıntı sızdırmaz).
 Regresyon testi: `tests/unit/regressions/v5-p0-6-dependency-unavailable.test.ts` (önce kırmızı).
 
-Yeniden koşum: Docker imajı bu oturumda yeniden derlenemedi (npm kayıt defteri ~26 KB/s), bu
-yüzden yukarıdaki tablolar düzeltme ÖNCESİ imajla alınmıştır; düzeltme sonrası beklenen, kopma
-satırlarındaki 500'lerin 503 sütununa geçmesidir (birim testiyle doğrulandı, kaos tekrar koşumu
-açık iş).
+Yukarıdaki tablolar düzeltme ÖNCESİ imajla alınmıştır (F7'de imaj ağ yüzünden derlenemedi).
+
+### Düzeltme sonrası tekrar koşum — Postgres (2026-09-29)
+
+Aynı kurulum ve komutlar, F9'da derlenen imaj (503 eşlemesi dahil), 30 VU, `load/chaos-pg.js`:
+
+| Evre                | 2xx | 4xx | 429 |     503 | 500 |  ağ |
+| ------------------- | --: | --: | --: | ------: | --: | --: |
+| baseline            | 342 |  20 |   0 |       0 |   0 |   0 |
+| gecikme             |  27 |  14 |   0 |       0 |   0 |   0 |
+| gecikme sonrası pay |  80 |   2 |   0 |       0 |   0 |   0 |
+| **kopma**           |   1 |   0 |   0 | **666** |   0 |   0 |
+| kopma sonrası pay   | 143 |   4 |   0 |       2 |   0 |   0 |
+| **reset_peer**      |   0 |   1 |   0 |   **9** |   0 |   0 |
+| reset sonrası pay   | 177 |  30 |   0 |       9 |   1 |   0 |
+| recovery            | 596 |  43 |   0 |       0 |   0 |   0 |
+
+Kopma ve `reset_peer` pencerelerindeki 500'ler (önce 531 + 911 + 27) 503'e geçti; pencere dışı
+5xx **0**. Tek kalan 500 reset sonrası toparlanma payında (1 istek).
+
+Düzeltmeler (aşağıdaki sepet hatası dahil) derlendikten sonra iki senaryo yeniden koşuldu:
+
+| Senaryo          | Kesintide 503 | 500 (toplam) | Pencere dışı 5xx | `load-assert`                   |
+| ---------------- | ------------: | -----------: | ---------------: | ------------------------------- |
+| `chaos-pg.js`    |    1 234 + 21 |            1 |            **0** | ok · 1 298 kontrol · **0 fark** |
+| `chaos-redis.js` |         2 639 |        **0** |            **0** | ok · 1 388 kontrol · **0 fark** |
+
+Kalan tek 500, PG `reset_peer` penceresinin içinde (bağlantı sıfırlanırken yarıda kalan tek istek).
+
+**Tekrar koşumun bulduğu hata (düzeltildi):** `load-assert` bugünkü mutabakatta 2 fark verdi —
+aynı `CartPayment` için PSP capture/iade 1 181 092 minor, jurnal 448 000. Jurnal eksik değildi:
+telafi edilmiş (REFUNDED) sepet ödemesi satırının `amountMinor`'ı, sepet yeniden tutulup
+ödendiğinde `payLocked` upsert'ünde yeni toplamla eziliyordu; mutabakat marker'ı görünce tutarı
+satırdan aldığı için hayali fark çıktı. Düzeltme: REFUNDED satırın tutarı dondurulur (deneme
+alanları yalnız açık statülerde yazılır); aynı ezme `createSplitPlan`'da da vardı → REFUNDED
+sepette bölünmüş ödeme planı reddedilir. Regresyon: `tests/integration/v5-compensation-ledger.test.ts`
+(`regression: v5-F9 partial cart journal`, `regression: v5-F9 split plan on refunded cart`);
+ADR 0026 madde 7.
 
 ## Değişmezler — tüm kaos + yük koşumlarından sonra (`scripts/load-assert.ts`)
 

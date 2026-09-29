@@ -38,6 +38,11 @@ işaret kalıcı kalıyor, mutabakat hayali fark raporluyor ve süpürücü sons
 6. **Mutabakat işaret tabanlı.** `reconcile` o günün işaretlerini okuyup `Payment`'a ek olarak
    `CartPayment`, `PaymentShare` ve FAILED devirleri de kapsar; telafi edilen ödemenin PSP tarafını
    jurnalden değil işaretten bilir.
+7. **Telafi edilmiş öznenin tutarı donar (v5-F9).** İşaretli ödemede mutabakat PSP tutarını
+   öznenin satırından (`CartPayment.amountMinor`) okur; bu yüzden telafi sonrası satır yeni bir
+   deneme tarafından ezilmez. `payCart` deneme alanlarını (tutar, para birimi, sağlayıcı) yalnız
+   açık durumdaki (`PENDING`, `REQUIRES_ACTION`, `FAILED`, `VOIDED`) satıra yazar; sepet OPEN'a
+   dönüp büyüse de `REFUNDED` satır telafi jurnaliyle mutabık kalır.
 
 ## Sonuçlar
 

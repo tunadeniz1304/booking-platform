@@ -15,7 +15,6 @@ export async function POST(req: NextRequest) {
     const client = clientKey(req.headers, {
       trustedProxyHops: config.TRUSTED_PROXY_HOPS,
       trustRealIpHeader: config.TRUST_REAL_IP_HEADER,
-      socketIp: (req as unknown as { ip?: string }).ip,
     });
     await assertNoticeRateLimit(redis, client);
     const notice = await submitNotice(noticeInputSchema.parse(await req.json()));

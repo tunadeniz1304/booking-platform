@@ -21,7 +21,7 @@ import { issueSession, revokeFamily, type SessionContext, type SessionTokens } f
  * hem `sid`'li erişim token'ı anında geçersizleşir.
  */
 
-type RequestLike = AuthRequest & { ip?: string };
+type RequestLike = AuthRequest;
 
 /** Kaba IP ipucu: IPv4 → son oktet maskeli (/24), IPv6 zaten /64 kovası. */
 export function maskIpHint(bucket: string | null): string | null {
@@ -70,7 +70,6 @@ export function sessionContextFrom(req: RequestLike): {
   const ipKey = trustedIpKey(req.headers, {
     trustedProxyHops: config.TRUSTED_PROXY_HOPS,
     trustRealIpHeader: config.TRUST_REAL_IP_HEADER,
-    socketIp: req.ip,
   });
   return {
     context: {

@@ -17,7 +17,6 @@ async function aiSubject(req: NextRequest): Promise<string> {
   return anonymousIdentities(req.headers, {
     trustedProxyHops: config.TRUSTED_PROXY_HOPS,
     trustRealIpHeader: config.TRUST_REAL_IP_HEADER,
-    socketIp: (req as unknown as { ip?: string }).ip,
   }).primary;
 }
 

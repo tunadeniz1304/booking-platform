@@ -71,7 +71,6 @@ export async function resolveViewer(req: NextRequest): Promise<ViewerIdentity> {
   const { primary } = anonymousIdentities(req.headers, {
     trustedProxyHops: config.TRUSTED_PROXY_HOPS,
     trustRealIpHeader: config.TRUST_REAL_IP_HEADER,
-    socketIp: (req as unknown as { ip?: string }).ip,
   });
   try {
     const minted = await redis.incrWithTtl(

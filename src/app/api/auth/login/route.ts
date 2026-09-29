@@ -37,7 +37,6 @@ export const POST = observed("auth.login", async function postHandler(req: NextR
     const client = clientKey(req.headers, {
       trustedProxyHops: config.TRUSTED_PROXY_HOPS,
       trustRealIpHeader: config.TRUST_REAL_IP_HEADER,
-      socketIp: (req as unknown as { ip?: string }).ip,
     });
     // v5#6: paylaşılan anonim kova tükendiyse e-posta kovası + PoW (proxy işareti).
     const degraded = isAuthDegraded(req);

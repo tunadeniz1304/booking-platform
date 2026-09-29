@@ -3,6 +3,7 @@ import { expect, test, type Page } from "@playwright/test";
 import {
   GUEST_EMAIL,
   HOST_EMAIL,
+  acceptNecessaryCookies,
   checkoutUrl,
   completeCheckout,
   farFutureStay,
@@ -198,7 +199,12 @@ test("a11y: admin destek kuyruğu", async ({ page, baseURL }) => {
 
 /** RNPL'e uygun tarife (seed: PAY_LATER, orta iptal politikası) ile HELD rezervasyon sayfası. */
 async function rnplHeldBooking(page: Page, baseURL: string): Promise<string> {
-  await loginViaApi(page, baseURL, GUEST_EMAIL);
+  // Çerez bandı "Rezervasyonu Tamamla" düğmesini örtmesin (bant a11y'si ayrı testlerde taranır).
+  await acceptNecessaryCookies(page.context(), baseURL);
+  // RNPL yalnız risk kararı `allow` iken sunulur; misafir hesabı diğer e2e ödemeleriyle
+  // `velocity_user` (10 dk'da >3 deneme) kuralına takılır → ayrı seed hesabı (ev sahibi) misafir
+  // olarak rezerve eder.
+  await loginViaApi(page, baseURL, HOST_EMAIL);
   const stay = await findStay(page.request);
   const detail = await page.request.get(`/api/properties/${stay.propertyId}`);
   const property = (await detail.json()) as {

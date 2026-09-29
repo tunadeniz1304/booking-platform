@@ -454,7 +454,9 @@ async function v3Screens(browser: import("@playwright/test").Browser): Promise<v
  * istendiğinde) MCP stay-card.
  */
 async function v5Screens(browser: import("@playwright/test").Browser): Promise<void> {
-  const guest = await newContext(browser, "guest@booking.test");
+  // RNPL yalnız risk `allow` iken sunulur; misafir hesabı önceki kümelerin ödemeleriyle
+  // `velocity_user` kuralına takılabilir → RNPL için ev sahibi hesabı misafir olarak rezerve eder.
+  const guest = await newContext(browser, "host@booking.test");
   const page = await guest.newPage();
 
   // RNPL: seed'deki PAY_LATER tarifesiyle HELD rezervasyon → "sonra öde" seçimi.

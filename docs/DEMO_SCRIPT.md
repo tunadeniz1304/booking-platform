@@ -75,7 +75,7 @@ docker compose -f docker-compose.yml -f docker-compose.demo.yml exec worker \
   npx tsx --conditions=react-server scripts/demo-scenarios.ts --only=10
 ```
 
-14 senaryonun tamamı aynı yolla: `… exec -e BASE_URL=http://app:3000 worker /bin/sh /usr/local/bin/entrypoint.sh npm run demo:scenarios` (Git Bash'te `MSYS_NO_PATHCONV=1` önekiyle).
+20 senaryonun tamamı aynı yolla: `… exec -e BASE_URL=http://app:3000 worker /bin/sh /usr/local/bin/entrypoint.sh npm run demo:scenarios` (Git Bash'te `MSYS_NO_PATHCONV=1` önekiyle).
 
 Ardından `admin@booking.test` ile `/admin/claims` (talep, kanıt, SLA, karar) açılır; misafir tarafı `/resolution`'dadır.
 
@@ -166,6 +166,26 @@ npm run demo:scenarios -- --suite=v4      # yalnız v4 (çalışan web sunucusu 
 | 14  | (g) Cüzdan: cashback → kredi ile ödeme → iptal | Konaklama tamamlanır → cashback kredisi ISSUED; ikinci rezervasyon kart + kredi ile ödenir; iptalde karta ve krediye oransal iade; her adımda `guest_credit` = Σ lot kalanı + Σ rezerve |
 
 (f) Her v4 senaryosunun sonunda: mizan dengede, dokunulan günlerde dengesiz jurnal 0 ve senaryonun ödeme/depozito/devir öznelerinde mutabakat farkı 0 (özet tablonun "Defter" sütunu).
+
+### v5 senaryoları (15–20, süreç içi)
+
+v4 ile aynı desen (`scripts/demo/v5-scenarios.ts`): servisler doğrudan çağrılır, zaman ileri sarılır ve PSP/saga hataları süreç içinde enjekte edilir. Her senaryo kendi "Demo v5 …" ilanını/kullanıcılarını kurar, bitince ilanı pasife alır ve sonunda aynı defter denetimini (f) yapar. Ödeme MockPsp, payout MockPayoutProvider, KYC mock kimlik sağlayıcısıdır; LLM ve ağ çağrısı yoktur.
+
+```bash
+npm run demo:scenarios -- --suite=v5      # yalnız v5 (çalışan web sunucusu gerekmez)
+npm run demo:scenarios -- --only=15,19    # tek tek
+```
+
+| #   | Senaryo                                  | Beklenen                                                                                                                                                                                                                        |
+| --- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 15  | RNPL zamanında + başarısız tahsilat      | İki RNPL rezervasyonu: bugün 0, CONFIRMED, ödeme PENDING, jurnal yok. A vadede tahsil edilir (PAID + `booking-captured`, tekrar no-op); B reddedilir → RETRYING + bildirim → ek süre sonunda iptal, ödeme VOIDED, envanter geri |
+| 16  | Sepet onay hatası → telafi               | 2 odalı sepet ödemesi alınır, onay adımında enjekte hata → telafi iadesi; sepet ödemesi REFUNDED, jurnalde capture + iade (Σ `psp_clearing` = 0), tutmalar bırakılır, mutabakat temiz                                           |
+| 17  | KYC'siz devir satıcısı                   | Devir COMPLETED → payout PENDING; hesap yok → `NO_ACCOUNT`, hesap var ama kimlik doğrulanmamış → `IDENTITY_UNVERIFIED` (ödeme yok, bakiye değişmez); mock KYC VERIFIED → payout PAID + `payout-released` jurnali                |
+| 18  | Destek ajanı insana devir                | iade/para talebi → `MONEY_REQUEST`, "beni bir müşteri temsilcisine bağlayın" → `USER_REQUEST` talebi; LLM'siz şablon yanıt, tek araç `open_support_ticket`; ödeme/rezervasyon değişmez, iade 0                                  |
+| 19  | Üçüncü taraf mandate doğrulaması + keşif | UCP profili → `jwks_uri`; OpenAPI'de keşif/ajan yolları var; `scripts/verify-mandate.ts` doğrulayıcısı geçerli mandate'i kabul eder, kurcalanmış imza / yanlış `aud` / HS256 sahte belirteci reddeder                           |
+| 20  | TR vs AB indirim referansı               | Aynı fiyat geçmişi (−25 gün düşük, −15 gün yüksek, bugün orta): TR (10 gün) referansı bugünkü fiyat → "önceki fiyat" gösterilmez; AB (30 gün, Omnibus) referansı 25 gün önceki en düşük fiyat                                   |
+
+Web tarafındaki karşılıkları: RNPL seçimi ve planı `/booking/<id>` sayfasında ("bugün 0 ₺, <tarih>'te X ₺" + iptal zaman çizelgesi), destek sohbeti `/support` ("İnsana bağlan" düğmesi), devredilen talepler `/admin/support`, JWKS/OpenAPI/SBOM bağlantıları `/trust`.
 
 ### Beklenen çıktı biçimi
 

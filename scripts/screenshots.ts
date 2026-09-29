@@ -3,9 +3,10 @@
  *
  * Çalışan demo yığınına karşı (`docker compose -f docker-compose.yml -f docker-compose.demo.yml up -d --build`, seed'li, LLM demo modu)
  * Playwright ile `docs/img/*.png` üretir. `SCREENSHOT_BASE_URL` varsayılanı http://localhost:3000.
- * Yalnızca demo seed hesaplarını kullanır. `SCREENSHOT_SET=v3|v4` yalnız o kümeyi üretir
+ * Yalnızca demo seed hesaplarını kullanır. `SCREENSHOT_SET=v3|v4|v5` yalnız o kümeyi üretir
  * (varsayılan: hepsi). v4 kümesi demo yığınında örnek sepet, bölünmüş ödeme planı ve (uygun
- * rezervasyon varsa) iade talebi oluşturur.
+ * rezervasyon varsa) iade talebi oluşturur. v5 kümesi RNPL'li bir rezervasyon ve destek
+ * sohbetinden bir insan devri talebi oluşturur.
  */
 import path from "path";
 import { mkdirSync, writeFileSync } from "fs";
@@ -364,8 +365,9 @@ async function main(): Promise<void> {
   mkdirSync(OUT_DIR, { recursive: true });
   const browser = await chromium.launch();
   try {
-    if (SET !== "v4") await v3Screens(browser);
-    if (SET !== "v3") await v4Screens(browser);
+    if (SET === "all" || SET === "v3") await v3Screens(browser);
+    if (SET === "all" || SET === "v4") await v4Screens(browser);
+    if (SET === "all" || SET === "v5") await v5Screens(browser);
   } finally {
     await browser.close();
   }
@@ -444,6 +446,86 @@ async function v3Screens(browser: import("@playwright/test").Browser): Promise<v
   await adminPage.goto("/admin");
   await shot(adminPage, "admin");
   await admin.close();
+}
+
+/**
+ * v5 ekranları: RNPL ödeme adımı + rezervasyon detayındaki ödeme planı, PDP kayıt no, destek
+ * sohbeti + "İnsana bağlan" devri, admin destek kuyruğu, güven merkezi ve (yalnız v5 kümesi
+ * istendiğinde) MCP stay-card.
+ */
+async function v5Screens(browser: import("@playwright/test").Browser): Promise<void> {
+  const guest = await newContext(browser, "guest@booking.test");
+  const page = await guest.newPage();
+
+  // RNPL: seed'deki PAY_LATER tarifesiyle HELD rezervasyon → "sonra öde" seçimi.
+  const [stay] = await stays(guest, 1);
+  const detail = await guest.request.get(`/api/properties/${stay.propertyId}`);
+  const { rooms } = (await detail.json()) as {
+    rooms: Array<{ id: string; ratePlans?: Array<{ id: string; code: string }> }>;
+  };
+  const room = rooms.find((r) => r.ratePlans?.some((p) => p.code === "PAY_LATER"));
+  if (!room) throw new Error("seed'de PAY_LATER tarifesi yok");
+  const plan = room.ratePlans!.find((p) => p.code === "PAY_LATER")!;
+  const offset = 60 + Math.floor(Math.random() * 200);
+  const params = new URLSearchParams({
+    propertyId: stay.propertyId,
+    roomId: room.id,
+    ratePlanId: plan.id,
+    checkIn: isoDaysFromNow(offset),
+    checkOut: isoDaysFromNow(offset + 2),
+    guestCount: "2",
+  });
+  await page.goto(`/checkout?${params.toString()}`);
+  await page.getByRole("button", { name: "Rezervasyonu Tamamla" }).click();
+  await page.waitForURL(/\/booking\/[^/?#]+$/);
+  const option = page.getByTestId("rnpl-option");
+  await option.getByRole("radio", { name: /sonra öde/ }).check();
+  await page.getByTestId("rnpl-timeline").waitFor();
+  await option.scrollIntoViewIfNeeded();
+  await shot(page, "v5-rnpl-checkout", true);
+  const form = page.getByRole("form", { name: "Ödeme" });
+  await form.getByLabel("Kart numarası").fill("4242 4242 4242 4242");
+  await form.getByLabel("CVC").fill("123");
+  await form.getByRole("button", { name: /Şimdi rezerve et/ }).click();
+  const planCard = page.getByTestId("rnpl-plan");
+  await planCard.waitFor();
+  await planCard.scrollIntoViewIfNeeded();
+  await shot(page, "v5-rnpl-plan", true);
+
+  // PDP: kayıt/belge numarası.
+  await page.goto(`/property/${stay.propertyId}`);
+  await page.getByTestId("registration-number").waitFor();
+  await shot(page, "v5-pdp-registration", true);
+
+  // Destek sohbeti: soru + "İnsana bağlan".
+  await page.goto("/support");
+  const input = page.getByLabel("Mesajınız");
+  await input.fill("Check-in saati kaçta?");
+  await page.getByRole("button", { name: "Gönder" }).click();
+  await page.getByText("Asistan").first().waitFor();
+  await page.getByRole("button", { name: "İnsana bağlan" }).click();
+  await page.getByText(/Konu insan destek ekibine devredildi/).waitFor();
+  await shot(page, "v5-support-chat", true);
+  await guest.close();
+
+  const admin = await newContext(browser, "admin@booking.test");
+  const adminPage = await admin.newPage();
+  await adminPage.goto("/admin/support");
+  await adminPage.locator("#support-admin").waitFor();
+  await shot(adminPage, "v5-admin-support", true);
+  await admin.close();
+
+  const anon = await newContext(browser);
+  const trustPage = await anon.newPage();
+  await trustPage.goto("/trust");
+  await trustPage.getByTestId("trust-sbom").waitFor();
+  await shot(trustPage, "v5-trust", true);
+  await anon.close();
+
+  if (SET === "v5") {
+    const token = await accessToken(await newContext(browser), "guest@booking.test");
+    await renderStayCard(browser, token, isoDaysFromNow(offset + 5), isoDaysFromNow(offset + 7));
+  }
 }
 
 main().catch((error: unknown) => {

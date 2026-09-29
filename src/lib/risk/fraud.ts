@@ -88,7 +88,6 @@ const MAX_SCORE = 100;
 const HOUR_MS = 3_600_000;
 const DAY_SECONDS = 86_400;
 const NEW_ACCOUNT_HOURS = 24;
-const FAILED_PAYMENTS_MIN = 3;
 const VELOCITY_USER_WINDOW_SECONDS = 600;
 const VELOCITY_WINDOW_SECONDS = 3600;
 
@@ -146,7 +145,7 @@ export function scoreSignals(
       hit("bin_ip_country_mismatch", `Kart ülkesi (BIN) ${cardCountry} ≠ IP ülkesi ${s.ipCountry}`)
     );
   }
-  if (s.recentFailedPayments >= FAILED_PAYMENTS_MIN) {
+  if (s.recentFailedPayments >= cfg.FRAUD_FAILED_PAYMENTS_MIN) {
     hits.push(hit("failed_payments", `${s.recentFailedPayments} başarısız ödeme / 24 saat`));
   }
   if (device.newDevice) hits.push(hit("new_device", "Hesap için yeni cihaz"));

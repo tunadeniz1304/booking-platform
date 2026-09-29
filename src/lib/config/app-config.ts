@@ -284,6 +284,8 @@ const schema = z.object({
   FRAUD_VELOCITY_USER_MAX: int(3, 1, 1000),
   FRAUD_VELOCITY_IP_MAX: int(10, 1, 10_000),
   FRAUD_VELOCITY_CARD_MAX: int(5, 1, 1000),
+  /** 24 saatte bu kadar başarısız ödemeden sonra `failed_payments` kuralı tetiklenir. */
+  FRAUD_FAILED_PAYMENTS_MIN: int(3, 1, 1000),
   /** Yeni hesapta "yüksek tutar" eşiği (minor-unit; 2.000.000 = 20.000 TRY). */
   FRAUD_HIGH_AMOUNT_MINOR: int(2_000_000, 1),
   /** Aynı cihaz izinde bundan fazla farklı hesap → device_shared. */

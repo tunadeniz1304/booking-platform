@@ -40,11 +40,17 @@ describe("regression: v4#5 güvensiz compose varsayılanları", () => {
     );
   });
 
-  it("fraud IP hız gevşetmesi yalnız demo override'ında (e2e tekrar koşuları, tek IP)", () => {
-    expect(read("docker-compose.demo.yml")).toMatch(
-      /FRAUD_VELOCITY_IP_MAX: "\$\{FRAUD_VELOCITY_IP_MAX:-\d+\}"/
-    );
-    expect(read("docker-compose.yml")).not.toMatch(/FRAUD_VELOCITY_IP_MAX/);
+  it("fraud hız/başarısızlık gevşetmesi yalnız demo override'ında (e2e tekrar koşuları)", () => {
+    const demo = read("docker-compose.demo.yml");
+    for (const key of [
+      "FRAUD_VELOCITY_IP_MAX",
+      "FRAUD_VELOCITY_USER_MAX",
+      "FRAUD_VELOCITY_CARD_MAX",
+      "FRAUD_FAILED_PAYMENTS_MIN",
+    ]) {
+      expect(demo).toMatch(new RegExp(String.raw`${key}: "\$\{${key}:-\d+\}"`));
+      expect(read("docker-compose.yml")).not.toMatch(new RegExp(key));
+    }
     // Üretim varsayılanı değişmedi.
     expect(read("src/lib/config/app-config.ts")).toMatch(/FRAUD_VELOCITY_IP_MAX: int\(10, /);
   });

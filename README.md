@@ -415,7 +415,7 @@ npm run check          # lint + typecheck + prettier --check + unit testler (alt
 npm run test:unit      # tests/unit/** — Docker gerekmez
 npm run test:int       # tests/integration/** — Docker gerekir (testcontainers)
 npm run test:coverage  # unit + integration, kapsam eşiği (Docker gerekir)
-npm run test:e2e       # Playwright + axe, çalışan demo yığınına karşı
+npm run test:e2e       # Playwright + axe, demo yığınına karşı (+ docker-compose.e2e.yml: LLM demo)
 ```
 
 | Script                                           | Ne yapar                                                                                |

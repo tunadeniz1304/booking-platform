@@ -3,8 +3,9 @@ import { defineConfig, devices } from "@playwright/test";
 /**
  * Uçtan uca testler (P2-3). Çalışan bir yığına karşı koşar; sunucuyu kendisi başlatmaz:
  *
- *   docker compose -f docker-compose.yml -f docker-compose.demo.yml up -d --build
- *                                       # seed'li demo ortamı (DEMO_MODE), LLM_MODE=demo
+ *   docker compose -f docker-compose.yml -f docker-compose.demo.yml  *     -f docker-compose.e2e.yml up -d --build
+ *                                       # seed'li demo ortamı (DEMO_MODE); e2e katmanı
+ *                                       # LLM_MODE=demo'yu sabitler (.env'de anahtar olsa da)
  *   npm run test:e2e                    # E2E_BASE_URL varsayılanı http://localhost:3000
  *
  * Vitest bu klasörü yüklemez (`vitest.config.mts` yalnızca tests/unit ve tests/integration).

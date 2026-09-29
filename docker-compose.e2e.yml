@@ -1,0 +1,17 @@
+# Uçtan uca test katmanı — demo katmanının ÜSTÜNE eklenir:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.demo.yml -f docker-compose.e2e.yml up -d --build
+#
+# `.env`'de LLM anahtarı varsa demo yığını canlı LLM kullanır; canlı model çıktısı
+# deterministik olmadığından e2e (ör. Smart Filter çipleri) kararsızlaşır. Bu katman
+# yalnız LLM'i deterministik demo moduna sabitler; diğer her şey demo katmanıyla aynıdır.
+services:
+  app:
+    environment:
+      LLM_MODE: demo
+  worker:
+    environment:
+      LLM_MODE: demo
+  grpc:
+    environment:
+      LLM_MODE: demo

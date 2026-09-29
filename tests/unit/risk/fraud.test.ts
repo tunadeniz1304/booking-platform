@@ -279,3 +279,22 @@ describe("P1-7 belge numarası formatı", () => {
     ["3412345", false],
   ])("%s → %s", (v, ok) => expect(LICENSE_RE.test(v)).toBe(ok));
 });
+
+describe("regression: v5 e2e tekrar koşuları — başarısız ödeme eşiği yapılandırılabilir", () => {
+  it("varsayılan 3 (üretim davranışı değişmez) ve eşik config'ten okunur", async () => {
+    const { resetConfigForTests } = await import("@/lib/config/app-config");
+    expect(getConfig().FRAUD_FAILED_PAYMENTS_MIN).toBe(3);
+    process.env.FRAUD_FAILED_PAYMENTS_MIN = "50";
+    resetConfigForTests();
+    try {
+      const out = scoreSignals({ ...base, recentFailedPayments: 10 }, calm);
+      expect(out.hits.map((h) => h.rule)).not.toContain("failed_payments");
+      expect(scoreSignals({ ...base, recentFailedPayments: 50 }, calm).hits[0]?.rule).toBe(
+        "failed_payments"
+      );
+    } finally {
+      delete process.env.FRAUD_FAILED_PAYMENTS_MIN;
+      resetConfigForTests();
+    }
+  });
+});

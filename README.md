@@ -252,9 +252,21 @@ Access token `POST /api/auth/login` yanıtındaki `accessToken` alanından alın
 ### Demo senaryoları
 
 - 3 dakikalık demo akışı: [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md)
-- Demo durumunu sıfırlamak: `npm run demo:reset`; 14 uçtan uca senaryo (7 HTTP + 7 v4 süreç içi, her v4 senaryosunda mizan ve mutabakat kontrolü): `npm run demo:scenarios`.
+- Demo durumunu sıfırlamak: `npm run demo:reset`; 20 uçtan uca senaryo (7 HTTP + 13 süreç içi v4/v5 senaryosu; süreç içi her senaryoda mizan ve mutabakat kontrolü): `npm run demo:scenarios`. v5 senaryoları: RNPL zamanında/başarısız tahsilat, sepet telafisi, KYC'siz devir payout'u, destek ajanı insana devir, üçüncü taraf mandate doğrulaması + OpenAPI keşfi, TR/AB indirim referansı.
 
 ### Ekran görüntüleri
+
+`npm run docs:screenshots` (çalışan demo yığınına karşı; `SCREENSHOT_SET=v3|v4|v5` tek küme).
+
+#### v5
+
+| Şimdi rezerve et, sonra öde (bugün 0 ₺ + iptal zaman çizelgesi) | Rezervasyon detayında planlı RNPL tahsilatı       |
+| --------------------------------------------------------------- | ------------------------------------------------- |
+| ![RNPL checkout](docs/img/v5-rnpl-checkout.png)                 | ![RNPL planı](docs/img/v5-rnpl-plan.png)          |
+| **AI destek sohbeti + "İnsana bağlan" devri**                   | **Admin destek kuyruğu (insan temsilci)**         |
+| ![Destek sohbeti](docs/img/v5-support-chat.png)                 | ![Destek kuyruğu](docs/img/v5-admin-support.png)  |
+| **Güven merkezi (SBOM, JWKS, OpenAPI, Scorecard)**              | **PDP'de kayıt/belge numarası**                   |
+| ![Güven merkezi](docs/img/v5-trust.png)                         | ![PDP kayıt no](docs/img/v5-pdp-registration.png) |
 
 #### v4
 

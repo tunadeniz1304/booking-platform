@@ -226,6 +226,31 @@ describeInt("ödeme onayı: hata, yarış ve idempotent yollar (integration)", (
     expect(r.payment?.providerRef).toBe(`pi_winner_${stamp}`);
   });
 
+  it("regression: v5-F9 lost claim — winner's hold stays HELD, loser voided exactly once", async () => {
+    const b = await hold();
+    const winner = `pi_f9_winner_${stamp}`;
+    await prisma.payment.create({
+      data: {
+        bookingId: b.id,
+        userId,
+        amountMinor: b.totalPriceMinor,
+        currency: b.currency,
+        provider: "mock",
+        status: "AUTHORIZED",
+        providerRef: winner,
+      },
+    });
+    const ref = `pi_f9_loser_${stamp}`;
+    await expect(captureAndConfirm(b, ref)).rejects.toMatchObject({
+      name: "PaymentInProgressError",
+    });
+    const r = await row(b.id);
+    expect(r.status).toBe("HELD");
+    expect(calls).toEqual([`void:${ref}`]);
+    expect(r.payment?.status).toBe("AUTHORIZED");
+    expect(r.payment?.providerRef).toBe(winner);
+  });
+
   it("tahsil sırasında başka ödeme onaylarsa: bizimki iade edilir, idempotent onay döner", async () => {
     const b = await hold();
     const ref = `pi_racer_${stamp}`;

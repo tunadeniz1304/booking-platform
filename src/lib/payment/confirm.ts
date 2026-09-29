@@ -41,6 +41,8 @@ interface PaymentSagaCtx {
   claimFrom: readonly PaymentStatus[];
   claimed: boolean;
   captured: boolean;
+  /** v5-F9: tahsil hakkı başka bir providerRef'te — tutma/kredi onundur, telafi yapılmaz. */
+  claimLost?: boolean;
 }
 
 /**
@@ -96,6 +98,9 @@ const PAYMENT_SAGA_STEPS: SagaStep<PaymentSagaCtx, PayOutcome>[] = [
         failureCode: null,
       });
       if (!claimed) {
+        // v5-F9: kayıp telafi gerektiren bir başarısızlık değil; yalnız kendi provizyonumuz
+        // (bir kez) void edilir — sonraki hata (ör. PaymentInProgressError) iş sonucudur.
+        ctx.claimLost = true;
         await voidLoser(ctx.booking.id, ctx.providerRef);
         return { done: await alreadyConfirmed(ctx.booking.id, ctx.booking.userId) };
       }
@@ -181,6 +186,7 @@ export async function captureAndConfirm(
   try {
     return await runSaga(PAYMENT_SAGA, PAYMENT_SAGA_STEPS, ctx, {
       from: SAGA_STEPS.capture,
+      isOutcome: () => ctx.claimLost === true,
       // fix-sweep-3: void/iade düştüyse `saga-compensation-retry` (açık yetkilendirme kalmasın).
       onCompensationFailed: (steps) =>
         scheduleCompensationRetry(

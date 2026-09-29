@@ -13,11 +13,12 @@
 ![PostgreSQL 16](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)
 ![Redis 7](https://img.shields.io/badge/Redis-7-DC382D?logo=redis&logoColor=white)
 <br />
-![Unit tests](https://img.shields.io/badge/unit%20tests-1028%20passing-brightgreen)
-![Integration tests](https://img.shields.io/badge/integration%20tests-342%20passing-brightgreen)
-![E2E tests](https://img.shields.io/badge/e2e%20tests-35%20passing-brightgreen)
-![Coverage](https://img.shields.io/badge/coverage-lines%2090.35%25%20%C2%B7%20branches%2079.13%25-green)
+![Unit tests](https://img.shields.io/badge/unit%20tests-1282%20passing-brightgreen)
+![Integration tests (v4)](https://img.shields.io/badge/integration%20tests%20%28v4%29-342%20passing-brightgreen)
+![E2E tests (v4)](https://img.shields.io/badge/e2e%20tests%20%28v4%29-35%20passing-brightgreen)
+![Coverage (v4)](https://img.shields.io/badge/coverage%20%28v4%29-lines%2090.35%25%20%C2%B7%20branches%2079.13%25-green)
 ![Price invariant](https://img.shields.io/badge/g%C3%B6sterilen%20%3D%20tahsil%20edilen%20%3D%20defter-200%20%C3%B6rnek%20%C2%B7%200%20kar%C5%9F%C4%B1%20%C3%B6rnek-brightgreen)
+![LLM eval](https://img.shields.io/badge/LLM%20eval%20%28demo%29-28%2F28%20%C2%B7%20red--team%2010%2F10-brightgreen)
 
 [**Dokümantasyonu keşfet »**](docs/ARCHITECTURE.md)
 
@@ -44,7 +45,8 @@
    - [Ajanlar için: MCP, ACP, UCP ve mandate](#ajanlar-için-mcp-acp-ucp-ve-mandate)
    - [Demo senaryoları](#demo-senaryoları)
    - [Ekran görüntüleri](#ekran-görüntüleri)
-5. [Özellikler (v4)](#özellikler-v4)
+5. [Özellikler (v5)](#özellikler-v5)
+   - [v4'ten devralınanlar](#v4ten-devralınanlar)
    - [Neyi kanıtlıyor?](#neyi-kanıtlıyor)
 6. [Testler ve betikler](#testler-ve-betikler)
 7. [Gözlemlenebilirlik](#gözlemlenebilirlik)
@@ -62,15 +64,24 @@
 
 ## Proje hakkında
 
-[![Grup sepeti — iki tesis, tümü-ya-hiç tutma](docs/img/v4-cart.png)](#ekran-görüntüleri)
+[![Şimdi rezerve et, sonra öde — bugün 0 ₺ ve iptal zaman çizelgesi](docs/img/v5-rnpl-checkout.png)](#ekran-görüntüleri)
 
-Sürüm: **v4** ([CHANGELOG](CHANGELOG.md), [FINAL_REPORT](docs/FINAL_REPORT.md))
+Sürüm: **v5** ([CHANGELOG](CHANGELOG.md), [FINAL_REPORT](docs/FINAL_REPORT.md))
 
 ### Değer önerisi
+
+1. **Gösterilen = tahsil edilen = defter.** Arama kartındaki toplam, `/api/quote`, PSP capture (+ cüzdan kredisi) ve tahsilat jurnali aynı tutardır; bu, fast-check ile 200 rastgele ilan/tarih/promosyon/vergi/FX/kredi örneğinde 0 karşı örnekle doğrulanır ([v5-price-invariant.test.ts](tests/integration/v5-price-invariant.test.ts)).
+2. **Doğrulanabilir ajan ticareti.** Ajan ödemeleri kullanıcının imzaladığı ES256 AP2 mandate'i ister; açık anahtar [`/.well-known/jwks.json`](src/app/.well-known/jwks.json/route.ts) üzerinden yayımlanır ve üçüncü taraf, platforma güvenmeden `npm run mandate:verify` ([scripts/verify-mandate.ts](scripts/verify-mandate.ts)) ile imzayı doğrulayabilir.
+3. **Kanıtlı tedarik zinciri.** Her push'ta [security.yml](.github/workflows/security.yml) Semgrep SAST, gitleaks, OSV-Scanner geçidi ve CycloneDX SBOM artefaktı üretir; SLSA provenance, CodeQL ve OpenSSF Scorecard iş akışında tanımlıdır ancak yalnız public repoda çalışır (repo şu an private olduğundan koşmaz, Scorecard rozeti yoktur).
+
+<details>
+<summary><strong>v4 değer önerisi (geçerliliğini koruyor)</strong></summary>
 
 1. **Para doğruluğu kanıtlanır, varsayılmaz.** Tüm tutarlar ISO 4217 üssüne göre `BigInt` minor-unit; her tahsilat, iade, escrow serbest bırakma, payout, depozito, cüzdan kredisi ve kaybedilen itiraz dengeli bir jurnal girişi yazar (DB tetiği Σ=0'ı zorlar); günlük mutabakat PSP gerçeğiyle farkı raporlar. Property testleri ve senaryolar her adımda "mizan dengede, fark 0" doğrular.
 2. **Sektör devlerinin pazar yeri özellikleri, tek tutarlı çekirdek üstünde.** Grup sepeti (tümü-ya-hiç tutma), bölünmüş ödeme, check-in+24 saat escrow ve rezervli payout, hasar depozitosu + çözüm merkezi, sadakat/cüzdan, promosyon motoru (Omnibus 30 gün), esnek tarih fiyat takvimi, görsel arama, PWA — hepsi aynı kilit, saga, outbox ve defteri kullanır.
 3. **Ajanlar için güvenli ticaret.** MCP, ACP ve UCP uçları insan checkout'uyla aynı sagayı çalıştırır; ödeme kullanıcının imzaladığı, süreli, tutar sınırlı (isteğe bağlı ilan kısıtlı) ve tek kullanımlık AP2 intent mandate'i olmadan yapılamaz; mandate verme recent-auth ister ve iptal edilebilir.
+
+</details>
 
 ### Kullanılan teknolojiler
 
@@ -96,61 +107,79 @@ Tam yığın: Next.js 16 (App Router) · React 19 · TypeScript strict · Postgr
 ```mermaid
 flowchart LR
   subgraph Clients["İstemciler"]
-    UI["Tarayıcı / PWA (tr/en)<br/>arama · PDP · sepet · checkout<br/>/host · /admin · /resolution"]
+    UI["Tarayıcı / PWA (tr/en)<br/>arama · sepet · checkout · RNPL<br/>/support · /trust · /host · /admin"]
     AG["LLM ajanları<br/>ChatGPT / Claude / Google AI Mode"]
+    V3["Üçüncü taraf doğrulayıcı<br/>scripts/verify-mandate.ts"]
+    EXT["Kanal yöneticisi / iç servisler"]
   end
 
-  subgraph Agent["Ajan kanalı"]
-    MCPH["/api/mcp (MCP HTTP, Bearer)<br/>checkout_stay · create_hold"]
-    ACP["/api/agentic/checkout_sessions (ACP)<br/>Stripe SPT · spt_mock_*"]
-    UCP["/.well-known/ucp + /api/ucp/checkout-sessions<br/>(UCP lodging → ACP servisleri)"]
-    MAN{{"AP2 intent mandate<br/>imza · süre · tutar · ilan · nonce"}}
-  end
+  CADDY["Caddy (ters vekil, :3000 → :80)<br/>tek giriş · XFF'yi soket adresiyle ezer<br/>Vary: Accept-Language"]
 
   subgraph Core["app (Next.js 16)"]
-    PX["src/proxy.ts<br/>JWT · CSRF · rate-limit · CSP nonce"]
-    CART["Grup sepeti src/lib/cart<br/>sıralı kilitler · tümü-ya-hiç hold"]
-    SPLIT["Bölünmüş ödeme<br/>paylar · davet linki · süre sonu yedeği"]
-    QT["computeTotal() + vergi + promosyon<br/>minor-unit BigInt"]
-    SAGA["Ödeme sagası<br/>hold → authorize → capture → confirm<br/>telafi: iade → void → bırak"]
-    LEDGER[("Çift girişli defter src/lib/ledger<br/>JournalEntry/Line · Σ=0 tetiği<br/>günlük mutabakat")]
-    ESC["Escrow serbest bırakma<br/>check-in + 24 s · komisyon · rezerv"]
-    PAY["Payout motoru<br/>MockPayout · Stripe Connect (ops.)"]
-    RES["Çözüm merkezi<br/>depozito · talepler · chargeback"]
-    PSP["PaymentProvider<br/>MockPsp (varsayılan) · Stripe (ops.)"]
+    PX["src/proxy.ts<br/>JWT · CSRF · rate-limit · CSP nonce<br/>TRUSTED_PROXY_HOPS=1"]
+    API["Route handler'lar<br/>/api/* · /api/openapi.json (3.1)<br/>/.well-known/jwks.json · /.well-known/ucp"]
+    MCPH["MCP (streamable HTTP /api/mcp)<br/>+ ACP / UCP · ES256 AP2 mandate"]
+    QT["computeTotal() + pazar kural motoru<br/>vergi · promosyon · TR 10 g / AB 30 g"]
+    SAGA["Ödeme servisi + saga<br/>hold → authorize → capture → confirm<br/>RNPL zamanlanmış tahsilat · telafi"]
+    LEDGER["Çift girişli defter<br/>Σ=0 tetiği · niyet işareti + süpürücü<br/>günlük mutabakat"]
+    SUP["Destek ajanı (salt-okur araçlar)<br/>güven eşiği → insana devir kuyruğu"]
     LLM["LLM katmanı src/lib/llm<br/>CANLI · DEMO · fallback"]
   end
 
   subgraph Worker["worker (BullMQ)"]
-    WJ["expire-holds · split-pay-deadline · escrow-release<br/>payouts · ledger-reconcile · deposit/claim SLA<br/>takedown-sla · wallet-sweep · data-retention"]
-    WO["outbox relay"]
+    WJ["rnpl-charge · expire-holds · escrow-release<br/>payouts · ledger-reconcile · deposit/claim SLA<br/>takedown-sla · data-retention · outbox relay"]
   end
 
+  GRPC["gRPC servisi (services/grpc)<br/>BookingService · AriService"]
+  MCPS["stdio MCP sunucusu (services/mcp)"]
+  PSP["PaymentProvider<br/>MockPsp (varsayılan) · Stripe (ops.)"]
   PG[("PostgreSQL 16<br/>pgvector · pg_trgm")]
   RD[("Redis 7<br/>Redlock · nonce · cache · rate-limit")]
+  OTEL["OpenTelemetry<br/>HTTP/DB span'ları · gen_ai.* span'ları<br/>→ Tempo · Prometheus/Grafana · alarmlar + runbook"]
 
-  UI --> PX --> CART --> SAGA
-  CART --> SPLIT --> SAGA
-  AG --> MCPH & ACP & UCP
-  UCP --> ACP
-  MCPH & ACP --> MAN --> SAGA
-  CART & SAGA --> QT
+  UI --> CADDY
+  AG --> CADDY
+  V3 -- "JWKS" --> CADDY
+  CADDY --> PX --> API
+  API --> MCPH & SUP
+  API & MCPH --> SAGA
+  SAGA --> QT
   SAGA --> PSP
-  SAGA -- "bookingCaptured" --> LEDGER
-  RES -- "depositCaptured · refundIssued · chargebackLost" --> LEDGER
-  RES --> PSP
-  WJ --> ESC -- "escrowReleased" --> LEDGER
-  ESC --> PAY -- "payoutReleased" --> LEDGER
-  PAY --> PSP
+  SAGA --> LEDGER
+  SUP --> LLM
+  WJ --> SAGA & LEDGER
+  EXT --> GRPC --> PG
+  MCPS -- "aynı servis katmanı" --> SAGA
   LEDGER --> PG
-  SAGA & MAN --> RD
-  WO --> WJ
-  PX --> LLM
+  SAGA & MCPH --> RD
+  Core -.-> OTEL
+  Worker -.-> OTEL
 ```
 
-Ayrıntılar: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) (defter, sepet/bölünmüş ödeme, escrow/payout/depozito ve mandate akış diyagramları; saga sekansı; hibrit arama) · kararlar: [docs/adr/](docs/adr/)
+Ayrıntılar: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) (defter, sepet/bölünmüş ödeme, escrow/payout/depozito ve mandate akış diyagramları; saga sekansı; hibrit arama; v5: RNPL zaman çizelgesi, telafi-jurnal akışı, destek ajanı + devir, ters vekil/IP çözümü, mandate doğrulama sekansı) · kararlar: [docs/adr/](docs/adr/)
 
 ### Sektör kıyası
+
+Referans: [booking-v5.md §2](booking-v5.md) hedef tablosu. "v5 (gerçekleşen)" sütunu bu repodaki durumdur; tutmayan veya ölçülemeyen hedefler son sütunda açıkça belirtilir.
+
+| Yetkinlik                 | Sektör liderleri                                          | v5 hedefi                                                                    | v5 (gerçekleşen)                                                                                                                                                                       | Sınır / tutmayan                                                                                                                           |
+| ------------------------- | --------------------------------------------------------- | ---------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Para izlenebilirliği      | Booking/Airbnb iç defterleri, Stripe mutabakatı           | Her PSP hareketi jurnalde, niyet işareti + süpürücü                          | Sepet/pay/devir/depozito telafileri dahil her PSP hareketi jurnalde; niyet işareti + süpürücü (ADR 0026); kaos ve RNPL fırtınasında mutabakat farkı 0                                  | —                                                                                                                                          |
+| Esnek ödeme               | Airbnb RNPL, Booking "pay at property"                    | Ücretsiz iptal bitiminden N gün önce tahsilat, başarısızlıkta otomatik iptal | RNPL (ADR 0028): bugün 0, zamanlanmış `rnpl-charge` + yedek süpürücü, başarısızlıkta otomatik iptal; 1 006 tetiklemeli fırtınada ihlal 0 ([v5-rnpl-storm](docs/perf/v5-rnpl-storm.md)) | Yalnız mock ödeme formunda (Stripe Payment Element yolunda yok)                                                                            |
+| Ajan ticareti             | Booking/Expedia ChatGPT app'leri, Google UCP Lodging, AP2 | ES256 + JWKS mandate, UCP güncel, üçüncü taraf doğrulama, MCP Apps kartı     | ES256 mandate + `/.well-known/jwks.json`, `npm run mandate:verify`, UCP manifest, MCP Apps `ui://booking/stay-card` (ADR 0025, 0035, 0036)                                             | MCP Apps istemci desteği sınırlı; kart gerçek istemci ekranında değil, SDK biçimiyle beslenerek doğrulandı                                 |
+| AI müşteri hizmeti        | Airbnb AI destek ajanı, Booking Smart Messenger           | Salt-okur araçlı destek ajanı + güven eşiğiyle insana devir                  | `/support` sohbet ajanı (salt-okur araçlar); düşük güven, talep veya hassas konu → `/admin/support` insan kuyruğu (ADR 0029)                                                           | Ajan işlem yapmaz (iade/iptal insan temsilcide); DEMO modunda şablon yanıtlar                                                              |
+| LLM güvencesi             | İç eval + gözlemlenebilirlik                              | promptfoo eval + red-team CI'da, OTel `gen_ai.*`, maliyet paneli             | `npm run llm:eval` 28 vaka, 10'u red-team (CI'da, eşik %95), `gen_ai.*` span'ları, Grafana LLM token/gecikme/eval panelleri (ADR 0030)                                                 | CI eval'i ağsız demo sağlayıcısıyla koşar, canlı model skoru ayrıca ölçülmedi; panel token gösterir, parasal maliyet değil                 |
+| Tedarik zinciri güvenliği | SLSA, SBOM, SAST                                          | CodeQL/Semgrep, gitleaks, SBOM, OSV, SLSA provenance, Scorecard              | `security.yml`: Semgrep, gitleaks, CycloneDX SBOM, OSV-Scanner geçidi; SHA-pinli action'lar, dependabot (ADR 0031)                                                                     | CodeQL, SLSA provenance ve Scorecard yalnız public repoda koşar; repo private olduğundan **çalışmıyor**                                    |
+| Kötüye kullanım direnci   | Kart test tespiti, KYC kapıları                           | Tek risk motoru, KYC fail-closed, IP çözümü ters vekille                     | Tüm ödeme yolları tek risk motorundan; KYC fail-closed (v5#3); Caddy ters vekil + `TRUSTED_PROXY_HOPS` (ADR 0034)                                                                      | Caddy'siz dağıtımda istemci IP çözümü garanti edilmez                                                                                      |
+| Fiyat şeffaflığı          | FTC Junk Fees, AB Omnibus, TR 10 gün kuralı               | Pazar kural motoru; "gösterilen = tahsil edilen = defter" property testi     | Pazar kural motoru (TR 10 gün / AB 30 gün indirim referansı, ADR 0032); fast-check 200 örnek, 0 karşı örnek                                                                            | Kural içerikleri eğitim amaçlı, hukuki görüş değil                                                                                         |
+| Uyum (STR)                | AB 2024/1028, TR 7464 + 7565                              | Kayıt no ilanda + pazar kuralı, KVKK export/silme                            | PDP'de kayıt/belge no + pazar kuralı; KVKK "verilerimi indir" ve hesap silme (`/api/account`)                                                                                          | Bakanlık ve AB kayıt servisleri mock                                                                                                       |
+| API sözleşmesi            | Expedia Rapid, Booking Connectivity (OpenAPI)             | `/api/openapi.json` 3.1 + kontrat testleri                                   | `/api/openapi.json` (OpenAPI 3.1), 2xx şemaları; integration testlerinde gerçek yanıtlar şemaya karşı doğrulanır (≥ 20 uç işlemi)                                                      | —                                                                                                                                          |
+| Gözlemlenebilirlik        | SLO + error budget + runbook                              | Runbook'lu alarmlar, `promtool` testleri, burn-rate, chaos raporu            | 29 alarmın hepsinde runbook ([docs/runbooks/](docs/runbooks/README.md)), `promtool test rules` CI'da, çok pencereli burn-rate; [v5-chaos](docs/perf/v5-chaos.md) (Toxiproxy)           | —                                                                                                                                          |
+| Ölçek/performans          | Sıcak envanterde saniye altı                              | Sepet hold p95 ≤ 2 s (100 VU)                                                | Kilit kuyruğu düzeltmesi: 20 VU'da hold p95 6,05 → **1,87 s** ([v5-cart](docs/perf/v5-cart.md))                                                                                        | **Tutmadı:** 100 VU'da hold p95 **8,40 s** (hedef 2 s); tüm VU'lar bilerek aynı 4 envanter satırında, kalan darboğaz kilit bekleme bütçesi |
+| i18n/erişilebilirlik      | 40+ dil, EAA                                              | Accept-Language müzakeresi, yeni ekranlarda axe 0 ihlal                      | Çerez yoksa Accept-Language (q-değerli) müzakeresi + `Vary`; yeni v5 ekranlarında axe e2e                                                                                              | Yalnız tr/en; manuel ekran okuyucu testi yok                                                                                               |
+
+<details>
+<summary><strong>v4 sektör kıyası (v3.0.0 → v4)</strong></summary>
 
 | Yetkinlik                   | Sektör liderleri                                     | v3.0.0                        | v4 (bu repoda)                                                                                                                                                                                         | Mock / sınır                                                                                  |
 | --------------------------- | ---------------------------------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
@@ -170,6 +199,8 @@ Ayrıntılar: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) (defter, sepet/bölü
 | Para hassasiyeti            | ISO 4217 tüm üsler                                   | `Decimal(10,2)`               | `BigInt` minor-unit kolonlar + ISO 4217 üs tablosu (JPY 0, KWD 3), tek half-up yuvarlama (ADR 0019)                                                                                                    | Eski ondalık API alanları geriye uyum için hâlâ yanıtlarda                                    |
 | Hesap güvenliği             | Yeniden doğrulama, oturum yönetimi                   | Passkey + step-up             | `auth_time` recent-auth, işleme+tutara bağlı tek kullanımlık step-up, 24 s yeni passkey soğuması, oturum listesi + uzaktan çıkış, yeni cihaz e-postası (ADR 0024)                                      | —                                                                                             |
 
+</details>
+
 v3'ten devralınan yetkinlikler (oda tipi envanteri, vergi motoru, FX snapshot, hibrit arama + LTR, gelir paneli, kanal yöneticisi, mesajlaşma, i18n) değişmeden korunur; ayrıntı [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
@@ -178,7 +209,7 @@ v3'ten devralınan yetkinlikler (oda tipi envanteri, vergi motoru, FX snapshot, 
 
 ### Gereksinimler
 
-- **Docker** (Compose v2) — demo yığını için tek gereksinim. `.env` dosyası gerekmez (varsa okunur).
+- **Docker** (Compose v2) — demo yığını için tek gereksinim. `.env` isteğe bağlıdır (`required: false`; yoksa güvenli varsayılanlar kullanılır).
 - **Node.js 22** ve npm — yalnız yerel geliştirme için (Docker imajları `node:22-alpine` tabanlıdır). Entegrasyon testleri de Docker ister (testcontainers).
 
 ### Kurulum
@@ -186,15 +217,17 @@ v3'ten devralınan yetkinlikler (oda tipi envanteri, vergi motoru, FX snapshot, 
 #### 30 saniyede çalıştır (Docker Compose demo)
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.demo.yml up
+cp .env.example .env
+docker compose -f docker-compose.yml -f docker-compose.demo.yml up --build
 ```
 
-→ <http://localhost:3000> (ilk açılışta imajlar derlenir; kod değiştirdiyseniz sona `--build` ekleyin)
+→ <http://localhost:3000> (ilk açılışta imajlar derlenir; sonraki açılışlarda `--build` gerekmez)
 
+- **Ters vekil (v5):** 3000 portunu artık **Caddy** yayımlar (`APP_PORT`, varsayılan 3000) ve istekleri iç ağdaki `app:3000`'e iletir; uygulama host'a doğrudan açılmaz. Caddy istemcinin gönderdiği `X-Forwarded-For`'u yok sayıp TCP soket adresini yazar, uygulama `TRUSTED_PROXY_HOPS=1` ile yalnız bu halkaya güvenir ([ADR 0034](docs/adr/0034-reverse-proxy-client-ip.md), `docker/Caddyfile`).
 - **Demo override'ı:** `docker-compose.demo.yml` demo modunu (demo seed, `/dev/mailbox`, MockPsp, kalıcı "DEMO" şeridi), http çerezini ve görsel aramayı (`VISION_CLIP_ENABLED=true`) açar. Tek başına `docker compose up` güvenli varsayılanlarla (Secure çerez, `DEMO_MODE=false`) production gibi davranır.
 - **Sırlar otomatik üretilir.** `secrets-init` servisi ilk açılışta JWT, iç API, transfer imza, webhook, metrik, Postgres ve Redis sırlarını rastgele üretip `booking_secrets` volume'una yazar. İmajlarda sır yoktur.
 - **Demo verisi:** `migrate` servisi `prisma migrate deploy` çalıştırır, ardından `DEMO_SEED` açıksa ve veritabanı boşsa seed yükler (v4 eki: ev sahibi payout hesabı, 4 promosyon + `HOSGELDIN` kuponu, ilan fotoğrafları, doğrulanmış erişilebilirlik özellikleri). `DEMO_MODE` kapalıyken demo seed reddedilir ve `/dev/mailbox` 404 döner (`src/lib/config/seed-guard.ts`).
-- **Anahtar ve internet gerekmez:** LLM → DEMO, ödeme ve payout → mock, KYC → mock, e-Arşiv entegratörü → mock, FX → statik yedek, kayıt no → mock registry, embedding → hash, SMTP → dev mailbox, Web Push → kapalı.
+- **Anahtar ve internet gerekmez:** LLM → DEMO (destek ajanı dahil), ödeme ve payout → mock, KYC → mock (yalnız demo override'ında; aksi halde fail-closed), e-Arşiv entegratörü → mock, FX → statik yedek, kayıt no → mock registry, embedding → hash, SMTP → dev mailbox, Web Push → kapalı.
 
 #### Yerel geliştirme
 
@@ -236,6 +269,7 @@ Tüm LLM erişimi `src/lib/llm/` sözleşmesinden geçer ([ADR 0005](docs/adr/00
 
 - `GET /api/llm/status` (giriş gerekli) etkin modu gösterir; anahtarın kendisi hiçbir yanıtta, logda veya telemetride görünmez. `npm run llm:smoke` anahtar yoksa "DEMO — smoke atlandı" ile 0 döner.
 - LLM **asla** fiyat, vergi, müsaitlik, iade, fraud, KYC, moderasyon, promosyon veya sıralama kararı vermez; çıktıdaki her sayı ve (yorum öne çıkanlarında) her alıntı guard'lardan geçer, LLM'e giden her metin KVKK redaksiyonundan geçer. Tüm LLM yolları kullanıcı başına günlük token bütçesine tabidir ve süreç çapında `LLM_MAX_CONCURRENCY` (4) ile sınırlanır (v4#3).
+- v5: destek ajanı da aynı sözleşmeden geçer (CANLI'da model, DEMO'da deterministik şablon). Her çağrı OTel `gen_ai.*` span'ı üretir (semconv v1.37.0; varsayılan olarak yalnız model, token sayısı, bitiş nedeni — içerik yalnız `LLM_OTEL_CAPTURE_CONTENT=true` iken ve redaksiyondan geçerek yazılır). `npm run llm:eval` 28 vakayı (10'u prompt-injection red-team) ağsız demo sağlayıcısıyla koşar, geçme oranı %95'in altındaysa CI kırmızıdır; canlı model için `npm run llm:eval -- --live` (yalnız yerel, anahtar gerekir) ([ADR 0030](docs/adr/0030-llm-evals-genai-telemetry.md)).
 
 ### Ajanlar için: MCP, ACP, UCP ve mandate
 
@@ -313,7 +347,20 @@ Görüntüler compose demo yığınından (seed'li, LLM demo modu) `npm run docs
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-## Özellikler (v4)
+## Özellikler (v5)
+
+- **Şimdi rezerve et, sonra öde (RNPL):** bugün 0 ₺; tahsilat ücretsiz iptal bitiminden önce zamanlanır (`rnpl-charge` + yedek süpürücü), başarısızsa rezervasyon otomatik iptal olur ([ADR 0028](docs/adr/0028-reserve-now-pay-later.md)).
+- **AI destek ajanı + insana devir:** `/support` sohbeti salt-okur araçlarla yanıtlar; düşük güven, kullanıcı talebi veya hassas konu `/admin/support` kuyruğuna insan temsilciye devredilir ([ADR 0029](docs/adr/0029-support-agent-human-handoff.md)).
+- **LLM eval ve telemetri:** `npm run llm:eval` (promptfoo, 28 vaka, 10'u red-team, CI'da %95 eşik), OTel `gen_ai.*` span'ları, Grafana LLM panelleri ([ADR 0030](docs/adr/0030-llm-evals-genai-telemetry.md)).
+- **Pazar kural motoru:** indirim referans dönemi TR 10 gün / AB 30 gün, kayıt/belge numarası kuralı ([ADR 0032](docs/adr/0032-market-rules-engine.md)).
+- **Doğrulanabilir ajan ticareti:** ES256 mandate, `/.well-known/jwks.json`, `npm run mandate:verify`, kalıcı nonce kaydı, MCP Apps `ui://` kartı ([ADR 0025](docs/adr/0025-asymmetric-mandate-signing.md), [0035](docs/adr/0035-verifiable-agent-commerce.md), [0036](docs/adr/0036-mcp-apps-stay-card.md)).
+- **Güven merkezi `/trust`:** SBOM, JWKS, OpenAPI, Scorecard durumu ("yayınlanmadı" — private repo) ve politika bağlantıları.
+- **Runbook'lu alarmlar:** 29 alarmın her biri [docs/runbooks/](docs/runbooks/README.md)'a bağlı, `promtool` birim testleri CI'da, çok pencereli burn-rate SLO'ları.
+- **Kaos ve yük raporları:** [v5-cart](docs/perf/v5-cart.md) (sepet sıcak noktası), [v5-chaos](docs/perf/v5-chaos.md) (Toxiproxy ile Redis/Postgres kesintisi), [v5-rnpl-storm](docs/perf/v5-rnpl-storm.md) (RNPL tahsilat fırtınası).
+- **OpenAPI 3.1:** `/api/openapi.json`, 2xx yanıt şemaları ve gerçek yanıtları şemaya karşı doğrulayan kontrat testleri.
+- **Para ve güvenlik:** her PSP hareketi jurnalde (niyet işareti + süpürücü, [ADR 0026](docs/adr/0026-compensation-journal-intent-marker.md)), ödeme servisi ayrımı ([ADR 0027](docs/adr/0027-payment-service-split.md)), KYC fail-closed, Caddy ters vekil ile güvenilir istemci IP'si, v5#1–#20 düzeltmeleri ([SECURITY](docs/SECURITY.md)).
+
+### v4'ten devralınanlar
 
 - **Güvenlik düzeltmeleri v4#1–#20** — her biri `regression: v4#N` testiyle ([SECURITY §5](docs/SECURITY.md)): devir capture-önce-commit sagası, recent-auth ve işleme bağlı step-up, LLM bütçe/eşzamanlılık, anonim rate-limit anahtarı, güvenli compose varsayılanları, doğrulanmış e-posta zorunluluğu, iptal–capture yarışı, geç webhook mutabakatı, idempotency gövde bağı, SSRF, PoW'lu giriş sertleştirmesi, 3DS deneme sınırı, cursor sayfalama, minor-unit para, webhook sağlayıcı ayrımı, son admin koruması, HLL görüntülenme sayacı, ARI para doğrulaması, `.env.*` ignore.
 - **Para çekirdeği:** `BigInt` minor-unit (ADR 0019), çift girişli defter + günlük mutabakat + `GET /api/admin/reconciliation` (ADR 0020).
@@ -355,12 +402,13 @@ Yük ve kaos ölçümleri: [docs/perf/](docs/perf/). Arama kalitesi ([docs/perf/
 
 ## Testler ve betikler
 
-| Paket                       | Sonuç (v4)                |
-| --------------------------- | ------------------------- |
-| Unit                        | 1028 test                 |
-| Integration                 | 342 test                  |
-| E2E (+ axe)                 | 35 test                   |
-| Kapsam (unit + integration) | satır %90,35 · dal %79,13 |
+| Paket                       | Sonuç                                                      |
+| --------------------------- | ---------------------------------------------------------- |
+| Unit                        | 1282 test (v5, `npm run test:unit`)                        |
+| Integration                 | 342 test (v4 ölçümü; v5 sayısı bu README'de güncellenmedi) |
+| E2E (+ axe)                 | 35 test (v4 ölçümü)                                        |
+| Kapsam (unit + integration) | satır %90,35 · dal %79,13 (v4 ölçümü)                      |
+| LLM eval (demo sağlayıcı)   | 28/28 vaka, 10/10 red-team (`evals/results/summary.json`)  |
 
 ```bash
 npm run check          # lint + typecheck + prettier --check + unit testler (altyapısız)
@@ -379,7 +427,9 @@ npm run test:e2e       # Playwright + axe, çalışan demo yığınına karşı
 | `grpc:server`                                    | gRPC `BookingService` + `AriService`                                                    |
 | `mcp:server` / `mcp:smoke`                       | stdio MCP sunucusu / duman testi (mandate'li rezervasyon + ret yolları)                 |
 | `llm:smoke`                                      | Canlı LLM için 1 JSON + 1 metin çağrısı (anahtar yoksa atlanır)                         |
-| `demo:reset` / `demo:scenarios`                  | Demo verisini sıfırlar / 14 senaryoyu koşar (7 HTTP + 7 v4 süreç içi, özet tablo)       |
+| `llm:eval`                                       | promptfoo LLM eval'i (28 vaka; varsayılan ağsız demo, `-- --live` yalnız yerel)         |
+| `mandate:verify`                                 | Bir AP2 mandate'ini `/.well-known/jwks.json` ile üçüncü taraf gözüyle doğrular          |
+| `demo:reset` / `demo:scenarios`                  | Demo verisini sıfırlar / 20 senaryoyu koşar (7 HTTP + 13 v4/v5 süreç içi, özet tablo)   |
 | `import:insideairbnb`                            | Inside Airbnb İstanbul alt kümesi + opsiyonel OSM POI içe aktarımı (ağ yoksa atlar)     |
 | `docs:screenshots`                               | README ekran görüntülerini üretir                                                       |
 | `embeddings:backfill`                            | Mülk embedding'lerini yeniden üretir                                                    |
@@ -390,7 +440,7 @@ npm run test:e2e       # Playwright + axe, çalışan demo yığınına karşı
 | `sdep:export` / `dac7:export`                    | AB 2024/1028 SDEP CSV / DAC7 ev sahibi raporu (JSON/CSV, takma adlı seçenek)            |
 | `i18n:check`                                     | tr/en mesaj anahtarı eşitliği                                                           |
 
-Entegrasyon testleri hiçbir zaman `DATABASE_URL`'e yazmaz; container'ın URL'ini kullanır. Testler ağa çıkmaz (`tests/setup.ts` global `fetch`'i engeller). CI: [.github/workflows/ci.yml](.github/workflows/ci.yml).
+Entegrasyon testleri hiçbir zaman `DATABASE_URL`'e yazmaz; container'ın URL'ini kullanır. Testler ağa çıkmaz (`tests/setup.ts` global `fetch`'i engeller). CI: [.github/workflows/ci.yml](.github/workflows/ci.yml) (lint, typecheck, unit, integration, e2e, `llm:eval`, actionlint, `promtool`) ve [security.yml](.github/workflows/security.yml).
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -400,13 +450,25 @@ Entegrasyon testleri hiçbir zaman `DATABASE_URL`'e yazmaz; container'ın URL'in
 docker compose --profile observability up --build
 ```
 
-Prometheus <http://127.0.0.1:9090>, Grafana <http://127.0.0.1:3001> (dashboard: `docs/observability/grafana-dashboard.json`), Tempo (OTLP). `/api/metrics` `METRICS_TOKEN` ile korunur; worker metrikleri 9464 portundadır (ör. `saga_compensation_total`, `ledger_imbalance_total`, `takedown_sla_breach_total`). `/api/health` (liveness) ve `/api/ready` (DB + Redis) açıktır.
+Prometheus <http://127.0.0.1:9090>, Grafana <http://127.0.0.1:3001> (dashboard: `docs/observability/grafana-dashboard.json`), Tempo (OTLP). `/api/metrics` `METRICS_TOKEN` ile korunur; worker metrikleri 9464 portundadır (ör. `saga_compensation_total`, `ledger_imbalance_total`, `takedown_sla_breach_total`). `/api/health` (liveness) ve `/api/ready` (DB + Redis) açıktır. LLM çağrıları OTel GenAI semantic conventions'a göre `gen_ai.*` span'ları üretir; Grafana'da LLM çağrı/gecikme/token ve eval geçme oranı panelleri vardır.
 
-Alarmlar (`docker/observability/alerts.yml`): SLO'lar için çok pencereli burn-rate alarmları; her alarmın runbook'u [docs/runbooks/](docs/runbooks/README.md), birim testleri `alerts.test.yml` (`promtool test rules`, CI). Tedarik zinciri: `security.yml` (Semgrep, gitleaks, OSV-Scanner, CycloneDX SBOM) — bildirim politikası [SECURITY.md](SECURITY.md), karar [ADR 0031](docs/adr/0031-supply-chain-provenance.md).
+Alarmlar (`docker/observability/alerts.yml`): SLO'lar için çok pencereli burn-rate alarmları; her alarmın runbook'u [docs/runbooks/](docs/runbooks/README.md), birim testleri `alerts.test.yml` (`promtool test rules`, CI). Tedarik zinciri: `security.yml` (Semgrep, gitleaks, OSV-Scanner, CycloneDX SBOM; CodeQL, SLSA provenance ve OpenSSF Scorecard yalnız public repoda koşar, repo şu an private) — bildirim politikası [SECURITY.md](SECURITY.md), karar [ADR 0031](docs/adr/0031-supply-chain-provenance.md).
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## Yol haritası
+
+Tamamlananlar (v5):
+
+- [x] RNPL (şimdi rezerve et, sonra öde) ve başarısız tahsilatta otomatik iptal
+- [x] AI destek ajanı + insana devir kuyruğu
+- [x] LLM eval (promptfoo, CI) ve OTel `gen_ai.*` telemetrisi
+- [x] Pazar kural motoru (TR 10 gün / AB 30 gün) ve "gösterilen = tahsil edilen = defter" property testi
+- [x] AP2 mandate'leri için ES256 + JWKS ve üçüncü taraf doğrulama betiği
+- [x] CI iş akışının güncellenmesi, `security.yml` tedarik zinciri taramaları, dependabot
+- [x] Runbook'lu alarmlar, `promtool` testleri, kaos ve yük raporları
+- [x] Caddy ters vekil ile güvenilir istemci IP'si; OpenAPI 3.1 sözleşmesi
+- [x] Güvenlik düzeltmeleri v5#1–#20
 
 Tamamlananlar (v4):
 
@@ -427,10 +489,11 @@ Tamamlananlar (v4):
 
 Açık / ertelenenler (aşağıdaki [dürüstlük notu](#dürüstlük-notu-mock--demo-olanlar), [ARCHITECTURE §18](docs/ARCHITECTURE.md#18-bilinen-sınırlamalar) ve [COMPLIANCE §6](docs/COMPLIANCE.md#6-sınırlar) sınırlarından):
 
-- [ ] CI iş akışının ([ci.yml](.github/workflows/ci.yml)) v4 kalite kapılarına göre güncellenmesi (ertelendi)
+- [ ] Sepet tutma p95 ≤ 2 s hedefi 100 VU'da (şu an 8,40 s; [v5-cart](docs/perf/v5-cart.md))
+- [ ] Repo public olduğunda SLSA provenance, CodeQL ve OpenSSF Scorecard'ın çalıştırılması (ve ancak o zaman Scorecard rozeti)
+- [ ] RNPL'nin Stripe Payment Element yolunda desteklenmesi
 - [ ] Stripe test modu hesabıyla canlı smoke: SPT (ACP), Connect, off-session depozito, Stripe Identity
 - [ ] Stripe Connect onboarding linki ve payout webhook'ları
-- [ ] AP2 mandate'leri için ES256/EdDSA + JWKS (üçüncü taraf doğrulaması)
 - [ ] Sepet ve bölünmüş ödemede Stripe Payment Element, passkey step-up, cüzdan kredisi ve kupon
 - [ ] Parti riski için ev sahibi onay adımı (şu an yalnız uyarı + panel)
 - [ ] DSA: bildirenin kabul edilen itirazıyla kaldırılan ilana ev sahibinin yeniden itirazı
@@ -445,21 +508,26 @@ Açık / ertelenenler (aşağıdaki [dürüstlük notu](#dürüstlük-notu-mock-
 
 Aşağıdakiler gerçek bir dış servise **bağlı değildir** ya da yalnızca ağsız sahte (fake) istemcilerle test edilmiştir:
 
-| Bileşen                                                         | Durum                                                                                                                                                                      |
-| --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Ödeme                                                           | Varsayılan **`MockPsp`** (`PAYMENT_PROVIDER=mock`). Stripe PaymentIntent/webhook sağlayıcısı kodda; testler kayıtlı yanıtlarla ve ağsız `tests/support/stripe-fake.ts` ile |
-| Stripe SPT (ACP), Stripe Connect, Customer/off-session depozito | Yalnız ağsız fake ile test edildi; Stripe test modu hesabıyla canlı smoke **yapılmadı**. SPT uç/parametre adları önizleme API'sine göre modellendi                         |
-| KYC                                                             | Varsayılan deterministik **mock** (`MockIdentityProvider`, test belgeleri); Stripe Identity sağlayıcısı yalnız anahtar + webhook sırrı varken, canlı test yok              |
-| Payout                                                          | Varsayılan **`MockPayoutProvider`** (`acct_mock_`, `po_mock_`); Stripe Connect onboarding linki ve payout webhook'ları yok                                                 |
-| e-Arşiv / e-Fatura                                              | PDF "DEMO — mali değeri yoktur"; UBL-TR XML üreticisi + **mock entegratör** (`MockEInvoiceIntegrator`); GİB/özel entegratör bağlantısı yok, XSD doğrulaması yok            |
-| Lisans / kayıt no, 7565 talepleri, SDEP                         | Bakanlık ve AB kayıt servisleri **mock**; resmî yazılar elle girilir; SDEP ve DAC7 yalnız dosyaya dışa aktarılır                                                           |
-| Görsel arama (CLIP)                                             | `@huggingface/transformers` **opsiyonel** bağımlılık, varsayılan `VISION_CLIP_ENABLED=false`; model yoksa özellik gerekçe koduyla kapalı                                   |
-| Embedding / LTR                                                 | Varsayılan embedding hash (`hash-fnv1a-128-syn`); LTR **sentetik** tıklamalarla eğitildi                                                                                   |
-| LLM                                                             | Anahtar yoksa DEMO; demo çıktıları deterministik şablonlardır                                                                                                              |
-| Web Push                                                        | VAPID anahtarı yoksa kapalı (`/api/push/subscription` 503 `PUSH_DISABLED`)                                                                                                 |
-| AP2 mandate                                                     | HS256 — yalnız platform doğrulayabilir (üçüncü taraf doğrulaması için ES256/EdDSA + JWKS gerekir)                                                                          |
-| Parti riski                                                     | Yalnız uyarı + panel; ev sahibi onay adımı yok                                                                                                                             |
-| Harita, FX                                                      | İnternet yoksa statik `data/fx-rates.json`                                                                                                                                 |
+| Bileşen                                                         | Durum                                                                                                                                                                                      |
+| --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Ödeme                                                           | Varsayılan **`MockPsp`** (`PAYMENT_PROVIDER=mock`). Stripe PaymentIntent/webhook sağlayıcısı kodda; testler kayıtlı yanıtlarla ve ağsız `tests/support/stripe-fake.ts` ile                 |
+| Stripe SPT (ACP), Stripe Connect, Customer/off-session depozito | Yalnız ağsız fake ile test edildi; Stripe test modu hesabıyla canlı smoke **yapılmadı**. SPT uç/parametre adları önizleme API'sine göre modellendi                                         |
+| KYC                                                             | **Mock yalnız demo modunda** (`MockIdentityProvider`, test belgeleri); demo dışında Stripe Identity hazır değilse fail-closed (503 `KYC_UNAVAILABLE`). Stripe Identity canlı test edilmedi |
+| Payout                                                          | Varsayılan **`MockPayoutProvider`** (`acct_mock_`, `po_mock_`); Stripe Connect onboarding linki ve payout webhook'ları yok                                                                 |
+| e-Arşiv / e-Fatura                                              | PDF "DEMO — mali değeri yoktur"; UBL-TR XML üreticisi + **mock entegratör** (`MockEInvoiceIntegrator`); GİB/özel entegratör bağlantısı yok, XSD doğrulaması yok                            |
+| Lisans / kayıt no, 7565 talepleri, SDEP                         | Bakanlık ve AB kayıt servisleri **mock**; resmî yazılar elle girilir; SDEP ve DAC7 yalnız dosyaya dışa aktarılır                                                                           |
+| Görsel arama (CLIP)                                             | `@huggingface/transformers` **opsiyonel** bağımlılık, varsayılan `VISION_CLIP_ENABLED=false`; model yoksa özellik gerekçe koduyla kapalı                                                   |
+| Embedding / LTR                                                 | Varsayılan embedding hash (`hash-fnv1a-128-syn`); LTR **sentetik** tıklamalarla eğitildi                                                                                                   |
+| LLM                                                             | Anahtar yoksa DEMO; demo çıktıları deterministik şablonlardır                                                                                                                              |
+| Web Push                                                        | VAPID anahtarı yoksa kapalı (`/api/push/subscription` 503 `PUSH_DISABLED`)                                                                                                                 |
+| AP2 mandate                                                     | v5'te ES256 + JWKS; üçüncü taraf `npm run mandate:verify` ile doğrulayabilir. Gerçek bir ajan platformuyla (ChatGPT/Google) uçtan uca entegrasyon testi yok                                |
+| MCP Apps kartı                                                  | `ui://booking/stay-card` MCP Apps biçiminde sunulur; istemci desteği sınırlı, kart gerçek bir ChatGPT/Claude istemcisinde değil, SDK biçimiyle beslenerek doğrulandı                       |
+| RNPL                                                            | Arayüzde yalnız mock ödeme formunda sunulur (kart PSP'de kaydedilir, vadede kayıtlı karttan tahsil edilir); Stripe Payment Element formunda RNPL seçeneği yok                              |
+| Destek ajanı                                                    | Salt-okur araçlar; işlem yapmaz. Anahtar yoksa DEMO şablon yanıtları; eval skoru demo sağlayıcısıyla ölçüldü                                                                               |
+| Tedarik zinciri                                                 | SLSA provenance, CodeQL ve OpenSSF Scorecard iş akışında tanımlı ama repo private olduğundan koşmuyor; Scorecard rozeti yok                                                                |
+| Sepet performansı                                               | 100 VU sepet tutma p95 8,40 s — 2 s hedefi tutmadı (20 VU'da 1,87 s)                                                                                                                       |
+| Parti riski                                                     | Yalnız uyarı + panel; ev sahibi onay adımı yok                                                                                                                                             |
+| Harita, FX                                                      | İnternet yoksa statik `data/fx-rates.json`                                                                                                                                                 |
 
 Bilinen sınırlamaların tamamı: [docs/ARCHITECTURE.md §18](docs/ARCHITECTURE.md#18-bilinen-sınırlamalar), [docs/SECURITY.md](docs/SECURITY.md), [docs/COMPLIANCE.md](docs/COMPLIANCE.md).
 
@@ -470,7 +538,8 @@ Bilinen sınırlamaların tamamı: [docs/ARCHITECTURE.md §18](docs/ARCHITECTURE
 | Doküman                                      | İçerik                                                                                              |
 | -------------------------------------------- | --------------------------------------------------------------------------------------------------- |
 | [ARCHITECTURE](docs/ARCHITECTURE.md)         | Bounded context'ler, envanter v2, saga, defter, sepet, escrow/payout/depozito, mandate diyagramları |
-| [adr/](docs/adr/)                            | Mimari karar kayıtları 0001–0024 (aşağıda)                                                          |
+| [adr/](docs/adr/)                            | Mimari karar kayıtları 0001–0036 (aşağıda)                                                          |
+| [runbooks/](docs/runbooks/README.md)         | Her alarm için belirti, panel, sorgu, müdahale, geri alma                                           |
 | [MODEL_CARD](docs/MODEL_CARD.md)             | LLM görevleri, LTR (sentetik veri uyarısı), conformal aralık, fotoğraf kalite skoru ve CLIP         |
 | [METHODOLOGY](docs/METHODOLOGY.md)           | Vergi, conformal prediction, RRF, fraud, promosyon, yorum öne çıkanları guard'ı, parti riski        |
 | [COMPLIANCE](docs/COMPLIANCE.md)             | TR/AB/ABD/PCI eşleme tablosu, "kodda nerede" referanslı (hukuki görüş değildir)                     |
@@ -482,9 +551,9 @@ Bilinen sınırlamaların tamamı: [docs/ARCHITECTURE.md §18](docs/ARCHITECTURE
 | [CHANGELOG](CHANGELOG.md)                    | Sürüm notları                                                                                       |
 
 <details>
-<summary><strong>Mimari karar kayıtları (ADR 0001–0024)</strong></summary>
+<summary><strong>Mimari karar kayıtları (ADR 0001–0036)</strong></summary>
 
-ADR'ler: [0001 modüler monolit](docs/adr/0001-modular-monolith.md) · [0002 iki katmanlı kilit](docs/adr/0002-two-layer-locking.md) · [0003 transactional outbox](docs/adr/0003-transactional-outbox.md) · [0004 minor-unit para ve quote](docs/adr/0004-minor-unit-money-quote.md) · [0005 LLM sözleşmesi](docs/adr/0005-llm-contract.md) · [0006 availability partisyonu](docs/adr/0006-availability-partitioning.md) · [0007 devir claim linki ve escrow](docs/adr/0007-transfer-claim-link-escrow.md) · [0008 hash vs gerçek embedding](docs/adr/0008-hash-vs-real-embedding.md) · [0009 Next 16 yükseltmesi](docs/adr/0009-framework-upgrade-next16.md) · [0010 oda tipi envanteri](docs/adr/0010-room-type-inventory-counters.md) · [0011 tesis saat dilimi](docs/adr/0011-property-time-zone-temporal.md) · [0012 vergi motoru ve kalıcı FX](docs/adr/0012-tax-engine-and-persistent-fx.md) · [0013 ödeme sagası](docs/adr/0013-payment-saga.md) · [0014 hibrit arama ve LTR](docs/adr/0014-hybrid-search-ltr-experiments.md) · [0015 ajan rezervasyonu ve gelir paneli](docs/adr/0015-agentic-booking-channel-revenue.md) · [0016 legacy fiyat ve pazarlık](docs/adr/0016-legacy-pricing-and-negotiation.md) · [0017 mesajlaşma, moderasyon, step-up](docs/adr/0017-messaging-moderation-step-up.md) · [0018 i18n](docs/adr/0018-i18n-namespaces-and-formatting.md) · [0019 BigInt minor-unit para](docs/adr/0019-minor-unit-bigint-money.md) · [0020 çift girişli defter ve mutabakat](docs/adr/0020-double-entry-ledger.md) · [0021 escrow, payout, rezerv, depozito](docs/adr/0021-escrow-payout-deposit.md) · [0022 çok-modlu arama](docs/adr/0022-multimodal-search.md) · [0023 ajan ticareti ve mandate'ler](docs/adr/0023-agentic-commerce-mandates.md) · [0024 recent-auth ve step-up bağlama](docs/adr/0024-recent-auth-step-up-binding.md) · [0025 asimetrik mandate imzası ve JWKS](docs/adr/0025-asymmetric-mandate-signing.md)
+ADR'ler: [0001 modüler monolit](docs/adr/0001-modular-monolith.md) · [0002 iki katmanlı kilit](docs/adr/0002-two-layer-locking.md) · [0003 transactional outbox](docs/adr/0003-transactional-outbox.md) · [0004 minor-unit para ve quote](docs/adr/0004-minor-unit-money-quote.md) · [0005 LLM sözleşmesi](docs/adr/0005-llm-contract.md) · [0006 availability partisyonu](docs/adr/0006-availability-partitioning.md) · [0007 devir claim linki ve escrow](docs/adr/0007-transfer-claim-link-escrow.md) · [0008 hash vs gerçek embedding](docs/adr/0008-hash-vs-real-embedding.md) · [0009 Next 16 yükseltmesi](docs/adr/0009-framework-upgrade-next16.md) · [0010 oda tipi envanteri](docs/adr/0010-room-type-inventory-counters.md) · [0011 tesis saat dilimi](docs/adr/0011-property-time-zone-temporal.md) · [0012 vergi motoru ve kalıcı FX](docs/adr/0012-tax-engine-and-persistent-fx.md) · [0013 ödeme sagası](docs/adr/0013-payment-saga.md) · [0014 hibrit arama ve LTR](docs/adr/0014-hybrid-search-ltr-experiments.md) · [0015 ajan rezervasyonu ve gelir paneli](docs/adr/0015-agentic-booking-channel-revenue.md) · [0016 legacy fiyat ve pazarlık](docs/adr/0016-legacy-pricing-and-negotiation.md) · [0017 mesajlaşma, moderasyon, step-up](docs/adr/0017-messaging-moderation-step-up.md) · [0018 i18n](docs/adr/0018-i18n-namespaces-and-formatting.md) · [0019 BigInt minor-unit para](docs/adr/0019-minor-unit-bigint-money.md) · [0020 çift girişli defter ve mutabakat](docs/adr/0020-double-entry-ledger.md) · [0021 escrow, payout, rezerv, depozito](docs/adr/0021-escrow-payout-deposit.md) · [0022 çok-modlu arama](docs/adr/0022-multimodal-search.md) · [0023 ajan ticareti ve mandate'ler](docs/adr/0023-agentic-commerce-mandates.md) · [0024 recent-auth ve step-up bağlama](docs/adr/0024-recent-auth-step-up-binding.md) · [0025 asimetrik mandate imzası ve JWKS](docs/adr/0025-asymmetric-mandate-signing.md) · [0026 telafi jurnali niyet işareti](docs/adr/0026-compensation-journal-intent-marker.md) · [0027 ödeme servisi ayrımı](docs/adr/0027-payment-service-split.md) · [0028 şimdi rezerve et, sonra öde](docs/adr/0028-reserve-now-pay-later.md) · [0029 destek ajanı ve insana devir](docs/adr/0029-support-agent-human-handoff.md) · [0030 LLM eval ve GenAI telemetrisi](docs/adr/0030-llm-evals-genai-telemetry.md) · [0031 tedarik zinciri ve provenance](docs/adr/0031-supply-chain-provenance.md) · [0032 pazar kural motoru](docs/adr/0032-market-rules-engine.md) · [0033 eski defter ve ondalık alanların kaldırılması](docs/adr/0033-legacy-ledger-contract.md) · [0034 ters vekil ve istemci IP'si](docs/adr/0034-reverse-proxy-client-ip.md) · [0035 doğrulanabilir ajan ticareti](docs/adr/0035-verifiable-agent-commerce.md) · [0036 MCP Apps konaklama kartı](docs/adr/0036-mcp-apps-stay-card.md)
 
 </details>
 
@@ -540,8 +609,8 @@ Bu bir portföy projesidir; öneri ve hata bildirimleri memnuniyetle karşılan�
 
 **booking-platform** is a portfolio-grade online travel agency (OTA) built with Next.js 16, PostgreSQL + pgvector, Redis and BullMQ. Money is stored as `BigInt` minor units (ISO 4217 exponents) and every capture, refund, escrow release, payout, damage deposit, wallet credit and lost chargeback posts a balanced double-entry journal (a deferred DB trigger enforces Σ=0), reconciled daily against PSP state. Group carts hold N room types all-or-nothing under ordered locks and can be paid by several people (split payment with deadline fallback); payouts are released 24 h after check-in with commission and a rolling reserve.
 
-Agents book through MCP, ACP (Stripe Shared Payment Token path) or UCP endpoints that run the same saga as the web checkout, and every agent payment needs a user-signed, time- and amount-bound (optionally listing-bound), single-use AP2 intent mandate. Sensitive account actions require recent authentication; step-up tokens are bound to booking + amount + nonce. The LLM only explains and summarises (quote-guarded review highlights, listing comparison); without a key it runs a deterministic demo mode. Still mock by default: payments (`MockPsp`), payouts, KYC (Stripe Identity mock), e-Arşiv integrator, license/STR registries; Stripe SPT/Connect/deposit paths are tested only against a network-less fake; CLIP visual search is optional.
+Agents book through MCP, ACP (Stripe Shared Payment Token path) or UCP endpoints that run the same saga as the web checkout, and every agent payment needs a user-signed, time- and amount-bound (optionally listing-bound), single-use AP2 intent mandate. Sensitive account actions require recent authentication; step-up tokens are bound to booking + amount + nonce. The LLM only explains and summarises (quote-guarded review highlights, listing comparison, a read-only support agent that hands off to a human queue); without a key it runs a deterministic demo mode. v5 adds reserve-now-pay-later, ES256 mandates verifiable by third parties via `/.well-known/jwks.json` and `npm run mandate:verify`, a market rules engine (TR 10-day / EU 30-day reference price), an LLM eval suite (28 cases, CI), `gen_ai.*` OpenTelemetry spans, runbook-linked alerts, an OpenAPI 3.1 document and a Caddy reverse proxy. A fast-check property test (200 samples) proves shown price = charged amount = ledger. Not met: cart hold p95 at 100 VU is 8.40 s (target 2 s). SLSA provenance and Scorecard only run on a public repo (this one is private). Still mock by default: payments (`MockPsp`), payouts, KYC (mock only in demo mode; fail-closed otherwise), e-Arşiv integrator, license/STR registries; Stripe SPT/Connect/deposit paths are tested only against a network-less fake; CLIP visual search is optional.
 
-Run it: `docker compose -f docker-compose.yml -f docker-compose.demo.yml up`, then open <http://localhost:3000>. Demo accounts (`guest@`, `host@`, `admin@booking.test`, password `Password123!`) exist **only with the demo override**. No real payments are taken and no real stays are sold; tax and regulatory features are for education only. Optional Inside Airbnb data is CC BY 4.0.
+Run it: `cp .env.example .env && docker compose -f docker-compose.yml -f docker-compose.demo.yml up --build`, then open <http://localhost:3000>. Demo accounts (`guest@`, `host@`, `admin@booking.test`, password `Password123!`) exist **only with the demo override**. No real payments are taken and no real stays are sold; tax and regulatory features are for education only. Optional Inside Airbnb data is CC BY 4.0.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>

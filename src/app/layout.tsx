@@ -13,7 +13,8 @@ import "../styles/globals.css";
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("common");
   return {
-    title: t("meta.title"),
+    // WCAG 2.4.2: alt segmentler kendi başlığını verir; ana sayfa varsayılanı kullanır.
+    title: { default: t("meta.title"), template: "%s — booking-platform" },
     description: t("meta.description"),
     // P1-12 PWA: kurulabilir uygulama bildirimi + ikonlar.
     manifest: "/manifest.webmanifest",

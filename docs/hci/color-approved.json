@@ -1,0 +1,18 @@
+{
+  "decided": "2026-10-11",
+  "decision": "Kullanıcı onayladı: uygulanacak, bu oturumda başlanmadı. Palet/tailwind.config/tema değişkenleri değişmez; yalnız mevcut tonlara geçiş ve mevcut tema token'larına bağlama.",
+  "ids": [
+    "F43",
+    "F47",
+    "F119",
+    "F190",
+    "F209",
+    "F222",
+    "F240",
+    "F258",
+    "F296",
+    "F297",
+    "F339",
+    "F359"
+  ]
+}

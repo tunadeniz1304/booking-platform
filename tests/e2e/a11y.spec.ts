@@ -51,7 +51,7 @@ test("a11y: arama", async ({ page }) => {
 test("a11y: ürün sayfası", async ({ page }) => {
   const stay = await findStay(page.request);
   await page.goto(`/property/${stay.propertyId}`);
-  await expect(page.getByRole("button", { name: "Rezervasyonu Onayla" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Rezervasyona devam et" })).toBeEnabled();
   await expectNoSeriousViolations(page);
 });
 
@@ -231,12 +231,13 @@ test("a11y: RNPL'li ödeme adımı ve rezervasyon detayında ödeme planı", asy
 
   const form = page.getByRole("form", { name: "Ödeme" });
   await form.getByLabel("Kart numarası").fill("4242 4242 4242 4242");
+  await form.getByLabel("Son kullanma (AA/YY)").fill("12/30");
   await form.getByLabel("CVC").fill("123");
   await form.getByRole("button", { name: /Şimdi rezerve et/ }).click();
   const plan = page.getByTestId("rnpl-plan");
   await expect(plan).toBeVisible();
   await expect(plan).toContainText("Planlandı");
-  await expect(plan).toContainText(/Bugün ₺?0/);
+  await expect(plan).toContainText(/Rezervasyon sırasında ₺?0/);
   await expect(page.getByTestId("rnpl-plan-timeline")).toBeVisible();
   await expectNoSeriousViolations(page);
 

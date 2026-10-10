@@ -1,7 +1,33 @@
 # HCI düzeltme işi — Handoff
 
-> Son güncelleme: 2026-10-11 · Durum: **Düzeltme workflow'u BİTTİ (24/24 paket)** · mesaj yamaları birleştirildi · kalite kapıları koşuluyor/koşuldu (bkz. §4.1)
-> Bu dosya, haftalık kullanım limiti dolarsa ya da oturum kesilirse işi kaldığı yerden sürdürmek içindir.
+> Son güncelleme: 2026-10-11 · Durum: **Critical + High turu bitti, PR açık** · Bu dosya, işi başka bir oturumda kaldığı yerden sürdürmek içindir.
+
+## 0. ŞU AN — yeni oturum buradan başlasın
+
+**PR:** https://github.com/tunadeniz1304/booking-platform/pull/9 (`hci/critical-high-fixes` → `main`), 4 commit + bu handoff güncellemesi.
+
+- Kullanıcı **merge'e onay verdi** ("pr merge sende"). CI yeşilse merge et. Repo geçmişi atomik commit'li, bu yüzden squash yerine merge commit kullan: `gh pr merge 9 --merge`.
+- `main` korumalı değil. Auto-merge açma; açarsan CI'ı beklemeden hemen merge eder.
+- CI kırmızıysa önce düşen işe bak. En olası aday e2e (Playwright + Docker): spec'ler onay diyaloğu, "Rezervasyona devam et" adı, son kullanma alanı ve RNPL metni için güncellendi, ama lokalde e2e koşulmadı.
+
+**Lokalde doğrulandı (merge öncesi):** lint ✓, typecheck ✓, format ✓, i18n (35 ad alanı) ✓, unit 152 dosya / 1328 test ✓, `next build` ✓.
+
+**Sıradaki işler (öncelik sırasıyla):**
+
+1. PR #9'u CI yeşil olunca merge et.
+2. 2 gerilemeyi kapat (§7): admin başlık menüsü `target-size` (Header.tsx); ev sahibi promosyon tablosu mobil taşma (PromotionsPanel.tsx).
+3. Onaylı 12 renk düzeltmesini uygula (§1.1).
+4. Paketler arası istekleri uygula: `docs/hci/fix-status.json` içinde her paketin `crossOwner` listesi, 131 istek. Bunlar "kısmen düzeltildi" durumundaki 149 bulgunun kalan kısmı.
+5. Medium/Low turu (1.015 bulgu, `fixOutcome: "next_round"`). Aynı paket/dosya sahipliği düzenini kullan (`scratchpad\build-packages.cjs` mantığı, filtre Medium/Low). Ajan başına ~120k token.
+6. Her turdan sonra raporu yeniden üret: `scratchpad\build-report.mjs` hem `HCI_REVIEW_booking-platform.md`'yi hem de `docs/hci/areas/*.md` ile `hci-findings.json`'ı `fix-status.json`'dan günceller. Scratchpad yoksa `hci-findings.json`'daki `fixOutcome` / `fixSummary` alanlarını elle güncelle.
+
+**Lokal ortam (bu makinede, oturum kapanınca):**
+
+- Docker'da `booking-dev-db-1` ve `booking-dev-redis-1` açık, demo seed yüklü.
+- Dev sunucusu `.claude/launch.json` → `booking-dev` ile başlatılabilir. Bu dosya `.git/info/exclude` ile git dışında; içinde yerel rastgele `JWT_SECRET`, `DEMO_MODE` ve `LLM_MODE=demo` var.
+- Lokal branch `hci/critical-high-fixes`.
+- `next dev` her çalıştığında `next-env.d.ts`'yi değiştirir; commit'lemeden önce `git checkout -- next-env.d.ts`.
+- Bulut oturumunda Docker/Postgres büyük ihtimalle yok: çalışma zamanı taraması ve e2e orada koşmaz, statik düzeltme ve lint/typecheck/unit koşar.
 
 ## 1. Hedef ve kullanıcı kararları
 
@@ -33,7 +59,7 @@
 
 Not: Satır numaraları düzeltme turundan ÖNCEKİ denetime aittir; dalga 2 ajanları bu dosyaları değiştirdi → uygulamadan önce Grep ile güncel konumu bul. Sonra `tests/unit/ui/theme-contrast.test.ts` + `npm run lint/typecheck/format:check` + karanlık temada görsel kontrol (`colorScheme: "dark"`).
 
-## 2. Üretilen çıktılar (repo içinde, commit edilmedi)
+## 2. Üretilen çıktılar (PR #9 ile commit edildi)
 
 | Dosya                            | İçerik                                                                                                                                                                                                 |
 | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -73,7 +99,7 @@ Dalga 1 merkez kontrol notları: `next build` (34 geçiş layout'u + kök `title
 
 ### 4.1 Kalite kapıları (birleştirme sonrası)
 
-Çıktılar: `scratchpad\gates\{lint,tc,i18n,fmt,unit}.txt`. Sonuç: _koşuluyor — tamamlanınca buraya işlenecek_.
+Sonuç: **hepsi geçti.** lint, typecheck, format, i18n, unit (1328/1328), `next build`. Birleştirme sonrası iki sorun çıktı ve düzeltildi: yeni hata sayfalarındaki konsol çağrıları (observability testi bunları yasaklıyor) ve yük altında zaman aşımına düşen bir LLM testi (tek başına geçiyor). Adım 1–5 tamamlandı; 3. adımda `testUpdates` uygulandı, `crossOwner` istekleri bekliyor (§0, iş 4).
 
 1. ~~**Mesaj yamalarını birleştir:**~~ (YAPILDI) ajanlar `messages/*.json`'u doğrudan düzenlemez, yamaları `scratchpad\msg\<paket>.json`'a yazar.
    `node "<scratchpad>\merge-messages.mjs" C:/Users/tuna9/projects/booking "<scratchpad>\msg" --dry` → çakışma yoksa `--dry` olmadan çalıştır → `npx prettier --write messages`.

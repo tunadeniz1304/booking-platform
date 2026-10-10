@@ -5,7 +5,7 @@
   "loading": "Loading…",
   "page": {
     "title": "Resolution center",
-    "intro": "Track, reply to and add evidence to your refund and damage claims. If you cannot agree, the claim is escalated to an admin."
+    "intro": "Track, answer and add evidence to the refund and damage claims you opened from a booking page or that were raised against you. If you can't agree, the claim goes to an administrator."
   },
   "detailPage": {
     "title": "Claim details",
@@ -50,7 +50,12 @@
     "created": "Opened: {date}",
     "yourRole": "Your role: {role}",
     "bookingRef": "Booking {id}",
-    "open": "Open details"
+    "open": "Open details",
+    "emptyHow": "Refund and damage claims are opened from the booking's page. Guests can open a claim once the stay has started, up to {days} days after check-out.",
+    "goToTrips": "Go to my bookings",
+    "respondCta": "Your reply is needed: respond by {date}. If the deadline passes, the claim goes to an administrator without your reply.",
+    "awaitingOther": "Waiting for the other party to reply by {date}. If they don't, the claim goes to an administrator.",
+    "respondNow": "Reply now"
   },
   "deposit": {
     "title": "Damage deposit",
@@ -82,18 +87,23 @@
   "open": {
     "titleGuest": "Request a refund",
     "titleHost": "File a damage claim",
-    "infoGuest": "If you had a problem with your stay, request a refund. The host is given time to respond; if they do not, the claim is escalated to an admin.",
+    "infoGuest": "If something went wrong with your stay, request a refund. You can open a claim once your stay has started, up to {days} days after check-out. The host is given time to reply; if they don't, the claim goes to an administrator.",
     "infoHost": "File a claim for damage that occurred during the stay. An approved amount is captured only up to the damage deposit pre-authorization.",
     "adminInfo": "Admins cannot open claims; review claims from the admin panel.",
     "amount": "Amount ({currency})",
-    "amountHint": "In major units, for example 250.00.",
+    "amountHint": "Enter the amount in the main currency unit, for example 1250 or 1,250.50.",
     "description": "Description",
     "descriptionHint": "Describe what happened (10 to 4000 characters). You can add evidence after the claim is opened.",
     "submit": "Submit claim",
     "submitting": "Submitting…",
-    "created": "Your claim has been opened.",
+    "created": "Your claim for {amount} has been opened.",
     "viewCreated": "View the claim and add evidence",
-    "invalidAmount": "Enter a valid amount greater than zero."
+    "invalidAmount": "Enter an amount greater than zero, for example 1250 or 1,250.50.",
+    "amountPreview": "Amount to claim: {amount}",
+    "descriptionTooShort": "The description must be at least {min} characters (leading and trailing spaces don't count).",
+    "descriptionCount": "{count}/{max} characters",
+    "alreadyOpen": "You already have an open claim for this booking. Follow that one instead of opening a new claim.",
+    "viewOpen": "View open claim"
   },
   "detail": {
     "requested": "Requested",
@@ -111,7 +121,8 @@
     "externalReason": "Reason: {reason}",
     "withdraw": "Withdraw claim",
     "withdrawConfirm": "Are you sure you want to withdraw this claim? This cannot be undone.",
-    "withdrawn": "The claim has been withdrawn."
+    "withdrawn": "The claim has been withdrawn.",
+    "withdrawConfirmTitle": "Withdraw this claim?"
   },
   "outcome": {
     "title": "Decision",
@@ -142,7 +153,14 @@
     "privacy": "For your privacy, location (GPS), EXIF and all other metadata is removed from uploaded files on the server.",
     "imageAlt": "Evidence photo: {role}, {date}",
     "pdf": "PDF document ({size} KB)",
-    "by": "{role} · {date}"
+    "by": "{role} · {date}",
+    "limits": "JPEG, PNG, WebP, AVIF or GIF photos (up to {imageMb} MB) or PDF (up to {pdfMb} MB). Up to {maxFiles} files per claim; {used} uploaded so far.",
+    "visibility": "Files you upload are visible to the other party and the administrator. Uploaded files can't be removed later.",
+    "selected": "Selected file: {name} ({size} KB)",
+    "confirmUpload": "Upload evidence",
+    "cancel": "Cancel",
+    "tooLarge": "The file is {size} MB; files of this type can be at most {max} MB.",
+    "badType": "This file type isn't supported. Choose a photo (JPEG, PNG, WebP, AVIF, GIF) or a PDF."
   },
   "decision": {
     "title": "Decide",
@@ -151,7 +169,7 @@
     "PARTIAL": "Partial approval",
     "REJECT": "Reject",
     "amount": "Partial amount ({currency})",
-    "amountHint": "Must be less than the requested amount ({amount}).",
+    "amountHint": "Must be less than the requested amount ({amount}). Example: 1,250 or 1,250.50",
     "note": "Decision note",
     "noteHint": "3–4000 characters; shown to both parties.",
     "submit": "Save decision",
@@ -161,7 +179,21 @@
     "pspManaged": "Chargebacks are handled by the payment provider and cannot be decided here.",
     "closed": "This claim is resolved; no further decision can be made.",
     "explainRefund": "Approving a refund claim refunds the guest: from escrow if the funds are still held, otherwise from the host's reserve / balance after release; the platform covers any shortfall.",
-    "explainDamage": "Approving a damage claim captures at most the damage deposit pre-authorization; any excess is only recorded as \"uncollected\"."
+    "explainDamage": "Approving a damage claim captures at most the damage deposit pre-authorization; any excess is only recorded as \"uncollected\".",
+    "chooseFirst": "Choose a decision first.",
+    "confirm": {
+      "title": {
+        "APPROVE": "Approve the claim in full?",
+        "PARTIAL": "Partially approve the claim?",
+        "REJECT": "Reject the claim?"
+      },
+      "refund": "The guest will be refunded {amount}. It comes from escrow if the money is still held, otherwise from the host's balance.",
+      "damage": "Up to {amount} will be collected from the guest on the host's behalf (limited to the damage deposit).",
+      "reject": "The claim will be rejected; no one will be paid.",
+      "final": "This decision cannot be undone. Your note is shown to both parties.",
+      "confirmAmount": "Confirm decision for {amount}",
+      "confirmReject": "Reject claim"
+    }
   },
   "errors": {
     "CLAIM_TOO_EARLY": "This type of claim cannot be opened yet (before the stay starts / ends).",
@@ -178,7 +210,12 @@
     "CLAIM_NO_PAYMENT": "No captured payment was found for this booking.",
     "CLAIM_REFUND_FAILED": "The refund failed; please try again later.",
     "PAYMENT_IN_PROGRESS": "Another payment operation is in progress for this booking; try again shortly.",
-    "EMAIL_NOT_VERIFIED": "Please verify your email address before doing this."
+    "EMAIL_NOT_VERIFIED": "Please verify your email address before doing this.",
+    "CLAIM_AMOUNT_EXCEEDS_REFUNDABLE_NOAMOUNT": "The amount is above the refundable limit. Try a smaller amount.",
+    "NOT_FOUND": "This claim could not be found, or you don't have access to it.",
+    "VALIDATION_ERROR": "Some of the details weren't accepted. Check the fields and try again.",
+    "PAYLOAD_TOO_LARGE": "The file is too large. Photos can be at most {imageMb} MB and PDFs at most {pdfMb} MB.",
+    "unknown": "The action couldn't be completed. Please try again shortly."
   },
   "host": {
     "title": "Damage deposit",
@@ -195,6 +232,15 @@
     "saved": "Deposit saved.",
     "removed": "Deposit removed.",
     "tooHigh": "The amount exceeds the limit (at most {amount}).",
-    "invalidAmount": "Enter a valid amount greater than zero."
+    "invalidAmount": "Enter a valid amount greater than zero.",
+    "formatHint": "Example: 1500 or 1,500.50",
+    "preview": "Amount to save: {amount}",
+    "invalidAmountFormat": "We could not read the amount. Enter an amount greater than zero, for example 1500 or 1,500.50.",
+    "savedAmount": "{scope} deposit saved as {amount}.",
+    "removedAmount": "{scope} deposit ({amount}) removed.",
+    "removeLabel": "Remove {scope} deposit",
+    "removeConfirmTitle": "Remove the {scope} deposit?",
+    "removeConfirmBody": "The {amount} deposit for {scope} will be removed. Future bookings will not hold an amount on the guest's card for damage.",
+    "removeConfirm": "Remove deposit"
   }
 }

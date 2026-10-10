@@ -26,5 +26,10 @@
     "NOT_STARTED": "Kupon henüz geçerli değil.",
     "INACTIVE": "Kupon geçerli değil.",
     "other": "Kupon bu konaklamaya uygulanamıyor."
+  },
+  "taxKind": {
+    "VAT": "KDV",
+    "ACCOMMODATION_TAX": "Konaklama vergisi",
+    "SERVICE_FEE": "Hizmet bedeli"
   }
 }

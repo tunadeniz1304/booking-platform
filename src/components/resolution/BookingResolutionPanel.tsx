@@ -6,7 +6,7 @@ import { apiFetch } from "@/lib/api-client";
 import { Status, focusRing, useLoader } from "@/components/ui/ui";
 import ClaimList from "./ClaimList";
 import OpenClaimForm from "./OpenClaimForm";
-import { DepositSummary, type ClaimSummary, type DepositView } from "./shared";
+import { ACTIVE_STATUSES, DepositSummary, type ClaimSummary, type DepositView } from "./shared";
 
 interface DepositResponse {
   deposit: DepositView | null;
@@ -32,6 +32,11 @@ export default function BookingResolutionPanel({ bookingId }: { bookingId: strin
     [bookingId]
   );
   const [deposit, claimsRes] = data ?? [null, null];
+  // Sunucu aynı rezervasyonda ikinci açık talebi reddeder (CLAIM_ALREADY_OPEN); formu
+  // göstermek yerine açık talebe yönlendir.
+  const openOwnClaim =
+    claimsRes?.claims.find((c) => c.role === "OPENER" && ACTIVE_STATUSES.includes(c.status)) ??
+    null;
 
   return (
     <section
@@ -78,6 +83,18 @@ export default function BookingResolutionPanel({ bookingId }: { bookingId: strin
       {deposit &&
         (deposit.role === "ADMIN" ? (
           <p className="text-sm text-gray-700">{t("open.adminInfo")}</p>
+        ) : openOwnClaim ? (
+          <div className="space-y-2">
+            <p className="text-sm text-gray-700">{t("open.alreadyOpen")}</p>
+            <p className="text-sm">
+              <Link
+                href={`/resolution/${encodeURIComponent(openOwnClaim.id)}`}
+                className={`font-semibold text-[#003580] underline ${focusRing}`}
+              >
+                {t("open.viewOpen")}
+              </Link>
+            </p>
+          </div>
         ) : (
           <OpenClaimForm
             bookingId={bookingId}

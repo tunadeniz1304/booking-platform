@@ -5,11 +5,13 @@ import { useTranslations } from "next-intl";
 import { apiFetch } from "@/lib/api-client";
 import { useFormat } from "@/i18n/use-format";
 import { Button, Card, Status, errorMessage, inputClass, useLoader } from "@/components/ui/ui";
+import { useRowFocusRecovery } from "@/components/admin/AdminDashboard";
 
 type TicketStatus = "OPEN" | "IN_PROGRESS" | "RESOLVED";
 
 interface TicketRow {
   id: string;
+  userId?: string | null;
   bookingId: string | null;
   status: TicketStatus;
   reason: "LOW_CONFIDENCE" | "MONEY_REQUEST" | "LEGAL_OR_COMPLAINT" | "USER_REQUEST";
@@ -38,8 +40,10 @@ export default function SupportAdmin() {
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const markFocus = useRowFocusRecovery(data, "support-admin");
 
-  const update = async (id: string, next: TicketStatus) => {
+  const update = async (id: string, index: number, next: TicketStatus) => {
+    if (busy) return;
     setBusy(id);
     setMessage(null);
     setActionError(null);
@@ -49,6 +53,7 @@ export default function SupportAdmin() {
         body: JSON.stringify({ status: next }),
       });
       setMessage(t("updated"));
+      markFocus(index);
       reload();
     } catch (e) {
       setActionError(errorMessage(e));
@@ -83,11 +88,15 @@ export default function SupportAdmin() {
         <p className="text-sm text-gray-700">{t("empty")}</p>
       ) : (
         <ul className="space-y-3">
-          {data.tickets.map((row) => (
-            <li key={row.id} className="rounded-md border border-gray-200 p-3 text-sm">
+          {data.tickets.map((row, index) => (
+            <li key={row.id} data-row className="rounded-md border border-gray-200 p-3 text-sm">
               <p className="font-medium text-gray-900">
                 {t(`reason.${row.reason}`)} · {t(`status.${row.status}`)} ·{" "}
                 {f.dateTime(row.createdAt)}
+              </p>
+              <p className="break-words text-gray-700">
+                {t("ticketId", { id: row.id })}
+                {row.userId ? ` · ${t("user", { id: row.userId })}` : ""}
               </p>
               <p className="text-gray-700">
                 {row.intent} · {t("confidence", { value: row.confidence.toFixed(2) })}
@@ -98,21 +107,21 @@ export default function SupportAdmin() {
                 {row.status === "OPEN" && (
                   <Button
                     variant="secondary"
-                    disabled={busy === row.id}
-                    onClick={() => update(row.id, "IN_PROGRESS")}
+                    busy={busy === row.id}
+                    onClick={() => update(row.id, index, "IN_PROGRESS")}
                   >
                     {t("markInProgress")}
                   </Button>
                 )}
                 {row.status !== "RESOLVED" ? (
-                  <Button disabled={busy === row.id} onClick={() => update(row.id, "RESOLVED")}>
+                  <Button busy={busy === row.id} onClick={() => update(row.id, index, "RESOLVED")}>
                     {t("markResolved")}
                   </Button>
                 ) : (
                   <Button
                     variant="secondary"
-                    disabled={busy === row.id}
-                    onClick={() => update(row.id, "OPEN")}
+                    busy={busy === row.id}
+                    onClick={() => update(row.id, index, "OPEN")}
                   >
                     {t("reopen")}
                   </Button>

@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
+import { useFormat } from "@/i18n/use-format";
 
 /** Sunucunun `/pay` yanıtı (yalnızca formun ihtiyaç duyduğu alanlar). */
 export interface PayResponse {
@@ -46,15 +47,26 @@ export default function StripePaymentForm(props: Props) {
   );
 }
 
-function InnerForm({ busy, submit, confirm, onError }: Props) {
+function InnerForm({
+  publishableKey,
+  amountMinor,
+  currency,
+  busy,
+  submit,
+  confirm,
+  onError,
+}: Props) {
   const t = useTranslations("payment");
+  const f = useFormat();
+  // Test notu yalnız test anahtarında; canlı anahtarda gerçek tahsilat tutarı söylenir.
+  const testMode = publishableKey.startsWith("pk_test_");
   const stripe = useStripe();
   const elements = useElements();
   const [working, setWorking] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!stripe || !elements) return;
+    if (!stripe || !elements || busy || working) return;
     setWorking(true);
     try {
       const { error: submitError } = await elements.submit();
@@ -76,8 +88,14 @@ function InnerForm({ busy, submit, confirm, onError }: Props) {
   return (
     <form onSubmit={onSubmit} className="space-y-3" aria-label={t("title")}>
       <PaymentElement />
-      <p className="text-xs text-gray-500">{t("stripeTestMode")}</p>
+      <p className="text-xs text-gray-500">
+        {testMode
+          ? t("stripeTestMode")
+          : t("stripeLiveCharge", { amount: f.money(amountMinor, currency) })}
+      </p>
       <button
+        type="submit"
+        aria-busy={busy || working || undefined}
         disabled={busy || working || !stripe}
         className="w-full rounded-lg bg-[#003580] px-4 py-3 text-sm font-semibold text-white disabled:bg-gray-300 disabled:text-gray-700"
       >

@@ -31,7 +31,8 @@
     },
     "cookies": {
       "title": "6. Çerezler",
-      "body": "<strong>Zorunlu çerezler</strong> (oturum, güvenlik, dil tercihi) hizmetin çalışması için gereklidir ve onaya tabi değildir. <strong>Analitik çerezler</strong> yalnızca çerez bandında onay vermeniz hâlinde kullanılır. Tercihiniz <code>cookie_consent</code> çerezinde saklanır; çerezi silerek tercihinizi değiştirebilirsiniz."
+      "body": "<strong>Zorunlu çerezler</strong> (oturum, güvenlik, dil tercihi) hizmetin çalışması için gereklidir ve onaya tabi değildir. <strong>Analitik çerezler</strong> yalnızca çerez bandında onay vermeniz hâlinde kullanılır. Tercihinizi istediğiniz an aşağıdaki \"Çerez tercihlerini değiştir\" düğmesiyle güncelleyebilirsiniz.",
+      "change": "Çerez tercihlerini değiştir"
     },
     "rights": {
       "title": "7. Haklarınız (KVKK md. 11)",
@@ -53,10 +54,29 @@
     "deleteBody": "Kişisel alanlarınız silinir veya takma adla değiştirilir. Rezervasyon ve ödeme kayıtları yasal saklama yükümlülüğü nedeniyle anonimleştirilerek tutulur. Bu işlem geri alınamaz.",
     "deleteButton": "Hesabımı sil",
     "confirmTitle": "Hesabınızı kalıcı olarak silmek istediğinize emin misiniz?",
-    "acknowledge": "İşlemin geri alınamayacağını anladım.",
+    "acknowledge": "Yaklaşan rezervasyonlarımın iptal koşullarına göre iptal edileceğini, cüzdan kredimin silineceğini ve bu işlemin geri alınamayacağını anladım.",
     "deleting": "Siliniyor…",
     "confirmDelete": "Evet, hesabımı sil",
     "cancel": "Vazgeç",
-    "noticeLink": "Verilerinizin nasıl işlendiğini <link>aydınlatma metninde</link> okuyabilirsiniz."
+    "noticeLink": "Verilerinizin nasıl işlendiğini <link>aydınlatma metninde</link> okuyabilirsiniz.",
+    "deleteEffects": {
+      "title": "Hesabınızı sildiğinizde:",
+      "bookings": "Yaklaşan rezervasyonlarınız, rezervasyonu yaptığınız andaki iptal koşullarına göre iptal edilir. İade almayabilir ya da yalnız kısmi iade alabilirsiniz.",
+      "wallet": "Cüzdanınızdaki kredi ve ödüller silinir; sonradan kullanılamaz.",
+      "transfers": "Satışa koyduğunuz rezervasyon devir ilanları geri çekilir.",
+      "listings": "Ev sahibiyseniz ilanlarınız yayından kaldırılır.",
+      "obligations": "Ev sahibi olarak yaklaşan onaylı rezervasyonunuz, bekleyen bir ödemeniz ya da açık bir talebiniz varsa önce bunları tamamlamanız gerekir."
+    },
+    "exportFailed": "Verileriniz indirilemedi. Lütfen tekrar deneyin.",
+    "deleteFailed": "Hesabınız silinemedi. Lütfen tekrar deneyin.",
+    "obligations": {
+      "title": "Hesabınız şu an silinemiyor. Önce aşağıdakileri tamamlayın:",
+      "hostedBookings": "{count, plural, other {Ev sahibi olarak # yaklaşan onaylı rezervasyonunuz var.}}",
+      "hostedBookingsLink": "Ev sahibi paneline git",
+      "pendingPayouts": "{count, plural, other {# bekleyen ödemeniz var.}}",
+      "pendingPayoutsLink": "Ödemelerime git",
+      "openClaims": "{count, plural, other {# açık talebiniz var.}}",
+      "openClaimsLink": "Taleplerime git"
+    }
   }
 }

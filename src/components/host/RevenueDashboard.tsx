@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useTranslations } from "next-intl";
+import { useEffect, useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import { apiFetch } from "@/lib/api-client";
 import { useFormat } from "@/i18n/use-format";
 import {
@@ -13,6 +13,7 @@ import {
   inputClass,
   useLoader,
 } from "@/components/ui/ui";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 interface Contribution {
   factor: "occupancy" | "lead_time" | "holiday" | "event" | "clamp";
@@ -71,12 +72,14 @@ function PickupChart({ points }: { points: Overview["pickup"] }) {
   const line = points.map((p, i) => `${i === 0 ? "M" : "L"}${x(i)},${y(p.onBooks)}`).join(" ");
   const barW = Math.max(2, step * 0.6);
   const last = points[points.length - 1];
+  const dailyMax = Math.max(...points.map((p) => p.pickup));
   return (
     <figure>
       <svg
         viewBox={`0 0 ${CHART.width} ${CHART.height}`}
         role="img"
         aria-labelledby="pickup-title pickup-desc"
+        aria-describedby="pickup-trend"
         className="h-auto w-full"
       >
         <title id="pickup-title">{t("pickup.chartTitle")}</title>
@@ -121,7 +124,56 @@ function PickupChart({ points }: { points: Overview["pickup"] }) {
           {f.date(last.date, "short")}
         </text>
       </svg>
-      <figcaption className="mt-1 text-xs text-gray-700">{t("pickup.caption")}</figcaption>
+      <figcaption className="mt-1 text-xs text-gray-700">
+        {t("pickup.caption")}{" "}
+        <span id="pickup-trend">
+          {t("pickup.trend", {
+            first: points[0].onBooks,
+            last: last.onBooks,
+            dailyMax,
+          })}
+        </span>
+      </figcaption>
+      {/* Grafiğin metin eşdeğeri (WCAG 1.1.1): günlük değerler fare olmadan da okunur. */}
+      <details className="mt-2 text-sm">
+        <summary className="inline-flex min-h-[44px] cursor-pointer items-center font-medium text-gray-900">
+          {t("pickup.tableToggle")}
+        </summary>
+        <div
+          className="max-h-80 overflow-auto"
+          role="region"
+          tabIndex={0}
+          aria-label={t("pickup.tableCaption")}
+        >
+          <table className="min-w-full text-left text-sm">
+            <caption className="sr-only">{t("pickup.tableCaption")}</caption>
+            <thead className="border-b text-gray-700">
+              <tr>
+                <th scope="col" className="py-1 pr-4">
+                  {t("pickup.columns.date")}
+                </th>
+                <th scope="col" className="py-1 pr-4 text-right">
+                  {t("pickup.columns.pickup")}
+                </th>
+                <th scope="col" className="py-1 pr-4 text-right">
+                  {t("pickup.columns.onBooks")}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {points.map((p) => (
+                <tr key={p.date} className="border-b last:border-0">
+                  <th scope="row" className="py-1 pr-4 font-normal">
+                    {f.date(p.date, "short")}
+                  </th>
+                  <td className="py-1 pr-4 text-right">{p.pickup}</td>
+                  <td className="py-1 pr-4 text-right">{p.onBooks}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </details>
     </figure>
   );
 }
@@ -135,17 +187,49 @@ function Kpi({ label, value }: { label: string; value: string }) {
   );
 }
 
-function SuggestionRow({ s, onDecided }: { s: SuggestionView; onDecided: () => void }) {
+function SuggestionRow({
+  s,
+  onDecided,
+}: {
+  s: SuggestionView;
+  onDecided: (message: string) => void;
+}) {
   const t = useTranslations("revenue");
   const f = useFormat();
+  const locale = useLocale();
+  // Ayrıntı etiketleri ve açıklama sunucuda Türkçe üretilir (WCAG 3.1.2).
+  const serverLang = locale === "tr" ? undefined : "tr";
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { confirm, confirmDialog } = useConfirm();
+  const noteId = `suggestion-${s.id}-note`;
+  const priceArgs = {
+    room: s.roomName,
+    date: f.date(s.date, "short"),
+    from: f.money(s.currentMinor, s.currency),
+    to: f.money(s.suggestedMinor, s.currency),
+  };
   const decide = async (action: "accept" | "reject") => {
+    if (busy) return;
+    if (
+      action === "accept" &&
+      !(await confirm({
+        title: t("suggestions.acceptConfirmTitle", priceArgs),
+        body: t("suggestions.acceptNote"),
+        confirmLabel: t("suggestions.acceptConfirm"),
+        tone: "primary",
+      }))
+    )
+      return;
     setBusy(true);
     setError(null);
     try {
       await apiFetch(`/api/host/revenue/suggestions/${s.id}/${action}`, { method: "POST" });
-      onDecided();
+      onDecided(
+        action === "accept"
+          ? t("suggestions.accepted", priceArgs)
+          : t("suggestions.rejected", priceArgs)
+      );
     } catch (e) {
       setError(errorMessage(e));
     } finally {
@@ -169,55 +253,84 @@ function SuggestionRow({ s, onDecided }: { s: SuggestionView; onDecided: () => v
           </span>
         </p>
       </div>
-      <table className="min-w-full text-left text-sm">
-        <caption className="sr-only">{t("suggestions.caption")}</caption>
-        <thead className="border-b text-gray-700">
-          <tr>
-            <th scope="col" className="py-1 pr-4">
-              {t("suggestions.columns.factor")}
-            </th>
-            <th scope="col" className="py-1 pr-4">
-              {t("suggestions.columns.detail")}
-            </th>
-            <th scope="col" className="py-1 pr-4">
-              {t("suggestions.columns.multiplier")}
-            </th>
-            <th scope="col" className="py-1 pr-4 text-right">
-              {t("suggestions.columns.contribution")}
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {s.contributions.map((c) => (
-            <tr key={c.factor} className="border-b last:border-0">
-              <td className="py-1 pr-4">{t(`factor.${c.factor}`)}</td>
-              <td className="py-1 pr-4 text-gray-700">{c.label}</td>
-              <td className="py-1 pr-4">×{c.multiplier.toFixed(2)}</td>
-              <td className="py-1 pr-4 text-right">
-                {c.amountMinor > 0 ? "+" : ""}
-                {f.money(c.amountMinor, s.currency)}
-              </td>
+      <div
+        className="overflow-x-auto"
+        role="region"
+        tabIndex={0}
+        aria-label={t("suggestions.caption")}
+      >
+        <table className="min-w-full text-left text-sm">
+          <caption className="sr-only">{t("suggestions.caption")}</caption>
+          <thead className="border-b text-gray-700">
+            <tr>
+              <th scope="col" className="py-1 pr-4">
+                {t("suggestions.columns.factor")}
+              </th>
+              <th scope="col" className="py-1 pr-4">
+                {t("suggestions.columns.detail")}
+              </th>
+              <th scope="col" className="py-1 pr-4">
+                {t("suggestions.columns.multiplier")}
+              </th>
+              <th scope="col" className="py-1 pr-4 text-right">
+                {t("suggestions.columns.contribution")}
+              </th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {s.contributions.map((c) => (
+              <tr key={c.factor} className="border-b last:border-0">
+                <td className="py-1 pr-4">{t(`factor.${c.factor}`)}</td>
+                <td className="py-1 pr-4 text-gray-700" lang={serverLang}>
+                  {c.label}
+                </td>
+                <td className="py-1 pr-4">×{c.multiplier.toFixed(2)}</td>
+                <td className="py-1 pr-4 text-right">
+                  {c.amountMinor > 0 ? "+" : ""}
+                  {f.money(c.amountMinor, s.currency)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
       <p className="text-sm text-gray-800">
-        {s.explanation} <LlmBadge mode={s.llmMode} />
+        <span lang={serverLang}>{s.explanation}</span> <LlmBadge mode={s.llmMode} />
       </p>
-      <div className="flex gap-2">
-        <Button onClick={() => decide("accept")} disabled={busy}>
+      <p id={noteId} className="text-xs text-gray-700">
+        {t("suggestions.acceptNote")}
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <Button
+          className="min-h-[44px]"
+          onClick={() => decide("accept")}
+          busy={busy}
+          aria-describedby={noteId}
+        >
           {t("suggestions.accept")}
         </Button>
-        <Button variant="secondary" onClick={() => decide("reject")} disabled={busy}>
+        <Button
+          variant="secondary"
+          className="min-h-[44px]"
+          onClick={() => decide("reject")}
+          busy={busy}
+        >
           {t("suggestions.reject")}
         </Button>
       </div>
       <Status error={error} />
+      {confirmDialog}
     </li>
   );
 }
 
-function PropertyRevenue({ propertyId }: { propertyId: string }) {
+function PropertyRevenue({
+  propertyId,
+  onAnnounce,
+}: {
+  propertyId: string;
+  onAnnounce: (text: string) => void;
+}) {
   const t = useTranslations("revenue");
   const f = useFormat();
   const { data, error, reload } = useLoader(
@@ -228,9 +341,19 @@ function PropertyRevenue({ propertyId }: { propertyId: string }) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [genError, setGenError] = useState<string | null>(null);
+  const loadedTitle = data?.property.title ?? null;
+
+  useEffect(() => {
+    if (loadedTitle !== null) onAnnounce(t("loaded", { title: loadedTitle }));
+  }, [loadedTitle, onAnnounce, t]);
 
   if (error) return <Status error={error} />;
-  if (!data) return <p className="text-sm text-gray-600">{t("loading")}</p>;
+  if (!data)
+    return (
+      <p aria-busy="true" className="text-sm text-gray-600">
+        {t("loading")}
+      </p>
+    );
   const k = data.kpis;
   const selectedRoom = roomId || data.rooms[0]?.id || "";
 
@@ -293,7 +416,7 @@ function PropertyRevenue({ propertyId }: { propertyId: string }) {
               ))}
             </select>
           </label>
-          <Button onClick={generate} disabled={busy || !selectedRoom}>
+          <Button className="min-h-[44px]" onClick={generate} disabled={!selectedRoom} busy={busy}>
             {t("suggestions.generate")}
           </Button>
         </div>
@@ -303,7 +426,15 @@ function PropertyRevenue({ propertyId }: { propertyId: string }) {
         ) : (
           <ul className="space-y-3">
             {data.suggestions.map((s) => (
-              <SuggestionRow key={s.id} s={s} onDecided={reload} />
+              <SuggestionRow
+                key={s.id}
+                s={s}
+                onDecided={(text) => {
+                  setGenError(null);
+                  setMessage(text);
+                  reload();
+                }}
+              />
             ))}
           </ul>
         )}
@@ -318,18 +449,37 @@ export default function RevenueDashboard() {
     apiFetch<Array<{ id: string; title: string }>>("/api/host/properties")
   );
   const [propertyId, setPropertyId] = useState("");
+  const [announce, setAnnounce] = useState("");
+  // Sürekli bağlı canlı bölge: mülk değişince yükleniyor/yüklendi duyurulur (WCAG 4.1.3).
+  const live = (
+    <div role="status" aria-live="polite" className="sr-only">
+      {announce}
+    </div>
+  );
   if (error) return <Status error={error} />;
-  if (!data) return <p className="text-sm text-gray-600">{t("loadingProperties")}</p>;
+  if (!data)
+    return (
+      <>
+        {live}
+        <p aria-busy="true" className="text-sm text-gray-600">
+          {t("loadingProperties")}
+        </p>
+      </>
+    );
   if (data.length === 0) return <p className="text-sm text-gray-700">{t("noProperties")}</p>;
   const selected = propertyId || data[0].id;
   return (
     <div className="space-y-6">
+      {live}
       <label className="block max-w-sm text-sm text-gray-800">
         {t("propertyLabel")}
         <select
           className={inputClass}
           value={selected}
-          onChange={(e) => setPropertyId(e.target.value)}
+          onChange={(e) => {
+            setPropertyId(e.target.value);
+            setAnnounce(t("loading"));
+          }}
         >
           {data.map((p) => (
             <option key={p.id} value={p.id}>
@@ -338,7 +488,7 @@ export default function RevenueDashboard() {
           ))}
         </select>
       </label>
-      <PropertyRevenue key={selected} propertyId={selected} />
+      <PropertyRevenue key={selected} propertyId={selected} onAnnounce={setAnnounce} />
     </div>
   );
 }

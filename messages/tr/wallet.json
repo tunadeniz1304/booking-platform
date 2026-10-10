@@ -37,7 +37,7 @@
     "use": "Kredimi kullan",
     "available": "Kullanılabilir: {amount}",
     "amount": "Kullanılacak kredi",
-    "max": "En fazla {amount} (kartla en az bir kısım ödenir)",
+    "max": "En fazla {amount} (kartla en az bir kısım ödenir). Örnek biçim: 150,50",
     "cardRemainder": "Kartla ödenecek: {amount}",
     "invalid": "Kredi tutarı 0 ile {max} arasında olmalı.",
     "notice": "Kredi önce ayrılır; kart ödemesi başarısız olursa krediniz iade edilir."

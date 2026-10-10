@@ -24,7 +24,19 @@
     "minPlaceholder": "Min",
     "maxPlaceholder": "Max",
     "type": "Property type",
-    "sort": "Sort by"
+    "sort": "Sort by",
+    "priceTotal": "Total price",
+    "pricePerNight": "Price per night",
+    "suffixTotal": "Total for the stay, taxes and fees included",
+    "suffixNight": "Price per night",
+    "minLabel": "Min",
+    "maxLabel": "Max",
+    "priceHint": "{unit}. Example: 1,250 or 1,250.50",
+    "priceInvalid": "Enter a valid amount (e.g. 1,250).",
+    "priceOrder": "The minimum can't be higher than the maximum.",
+    "anyType": "All",
+    "toggle": "Filters and sorting ({count} active)",
+    "clearAll": "Clear all filters"
   },
   "sort": {
     "recommended": "Recommended",
@@ -33,7 +45,7 @@
     "rating": "Rating (highest first)"
   },
   "loading": "Loading...",
-  "resultCount": "Showing {shown} results ({total} found)",
+  "resultCount": "Showing {shown} of {total} stays",
   "cached": "From cache",
   "view": "View",
   "list": "List",
@@ -41,7 +53,7 @@
   "mapFailed": "The map could not be loaded (e.g. offline); showing the list view.",
   "noLocation": "These results have no location data; showing the list view.",
   "noResults": "No results found",
-  "noResultsHint": "Try changing the filters.",
+  "noResultsHint": "Try changing the destination, dates or number of guests.",
   "mapResults": "Results on the map",
   "bar": {
     "destination": "Where to?",
@@ -57,24 +69,50 @@
     "rooms": "Rooms",
     "decrease": "Decrease",
     "increase": "Increase",
-    "submit": "Search"
+    "submit": "Search",
+    "datesDialog": "Check-in and check-out dates",
+    "roomsHint": "Each room needs at least one adult",
+    "decreaseAdults": "Decrease number of adults",
+    "increaseAdults": "Increase number of adults",
+    "decreaseChildren": "Decrease number of children",
+    "increaseChildren": "Increase number of children",
+    "decreaseRooms": "Decrease number of rooms",
+    "increaseRooms": "Increase number of rooms",
+    "countStatus": "{label}: {count}",
+    "done": "Done"
   },
   "picker": {
     "prevMonth": "Previous month",
-    "nextMonth": "Next month"
+    "nextMonth": "Next month",
+    "dialogLabel": "Choose check-in and check-out dates",
+    "checkIn": "check-in date",
+    "checkOut": "check-out date",
+    "inRange": "within your stay",
+    "hintCheckIn": "Choose a day for check-in. You can move between days with the arrow keys.",
+    "hintCheckOut": "Check-in: {date}. Now choose your check-out date.",
+    "hintDone": "Selected dates: check-in {checkIn}, check-out {checkOut}."
   },
   "autocomplete": {
     "placeholder": "City, hotel or region",
     "popular": "Popular destinations",
     "searching": "Searching...",
     "suggestions": "Suggestions",
-    "noResults": "No results found"
+    "noResults": "No results found",
+    "count": "{count, plural, one {# suggestion} other {# suggestions}}"
   },
   "mapView": {
     "initFailed": "the map could not be initialised",
     "error": "map error",
     "fallback": "The map could not be loaded; using the list view.",
-    "cluster": "{count} stays; click to zoom in"
+    "cluster": "{count} stays; click to zoom in",
+    "title": "Results map",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out",
+    "resetBearing": "Drag to rotate the map, click to reset north",
+    "closePopup": "Close details",
+    "toggleAttribution": "Show or hide map attribution",
+    "mapFeedback": "Map feedback",
+    "marker": "Map marker"
   },
   "smart": {
     "label": "Smart filter — describe what you're looking for",
@@ -110,7 +148,13 @@
     "taxesOnDates": "taxes and fees are added once you pick dates",
     "seeDeal": "See deal",
     "addFavorite": "Add to favourites",
-    "removeFavorite": "Remove from favourites"
+    "removeFavorite": "Remove from favourites",
+    "favoriteAdded": "Added to favorites",
+    "favoriteRemoved": "Removed from favorites",
+    "favoriteAddFailed": "Couldn't add to favorites. Please try again.",
+    "favoriteRemoveFailed": "Couldn't remove from favorites. Please try again.",
+    "ratingLabel": "Guest rating: {value}",
+    "noRating": "No ratings yet"
   },
   "visual": {
     "showSimilar": "Show similar",
@@ -131,6 +175,29 @@
     "suggestion": "{savings} cheaper on {dates}",
     "total": "Total {total}",
     "view": "See these dates",
-    "needsDates": "Pick check-in and check-out dates to use flexible dates."
+    "needsDates": "Pick check-in and check-out dates to use flexible dates.",
+    "pickDates": "Choose dates"
+  },
+  "noResultsDestination": "No stays found for “{destination}”",
+  "noResultsDestinationHint": "Check the spelling or try another city.",
+  "noResultsFiltersHint": "No stays match the filters you chose. Loosen or clear the filters.",
+  "allStays": "See all stays",
+  "skipToResults": "Skip to results",
+  "loadMore": "Show more ({remaining} stays left)",
+  "guestCountDefault": "{count} guests (default)",
+  "mapPrice": {
+    "total": "{price} total",
+    "perNight": "{price} / night"
+  },
+  "edit": {
+    "toggle": "Edit search",
+    "destination": "Where to?",
+    "checkIn": "Check-in date",
+    "checkOut": "Check-out date",
+    "guests": "Number of guests",
+    "submit": "Update search",
+    "datesBoth": "Choose both a check-in and a check-out date.",
+    "datesOrder": "Check-out must be after check-in.",
+    "guestsInvalid": "Number of guests must be between 1 and 30."
   }
 }

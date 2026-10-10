@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -12,6 +12,7 @@ import RnplPlanCard, { type RnplPlan } from "@/components/booking/RnplPlan";
 import BookingMessages from "@/components/booking/BookingMessages";
 import BookingResolutionPanel from "@/components/resolution/BookingResolutionPanel";
 import { useFormat } from "@/i18n/use-format";
+import { loginHref } from "@/components/ui/ui";
 
 interface BookingDetail {
   id: string;
@@ -47,6 +48,11 @@ export default function BookingConfirmationPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [needsLogin, setNeedsLogin] = useState(false);
+  /** Ödeme/iptal sonrası durum değişikliği duyurusu (her zaman mount edilen canlı bölge). */
+  const [announcement, setAnnouncement] = useState("");
+  const prevStatus = useRef<string | null>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const focusHeading = useRef(false);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -54,6 +60,21 @@ export default function BookingConfirmationPage() {
       const data = await apiFetch<{ booking: BookingDetail; paymentPlan?: RnplPlan | null }>(
         `/api/bookings/${id}`
       );
+      const next = data.booking.status;
+      if (prevStatus.current !== null && prevStatus.current !== next) {
+        setAnnouncement(
+          next === "CONFIRMED"
+            ? t("detail.statusChanged.CONFIRMED")
+            : next === "CANCELLED"
+              ? t("detail.statusChanged.CANCELLED")
+              : t("detail.statusChanged.other", {
+                  status: isStatusKey(next) ? t(`status.${next}`) : next,
+                })
+        );
+        // Ödeme formu gibi odaktaki öğe DOM'dan kalkabileceği için odak başlığa taşınır.
+        focusHeading.current = true;
+      }
+      prevStatus.current = next;
       setBooking(data.booking);
       setPlan(data.paymentPlan ?? null);
     } catch (err) {
@@ -69,6 +90,12 @@ export default function BookingConfirmationPage() {
     return () => clearTimeout(timer);
   }, [load]);
 
+  useEffect(() => {
+    if (!focusHeading.current) return;
+    focusHeading.current = false;
+    headingRef.current?.focus();
+  }, [booking]);
+
   if (needsLogin) {
     return (
       <div className="flex min-h-screen flex-col bg-gray-50">
@@ -78,7 +105,7 @@ export default function BookingConfirmationPage() {
             <h1 className="text-2xl font-bold text-gray-900">{t("detail.loginRequiredTitle")}</h1>
             <p className="mt-2 text-gray-600">{t("detail.loginRequiredText")}</p>
             <Link
-              href="/login"
+              href={loginHref()}
               className="mt-4 inline-block rounded-lg bg-[#003580] px-6 py-3 text-sm font-semibold text-white"
             >
               {t("detail.login")}
@@ -98,6 +125,9 @@ export default function BookingConfirmationPage() {
     <div className="flex min-h-screen flex-col bg-gray-50">
       <Header />
       <main id="main" className="mx-auto w-full max-w-3xl flex-1 px-4 py-10">
+        <p role="status" className="sr-only">
+          {announcement}
+        </p>
         {loading ? (
           <p className="text-center text-gray-500">{t("detail.loading")}</p>
         ) : error ? (
@@ -114,7 +144,7 @@ export default function BookingConfirmationPage() {
         ) : booking ? (
           <div className="overflow-hidden rounded-2xl bg-white shadow-sm">
             <div className="bg-green-700 px-8 py-6 text-white">
-              <h1 className="text-2xl font-bold">
+              <h1 ref={headingRef} tabIndex={-1} className="text-2xl font-bold">
                 {isStatusKey(booking.status) ? t(`status.${booking.status}`) : booking.status}
               </h1>
               <p className="mt-1 text-sm text-green-50">
@@ -193,6 +223,7 @@ export default function BookingConfirmationPage() {
                   {t("detail.myBookings")}
                 </Link>
                 <button
+                  type="button"
                   onClick={print}
                   className="rounded-lg border border-gray-300 px-6 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
                 >

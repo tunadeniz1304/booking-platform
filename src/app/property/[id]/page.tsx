@@ -14,11 +14,16 @@ import ReviewsSection from "@/components/property/ReviewsSection";
 import AccessibilitySection from "@/components/property/AccessibilitySection";
 import { listPublicFeatures } from "@/lib/compliance/accessibility";
 import PriceCalendar from "@/components/property/PriceCalendar";
+import { toSnapshot, type PolicySnapshot } from "@/lib/booking/cancellation";
 
 interface PropertyPageProps {
   params: Promise<{ id: string }>;
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }
+
+// ui.tsx "use client" modülü; sunucu bileşeninde aynı focusRing sınıfları yerel kopya.
+const focusRing =
+  "focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003580] focus-visible:ring-offset-2";
 
 const one = (v: string | string[] | undefined) => (typeof v === "string" ? v : undefined);
 
@@ -36,6 +41,10 @@ interface PropertyDetail {
   amenities: { name: string; icon: string | null }[];
   images: string[];
   rooms: BookingWidgetRoom[];
+  timeZone: string;
+  checkInTime: string;
+  checkOutTime: string;
+  cancellationPolicy: { kind: string; version: number; rules: unknown } | null;
 }
 
 async function getProperty(id: string): Promise<PropertyDetail | null> {
@@ -52,6 +61,10 @@ async function getProperty(id: string): Promise<PropertyDetail | null> {
       ratingAvg: true,
       ratingCount: true,
       images: true,
+      timeZone: true,
+      checkInTime: true,
+      checkOutTime: true,
+      cancellationPolicy: { select: { kind: true, version: true, rules: true } },
       location: { select: { city: true, country: true } },
       amenities: { select: { name: true, icon: true } },
       rooms: {
@@ -122,6 +135,14 @@ export default async function PropertyPage({ params, searchParams }: PropertyPag
   }
   // P1-13(e): yalnız doğrulanmış erişilebilirlik özellikleri.
   const accessibility = await listPublicFeatures(property.id);
+  // Başlıktaki puan, aşağıda listelenen yayımlanmış yorumlarla tutarlı olsun (F132).
+  const ratingAgg = await prisma.review.aggregate({
+    where: { propertyId: property.id, moderationStatus: "PUBLISHED" },
+    _avg: { rating: true },
+    _count: { _all: true },
+  });
+  const reviewCount = ratingAgg._count._all;
+  const reviewAvg = ratingAgg._avg.rating ?? 0;
   // P1-7: kayıt no gösterimi ve toplam fiyat notu tesis pazarının kuralından.
   const market = marketRulesFor(property.location.country);
   const registrationLabel =
@@ -130,6 +151,28 @@ export default async function PropertyPage({ params, searchParams }: PropertyPag
       : market.registration.scheme === "eu-2024-1028"
         ? t("registration.euRegistration")
         : t("registration.platform");
+
+  // İptal politikası (atanmamışsa varsayılan); kurallar okunamazsa bölüm yalnız saatleri gösterir.
+  let policy: PolicySnapshot | null;
+  try {
+    policy = toSnapshot(property.cancellationPolicy);
+  } catch {
+    policy = null;
+  }
+  const tiers = policy ? [...policy.rules.tiers].sort((a, b) => b.hoursBefore - a.hoursBefore) : [];
+  const tierText = (tier: { hoursBefore: number; refundPercent: number }) => {
+    const percent = tier.refundPercent;
+    if (tiers.length === 1) return t("policies.tierAny", { percent });
+    if (tier.hoursBefore <= 0) return t("policies.tierLater", { percent });
+    if (tier.hoursBefore % 24 === 0) {
+      return t("policies.tierDays", { days: tier.hoursBefore / 24, percent });
+    }
+    return t("policies.tierHours", { hours: tier.hoursBefore, percent });
+  };
+  const amenityName = (amenity: { name: string; icon: string | null }) =>
+    amenity.icon && t.has(`amenityNames.${amenity.icon}`)
+      ? t(`amenityNames.${amenity.icon}`)
+      : null;
 
   return (
     <div className="min-h-screen bg-white">
@@ -140,13 +183,28 @@ export default async function PropertyPage({ params, searchParams }: PropertyPag
             {property.location.city}, {property.location.country}
           </p>
           <h1 className="mt-1 text-3xl font-bold text-gray-900">{property.title}</h1>
-          <div className="mt-2 flex items-center gap-2">
-            <span className="inline-flex items-center rounded-lg bg-[#003580] px-2 py-1 text-sm font-semibold text-white">
-              {property.ratingAvg.toFixed(1)}
-            </span>
-            <span className="text-sm text-gray-600">
-              {t("ratingCount", { count: property.ratingCount })}
-            </span>
+          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+            {reviewCount > 0 ? (
+              <>
+                <span className="inline-flex items-center rounded-lg bg-[#003580] px-2 py-1 text-sm font-semibold text-white">
+                  {t("ratingOutOf", { rating: reviewAvg.toFixed(1) })}
+                </span>
+                <a
+                  href="#reviews-title"
+                  className={`inline-flex min-h-[44px] items-center text-sm text-gray-600 underline sm:min-h-0 ${focusRing}`}
+                >
+                  {t("ratingCount", { count: reviewCount })}
+                </a>
+              </>
+            ) : (
+              <span className="text-sm text-gray-600">{t("noRatingYet")}</span>
+            )}
+            <a
+              href="#booking"
+              className={`inline-flex min-h-[44px] items-center text-sm text-gray-600 underline sm:min-h-0 ${focusRing}`}
+            >
+              {t("jumpToBooking")}
+            </a>
           </div>
           {property.licenseNumber && (
             <p className="mt-2 text-sm text-gray-600" data-testid="registration-number">
@@ -158,27 +216,80 @@ export default async function PropertyPage({ params, searchParams }: PropertyPag
           )}
         </div>
 
+        {/* Mobilde sıra: galeri → rezervasyon formu → ayrıntılar; masaüstünde form sağ sütunda. */}
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-2 lg:col-start-1 lg:row-start-1">
             <PropertyGallery images={property.images} title={property.title} />
+          </div>
 
-            <div className="mt-8">
+          <div
+            id="booking"
+            tabIndex={-1}
+            className="scroll-mt-6 focus:outline-none lg:col-span-1 lg:col-start-3 lg:row-span-2 lg:row-start-1"
+          >
+            <div className="lg:sticky lg:top-6 lg:-m-1 lg:max-h-[calc(100dvh-3rem)] lg:overflow-y-auto lg:overscroll-contain lg:p-1">
+              <BookingWidget
+                propertyId={property.id}
+                rooms={property.rooms}
+                basePriceMinor={property.basePriceMinor}
+                currency={property.currency}
+                initial={initial}
+              />
+            </div>
+          </div>
+
+          <div className="lg:col-span-2 lg:col-start-1 lg:row-start-2">
+            <div>
               <h2 className="text-xl font-semibold text-gray-900">{t("description")}</h2>
               <p className="mt-2 whitespace-pre-line text-gray-700">{property.description}</p>
             </div>
+
+            <section id="policies" aria-labelledby="policies-title" className="mt-8 scroll-mt-6">
+              <h2 id="policies-title" className="text-xl font-semibold text-gray-900">
+                {t("policies.title")}
+              </h2>
+              <ul className="mt-2 space-y-1 text-sm text-gray-700">
+                <li>{t("policies.checkIn", { time: property.checkInTime })}</li>
+                <li>{t("policies.checkOut", { time: property.checkOutTime })}</li>
+              </ul>
+              <p className="mt-1 text-xs text-gray-500">
+                {t("policies.localTime", { timeZone: property.timeZone })}
+              </p>
+              {policy && (
+                <>
+                  <h3 className="mt-4 text-sm font-medium text-gray-800">
+                    {t("policies.cancellationTitle", {
+                      kind: t(`policies.kinds.${policy.kind}`),
+                    })}
+                  </h3>
+                  <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-gray-700">
+                    {policy.rules.graceHours ? (
+                      <li>{t("policies.grace", { hours: policy.rules.graceHours })}</li>
+                    ) : null}
+                    {tiers.map((tier) => (
+                      <li key={tier.hoursBefore}>{tierText(tier)}</li>
+                    ))}
+                  </ul>
+                  <p className="mt-2 text-xs text-gray-500">{t("policies.note")}</p>
+                </>
+              )}
+            </section>
 
             {property.amenities.length > 0 && (
               <div className="mt-8">
                 <h2 className="text-xl font-semibold text-gray-900">{t("amenities")}</h2>
                 <ul className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
-                  {property.amenities.map((amenity) => (
-                    <li
-                      key={amenity.name}
-                      className="rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-700"
-                    >
-                      {amenity.name}
-                    </li>
-                  ))}
+                  {property.amenities.map((amenity) => {
+                    const translated = amenityName(amenity);
+                    return (
+                      <li
+                        key={amenity.name}
+                        className="rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-700"
+                      >
+                        {translated ?? <span lang="tr">{amenity.name}</span>}
+                      </li>
+                    );
+                  })}
                 </ul>
               </div>
             )}
@@ -198,18 +309,6 @@ export default async function PropertyPage({ params, searchParams }: PropertyPag
                 {tc("reportListing")}
               </Link>
             </p>
-          </div>
-
-          <div className="lg:col-span-1">
-            <div className="lg:sticky lg:top-6">
-              <BookingWidget
-                propertyId={property.id}
-                rooms={property.rooms}
-                basePriceMinor={property.basePriceMinor}
-                currency={property.currency}
-                initial={initial}
-              />
-            </div>
           </div>
         </div>
       </main>

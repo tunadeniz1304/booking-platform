@@ -31,7 +31,8 @@
     },
     "cookies": {
       "title": "6. Cookies",
-      "body": "<strong>Essential cookies</strong> (session, security, language preference) are required for the service to work and are not subject to consent. <strong>Analytics cookies</strong> are used only if you give consent in the cookie banner. Your preference is stored in the <code>cookie_consent</code> cookie; you can change your preference by deleting that cookie."
+      "body": "<strong>Essential cookies</strong> (session, security, language preference) are required for the service to work and are not subject to consent. <strong>Analytics cookies</strong> are used only if you give consent in the cookie banner. You can update your preference at any time with the \"Change cookie preferences\" button below.",
+      "change": "Change cookie preferences"
     },
     "rights": {
       "title": "7. Your rights (KVKK Art. 11)",
@@ -50,13 +51,32 @@
     "exportBody": "Download a copy of the personal data associated with your account (profile, bookings, reviews, favorites) as JSON. The password hash is not exported.",
     "exportButton": "Download my data",
     "deleteTitle": "Delete my account",
-    "deleteBody": "Your personal fields are deleted or replaced with a pseudonym. Booking and payment records are kept in anonymized form due to legal retention obligations. This action cannot be undone.",
+    "deleteBody": "Your personal fields are deleted or replaced with a pseudonym. Booking and payment records are kept in anonymised form because of legal retention obligations. This cannot be undone.",
     "deleteButton": "Delete my account",
     "confirmTitle": "Are you sure you want to permanently delete your account?",
-    "acknowledge": "I understand this action cannot be undone.",
+    "acknowledge": "I understand that my upcoming bookings will be cancelled under their cancellation terms, my wallet credit will be deleted and this cannot be undone.",
     "deleting": "Deleting…",
     "confirmDelete": "Yes, delete my account",
     "cancel": "Cancel",
-    "noticeLink": "You can read how your data is processed in the <link>privacy notice</link>."
+    "noticeLink": "You can read how your data is processed in the <link>privacy notice</link>.",
+    "deleteEffects": {
+      "title": "When you delete your account:",
+      "bookings": "Your upcoming bookings are cancelled under the cancellation terms that applied when you booked. You may get no refund or only a partial refund.",
+      "wallet": "Credit and rewards in your wallet are deleted and cannot be used later.",
+      "transfers": "Booking transfer listings you have put up for sale are withdrawn.",
+      "listings": "If you are a host, your listings are taken offline.",
+      "obligations": "If, as a host, you have upcoming confirmed bookings, a pending payout or an open claim, you must resolve them first."
+    },
+    "exportFailed": "Could not download your data. Please try again.",
+    "deleteFailed": "Could not delete your account. Please try again.",
+    "obligations": {
+      "title": "Your account cannot be deleted yet. Please resolve the following first:",
+      "hostedBookings": "{count, plural, one {You have # upcoming confirmed booking as a host.} other {You have # upcoming confirmed bookings as a host.}}",
+      "hostedBookingsLink": "Go to host dashboard",
+      "pendingPayouts": "{count, plural, one {You have # pending payout.} other {You have # pending payouts.}}",
+      "pendingPayoutsLink": "Go to my payouts",
+      "openClaims": "{count, plural, one {You have # open claim.} other {You have # open claims.}}",
+      "openClaimsLink": "Go to my claims"
+    }
   }
 }

@@ -36,6 +36,7 @@ export const NAMESPACES = [
   "reviews",
   "search",
   "support",
+  "titles",
   "transfers",
   "trust",
   "trustCenter",

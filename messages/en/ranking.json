@@ -5,7 +5,10 @@
   "table": {
     "component": "Component",
     "weight": "Weight",
-    "description": "Description"
+    "description": "Description",
+    "caption": "Components and weights of the recommended order",
+    "weightNoQuery": "Weight (without search text)",
+    "weightWithQuery": "Weight (with search text or a destination)"
   },
   "weightValue": "{value}%",
   "factors": {
@@ -32,5 +35,7 @@
   },
   "footnote": "When you sort by price, rating or most liked, only that criterion is used.",
   "why": "Why this ranking?",
-  "totalScore": "Total score: {score}"
+  "totalScore": "Total score: {score}",
+  "withQueryNote": "When you enter a destination or search text, search text similarity counts for more so that results match what you are looking for; in that case the weights in the third column are used.",
+  "experimentNote": "To improve the ranking, some visitors may see an experimental, self-learning ranking model. It uses only the components above, and paid placement or commission does not affect it either."
 }

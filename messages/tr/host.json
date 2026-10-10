@@ -1,15 +1,29 @@
 {
   "page": {
     "title": "Ev sahibi paneli",
-    "intro": "Mülklerinizi düzenleyin, oda ekleyin, takvimi toplu güncelleyin ve rezervasyonları izleyin."
+    "intro": "İlan oluşturun ve düzenleyin, oda ekleyin, takvimi toplu güncelleyin, rezervasyonları ve misafir mesajlarını izleyin."
   },
   "messagesPage": {
-    "back": "← Ev sahibi paneli"
+    "back": "Ev sahibi paneli",
+    "title": "Misafir yazışması",
+    "intro": "Bu rezervasyonun misafiriyle yazışın; konaklamadan sonra hasar olduysa aşağıdan depozitodan karşılanması için talep açabilirsiniz."
   },
   "dashboard": {
     "revenueLink": "Gelir paneli: doluluk, ADR, RevPAR ve fiyat önerileri →",
     "loadingProperties": "Mülkler yükleniyor…",
-    "noProperties": "Henüz bir mülkünüz yok."
+    "noProperties": "Henüz bir ilanınız yok. İlk ilanınızı oluşturduğunuzda burada düzenleyebilir, oda ekleyebilir ve takvimi yönetebilirsiniz.",
+    "sectionsNav": "Panel bölümleri",
+    "navBookings": "Rezervasyonlar ve mesajlar",
+    "navProperties": "İlanlarım",
+    "navPromotions": "Promosyonlar",
+    "navAccessibility": "Erişilebilirlik",
+    "propertiesTitle": "İlanlarım",
+    "createFirst": "İlk ilanınızı oluşturun",
+    "createNew": "Yeni ilan oluştur",
+    "filterLabel": "İlan ara",
+    "filterHint": "İlanları başlığa göre süzer.",
+    "filterEmpty": "Aramanızla eşleşen ilan yok.",
+    "retry": "Yeniden dene"
   },
   "bookings": {
     "title": "Rezervasyonlar",
@@ -25,7 +39,8 @@
       "status": "Durum",
       "messages": "Mesajlar"
     },
-    "messagesLink": "Mesajlar"
+    "messagesLink": "Mesajlar",
+    "error": "Rezervasyonlar yüklenemedi."
   },
   "bookingStatus": {
     "PENDING": "Beklemede",
@@ -52,11 +67,26 @@
       "description": "Açıklama",
       "licenseNumber": "İzin belgesi no",
       "licenseHint": "İl plaka kodu + sıra no, ör. 34-12345. Belgesiz ilan yayınlanamaz.",
-      "isActive": "İlan yayında"
+      "isActive": "Kaydettiğimde yayına al",
+      "basePriceHint": "Örnek: 1.500 veya 1.500,50"
     },
     "saving": "Kaydediliyor…",
     "save": "Kaydet",
-    "saved": "Kaydedildi."
+    "saved": "Kaydedildi.",
+    "manage": "İlanı yönet: bilgiler, odalar, takvim, fotoğraflar",
+    "visibility": {
+      "live": "Aramada görünüyor.",
+      "pending": "Yayına işaretli, ancak izin belgesi doğrulanana kadar aramada görünmüyor.",
+      "rejected": "İzin belgesi kayıtta bulunamadı; ilan aramada görünmüyor. Belge numarasını düzeltip Kaydet düğmesine basın.",
+      "off": "Yayında değil; aramada görünmüyor."
+    },
+    "pricePreview": "Yeni gecelik fiyat: {price} (şu anki: {previous})",
+    "invalidAmount": "Geçerli bir tutar girin (ör. 1.500 veya 1.500,50).",
+    "priceConfirm": {
+      "title": "Fiyatta büyük değişiklik",
+      "body": "Taban gecelik fiyat {from} yerine {to} olacak. Doğru mu?",
+      "confirm": "Evet, fiyatı kaydet"
+    }
   },
   "rooms": {
     "title": "Odalar",
@@ -70,8 +100,13 @@
       "defaultBedType": "Çift kişilik",
       "priceModifier": "Fiyat farkı",
       "submit": "Oda ekle",
-      "added": "Oda eklendi."
-    }
+      "added": "Oda eklendi.",
+      "adding": "Ekleniyor…",
+      "priceModifierHint": "Taban fiyata eklenecek gecelik tutar; ör. 250 veya 250,50"
+    },
+    "closeSale": "Satışa kapat",
+    "openSale": "Satışa aç",
+    "updated": "Oda güncellendi."
   },
   "calendar": {
     "title": "Toplu takvim güncellemesi",
@@ -85,12 +120,16 @@
     "close": "Satışa kapat",
     "submit": "Takvimi güncelle",
     "noChange": "Fiyat veya müsaitlik değişikliği girin.",
-    "result": "Güncellenen gece: {updated}, eklenen: {created}, rezervasyonlu olduğu için atlanan: {skipped}."
+    "result": "Güncellenen gece: {updated}, eklenen: {created}, rezervasyonlu olduğu için atlanan: {skipped}.",
+    "priceHint": "Örnek: 2.750 veya 2.750,50"
   },
   "listingCopy": {
     "suggesting": "Öneri hazırlanıyor…",
     "suggest": "İlan metni önerisi",
-    "draft": "Taslak (otomatik yayınlanmaz, düzenleyip onaylayın)"
+    "draft": "Taslak (otomatik yayınlanmaz, düzenleyip onaylayın)",
+    "title": "İlan metni önerisi",
+    "trLabel": "Türkçe:",
+    "enLabel": "İngilizce:"
   },
   "photos": {
     "title": "Fotoğraflar",
@@ -103,7 +142,17 @@
     },
     "remove": "Fotoğrafı kaldır",
     "lowQuality": "Fotoğraf bulanık veya pozlaması zayıf görünüyor; daha net bir kare yüklemeyi düşünün.",
-    "visualOff": "Görsel benzerlik araması bu ortamda kapalı; fotoğraf yine de yayınlandı."
+    "visualOff": "Görsel benzerlik araması bu ortamda kapalı; fotoğraf yine de yayınlandı.",
+    "loading": "Fotoğraflar yükleniyor…",
+    "count": "{count, plural, =0 {Henüz fotoğraf yok.} one {# fotoğraf} other {# fotoğraf}}",
+    "alt": "İlan fotoğrafı {index}",
+    "uploadLabel": "Fotoğraf yükle",
+    "removed": "Fotoğraf kaldırıldı.",
+    "removeConfirm": {
+      "title": "Fotoğraf kaldırılsın mı?",
+      "body": "Bu fotoğraf ilandan kalıcı olarak silinir ve misafirler artık göremez.",
+      "confirm": "Fotoğrafı kaldır"
+    }
   },
   "promotions": {
     "title": "Promosyonlar",
@@ -156,7 +205,46 @@
       "priority": "Öncelik",
       "priorityHint": "Yüksek öncelik önce uygulanır.",
       "stackable": "Diğer promosyonlarla birleşebilir",
-      "submit": "Promosyon ekle"
+      "submit": "Promosyon ekle",
+      "nameHint": "{min}–{max} karakter.",
+      "percentHint": "0,01 ile 100 arasında bir oran girin.",
+      "preview": "Örnek: gecelik {before} olan fiyat %{percent} indirimle {after} olur.",
+      "highWarning": "Dikkat: %{percent} indirim çok yüksek. Kaydetmeden önce oranı kontrol edin.",
+      "highConfirmTitle": "%{percent} indirim kaydedilsin mi?",
+      "highConfirmBody": "Misafirler fiyatın yalnızca küçük bir kısmını öder. %100 indirim konaklamayı ücretsiz yapar.",
+      "highConfirm": "Evet, kaydet",
+      "stackableWarning": "Birleşebilir promosyonlar birlikte uygulanır; toplam indirim tek başına bu orandan yüksek olabilir.",
+      "rangeHint": "{min} ile {max} arasında bir sayı girin.",
+      "couponHint": "{min}–{max} karakter; yalnız harf, rakam, - ve _ kullanın."
     }
+  },
+  "form": {
+    "fieldInvalid": "Bu alanı kontrol edin.",
+    "fieldErrorsSummary": "{count, plural, one {# alanda} other {# alanda}} sorun var; işaretli alanları düzeltip tekrar deneyin."
+  },
+  "create": {
+    "title": "Yeni ilan",
+    "intro": "Temel bilgileri ve ilk odanızı girin. Fotoğraf, ek oda ve takvimi ilan oluşturulduktan sonra ekleyebilirsiniz. İlan, izin belgesi doğrulanınca aramada görünür.",
+    "type": "Konaklama türü",
+    "types": {
+      "HOTEL": "Otel",
+      "APARTMENT": "Daire",
+      "VILLA": "Villa",
+      "HOSTEL": "Hostel",
+      "BED_AND_BREAKFAST": "Pansiyon"
+    },
+    "descriptionHint": "En az 10 karakter. Misafirlerin ilk okuduğu metin budur.",
+    "city": "Şehir",
+    "country": "Ülke",
+    "defaultCountry": "Türkiye",
+    "basePrice": "Taban gecelik fiyat",
+    "currency": "Para birimi",
+    "firstRoom": "İlk oda",
+    "submit": "İlanı oluştur",
+    "submitting": "Oluşturuluyor…",
+    "created": "İlan oluşturuldu.",
+    "cancel": "Vazgeç",
+    "kycRequired": "İlan oluşturabilmek için önce kimliğinizi doğrulamanız gerekiyor. Bu, misafirlerin güvenliği için zorunludur.",
+    "kycLink": "Hesabım sayfasında kimliğimi doğrula"
   }
 }

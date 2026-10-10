@@ -13,7 +13,8 @@
     "pros": "Pros",
     "cons": "Cons",
     "sources": "Sources:",
-    "unavailable": "The review summary is not available right now."
+    "unavailable": "The review summary is not available right now.",
+    "inTurkish": "This summary is written in Turkish."
   },
   "subScores": {
     "cleanliness": "Cleanliness",

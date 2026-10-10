@@ -8,7 +8,8 @@
     "guests": "Misafir sayısı",
     "startDate": "Başlangıç tarihi",
     "submit": "Plan oluştur",
-    "submitting": "Planlanıyor…"
+    "submitting": "Planlanıyor…",
+    "citiesHint": "Örnek: İstanbul, Kapadokya, Antalya"
   },
   "result": {
     "title": "Önerilen plan",
@@ -19,6 +20,21 @@
     "holdLabel": "{city} konaklamasını tut (hold)",
     "noStay": "Bu tarihlerde uygun konaklama bulunamadı.",
     "total": "Konaklama toplamı: <b>{amount}</b>",
-    "note": "Plan rezervasyon yapmaz; «Tut» ile odayı kısa süre ayırıp ödemeye geçersiniz."
+    "note": "Plan rezervasyon yapmaz. «Tut» odayı kısa süre sizin için ayırır; her durak için «Öde» ile ödemeyi tamamlayın. Planınız bu sekmede saklanır.",
+    "held": "Tutuldu, kısa süre içinde ödeyin.",
+    "pay": "Öde",
+    "payLabel": "{city} konaklamasını öde",
+    "heldSummary": "Tutulan durak: {held}/{total}"
+  },
+  "errors": {
+    "citiesRequired": "En az bir şehir girin.",
+    "tooManyCities": "En fazla {max} şehir girin; şu an {count} şehir var.",
+    "cityLength": "\"{city}\" geçerli bir şehir adı değil; her şehir 2 ile 60 karakter arasında olmalı.",
+    "invalid": {
+      "cities": "Şehirleri kontrol edin: 1–6 şehir, virgülle ayrılmış.",
+      "days": "Gün sayısı 1 ile 30 arasında olmalı.",
+      "guests": "Misafir sayısı 1 ile 10 arasında olmalı.",
+      "startDate": "Geçerli bir başlangıç tarihi seçin."
+    }
   }
 }

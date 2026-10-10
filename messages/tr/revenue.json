@@ -28,7 +28,15 @@
     "noData": "Veri yok.",
     "chartTitle": "Pickup grafiği",
     "chartDesc": "Son {count} günde girilen rezervasyonların penceredeki oda-gece toplamı; son değer {last}.",
-    "caption": "Çizgi: penceredeki toplam oda-gece · Çubuk: o gün girilen oda-gece"
+    "caption": "Çizgi: penceredeki toplam oda-gece · Çubuk: o gün girilen oda-gece",
+    "trend": "Penceredeki oda-gece {first} değerinden {last} değerine çıktı; bir günde en çok {dailyMax} oda-gece girildi.",
+    "tableToggle": "Veriyi tablo olarak göster",
+    "tableCaption": "Günlük pickup verisi",
+    "columns": {
+      "date": "Tarih",
+      "pickup": "O gün girilen oda-gece",
+      "onBooks": "Penceredeki toplam oda-gece"
+    }
   },
   "suggestions": {
     "title": "Fiyat önerileri",
@@ -46,6 +54,12 @@
       "contribution": "Katkı"
     },
     "accept": "Kabul et",
-    "reject": "Reddet"
-  }
+    "reject": "Reddet",
+    "acceptNote": "Kabul ettiğiniz fiyat hemen yayına girer ve sabitlenir; motor bu geceyi bir daha güncellemez. Eski fiyata dönmek için takvimden elle fiyat girmeniz gerekir.",
+    "acceptConfirmTitle": "{room} · {date} fiyatı {from} → {to} olarak ayarlansın mı?",
+    "acceptConfirm": "Fiyatı ayarla",
+    "accepted": "{room} · {date} fiyatı {from} → {to} olarak ayarlandı ve sabitlendi. Önceki fiyat: {from}.",
+    "rejected": "{room} · {date} önerisi reddedildi; fiyat {from} olarak kaldı."
+  },
+  "loaded": "{title} verileri yüklendi."
 }

@@ -15,7 +15,10 @@
     "connectHuman": "Talk to a human",
     "humanMessage": "I would like to talk to a human agent.",
     "humanHint": "If the AI answer is not enough, you can hand the conversation straight to our human support team.",
-    "humanPending": "Your request was forwarded to our human support team; an agent will get back to you."
+    "humanPending": "Your request was forwarded to our human support team; an agent will get back to you.",
+    "bookingLabel": "Which booking is this about?",
+    "bookingNone": "None selected (your nearest booking is used)",
+    "context": "Booking: {booking}"
   },
   "admin": {
     "link": "Support queue",
@@ -42,6 +45,8 @@
       "MONEY_REQUEST": "Money/refund request",
       "LEGAL_OR_COMPLAINT": "Legal/complaint",
       "USER_REQUEST": "User asked for a human"
-    }
+    },
+    "ticketId": "Ticket no: {id}",
+    "user": "User: {id}"
   }
 }

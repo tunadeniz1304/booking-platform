@@ -1,19 +1,21 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
-import { useTranslations } from "next-intl";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import { apiFetch } from "@/lib/api-client";
 import { useFormat } from "@/i18n/use-format";
 import {
   Button,
   Card,
   Field,
+  focusRing,
   LlmBadge,
   Status,
   errorMessage,
   inputClass,
   useLoader,
 } from "@/components/ui/ui";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 interface OutboxState {
   counts: Record<string, number>;
@@ -75,6 +77,42 @@ interface ExperimentResult {
 
 type Feedback = { error?: string; message?: string };
 
+/**
+ * Satır eylemi sonrası odak kurtarma: eylem başarılı olunca `mark(index)` çağrılır;
+ * yeniden yüklenen veride odaklı düğme DOM'dan kalktıysa (odak <body>'ye düştüyse)
+ * aynı sıradaki (yoksa son) satırın ilk denetimine, liste boşaldıysa kart başlığına odaklanır.
+ * Satırlar `data-row` özniteliği taşımalıdır.
+ */
+export function useRowFocusRecovery(data: unknown, cardId: string): (index: number) => void {
+  const pending = useRef<number | null>(null);
+  useEffect(() => {
+    const index = pending.current;
+    if (index === null || !data) return;
+    pending.current = null;
+    const active = document.activeElement;
+    if (active && active !== document.body && active.isConnected) return;
+    const card = document.getElementById(cardId);
+    if (!card) return;
+    const rows = card.querySelectorAll<HTMLElement>("[data-row]");
+    const row = rows.length > 0 ? rows[Math.min(index, rows.length - 1)] : null;
+    const target =
+      row?.querySelector<HTMLElement>("button, a[href], input, textarea, select") ??
+      card.querySelector<HTMLElement>("h2");
+    if (!target) return;
+    if (target.tagName === "H2") target.setAttribute("tabindex", "-1");
+    target.focus();
+  }, [data, cardId]);
+  return (index: number) => {
+    pending.current = index;
+  };
+}
+
+/** Sunucu/LLM kaynaklı Türkçe metni, arayüz dili Türkçe değilse `lang="tr"` ile işaretler. */
+function TrText({ children }: { children: ReactNode }) {
+  const locale = useLocale();
+  return locale === "tr" ? <>{children}</> : <span lang="tr">{children}</span>;
+}
+
 export default function AdminDashboard() {
   return (
     <div className="space-y-6">
@@ -130,15 +168,21 @@ function OutboxCard() {
   const f = useFormat();
   const { data, error, reload } = useLoader(() => apiFetch<OutboxState>("/api/admin/outbox"));
   const [feedback, setFeedback] = useState<Feedback>({});
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const markFocus = useRowFocusRecovery(data, "outbox");
 
-  async function requeue(id: string) {
+  async function requeue(id: string, index: number) {
     setFeedback({});
+    setBusyId(id);
     try {
       await apiFetch("/api/admin/outbox", { method: "POST", body: JSON.stringify({ id }) });
       setFeedback({ message: t("outbox.requeued") });
+      markFocus(index);
       reload();
     } catch (e) {
       setFeedback({ error: errorMessage(e) });
+    } finally {
+      setBusyId(null);
     }
   }
 
@@ -160,9 +204,10 @@ function OutboxCard() {
             <p className="text-sm text-gray-700">{t("outbox.deadEmpty")}</p>
           ) : (
             <ul className="mt-2 space-y-2">
-              {data.dead.map((m) => (
+              {data.dead.map((m, index) => (
                 <li
                   key={m.id}
+                  data-row
                   className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3 text-sm"
                 >
                   <span>
@@ -172,7 +217,11 @@ function OutboxCard() {
                       <span className="block text-xs text-red-800">{m.lastError}</span>
                     )}
                   </span>
-                  <Button variant="secondary" onClick={() => requeue(m.id)}>
+                  <Button
+                    variant="secondary"
+                    busy={busyId === m.id}
+                    onClick={() => requeue(m.id, index)}
+                  >
                     {t("outbox.requeue")}
                   </Button>
                 </li>
@@ -193,6 +242,9 @@ function EventsCard() {
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<Feedback>({});
   const [lastMode, setLastMode] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const { confirm, confirmDialog } = useConfirm();
+  const markFocus = useRowFocusRecovery(data, "events");
 
   async function propose(e: FormEvent) {
     e.preventDefault();
@@ -214,14 +266,28 @@ function EventsCard() {
     }
   }
 
-  async function act(id: string, action: "approve" | "reject" | "rollback") {
+  async function act(ev: DemandEvent, index: number, action: "approve" | "reject" | "rollback") {
+    if (action !== "approve") {
+      const key = action === "reject" ? "confirmReject" : "confirmRollback";
+      const ok = await confirm({
+        title: t(`events.${key}.title`, { title: ev.title }),
+        body: t(`events.${key}.body`),
+        confirmLabel: t(`events.${key}.confirm`),
+        tone: "danger",
+      });
+      if (!ok) return;
+    }
     setFeedback({});
+    setBusyId(ev.id);
     try {
-      await apiFetch(`/api/admin/events/${id}/${action}`, { method: "POST", body: "{}" });
+      await apiFetch(`/api/admin/events/${ev.id}/${action}`, { method: "POST", body: "{}" });
       setFeedback({ message: t("events.applied") });
+      markFocus(index);
       reload();
     } catch (err) {
       setFeedback({ error: errorMessage(err) });
+    } finally {
+      setBusyId(null);
     }
   }
 
@@ -253,8 +319,8 @@ function EventsCard() {
       {data && data.length === 0 && <p className="text-sm text-gray-700">{t("events.empty")}</p>}
       {data && data.length > 0 && (
         <ul className="mt-2 space-y-2">
-          {data.map((ev) => (
-            <li key={ev.id} className="rounded-md border p-3 text-sm text-gray-900">
+          {data.map((ev, index) => (
+            <li key={ev.id} data-row className="rounded-md border p-3 text-sm text-gray-900">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span>
                   <strong>{ev.title}</strong> · {ev.location.city} · {f.date(ev.startsAt, "short")}–
@@ -264,24 +330,39 @@ function EventsCard() {
                 <span className="flex gap-2">
                   {ev.status === "PROPOSED" && (
                     <>
-                      <Button onClick={() => act(ev.id, "approve")}>{t("events.approve")}</Button>
-                      <Button variant="secondary" onClick={() => act(ev.id, "reject")}>
+                      <Button busy={busyId === ev.id} onClick={() => act(ev, index, "approve")}>
+                        {t("events.approve")}
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        busy={busyId === ev.id}
+                        onClick={() => act(ev, index, "reject")}
+                      >
                         {t("events.reject")}
                       </Button>
                     </>
                   )}
                   {ev.status === "APPROVED" && (
-                    <Button variant="danger" onClick={() => act(ev.id, "rollback")}>
+                    <Button
+                      variant="danger"
+                      busy={busyId === ev.id}
+                      onClick={() => act(ev, index, "rollback")}
+                    >
                       {t("events.rollback")}
                     </Button>
                   )}
                 </span>
               </div>
-              {ev.rationale && <p className="mt-1 text-xs text-gray-700">{ev.rationale}</p>}
+              {ev.rationale && (
+                <p className="mt-1 text-xs text-gray-700">
+                  <TrText>{ev.rationale}</TrText>
+                </p>
+              )}
             </li>
           ))}
         </ul>
       )}
+      {confirmDialog}
     </Card>
   );
 }
@@ -310,18 +391,34 @@ function FraudCard() {
   const t = useTranslations("admin");
   const { data, error, reload } = useLoader(() => apiFetch<FraudCheck[]>("/api/admin/fraud"));
   const [feedback, setFeedback] = useState<Feedback>({});
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const { confirm, confirmDialog } = useConfirm();
+  const markFocus = useRowFocusRecovery(data, "fraud");
 
-  async function resolve(id: string, resolution: "legit" | "fraud") {
+  async function resolve(check: FraudCheck, index: number, resolution: "legit" | "fraud") {
+    if (resolution === "fraud") {
+      const ok = await confirm({
+        title: t("fraud.confirm.title", { booking: check.bookingId }),
+        body: t("fraud.confirm.body", { user: check.userId }),
+        confirmLabel: t("fraud.confirm.confirm"),
+        tone: "danger",
+      });
+      if (!ok) return;
+    }
     setFeedback({});
+    setBusyId(check.id);
     try {
       await apiFetch("/api/admin/fraud", {
         method: "POST",
-        body: JSON.stringify({ id, resolution }),
+        body: JSON.stringify({ id: check.id, resolution }),
       });
       setFeedback({ message: t("decisionSaved") });
+      markFocus(index);
       reload();
     } catch (e) {
       setFeedback({ error: errorMessage(e) });
+    } finally {
+      setBusyId(null);
     }
   }
 
@@ -331,9 +428,10 @@ function FraudCard() {
       {data?.length === 0 && <p className="text-sm text-gray-700">{t("fraud.empty")}</p>}
       {data && data.length > 0 && (
         <ul className="space-y-2">
-          {data.map((f) => (
+          {data.map((f, index) => (
             <li
               key={f.id}
+              data-row
               className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3 text-sm"
             >
               <span>
@@ -347,17 +445,30 @@ function FraudCard() {
                     <li key={`${r.code}-${i}`}>
                       <code>{r.code}</code>
                       {r.points !== null && ` (+${r.points})`}
-                      {r.detail && ` — ${r.detail}`}
+                      {r.detail && (
+                        <>
+                          {" — "}
+                          <TrText>{r.detail}</TrText>
+                        </>
+                      )}
                     </li>
                   ))}
                   {fraudReasons(f.reasons).length === 0 && <li>{t("fraud.noReasons")}</li>}
                 </ul>
               </span>
               <span className="flex gap-2">
-                <Button variant="secondary" onClick={() => resolve(f.id, "legit")}>
+                <Button
+                  variant="secondary"
+                  busy={busyId === f.id}
+                  onClick={() => resolve(f, index, "legit")}
+                >
                   {t("fraud.legit")}
                 </Button>
-                <Button variant="danger" onClick={() => resolve(f.id, "fraud")}>
+                <Button
+                  variant="danger"
+                  busy={busyId === f.id}
+                  onClick={() => resolve(f, index, "fraud")}
+                >
                   {t("fraud.fraud")}
                 </Button>
               </span>
@@ -365,6 +476,7 @@ function FraudCard() {
           ))}
         </ul>
       )}
+      {confirmDialog}
     </Card>
   );
 }
@@ -385,18 +497,34 @@ function ReviewModerationCard() {
   const t = useTranslations("admin");
   const { data, error, reload } = useLoader(() => apiFetch<ModerationItem[]>("/api/admin/reviews"));
   const [feedback, setFeedback] = useState<Feedback>({});
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const { confirm, confirmDialog } = useConfirm();
+  const markFocus = useRowFocusRecovery(data, "review-moderation");
 
-  async function decide(id: string, action: "publish" | "remove") {
+  async function decide(item: ModerationItem, index: number, action: "publish" | "remove") {
+    if (action === "remove") {
+      const ok = await confirm({
+        title: t("moderation.confirmRemove.title", { property: item.propertyTitle }),
+        body: t("moderation.confirmRemove.body"),
+        confirmLabel: t("moderation.confirmRemove.confirm"),
+        tone: "danger",
+      });
+      if (!ok) return;
+    }
     setFeedback({});
+    setBusyId(item.id);
     try {
       await apiFetch("/api/admin/reviews", {
         method: "POST",
-        body: JSON.stringify({ id, action }),
+        body: JSON.stringify({ id: item.id, action }),
       });
       setFeedback({ message: t("decisionSaved") });
+      markFocus(index);
       reload();
     } catch (e) {
       setFeedback({ error: errorMessage(e) });
+    } finally {
+      setBusyId(null);
     }
   }
 
@@ -406,8 +534,8 @@ function ReviewModerationCard() {
       {data?.length === 0 && <p className="text-sm text-gray-700">{t("moderation.empty")}</p>}
       {data && data.length > 0 && (
         <ul className="space-y-2">
-          {data.map((r) => (
-            <li key={r.id} className="rounded-md border p-3 text-sm">
+          {data.map((r, index) => (
+            <li key={r.id} data-row className="rounded-md border p-3 text-sm">
               <p>
                 <strong>{r.propertyTitle}</strong> · {r.rating}/5 ·{" "}
                 {r.status === "HIDDEN" ? t("moderation.hidden") : t("moderation.preReview")} ·{" "}
@@ -415,7 +543,7 @@ function ReviewModerationCard() {
               </p>
               {r.comment && <p className="mt-1 text-gray-800">{r.comment}</p>}
               <p className="mt-1 text-xs text-gray-700">
-                {t("moderation.whyFlagged")} {r.explanation}{" "}
+                {t("moderation.whyFlagged")} <TrText>{r.explanation}</TrText>{" "}
                 {r.reasons.map((x) => (
                   <code key={x.code} className="mr-1">
                     {x.code}
@@ -423,10 +551,18 @@ function ReviewModerationCard() {
                 ))}
               </p>
               <span className="mt-2 flex gap-2">
-                <Button variant="secondary" onClick={() => decide(r.id, "publish")}>
+                <Button
+                  variant="secondary"
+                  busy={busyId === r.id}
+                  onClick={() => decide(r, index, "publish")}
+                >
                   {t("moderation.publish")}
                 </Button>
-                <Button variant="danger" onClick={() => decide(r.id, "remove")}>
+                <Button
+                  variant="danger"
+                  busy={busyId === r.id}
+                  onClick={() => decide(r, index, "remove")}
+                >
                   {t("moderation.remove")}
                 </Button>
               </span>
@@ -434,6 +570,7 @@ function ReviewModerationCard() {
           ))}
         </ul>
       )}
+      {confirmDialog}
     </Card>
   );
 }
@@ -447,25 +584,48 @@ function ExperimentsCard() {
       <Status error={error} />
       {data?.length === 0 && <p className="text-sm text-gray-700">{t("experiments.empty")}</p>}
       {data?.map((exp) => (
-        <div key={exp.flagKey} className="overflow-x-auto">
+        <div
+          key={exp.flagKey}
+          className={`overflow-x-auto rounded-md ${focusRing}`}
+          tabIndex={0}
+          role="region"
+          aria-label={t("experiments.tableLabel", { flag: exp.flagKey })}
+        >
           <p className="mb-2 text-sm font-medium">
             {exp.flagKey} · {exp.enabled ? t("experiments.on") : t("experiments.off")}
           </p>
           <table className="w-full text-left text-sm">
+            <caption className="sr-only">
+              {t("experiments.tableLabel", { flag: exp.flagKey })}
+            </caption>
             <thead>
               <tr className="border-b">
-                <th className="py-1 pr-3">{t("experiments.columns.arm")}</th>
-                <th className="py-1 pr-3">{t("experiments.columns.exposures")}</th>
-                <th className="py-1 pr-3">{t("experiments.columns.users")}</th>
-                <th className="py-1 pr-3">{t("experiments.columns.conversions")}</th>
-                <th className="py-1 pr-3">{t("experiments.columns.rate")}</th>
-                <th className="py-1">{t("experiments.columns.ci")}</th>
+                <th scope="col" className="py-1 pr-3">
+                  {t("experiments.columns.arm")}
+                </th>
+                <th scope="col" className="py-1 pr-3">
+                  {t("experiments.columns.exposures")}
+                </th>
+                <th scope="col" className="py-1 pr-3">
+                  {t("experiments.columns.users")}
+                </th>
+                <th scope="col" className="py-1 pr-3">
+                  {t("experiments.columns.conversions")}
+                </th>
+                <th scope="col" className="py-1 pr-3">
+                  {t("experiments.columns.rate")}
+                </th>
+                <th scope="col" className="py-1">
+                  {t("experiments.columns.ci")}
+                </th>
               </tr>
             </thead>
             <tbody>
               {exp.variants.map((v) => (
                 <tr key={v.variant} className="border-b last:border-0">
-                  <td className="py-1 pr-3">{v.variant}</td>
+                  <th scope="row" className="py-1 pr-3 font-normal">
+                    {v.variant}
+                  </th>
                   <td className="py-1 pr-3">{v.exposures}</td>
                   <td className="py-1 pr-3">{v.users}</td>
                   <td className="py-1 pr-3">{v.conversions}</td>
@@ -483,23 +643,44 @@ function ExperimentsCard() {
   );
 }
 
+const ROLES = ["USER", "HOST", "ADMIN"] as const;
+type Role = (typeof ROLES)[number];
+
 function RoleCard() {
   const t = useTranslations("admin");
   const [userId, setUserId] = useState("");
-  const [role, setRole] = useState<"USER" | "HOST" | "ADMIN">("HOST");
+  const [role, setRole] = useState<Role>("HOST");
   const [feedback, setFeedback] = useState<Feedback>({});
+  const [busy, setBusy] = useState(false);
+  const { confirm, confirmDialog } = useConfirm();
+  const roleLabel = (r: string) =>
+    (ROLES as readonly string[]).includes(r) ? t(`roles.options.${r as Role}`) : r;
 
   async function submit(e: FormEvent) {
     e.preventDefault();
+    const target = userId.trim();
+    const ok = await confirm({
+      title: t("roles.confirm.title", { user: target }),
+      body:
+        role === "ADMIN"
+          ? t("roles.confirm.adminBody", { role: roleLabel(role) })
+          : t("roles.confirm.body", { role: roleLabel(role) }),
+      confirmLabel: t("roles.confirm.confirm"),
+      tone: role === "ADMIN" ? "danger" : "primary",
+    });
+    if (!ok) return;
     setFeedback({});
+    setBusy(true);
     try {
       const res = await apiFetch<{ id: string; role: string }>(
-        `/api/admin/users/${encodeURIComponent(userId.trim())}/role`,
+        `/api/admin/users/${encodeURIComponent(target)}/role`,
         { method: "PATCH", body: JSON.stringify({ role }) }
       );
-      setFeedback({ message: t("roles.updated", { role: res.role }) });
+      setFeedback({ message: t("roles.updated", { role: roleLabel(res.role) }) });
     } catch (err) {
       setFeedback({ error: errorMessage(err) });
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -512,6 +693,9 @@ function RoleCard() {
             className={inputClass}
             value={userId}
             required
+            autoComplete="off"
+            autoCapitalize="none"
+            spellCheck={false}
             onChange={(e) => setUserId(e.target.value)}
           />
         </Field>
@@ -520,20 +704,25 @@ function RoleCard() {
             id="role-value"
             className={inputClass}
             value={role}
-            onChange={(e) => setRole(e.target.value as typeof role)}
+            onChange={(e) => setRole(e.target.value as Role)}
           >
-            <option value="USER">USER</option>
-            <option value="HOST">HOST</option>
-            <option value="ADMIN">ADMIN</option>
+            {ROLES.map((r) => (
+              <option key={r} value={r}>
+                {t(`roles.options.${r}`)}
+              </option>
+            ))}
           </select>
         </Field>
         <div className="flex items-end">
-          <Button type="submit">{t("roles.submit")}</Button>
+          <Button type="submit" busy={busy}>
+            {busy ? t("roles.submitting") : t("roles.submit")}
+          </Button>
         </div>
       </form>
       <div className="mt-2">
         <Status error={feedback.error} message={feedback.message} />
       </div>
+      {confirmDialog}
     </Card>
   );
 }

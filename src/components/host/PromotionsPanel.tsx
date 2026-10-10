@@ -14,6 +14,12 @@ import {
   inputClass,
   useLoader,
 } from "@/components/ui/ui";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
+
+/** Bu oranın üstündeki indirimler gönderimden önce onay ister (yanlışlıkla %100). */
+const HIGH_DISCOUNT_PERCENT = 50;
+/** İndirim önizlemesindeki örnek gecelik fiyat (para birimsiz). */
+const EXAMPLE_PRICE = 1000;
 
 /** P1-8: ev sahibi promosyon listesi + basit oluşturma formu (yüzde indirim). */
 
@@ -57,7 +63,11 @@ export default function PromotionsPanel({
   const { data, error, reload } = useLoader(() =>
     apiFetch<{ promotions: Promotion[] }>("/api/host/promotions")
   );
+  // Liste eylemlerinin sonucu tablonun üstünde, form sonucu gönder düğmesinin yanında.
   const [status, setStatus] = useState<{ error?: string; message?: string }>({});
+  const [formStatus, setFormStatus] = useState<{ error?: string; message?: string }>({});
+  const [submitting, setSubmitting] = useState(false);
+  const { confirm, confirmDialog } = useConfirm();
   const [form, setForm] = useState({
     name: "",
     type: "EARLY_BIRD" as PromotionType,
@@ -84,15 +94,28 @@ export default function PromotionsPanel({
 
   async function submit(e: FormEvent) {
     e.preventDefault();
-    setStatus({});
+    if (submitting) return;
+    setFormStatus({});
     const condition = CONDITION[form.type];
+    const percent = Number(form.percent);
+    if (
+      percent > HIGH_DISCOUNT_PERCENT &&
+      !(await confirm({
+        title: t("promotions.form.highConfirmTitle", { percent: form.percent }),
+        body: t("promotions.form.highConfirmBody", { percent: form.percent }),
+        confirmLabel: t("promotions.form.highConfirm"),
+        tone: "danger",
+      }))
+    )
+      return;
+    setSubmitting(true);
     try {
       await apiFetch("/api/host/promotions", {
         method: "POST",
         body: JSON.stringify({
           name: form.name,
           type: form.type,
-          discountBps: Math.round(Number(form.percent) * 100),
+          discountBps: Math.round(percent * 100),
           ...(condition ? { [condition]: Number(form.condition) } : {}),
           ...(form.type === "COUPON"
             ? {
@@ -105,11 +128,13 @@ export default function PromotionsPanel({
           stackable: form.stackable,
         }),
       });
-      setStatus({ message: t("promotions.created") });
+      setFormStatus({ message: t("promotions.created") });
       setForm({ ...form, name: "", couponCode: "" });
       reload();
     } catch (err) {
-      setStatus({ error: errorMessage(err) });
+      setFormStatus({ error: errorMessage(err) });
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -142,6 +167,8 @@ export default function PromotionsPanel({
   const promotions = data?.promotions ?? null;
   const condition = CONDITION[form.type];
   const id = "promo-form";
+  const percentValue = Number(form.percent);
+  const percentValid = form.percent !== "" && percentValue > 0 && percentValue <= 100;
 
   return (
     <Card title={t("promotions.title")} id="host-promotions">
@@ -225,7 +252,11 @@ export default function PromotionsPanel({
         className="mt-4 grid gap-3 md:grid-cols-4"
         aria-label={t("promotions.form.ariaLabel")}
       >
-        <Field label={t("promotions.form.name")} id={`${id}-name`}>
+        <Field
+          label={t("promotions.form.name")}
+          id={`${id}-name`}
+          hint={t("promotions.form.nameHint", { min: 2, max: 80 })}
+        >
           <input
             id={`${id}-name`}
             className={inputClass}
@@ -250,7 +281,11 @@ export default function PromotionsPanel({
             ))}
           </select>
         </Field>
-        <Field label={t("promotions.form.percent")} id={`${id}-pct`}>
+        <Field
+          label={t("promotions.form.percent")}
+          id={`${id}-pct`}
+          hint={t("promotions.form.percentHint")}
+        >
           <input
             id={`${id}-pct`}
             type="number"
@@ -263,8 +298,34 @@ export default function PromotionsPanel({
             onChange={(e) => setForm({ ...form, percent: e.target.value })}
           />
         </Field>
+        <div aria-live="polite" className="text-xs text-gray-700 md:col-span-4">
+          {percentValid && (
+            <p>
+              {t("promotions.form.preview", {
+                before: f.number(EXAMPLE_PRICE),
+                after: f.number(EXAMPLE_PRICE * (1 - percentValue / 100), {
+                  maximumFractionDigits: 2,
+                }),
+                percent: form.percent,
+              })}
+            </p>
+          )}
+          {percentValid && percentValue > HIGH_DISCOUNT_PERCENT && (
+            <p className="font-semibold">
+              {t("promotions.form.highWarning", { percent: form.percent })}
+            </p>
+          )}
+          {form.stackable && <p>{t("promotions.form.stackableWarning")}</p>}
+        </div>
         {condition && (
-          <Field label={t(`promotions.form.${condition}`)} id={`${id}-cond`}>
+          <Field
+            label={t(`promotions.form.${condition}`)}
+            id={`${id}-cond`}
+            hint={t("promotions.form.rangeHint", {
+              min: condition === "minNights" ? 1 : 0,
+              max: 730,
+            })}
+          >
             <input
               id={`${id}-cond`}
               type="number"
@@ -279,12 +340,19 @@ export default function PromotionsPanel({
         )}
         {form.type === "COUPON" && (
           <>
-            <Field label={t("promotions.form.couponCode")} id={`${id}-code`}>
+            <Field
+              label={t("promotions.form.couponCode")}
+              id={`${id}-code`}
+              hint={t("promotions.form.couponHint", { min: 4, max: 40 })}
+            >
               <input
                 id={`${id}-code`}
                 className={inputClass}
                 value={form.couponCode}
                 required
+                autoCapitalize="characters"
+                autoComplete="off"
+                spellCheck={false}
                 pattern="[A-Za-z0-9_\-]{4,40}"
                 onChange={(e) => setForm({ ...form, couponCode: e.target.value })}
               />
@@ -331,7 +399,7 @@ export default function PromotionsPanel({
             onChange={(e) => setForm({ ...form, priority: e.target.value })}
           />
         </Field>
-        <div className="flex items-end gap-2 pb-2">
+        <div className="flex min-h-[44px] items-end gap-2 pb-2">
           <input
             id={`${id}-stack`}
             type="checkbox"
@@ -344,11 +412,20 @@ export default function PromotionsPanel({
           </label>
         </div>
         <div className="flex items-end">
-          <Button type="submit" variant="secondary" className="w-full">
+          <Button
+            type="submit"
+            variant="secondary"
+            className="min-h-[44px] w-full"
+            busy={submitting}
+          >
             {t("promotions.form.submit")}
           </Button>
         </div>
+        <div className="md:col-span-4">
+          <Status error={formStatus.error} message={formStatus.message} />
+        </div>
       </form>
+      {confirmDialog}
     </Card>
   );
 }

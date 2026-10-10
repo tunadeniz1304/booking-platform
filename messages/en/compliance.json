@@ -23,7 +23,15 @@
     "sent": "We received your notice. Your reference: {reference}. A confirmation email was sent.",
     "invalid": "Please fill in all required fields correctly.",
     "rateLimited": "Too many notices sent; please try again later.",
-    "error": "The notice could not be sent; please try again."
+    "error": "The notice could not be sent; please try again.",
+    "sentTitle": "Your report has been received",
+    "errors": {
+      "contentUrl": "Enter a valid address, for example https://example.com/listing/123.",
+      "category": "Choose a report type.",
+      "explanation": "The explanation must be at least 20 characters, not counting spaces.",
+      "reporterName": "The name can be at most 120 characters.",
+      "reporterEmail": "Enter a valid email address, for example name@example.com."
+    }
   },
   "admin": {
     "title": "Compliance",
@@ -69,7 +77,35 @@
     "noticeDecided": "Decision recorded; the statement of reasons will be sent.",
     "transparency": "Transparency report",
     "exportCsv": "Download CSV (this year)",
-    "exportJson": "View JSON (this year)"
+    "exportJson": "View JSON (this year)",
+    "propertyIdHint": "Paste the listing ID; when you leave the field, the listing name is shown below.",
+    "preview": {
+      "loading": "Looking up the listing…",
+      "found": "Listing to be taken down: {title} · {city}",
+      "missing": "No published listing was found with this ID. Check the ID."
+    },
+    "confirmTakedown": {
+      "title": "Take the listing down now?",
+      "body": "The listing {listing} is unpublished as soon as this request is saved. It cannot be republished until the request is closed.",
+      "confirm": "Save request and take down listing"
+    },
+    "saving": "Saving…",
+    "retry": "Try again",
+    "noTakedowns": "No requests recorded.",
+    "closeForm": {
+      "resolution": "Reason for closing",
+      "warning": "A closed request cannot be reopened; the host may republish the listing.",
+      "confirm": "Close request"
+    },
+    "choose": "Choose…",
+    "confirmDecision": {
+      "title": "Save this decision?",
+      "summary": "Decision: {decision} · Content: {url}",
+      "removedEffect": "The listing is taken down; the reporter and the host receive a statement of reasons by email.",
+      "noActionEffect": "The content stays online; the reporter and the host receive a statement of reasons by email.",
+      "final": "A saved decision cannot be changed; it is only reviewed again if one of the parties appeals.",
+      "confirm": "Confirm and send decision"
+    }
   },
   "accessibility": {
     "title": "Accessibility",
@@ -79,7 +115,7 @@
     "roomType": "Room: {name}",
     "width": "{width} cm clear width",
     "evidence": "Evidence photo",
-    "disclosure": "Only features verified with evidence are shown. If you have a specific need, message the host before booking.",
+    "disclosure": "Only features verified with evidence are shown. If you have a specific need, contact Support before booking and mention the listing name.",
     "filterTitle": "Accessibility (verified)",
     "filterHint": "All selected features must be verified in the same room.",
     "codes": {
@@ -119,7 +155,16 @@
       "add": "Add feature",
       "added": "Feature added.",
       "evidenceSaved": "Evidence updated; the feature will be reviewed again.",
-      "deleted": "Feature deleted."
+      "deleted": "Feature deleted.",
+      "saveEvidence": "Save evidence",
+      "saveEvidenceLabel": "Save evidence for {name}",
+      "evidenceVerifiedWarning": "This feature is verified. If you change and save the evidence, verification is removed and the platform team reviews it again.",
+      "evidenceConfirmTitle": "Change the evidence for {name}?",
+      "evidencePreviewAlt": "Selected evidence: {photo}",
+      "deleteConfirmTitle": "Delete {name} ({scope})?",
+      "deleteConfirmBody": "The feature is permanently removed from the list.",
+      "deleteConfirmVerified": "The verified badge is removed and the feature no longer shows on the listing or in search. If you add it again, the platform team must review it again.",
+      "deleteConfirm": "Delete permanently"
     },
     "admin": {
       "title": "Accessibility verification queue",
@@ -135,7 +180,8 @@
       "unverify": "Remove verification",
       "verifiedOk": "Feature verified.",
       "unverifiedOk": "Verification removed."
-    }
+    },
+    "askSupport": "Ask Support"
   },
   "appeal": {
     "title": "Appeal a decision",
@@ -183,7 +229,17 @@
       "groundHint": "A ground is required because the listing will be removed.",
       "response": "Reasons (sent to the appellant)",
       "submit": "Save appeal decision",
-      "decided": "Appeal decision saved; the outcome will be emailed."
-    }
+      "decided": "Appeal decision saved; the outcome will be emailed.",
+      "chooseOutcome": "Choose an outcome.",
+      "confirm": {
+        "title": "Save the appeal decision?",
+        "upheldRemove": "The earlier decision is reversed and the listing is taken down.",
+        "upheldRestore": "The earlier takedown is reversed; the listing may be republished.",
+        "rejected": "The earlier decision stays in place.",
+        "final": "A saved appeal decision cannot be changed and is emailed to the appellant.",
+        "confirm": "Confirm appeal decision"
+      }
+    },
+    "sentTitle": "Your appeal has been received"
   }
 }

@@ -26,5 +26,37 @@
     "system": "System theme",
     "light": "Light theme",
     "dark": "Dark theme"
-  }
+  },
+  "notFound": {
+    "title": "Page not found",
+    "description": "The page you are looking for may have moved, been removed, or the link may be wrong. You can continue from the home page or search for a new stay.",
+    "navLabel": "Where to go next",
+    "home": "Back to home page",
+    "search": "Search stays"
+  },
+  "errorPage": {
+    "title": "Something went wrong",
+    "description": "The page could not be loaded right now. You can try again in a moment or go back to the home page.",
+    "retry": "Try again",
+    "home": "Back to home page",
+    "reference": "If you contact support, please share this reference code: {digest}"
+  },
+  "errors": {
+    "NETWORK": "Could not connect. Check your internet connection and try again.",
+    "UNAUTHORIZED": "Please sign in to do this.",
+    "FORBIDDEN": "You do not have permission to do this.",
+    "NOT_FOUND": "The record you are looking for could not be found.",
+    "VALIDATION_ERROR": "Some details are missing or incorrect. Please check the fields.",
+    "TRANSACTION_CONFLICT": "Another change happened at the same time. Please try again.",
+    "RATE_LIMITED": "Too many attempts. Please wait a moment and try again.",
+    "SERVICE_UNAVAILABLE": "The service isn't responding right now. Please try again in a few minutes.",
+    "network": "Couldn't connect. Check your internet connection and try again.",
+    "EMAIL_NOT_VERIFIED": "Verify your email address to continue. The verification link is in your inbox.",
+    "INTERNAL_ERROR": "Something went wrong. Please try again.",
+    "INVALID_JSON": "The request couldn't be read. Refresh the page and try again."
+  },
+  "confirm": {
+    "cancel": "Cancel"
+  },
+  "errorPrefix": "Error:"
 }

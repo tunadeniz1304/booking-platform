@@ -22,16 +22,25 @@
     "refunded": "İptal edildi. İade: {amount} (%{percent}).",
     "noRefund": "İptal edildi. Politika gereği iade yok.",
     "failed": "İptal edilemedi",
-    "button": "Rezervasyonu iptal et"
+    "button": "Rezervasyonu iptal et",
+    "dialogTitle": "Rezervasyon iptal edilsin mi?",
+    "dialogBodyHeld": "Henüz ödeme alınmadı. İptal ederseniz odanın tutulması kaldırılır.",
+    "dialogBodyConfirmed": "İade tutarı, rezervasyon sırasında kabul ettiğiniz iptal politikasına göre hesaplanır ve iptalden hemen sonra gösterilir.",
+    "irreversible": "Bu işlem geri alınamaz.",
+    "confirmButton": "Evet, iptal et",
+    "keep": "Rezervasyonu koru"
   },
   "stepUp": {
     "failed": "Doğrulama başarısız",
     "title": "Ek doğrulama gerekli",
     "description": "Hesabınızı korumak için bu ödemeyi passkey'inizle onaylamanızı istiyoruz. Onaydan sonra ödeme otomatik olarak yeniden denenir.",
-    "managePasskeys": "Passkey'lerimi yönet",
+    "managePasskeys": "Passkey oluştur veya yönet (yeni sekmede açılır)",
     "waiting": "Bekleniyor...",
     "verify": "Passkey ile doğrula",
-    "cancel": "Vazgeç"
+    "cancel": "Vazgeç",
+    "whatIsPasskey": "Passkey, telefonunuzun ya da bilgisayarınızın kilidini açtığınız yöntemle (parmak izi, yüz tanıma veya PIN) yaptığınız, parola gerektirmeyen bir doğrulamadır.",
+    "noPasskey": "Passkey'iniz yoksa hesap sayfasında birkaç saniyede oluşturabilir, sonra bu pencereye dönüp yeniden deneyebilirsiniz.",
+    "holdUntil": "Odanız sizin için tutuluyor; tutma süresi saat {time} itibarıyla doluyor."
   },
   "rnpl": {
     "legend": "Ödeme zamanı",
@@ -40,12 +49,12 @@
     "timeline": "İptal zaman çizelgesi",
     "stepToday": "Bugün: {today} tahsil edilir; kartınız yalnızca kaydedilir.",
     "stepCharge": "{date}: {amount} kayıtlı kartınızdan tahsil edilir.",
-    "stepFreeCancel": "{date} tarihine kadar ücretsiz iptal; tahsilattan önce iptal ederseniz hiç ödeme alınmaz.",
+    "stepFreeCancel": "{date} saatine kadar ücretsiz iptal; tahsilattan önce iptal ederseniz hiç ödeme alınmaz.",
     "stepFailure": "Tahsilat başarısız olursa size bildirir ve yeniden deneriz; ek süre içinde ödenmezse rezervasyon otomatik iptal edilir.",
     "reserve": "Şimdi rezerve et (bugün ödeme yok)",
     "plan": {
       "title": "Ödeme planı: şimdi rezerve et, sonra öde",
-      "summary": "Bugün {today} ödendi; {date} tarihinde {amount} kayıtlı kartınızdan tahsil edilecek.",
+      "summary": "Rezervasyon sırasında {today} ödendi; {date} tarihinde {amount} kayıtlı kartınızdan tahsil edilecek.",
       "retry": "Tahsilat başarısız oldu; sonraki deneme: {date}. Kartınızı kontrol edin.",
       "captured": "{amount}, {date} tarihinde tahsil edildi.",
       "status": {
@@ -54,7 +63,43 @@
         "CAPTURED": "Tahsil edildi",
         "CANCELLED": "İptal — tahsilat yok",
         "DEFAULTED": "Ödenmedi — rezervasyon iptal"
-      }
-    }
-  }
+      },
+      "summaryCancelled": "Plan iptal edildi; kartınızdan tahsilat yapılmayacak.",
+      "summaryDefaulted": "Ödeme alınamadığı için rezervasyon iptal edildi; kartınızdan başka tahsilat yapılmayacak.",
+      "stepBooked": "Rezervasyon sırasında: {today} ödendi; kartınız yalnızca kaydedildi."
+    },
+    "moment": "{date} {time} ({tz})"
+  },
+  "expiryHint": "AA/YY biçiminde, ör. 08/28",
+  "threeDsIntro": "Bankanız bu ödemeyi onaylamanızı istiyor. Telefonunuza gelen kodu girin.",
+  "threeDsDemoHint": "Demo doğrulama kodu: {code}",
+  "threeDsAnnounce": "3D Secure doğrulaması gerekiyor. Bankanızın gönderdiği kodu girin.",
+  "threeDsBack": "Geri dön, başka kart kullan",
+  "paidAnnounce": "Ödemeniz alındı, rezervasyonunuz onaylandı.",
+  "hold": {
+    "remaining": "Kalan süre: {time}",
+    "warnMinutes": "Odanın tutulma süresinin bitmesine {minutes} dakika kaldı.",
+    "expired": "Tutma süresi doldu. Oda artık sizin için ayrılmış değil.",
+    "expiredTitle": "Tutma süresi doldu",
+    "expiredBody": "Ödeme süresi içinde tamamlanmadığı için oda serbest bırakıldı. Ücret alınmadı. Aynı tarihler için yeniden arama yapabilirsiniz.",
+    "rebook": "Yeniden ara ve rezervasyon yap"
+  },
+  "errors": {
+    "EXPIRY_FORMAT": "Son kullanma tarihini AA/YY biçiminde girin, ör. 08/28.",
+    "CARD_NUMBER_INVALID": "Kart numarası geçersiz. Lütfen kartın üzerindeki numarayı kontrol edin.",
+    "CVC_INVALID": "Güvenlik kodu (CVC) geçersiz. Kartın arkasındaki 3 ya da 4 haneli kodu girin.",
+    "CARD_EXPIRED": "Kartın son kullanma tarihi geçmiş. Lütfen başka bir kart deneyin.",
+    "AUTHENTICATION_FAILED": "Doğrulama kodu hatalı, ödeme alınmadı. Kart bilgilerinizi kontrol edip yeniden deneyin.",
+    "PAYMENT_DECLINED": "Ödeme reddedildi. Lütfen başka bir kart deneyin.",
+    "HOLD_EXPIRED": "Odanın tutulma süresi doldu, ödeme alınmadı.",
+    "PAYMENT_ATTEMPTS_EXCEEDED": "Çok fazla başarısız deneme yapıldı. Lütfen bir süre sonra tekrar deneyin.",
+    "PAYMENT_IN_PROGRESS": "Bu rezervasyon için bir ödeme zaten işleniyor. Lütfen birkaç saniye bekleyin.",
+    "PAYMENT_PROVIDER_ERROR": "Ödeme sağlayıcısına şu anda ulaşılamıyor. Ücret alınmadı, lütfen tekrar deneyin.",
+    "INVALID_CARD_TOKEN": "Kart bilgileri işlenemedi. Lütfen kart bilgilerini yeniden girin.",
+    "FRAUD_BLOCKED": "Bu ödeme güvenlik nedeniyle onaylanmadı. Başka bir kart deneyin ya da destekle iletişime geçin.",
+    "NO_PENDING_CHALLENGE": "Doğrulama bekleyen ödeme yok. Kart bilgilerinizi girip yeniden deneyin.",
+    "IDENTITY_VERIFICATION_REQUIRED": "Devam etmek için kimliğinizi doğrulamanız gerekiyor.",
+    "RATE_LIMITED": "Çok fazla istek gönderildi. Lütfen biraz bekleyip tekrar deneyin."
+  },
+  "stripeLiveCharge": "Onayladığınızda kartınızdan {amount} tahsil edilecek."
 }

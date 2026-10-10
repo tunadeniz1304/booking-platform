@@ -6,6 +6,7 @@ import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import { apiFetch } from "@/lib/api-client";
 import { useFormat } from "@/i18n/use-format";
+import { focusRing } from "@/components/ui/ui";
 
 interface Mail {
   id: string;
@@ -15,6 +16,21 @@ interface Mail {
   status: string;
   transport: string;
   createdAt: string;
+}
+
+const URL_PATTERN = /(https?:\/\/[^\s<>"']+)/g;
+
+/** Düz metindeki bağlantıları tıklanabilir `<a>` öğelerine çevirir (doğrulama/sıfırlama linkleri). */
+function linkify(text: string, focusClass: string) {
+  return text.split(URL_PATTERN).map((part, i) =>
+    i % 2 === 1 ? (
+      <a key={i} href={part} className={`break-all underline ${focusClass}`}>
+        {part}
+      </a>
+    ) : (
+      part
+    )
+  );
 }
 
 /** Geliştirme posta kutusu (SMTP yokken gönderilen Türkçe e-postalar). */
@@ -48,13 +64,16 @@ export default function MailboxClient() {
         {mails?.length === 0 && <p className="mt-6 text-gray-500">{t("empty")}</p>}
         <ul className="mt-6 space-y-4">
           {mails?.map((m) => (
-            <li key={m.id} className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-              <p className="text-xs text-gray-500">
+            <li
+              key={m.id}
+              className="min-w-0 rounded-xl border border-gray-200 bg-white p-4 shadow-sm"
+            >
+              <p className="break-all text-xs text-gray-500">
                 {fmt.dateTime(m.createdAt)} · {m.to} · {m.transport}/{m.status}
               </p>
               <h2 className="mt-1 font-semibold text-gray-900">{m.subject}</h2>
-              <pre className="mt-2 whitespace-pre-wrap font-sans text-sm text-gray-700">
-                {m.text}
+              <pre className="mt-2 whitespace-pre-wrap break-words font-sans text-sm text-gray-700 [overflow-wrap:anywhere]">
+                {linkify(m.text, focusRing)}
               </pre>
             </li>
           ))}

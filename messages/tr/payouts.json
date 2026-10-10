@@ -79,10 +79,25 @@
     "title": "Ödeme hesapları",
     "empty": "Ödeme hesabı yok.",
     "pending": "Bekleyen ödeme: {count}",
-    "reason": "Durdurma gerekçesi (isteğe bağlı)",
+    "reason": "Durdurma gerekçesi",
     "pause": "Ödemeleri durdur",
     "resume": "Ödemelere devam et",
     "paused": "Ödemeler durduruldu.",
-    "resumed": "Ödemeler yeniden etkin."
+    "resumed": "Ödemeler yeniden etkin.",
+    "reasonRequired": "Ödemeleri durdurmadan önce bir gerekçe yazın. Gerekçe denetim kaydına eklenir.",
+    "confirmPause": {
+      "title": "{name} için ödemeler durdurulsun mu?",
+      "body": "{count, plural, =0 {Bekleyen ödeme yok.} other {# bekleyen ödeme siz devam ettirene kadar gönderilmeyecek.}} Gerekçe: {reason}",
+      "confirm": "Ödemeleri durdur"
+    }
+  },
+  "policyNoReserve": "Tutar, girişten {hours} saat sonra emanetten serbest bırakılır; %{commission} platform komisyonu düşülür ve payınızın bir kısmı {days} gün rezervde tutulur. Rezerv oranı hesabınızı bağladığınızda gösterilir.",
+  "resolve": {
+    "identity": "Ödeme alabilmek için kimliğinizi doğrulamanız gerekiyor.",
+    "identityRejected": "Kimlik doğrulamanız reddedildi. Belgelerinizi kontrol edip yeniden gönderin.",
+    "identityLink": "Kimliğinizi doğrulayın",
+    "paused": "Ödemeleriniz platform ekibi tarafından durduruldu. Nedenini öğrenmek için destekle iletişime geçin.",
+    "supportLink": "Destek ekibine yazın",
+    "providerDisabled": "Ödeme sağlayıcısı hesabınızı henüz onaylamadı. Birkaç dakika sonra aşağıdaki \"Durumu yenile / kaydet\" düğmesiyle tekrar kontrol edin."
   }
 }

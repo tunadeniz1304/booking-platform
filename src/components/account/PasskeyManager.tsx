@@ -4,8 +4,8 @@ import { useCallback, useEffect, useState, useSyncExternalStore, type FormEvent 
 import { useTranslations } from "next-intl";
 import { apiFetch } from "@/lib/api-client";
 import { useFormat } from "@/i18n/use-format";
-import { passkeyErrorMessage, passkeySupported, registerPasskey } from "@/lib/auth/passkey-client";
-import { ReauthCancelledError, useReauth } from "./ReauthDialog";
+import { passkeySupported, registerPasskey } from "@/lib/auth/passkey-client";
+import { useAccountErrorText, useReauth } from "./ReauthDialog";
 
 interface Passkey {
   id: string;
@@ -30,17 +30,8 @@ export default function PasskeyManager() {
   // v4#2: ekleme/silme yakın zamanda yeniden doğrulama ister (403 REAUTH_REQUIRED → pencere).
   const reauth = useReauth();
 
-  // WebAuthn hata adları çeviri anahtarına eşlenir; API hataları olduğu gibi gösterilir.
-  const errorText = useCallback(
-    (err: unknown, fallback: string): string => {
-      if (err instanceof Error && err.name === "NotAllowedError") return t("passkeys.cancelled");
-      if (err instanceof Error && err.name === "InvalidStateError")
-        return t("passkeys.alreadyRegistered");
-      if (err instanceof ReauthCancelledError) return t("reauth.cancelled");
-      return passkeyErrorMessage(err, fallback);
-    },
-    [t]
-  );
+  // F191: WebAuthn hata adları ve API hataları arayüz dilinde gösterilir.
+  const errorText = useAccountErrorText();
 
   const load = useCallback(
     () =>
@@ -69,6 +60,7 @@ export default function PasskeyManager() {
 
   async function add(e: FormEvent) {
     e.preventDefault();
+    if (busy) return;
     setBusy(true);
     setStatus(null);
     try {
@@ -84,6 +76,7 @@ export default function PasskeyManager() {
   }
 
   async function remove(id: string) {
+    if (busy) return;
     if (!window.confirm(t("passkeys.confirmDelete"))) return;
     setBusy(true);
     setStatus(null);
@@ -132,8 +125,8 @@ export default function PasskeyManager() {
               <button
                 type="button"
                 onClick={() => void remove(p.id)}
-                disabled={busy}
-                className="rounded-lg border border-red-300 px-3 py-1 text-xs font-semibold text-red-700 disabled:opacity-50"
+                aria-disabled={busy || undefined}
+                className="min-h-[44px] rounded-lg border border-red-300 px-3 py-1 text-xs font-semibold text-red-700 aria-disabled:opacity-50 sm:min-h-0"
               >
                 {t("passkeys.delete")}
               </button>
@@ -156,8 +149,8 @@ export default function PasskeyManager() {
           />
           <button
             type="submit"
-            disabled={busy}
-            className="rounded-lg bg-[#003580] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+            aria-disabled={busy || undefined}
+            className="rounded-lg bg-[#003580] px-4 py-2 text-sm font-semibold text-white aria-disabled:opacity-50"
           >
             {t("passkeys.add")}
           </button>

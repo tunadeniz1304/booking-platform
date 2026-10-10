@@ -40,5 +40,11 @@
     "mostFlexible": "En esnek iptal"
   },
   "onlyHere": "Yalnızca bu ilanda",
-  "commentary": "Yorum"
+  "commentary": "Yorum",
+  "fullHint": "{max}/{max} ilan seçildi. Yeni eklemek için birini çıkarın.",
+  "ready": "Karşılaştırmaya hazır.",
+  "retry": "Yeniden dene",
+  "resetAndBack": "Seçimi temizle ve aramaya dön",
+  "errorHelp": "Seçtiğiniz ilanlardan biri artık yayında olmayabilir. Yeniden deneyin ya da seçimi temizleyip aramaya dönün.",
+  "tableLabel": "Seçilen ilanların karşılaştırma tablosu"
 }

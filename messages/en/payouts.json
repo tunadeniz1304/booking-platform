@@ -79,10 +79,25 @@
     "title": "Payout accounts",
     "empty": "No payout accounts.",
     "pending": "Pending payouts: {count}",
-    "reason": "Reason for pausing (optional)",
+    "reason": "Reason for pausing",
     "pause": "Pause payouts",
     "resume": "Resume payouts",
     "paused": "Payouts paused.",
-    "resumed": "Payouts resumed."
+    "resumed": "Payouts resumed.",
+    "reasonRequired": "Enter a reason before pausing payouts. The reason is added to the audit log.",
+    "confirmPause": {
+      "title": "Pause payouts for {name}?",
+      "body": "{count, plural, =0 {No payouts are pending.} one {# pending payout will not be sent until you resume.} other {# pending payouts will not be sent until you resume.}} Reason: {reason}",
+      "confirm": "Pause payouts"
+    }
+  },
+  "policyNoReserve": "The amount is released from escrow {hours} hours after check-in; a {commission}% platform commission is deducted and part of your share is held in reserve for {days} days. The reserve rate is shown once you connect your account.",
+  "resolve": {
+    "identity": "You need to verify your identity to receive payouts.",
+    "identityRejected": "Your identity verification was rejected. Check your documents and submit them again.",
+    "identityLink": "Verify your identity",
+    "paused": "Your payouts were paused by the platform team. Contact support to find out why.",
+    "supportLink": "Contact support",
+    "providerDisabled": "The payment provider has not approved your account yet. Check again in a few minutes with the \"Refresh status / save\" button below."
   }
 }

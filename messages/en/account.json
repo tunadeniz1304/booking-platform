@@ -10,7 +10,13 @@
     "favoriteAdd": "Could not add favorite",
     "favoriteFailed": "Favorite action failed",
     "cancelBooking": "Could not cancel booking",
-    "cancelFailed": "Cancellation failed"
+    "cancelFailed": "Cancellation failed",
+    "sessionExpired": "Your session has expired. <link>Sign in again</link> to see your account.",
+    "codes": {
+      "RATE_LIMITED": "Too many requests. Please wait a moment and try again.",
+      "REAUTH_RATE_LIMITED": "Too many failed attempts. Please try again later.",
+      "KYC_RATE_LIMITED": "You started identity verification too many times in a short period. Please try again later."
+    }
   },
   "role": {
     "host": "Host",
@@ -21,7 +27,10 @@
     "pending": "Pending",
     "confirmed": "Confirmed",
     "cancelled": "Cancelled",
-    "completed": "Completed"
+    "completed": "Completed",
+    "held": "Awaiting payment",
+    "expired": "Expired",
+    "unknown": "Unknown status"
   },
   "bookings": {
     "title": "My Bookings",
@@ -35,7 +44,21 @@
     "cancelling": "Cancelling...",
     "processing": "Processing...",
     "removeFavorite": "Remove from Favorites",
-    "addFavorite": "Add to Favorites"
+    "addFavorite": "Add to Favorites",
+    "details": "Details and messages",
+    "completePayment": "Complete payment",
+    "cancelConfirm": {
+      "title": "Do you want to cancel this booking?",
+      "summary": "{checkIn} – {checkOut} · Total {total}",
+      "refundNote": "How much you get back depends on the listing's cancellation policy and when you cancel; the amount is shown right after cancelling. You can check the policy first in the <link>booking details</link>. This cannot be undone.",
+      "confirm": "Yes, cancel",
+      "keep": "Keep booking"
+    },
+    "cancelDone": {
+      "refunded": "Booking cancelled. {amount} will be refunded ({percent}%).",
+      "noRefund": "Booking cancelled. No refund applies under the cancellation policy.",
+      "plain": "Booking cancelled."
+    }
   },
   "favorites": {
     "title": "My Favorites",
@@ -77,7 +100,8 @@
     "cancel": "Cancel",
     "failed": "Verification failed",
     "rateLimited": "Too many failed attempts. Please try again later.",
-    "cancelled": "Re-authentication was cancelled"
+    "cancelled": "Re-authentication was cancelled",
+    "wrongPassword": "Incorrect password. Please check it and try again."
   },
   "sessions": {
     "title": "Sessions",
@@ -98,7 +122,10 @@
     "confirmRevokeCurrent": "This will sign you out on this device. Continue?",
     "confirmRevokeOthers": "Sign out every session except this device?",
     "revokedOk": "Session signed out",
-    "revokeFailed": "Could not sign the session out"
+    "revokeFailed": "Could not sign the session out",
+    "confirmRevokeLabel": "Yes, sign out session",
+    "confirmLogoutLabel": "Yes, sign out",
+    "alreadyClosed": "This session was already closed; the list has been updated."
   },
   "mandates": {
     "title": "AI agent payment mandates",
@@ -133,6 +160,15 @@
     "scoped": "{count, plural, one {Limited to # listing} other {Limited to # listings}}",
     "revoke": "Revoke",
     "revokeLabel": "Revoke mandate with limit {amount}",
-    "revoked": "Mandate revoked; the agent can no longer pay with it."
-  }
+    "revoked": "Mandate revoked; the agent can no longer pay with it.",
+    "amountHint": "Example: 1500 or 1,500.50",
+    "amountFormat": "Enter the amount as 1500 or 1,500.50.",
+    "amountPreview": "Limit: {amount}",
+    "createFailed": "Could not create the permission. Please try again.",
+    "revokeFailed": "Could not revoke the permission. Please try again.",
+    "revokeConfirmTitle": "Revoke this permission?",
+    "revokeConfirmBody": "The permission with a {amount} limit, valid until {date}, will be revoked. Your agent will no longer be able to pay with it and this cannot be undone; you would need to grant a new permission.",
+    "revokeConfirm": "Yes, revoke"
+  },
+  "backHome": "Back to home page"
 }

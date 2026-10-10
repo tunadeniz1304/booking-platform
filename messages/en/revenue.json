@@ -28,7 +28,15 @@
     "noData": "No data.",
     "chartTitle": "Pickup chart",
     "chartDesc": "Room-nights in the window from bookings made over the last {count} days; latest value {last}.",
-    "caption": "Line: total room-nights in the window · Bars: room-nights booked that day"
+    "caption": "Line: total room-nights in the window · Bars: room-nights booked that day",
+    "trend": "Room-nights on the books went from {first} to {last}; the most room-nights booked in one day was {dailyMax}.",
+    "tableToggle": "Show data as a table",
+    "tableCaption": "Daily pickup data",
+    "columns": {
+      "date": "Date",
+      "pickup": "Room-nights booked that day",
+      "onBooks": "Total room-nights on the books"
+    }
   },
   "suggestions": {
     "title": "Price suggestions",
@@ -46,6 +54,12 @@
       "contribution": "Contribution"
     },
     "accept": "Accept",
-    "reject": "Reject"
-  }
+    "reject": "Reject",
+    "acceptNote": "The accepted price goes live right away and is locked; the engine will not update this night again. To go back, you must enter the old price manually in the calendar.",
+    "acceptConfirmTitle": "Set the {room} · {date} price from {from} to {to}?",
+    "acceptConfirm": "Set price",
+    "accepted": "{room} · {date} price set from {from} to {to} and locked. Previous price: {from}.",
+    "rejected": "{room} · {date} suggestion rejected; the price stays at {from}."
+  },
+  "loaded": "{title} data loaded."
 }

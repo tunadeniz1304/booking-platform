@@ -3,9 +3,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { apiFetch, logout } from "@/lib/api-client";
+import { ApiError, apiFetch, logout } from "@/lib/api-client";
 import { useFormat } from "@/i18n/use-format";
-import { ReauthCancelledError, useReauth } from "./ReauthDialog";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { useAccountErrorText, useReauth } from "./ReauthDialog";
 
 interface SessionView {
   id: string;
@@ -25,21 +26,16 @@ const fetchSessions = () =>
  */
 export default function SessionManager() {
   const t = useTranslations("account.sessions");
-  const tr = useTranslations("account.reauth");
   const fmt = useFormat();
   const router = useRouter();
   const reauth = useReauth();
+  const { confirm, confirmDialog } = useConfirm();
   const [sessions, setSessions] = useState<SessionView[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
 
-  const errorText = useCallback(
-    (err: unknown, fallback: string) => {
-      if (err instanceof ReauthCancelledError) return tr("cancelled");
-      return err instanceof Error && err.message ? err.message : fallback;
-    },
-    [tr]
-  );
+  // F191: sunucu/tarayıcı metni yerine arayüz dilinde hata.
+  const errorText = useAccountErrorText();
 
   const load = useCallback(
     () =>
@@ -67,24 +63,37 @@ export default function SessionManager() {
     };
   }, [errorText, router, t]);
 
-  async function revoke(query: string, confirmText: string, current = false) {
-    if (!window.confirm(confirmText)) return;
+  async function revoke(query: string | null, confirmText: string) {
+    if (busy) return;
+    const ok = await confirm({
+      title: confirmText,
+      confirmLabel: query === null ? t("confirmLogoutLabel") : t("confirmRevokeLabel"),
+      tone: "danger",
+    });
+    if (!ok) return;
     setBusy(true);
     setStatus(null);
     try {
-      await reauth.run(() => apiFetch(`/api/account/sessions?${query}`, { method: "DELETE" }));
-      if (current) {
+      if (query === null) {
+        // F192: bu cihaz için yeniden doğrulama gerekmez; çıkış mevcut oturumu sunucuda kapatır.
+        // (Yeniden doğrulama oturumu yenilediği için eski kimlikle DELETE 404 dönüyordu.)
         await logout();
         router.push("/login");
         return;
       }
+      await reauth.run(() => apiFetch(`/api/account/sessions?${query}`, { method: "DELETE" }));
       setStatus({ kind: "ok", text: t("revokedOk") });
-      await load();
     } catch (err) {
-      setStatus({ kind: "error", text: errorText(err, t("revokeFailed")) });
+      // 404: oturum zaten kapanmış; liste yenilenince kaybolur.
+      if (err instanceof ApiError && err.code === "NOT_FOUND") {
+        setStatus({ kind: "ok", text: t("alreadyClosed") });
+      } else {
+        setStatus({ kind: "error", text: errorText(err, t("revokeFailed")) });
+      }
     } finally {
       setBusy(false);
     }
+    await load();
   }
 
   const others = sessions?.filter((s) => !s.current).length ?? 0;
@@ -130,13 +139,12 @@ export default function SessionManager() {
                 type="button"
                 onClick={() =>
                   void revoke(
-                    `id=${encodeURIComponent(s.id)}`,
-                    s.current ? t("confirmRevokeCurrent") : t("confirmRevoke"),
-                    s.current
+                    s.current ? null : `id=${encodeURIComponent(s.id)}`,
+                    s.current ? t("confirmRevokeCurrent") : t("confirmRevoke")
                   )
                 }
-                disabled={busy}
-                className="rounded-lg border border-red-300 px-3 py-1 text-xs font-semibold text-red-700 disabled:opacity-50"
+                aria-disabled={busy || undefined}
+                className="min-h-[44px] shrink-0 rounded-lg border border-red-300 px-3 py-1 text-xs font-semibold text-red-700 aria-disabled:opacity-50 sm:min-h-0"
               >
                 {t("revoke")}
               </button>
@@ -148,13 +156,14 @@ export default function SessionManager() {
         <button
           type="button"
           onClick={() => void revoke("scope=others", t("confirmRevokeOthers"))}
-          disabled={busy}
-          className="mt-4 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+          aria-disabled={busy || undefined}
+          className="mt-4 min-h-[44px] rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white aria-disabled:opacity-50 sm:min-h-0"
         >
           {t("revokeOthers")}
         </button>
       )}
       {reauth.dialog}
+      {confirmDialog}
     </section>
   );
 }

@@ -14,5 +14,7 @@
   "aiDraftNotice": "AI draft — check and edit it before sending.",
   "send": "Send",
   "suggestDraft": "Suggest a reply draft",
-  "closed": "Messaging is only available for confirmed bookings."
+  "closed": "Messaging is only available for confirmed bookings.",
+  "notFound": "This conversation could not be found, or you don't have permission to view it.",
+  "loginRequired": "<link>Sign in</link> to see your messages."
 }

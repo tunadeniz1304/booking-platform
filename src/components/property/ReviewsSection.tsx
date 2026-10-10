@@ -1,7 +1,7 @@
 "use client";
 
-import { Fragment, useState, type ReactNode } from "react";
-import { useTranslations } from "next-intl";
+import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import { ApiError, apiFetch } from "@/lib/api-client";
 import { useFormat } from "@/i18n/use-format";
 import { LlmBadge, focusRing, useLoader } from "@/components/ui/ui";
@@ -30,8 +30,22 @@ function ReportButton({ reviewId }: { reviewId: string }) {
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState<string>("OFFENSIVE");
   const [status, setStatus] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const selectRef = useRef<HTMLSelectElement>(null);
+  /** Kapanışta odağı tetikleyiciye döndürmek için (ilk render'da değil). */
+  const wasOpen = useRef(false);
+  const panelId = `report-panel-${reviewId}`;
+
+  useEffect(() => {
+    if (open) selectRef.current?.focus();
+    else if (wasOpen.current) triggerRef.current?.focus();
+    wasOpen.current = open;
+  }, [open]);
 
   async function submit() {
+    if (busy) return;
+    setBusy(true);
     setStatus(null);
     try {
       await apiFetch(`/api/reviews/${reviewId}/report`, {
@@ -48,21 +62,43 @@ function ReportButton({ reviewId }: { reviewId: string }) {
             ? e.message
             : t("report.failed")
       );
+    } finally {
+      setBusy(false);
     }
   }
 
   return (
     <div className="mt-2 text-xs">
-      {open ? (
-        <span className="flex flex-wrap items-center gap-2">
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-controls={panelId}
+        className={`inline-flex min-h-[44px] items-center text-gray-700 underline sm:min-h-0 ${focusRing}`}
+      >
+        {t("report.open")}
+      </button>
+      {open && (
+        <span
+          id={panelId}
+          className="mt-1 flex flex-wrap items-center gap-2"
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              e.stopPropagation();
+              setOpen(false);
+            }
+          }}
+        >
           <label htmlFor={`report-${reviewId}`} className="sr-only">
             {t("report.reasonLabel")}
           </label>
           <select
+            ref={selectRef}
             id={`report-${reviewId}`}
             value={reason}
             onChange={(e) => setReason(e.target.value)}
-            className="rounded border border-gray-300 px-1 py-0.5"
+            className={`min-h-[44px] rounded border border-gray-300 px-1 py-0.5 sm:min-h-0 ${focusRing}`}
           >
             {REPORT_REASONS.map((v) => (
               <option key={v} value={v}>
@@ -73,26 +109,20 @@ function ReportButton({ reviewId }: { reviewId: string }) {
           <button
             type="button"
             onClick={() => void submit()}
-            className={`font-semibold text-red-800 underline ${focusRing}`}
+            disabled={busy}
+            aria-busy={busy}
+            className={`inline-flex min-h-[44px] items-center font-semibold text-red-800 underline disabled:opacity-60 sm:min-h-0 ${focusRing}`}
           >
             {t("report.submit")}
           </button>
           <button
             type="button"
             onClick={() => setOpen(false)}
-            className={`text-gray-700 underline ${focusRing}`}
+            className={`inline-flex min-h-[44px] items-center text-gray-700 underline sm:min-h-0 ${focusRing}`}
           >
             {t("report.cancel")}
           </button>
         </span>
-      ) : (
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          className={`text-gray-700 underline ${focusRing}`}
-        >
-          {t("report.open")}
-        </button>
       )}
       {status && (
         <p role="status" className="mt-1 text-gray-700">
@@ -166,8 +196,8 @@ function CommentText({ text, quote }: { text: string; quote: HighlightQuote | nu
 function Stars({ rating }: { rating: number }) {
   const t = useTranslations("reviews");
   return (
-    <span aria-label={t("starsLabel", { rating })} className="text-amber-700">
-      {"★".repeat(rating)}
+    <span role="img" aria-label={t("starsLabel", { rating })} className="text-amber-700">
+      <span aria-hidden="true">{"★".repeat(rating)}</span>
       <span aria-hidden="true" className="text-gray-400">
         {"★".repeat(Math.max(0, 5 - rating))}
       </span>
@@ -179,14 +209,18 @@ function Stars({ rating }: { rating: number }) {
 export default function ReviewsSection({ propertyId }: { propertyId: string }) {
   const t = useTranslations("reviews");
   const f = useFormat();
+  const locale = useLocale();
   const sourceLabel = (n: number) => t("summary.sourceLabel", { n });
   const reviews = useLoader(
     () => apiFetch<ReviewItem[]>(`/api/properties/${propertyId}/reviews`),
     [propertyId]
   );
   const summary = useLoader(
-    () => apiFetch<ReviewSummary>(`/api/properties/${propertyId}/reviews/summary`),
-    [propertyId]
+    () =>
+      apiFetch<ReviewSummary>(
+        `/api/properties/${propertyId}/reviews/summary?locale=${encodeURIComponent(locale)}`
+      ),
+    [propertyId, locale]
   );
 
   const [activeQuote, setActiveQuote] = useState<HighlightQuote | null>(null);
@@ -214,12 +248,15 @@ export default function ReviewsSection({ propertyId }: { propertyId: string }) {
                 {t("summary.basedOn", { count: summary.data.reviewCount })}
               </span>
             </div>
-            <p>{withCitations(summary.data.summary, citationOrder, sourceLabel)}</p>
+            {locale !== "tr" && (
+              <p className="mb-2 text-xs text-gray-700">{t("summary.inTurkish")}</p>
+            )}
+            <p lang="tr">{withCitations(summary.data.summary, citationOrder, sourceLabel)}</p>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               {summary.data.pros.length > 0 && (
                 <div>
                   <h4 className="font-semibold text-green-900">{t("summary.pros")}</h4>
-                  <ul className="mt-1 list-disc pl-5">
+                  <ul lang="tr" className="mt-1 list-disc pl-5">
                     {summary.data.pros.map((p, i) => (
                       <li key={i}>{withCitations(p, citationOrder, sourceLabel)}</li>
                     ))}
@@ -229,7 +266,7 @@ export default function ReviewsSection({ propertyId }: { propertyId: string }) {
               {summary.data.cons.length > 0 && (
                 <div>
                   <h4 className="font-semibold text-red-900">{t("summary.cons")}</h4>
-                  <ul className="mt-1 list-disc pl-5">
+                  <ul lang="tr" className="mt-1 list-disc pl-5">
                     {summary.data.cons.map((c, i) => (
                       <li key={i}>{withCitations(c, citationOrder, sourceLabel)}</li>
                     ))}

@@ -23,7 +23,8 @@ export function buildManifest(locale: Locale) {
     start_url: "/?source=pwa",
     scope: "/",
     display: "standalone",
-    orientation: "portrait",
+    // WCAG 1.3.4: kurulu uygulama yön kilitlemez (yatay sabit cihazlar).
+    orientation: "any",
     background_color: "#ffffff",
     theme_color: THEME_COLOR,
     categories: ["travel"],

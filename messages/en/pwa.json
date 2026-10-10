@@ -34,7 +34,10 @@
     "disabledServer": "Push notifications are not configured on this server (no VAPID keys); email notifications keep working.",
     "unsupported": "Your browser does not support push notifications.",
     "denied": "Notification permission was denied. You can allow it in your browser settings.",
-    "error": "The notification setting could not be changed."
+    "error": "The notification setting could not be changed.",
+    "dismissed": "Notification permission was not granted. You can try again if you like.",
+    "disabledDone": "Notifications are turned off on this device.",
+    "deniedHelp": "To allow them, tap the lock icon in the address bar, set Notifications to \"Allow\" and reload the page."
   },
   "offline": {
     "title": "You are offline",

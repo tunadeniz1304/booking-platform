@@ -26,5 +26,37 @@
     "system": "Sistem teması",
     "light": "Açık tema",
     "dark": "Koyu tema"
-  }
+  },
+  "notFound": {
+    "title": "Sayfa bulunamadı",
+    "description": "Aradığınız sayfa taşınmış, kaldırılmış ya da bağlantı hatalı olabilir. Ana sayfadan devam edebilir ya da yeni bir konaklama arayabilirsiniz.",
+    "navLabel": "Devam etmek için",
+    "home": "Ana sayfaya dön",
+    "search": "Konaklama ara"
+  },
+  "errorPage": {
+    "title": "Bir sorun oluştu",
+    "description": "Sayfa şu an yüklenemedi. Biraz sonra tekrar deneyebilir ya da ana sayfaya dönebilirsiniz.",
+    "retry": "Tekrar dene",
+    "home": "Ana sayfaya dön",
+    "reference": "Destekle iletişime geçerseniz bu referans kodunu paylaşın: {digest}"
+  },
+  "errors": {
+    "NETWORK": "Bağlantı kurulamadı. İnternet bağlantınızı kontrol edip tekrar deneyin.",
+    "UNAUTHORIZED": "Bu işlem için giriş yapmanız gerekiyor.",
+    "FORBIDDEN": "Bu işlem için yetkiniz yok.",
+    "NOT_FOUND": "Aradığınız kayıt bulunamadı.",
+    "VALIDATION_ERROR": "Bazı bilgiler eksik ya da hatalı. Lütfen alanları kontrol edin.",
+    "TRANSACTION_CONFLICT": "Aynı anda başka bir işlem yapıldı. Lütfen tekrar deneyin.",
+    "RATE_LIMITED": "Çok fazla deneme yapıldı. Lütfen biraz bekleyip tekrar deneyin.",
+    "SERVICE_UNAVAILABLE": "Hizmet şu anda yanıt vermiyor. Lütfen birkaç dakika sonra tekrar deneyin.",
+    "network": "Bağlantı kurulamadı. İnternet bağlantınızı kontrol edip tekrar deneyin.",
+    "EMAIL_NOT_VERIFIED": "Devam etmek için e-posta adresinizi doğrulayın. Doğrulama bağlantısı e-posta kutunuzda.",
+    "INTERNAL_ERROR": "Bir sorun oluştu. Lütfen tekrar deneyin.",
+    "INVALID_JSON": "İstek okunamadı. Sayfayı yenileyip tekrar deneyin."
+  },
+  "confirm": {
+    "cancel": "Vazgeç"
+  },
+  "errorPrefix": "Hata:"
 }

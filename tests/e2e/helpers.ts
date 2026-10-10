@@ -102,6 +102,7 @@ export async function completeCheckout(page: Page): Promise<string> {
 export async function payWithCard(page: Page, cardNumber: string) {
   const form = page.getByRole("form", { name: "Ödeme" });
   await form.getByLabel("Kart numarası").fill(cardNumber);
+  await form.getByLabel("Son kullanma (AA/YY)").fill("12/30");
   await form.getByLabel("CVC").fill("123");
   await form.getByRole("button", { name: "Öde ve onayla" }).click();
 }

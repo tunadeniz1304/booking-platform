@@ -82,7 +82,7 @@ describe("P2-1 rezervasyon detayında RNPL planı", () => {
   it("bugün 0, vade tarihinde toplam ve iptal zaman çizelgesi", () => {
     const html = renderPlan(plan);
     expect(html).toContain('data-testid="rnpl-plan"');
-    expect(html).toMatch(/Bugün ₺?0/);
+    expect(html).toMatch(/Rezervasyon sırasında ₺?0/);
     expect(html).toContain("2.500");
     expect(html).toContain("20 Ekim 2026");
     expect(html).toContain('data-testid="rnpl-plan-timeline"');

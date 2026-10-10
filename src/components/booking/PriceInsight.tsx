@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { ApiError, apiFetch } from "@/lib/api-client";
 import { useFormat } from "@/i18n/use-format";
-import { focusRing } from "@/components/ui/ui";
+import { focusRing, useErrorText } from "@/components/ui/ui";
 
 /** /api/price-insight yanıtı (tutarlar minor-unit, gece başı). */
 interface PriceInsightView {
@@ -33,6 +33,7 @@ type AlertState = { kind: "ok" | "error"; text: string } | null;
 export default function PriceInsight({ roomId, checkIn, checkOut, guests }: Props) {
   const t = useTranslations("booking.priceInsight");
   const f = useFormat();
+  const errorText = useErrorText();
   const key = new URLSearchParams({ roomId, checkIn, checkOut }).toString();
   const [insight, setInsight] = useState<{ key: string; data: PriceInsightView | null } | null>(
     null
@@ -77,7 +78,7 @@ export default function PriceInsight({ roomId, checkIn, checkOut, guests }: Prop
             err instanceof ApiError && err.status === 401
               ? t("alertLoginRequired")
               : err instanceof ApiError
-                ? err.message
+                ? errorText(err)
                 : t("alertFailed"),
         },
       });
@@ -119,7 +120,8 @@ export default function PriceInsight({ roomId, checkIn, checkOut, guests }: Prop
         type="button"
         onClick={() => void createAlert()}
         disabled={busy}
-        className={`mt-2 text-sm font-semibold text-[#003580] underline disabled:opacity-60 ${focusRing}`}
+        aria-busy={busy || undefined}
+        className={`mt-2 inline-flex min-h-[44px] items-center text-sm font-semibold text-[#003580] underline disabled:opacity-60 sm:min-h-0 ${focusRing}`}
       >
         {t("setAlert")}
       </button>

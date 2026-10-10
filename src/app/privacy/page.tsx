@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
+import { CookiePreferencesButton } from "@/components/privacy/PrivacyCenter";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("privacy");
@@ -83,6 +84,7 @@ export default async function PrivacyPage() {
                 code: (c) => <code>{c}</code>,
               })}
             </p>
+            <CookiePreferencesButton />
           </section>
 
           <section aria-labelledby="p-rights">

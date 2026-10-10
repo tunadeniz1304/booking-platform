@@ -37,7 +37,7 @@
     "use": "Use my credit",
     "available": "Available: {amount}",
     "amount": "Credit to apply",
-    "max": "Up to {amount} (part must be paid by card)",
+    "max": "Up to {amount} (part must be paid by card). Example format: 150.50",
     "cardRemainder": "Card charge: {amount}",
     "invalid": "Credit must be between 0 and {max}.",
     "notice": "Credit is reserved first; if the card payment fails, your credit is returned."

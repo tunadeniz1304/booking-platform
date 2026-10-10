@@ -33,7 +33,7 @@ test.describe("rezervasyon akışı (misafir)", () => {
     await page.waitForURL(/\/property\/[^/]+$/);
 
     // PDP: teklif yüklenince onay butonu etkinleşir → checkout
-    const reserve = page.getByRole("button", { name: "Rezervasyonu Onayla" });
+    const reserve = page.getByRole("button", { name: "Rezervasyona devam et" });
     await expect(reserve).toBeEnabled();
     await reserve.click();
     await page.waitForURL(/\/checkout\?/);
@@ -70,8 +70,8 @@ test.describe("rezervasyon akışı (misafir)", () => {
 
     // İptal → iade tutarı gösterilir
     await page.goto(bookingUrl);
-    page.once("dialog", (dialog) => void dialog.accept());
     await page.getByRole("button", { name: "Rezervasyonu iptal et" }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Evet, iptal et" }).click();
     await expect(page.getByRole("status")).toHaveText(/İptal edildi\. İade: .+ \(%\d+\)\./);
     await expect(page.getByRole("heading", { name: "Rezervasyon iptal edildi" })).toBeVisible();
   });
@@ -94,8 +94,8 @@ test.describe("rezervasyon akışı (misafir)", () => {
     expect(body.booking.status).toBe("HELD");
 
     // Envanteri gereksiz tutmamak için hold'u bırak.
-    page.once("dialog", (dialog) => void dialog.accept());
     await page.getByRole("button", { name: "Rezervasyonu iptal et" }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Evet, iptal et" }).click();
     await expect(page.getByRole("heading", { name: "Rezervasyon iptal edildi" })).toBeVisible();
   });
 });

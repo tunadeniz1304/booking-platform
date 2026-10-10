@@ -26,5 +26,10 @@
     "NOT_STARTED": "This coupon is not valid yet.",
     "INACTIVE": "This coupon is not valid.",
     "other": "This coupon does not apply to this stay."
+  },
+  "taxKind": {
+    "VAT": "VAT",
+    "ACCOMMODATION_TAX": "Accommodation tax",
+    "SERVICE_FEE": "Service fee"
   }
 }

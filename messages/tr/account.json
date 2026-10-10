@@ -10,7 +10,13 @@
     "favoriteAdd": "Favori eklenemedi",
     "favoriteFailed": "Favori işlemi başarısız",
     "cancelBooking": "Rezervasyon iptal edilemedi",
-    "cancelFailed": "İptal işlemi başarısız"
+    "cancelFailed": "İptal işlemi başarısız",
+    "sessionExpired": "Oturumunuzun süresi doldu. Hesabınızı görmek için <link>yeniden giriş yapın</link>.",
+    "codes": {
+      "RATE_LIMITED": "Çok fazla istek gönderildi. Lütfen biraz bekleyip tekrar deneyin.",
+      "REAUTH_RATE_LIMITED": "Çok fazla hatalı deneme. Lütfen daha sonra tekrar deneyin.",
+      "KYC_RATE_LIMITED": "Kimlik doğrulamayı kısa sürede çok kez başlattınız. Lütfen daha sonra tekrar deneyin."
+    }
   },
   "role": {
     "host": "Ev Sahibi",
@@ -21,7 +27,10 @@
     "pending": "Beklemede",
     "confirmed": "Onaylandı",
     "cancelled": "İptal Edildi",
-    "completed": "Tamamlandı"
+    "completed": "Tamamlandı",
+    "held": "Ödeme bekleniyor",
+    "expired": "Süresi doldu",
+    "unknown": "Durum bilinmiyor"
   },
   "bookings": {
     "title": "Rezervasyonlarım",
@@ -35,7 +44,21 @@
     "cancelling": "İptal ediliyor...",
     "processing": "İşleniyor...",
     "removeFavorite": "Favorilerden Çıkar",
-    "addFavorite": "Favorilere Ekle"
+    "addFavorite": "Favorilere Ekle",
+    "details": "Ayrıntılar ve mesajlar",
+    "completePayment": "Ödemeyi tamamla",
+    "cancelConfirm": {
+      "title": "Bu rezervasyonu iptal etmek istiyor musunuz?",
+      "summary": "{checkIn} – {checkOut} · Toplam {total}",
+      "refundNote": "Ne kadar iade alacağınız ilanın iptal politikasına ve ne zaman iptal ettiğinize bağlıdır; tutar iptalden hemen sonra gösterilir. Politikayı önce <link>rezervasyon ayrıntılarında</link> görebilirsiniz. Bu işlem geri alınamaz.",
+      "confirm": "Evet, iptal et",
+      "keep": "Vazgeç"
+    },
+    "cancelDone": {
+      "refunded": "Rezervasyon iptal edildi. {amount} iade edilecek (%{percent}).",
+      "noRefund": "Rezervasyon iptal edildi. İptal politikası gereği iade yapılmayacak.",
+      "plain": "Rezervasyon iptal edildi."
+    }
   },
   "favorites": {
     "title": "Favorilerim",
@@ -77,7 +100,8 @@
     "cancel": "Vazgeç",
     "failed": "Doğrulama başarısız",
     "rateLimited": "Çok fazla hatalı deneme. Lütfen daha sonra tekrar deneyin.",
-    "cancelled": "Yeniden doğrulama iptal edildi"
+    "cancelled": "Yeniden doğrulama iptal edildi",
+    "wrongPassword": "Parola hatalı. Lütfen kontrol edip tekrar deneyin."
   },
   "sessions": {
     "title": "Oturumlar",
@@ -98,7 +122,10 @@
     "confirmRevokeCurrent": "Bu cihazdaki oturumunuz kapatılacak ve çıkış yapacaksınız. Devam edilsin mi?",
     "confirmRevokeOthers": "Bu cihaz dışındaki tüm oturumlar kapatılsın mı?",
     "revokedOk": "Oturum kapatıldı",
-    "revokeFailed": "Oturum kapatılamadı"
+    "revokeFailed": "Oturum kapatılamadı",
+    "confirmRevokeLabel": "Evet, oturumu kapat",
+    "confirmLogoutLabel": "Evet, çıkış yap",
+    "alreadyClosed": "Bu oturum zaten kapanmış; liste güncellendi."
   },
   "mandates": {
     "title": "Yapay zekâ ajanı ödeme yetkileri",
@@ -133,6 +160,15 @@
     "scoped": "{count, plural, other {# ilanla sınırlı}}",
     "revoke": "İptal et",
     "revokeLabel": "{amount} limitli yetkiyi iptal et",
-    "revoked": "Yetki iptal edildi; ajan bu yetkiyle ödeme yapamaz."
-  }
+    "revoked": "Yetki iptal edildi; ajan bu yetkiyle ödeme yapamaz.",
+    "amountHint": "Örnek: 1500 veya 1.500,50",
+    "amountFormat": "Tutarı 1500 veya 1.500,50 biçiminde girin.",
+    "amountPreview": "Limit: {amount}",
+    "createFailed": "Yetki oluşturulamadı. Lütfen tekrar deneyin.",
+    "revokeFailed": "Yetki iptal edilemedi. Lütfen tekrar deneyin.",
+    "revokeConfirmTitle": "Bu yetki iptal edilsin mi?",
+    "revokeConfirmBody": "{amount} limitli, {date} tarihine kadar geçerli yetki iptal edilecek. Ajanınız bu yetkiyle artık ödeme yapamaz ve iptal geri alınamaz; gerekirse yeni bir yetki vermeniz gerekir.",
+    "revokeConfirm": "Evet, iptal et"
+  },
+  "backHome": "Ana sayfaya dön"
 }

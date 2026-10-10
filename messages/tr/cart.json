@@ -10,7 +10,7 @@
   "totalNotice": "Vergiler dahil. Tüm odalar birlikte tutulur ve tek ödemeyle onaylanır; biri müsait değilse hiçbiri ayrılmaz.",
   "proceed": "Ödemeye geç",
   "cancelCart": "Sepeti boşalt",
-  "cancelConfirm": "Sepetteki tüm kalemler silinsin mi?",
+  "cancelConfirm": "Sepet boşaltılsın mı?",
   "lockedNotice": "Sepet ödeme için tutuluyor. Değişiklik için tutmayı bırakın.",
   "release": "Tutmayı bırak",
   "updateFailed": "Sepet güncellenemedi",
@@ -22,7 +22,9 @@
     "children": "Çocuk",
     "quantity": "Oda adedi",
     "remove": "Kaldır",
-    "removeLabel": "{name} kalemini kaldır"
+    "removeLabel": "{name} kalemini kaldır",
+    "adultsRange": "Yetişkin sayısı {min} ile {max} arasında bir tam sayı olmalı. Kayıtlı değer ({saved}) geri yüklendi.",
+    "childrenRange": "Çocuk sayısı {min} ile {max} arasında bir tam sayı olmalı. Kayıtlı değer ({saved}) geri yüklendi."
   },
   "add": {
     "button": "Sepete ekle",
@@ -30,7 +32,8 @@
     "added": "Sepete eklendi.",
     "goToCart": "Sepete git",
     "failed": "Sepete eklenemedi",
-    "hint": "Birden çok oda veya tesisi tek ödemede ayırtın."
+    "hint": "Birden çok oda veya tesisi tek ödemede ayırtın.",
+    "loginHint": "Sepete eklemek için giriş yapmanız istenecek; seçimleriniz korunur."
   },
   "checkout": {
     "title": "Grup rezervasyonu",
@@ -43,14 +46,25 @@
     "itemUnavailable": "Sepetteki odalardan biri artık müsait değil; hiçbir oda tutulmadı.",
     "holdFailed": "Odalar tutulamadı",
     "declined": "Ödeme reddedildi; tüm tutmalar bırakıldı. Tekrar tutup başka bir kartla deneyebilirsiniz.",
-    "expired": "Tutma süresi doldu.",
-    "confirmPending": "Ödemeniz alındı; rezervasyon onayı birkaç saniye içinde tamamlanacak. Sepetinizi yenileyerek durumu görebilirsiniz.",
+    "expired": "Tutma süresi doldu ve odalar serbest bırakıldı. Sepeti geri yükleyip odaları yeniden tutabilirsiniz.",
+    "confirmPending": "Ödemeniz alındı; rezervasyon onayı tamamlanıyor.",
     "success": "Rezervasyonlarınız onaylandı!",
     "successHint": "Toplam {amount} tek ödemeyle tahsil edildi.",
     "viewBooking": "Rezervasyonu görüntüle",
     "trips": "Seyahatlerim",
     "backToCart": "Sepete dön",
-    "noCart": "Ödenecek sepet yok."
+    "noCart": "Ödenecek sepet yok.",
+    "remaining": "({minutes, plural, =0 {1 dakikadan az kaldı} other {# dakika kaldı}})",
+    "expiringSoon": "Tutma süresinin bitmesine 2 dakikadan az kaldı. Ödemeyi şimdi tamamlayın.",
+    "expiredTitle": "Tutma süresi doldu",
+    "expiredHint": "Odalar artık sizin için ayrılmıyor. Ödemeye devam etmek için odaları yeniden tutun.",
+    "reholdButton": "Odaları yeniden tut",
+    "rehold": "Odaları yeniden tutmak için \"Odaları tut\" düğmesine basın.",
+    "expiredNoCart": "Tutma süresi dolduğu için sepet kapandı. Sepeti geri yükleyip odaları yeniden tutabilirsiniz.",
+    "reopened": "Sepet geri yüklendi. Ödemeye devam etmek için odaları tutun.",
+    "pendingTitle": "Ödemeniz alındı",
+    "pendingWait": "Rezervasyon onayı birkaç saniye içinde tamamlanacak. Bu sayfa kendiliğinden güncellenir; tekrar ödeme yapmayın.",
+    "pendingSlow": "Onay beklenenden uzun sürüyor. Ödemeniz alındı; tekrar ödeme yapmayın. Rezervasyonlarınız onaylanınca Seyahatlerim'de görünecek ve size e-posta gönderilecek."
   },
   "split": {
     "title": "Ödemeyi grupla bölüş",
@@ -115,7 +129,78 @@
       "closed": "Bu bölünmüş ödeme artık açık değil.",
       "alreadyPaid": "Bu pay zaten ödendi.",
       "deadlinePassed": "Ödeme süresi doldu.",
-      "declined": "Kart reddedildi; başka bir kartla tekrar deneyebilirsiniz."
+      "declined": "Kart reddedildi; başka bir kartla tekrar deneyebilirsiniz.",
+      "home": "Ana sayfa",
+      "threeDsIntro": "Bankanız bu ödemeyi onaylamanızı istiyor. Telefonunuza gelen doğrulama kodunu girin.",
+      "threeDsDemoHint": "Demo doğrulama kodu: {code}",
+      "resendVerify": "Doğrulama e-postasını yeniden gönder",
+      "resendSending": "Gönderiliyor…",
+      "resendSent": "Doğrulama bağlantısını e-posta adresinize gönderdik. E-postadaki bağlantıya tıklayın, sonra bu sayfayı yenileyin.",
+      "alreadyVerified": "E-posta adresiniz zaten doğrulanmış. Sayfayı yenileyip tekrar deneyin.",
+      "resendFailed": "Doğrulama e-postası gönderilemedi. Biraz sonra tekrar deneyin.",
+      "refresh": "Sayfayı yenile",
+      "signedInAs": "Şu anda {email} hesabıyla giriş yaptınız.",
+      "switchAccount": "Çıkış yap ve davet edilen hesapla giriş yap"
+    },
+    "modeLegend": "Tutar nasıl bölünsün?",
+    "amountHint": "ör. 1.250,50",
+    "equalShare": "Payı: {amount}",
+    "removeParticipantN": "Katılımcı {n} satırını kaldır",
+    "organizerPending": "Tüm tutarlar geçerli olunca payınız hesaplanır.",
+    "overTotal": "Payların toplamı sepet tutarını ({total}) {excess} aşıyor. Tutarları azaltın.",
+    "beforeCreate": "Paylar oluşturulunca katılımcıların payını belirli bir süre içinde ödemesi gerekir; son ödeme saati bir sonraki adımda görünür. Süre dolduğunda ödenmemiş paylar ya size düşer ya da tüm ödemeler iade edilip odalar bırakılır.",
+    "deadlineLeft": "({minutes, plural, =0 {1 dakikadan az kaldı} other {# dakika kaldı}})",
+    "copyLinkFor": "Linki kopyala: {name}",
+    "sendEmailFor": "E-postayla gönder: {name}",
+    "inviteEmailLabel": "Davet e-postası",
+    "errors": {
+      "amountRequired": "Bir tutar girin.",
+      "amountInvalid": "Geçerli bir tutar girin, ör. 1.250,50",
+      "emailDuplicate": "Bu e-posta başka bir katılımcıya da yazıldı.",
+      "SPLIT_DUPLICATE_EMAIL": "Aynı e-posta birden çok katılımcıya yazılamaz.",
+      "SPLIT_AMOUNT_INVALID": "Pay tutarları geçersiz. Her tutar sıfırdan büyük olmalı ve toplam sepet tutarını aşmamalı.",
+      "SPLIT_SHARE_COUNT": "Katılımcı sayısı izin verilen aralıkta değil.",
+      "SPLIT_EXISTS": "Bu sepet için zaten bir bölünmüş ödeme var. Sayfayı yenileyin.",
+      "SPLIT_CLOSED": "Bu bölünmüş ödeme artık açık değil.",
+      "SPLIT_DEADLINE_PASSED": "Bölünmüş ödemenin süresi doldu.",
+      "SHARE_EMAIL_REQUIRED": "Davet göndermek için bir e-posta adresi girin.",
+      "SHARE_NOT_INVITABLE": "Bu paya artık davet gönderilemez.",
+      "CART_NOT_HELD": "Sepet artık ödeme için tutulmuyor. Odaları yeniden tutun.",
+      "CART_PAYMENT_IN_PROGRESS": "Bu sepet için bir ödeme sürüyor. Birkaç saniye sonra yeniden deneyin.",
+      "VALIDATION_ERROR": "Girilen bilgilerden biri geçersiz. Alanları kontrol edin."
     }
+  },
+  "cancelConfirmBody": "Sepetteki tüm odalar silinir ve sepet kapatılır. Bu işlem geri alınamaz.",
+  "cancelConfirmHeld": "Odalar şu anda sizin için tutuluyor. Sepeti boşaltırsanız tutma bırakılır ve sepet kapatılır. Grup ödemesi başlattıysanız katılımcıların ödemeleri iptal edilip iade edilir. Bu işlem geri alınamaz.",
+  "cancelKeep": "Vazgeç, sepet kalsın",
+  "announce": {
+    "updated": "Sepet güncellendi. Yeni toplam: {total}",
+    "removed": "{name} sepetten kaldırıldı. Yeni toplam: {total}",
+    "cleared": "Sepet boşaltıldı.",
+    "released": "Odaların tutması bırakıldı. Artık sepeti düzenleyebilirsiniz.",
+    "reopened": "Sepetiniz geri yüklendi."
+  },
+  "errors": {
+    "CART_LOCKED": "Sepet ödeme için tutuluyor. Değişiklik yapmak için önce \"Tutmayı bırak\" düğmesine basın.",
+    "CART_NOT_OPEN": "Bu sepet artık değiştirilemiyor. Sayfayı yenileyip sepetin son durumunu kontrol edin.",
+    "CONCURRENT_UPDATE": "Sepet aynı anda başka bir yerden değişti. Son durumu yükledik, lütfen tekrar deneyin.",
+    "CONFLICT": "Sepet aynı anda başka bir yerden değişti. Son durumu yükledik, lütfen tekrar deneyin.",
+    "VALIDATION_ERROR": "Girilen bilgilerden biri geçersiz. Alanları kontrol edip yeniden deneyin.",
+    "NOT_FOUND": "Bu kalem artık sepetinizde değil. Sepetin son durumunu yükledik.",
+    "CART_NOT_HELD": "Sepet artık ödeme için tutulmuyor. Odaları yeniden tutup tekrar deneyin.",
+    "CART_PAYMENT_IN_PROGRESS": "Bu sepet için bir ödeme zaten sürüyor. Birkaç saniye bekleyip sayfayı yenileyin.",
+    "CART_NOT_CONFIRMABLE": "Sepet artık onaylanamıyor. Sepete dönüp durumu kontrol edin.",
+    "FRAUD_BLOCKED": "Güvenlik kontrolü nedeniyle bu ödeme yapılamadı. Başka bir kart deneyin ya da destekle iletişime geçin.",
+    "NO_PENDING_CHALLENGE": "Doğrulama bekleyen bir ödeme yok. Ödemeyi yeniden başlatın.",
+    "CHALLENGE_FAILED": "Doğrulama kodu hatalı. Kodu kontrol edip yeniden deneyin."
+  },
+  "released": "Tutma bırakıldı; odalar artık sizin için ayrılmıyor.",
+  "releasedSplit": "Bölünmüş ödeme iptal edildi ve tutma bırakıldı. Yapılmış ödemeler iptal ya da iade edilecek.",
+  "releaseConfirm": {
+    "title": "Tutma bırakılsın mı?",
+    "body": "Odalar artık sizin için ayrılmayacak ve başkası tarafından ayırtılabilir. Ödemek için odaları yeniden tutmanız gerekir.",
+    "splitTitle": "Bölünmüş ödeme iptal edilsin mi?",
+    "splitBody": "{count, plural, =0 {Henüz kimse payını ödemedi.} other {Yapılmış # ödeme ({funded}) iptal ya da iade edilecek.}} Davet bağlantıları çalışmayacak ve odalar serbest kalacak. Bu işlem geri alınamaz.",
+    "splitConfirm": "Bölüşmeyi iptal et ve odaları bırak"
   }
 }

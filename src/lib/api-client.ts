@@ -22,6 +22,14 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Ağ kesintisi (fetch'in TypeError'ı: "Failed to fetch" / "Load failed") mi? Arayüz bu
+ * durumda ham tarayıcı metni yerine yerelleştirilmiş "bağlantı kurulamadı" göstermeli (F52).
+ */
+export function isNetworkError(err: unknown): boolean {
+  return err instanceof TypeError;
+}
+
 let refreshing: Promise<boolean> | null = null;
 
 async function refreshSession(): Promise<boolean> {

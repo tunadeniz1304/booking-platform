@@ -2,11 +2,13 @@
 
 import { Suspense, type ReactNode } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { apiFetch } from "@/lib/api-client";
 import { useFormat } from "@/i18n/use-format";
-import { LlmBadge, PageShell, focusRing, useLoader } from "@/components/ui/ui";
+import { Button, LlmBadge, PageShell, focusRing, useLoader } from "@/components/ui/ui";
+import { propertyHref } from "@/components/property/PropertyCard";
+import { useCompareSelection } from "@/components/compare/useCompareSelection";
 
 type PolicyKind = "FLEXIBLE" | "MODERATE" | "STRICT" | "NON_REFUNDABLE";
 type Unavailable = "NO_DATES" | "NO_ROOM_FOR_GUESTS" | "UNAVAILABLE";
@@ -58,6 +60,8 @@ function CompareContent() {
   const f = useFormat();
   const locale = useLocale();
   const sp = useSearchParams();
+  const router = useRouter();
+  const { clear } = useCompareSelection();
   const ids = (sp.get("ids") ?? "").split(",").filter(Boolean);
   const query = new URLSearchParams(sp.toString());
   query.set("locale", locale);
@@ -81,15 +85,45 @@ function CompareContent() {
     );
   }
   if (res.error) {
+    // F201: hata çıkmaz sokak olmasın — yeniden dene, aramaya dön ya da seçimi sıfırla.
+    const backParams = new URLSearchParams();
+    for (const key of ["checkIn", "checkOut", "guests"]) {
+      const v = sp.get(key);
+      if (v) backParams.set(key, v);
+    }
+    const backQuery = backParams.toString();
+    const backHref = backQuery ? `/search?${backQuery}` : "/search";
     return (
-      <p role="alert" className="text-sm text-red-700">
-        {res.error}
-      </p>
+      <div className="space-y-3">
+        <p role="alert" className="text-sm text-red-700">
+          {res.error}
+        </p>
+        <p className="text-sm text-gray-700">{t("errorHelp")}</p>
+        <div className="flex flex-wrap items-center gap-3">
+          <Button onClick={res.reload}>{t("retry")}</Button>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              clear();
+              router.push(backHref);
+            }}
+          >
+            {t("resetAndBack")}
+          </Button>
+          <Link
+            href={backHref}
+            className={`inline-flex min-h-[44px] items-center text-sm underline sm:min-h-[24px] ${focusRing}`}
+          >
+            {t("backToSearch")}
+          </Link>
+        </div>
+      </div>
     );
   }
   const data = res.data;
   if (!data) return <p className="text-sm text-gray-700">{t("loading")}</p>;
 
+  const ctx = { checkIn: data.checkIn, checkOut: data.checkOut, guests: data.guests };
   const cell = "border-b border-gray-200 px-3 py-2 align-top text-sm text-gray-900";
   return (
     <div className="space-y-4">
@@ -103,8 +137,14 @@ function CompareContent() {
           : t("noDates")}
       </p>
 
-      <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
+      <div
+        className={`overflow-x-auto rounded-lg border border-gray-200 bg-white ${focusRing}`}
+        role="region"
+        aria-label={t("tableLabel")}
+        tabIndex={0}
+      >
         <table className="min-w-full border-collapse" data-testid="compare-table">
+          <caption className="sr-only">{t("tableLabel")}</caption>
           <thead>
             <tr>
               <th scope="col" className="sr-only">
@@ -112,7 +152,7 @@ function CompareContent() {
               </th>
               {data.listings.map((l) => (
                 <th key={l.id} scope="col" className={`${cell} text-left font-semibold`}>
-                  <Link href={`/property/${l.id}`} className={`underline ${focusRing}`}>
+                  <Link href={propertyHref(l.id, ctx)} className={`underline ${focusRing}`}>
                     {l.title}
                   </Link>
                 </th>
@@ -153,7 +193,13 @@ function CompareContent() {
               {data.listings.map((l) => (
                 <td key={l.id} className={cell}>
                   {l.rating.count > 0
-                    ? t("ratingValue", { avg: f.number(l.rating.avg), count: l.rating.count })
+                    ? t("ratingValue", {
+                        avg: f.number(l.rating.avg, {
+                          minimumFractionDigits: 1,
+                          maximumFractionDigits: 1,
+                        }),
+                        count: l.rating.count,
+                      })
                     : t("noRating")}
                   {data.diff.bestRatedId === l.id && <Badge>{t("badges.bestRated")}</Badge>}
                 </td>

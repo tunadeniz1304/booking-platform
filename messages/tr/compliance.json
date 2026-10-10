@@ -23,7 +23,15 @@
     "sent": "Bildiriminiz alındı. Başvuru numaranız: {reference}. Onay e-postası gönderildi.",
     "invalid": "Lütfen tüm zorunlu alanları doğru doldurun.",
     "rateLimited": "Çok fazla bildirim gönderildi; lütfen daha sonra tekrar deneyin.",
-    "error": "Bildirim gönderilemedi; lütfen tekrar deneyin."
+    "error": "Bildirim gönderilemedi; lütfen tekrar deneyin.",
+    "sentTitle": "Bildiriminiz alındı",
+    "errors": {
+      "contentUrl": "Geçerli bir adres girin, örneğin https://ornek.com/ilan/123.",
+      "category": "Bir bildirim türü seçin.",
+      "explanation": "Açıklama boşluklar hariç en az 20 karakter olmalı.",
+      "reporterName": "Ad en fazla 120 karakter olabilir.",
+      "reporterEmail": "Geçerli bir e-posta adresi girin, örneğin ad@ornek.com."
+    }
   },
   "admin": {
     "title": "Uyum",
@@ -69,7 +77,35 @@
     "noticeDecided": "Karar kaydedildi; gerekçeli karar bildirimi gönderilecek.",
     "transparency": "Şeffaflık raporu",
     "exportCsv": "CSV indir (bu yıl)",
-    "exportJson": "JSON görüntüle (bu yıl)"
+    "exportJson": "JSON görüntüle (bu yıl)",
+    "propertyIdHint": "İlanın kimliğini yapıştırın; alandan çıkınca ilan adı aşağıda gösterilir.",
+    "preview": {
+      "loading": "İlan aranıyor…",
+      "found": "Kaldırılacak ilan: {title} · {city}",
+      "missing": "Bu kimlikle yayında bir ilan bulunamadı. Kimliği kontrol edin."
+    },
+    "confirmTakedown": {
+      "title": "İlan hemen yayından kaldırılsın mı?",
+      "body": "{listing} ilanı bu talep kaydedilir kaydedilmez yayından kalkar. İlan, talep kapatılana kadar yeniden yayına alınamaz.",
+      "confirm": "Talebi kaydet ve ilanı kaldır"
+    },
+    "saving": "Kaydediliyor…",
+    "retry": "Tekrar dene",
+    "noTakedowns": "Kayıtlı talep yok.",
+    "closeForm": {
+      "resolution": "Kapatma gerekçesi",
+      "warning": "Kapatılan talep yeniden açılamaz; ev sahibi ilanı yeniden yayına alabilir.",
+      "confirm": "Talebi kapat"
+    },
+    "choose": "Seçin…",
+    "confirmDecision": {
+      "title": "Karar kaydedilsin mi?",
+      "summary": "Karar: {decision} · İçerik: {url}",
+      "removedEffect": "İlan yayından kaldırılır; bildiren kişiye ve ev sahibine gerekçeli karar e-postası gider.",
+      "noActionEffect": "İçerik yayında kalır; bildiren kişiye ve ev sahibine gerekçeli karar e-postası gider.",
+      "final": "Kaydedilen karar değiştirilemez; yalnızca taraflardan biri itiraz ederse yeniden incelenir.",
+      "confirm": "Kararı onayla ve gönder"
+    }
   },
   "accessibility": {
     "title": "Erişilebilirlik",
@@ -79,7 +115,7 @@
     "roomType": "Oda: {name}",
     "width": "{width} cm net genişlik",
     "evidence": "Kanıt fotoğrafı",
-    "disclosure": "Yalnızca kanıtla doğrulanmış özellikler gösterilir. Özel bir ihtiyacınız varsa rezervasyondan önce ev sahibine mesaj gönderin.",
+    "disclosure": "Yalnızca kanıtla doğrulanmış özellikler gösterilir. Özel bir ihtiyacınız varsa rezervasyondan önce Destek'e yazın ve ilanın adını belirtin.",
     "filterTitle": "Erişilebilirlik (doğrulanmış)",
     "filterHint": "Seçilen tüm özellikler aynı odada doğrulanmış olmalı.",
     "codes": {
@@ -119,7 +155,16 @@
       "add": "Özelliği ekle",
       "added": "Özellik eklendi.",
       "evidenceSaved": "Kanıt güncellendi; özellik yeniden incelenecek.",
-      "deleted": "Özellik silindi."
+      "deleted": "Özellik silindi.",
+      "saveEvidence": "Kanıtı kaydet",
+      "saveEvidenceLabel": "{name} için kanıtı kaydet",
+      "evidenceVerifiedWarning": "Bu özellik doğrulandı. Kanıtı değiştirip kaydederseniz doğrulama kaldırılır ve platform ekibi yeniden inceler.",
+      "evidenceConfirmTitle": "{name} için kanıt değiştirilsin mi?",
+      "evidencePreviewAlt": "Seçili kanıt: {photo}",
+      "deleteConfirmTitle": "{name} ({scope}) silinsin mi?",
+      "deleteConfirmBody": "Özellik listeden kalıcı olarak kaldırılır.",
+      "deleteConfirmVerified": "Doğrulanmış rozet kalkar ve özellik ilanda ile aramada görünmez. Yeniden eklerseniz platform ekibinin tekrar incelemesi gerekir.",
+      "deleteConfirm": "Kalıcı olarak sil"
     },
     "admin": {
       "title": "Erişilebilirlik doğrulama kuyruğu",
@@ -135,7 +180,8 @@
       "unverify": "Doğrulamayı kaldır",
       "verifiedOk": "Özellik doğrulandı.",
       "unverifiedOk": "Doğrulama kaldırıldı."
-    }
+    },
+    "askSupport": "Destek'e soru sor"
   },
   "appeal": {
     "title": "Karara itiraz",
@@ -183,7 +229,17 @@
       "groundHint": "İlan kaldırılacağı için dayanak zorunludur.",
       "response": "Gerekçe (itiraz edene gönderilir)",
       "submit": "İtiraz kararını kaydet",
-      "decided": "İtiraz kararı kaydedildi; sonuç e-postalanacak."
-    }
+      "decided": "İtiraz kararı kaydedildi; sonuç e-postalanacak.",
+      "chooseOutcome": "Bir sonuç seçin.",
+      "confirm": {
+        "title": "İtiraz kararı kaydedilsin mi?",
+        "upheldRemove": "Önceki karar geri alınır ve ilan yayından kaldırılır.",
+        "upheldRestore": "Önceki kaldırma kararı geri alınır; ilan yeniden yayına alınabilir.",
+        "rejected": "Önceki karar geçerli kalır.",
+        "final": "Kaydedilen itiraz kararı değiştirilemez ve itiraz edene e-postayla bildirilir.",
+        "confirm": "İtiraz kararını onayla"
+      }
+    },
+    "sentTitle": "İtirazınız alındı"
   }
 }

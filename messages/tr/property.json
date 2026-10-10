@@ -1,6 +1,6 @@
 {
   "metaTitle": "{title} | Booking Platform",
-  "notFoundTitle": "Property Bulunamadı",
+  "notFoundTitle": "İlan bulunamadı",
   "ratingCount": "{count} değerlendirme",
   "description": "Açıklama",
   "registration": {
@@ -11,13 +11,17 @@
   "totalPriceNote": "Gösterilen fiyatlar vergi ve zorunlu ücretler dahil toplamdır.",
   "amenities": "Olanaklar",
   "gallery": {
-    "imageAlt": "{title} - görsel {index}",
-    "thumbnailAlt": "{title} - küçük görsel {index}"
+    "imageAlt": "{title} - fotoğraf {index} / {total}",
+    "thumbnailAlt": "{title} - küçük görsel {index}",
+    "noPhotos": "Bu ilan için henüz fotoğraf yok.",
+    "thumbnails": "Fotoğraflar",
+    "show": "Fotoğraf {index} / {total} göster",
+    "counter": "Fotoğraf {index} / {total} gösteriliyor"
   },
   "calendar": {
     "title": "Fiyat takvimi",
-    "subtitleIncluded": "1 gece, {guests} misafir için en düşük fiyat — vergi ve ücretler dahil",
-    "subtitleExcluded": "1 gece, {guests} misafir için en düşük gecelik fiyat — vergi ve ücretler hariç",
+    "subtitleIncluded": "1 gece için, {guests} kişilik en ucuz oda ve fiyat seçeneğine göre en düşük fiyat — vergi ve ücretler dahil. Misafir sayınız veya seçtiğiniz oda farklıysa fiyat değişir.",
+    "subtitleExcluded": "1 gece için, {guests} kişilik en ucuz oda ve fiyat seçeneğine göre en düşük gecelik fiyat — vergi ve ücretler hariç. Misafir sayınız veya seçtiğiniz oda farklıysa fiyat değişir.",
     "taxesToggle": "Vergi ve ücretleri dahil göster",
     "prevMonth": "Önceki ay",
     "nextMonth": "Sonraki ay",
@@ -48,6 +52,47 @@
       "band2": "Orta",
       "band3": "Yüksek",
       "band4": "Çok yüksek"
-    }
+    },
+    "minStayError": "Bu giriş tarihi için en az {count} gece seçin.",
+    "rangeBlocked": "{date} gecesi dolu. Daha erken bir çıkış tarihi ya da başka bir giriş tarihi seçin.",
+    "dayAriaCheckoutOnly": "{date}: yalnızca çıkış tarihi olarak seçilebilir",
+    "checkoutOnly": "Çıkış",
+    "goToBooking": "Rezervasyon formuna git"
+  },
+  "ratingOutOf": "{rating}/5",
+  "noRatingYet": "Henüz puan yok",
+  "jumpToBooking": "Rezervasyon formuna git",
+  "amenityNames": {
+    "wifi": "Ücretsiz Wi-Fi",
+    "pool": "Havuz",
+    "snow": "Klima",
+    "car": "Otopark",
+    "coffee": "Kahvaltı dahil",
+    "spa": "Spa ve sauna",
+    "dumbbell": "Fitness merkezi",
+    "view": "Deniz manzarası",
+    "paw": "Evcil hayvan kabul edilir",
+    "clock": "7/24 resepsiyon",
+    "city": "Şehir merkezinde",
+    "service": "Oda servisi"
+  },
+  "policies": {
+    "title": "Giriş, çıkış ve iptal koşulları",
+    "checkIn": "Giriş: {time} ve sonrası",
+    "checkOut": "Çıkış: en geç {time}",
+    "localTime": "Saatler tesisin yerel saatine göredir ({timeZone}).",
+    "cancellationTitle": "İptal politikası: {kind}",
+    "kinds": {
+      "FLEXIBLE": "Esnek",
+      "MODERATE": "Orta",
+      "STRICT": "Katı",
+      "NON_REFUNDABLE": "İade edilemez"
+    },
+    "tierDays": "Girişe {days} gün veya daha fazla kala iptal ederseniz: {percent, plural, =0 {iade yapılmaz} other {ödediğinizin %{percent} kadarı iade edilir}}",
+    "tierHours": "Girişe {hours} saat veya daha fazla kala iptal ederseniz: {percent, plural, =0 {iade yapılmaz} other {ödediğinizin %{percent} kadarı iade edilir}}",
+    "tierLater": "Daha geç iptal ederseniz: {percent, plural, =0 {iade yapılmaz} other {ödediğinizin %{percent} kadarı iade edilir}}",
+    "tierAny": "İptal ederseniz: {percent, plural, =0 {iade yapılmaz} other {ödediğinizin %{percent} kadarı iade edilir}}",
+    "grace": "Rezervasyondan sonraki ilk {hours} saat içinde, giriş tarihine yeterli süre varsa ücretsiz iptal edebilirsiniz.",
+    "note": "Süreler giriş gününün giriş saatinden geriye doğru sayılır. İade edilemez bir fiyat seçerseniz iade yapılmaz; kesin koşullar ödemeden önce de gösterilir."
   }
 }

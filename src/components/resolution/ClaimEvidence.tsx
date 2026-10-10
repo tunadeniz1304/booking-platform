@@ -4,12 +4,27 @@ import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { apiFetch } from "@/lib/api-client";
 import { useFormat } from "@/i18n/use-format";
-import { Status, focusRing } from "@/components/ui/ui";
-import { useClaimErrorText, type ClaimDetailResponse } from "./shared";
+import { Button, Status, focusRing } from "@/components/ui/ui";
+import {
+  EVIDENCE_IMAGE_MAX_MB,
+  EVIDENCE_MAX_FILES,
+  EVIDENCE_PDF_MAX_MB,
+  useClaimErrorText,
+  type ClaimDetailResponse,
+} from "./shared";
 
 type Evidence = ClaimDetailResponse["evidence"][number];
 
-const ACCEPT = "image/jpeg,image/png,image/webp,image/avif,image/gif,application/pdf";
+const ACCEPTED_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/avif",
+  "image/gif",
+  "application/pdf",
+];
+const ACCEPT = ACCEPTED_TYPES.join(",");
+const MB = 1024 * 1024;
 
 /** Kanıt galerisi + yükleme. Dosyalar çerezle yetkilendirilen API üzerinden sunulur. */
 export default function ClaimEvidence({
@@ -27,12 +42,36 @@ export default function ClaimEvidence({
   const f = useFormat();
   const claimError = useClaimErrorText();
   const [busy, setBusy] = useState(false);
+  const [selected, setSelected] = useState<File | null>(null);
   const [feedback, setFeedback] = useState<{ error?: string; message?: string }>({});
   const inputId = `claim-evidence-${claimId}`;
   const fileUrl = (e: Evidence) =>
     `/api/claims/${encodeURIComponent(claimId)}/evidence/${encodeURIComponent(e.id)}`;
 
+  /** Seçim anında tür ve boyutu kontrol eder; uygunsa yüklemeden önce onaya bırakır. */
+  function select(file: File) {
+    setFeedback({});
+    if (file.type && !ACCEPTED_TYPES.includes(file.type)) {
+      setSelected(null);
+      setFeedback({ error: t("evidence.badType") });
+      return;
+    }
+    const maxMb = file.type === "application/pdf" ? EVIDENCE_PDF_MAX_MB : EVIDENCE_IMAGE_MAX_MB;
+    if (file.size > maxMb * MB) {
+      setSelected(null);
+      setFeedback({
+        error: t("evidence.tooLarge", {
+          size: f.number(file.size / MB, { maximumFractionDigits: 1 }),
+          max: maxMb,
+        }),
+      });
+      return;
+    }
+    setSelected(file);
+  }
+
   async function upload(file: File) {
+    if (busy) return;
     setBusy(true);
     setFeedback({});
     try {
@@ -42,6 +81,7 @@ export default function ClaimEvidence({
         method: "POST",
         body,
       });
+      setSelected(null);
       setFeedback({ message: t("evidence.uploaded") });
       onUploaded();
     } catch (err) {
@@ -105,7 +145,7 @@ export default function ClaimEvidence({
         </ul>
       )}
       {canUpload && (
-        <div>
+        <div className="space-y-2">
           <label htmlFor={inputId} className="block text-sm font-medium text-gray-800">
             {t("evidence.upload")}
           </label>
@@ -114,17 +154,56 @@ export default function ClaimEvidence({
             type="file"
             accept={ACCEPT}
             disabled={busy}
-            aria-describedby={`${inputId}-privacy`}
-            className="mt-1 block text-sm text-gray-800"
+            aria-describedby={`${inputId}-limits ${inputId}-visibility ${inputId}-privacy`}
+            className="mt-1 block min-h-[44px] text-sm text-gray-800"
             onChange={(e) => {
               const file = e.target.files?.[0];
-              if (file) void upload(file);
+              if (file) select(file);
               e.target.value = "";
             }}
           />
-          <p id={`${inputId}-privacy`} className="mt-1 text-xs text-gray-600">
+          <p id={`${inputId}-limits`} className="text-xs text-gray-600">
+            {t("evidence.limits", {
+              imageMb: EVIDENCE_IMAGE_MAX_MB,
+              pdfMb: EVIDENCE_PDF_MAX_MB,
+              maxFiles: EVIDENCE_MAX_FILES,
+              used: evidence.length,
+            })}
+          </p>
+          <p id={`${inputId}-visibility`} className="text-xs text-gray-600">
+            {t("evidence.visibility")}
+          </p>
+          <p id={`${inputId}-privacy`} className="text-xs text-gray-600">
             {t("evidence.privacy")}
           </p>
+          {selected && (
+            <div className="space-y-2 rounded-md border border-gray-200 bg-white p-2 text-sm">
+              <p className="break-all text-gray-800">
+                {t("evidence.selected", {
+                  name: selected.name,
+                  size: f.number(selected.size / 1024, { maximumFractionDigits: 0 }),
+                })}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  disabled={busy}
+                  aria-busy={busy || undefined}
+                  onClick={() => void upload(selected)}
+                >
+                  {t("evidence.confirmUpload")}
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={busy}
+                  onClick={() => setSelected(null)}
+                >
+                  {t("evidence.cancel")}
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       )}
       <div aria-live="polite">

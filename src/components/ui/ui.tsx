@@ -3,6 +3,7 @@
 import {
   cloneElement,
   isValidElement,
+  useCallback,
   useEffect,
   useState,
   type ReactElement,
@@ -12,7 +13,7 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
-import { fetchCurrentUser, type SessionUser } from "@/lib/api-client";
+import { ApiError, fetchCurrentUser, type SessionUser } from "@/lib/api-client";
 
 /** Ortak odak halkası (klavye kullanıcıları için görünür). */
 export const focusRing =
@@ -26,16 +27,34 @@ const buttonVariants = {
   danger: "bg-red-700 text-white hover:bg-red-800",
 } as const;
 
+/**
+ * `busy`: işlem sürerken düğme odakta kalır (`disabled` odağı <body>'ye düşürür);
+ * `aria-disabled` + `aria-busy` verilir, tıklama ve form gönderimi yok sayılır (çift gönderim yok).
+ */
 export function Button({
   variant = "primary",
   className = "",
+  busy = false,
+  onClick,
   ...props
-}: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: keyof typeof buttonVariants }) {
+}: React.ComponentPropsWithRef<"button"> & {
+  variant?: keyof typeof buttonVariants;
+  busy?: boolean;
+}) {
   return (
     <button
       type="button"
       {...props}
-      className={`inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${buttonVariants[variant]} ${focusRing} ${className}`}
+      aria-disabled={busy || props["aria-disabled"] || undefined}
+      aria-busy={busy || undefined}
+      onClick={(e) => {
+        if (busy) {
+          e.preventDefault();
+          return;
+        }
+        onClick?.(e);
+      }}
+      className={`inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 aria-disabled:cursor-not-allowed aria-disabled:opacity-60 ${buttonVariants[variant]} ${focusRing} ${className}`}
     />
   );
 }
@@ -57,6 +76,7 @@ export function Field({
   error?: string | null;
   children: ReactNode;
 }) {
+  const t = useTranslations("common");
   const hintId = hint ? `${id}-hint` : undefined;
   const errorId = error ? `${id}-error` : undefined;
   const describedBy = [hintId, errorId].filter(Boolean).join(" ") || undefined;
@@ -80,6 +100,7 @@ export function Field({
       )}
       {error && (
         <p id={errorId} className="mt-1 text-xs font-medium text-red-700">
+          <span className="sr-only">{t("errorPrefix")} </span>
           {error}
         </p>
       )}
@@ -194,6 +215,21 @@ export function useSession(): SessionState {
   return state;
 }
 
+/**
+ * Giriş bağlantısı, dönüş adresiyle (`/login?redirect=...`). `returnTo` verilmezse
+ * tarayıcıdaki geçerli yol + sorgu + hash kullanılır; giriş/kayıt sayfalarının kendisi taşınmaz.
+ */
+export function loginHref(returnTo?: string, base: "/login" | "/register" = "/login"): string {
+  const target =
+    returnTo ??
+    (typeof window === "undefined"
+      ? "/"
+      : `${window.location.pathname}${window.location.search}${window.location.hash}`);
+  if (!target.startsWith("/") || target.startsWith("//") || target === "/") return base;
+  if (/^\/(login|register)(\/|\?|#|$)/.test(target)) return base;
+  return `${base}?redirect=${encodeURIComponent(target)}`;
+}
+
 /** Rol kapısı: oturum yoksa giriş bağlantısı, rol yetmiyorsa açık mesaj (API ayrıca yetkilendirir). */
 export function RoleGate({
   roles,
@@ -216,7 +252,10 @@ export function RoleGate({
       <p className="text-sm text-gray-800">
         {t.rich("loginRequired", {
           link: (chunks) => (
-            <Link href="/login" className={`font-semibold text-[#003580] underline ${focusRing}`}>
+            <Link
+              href={loginHref()}
+              className={`font-semibold text-[#003580] underline ${focusRing}`}
+            >
               {chunks}
             </Link>
           ),
@@ -239,7 +278,7 @@ export function RoleGate({
  * setState yalnızca Promise geri çağrısında yapılır (effect gövdesinde değil).
  */
 export function useLoader<T>(fetcher: () => Promise<T>, deps: ReadonlyArray<unknown> = []) {
-  const t = useTranslations("common");
+  const errorText = useErrorText();
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
@@ -252,7 +291,7 @@ export function useLoader<T>(fetcher: () => Promise<T>, deps: ReadonlyArray<unkn
         setError(null);
       })
       .catch((e: unknown) => {
-        if (active) setError(errorMessage(e, t("unexpectedError")));
+        if (active) setError(errorText(e));
       });
     return () => {
       active = false;
@@ -265,4 +304,37 @@ export function useLoader<T>(fetcher: () => Promise<T>, deps: ReadonlyArray<unkn
 /** `fallback` verilmezse Türkçe varsayılan kullanılır (çevirici dışındaki çağıranlar için). */
 export function errorMessage(error: unknown, fallback = "Beklenmeyen bir hata oluştu"): string {
   return error instanceof Error ? error.message : fallback;
+}
+
+/** Sunucu metni yerine arayüz dilinde gösterilen genel hata kodları. */
+const GENERIC_ERROR_CODES = new Set([
+  "UNAUTHORIZED",
+  "EMAIL_NOT_VERIFIED",
+  "SERVICE_UNAVAILABLE",
+  "INTERNAL_ERROR",
+  "INVALID_JSON",
+  "TRANSACTION_CONFLICT",
+]);
+
+/**
+ * Hata nesnesini arayüz dilinde kullanıcı metnine çevirir: genel kodlar ve ağ hataları
+ * `common.errors.*` ile, kodsuz/5xx hatalar `common.unexpectedError` ile; alana özgü
+ * sunucu iletileri (doğrulama, çakışma vb.) olduğu gibi kalır.
+ */
+export function useErrorText(): (error: unknown) => string {
+  const t = useTranslations("common");
+  return useCallback(
+    (error: unknown): string => {
+      if (error instanceof ApiError) {
+        if (error.code && GENERIC_ERROR_CODES.has(error.code)) return t(`errors.${error.code}`);
+        if (!error.code || error.status >= 500) return t("unexpectedError");
+        return error.message;
+      }
+      if (error instanceof TypeError || (error instanceof Error && error.name === "AbortError")) {
+        return t("errors.network");
+      }
+      return errorMessage(error, t("unexpectedError"));
+    },
+    [t]
+  );
 }

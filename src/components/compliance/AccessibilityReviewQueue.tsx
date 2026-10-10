@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { apiFetch } from "@/lib/api-client";
 import type { AccessibilityCodeValue } from "@/lib/compliance/accessibility-codes";
-import { Button, Card, Status, errorMessage, focusRing, useLoader } from "@/components/ui/ui";
+import { Button, Card, Status, focusRing, useErrorText, useLoader } from "@/components/ui/ui";
 
 interface ReviewRow {
   id: string;
@@ -32,19 +32,48 @@ export default function AccessibilityReviewQueue() {
       ),
     [tab]
   );
-  const [status, setStatus] = useState<{ error?: string; message?: string }>({});
+  const errorText = useErrorText();
+  const tc = useTranslations("common");
+  const [message, setMessage] = useState<string | null>(null);
+  const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
+  const [pending, setPending] = useState<string | null>(null);
+  const pendingRef = useRef<string | null>(null);
+  const focusAfterReload = useRef<string | null>(null);
 
-  const verify = (row: ReviewRow, verified: boolean) => {
-    setStatus({});
-    apiFetch(`/api/admin/accessibility/${row.id}`, {
-      method: "POST",
-      body: JSON.stringify({ verified }),
-    })
-      .then(() => {
-        setStatus({ message: verified ? t("admin.verifiedOk") : t("admin.unverifiedOk") });
-        rows.reload();
-      })
-      .catch((err: unknown) => setStatus({ error: errorMessage(err) }));
+  // İşlenen satır listeden kalkınca odak sonraki satıra (yoksa kart başlığına) taşınır.
+  useEffect(() => {
+    const target = focusAfterReload.current;
+    if (!target) return;
+    focusAfterReload.current = null;
+    const el = document.getElementById(target);
+    if (!el) return;
+    if (!el.hasAttribute("tabindex")) el.setAttribute("tabindex", "-1");
+    el.focus();
+  }, [rows.data]);
+
+  const verify = async (row: ReviewRow, verified: boolean) => {
+    if (pendingRef.current) return;
+    const list = rows.data ?? [];
+    const index = list.findIndex((x) => x.id === row.id);
+    const next = list[index + 1] ?? list[index - 1];
+    pendingRef.current = row.id;
+    setPending(row.id);
+    setMessage(null);
+    setRowErrors((prev) => ({ ...prev, [row.id]: "" }));
+    try {
+      await apiFetch(`/api/admin/accessibility/${row.id}`, {
+        method: "POST",
+        body: JSON.stringify({ verified }),
+      });
+      setMessage(verified ? t("admin.verifiedOk") : t("admin.unverifiedOk"));
+      focusAfterReload.current = next ? `a11y-${next.id}-title` : "accessibility-review-title";
+      rows.reload();
+    } catch (err: unknown) {
+      setRowErrors((prev) => ({ ...prev, [row.id]: errorText(err) }));
+    } finally {
+      pendingRef.current = null;
+      setPending(null);
+    }
   };
 
   return (
@@ -62,7 +91,12 @@ export default function AccessibilityReviewQueue() {
           </Button>
         ))}
       </div>
-      <Status error={status.error ?? rows.error} message={status.message} />
+      <Status error={rows.error} message={message} />
+      {!rows.data && !rows.error && (
+        <p role="status" className="text-sm text-gray-600">
+          {tc("loading")}
+        </p>
+      )}
       {rows.data?.length === 0 && <p className="text-sm text-gray-600">{t("admin.empty")}</p>}
       <ul className="divide-y divide-gray-200">
         {rows.data?.map((row) => (
@@ -76,10 +110,10 @@ export default function AccessibilityReviewQueue() {
               />
             )}
             <div className="min-w-0 flex-1">
-              <p className="font-semibold text-gray-900">
+              <h3 id={`a11y-${row.id}-title`} tabIndex={-1} className="font-semibold text-gray-900">
                 {t(`codes.${row.code}`)}
                 {row.widthCm !== null && ` · ${t("width", { width: row.widthCm })}`}
-              </p>
+              </h3>
               <p className="text-gray-700">
                 <a href={`/property/${row.propertyId}`} className={`underline ${focusRing}`}>
                   {row.propertyTitle}
@@ -87,7 +121,8 @@ export default function AccessibilityReviewQueue() {
                 ·{" "}
                 {row.roomTypeName ? t("roomType", { name: row.roomTypeName }) : t("wholeProperty")}
               </p>
-              {row.note && <p className="text-gray-700">{row.note}</p>}
+              {row.note && <p className="break-words text-gray-700">{row.note}</p>}
+              <Status error={rowErrors[row.id] || null} />
             </div>
             <div className="flex gap-2">
               {row.evidencePhotoUrl && (
@@ -101,11 +136,17 @@ export default function AccessibilityReviewQueue() {
                 </a>
               )}
               {row.verified ? (
-                <Button variant="secondary" onClick={() => verify(row, false)}>
+                <Button
+                  variant="secondary"
+                  busy={pending === row.id}
+                  onClick={() => void verify(row, false)}
+                >
                   {t("admin.unverify")}
                 </Button>
               ) : (
-                <Button onClick={() => verify(row, true)}>{t("admin.verify")}</Button>
+                <Button busy={pending === row.id} onClick={() => void verify(row, true)}>
+                  {t("admin.verify")}
+                </Button>
               )}
             </div>
           </li>

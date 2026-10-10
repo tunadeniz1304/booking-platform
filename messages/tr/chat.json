@@ -14,5 +14,7 @@
   "aiDraftNotice": "Yapay zekâ taslağı — göndermeden önce kontrol edin ve düzenleyin.",
   "send": "Gönder",
   "suggestDraft": "Yanıt taslağı öner",
-  "closed": "Mesajlaşma yalnızca onaylı rezervasyonlarda açıktır."
+  "closed": "Mesajlaşma yalnızca onaylı rezervasyonlarda açıktır.",
+  "notFound": "Bu yazışma bulunamadı ya da görüntüleme izniniz yok.",
+  "loginRequired": "Mesajları görmek için <link>giriş yapın</link>."
 }

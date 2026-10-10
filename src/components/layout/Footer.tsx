@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 
+/** WCAG 2.5.8: bağlantı hedefi mobilde 44 px, geniş ekranda en az 24 px yükseklikte. */
+const linkTarget = "inline-flex min-h-[44px] items-center sm:min-h-[24px]";
+const focusClass = "focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003580]";
+
 const footerColumns = [
   {
     key: "support",
@@ -27,12 +31,12 @@ export default function Footer() {
               <h2 className="text-sm font-semibold text-gray-900">
                 {t(`columns.${column.key}.title`)}
               </h2>
-              <ul className="mt-4 space-y-3">
+              <ul className="mt-3 space-y-1 sm:space-y-2">
                 {column.links.map((link) => (
                   <li key={link}>
                     <Link
                       href="/"
-                      className="text-sm text-gray-600 transition hover:text-[#003580] hover:underline"
+                      className={`${linkTarget} text-sm text-gray-600 transition hover:text-[#003580] hover:underline ${focusClass}`}
                     >
                       {t(`columns.${column.key}.${link}`)}
                     </Link>
@@ -47,31 +51,34 @@ export default function Footer() {
           <p className="text-xs text-gray-600">
             © {new Date().getFullYear()} booking-platform · {t("demo")}
           </p>
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
             <Link
               href="/privacy"
-              className="text-xs text-gray-600 transition hover:text-[#003580] hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003580]"
+              className={`${linkTarget} text-xs text-gray-600 transition hover:text-[#003580] hover:underline ${focusClass}`}
             >
               {t("privacyNotice")}
             </Link>
             <Link
               href="/trust"
-              className="text-xs text-gray-600 transition hover:text-[#003580] hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003580]"
+              className={`${linkTarget} text-xs text-gray-600 transition hover:text-[#003580] hover:underline ${focusClass}`}
             >
               {t("trustCenter")}
             </Link>
             <Link
               href="/account/privacy"
-              className="text-xs text-gray-600 transition hover:text-[#003580] hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003580]"
+              className={`${linkTarget} text-xs text-gray-600 transition hover:text-[#003580] hover:underline ${focusClass}`}
             >
               {t("myData")}
             </Link>
-            <button className="text-xs text-gray-500 transition hover:text-[#003580] hover:underline">
+            <button
+              type="button"
+              className={`${linkTarget} text-xs text-gray-500 transition hover:text-[#003580] hover:underline ${focusClass}`}
+            >
               {t("terms")}
             </button>
             <Link
               href="/privacy#p-cookies"
-              className="text-xs text-gray-600 transition hover:text-[#003580] hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003580]"
+              className={`${linkTarget} text-xs text-gray-600 transition hover:text-[#003580] hover:underline ${focusClass}`}
             >
               {t("cookies")}
             </Link>

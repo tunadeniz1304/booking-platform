@@ -6,6 +6,34 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useFormat } from "@/i18n/use-format";
+import { ApiError, apiFetch } from "@/lib/api-client";
+import { loginHref } from "@/components/ui/ui";
+
+/** Arama bağlamı (tarih, misafir) — ilan sayfasına taşınır (F93/F205). */
+export interface SearchContext {
+  checkIn?: string | null;
+  checkOut?: string | null;
+  guests?: number | null;
+  roomId?: string | null;
+  ratePlanId?: string | null;
+}
+
+/**
+ * İlan bağlantısı: arama bağlamındaki dolu alanları sorguya ekler. Tarih yalnızca ikisi
+ * birlikte varsa taşınır; misafir sayısı tarih olmasa da korunur.
+ */
+export function propertyHref(id: string, ctx?: SearchContext): string {
+  const params = new URLSearchParams();
+  if (ctx?.checkIn && ctx.checkOut) {
+    params.set("checkIn", ctx.checkIn);
+    params.set("checkOut", ctx.checkOut);
+  }
+  if (ctx?.guests && ctx.guests > 0) params.set("guests", String(ctx.guests));
+  if (ctx?.roomId) params.set("roomId", ctx.roomId);
+  if (ctx?.ratePlanId) params.set("ratePlanId", ctx.ratePlanId);
+  const q = params.toString();
+  return q ? `/property/${id}?${q}` : `/property/${id}`;
+}
 
 export interface PropertyCardProps {
   id: string;
@@ -32,6 +60,8 @@ export interface PropertyCardProps {
     roomId: string;
     ratePlanId: string;
   };
+  /** Teklif olmasa da ilan sayfasına taşınacak arama tarih/misafir bilgisi. */
+  searchContext?: SearchContext;
 }
 
 export default function PropertyCard({
@@ -46,44 +76,47 @@ export default function PropertyCard({
   propertyType,
   initialFavorite = false,
   stay,
+  searchContext,
 }: PropertyCardProps) {
-  const href = stay
-    ? `/property/${id}?${new URLSearchParams({
-        checkIn: stay.checkIn,
-        checkOut: stay.checkOut,
-        guests: String(stay.guests),
-        roomId: stay.roomId,
-        ratePlanId: stay.ratePlanId,
-      }).toString()}`
-    : `/property/${id}`;
+  const href = propertyHref(id, stay ?? searchContext);
   const router = useRouter();
   const t = useTranslations("search");
   const f = useFormat();
   const [isFavorite, setIsFavorite] = useState(initialFavorite);
   const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
 
   const toggleFavorite = async () => {
     if (busy) return;
     setBusy(true);
+    setNotice(null);
+    const wasFavorite = isFavorite;
     try {
-      if (isFavorite) {
-        const res = await fetch(`/api/favorites?propertyId=${id}`, { method: "DELETE" });
-        if (!res.ok) throw new Error("Favori kaldırılamadı");
-        setIsFavorite(false);
+      if (wasFavorite) {
+        await apiFetch(`/api/favorites?propertyId=${encodeURIComponent(id)}`, {
+          method: "DELETE",
+        });
       } else {
-        const res = await fetch("/api/favorites", {
+        await apiFetch("/api/favorites", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ propertyId: id }),
         });
-        if (!res.ok) throw new Error("Favori eklenemedi");
-        setIsFavorite(true);
       }
+      setIsFavorite(!wasFavorite);
+      setNotice({
+        tone: "ok",
+        text: wasFavorite ? t("card.favoriteRemoved") : t("card.favoriteAdded"),
+      });
     } catch (err) {
-      // Giriş yapılmamışsa favori eklenemez; kullanıcıyı girişe yönlendir
-      if (err instanceof Error && err.message.includes("401")) {
-        router.push("/login");
+      // Oturum yoksa (yenileme de başarısızsa) girişe, dönüşte bu sayfaya geri gel.
+      if (err instanceof ApiError && err.status === 401) {
+        router.push(loginHref());
+        return;
       }
+      setNotice({
+        tone: "error",
+        text: wasFavorite ? t("card.favoriteRemoveFailed") : t("card.favoriteAddFailed"),
+      });
     } finally {
       setBusy(false);
     }
@@ -103,9 +136,10 @@ export default function PropertyCard({
           type="button"
           onClick={toggleFavorite}
           disabled={busy}
+          aria-busy={busy || undefined}
           aria-pressed={isFavorite}
           aria-label={isFavorite ? t("card.removeFavorite") : t("card.addFavorite")}
-          className="absolute right-3 top-3 rounded-full bg-white/90 p-2 text-gray-600 shadow-sm transition hover:bg-white hover:text-red-500 disabled:opacity-50"
+          className="absolute right-3 top-3 inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full bg-white/90 p-2 text-gray-600 shadow-sm transition hover:bg-white hover:text-red-500 disabled:opacity-50"
         >
           <svg
             className={`h-5 w-5 ${isFavorite ? "fill-red-500 text-red-500" : "fill-none"}`}
@@ -126,6 +160,13 @@ export default function PropertyCard({
           {propertyType}
         </span>
       </div>
+
+      <p
+        role="status"
+        className={notice?.tone === "error" ? "px-4 pt-3 text-sm text-red-700" : "sr-only"}
+      >
+        {notice?.text}
+      </p>
 
       <div className="p-4">
         <div className="flex items-start justify-between gap-2">
@@ -159,14 +200,26 @@ export default function PropertyCard({
               {location}
             </p>
           </div>
-          <div className="flex flex-col items-end">
-            <span className="rounded-sm bg-[#003580] px-2 py-1 text-sm font-bold text-white">
-              {rating.toFixed(1)}
-            </span>
-            <span className="mt-1 text-xs text-gray-500">
-              {t("card.reviews", { count: reviewCount })}
-            </span>
-          </div>
+          {reviewCount > 0 ? (
+            <div className="flex flex-col items-end">
+              <span
+                className="rounded-sm bg-[#003580] px-2 py-1 text-sm font-bold text-white"
+                aria-hidden="true"
+              >
+                {f.number(rating, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+              </span>
+              <span className="sr-only">
+                {t("card.ratingLabel", {
+                  value: f.number(rating, { minimumFractionDigits: 1, maximumFractionDigits: 1 }),
+                })}
+              </span>
+              <span className="mt-1 text-xs text-gray-500">
+                {t("card.reviews", { count: reviewCount })}
+              </span>
+            </div>
+          ) : (
+            <span className="text-xs text-gray-500">{t("card.noRating")}</span>
+          )}
         </div>
 
         <div className="mt-4 flex items-end justify-between border-t border-gray-100 pt-4">

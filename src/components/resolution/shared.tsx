@@ -3,9 +3,11 @@
 import { useCallback } from "react";
 import { useTranslations } from "next-intl";
 import { ApiError } from "@/lib/api-client";
-import { money, toDecimalString, toMinor } from "@/lib/money/money";
+import { money, toDecimalString } from "@/lib/money/money";
+import { currencyExponent } from "@/lib/money/currencies";
+import { parseAmountToMinor } from "@/lib/ui/amount-input";
 import { useFormat } from "@/i18n/use-format";
-import { errorMessage } from "@/components/ui/ui";
+import { useErrorText } from "@/components/ui/ui";
 
 /** Çözüm merkezi (P1-5) istemci tipleri — API sözleşmesinin birebir yansıması. */
 export type ClaimType = "GUEST_REFUND" | "HOST_DAMAGE" | "CHARGEBACK";
@@ -99,7 +101,17 @@ export interface ClaimDetailResponse {
   }>;
 }
 
-/** Sunucudan gelen hata kodları; çevirisi olmayanlarda sunucu mesajı gösterilir. */
+/**
+ * Sunucu varsayılan sınırları (app-config: CLAIM_GUEST_WINDOW_DAYS, CLAIM_EVIDENCE_*).
+ * Yalnızca kullanıcıya önceden bilgi vermek ve seçim anında erken uyarı için kullanılır;
+ * asıl doğrulama sunucudadır.
+ */
+export const CLAIM_GUEST_WINDOW_DAYS = 14;
+export const EVIDENCE_IMAGE_MAX_MB = 8;
+export const EVIDENCE_PDF_MAX_MB = 5;
+export const EVIDENCE_MAX_FILES = 10;
+
+/** Sunucudan gelen ve arayüz dilinde çevirisi olan hata kodları. */
 const KNOWN_ERROR_CODES = new Set([
   "CLAIM_TOO_EARLY",
   "CLAIM_WINDOW_CLOSED",
@@ -116,37 +128,73 @@ const KNOWN_ERROR_CODES = new Set([
   "CLAIM_REFUND_FAILED",
   "PAYMENT_IN_PROGRESS",
   "EMAIL_NOT_VERIFIED",
+  "NOT_FOUND",
+  "VALIDATION_ERROR",
 ]);
 
-/** Talep API hatasını kullanıcı diline çevirir (bilinmeyen kodda sunucu mesajına düşer). */
+/** Genel (talebe özgü olmayan) kodlar ortak `useErrorText` ile çevrilir. */
+const COMMON_ERROR_CODES = new Set([
+  "UNAUTHORIZED",
+  "SERVICE_UNAVAILABLE",
+  "INTERNAL_ERROR",
+  "INVALID_JSON",
+  "TRANSACTION_CONFLICT",
+]);
+
+/**
+ * Talep API hatasını kullanıcı diline çevirir. Bilinmeyen kodlarda sunucunun ham
+ * (tek dilli) metni yerine arayüz dilinde genel bir ileti gösterilir.
+ */
 export function useClaimErrorText() {
   const t = useTranslations("resolution.errors");
-  const tc = useTranslations("common");
+  const commonError = useErrorText();
   const f = useFormat();
   return useCallback(
     (err: unknown, currency?: string): string => {
-      if (err instanceof ApiError && err.code && KNOWN_ERROR_CODES.has(err.code)) {
-        if (err.code === "CLAIM_AMOUNT_EXCEEDS_REFUNDABLE") {
-          const max = (err.details as { refundableMinor?: unknown } | undefined)?.refundableMinor;
-          if (typeof max !== "number" || !currency) return err.message;
-          return t(err.code, { amount: f.money(max, currency) });
+      if (!(err instanceof ApiError)) return commonError(err);
+      if (err.code === "CLAIM_AMOUNT_EXCEEDS_REFUNDABLE") {
+        // Sunucu tutarı string (BigInt) ya da sayı olarak gönderebilir.
+        const raw = (err.details as { refundableMinor?: unknown } | undefined)?.refundableMinor;
+        const max = typeof raw === "string" && raw.trim() !== "" ? Number(raw) : raw;
+        if (typeof max !== "number" || !Number.isSafeInteger(max) || !currency) {
+          return t("CLAIM_AMOUNT_EXCEEDS_REFUNDABLE_NOAMOUNT");
         }
-        return t(err.code);
+        try {
+          return t(err.code, { amount: f.money(max, currency) });
+        } catch {
+          return t("CLAIM_AMOUNT_EXCEEDS_REFUNDABLE_NOAMOUNT");
+        }
       }
-      return errorMessage(err, tc("unexpectedError"));
+      if (err.status === 413 || err.code === "PAYLOAD_TOO_LARGE") {
+        return t("PAYLOAD_TOO_LARGE", {
+          imageMb: EVIDENCE_IMAGE_MAX_MB,
+          pdfMb: EVIDENCE_PDF_MAX_MB,
+        });
+      }
+      if (err.code && KNOWN_ERROR_CODES.has(err.code)) return t(err.code);
+      if (err.status === 404) return t("NOT_FOUND");
+      if (!err.code || err.status >= 500 || COMMON_ERROR_CODES.has(err.code)) {
+        return commonError(err);
+      }
+      return t("unknown");
     },
-    [t, tc, f]
+    [t, commonError, f]
   );
 }
 
-/** Ana birimdeki kullanıcı girdisini ("250,50") pozitif minor-unit'e çevirir; geçersizse null. */
+/**
+ * Ana birimdeki kullanıcı girdisini ("1.250", "1.250,50", "250.5") pozitif minor-unit'e
+ * çevirir; binlik ayırıcıyı ondalık sanmaz. Geçersiz ya da sıfırsa null.
+ */
 export function parseMajorInput(value: string, currency: string): number | null {
+  let digits: number;
   try {
-    const minor = toMinor(value.trim().replace(",", "."), currency);
-    return minor > 0 ? minor : null;
+    digits = currencyExponent(currency.toUpperCase());
   } catch {
     return null;
   }
+  const minor = parseAmountToMinor(value, digits);
+  return minor !== null && Number.isSafeInteger(minor) && minor > 0 ? minor : null;
 }
 
 /** Minor-unit → form alanı için ana birim metni (ör. 25000 → "250.00"). */

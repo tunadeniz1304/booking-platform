@@ -6,6 +6,7 @@ import SearchBar from "@/components/search/SearchBar";
 import PropertyCard from "@/components/property/PropertyCard";
 import { getTranslations } from "next-intl/server";
 import { getPopularProperties } from "@/lib/search";
+import { logger, errorFields } from "@/lib/observability/logger";
 
 export const dynamic = "force-dynamic";
 
@@ -32,9 +33,25 @@ const popularDestinations = [
   },
 ];
 
+/** Mülk türü → `search.types.*` çeviri anahtarı (arama sayfasıyla aynı eşleme). */
+const TYPE_KEYS: Record<string, string> = {
+  HOTEL: "hotel",
+  APARTMENT: "apartment",
+  VILLA: "villa",
+  HOSTEL: "hostel",
+  BED_AND_BREAKFAST: "bedAndBreakfast",
+};
+
 export default async function HomePage() {
-  const popular = await getPopularProperties(6);
+  // Öne çıkanlar sorgusu başarısız olsa da arama formu kullanılabilir kalmalı.
+  const popular = await getPopularProperties(6).catch((error: unknown) => {
+    logger.error(errorFields(error), "home popular properties failed");
+    return null;
+  });
   const t = await getTranslations("home");
+  const tSearch = await getTranslations("search");
+  const typeLabel = (type: string) =>
+    TYPE_KEYS[type] ? tSearch(`types.${TYPE_KEYS[type]}`) : type;
 
   return (
     <div className="min-h-screen bg-white">
@@ -80,7 +97,19 @@ export default async function HomePage() {
 
         <section className="mx-auto max-w-7xl px-4 pb-16 sm:px-6 lg:px-8">
           <h2 className="text-2xl font-bold text-gray-900">{t("featured")}</h2>
-          {popular.length > 0 ? (
+          {popular === null ? (
+            <div className="mt-6 rounded-lg bg-gray-50 p-12 text-center">
+              <p role="status" className="text-gray-500">
+                {t("featuredError")}
+              </p>
+              <Link
+                href="/"
+                className="mt-3 inline-flex min-h-[44px] items-center rounded-sm px-2 font-semibold underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003580] focus-visible:ring-offset-2"
+              >
+                {t("retry")}
+              </Link>
+            </div>
+          ) : popular.length > 0 ? (
             <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {popular.map((property) => (
                 <PropertyCard
@@ -93,9 +122,10 @@ export default async function HomePage() {
                     "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=600&h=400&fit=crop"
                   }
                   priceMinor={property.basePriceMinor}
+                  currency={property.currency}
                   rating={property.ratingAvg}
                   reviewCount={property.ratingCount}
-                  propertyType={property.propertyType}
+                  propertyType={typeLabel(property.propertyType)}
                 />
               ))}
             </div>

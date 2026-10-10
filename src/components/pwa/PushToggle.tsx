@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { apiFetch } from "@/lib/api-client";
 import { base64UrlToBytes, pushSupported } from "@/lib/pwa/client";
@@ -38,6 +38,18 @@ export default function PushToggle() {
   const [view, setView] = useState<View>("loading");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** Kullanıcı eylemi sonrası duyurulacak durum (her zaman mount edilen canlı bölgede). */
+  const [notice, setNotice] = useState<string | null>(null);
+  /** Eylem sonrası odak hedefi: yeni düğme ya da (düğme kalktıysa) durum metni. */
+  const pendingFocus = useRef(false);
+  const actionRef = useRef<HTMLButtonElement>(null);
+  const stateTextRef = useRef<HTMLParagraphElement>(null);
+
+  useEffect(() => {
+    if (!pendingFocus.current || busy) return;
+    pendingFocus.current = false;
+    (actionRef.current ?? stateTextRef.current)?.focus();
+  }, [view, busy]);
 
   useEffect(() => {
     let active = true;
@@ -55,10 +67,17 @@ export default function PushToggle() {
     if (!status?.publicKey) return;
     setBusy(true);
     setError(null);
+    setNotice(null);
+    pendingFocus.current = true;
     try {
       const permission = await Notification.requestPermission();
       if (permission !== "granted") {
-        setView(permission === "denied" ? "denied" : "off");
+        if (permission === "denied") {
+          setView("denied");
+        } else {
+          setView("off");
+          setNotice(t("dismissed"));
+        }
         return;
       }
       const reg = await navigator.serviceWorker.ready;
@@ -81,6 +100,8 @@ export default function PushToggle() {
   async function disable() {
     setBusy(true);
     setError(null);
+    setNotice(null);
+    pendingFocus.current = true;
     try {
       const reg = await navigator.serviceWorker.getRegistration();
       const sub = await reg?.pushManager.getSubscription();
@@ -92,6 +113,7 @@ export default function PushToggle() {
         await sub.unsubscribe();
       }
       setView("off");
+      setNotice(t("disabledDone"));
     } catch {
       setError(t("error"));
     } finally {
@@ -109,22 +131,32 @@ export default function PushToggle() {
         data-testid="push-state"
         data-state={view}
       >
-        {view === "unsupported" && <p>{t("unsupported")}</p>}
-        {view === "server-off" && <p>{t("disabledServer")}</p>}
-        {view === "denied" && <p>{t("denied")}</p>}
-        {view === "on" && <p>{t("enabled")}</p>}
+        {/* Her zaman mount edilen canlı bölge: durum değişince ekran okuyucuya duyurulur. */}
+        <div aria-live="polite" className="space-y-2">
+          {view === "unsupported" && <p>{t("unsupported")}</p>}
+          {view === "server-off" && <p>{t("disabledServer")}</p>}
+          {view === "denied" && (
+            <>
+              <p ref={stateTextRef} tabIndex={-1}>
+                {t("denied")}
+              </p>
+              <p className="text-gray-700">{t("deniedHelp")}</p>
+            </>
+          )}
+          {view === "on" && <p>{t("enabled")}</p>}
+        </div>
         {view === "off" && (
-          <Button onClick={enable} disabled={busy}>
+          <Button ref={actionRef} onClick={enable} busy={busy}>
             {busy ? t("working") : t("enable")}
           </Button>
         )}
         {view === "on" && (
-          <Button variant="secondary" onClick={disable} disabled={busy}>
+          <Button ref={actionRef} variant="secondary" onClick={disable} busy={busy}>
             {busy ? t("working") : t("disable")}
           </Button>
         )}
       </div>
-      <Status error={error} />
+      <Status error={error} message={notice} />
     </Card>
   );
 }

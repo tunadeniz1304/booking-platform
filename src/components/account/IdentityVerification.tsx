@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useTranslations } from "next-intl";
-import { ApiError, apiFetch } from "@/lib/api-client";
+import { apiFetch } from "@/lib/api-client";
 import { useFormat } from "@/i18n/use-format";
+import { useAccountErrorText } from "./ReauthDialog";
 
 type KycStatus = "NOT_STARTED" | "PENDING" | "VERIFIED" | "REQUIRES_INPUT" | "FAILED";
 
@@ -32,6 +33,8 @@ const fetchStatus = () => apiFetch<IdentityStatus>("/api/account/identity");
  */
 export default function IdentityVerification({ role }: { role?: string }) {
   const t = useTranslations("trust.kyc");
+  // F187: sunucu metni yerine arayüz dilinde hata.
+  const errorText = useAccountErrorText();
   const fmt = useFormat();
   const [data, setData] = useState<IdentityStatus | null>(null);
   const [doc, setDoc] = useState("valid");
@@ -79,7 +82,7 @@ export default function IdentityVerification({ role }: { role?: string }) {
       }
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t("startFailed"));
+      setError(errorText(err, t("startFailed")));
     } finally {
       setBusy(false);
     }

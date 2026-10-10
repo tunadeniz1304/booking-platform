@@ -19,13 +19,24 @@
     "none": "You have no transferable (confirmed) bookings.",
     "booking": "Booking",
     "askPrice": "Asking price ({currency})",
-    "askHint": "Cannot exceed the amount you paid.",
+    "askHint": "Example: 1,250 or 1,250.50. Cannot exceed what you paid.",
     "submit": "Transfer",
     "linkOnce": "The transfer link is shown only now — copy it and share it with the buyer.",
     "linkLabel": "Transfer link",
     "copy": "Copy",
-    "hide": "Hide",
-    "copied": "Copied."
+    "hide": "I've copied it, close",
+    "copied": "Copied.",
+    "askInvalid": "Enter a valid amount (example: 1,250.50).",
+    "submitting": "Creating…",
+    "submitNewLink": "Create new link",
+    "listedSuffix": "(listed, until {date})",
+    "replaceTitle": "Create a new link?",
+    "replaceBody": "This booking is already listed. If you continue, the previous link stops working immediately and you must send the new link to the buyer.",
+    "replaceConfirm": "Create new link",
+    "linkLost": "If you lose the link you can create a new one; the old one will stop working.",
+    "closeTitle": "Close without copying the link?",
+    "closeBody": "This link will not be shown again. If you haven't copied it, you can't send it to the buyer.",
+    "closeConfirm": "Close anyway"
   },
   "claim": {
     "title": "Take over booking",
@@ -41,6 +52,44 @@
     "year": "Year",
     "cvc": "CVC",
     "processing": "Processing…",
-    "submit": "Pay and take over"
+    "submit": "Pay and take over",
+    "loginPrompt": "To complete the transfer, <login>log in</login> or <register>create an account</register>. Your link is kept in this tab.",
+    "reviewNote": "Before paying, confirm the property, dates and price with the seller. The amount the seller asked for will be charged to your card.",
+    "confirmTitle": "Make the payment?",
+    "confirmBody": "The transfer price set by the seller will be charged to your card and the booking will move to you. This cannot be undone.",
+    "confirmAction": "Pay and take over",
+    "maybeCharged": "Your previous attempt may already have been charged and the transfer completed. Check <link>your trips</link> before paying again."
+  },
+  "mine": {
+    "title": "My transfer listings",
+    "empty": "You have no transfer listings yet.",
+    "booking": "Booking",
+    "validUntil": "valid until {date}",
+    "withdraw": "Withdraw listing",
+    "withdrawLabel": "Withdraw the listing for {title}",
+    "withdrawing": "Withdrawing…",
+    "withdrawTitle": "Withdraw this listing?",
+    "withdrawBody": "The link you shared stops working immediately and the booking stays with you.",
+    "withdrawConfirm": "Withdraw listing",
+    "withdrawn": "Listing withdrawn; the link can no longer be used.",
+    "status": {
+      "LISTED": "Listed",
+      "CLAIMED": "Buyer is paying",
+      "CAPTURE_PENDING": "Payment processing",
+      "COMPLETED": "Transferred",
+      "CANCELLED": "Withdrawn",
+      "FAILED": "Not completed",
+      "EXPIRED": "Expired",
+      "OTHER": "Unknown status"
+    }
+  },
+  "verify": {
+    "title": "Verify your email to use transfers",
+    "body": "You need a verified email address to transfer or take over a booking. Click the link in the email we sent you, then come back to this page.",
+    "resend": "Resend verification email",
+    "sending": "Sending…",
+    "sent": "Verification email sent. Check your inbox.",
+    "alreadyVerified": "Your email is already verified. Please try again.",
+    "failed": "We couldn't send the email. Please try again shortly."
   }
 }

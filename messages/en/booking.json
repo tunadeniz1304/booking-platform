@@ -9,11 +9,26 @@
     "noRooms": "No rooms available",
     "roomOption": "{name} - {capacity, plural, one {# person} other {# people}} - {bedType}",
     "ratePlan": "Rate option",
-    "refundable": "Refund per cancellation policy",
-    "nonRefundable": "Non-refundable",
+    "refundable": "Refundable (per cancellation terms)",
+    "nonRefundable": "Non-refundable: no refund if you cancel",
     "breakfastIncluded": "Breakfast included",
     "calculating": "Calculating price…",
-    "submit": "Confirm booking"
+    "submit": "Continue to booking",
+    "planDelta": "{percent}% more than the lowest option",
+    "planCheapest": "lowest price",
+    "policyLink": "See cancellation terms",
+    "closeCalendar": "Close calendar",
+    "roomOptionTooSmall": "{name} - {capacity, plural, one {# person} other {# people}} - {bedType} · too small for {guests, plural, one {# guest} other {# guests}}",
+    "overCapacity": "This room fits up to {capacity, plural, one {# person} other {# people}}. Reduce the number of guests or choose a larger room.",
+    "overCapacityNoRoom": "Rooms here fit up to {capacity, plural, one {# person} other {# people}}. For {guests, plural, one {# guest} other {# guests}}, add more than one room to your cart.",
+    "switchRoom": "Choose {name} (fits {capacity, plural, one {# person} other {# people}})",
+    "roomSwitched": "{name} selected; recalculating the price.",
+    "submitHint": "You won't be charged yet. Next, you'll review your details, then go to payment.",
+    "errors": {
+      "SOLD_OUT": "This room is fully booked for your dates. Try other dates or another room.",
+      "RESTRICTED": "Your dates don't meet this property's stay rules (for example a minimum number of nights or a day closed to arrival). Try different dates.",
+      "NOT_FOUND": "This room is no longer for sale. Choose another room."
+    }
   },
   "priceInsight": {
     "title": "Price insight",
@@ -54,6 +69,11 @@
     "total": "Total amount",
     "viewProperty": "View property",
     "myBookings": "My bookings",
-    "print": "Print"
+    "print": "Print",
+    "statusChanged": {
+      "CONFIRMED": "Payment received, your booking is confirmed. A confirmation email has been sent.",
+      "CANCELLED": "The booking has been cancelled.",
+      "other": "Booking status updated: {status}"
+    }
   }
 }

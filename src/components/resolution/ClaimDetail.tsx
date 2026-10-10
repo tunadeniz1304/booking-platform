@@ -4,7 +4,8 @@ import { useState, type ReactNode } from "react";
 import { useTranslations } from "next-intl";
 import { apiFetch } from "@/lib/api-client";
 import { useFormat } from "@/i18n/use-format";
-import { Button, Card, Status, useLoader } from "@/components/ui/ui";
+import { Button, Card, Status, focusRing, useLoader } from "@/components/ui/ui";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import ClaimEvidence from "./ClaimEvidence";
 import ClaimMessages from "./ClaimMessages";
 import {
@@ -54,6 +55,7 @@ export default function ClaimDetail({
       <ClaimOverview
         detail={data}
         canWithdraw={isParty && active && claim.role === "OPENER"}
+        canReply={canReply}
         onChanged={reload}
       />
       {!active && <ClaimOutcome detail={data} />}
@@ -86,21 +88,31 @@ export default function ClaimDetail({
 function ClaimOverview({
   detail,
   canWithdraw,
+  canReply,
   onChanged,
 }: {
   detail: ClaimDetailResponse;
   canWithdraw: boolean;
+  canReply: boolean;
   onChanged: () => void;
 }) {
   const t = useTranslations("resolution");
   const f = useFormat();
   const claimError = useClaimErrorText();
+  const { confirm, confirmDialog } = useConfirm();
   const { claim, booking } = detail;
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<{ error?: string; message?: string }>({});
 
   async function withdraw() {
-    if (!window.confirm(t("detail.withdrawConfirm"))) return;
+    if (busy) return;
+    const ok = await confirm({
+      title: t("detail.withdrawConfirmTitle"),
+      body: t("detail.withdrawConfirm"),
+      confirmLabel: t("detail.withdraw"),
+      tone: "danger",
+    });
+    if (!ok) return;
     setBusy(true);
     setFeedback({});
     try {
@@ -138,6 +150,25 @@ function ClaimOverview({
         <ClaimStatusBadge status={claim.status} />
         {claim.propertyTitle && <span>{claim.propertyTitle}</span>}
       </div>
+      {claim.status === "AWAITING_RESPONSE" &&
+        claim.slaDueAt &&
+        (claim.role === "RESPONDENT" || claim.role === "OPENER") && (
+          <div className="mb-3 text-sm">
+            <p className="font-medium text-amber-800">
+              {claim.role === "RESPONDENT"
+                ? t("list.respondCta", { date: f.dateTime(claim.slaDueAt) })
+                : t("list.awaitingOther", { date: f.dateTime(claim.slaDueAt) })}
+            </p>
+            {claim.role === "RESPONDENT" && canReply && (
+              <a
+                href={`#claim-msg-${claim.id}`}
+                className={`inline-flex min-h-[44px] items-center font-semibold text-[#003580] underline sm:min-h-0 ${focusRing}`}
+              >
+                {t("list.respondNow")}
+              </a>
+            )}
+          </div>
+        )}
       <dl className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
         {rows.map(([label, value]) => (
           <div key={label} className="rounded-md bg-gray-50 p-2">
@@ -167,12 +198,18 @@ function ClaimOverview({
       <p className="mt-1 whitespace-pre-wrap text-sm text-gray-800">{claim.description}</p>
       {canWithdraw && (
         <div className="mt-4">
-          <Button variant="danger" disabled={busy} onClick={() => void withdraw()}>
+          <Button
+            variant="danger"
+            disabled={busy}
+            aria-busy={busy || undefined}
+            onClick={() => void withdraw()}
+          >
             {t("detail.withdraw")}
           </Button>
         </div>
       )}
       <Status error={feedback.error} message={feedback.message} />
+      {confirmDialog}
     </Card>
   );
 }

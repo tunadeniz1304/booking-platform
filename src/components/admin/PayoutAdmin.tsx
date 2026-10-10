@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { apiFetch } from "@/lib/api-client";
 import { useFormat } from "@/i18n/use-format";
 import { Button, Card, Status, errorMessage, inputClass, useLoader } from "@/components/ui/ui";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 interface AccountRow {
   userId: string;
@@ -30,13 +31,32 @@ export default function PayoutAdmin() {
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [reasonMissing, setReasonMissing] = useState<string | null>(null);
+  const { confirm, confirmDialog } = useConfirm();
 
   const toggle = async (row: AccountRow) => {
-    setBusy(row.userId);
+    if (busy) return;
+    const reason = reasons[row.userId]?.trim();
     setActionError(null);
     setMessage(null);
+    setReasonMissing(null);
+    if (!row.payoutsPaused) {
+      // Durdurma denetim kaydına gerekçesiyle yazılsın: gerekçe zorunlu ve onay adımında gösterilir.
+      if (!reason) {
+        setReasonMissing(row.userId);
+        document.getElementById(`payout-reason-${row.userId}`)?.focus();
+        return;
+      }
+      const ok = await confirm({
+        title: t("admin.confirmPause.title", { name: row.displayName }),
+        body: t("admin.confirmPause.body", { count: row.pendingPayouts, reason }),
+        confirmLabel: t("admin.confirmPause.confirm"),
+        tone: "danger",
+      });
+      if (!ok) return;
+    }
+    setBusy(row.userId);
     try {
-      const reason = reasons[row.userId]?.trim();
       await apiFetch(`/api/admin/payouts/${encodeURIComponent(row.userId)}`, {
         method: "POST",
         body: JSON.stringify({ paused: !row.payoutsPaused, ...(reason ? { reason } : {}) }),
@@ -71,19 +91,36 @@ export default function PayoutAdmin() {
               </p>
               <div className="mt-2 flex flex-wrap items-end gap-2">
                 {!row.payoutsPaused && (
-                  <label className="text-xs text-gray-700">
-                    {t("admin.reason")}
+                  <div className="text-xs text-gray-700">
+                    <label htmlFor={`payout-reason-${row.userId}`}>{t("admin.reason")}</label>
                     <input
+                      id={`payout-reason-${row.userId}`}
                       className={inputClass}
                       maxLength={500}
+                      required
+                      autoComplete="off"
+                      aria-invalid={reasonMissing === row.userId || undefined}
+                      aria-describedby={
+                        reasonMissing === row.userId
+                          ? `payout-reason-${row.userId}-error`
+                          : undefined
+                      }
                       value={reasons[row.userId] ?? ""}
-                      onChange={(e) => setReasons({ ...reasons, [row.userId]: e.target.value })}
+                      onChange={(e) => {
+                        setReasons({ ...reasons, [row.userId]: e.target.value });
+                        if (reasonMissing === row.userId) setReasonMissing(null);
+                      }}
                     />
-                  </label>
+                    {reasonMissing === row.userId && (
+                      <p id={`payout-reason-${row.userId}-error`} className="mt-1 text-red-700">
+                        {t("admin.reasonRequired")}
+                      </p>
+                    )}
+                  </div>
                 )}
                 <Button
                   variant={row.payoutsPaused ? "primary" : "danger"}
-                  disabled={busy === row.userId}
+                  busy={busy === row.userId}
                   onClick={() => toggle(row)}
                 >
                   {row.payoutsPaused ? t("admin.resume") : t("admin.pause")}
@@ -94,6 +131,7 @@ export default function PayoutAdmin() {
         </ul>
       )}
       <Status error={actionError} message={message} />
+      {confirmDialog}
     </Card>
   );
 }

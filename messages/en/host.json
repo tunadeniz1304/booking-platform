@@ -1,15 +1,29 @@
 {
   "page": {
     "title": "Host dashboard",
-    "intro": "Edit your properties, add rooms, update the calendar in bulk and track your bookings."
+    "intro": "Create and edit listings, add rooms, update the calendar in bulk, and track bookings and guest messages."
   },
   "messagesPage": {
-    "back": "← Host dashboard"
+    "back": "Host dashboard",
+    "title": "Guest conversation",
+    "intro": "Message the guest for this booking. If there was damage after the stay, you can open a claim below to have it covered from the deposit."
   },
   "dashboard": {
     "revenueLink": "Revenue dashboard: occupancy, ADR, RevPAR and price suggestions →",
     "loadingProperties": "Loading properties…",
-    "noProperties": "You don't have any properties yet."
+    "noProperties": "You do not have any listings yet. Once you create your first listing you can edit it, add rooms and manage its calendar here.",
+    "sectionsNav": "Dashboard sections",
+    "navBookings": "Bookings and messages",
+    "navProperties": "My listings",
+    "navPromotions": "Promotions",
+    "navAccessibility": "Accessibility",
+    "propertiesTitle": "My listings",
+    "createFirst": "Create your first listing",
+    "createNew": "Create new listing",
+    "filterLabel": "Search listings",
+    "filterHint": "Filters listings by title.",
+    "filterEmpty": "No listings match your search.",
+    "retry": "Try again"
   },
   "bookings": {
     "title": "Bookings",
@@ -25,7 +39,8 @@
       "status": "Status",
       "messages": "Messages"
     },
-    "messagesLink": "Messages"
+    "messagesLink": "Messages",
+    "error": "Bookings could not be loaded."
   },
   "bookingStatus": {
     "PENDING": "Pending",
@@ -52,11 +67,26 @@
       "description": "Description",
       "licenseNumber": "Licence number",
       "licenseHint": "Province plate code + sequence number, e.g. 34-12345. Listings without a licence cannot go live.",
-      "isActive": "Listing is live"
+      "isActive": "Publish when I save",
+      "basePriceHint": "Example: 1,500 or 1,500.50"
     },
     "saving": "Saving…",
     "save": "Save",
-    "saved": "Saved."
+    "saved": "Saved.",
+    "manage": "Manage listing: details, rooms, calendar, photos",
+    "visibility": {
+      "live": "Visible in search.",
+      "pending": "Marked as live, but not visible in search until the licence is verified.",
+      "rejected": "Licence not found in the registry; the listing is not visible in search. Correct the licence number and press Save.",
+      "off": "Not live; not visible in search."
+    },
+    "pricePreview": "New nightly price: {price} (currently: {previous})",
+    "invalidAmount": "Enter a valid amount (e.g. 1,500 or 1,500.50).",
+    "priceConfirm": {
+      "title": "Large price change",
+      "body": "The base nightly price will change from {from} to {to}. Is that correct?",
+      "confirm": "Yes, save the price"
+    }
   },
   "rooms": {
     "title": "Rooms",
@@ -70,8 +100,13 @@
       "defaultBedType": "Double",
       "priceModifier": "Price difference",
       "submit": "Add room",
-      "added": "Room added."
-    }
+      "added": "Room added.",
+      "adding": "Adding…",
+      "priceModifierHint": "Nightly amount added to the base price, e.g. 250 or 250.50"
+    },
+    "closeSale": "Close for sale",
+    "openSale": "Open for sale",
+    "updated": "Room updated."
   },
   "calendar": {
     "title": "Bulk calendar update",
@@ -85,12 +120,16 @@
     "close": "Close for sale",
     "submit": "Update calendar",
     "noChange": "Enter a price or availability change.",
-    "result": "Nights updated: {updated}, added: {created}, skipped because booked: {skipped}."
+    "result": "Nights updated: {updated}, added: {created}, skipped because booked: {skipped}.",
+    "priceHint": "Example: 2,750 or 2,750.50"
   },
   "listingCopy": {
     "suggesting": "Preparing suggestion…",
     "suggest": "Suggest listing copy",
-    "draft": "Draft (not published automatically; edit and approve it)"
+    "draft": "Draft (not published automatically; edit and approve it)",
+    "title": "Listing text suggestion",
+    "trLabel": "Turkish:",
+    "enLabel": "English:"
   },
   "photos": {
     "title": "Photos",
@@ -103,7 +142,17 @@
     },
     "remove": "Remove photo",
     "lowQuality": "The photo looks blurry or poorly exposed; consider uploading a sharper shot.",
-    "visualOff": "Visual similarity search is disabled here; the photo was still published."
+    "visualOff": "Visual similarity search is disabled here; the photo was still published.",
+    "loading": "Loading photos…",
+    "count": "{count, plural, =0 {No photos yet.} one {# photo} other {# photos}}",
+    "alt": "Listing photo {index}",
+    "uploadLabel": "Upload a photo",
+    "removed": "Photo removed.",
+    "removeConfirm": {
+      "title": "Remove this photo?",
+      "body": "The photo will be permanently deleted from the listing and guests will no longer see it.",
+      "confirm": "Remove photo"
+    }
   },
   "promotions": {
     "title": "Promotions",
@@ -156,7 +205,46 @@
       "priority": "Priority",
       "priorityHint": "Higher priority is applied first.",
       "stackable": "Can be combined with other promotions",
-      "submit": "Add promotion"
+      "submit": "Add promotion",
+      "nameHint": "{min}–{max} characters.",
+      "percentHint": "Enter a rate between 0.01 and 100.",
+      "preview": "Example: a nightly price of {before} becomes {after} with {percent}% off.",
+      "highWarning": "Careful: {percent}% off is very high. Check the rate before saving.",
+      "highConfirmTitle": "Save a {percent}% discount?",
+      "highConfirmBody": "Guests will pay only a small part of the price. A 100% discount makes the stay free.",
+      "highConfirm": "Yes, save",
+      "stackableWarning": "Stackable promotions apply together, so the total discount can be higher than this rate alone.",
+      "rangeHint": "Enter a number between {min} and {max}.",
+      "couponHint": "{min}–{max} characters; letters, digits, - and _ only."
     }
+  },
+  "form": {
+    "fieldInvalid": "Please check this field.",
+    "fieldErrorsSummary": "{count, plural, one {# field has} other {# fields have}} a problem; fix the marked fields and try again."
+  },
+  "create": {
+    "title": "New listing",
+    "intro": "Enter the basics and your first room. You can add photos, more rooms and the calendar after the listing is created. The listing appears in search once its licence is verified.",
+    "type": "Property type",
+    "types": {
+      "HOTEL": "Hotel",
+      "APARTMENT": "Apartment",
+      "VILLA": "Villa",
+      "HOSTEL": "Hostel",
+      "BED_AND_BREAKFAST": "Bed and breakfast"
+    },
+    "descriptionHint": "At least 10 characters. This is the first text guests read.",
+    "city": "City",
+    "country": "Country",
+    "defaultCountry": "Türkiye",
+    "basePrice": "Base nightly price",
+    "currency": "Currency",
+    "firstRoom": "First room",
+    "submit": "Create listing",
+    "submitting": "Creating…",
+    "created": "Listing created.",
+    "cancel": "Cancel",
+    "kycRequired": "You need to verify your identity before you can create a listing. This is required for guest safety.",
+    "kycLink": "Verify my identity on the My account page"
   }
 }

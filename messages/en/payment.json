@@ -22,16 +22,25 @@
     "refunded": "Cancelled. Refund: {amount} ({percent}%).",
     "noRefund": "Cancelled. No refund under the policy.",
     "failed": "The booking could not be cancelled",
-    "button": "Cancel booking"
+    "button": "Cancel booking",
+    "dialogTitle": "Cancel this booking?",
+    "dialogBodyHeld": "No payment has been taken yet. Cancelling releases the room hold.",
+    "dialogBodyConfirmed": "Your refund is calculated from the cancellation policy you accepted when booking and is shown right after cancelling.",
+    "irreversible": "This cannot be undone.",
+    "confirmButton": "Yes, cancel",
+    "keep": "Keep booking"
   },
   "stepUp": {
     "failed": "Verification failed",
     "title": "Additional verification required",
     "description": "To protect your account, we ask you to approve this payment with your passkey. After approval the payment is retried automatically.",
-    "managePasskeys": "Manage my passkeys",
+    "managePasskeys": "Create or manage passkeys (opens in a new tab)",
     "waiting": "Waiting...",
     "verify": "Verify with passkey",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "whatIsPasskey": "A passkey is a password-free check that uses the same method you unlock your phone or computer with (fingerprint, face or PIN).",
+    "noPasskey": "If you don't have a passkey, you can create one in a few seconds on your account page, then come back to this window and try again.",
+    "holdUntil": "Your room is held for you until {time}."
   },
   "rnpl": {
     "legend": "When to pay",
@@ -45,7 +54,7 @@
     "reserve": "Reserve now (no payment today)",
     "plan": {
       "title": "Payment plan: reserve now, pay later",
-      "summary": "{today} paid today; {amount} will be charged to your saved card on {date}.",
+      "summary": "{today} paid at booking; {amount} will be charged to your saved card on {date}.",
       "retry": "The charge failed; next attempt: {date}. Please check your card.",
       "captured": "{amount} was charged on {date}.",
       "status": {
@@ -54,7 +63,43 @@
         "CAPTURED": "Charged",
         "CANCELLED": "Cancelled — no charge",
         "DEFAULTED": "Unpaid — booking cancelled"
-      }
-    }
-  }
+      },
+      "summaryCancelled": "The plan was cancelled; your card will not be charged.",
+      "summaryDefaulted": "The payment could not be collected, so the booking was cancelled; your card will not be charged again.",
+      "stepBooked": "At booking: {today} paid; your card was only saved."
+    },
+    "moment": "{date}, {time} ({tz})"
+  },
+  "expiryHint": "MM/YY format, e.g. 08/28",
+  "threeDsIntro": "Your bank wants you to approve this payment. Enter the code sent to your phone.",
+  "threeDsDemoHint": "Demo verification code: {code}",
+  "threeDsAnnounce": "3D Secure verification required. Enter the code your bank sent you.",
+  "threeDsBack": "Go back and use another card",
+  "paidAnnounce": "Payment received, your booking is confirmed.",
+  "hold": {
+    "remaining": "Time left: {time}",
+    "warnMinutes": "Your room hold ends in {minutes, plural, one {# minute} other {# minutes}}.",
+    "expired": "The hold has expired. The room is no longer reserved for you.",
+    "expiredTitle": "Hold expired",
+    "expiredBody": "The payment was not completed in time, so the room was released. You have not been charged. You can search the same dates again.",
+    "rebook": "Search again and book"
+  },
+  "errors": {
+    "EXPIRY_FORMAT": "Enter the expiry date as MM/YY, e.g. 08/28.",
+    "CARD_NUMBER_INVALID": "The card number is not valid. Please check the number on your card.",
+    "CVC_INVALID": "The security code (CVC) is not valid. Enter the 3 or 4 digit code on the back of the card.",
+    "CARD_EXPIRED": "This card has expired. Please try another card.",
+    "AUTHENTICATION_FAILED": "The verification code was wrong and no payment was taken. Check your card details and try again.",
+    "PAYMENT_DECLINED": "The payment was declined. Please try another card.",
+    "HOLD_EXPIRED": "The room hold has expired; no payment was taken.",
+    "PAYMENT_ATTEMPTS_EXCEEDED": "Too many failed attempts. Please try again later.",
+    "PAYMENT_IN_PROGRESS": "A payment for this booking is already being processed. Please wait a few seconds.",
+    "PAYMENT_PROVIDER_ERROR": "The payment provider cannot be reached right now. You have not been charged; please try again.",
+    "INVALID_CARD_TOKEN": "Your card details could not be processed. Please enter them again.",
+    "FRAUD_BLOCKED": "This payment was not approved for security reasons. Try another card or contact support.",
+    "NO_PENDING_CHALLENGE": "There is no payment waiting for verification. Enter your card details and try again.",
+    "IDENTITY_VERIFICATION_REQUIRED": "You need to verify your identity to continue.",
+    "RATE_LIMITED": "Too many requests. Please wait a moment and try again."
+  },
+  "stripeLiveCharge": "When you confirm, {amount} will be charged to your card."
 }

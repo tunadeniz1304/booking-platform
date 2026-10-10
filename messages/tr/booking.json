@@ -9,11 +9,26 @@
     "noRooms": "Uygun oda yok",
     "roomOption": "{name} - {capacity} kişi - {bedType}",
     "ratePlan": "Fiyat seçeneği",
-    "refundable": "İptal politikasına göre iade",
-    "nonRefundable": "İade edilemez",
+    "refundable": "İade edilebilir (iptal koşullarına göre)",
+    "nonRefundable": "İade edilemez: iptal ederseniz ücret geri ödenmez",
     "breakfastIncluded": "Kahvaltı dahil",
     "calculating": "Fiyat hesaplanıyor…",
-    "submit": "Rezervasyonu Onayla"
+    "submit": "Rezervasyona devam et",
+    "planDelta": "en uygun seçenekten %{percent} pahalı",
+    "planCheapest": "en uygun fiyat",
+    "policyLink": "İptal koşullarını gör",
+    "closeCalendar": "Takvimi kapat",
+    "roomOptionTooSmall": "{name} - {capacity} kişi - {bedType} · {guests} misafir için küçük",
+    "overCapacity": "Bu oda en fazla {capacity} kişilik. Misafir sayısını azaltın ya da daha büyük bir oda seçin.",
+    "overCapacityNoRoom": "Bu tesisteki odalar en fazla {capacity} kişilik. {guests} misafir için sepete birden fazla oda ekleyebilirsiniz.",
+    "switchRoom": "{name} odasını seç ({capacity} kişilik)",
+    "roomSwitched": "{name} seçildi; fiyat yeniden hesaplanıyor.",
+    "submitHint": "Henüz ödeme alınmaz. Sonraki adımda bilgilerinizi gözden geçirir, ardından ödemeye geçersiniz.",
+    "errors": {
+      "SOLD_OUT": "Bu oda seçtiğiniz tarihlerde dolu. Başka tarih ya da oda deneyin.",
+      "RESTRICTED": "Seçtiğiniz tarihler tesisin konaklama kurallarına uymuyor (ör. en az gece sayısı ya da girişe kapalı gün). Farklı tarihler deneyin.",
+      "NOT_FOUND": "Bu oda artık satışta değil. Başka bir oda seçin."
+    }
   },
   "priceInsight": {
     "title": "Fiyat içgörüsü",
@@ -54,6 +69,11 @@
     "total": "Toplam Tutar",
     "viewProperty": "Konaklamayı Görüntüle",
     "myBookings": "Rezervasyonlarım",
-    "print": "Yazdır"
+    "print": "Yazdır",
+    "statusChanged": {
+      "CONFIRMED": "Ödeme alındı, rezervasyonunuz onaylandı. Onay e-postası gönderildi.",
+      "CANCELLED": "Rezervasyon iptal edildi.",
+      "other": "Rezervasyon durumu güncellendi: {status}"
+    }
   }
 }

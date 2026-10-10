@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { apiFetch } from "@/lib/api-client";
 import { useFormat } from "@/i18n/use-format";
+import { parseAmountToMinor } from "@/lib/ui/amount-input";
 
 interface CreditOptions {
   currency: string;
@@ -38,6 +39,19 @@ export default function WalletCreditOption({
   const [opts, setOpts] = useState<CreditOptions | null>(null);
   const [use, setUse] = useState(false);
   const [amount, setAmount] = useState(0);
+  /** Kullanıcının yazdığı metin ("1.250,50" gibi); tutar ondan ayrıştırılır. */
+  const [draft, setDraft] = useState<string | null>(null);
+  const uid = useId();
+  const hintId = `${uid}-hint`;
+  const errorId = `${uid}-error`;
+
+  // Bileşen kaldırılınca (ör. "sonra öde" seçildi) ebeveyndeki kredi sıfırlanır; aksi halde
+  // kutu yeniden boş görünürken eski kredi ödemeye eklenirdi (gizli durum).
+  const onChangeRef = useRef(onChange);
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
+  useEffect(() => () => onChangeRef.current(0), []);
 
   useEffect(() => {
     let active = true;
@@ -56,6 +70,8 @@ export default function WalletCreditOption({
   if (!opts || opts.maxUsableMinor <= 0) return null;
   const cur = currency ?? opts.currency;
   const valid = Number.isInteger(amount) && amount >= 0 && amount <= opts.maxUsableMinor;
+  const amountText =
+    draft ?? fmt.number(amount / 100, { maximumFractionDigits: 2, useGrouping: false });
 
   const update = (nextUse: boolean, nextAmount: number) => {
     setUse(nextUse);
@@ -67,7 +83,7 @@ export default function WalletCreditOption({
   return (
     <fieldset className="space-y-2 rounded-lg border border-gray-200 p-3" disabled={disabled}>
       <legend className="px-1 text-sm font-semibold text-gray-900">{t("title")}</legend>
-      <label className="flex items-center gap-2 text-sm text-gray-800">
+      <label className="flex min-h-[44px] items-center gap-2 text-sm text-gray-800 sm:min-h-0">
         <input
           type="checkbox"
           checked={use}
@@ -84,22 +100,26 @@ export default function WalletCreditOption({
           <label className="block text-sm font-medium text-gray-700">
             {t("amount")}
             <input
-              type="number"
+              type="text"
               inputMode="decimal"
-              min={0}
-              max={opts.maxUsableMinor / 100}
-              step="0.01"
-              value={amount / 100}
-              onChange={(e) => update(true, Math.round(Number(e.target.value) * 100))}
-              aria-invalid={!valid}
-              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              autoComplete="off"
+              value={amountText}
+              onChange={(e) => {
+                setDraft(e.target.value);
+                // Ayrıştırılamayan metin geçersiz sayılır (-1); "1.250,50" ve "1250.5" kabul edilir.
+                update(true, parseAmountToMinor(e.target.value) ?? -1);
+              }}
+              onBlur={() => setDraft(null)}
+              aria-invalid={!valid || undefined}
+              aria-describedby={valid ? hintId : `${hintId} ${errorId}`}
+              className="mt-1 min-h-[44px] w-full rounded-lg border border-gray-300 px-3 py-2 text-sm sm:min-h-0"
             />
           </label>
-          <p className="text-xs text-gray-500">
+          <p id={hintId} className="text-xs text-gray-500">
             {t("max", { amount: fmt.money(opts.maxUsableMinor, cur) })}
           </p>
           {!valid && (
-            <p role="alert" className="text-xs text-red-700">
+            <p id={errorId} className="text-xs text-red-700">
               {t("invalid", { max: fmt.money(opts.maxUsableMinor, cur) })}
             </p>
           )}

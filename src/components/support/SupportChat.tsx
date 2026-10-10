@@ -3,7 +3,16 @@
 import { useId, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { apiFetch } from "@/lib/api-client";
-import { Button, Card, LlmBadge, Status, errorMessage, inputClass } from "@/components/ui/ui";
+import { useFormat } from "@/i18n/use-format";
+import {
+  Button,
+  Card,
+  LlmBadge,
+  Status,
+  inputClass,
+  useErrorText,
+  useLoader,
+} from "@/components/ui/ui";
 
 interface ChatReply {
   reply: string;
@@ -19,6 +28,22 @@ interface Turn {
   text: string;
   llmMode?: string;
   ticketId?: string;
+  /** Yanıtın ilgili olduğu rezervasyon (bağlam satırı). */
+  context?: string;
+}
+
+interface MyBooking {
+  id: string;
+  status: string;
+  checkIn: string;
+  checkOut: string;
+  property: { title: string };
+}
+
+/** `/support?bookingId=…` ile gelinirse o rezervasyon önceden seçilir. */
+function initialBookingId(): string {
+  if (typeof window === "undefined") return "";
+  return new URLSearchParams(window.location.search).get("bookingId") ?? "";
 }
 
 const MAX_MESSAGE = 1000;
@@ -33,6 +58,19 @@ export default function SupportChat() {
   const locale = useLocale();
   const inputId = useId();
   const hintId = useId();
+  const bookingSelectId = useId();
+  const f = useFormat();
+  const errorText = useErrorText();
+  const bookings = useLoader(() => apiFetch<MyBooking[]>("/api/bookings"));
+  const [now] = useState(() => Date.now());
+  const upcoming = (bookings.data ?? [])
+    .filter((b) => b.status !== "CANCELLED" && new Date(b.checkOut).getTime() >= now)
+    .sort((a, b) => new Date(a.checkIn).getTime() - new Date(b.checkIn).getTime());
+  const [chosenBooking, setChosenBooking] = useState(initialBookingId);
+  const selectedBooking =
+    upcoming.find((b) => b.id === chosenBooking) ?? (chosenBooking ? undefined : upcoming[0]);
+  const bookingLabel = (b: MyBooking) =>
+    `${b.property.title} · ${f.date(b.checkIn)} – ${f.date(b.checkOut)}`;
   const [message, setMessage] = useState("");
   const [turns, setTurns] = useState<Turn[]>([]);
   const [busy, setBusy] = useState(false);
@@ -44,12 +82,14 @@ export default function SupportChat() {
     setError(null);
     setTurns((prev) => [...prev, { role: "user", text }]);
     setMessage("");
+    const booking = selectedBooking;
     try {
       const res = await apiFetch<ChatReply>("/api/support/chat", {
         method: "POST",
         body: JSON.stringify({
           message: text,
           locale: locale === "en" ? "en" : "tr",
+          ...(booking ? { bookingId: booking.id } : {}),
           ...(requestHuman ? { requestHuman: true } : {}),
         }),
       });
@@ -60,10 +100,11 @@ export default function SupportChat() {
           text: res.reply,
           llmMode: res.llmMode,
           ticketId: res.handoff?.ticketId,
+          context: booking ? bookingLabel(booking) : undefined,
         },
       ]);
     } catch (err) {
-      setError(errorMessage(err));
+      setError(errorText(err));
     } finally {
       setBusy(false);
     }
@@ -106,6 +147,11 @@ export default function SupportChat() {
               {turn.role === "user" ? t("you") : t("assistant")}{" "}
               {turn.role === "assistant" && <LlmBadge mode={turn.llmMode} />}
             </p>
+            {turn.context && (
+              <p className="mb-1 text-xs text-gray-700">
+                {t("context", { booking: turn.context })}
+              </p>
+            )}
             <p className="whitespace-pre-line">{turn.text}</p>
             {turn.ticketId && (
               <p className="mt-2 text-xs font-medium text-amber-900">
@@ -115,7 +161,27 @@ export default function SupportChat() {
           </div>
         ))}
       </div>
-      <form onSubmit={send} className="space-y-2">
+      <form onSubmit={send} aria-busy={busy} className="space-y-2">
+        {upcoming.length > 0 && (
+          <div>
+            <label htmlFor={bookingSelectId} className="block text-sm font-medium text-gray-900">
+              {t("bookingLabel")}
+            </label>
+            <select
+              id={bookingSelectId}
+              className={inputClass}
+              value={selectedBooking?.id ?? ""}
+              onChange={(e) => setChosenBooking(e.target.value)}
+            >
+              {!selectedBooking && <option value="">{t("bookingNone")}</option>}
+              {upcoming.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {bookingLabel(b)}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <label htmlFor={inputId} className="block text-sm font-medium text-gray-900">
           {t("label")}
         </label>

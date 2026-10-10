@@ -8,7 +8,8 @@
     "guests": "Number of guests",
     "startDate": "Start date",
     "submit": "Create plan",
-    "submitting": "Planning…"
+    "submitting": "Planning…",
+    "citiesHint": "Example: Istanbul, Cappadocia, Antalya"
   },
   "result": {
     "title": "Suggested plan",
@@ -19,6 +20,21 @@
     "holdLabel": "Hold the stay in {city}",
     "noStay": "No available stay was found for these dates.",
     "total": "Stays total: <b>{amount}</b>",
-    "note": "The plan does not make a booking; «Hold» reserves the room briefly and takes you to payment."
+    "note": "The plan doesn't book anything. \"Hold\" reserves the room for a short time; complete each stop with \"Pay\". Your plan is kept in this tab.",
+    "held": "Held — pay soon to keep it.",
+    "pay": "Pay",
+    "payLabel": "Pay for the {city} stay",
+    "heldSummary": "Stops held: {held}/{total}"
+  },
+  "errors": {
+    "citiesRequired": "Enter at least one city.",
+    "tooManyCities": "Enter at most {max} cities; you entered {count}.",
+    "cityLength": "\"{city}\" is not a valid city name; each city must be 2 to 60 characters.",
+    "invalid": {
+      "cities": "Check the cities: 1–6 cities, separated by commas.",
+      "days": "Days must be between 1 and 30.",
+      "guests": "Guests must be between 1 and 10.",
+      "startDate": "Choose a valid start date."
+    }
   }
 }

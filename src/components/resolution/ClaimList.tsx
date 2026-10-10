@@ -23,7 +23,7 @@ export default function ClaimList({
 }) {
   const t = useTranslations("resolution");
   const f = useFormat();
-  const linkClass = `font-semibold text-[#003580] underline ${focusRing}`;
+  const linkClass = `inline-flex min-h-[44px] items-center font-semibold text-[#003580] underline sm:min-h-0 ${focusRing}`;
   return (
     <ul className="space-y-3">
       {claims.map((c) => (
@@ -49,7 +49,11 @@ export default function ClaimList({
           </p>
           {c.status === "AWAITING_RESPONSE" && c.slaDueAt && (
             <p className="font-medium text-amber-800">
-              {t("list.slaDue", { date: f.dateTime(c.slaDueAt) })}
+              {c.role === "RESPONDENT"
+                ? t("list.respondCta", { date: f.dateTime(c.slaDueAt) })
+                : c.role === "OPENER"
+                  ? t("list.awaitingOther", { date: f.dateTime(c.slaDueAt) })
+                  : t("list.slaDue", { date: f.dateTime(c.slaDueAt) })}
             </p>
           )}
           <div className="mt-2">
@@ -63,9 +67,21 @@ export default function ClaimList({
                 {t("admin.select")}
               </button>
             ) : (
-              <Link href={`/resolution/${encodeURIComponent(c.id)}`} className={linkClass}>
-                {t("list.open")}
-              </Link>
+              <div className="flex flex-wrap gap-x-4 gap-y-1">
+                <Link href={`/resolution/${encodeURIComponent(c.id)}`} className={linkClass}>
+                  {t("list.open")}
+                </Link>
+                {c.role === "RESPONDENT" &&
+                  c.status === "AWAITING_RESPONSE" &&
+                  c.type !== "CHARGEBACK" && (
+                    <Link
+                      href={`/resolution/${encodeURIComponent(c.id)}#claim-msg-${encodeURIComponent(c.id)}`}
+                      className={linkClass}
+                    >
+                      {t("list.respondNow")}
+                    </Link>
+                  )}
+              </div>
             )}
           </div>
         </li>

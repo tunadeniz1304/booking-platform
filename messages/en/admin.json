@@ -41,12 +41,22 @@
     "impact": "impact {impact}/10",
     "approve": "Approve",
     "reject": "Reject",
-    "rollback": "Roll back",
+    "rollback": "Undo approval",
     "status": {
       "PROPOSED": "Proposed",
       "APPROVED": "Approved",
       "REJECTED": "Rejected",
       "ROLLED_BACK": "Rolled back"
+    },
+    "confirmReject": {
+      "title": "Reject the “{title}” proposal?",
+      "body": "A rejected proposal does not affect prices and cannot be approved again from this list.",
+      "confirm": "Reject proposal"
+    },
+    "confirmRollback": {
+      "title": "Undo the approval of “{title}”?",
+      "body": "This event's effect on prices will be removed. A rolled-back event cannot be approved again here.",
+      "confirm": "Undo approval"
     }
   },
   "fraud": {
@@ -57,8 +67,13 @@
     "score": "score",
     "reasonsLabel": "Reason codes",
     "noReasons": "No reasons recorded",
-    "legit": "Legitimate",
-    "fraud": "Fraud"
+    "legit": "Mark as legitimate",
+    "fraud": "Mark as fraud",
+    "confirm": {
+      "title": "Mark booking {booking} as fraud?",
+      "body": "The record leaves the queue and the user ({user}) is flagged with a fraud record. This decision cannot be undone here.",
+      "confirm": "Mark as fraud"
+    }
   },
   "moderation": {
     "title": "Review moderation queue",
@@ -68,7 +83,12 @@
     "reports": "{count, plural, one {# report} other {# reports}}",
     "whyFlagged": "Why it was flagged:",
     "publish": "Publish",
-    "remove": "Remove"
+    "remove": "Remove",
+    "confirmRemove": {
+      "title": "Remove the review of “{property}”?",
+      "body": "The review is unpublished and the property's rating is recalculated. This decision cannot be undone here.",
+      "confirm": "Remove review"
+    }
   },
   "experiments": {
     "title": "A/B experiments",
@@ -82,7 +102,8 @@
       "conversions": "Conversions",
       "rate": "Rate",
       "ci": "95% Wilson"
-    }
+    },
+    "tableLabel": "{flag} experiment results"
   },
   "roles": {
     "title": "Change user role",
@@ -90,6 +111,18 @@
     "userIdHint": "You cannot change your own role.",
     "newRole": "New role",
     "submit": "Update role",
-    "updated": "Role updated: {role} (takes effect within 15 minutes)."
+    "updated": "Role updated: {role} (takes effect within 15 minutes).",
+    "submitting": "Updating…",
+    "options": {
+      "USER": "Guest (USER)",
+      "HOST": "Host (HOST)",
+      "ADMIN": "Administrator (ADMIN)"
+    },
+    "confirm": {
+      "title": "Change the role of user {user}?",
+      "body": "New role: {role}. All of the user's sessions will be signed out and they will need to sign in again.",
+      "adminBody": "New role: {role}. This user will have access to all admin actions (payouts, claims, roles). All of the user's sessions will be signed out.",
+      "confirm": "Change role"
+    }
   }
 }

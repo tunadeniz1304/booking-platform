@@ -19,13 +19,24 @@
     "none": "Devredilebilir (onaylı) rezervasyonunuz yok.",
     "booking": "Rezervasyon",
     "askPrice": "İstek fiyatı ({currency})",
-    "askHint": "Ödediğiniz tutarın üst sınırını aşamaz.",
+    "askHint": "Örnek: 1.250 veya 1.250,50. Ödediğiniz tutarı aşamaz.",
     "submit": "Devret",
     "linkOnce": "Devir bağlantısı yalnızca şimdi gösterilir — kopyalayıp alıcıyla paylaşın.",
     "linkLabel": "Devir bağlantısı",
     "copy": "Kopyala",
-    "hide": "Gizle",
-    "copied": "Kopyalandı."
+    "hide": "Kopyaladım, kapat",
+    "copied": "Kopyalandı.",
+    "askInvalid": "Geçerli bir tutar girin (örnek: 1.250,50).",
+    "submitting": "Oluşturuluyor…",
+    "submitNewLink": "Yeni bağlantı oluştur",
+    "listedSuffix": "(ilanda, {date} tarihine kadar)",
+    "replaceTitle": "Yeni bağlantı oluşturulsun mu?",
+    "replaceBody": "Bu rezervasyon zaten ilanda. Devam ederseniz önceki bağlantı hemen geçersiz olur; alıcıya yeni bağlantıyı iletmeniz gerekir.",
+    "replaceConfirm": "Yeni bağlantı oluştur",
+    "linkLost": "Bağlantıyı kaybederseniz yeni bir bağlantı oluşturabilirsiniz; eskisi geçersiz olur.",
+    "closeTitle": "Bağlantıyı kopyalamadan kapatılsın mı?",
+    "closeBody": "Bu bağlantı bir daha gösterilmeyecek. Kopyalamadıysanız alıcıya iletemezsiniz.",
+    "closeConfirm": "Yine de kapat"
   },
   "claim": {
     "title": "Rezervasyonu devral",
@@ -41,6 +52,44 @@
     "year": "Yıl",
     "cvc": "CVC",
     "processing": "İşleniyor…",
-    "submit": "Öde ve devral"
+    "submit": "Öde ve devral",
+    "loginPrompt": "Devri tamamlamak için <login>giriş yapın</login> ya da <register>hesap oluşturun</register>. Bağlantınız bu sekmede korunur.",
+    "reviewNote": "Ödemeden önce tesis, tarihler ve fiyatı satıcıyla teyit edin. Kartınızdan satıcının istediği tutar çekilir.",
+    "confirmTitle": "Ödeme yapılsın mı?",
+    "confirmBody": "Kartınızdan satıcının belirlediği devir tutarı çekilecek ve rezervasyon size geçecek. Bu işlem geri alınamaz.",
+    "confirmAction": "Öde ve devral",
+    "maybeCharged": "Önceki denemenizde ödeme alınmış ve devir tamamlanmış olabilir. Tekrar ödemeden önce <link>seyahatlerinizi</link> kontrol edin."
+  },
+  "mine": {
+    "title": "Devir ilanlarım",
+    "empty": "Henüz devir ilanınız yok.",
+    "booking": "Rezervasyon",
+    "validUntil": "{date} tarihine kadar geçerli",
+    "withdraw": "İlanı geri çek",
+    "withdrawLabel": "{title} ilanını geri çek",
+    "withdrawing": "Geri çekiliyor…",
+    "withdrawTitle": "İlan geri çekilsin mi?",
+    "withdrawBody": "Paylaştığınız bağlantı hemen geçersiz olur ve rezervasyon sizde kalır.",
+    "withdrawConfirm": "İlanı geri çek",
+    "withdrawn": "İlan geri çekildi; bağlantı artık kullanılamaz.",
+    "status": {
+      "LISTED": "İlanda",
+      "CLAIMED": "Alıcı ödeme yapıyor",
+      "CAPTURE_PENDING": "Ödeme işleniyor",
+      "COMPLETED": "Devredildi",
+      "CANCELLED": "Geri çekildi",
+      "FAILED": "Tamamlanamadı",
+      "EXPIRED": "Süresi doldu",
+      "OTHER": "Bilinmeyen durum"
+    }
+  },
+  "verify": {
+    "title": "Devir için e-posta adresinizi doğrulayın",
+    "body": "Rezervasyon devretmek ya da devralmak için e-posta adresinizin doğrulanmış olması gerekir. Size gönderdiğimiz e-postadaki bağlantıya tıklayın, sonra bu sayfaya dönün.",
+    "resend": "Doğrulama e-postasını yeniden gönder",
+    "sending": "Gönderiliyor…",
+    "sent": "Doğrulama e-postası gönderildi. Gelen kutunuzu kontrol edin.",
+    "alreadyVerified": "E-posta adresiniz zaten doğrulanmış. Tekrar deneyin.",
+    "failed": "E-posta gönderilemedi. Biraz sonra yeniden deneyin."
   }
 }

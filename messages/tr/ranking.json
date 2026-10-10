@@ -5,7 +5,10 @@
   "table": {
     "component": "Bileşen",
     "weight": "Ağırlık",
-    "description": "Açıklama"
+    "description": "Açıklama",
+    "caption": "Önerilen sıralamadaki bileşenler ve ağırlıkları",
+    "weightNoQuery": "Ağırlık (arama metni yokken)",
+    "weightWithQuery": "Ağırlık (arama metni ya da varış yeri girildiğinde)"
   },
   "weightValue": "%{value}",
   "factors": {
@@ -32,5 +35,7 @@
   },
   "footnote": "Fiyat, puan veya en çok beğenilen sıralamalarını seçtiğinizde yalnızca o ölçüt kullanılır.",
   "why": "Bu sıralama neden?",
-  "totalScore": "Toplam skor: {score}"
+  "totalScore": "Toplam skor: {score}",
+  "withQueryNote": "Bir varış yeri ya da arama metni girdiğinizde, sonuçların aradığınızla ilgili olması için arama metni benzerliği daha ağır basar; bu durumda üçüncü sütundaki ağırlıklar kullanılır.",
+  "experimentNote": "Sıralamayı iyileştirmek için bazı ziyaretçilerde deneysel, kendi kendine öğrenen bir sıralama modeli kullanılabilir. Bu model de yalnızca yukarıdaki bileşenleri kullanır; ücretli yerleşim ya da komisyon onu da etkilemez."
 }

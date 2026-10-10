@@ -15,6 +15,7 @@ import Map, { Marker, NavigationControl, Popup, type MapRef } from "react-map-gl
 import { setWorkerUrl, type StyleSpecification } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { focusRing } from "@/components/ui/ui";
+import { propertyHref, type SearchContext } from "@/components/property/PropertyCard";
 import {
   CLUSTER_MAX_ZOOM,
   boundsOf,
@@ -29,6 +30,8 @@ export interface MapPoint {
   latitude: number;
   longitude: number;
   priceLabel: string;
+  /** Hazır ilan bağlantısı (tarih/misafir/oda bağlamıyla); yoksa `searchContext` ile kurulur. */
+  href?: string;
 }
 
 // MapLibre 6 worker'ı bundler dışından yüklenir (scripts/copy-maplibre-worker.mjs).
@@ -81,14 +84,35 @@ export default function ResultsMap({
   selectedId,
   onSelect,
   onFail,
+  searchContext,
 }: {
   points: MapPoint[];
   selectedId: string | null;
   onSelect: (id: string | null) => void;
   onFail: (reason: string) => void;
+  /** Popup'taki ilan bağlantısına taşınacak arama tarih/misafir bilgisi (F93/F202). */
+  searchContext?: SearchContext;
 }) {
   const t = useTranslations("search");
   const mapRef = useRef<MapRef>(null);
+  // F208: popup'ı açan öğe (işaretçi ya da yan liste düğmesi); kapanınca odak oraya döner.
+  const lastTriggerRef = useRef<HTMLElement | null>(null);
+  // İşaretçiyle seçildiyse ilk odak popup'taki bağlantıya taşınır.
+  const focusPopupRef = useRef(false);
+  // F92: MapLibre'nin yerleşik denetim etiketleri arayüz dilinde.
+  const mapLocale = useMemo(
+    () => ({
+      "Map.Title": t("mapView.title"),
+      "NavigationControl.ZoomIn": t("mapView.zoomIn"),
+      "NavigationControl.ZoomOut": t("mapView.zoomOut"),
+      "NavigationControl.ResetBearing": t("mapView.resetBearing"),
+      "Popup.Close": t("mapView.closePopup"),
+      "AttributionControl.ToggleAttribution": t("mapView.toggleAttribution"),
+      "AttributionControl.MapFeedback": t("mapView.mapFeedback"),
+      "Marker.Title": t("mapView.marker"),
+    }),
+    [t]
+  );
   // Üst bileşen her render'da yeni dizi verebilir → indeks içerik anahtarıyla önbelleklenir.
   const pointsKey = points.map((p) => `${p.id}:${p.latitude}:${p.longitude}`).join("|");
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -123,6 +147,27 @@ export default function ResultsMap({
 
   const items = useMemo(() => (view ? index.items(view.bounds, view.zoom) : []), [index, view]);
   const selected = points.find((p) => p.id === selectedId) ?? null;
+
+  // Seçim değişince tetikleyen öğeyi sakla (popup odak çalmadığı için hâlâ odakta).
+  useEffect(() => {
+    if (!selectedId) return;
+    const active = document.activeElement;
+    if (
+      active instanceof HTMLElement &&
+      active !== document.body &&
+      !active.closest(".maplibregl-popup")
+    ) {
+      lastTriggerRef.current = active;
+    }
+  }, [selectedId]);
+
+  const closePopup = () => {
+    onSelect(null);
+    const trigger = lastTriggerRef.current;
+    requestAnimationFrame(() => {
+      if (trigger?.isConnected) trigger.focus();
+    });
+  };
 
   // Listeden seçim → seçili nokta görünürde değilse / kümede kalıyorsa oraya uç.
   useEffect(() => {
@@ -161,6 +206,7 @@ export default function ResultsMap({
           initialViewState={initialViewState}
           mapStyle={OSM_STYLE}
           style={{ width: "100%", height: "100%" }}
+          locale={mapLocale}
           onLoad={syncView}
           onMoveEnd={syncView}
           onError={(e) => {
@@ -210,6 +256,8 @@ export default function ResultsMap({
                   onClick={(e) => {
                     // Tıklama haritaya ulaşırsa yeni açılan Popup'ı hemen kapatır.
                     e.stopPropagation();
+                    lastTriggerRef.current = e.currentTarget;
+                    focusPopupRef.current = true;
                     onSelect(item.point.id);
                   }}
                   aria-pressed={item.point.id === selectedId}
@@ -230,13 +278,20 @@ export default function ResultsMap({
               longitude={selected.longitude}
               latitude={selected.latitude}
               anchor="top"
-              onClose={() => onSelect(null)}
+              onClose={closePopup}
               closeOnClick={false}
               closeButton
+              focusAfterOpen={false}
             >
               <div className="text-sm text-gray-900">
                 <Link
-                  href={`/property/${selected.id}`}
+                  ref={(el) => {
+                    if (el && focusPopupRef.current) {
+                      focusPopupRef.current = false;
+                      el.focus();
+                    }
+                  }}
+                  href={selected.href ?? propertyHref(selected.id, searchContext)}
                   className={`font-semibold text-[#003580] underline ${focusRing}`}
                 >
                   {selected.title}

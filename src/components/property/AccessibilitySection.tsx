@@ -1,5 +1,10 @@
+import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import type { PublicAccessibilityFeature } from "@/lib/compliance/accessibility";
+
+// ui.tsx "use client" modülü; sunucu bileşeninde aynı focusRing sınıfları yerel kopya.
+const focusRing =
+  "focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003580] focus-visible:ring-offset-2";
 
 /**
  * P1-13(e) ilan sayfası erişilebilirlik bölümü (ADA 36.302(e)(1)(ii) açıklama gerekliliği):
@@ -27,7 +32,15 @@ export default async function AccessibilitySection({
       <h2 id="accessibility-title" className="text-xl font-semibold text-gray-900">
         {t("title")}
       </h2>
-      <p className="mt-1 text-sm text-gray-600">{t("disclosure")}</p>
+      <p className="mt-1 text-sm text-gray-600">
+        {t("disclosure")}{" "}
+        <Link
+          href="/support"
+          className={`inline-flex min-h-[44px] items-center text-[#003580] underline sm:min-h-0 ${focusRing}`}
+        >
+          {t("askSupport")}
+        </Link>
+      </p>
       {[...groups.entries()].map(([key, group]) => (
         <div key={key || "property"} className="mt-4">
           <h3 className="text-sm font-medium text-gray-800">{group.label}</h3>

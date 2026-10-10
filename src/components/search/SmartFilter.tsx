@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useTranslations } from "next-intl";
 import { Button, LlmBadge, focusRing, inputClass } from "@/components/ui/ui";
 
@@ -97,6 +97,29 @@ export default function SmartFilter({
   const t = useTranslations("search");
   const [text, setText] = useState("");
   const chips = filters ? filtersToChips(filters, t) : [];
+  const inputRef = useRef<HTMLInputElement>(null);
+  const chipListRef = useRef<HTMLUListElement>(null);
+  // Kaldırılan çipin sırası: filtreler güncellenince odak bir sonraki çipe (yoksa
+  // öncekine, hiç çip kalmadıysa girişe) taşınır; aksi halde odak body'ye düşer (WCAG 2.4.3).
+  const pendingFocusIndex = useRef<number | null>(null);
+
+  useEffect(() => {
+    const idx = pendingFocusIndex.current;
+    if (idx === null) return;
+    pendingFocusIndex.current = null;
+    const buttons = chipListRef.current?.querySelectorAll<HTMLButtonElement>("button");
+    if (buttons && buttons.length > 0) {
+      buttons[Math.min(idx, buttons.length - 1)].focus();
+    } else {
+      inputRef.current?.focus();
+    }
+  }, [filters]);
+
+  function removeAt(chip: Chip, index: number) {
+    if (!filters) return;
+    pendingFocusIndex.current = index;
+    onChange(removeChip(filters, chip));
+  }
 
   function submit(e: FormEvent) {
     e.preventDefault();
@@ -112,6 +135,7 @@ export default function SmartFilter({
           </label>
           <input
             id="smart-filter"
+            ref={inputRef}
             className={inputClass}
             value={text}
             minLength={3}
@@ -131,12 +155,16 @@ export default function SmartFilter({
             {chips.length === 0 && (
               <span className="text-sm text-gray-700">{t("smart.noFilters")}</span>
             )}
-            <ul className="flex flex-wrap gap-2" aria-label={t("smart.extracted")}>
-              {chips.map((chip) => (
+            <ul
+              ref={chipListRef}
+              className="flex flex-wrap gap-2"
+              aria-label={t("smart.extracted")}
+            >
+              {chips.map((chip, index) => (
                 <li key={`${chip.key}-${chip.value ?? ""}`}>
                   <button
                     type="button"
-                    onClick={() => onChange(removeChip(filters, chip))}
+                    onClick={() => removeAt(chip, index)}
                     className={`inline-flex items-center gap-1 rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-[#003580] hover:bg-blue-200 ${focusRing}`}
                     aria-label={t("smart.remove", { label: chip.label })}
                   >
@@ -150,6 +178,7 @@ export default function SmartFilter({
               onClick={() => {
                 setText("");
                 onClear();
+                inputRef.current?.focus();
               }}
               className={`text-xs font-semibold text-[#003580] underline ${focusRing}`}
             >

@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { useFormat } from "@/i18n/use-format";
 import { apiFetch } from "@/lib/api-client";
 import { publishStaySelection } from "@/components/booking/stay-selection";
+import { focusRing } from "@/components/ui/ui";
 
 /**
  * Esnek tarih fiyat takvimi (v4 P1-3): ay ızgarası, her gece için en ucuz 1 gecelik fiyat.
@@ -107,6 +108,8 @@ export default function PriceCalendar({
   const [taxesIncluded, setTaxesIncluded] = useState(true);
   const [checkIn, setCheckIn] = useState<string | null>(null);
   const [checkOut, setCheckOut] = useState<string | null>(null);
+  /** Seçilen giriş gününün en az konaklama kuralı (çıkış doğrulaması için). */
+  const [checkInMinStay, setCheckInMinStay] = useState(1);
   const [status, setStatus] = useState("");
   const taxes = taxesIncluded ? "included" : "excluded";
   const requestKey = `${propertyId}|${month}|${taxes}`;
@@ -153,9 +156,36 @@ export default function PriceCalendar({
   const shortPrice = (minor: number) =>
     data ? (formatShortPrice(minor, data.currency, f.locale) ?? f.money(minor, data.currency)) : "";
 
+  /** Giriş seçiliyken çıkış olarak seçilebilen ilk dolu/fiyatsız gün (o gece konaklanmaz). */
+  const checkoutOnlyDate = useMemo(() => {
+    if (!checkIn || checkOut || !data) return null;
+    const blocked = data.days.find(
+      (d) =>
+        d.date > checkIn && !d.past && (!d.available || d.priceMinor === null || d.band === null)
+    );
+    return blocked?.date ?? null;
+  }, [checkIn, checkOut, data]);
+
   const selectDay = (day: CalendarDay) => {
-    if (!day.available) return;
     if (checkIn && !checkOut && day.date > checkIn) {
+      const nights = Math.round(
+        (Date.parse(`${day.date}T00:00:00Z`) - Date.parse(`${checkIn}T00:00:00Z`)) / 86_400_000
+      );
+      if (nights < checkInMinStay) {
+        setStatus(t("minStayError", { count: checkInMinStay }));
+        return;
+      }
+      // Aradaki gecelerden (yüklü ayda) dolu olan varsa seçimi yayınlama.
+      const blockedNight = data?.days.find(
+        (d) =>
+          d.date >= checkIn &&
+          d.date < day.date &&
+          (!d.available || d.priceMinor === null || d.band === null)
+      );
+      if (blockedNight) {
+        setStatus(t("rangeBlocked", { date: f.date(blockedNight.date, "medium") }));
+        return;
+      }
       setCheckOut(day.date);
       publishStaySelection({ checkIn, checkOut: day.date });
       setStatus(
@@ -163,12 +193,14 @@ export default function PriceCalendar({
       );
       return;
     }
+    if (!day.available) return;
     if (day.closedToArrival) {
       setStatus(t("closedToArrivalHint", { date: f.date(day.date, "medium") }));
       return;
     }
     const out = addDaysIso(day.date, Math.max(1, day.minStay ?? 1));
     setCheckIn(day.date);
+    setCheckInMinStay(Math.max(1, day.minStay ?? 1));
     setCheckOut(null);
     publishStaySelection({ checkIn: day.date, checkOut: out });
     setStatus(t("selectCheckOut", { date: f.date(day.date, "medium") }));
@@ -252,6 +284,23 @@ export default function PriceCalendar({
                     if (!day) return <td key={di} />;
                     const dayNum = Number(day.date.slice(8));
                     const dateLabel = f.date(day.date, "long");
+                    if (day.date === checkoutOnlyDate) {
+                      return (
+                        <td key={day.date}>
+                          <button
+                            type="button"
+                            onClick={() => selectDay(day)}
+                            aria-label={t("dayAriaCheckoutOnly", { date: dateLabel })}
+                            className="flex h-14 w-full flex-col items-center justify-center rounded-md border border-dashed border-gray-300 bg-gray-50 text-gray-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#003580]"
+                          >
+                            <span className="text-xs">{dayNum}</span>
+                            <span className="text-[11px] leading-tight" aria-hidden="true">
+                              {t("checkoutOnly")}
+                            </span>
+                          </button>
+                        </td>
+                      );
+                    }
                     if (!day.available || day.priceMinor === null || day.band === null) {
                       return (
                         <td key={day.date}>
@@ -292,9 +341,9 @@ export default function PriceCalendar({
                             level,
                             extras: extras ? `, ${extras}` : "",
                           })}
-                          className={`flex h-14 w-full flex-col items-center justify-center rounded-md border text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003580] ${
+                          className={`flex h-14 w-full flex-col items-center justify-center rounded-md border text-gray-900 focus-visible:outline focus-visible:outline-dashed focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#003580] ${
                             BAND_CLASSES[day.band]
-                          } ${selected ? "ring-2 ring-[#003580]" : ""} ${
+                          } ${selected ? "ring-2 ring-inset ring-[#003580]" : ""} ${
                             day.cheapest ? "border-2 border-emerald-700 font-semibold" : ""
                           }`}
                         >
@@ -355,6 +404,16 @@ export default function PriceCalendar({
       <p className="mt-2 text-sm text-gray-700" aria-live="polite">
         {status || t("selectHint")}
       </p>
+      {checkIn && (
+        <p className="mt-1 text-sm">
+          <a
+            href="#booking"
+            className={`inline-flex min-h-[44px] items-center text-[#003580] underline sm:min-h-0 ${focusRing}`}
+          >
+            {t("goToBooking")}
+          </a>
+        </p>
+      )}
       <p className="mt-1 text-xs text-gray-500">{t("estimateNote")}</p>
     </section>
   );

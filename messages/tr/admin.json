@@ -41,12 +41,22 @@
     "impact": "etki {impact}/10",
     "approve": "Onayla",
     "reject": "Reddet",
-    "rollback": "Geri al",
+    "rollback": "Onayı geri al",
     "status": {
       "PROPOSED": "Önerildi",
       "APPROVED": "Onaylı",
       "REJECTED": "Reddedildi",
       "ROLLED_BACK": "Geri alındı"
+    },
+    "confirmReject": {
+      "title": "“{title}” önerisi reddedilsin mi?",
+      "body": "Reddedilen öneri fiyatlara yansımaz ve bu listeden yeniden onaylanamaz.",
+      "confirm": "Öneriyi reddet"
+    },
+    "confirmRollback": {
+      "title": "“{title}” onayı geri alınsın mı?",
+      "body": "Bu olayın fiyatlara etkisi kaldırılır. Geri alınan olay buradan yeniden onaylanamaz.",
+      "confirm": "Onayı geri al"
     }
   },
   "fraud": {
@@ -57,8 +67,13 @@
     "score": "skor",
     "reasonsLabel": "Sebep kodları",
     "noReasons": "Sebep kaydı yok",
-    "legit": "Meşru",
-    "fraud": "Dolandırıcılık"
+    "legit": "Meşru olarak işaretle",
+    "fraud": "Dolandırıcılık olarak işaretle",
+    "confirm": {
+      "title": "{booking} rezervasyonu dolandırıcılık olarak işaretlensin mi?",
+      "body": "Kayıt kuyruktan çıkar ve kullanıcı ({user}) dolandırıcılık kaydıyla işaretlenir. Bu karar buradan geri alınamaz.",
+      "confirm": "Dolandırıcılık olarak işaretle"
+    }
   },
   "moderation": {
     "title": "Yorum moderasyon kuyruğu",
@@ -68,7 +83,12 @@
     "reports": "{count} şikâyet",
     "whyFlagged": "Neden işaretlendi:",
     "publish": "Yayınla",
-    "remove": "Kaldır"
+    "remove": "Kaldır",
+    "confirmRemove": {
+      "title": "“{property}” yorumu kaldırılsın mı?",
+      "body": "Yorum yayından kalkar ve tesisin puanı yeniden hesaplanır. Bu karar buradan geri alınamaz.",
+      "confirm": "Yorumu kaldır"
+    }
   },
   "experiments": {
     "title": "A/B deneyleri",
@@ -82,7 +102,8 @@
       "conversions": "Dönüşüm",
       "rate": "Oran",
       "ci": "%95 Wilson"
-    }
+    },
+    "tableLabel": "{flag} deney sonuçları"
   },
   "roles": {
     "title": "Kullanıcı rolü değiştir",
@@ -90,6 +111,18 @@
     "userIdHint": "Kendi rolünüzü değiştiremezsiniz.",
     "newRole": "Yeni rol",
     "submit": "Rolü güncelle",
-    "updated": "Rol güncellendi: {role} (en geç 15 dk içinde yansır)."
+    "updated": "Rol güncellendi: {role} (en geç 15 dk içinde yansır).",
+    "submitting": "Güncelleniyor…",
+    "options": {
+      "USER": "Misafir (USER)",
+      "HOST": "Ev sahibi (HOST)",
+      "ADMIN": "Yönetici (ADMIN)"
+    },
+    "confirm": {
+      "title": "{user} kimlikli kullanıcının rolü değiştirilsin mi?",
+      "body": "Yeni rol: {role}. Kullanıcının tüm oturumları kapanır ve yeniden giriş yapması gerekir.",
+      "adminBody": "Yeni rol: {role}. Bu kullanıcı tüm yönetim işlemlerine (ödemeler, talepler, roller) erişebilecek. Kullanıcının tüm oturumları kapanır.",
+      "confirm": "Rolü değiştir"
+    }
   }
 }

@@ -35,6 +35,8 @@ export default function RnplPlanCard({ plan }: { plan: RnplPlan | null | undefin
   const today = f.money(plan.paidTodayMinor, plan.currency);
   const due = f.date(plan.dueAt, "long");
   const freeUntil = f.date(plan.freeCancellationUntil, "long");
+  /** Tahsilat henüz yapılmadı: özet ve zaman çizelgesi yalnız bu durumlarda anlamlı. */
+  const pending = plan.status === "SCHEDULED" || plan.status === "RETRYING";
 
   return (
     <section
@@ -52,7 +54,15 @@ export default function RnplPlanCard({ plan }: { plan: RnplPlan | null | undefin
           {t(`plan.status.${plan.status}`)}
         </span>
       </div>
-      <p className="mt-2 font-medium">{t("plan.summary", { today, amount, date: due })}</p>
+      {pending && (
+        <p className="mt-2 font-medium">{t("plan.summary", { today, amount, date: due })}</p>
+      )}
+      {plan.status === "CANCELLED" && (
+        <p className="mt-2 font-medium">{t("plan.summaryCancelled")}</p>
+      )}
+      {plan.status === "DEFAULTED" && (
+        <p className="mt-2 font-medium">{t("plan.summaryDefaulted")}</p>
+      )}
       {plan.status === "RETRYING" && plan.nextAttemptAt && (
         <p className="mt-1 text-amber-900">
           {t("plan.retry", { date: f.date(plan.nextAttemptAt, "long") })}
@@ -63,16 +73,18 @@ export default function RnplPlanCard({ plan }: { plan: RnplPlan | null | undefin
           {t("plan.captured", { amount, date: f.date(plan.capturedAt, "long") })}
         </p>
       )}
-      <ol
-        className="ml-5 mt-3 list-decimal space-y-1 text-xs text-gray-700"
-        aria-label={t("timeline")}
-        data-testid="rnpl-plan-timeline"
-      >
-        <li>{t("stepToday", { today })}</li>
-        <li>{t("stepCharge", { date: due, amount })}</li>
-        <li>{t("stepFreeCancel", { date: freeUntil })}</li>
-        <li>{t("stepFailure")}</li>
-      </ol>
+      {pending && (
+        <ol
+          className="ml-5 mt-3 list-decimal space-y-1 text-xs text-gray-700"
+          aria-label={t("timeline")}
+          data-testid="rnpl-plan-timeline"
+        >
+          <li>{t("plan.stepBooked", { today })}</li>
+          <li>{t("stepCharge", { date: due, amount })}</li>
+          <li>{t("stepFreeCancel", { date: freeUntil })}</li>
+          <li>{t("stepFailure")}</li>
+        </ol>
+      )}
     </section>
   );
 }

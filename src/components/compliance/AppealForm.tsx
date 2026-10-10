@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { Button, Card, Field, Status, inputClass } from "@/components/ui/ui";
 
@@ -20,12 +20,22 @@ export default function AppealForm({
   const [error, setError] = useState<string | null>(null);
   const [fieldError, setFieldError] = useState<string | null>(null);
   const [reference, setReference] = useState("");
+  const doneRef = useRef<HTMLHeadingElement>(null);
+
+  useEffect(() => {
+    if (state !== "sent") return;
+    doneRef.current?.scrollIntoView({ block: "start" });
+    doneRef.current?.focus();
+  }, [state]);
 
   const submit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (state === "sending") return;
     const reason = String(new FormData(e.currentTarget).get("reason") ?? "").trim();
     if (reason.length < 20) {
       setFieldError(t("reasonTooShort"));
+      // Odak alana taşınır: etiket, aria-invalid ve hata metni birlikte okunur.
+      document.getElementById("appeal-reason")?.focus();
       return;
     }
     setFieldError(null);
@@ -54,33 +64,44 @@ export default function AppealForm({
     );
   };
 
-  if (state === "sent") {
-    return (
-      <Card>
-        <Status message={t("sent", { reference })} />
-      </Card>
-    );
-  }
-
   return (
     <Card title={t("formTitle")} id="appeal-form">
-      <form onSubmit={submit} className="space-y-4" noValidate>
-        <Field id="appeal-reason" label={t("reason")} hint={t("reasonHint")} error={fieldError}>
-          <textarea
-            id="appeal-reason"
-            name="reason"
-            required
-            minLength={20}
-            maxLength={5000}
-            rows={6}
-            className={inputClass}
-          />
-        </Field>
-        <Button type="submit" disabled={state === "sending"}>
-          {state === "sending" ? t("sending") : t("submit")}
-        </Button>
-        <Status error={error} />
-      </form>
+      <div aria-live="polite">
+        {state === "sent" && (
+          <>
+            <h3
+              ref={doneRef}
+              tabIndex={-1}
+              className="scroll-mt-24 text-base font-semibold text-gray-900"
+            >
+              {t("sentTitle")}
+            </h3>
+            <p className="mt-2 text-sm text-green-800">{t("sent", { reference })}</p>
+          </>
+        )}
+      </div>
+      {state !== "sent" && (
+        <form onSubmit={submit} className="space-y-4" noValidate>
+          <Field id="appeal-reason" label={t("reason")} hint={t("reasonHint")} error={fieldError}>
+            <textarea
+              id="appeal-reason"
+              name="reason"
+              required
+              minLength={20}
+              maxLength={5000}
+              rows={6}
+              className={inputClass}
+              onChange={(e) => {
+                if (fieldError && e.currentTarget.value.trim().length >= 20) setFieldError(null);
+              }}
+            />
+          </Field>
+          <Button type="submit" busy={state === "sending"}>
+            {state === "sending" ? t("sending") : t("submit")}
+          </Button>
+          <Status error={error} />
+        </form>
+      )}
     </Card>
   );
 }

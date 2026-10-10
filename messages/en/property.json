@@ -1,6 +1,6 @@
 {
   "metaTitle": "{title} | Booking Platform",
-  "notFoundTitle": "Property not found",
+  "notFoundTitle": "Listing not found",
   "ratingCount": "{count, plural, one {# review} other {# reviews}}",
   "description": "Description",
   "registration": {
@@ -11,13 +11,17 @@
   "totalPriceNote": "Prices shown are totals including taxes and mandatory fees.",
   "amenities": "Amenities",
   "gallery": {
-    "imageAlt": "{title} - image {index}",
-    "thumbnailAlt": "{title} - thumbnail {index}"
+    "imageAlt": "{title} - photo {index} of {total}",
+    "thumbnailAlt": "{title} - thumbnail {index}",
+    "noPhotos": "No photos for this listing yet.",
+    "thumbnails": "Photos",
+    "show": "Show photo {index} of {total}",
+    "counter": "Showing photo {index} of {total}"
   },
   "calendar": {
     "title": "Price calendar",
-    "subtitleIncluded": "Lowest price for 1 night, {guests} guest(s) — taxes and fees included",
-    "subtitleExcluded": "Lowest nightly price for 1 night, {guests} guest(s) — taxes and fees excluded",
+    "subtitleIncluded": "Lowest price for 1 night, based on the cheapest room and rate for {guests} {guests, plural, one {guest} other {guests}} — taxes and fees included. The price changes if your guest count or room is different.",
+    "subtitleExcluded": "Lowest nightly price for 1 night, based on the cheapest room and rate for {guests} {guests, plural, one {guest} other {guests}} — taxes and fees excluded. The price changes if your guest count or room is different.",
     "taxesToggle": "Include taxes and fees",
     "prevMonth": "Previous month",
     "nextMonth": "Next month",
@@ -48,6 +52,47 @@
       "band2": "Medium",
       "band3": "High",
       "band4": "Very high"
-    }
+    },
+    "minStayError": "Choose at least {count, plural, one {# night} other {# nights}} for this check-in date.",
+    "rangeBlocked": "The night of {date} is booked. Choose an earlier check-out date or a different check-in date.",
+    "dayAriaCheckoutOnly": "{date}: available as a check-out date only",
+    "checkoutOnly": "Check-out",
+    "goToBooking": "Go to the booking form"
+  },
+  "ratingOutOf": "{rating}/5",
+  "noRatingYet": "No ratings yet",
+  "jumpToBooking": "Go to the booking form",
+  "amenityNames": {
+    "wifi": "Free Wi-Fi",
+    "pool": "Pool",
+    "snow": "Air conditioning",
+    "car": "Parking",
+    "coffee": "Breakfast included",
+    "spa": "Spa and sauna",
+    "dumbbell": "Fitness centre",
+    "view": "Sea view",
+    "paw": "Pets allowed",
+    "clock": "24-hour front desk",
+    "city": "City centre",
+    "service": "Room service"
+  },
+  "policies": {
+    "title": "Check-in, check-out and cancellation",
+    "checkIn": "Check-in: from {time}",
+    "checkOut": "Check-out: by {time}",
+    "localTime": "Times are in the property's local time ({timeZone}).",
+    "cancellationTitle": "Cancellation policy: {kind}",
+    "kinds": {
+      "FLEXIBLE": "Flexible",
+      "MODERATE": "Moderate",
+      "STRICT": "Strict",
+      "NON_REFUNDABLE": "Non-refundable"
+    },
+    "tierDays": "Cancel {days, plural, one {# day} other {# days}} or more before check-in: {percent, plural, =0 {no refund} other {{percent}% of what you paid is refunded}}",
+    "tierHours": "Cancel {hours, plural, one {# hour} other {# hours}} or more before check-in: {percent, plural, =0 {no refund} other {{percent}% of what you paid is refunded}}",
+    "tierLater": "Cancel later: {percent, plural, =0 {no refund} other {{percent}% of what you paid is refunded}}",
+    "tierAny": "If you cancel: {percent, plural, =0 {no refund} other {{percent}% of what you paid is refunded}}",
+    "grace": "You can cancel for free within {hours} hours of booking, as long as check-in is far enough away.",
+    "note": "Times count back from the check-in time on your arrival day. If you choose a non-refundable rate, there is no refund; the exact terms are also shown before you pay."
   }
 }

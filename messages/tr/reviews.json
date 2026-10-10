@@ -13,7 +13,8 @@
     "pros": "Olumlu",
     "cons": "Olumsuz",
     "sources": "Kaynaklar:",
-    "unavailable": "Yorum özeti şu an kullanılamıyor."
+    "unavailable": "Yorum özeti şu an kullanılamıyor.",
+    "inTurkish": "Bu özet Türkçe hazırlanır."
   },
   "subScores": {
     "cleanliness": "Temizlik",

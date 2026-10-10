@@ -13,6 +13,8 @@ export interface RnplOffer {
   currency: string;
   dueAt?: string;
   freeCancellationUntil?: string;
+  /** Tesisin IANA saat dilimi (sunucu verirse); yoksa ziyaretçinin saat dilimi kullanılır. */
+  timeZone?: string;
 }
 
 interface Props {
@@ -54,8 +56,17 @@ export function RnplChoice({
   if (!offer?.available || !offer.dueAt || !offer.freeCancellationUntil) return null;
   const amount = f.money(offer.amountMinor, offer.currency);
   const today = f.money(0, offer.currency);
-  const due = f.date(offer.dueAt, "long");
-  const freeUntil = f.date(offer.freeCancellationUntil, "long");
+  // Son tarih bir andır (tesis yerel saatiyle giriş saatine bağlı): tarih + saat + saat dilimi.
+  const tz = offer.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const moment = (iso: string) => {
+    const tzName =
+      new Intl.DateTimeFormat(f.locale, { timeZone: tz, timeZoneName: "short" })
+        .formatToParts(new Date(iso))
+        .find((p) => p.type === "timeZoneName")?.value ?? tz;
+    return t("moment", { date: f.date(iso, "long", tz), time: f.time(iso, tz), tz: tzName });
+  };
+  const due = moment(offer.dueAt);
+  const freeUntil = moment(offer.freeCancellationUntil);
 
   return (
     <fieldset className="space-y-2" disabled={disabled} data-testid="rnpl-option">

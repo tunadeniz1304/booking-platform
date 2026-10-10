@@ -15,7 +15,10 @@
     "connectHuman": "İnsana bağlan",
     "humanMessage": "Bir insan temsilciyle görüşmek istiyorum.",
     "humanHint": "AI yanıtı yetmezse konuyu doğrudan insan destek ekibine aktarabilirsiniz.",
-    "humanPending": "Talebiniz insan destek ekibine iletildi; bir temsilci size dönecek."
+    "humanPending": "Talebiniz insan destek ekibine iletildi; bir temsilci size dönecek.",
+    "bookingLabel": "Hangi rezervasyon hakkında?",
+    "bookingNone": "Seçilmedi (en yakın rezervasyonunuz kullanılır)",
+    "context": "Rezervasyon: {booking}"
   },
   "admin": {
     "link": "Destek kuyruğu",
@@ -42,6 +45,8 @@
       "MONEY_REQUEST": "Para/iade talebi",
       "LEGAL_OR_COMPLAINT": "Hukuki/şikâyet",
       "USER_REQUEST": "Kullanıcı insan istedi"
-    }
+    },
+    "ticketId": "Talep no: {id}",
+    "user": "Kullanıcı: {id}"
   }
 }

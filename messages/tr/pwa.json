@@ -34,7 +34,10 @@
     "disabledServer": "Anlık bildirimler bu sunucuda yapılandırılmamış (VAPID anahtarları yok); e-posta bildirimleri çalışmaya devam eder.",
     "unsupported": "Tarayıcınız anlık bildirimleri desteklemiyor.",
     "denied": "Bildirim izni reddedildi. Tarayıcı ayarlarından izin verebilirsiniz.",
-    "error": "Bildirim ayarı değiştirilemedi."
+    "error": "Bildirim ayarı değiştirilemedi.",
+    "dismissed": "Bildirim izni verilmedi. İsterseniz yeniden deneyebilirsiniz.",
+    "disabledDone": "Bu cihazda bildirimler kapatıldı.",
+    "deniedHelp": "İzni açmak için adres çubuğundaki kilit simgesine dokunun, Bildirimler ayarını \"İzin ver\" yapın ve sayfayı yenileyin."
   },
   "offline": {
     "title": "Çevrimdışısınız",

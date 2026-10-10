@@ -78,6 +78,18 @@ export async function reauthWithPasskey() {
   });
 }
 
+/**
+ * WebAuthn hatasını dil bağımsız koda eşler (F54): arayüz bunu `t()` ile yerelleştirir
+ * (ör. PasskeyManager'daki `passkeys.cancelled`). Tanınmayan hatada null.
+ */
+export function passkeyErrorCode(err: unknown): "CANCELLED" | "ALREADY_REGISTERED" | null {
+  if (err instanceof Error) {
+    if (err.name === "NotAllowedError") return "CANCELLED";
+    if (err.name === "InvalidStateError") return "ALREADY_REGISTERED";
+  }
+  return null;
+}
+
 /** WebAuthn iptal/zaman aşımı hatalarını kullanıcı diline çevirir. */
 export function passkeyErrorMessage(err: unknown, fallback: string): string {
   if (err instanceof Error) {

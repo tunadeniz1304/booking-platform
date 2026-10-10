@@ -5,7 +5,7 @@
   "loading": "Yükleniyor…",
   "page": {
     "title": "Çözüm merkezi",
-    "intro": "İade ve hasar taleplerinizi izleyin, yanıtlayın ve kanıt ekleyin. Anlaşamazsanız talep yöneticiye aktarılır."
+    "intro": "Rezervasyon sayfasından açtığınız ya da size yöneltilen iade ve hasar taleplerini burada izleyin, yanıtlayın ve kanıt ekleyin. Anlaşamazsanız talep yöneticiye aktarılır."
   },
   "detailPage": {
     "title": "Talep ayrıntısı",
@@ -50,7 +50,12 @@
     "created": "Açılış: {date}",
     "yourRole": "Rolünüz: {role}",
     "bookingRef": "Rezervasyon {id}",
-    "open": "Ayrıntıyı aç"
+    "open": "Ayrıntıyı aç",
+    "emptyHow": "İade ya da hasar talebi, ilgili rezervasyonun sayfasından açılır. Misafirler talebi konaklama başladıktan sonra, çıkıştan itibaren {days} gün içinde açabilir.",
+    "goToTrips": "Rezervasyonlarıma git",
+    "respondCta": "Yanıtınız bekleniyor: {date} tarihine kadar yanıt verin. Süre dolarsa talep, yanıtınız olmadan yöneticiye aktarılır.",
+    "awaitingOther": "Karşı tarafın {date} tarihine kadar yanıt vermesi bekleniyor. Yanıt gelmezse talep yöneticiye aktarılır.",
+    "respondNow": "Şimdi yanıtla"
   },
   "deposit": {
     "title": "Hasar depozitosu",
@@ -82,18 +87,23 @@
   "open": {
     "titleGuest": "İade talebi aç",
     "titleHost": "Hasar talebi aç",
-    "infoGuest": "Konaklamanızla ilgili bir sorun yaşadıysanız iade talep edin. Ev sahibinin yanıt vermesi için süre tanınır; yanıt gelmezse talep yöneticiye aktarılır.",
+    "infoGuest": "Konaklamanızla ilgili bir sorun yaşadıysanız iade talep edin. Talebi konaklama başladıktan sonra, çıkıştan itibaren {days} gün içinde açabilirsiniz. Ev sahibinin yanıt vermesi için süre tanınır; yanıt gelmezse talep yöneticiye aktarılır.",
     "infoHost": "Konaklama sırasında oluşan hasar için talep açın. Onaylanan tutar en fazla hasar depozitosu provizyonundan tahsil edilir.",
     "adminInfo": "Yöneticiler talep açamaz; talepleri yönetim panelinden inceleyebilirsiniz.",
     "amount": "Tutar ({currency})",
-    "amountHint": "Ana para birimi cinsinden, örneğin 250,00.",
+    "amountHint": "Ana para birimiyle yazın, örneğin 1.250 veya 1.250,50.",
     "description": "Açıklama",
     "descriptionHint": "Ne olduğunu anlatın (en az 10, en fazla 4000 karakter). Kanıtları talep açıldıktan sonra ekleyebilirsiniz.",
     "submit": "Talebi gönder",
     "submitting": "Gönderiliyor…",
-    "created": "Talebiniz açıldı.",
+    "created": "{amount} tutarındaki talebiniz açıldı.",
     "viewCreated": "Talebi görüntüle ve kanıt ekle",
-    "invalidAmount": "Geçerli, sıfırdan büyük bir tutar girin."
+    "invalidAmount": "Tutarı sıfırdan büyük olacak şekilde 1.250 veya 1.250,50 biçiminde yazın.",
+    "amountPreview": "Talep edilecek tutar: {amount}",
+    "descriptionTooShort": "Açıklama en az {min} karakter olmalı (baştaki ve sondaki boşluklar sayılmaz).",
+    "descriptionCount": "{count}/{max} karakter",
+    "alreadyOpen": "Bu rezervasyon için zaten açık bir talebiniz var. Yeni talep açmak yerine onu takip edebilirsiniz.",
+    "viewOpen": "Açık talebi görüntüle"
   },
   "detail": {
     "requested": "Talep edilen",
@@ -111,7 +121,8 @@
     "externalReason": "Gerekçe: {reason}",
     "withdraw": "Talebi geri çek",
     "withdrawConfirm": "Talebi geri çekmek istediğinize emin misiniz? Bu işlem geri alınamaz.",
-    "withdrawn": "Talep geri çekildi."
+    "withdrawn": "Talep geri çekildi.",
+    "withdrawConfirmTitle": "Talep geri çekilsin mi?"
   },
   "outcome": {
     "title": "Karar",
@@ -142,7 +153,14 @@
     "privacy": "Gizliliğiniz için yüklenen dosyalardaki konum (GPS), EXIF ve diğer tüm meta veriler sunucuda silinir.",
     "imageAlt": "Kanıt fotoğrafı: {role}, {date}",
     "pdf": "PDF belgesi ({size} KB)",
-    "by": "{role} · {date}"
+    "by": "{role} · {date}",
+    "limits": "JPEG, PNG, WebP, AVIF veya GIF fotoğraf (en fazla {imageMb} MB) ya da PDF (en fazla {pdfMb} MB). Talep başına en fazla {maxFiles} dosya; şu ana kadar {used} dosya yüklendi.",
+    "visibility": "Yüklediğiniz dosyaları karşı taraf ve yönetici görür. Yüklenen dosya sonradan kaldırılamaz.",
+    "selected": "Seçilen dosya: {name} ({size} KB)",
+    "confirmUpload": "Kanıtı yükle",
+    "cancel": "Vazgeç",
+    "tooLarge": "Dosya {size} MB; bu türde en fazla {max} MB yükleyebilirsiniz.",
+    "badType": "Bu dosya türü desteklenmiyor. Fotoğraf (JPEG, PNG, WebP, AVIF, GIF) ya da PDF seçin."
   },
   "decision": {
     "title": "Karar ver",
@@ -151,7 +169,7 @@
     "PARTIAL": "Kısmi onay",
     "REJECT": "Reddet",
     "amount": "Kısmi tutar ({currency})",
-    "amountHint": "Talep edilen tutardan ({amount}) küçük olmalı.",
+    "amountHint": "Talep edilen tutardan ({amount}) küçük olmalı. Örnek: 1.250 ya da 1.250,50",
     "note": "Karar notu",
     "noteHint": "3–4000 karakter; taraflara gösterilir.",
     "submit": "Kararı kaydet",
@@ -161,7 +179,21 @@
     "pspManaged": "Ters ibrazlar ödeme sağlayıcısı üzerinden yürütülür; buradan karar verilemez.",
     "closed": "Bu talep sonuçlandı; yeni karar verilemez.",
     "explainRefund": "İade talebi onaylanırsa misafire iade yapılır: tutar henüz emanetteyse emanetten, ev sahibine aktarıldıysa ev sahibinin rezervinden / bakiyesinden karşılanır; yetmeyen kısmı platform üstlenir.",
-    "explainDamage": "Hasar talebi onaylanırsa en fazla hasar depozitosu provizyonu kadar tahsil edilir; bunu aşan kısım yalnızca \"tahsil edilemeyen\" olarak kaydedilir."
+    "explainDamage": "Hasar talebi onaylanırsa en fazla hasar depozitosu provizyonu kadar tahsil edilir; bunu aşan kısım yalnızca \"tahsil edilemeyen\" olarak kaydedilir.",
+    "chooseFirst": "Önce bir karar seçin.",
+    "confirm": {
+      "title": {
+        "APPROVE": "Talep tam olarak onaylansın mı?",
+        "PARTIAL": "Talebe kısmi onay verilsin mi?",
+        "REJECT": "Talep reddedilsin mi?"
+      },
+      "refund": "Misafire {amount} iade edilecek. Tutar emanetteyse emanetten, değilse ev sahibinin bakiyesinden karşılanır.",
+      "damage": "Ev sahibi adına misafirden en fazla {amount} tahsil edilecek (hasar depozitosu kadar).",
+      "reject": "Talep reddedilecek; kimseye ödeme yapılmayacak.",
+      "final": "Bu karar geri alınamaz. Notunuz taraflara gösterilir.",
+      "confirmAmount": "{amount} için kararı onayla",
+      "confirmReject": "Talebi reddet"
+    }
   },
   "errors": {
     "CLAIM_TOO_EARLY": "Bu talep türü henüz açılamaz (konaklama başlamadan / bitmeden önce).",
@@ -178,7 +210,12 @@
     "CLAIM_NO_PAYMENT": "Bu rezervasyon için tahsil edilmiş bir ödeme bulunamadı.",
     "CLAIM_REFUND_FAILED": "İade işlemi başarısız oldu; lütfen daha sonra tekrar deneyin.",
     "PAYMENT_IN_PROGRESS": "Rezervasyonda başka bir ödeme işlemi sürüyor; biraz sonra tekrar deneyin.",
-    "EMAIL_NOT_VERIFIED": "Bu işlem için önce e-posta adresinizi doğrulamanız gerekir."
+    "EMAIL_NOT_VERIFIED": "Bu işlem için önce e-posta adresinizi doğrulamanız gerekir.",
+    "CLAIM_AMOUNT_EXCEEDS_REFUNDABLE_NOAMOUNT": "Tutar iade edilebilir üst sınırı aşıyor. Daha küçük bir tutar deneyin.",
+    "NOT_FOUND": "Talep bulunamadı ya da bu talebe erişiminiz yok.",
+    "VALIDATION_ERROR": "Girdiğiniz bilgiler kabul edilmedi. Alanları kontrol edip tekrar deneyin.",
+    "PAYLOAD_TOO_LARGE": "Dosya çok büyük. Fotoğraflar en fazla {imageMb} MB, PDF'ler en fazla {pdfMb} MB olabilir.",
+    "unknown": "İşlem tamamlanamadı. Lütfen biraz sonra tekrar deneyin."
   },
   "host": {
     "title": "Hasar depozitosu",
@@ -195,6 +232,15 @@
     "saved": "Depozito kaydedildi.",
     "removed": "Depozito kaldırıldı.",
     "tooHigh": "Tutar üst sınırı aşıyor (en fazla {amount}).",
-    "invalidAmount": "Geçerli, sıfırdan büyük bir tutar girin."
+    "invalidAmount": "Geçerli, sıfırdan büyük bir tutar girin.",
+    "formatHint": "Örnek: 1500 veya 1.500,50",
+    "preview": "Kaydedilecek tutar: {amount}",
+    "invalidAmountFormat": "Tutarı anlayamadık. Sıfırdan büyük bir tutar girin; örnek: 1500 veya 1.500,50.",
+    "savedAmount": "{scope} depozitosu {amount} olarak kaydedildi.",
+    "removedAmount": "{scope} depozitosu ({amount}) kaldırıldı.",
+    "removeLabel": "{scope} depozitosunu kaldır",
+    "removeConfirmTitle": "{scope} depozitosu kaldırılsın mı?",
+    "removeConfirmBody": "{scope} için {amount} tutarındaki depozito kaldırılacak. Bundan sonraki rezervasyonlarda misafirin kartında hasar için tutar ayrılmaz.",
+    "removeConfirm": "Depozitoyu kaldır"
   }
 }

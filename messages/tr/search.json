@@ -24,7 +24,19 @@
     "minPlaceholder": "Min",
     "maxPlaceholder": "Max",
     "type": "Konaklama Türü",
-    "sort": "Sıralama"
+    "sort": "Sıralama",
+    "priceTotal": "Toplam fiyat",
+    "pricePerNight": "Gecelik fiyat",
+    "suffixTotal": "Konaklamanın vergi ve ücretler dahil toplamı",
+    "suffixNight": "Gece başına fiyat",
+    "minLabel": "En az",
+    "maxLabel": "En çok",
+    "priceHint": "{unit}. Örnek: 1.250 ya da 1.250,50",
+    "priceInvalid": "Geçerli bir tutar girin (ör. 1.250).",
+    "priceOrder": "En az tutar, en çok tutardan büyük olamaz.",
+    "anyType": "Tümü",
+    "toggle": "Filtre ve sıralama ({count} etkin)",
+    "clearAll": "Tüm filtreleri temizle"
   },
   "sort": {
     "recommended": "Önerilen",
@@ -33,7 +45,7 @@
     "rating": "Puan (önce en yüksek)"
   },
   "loading": "Yükleniyor...",
-  "resultCount": "{shown} sonuç gösteriliyor ({total} bulundu)",
+  "resultCount": "{total} konaklamadan {shown} tanesi gösteriliyor",
   "cached": "Önbellekten",
   "view": "Görünüm",
   "list": "Liste",
@@ -41,7 +53,7 @@
   "mapFailed": "Harita yüklenemedi (ör. çevrimdışı); liste görünümü gösteriliyor.",
   "noLocation": "Sonuçlar için konum bilgisi yok; liste görünümü gösteriliyor.",
   "noResults": "Sonuç bulunamadı",
-  "noResultsHint": "Filtreleri değiştirmeyi deneyin.",
+  "noResultsHint": "Varış yerini, tarihleri ya da misafir sayısını değiştirmeyi deneyin.",
   "mapResults": "Haritadaki sonuçlar",
   "bar": {
     "destination": "Nereye?",
@@ -57,24 +69,50 @@
     "rooms": "Odalar",
     "decrease": "Azalt",
     "increase": "Artır",
-    "submit": "Ara"
+    "submit": "Ara",
+    "datesDialog": "Giriş ve çıkış tarihleri",
+    "roomsHint": "Her odada en az bir yetişkin kalmalı",
+    "decreaseAdults": "Yetişkin sayısını azalt",
+    "increaseAdults": "Yetişkin sayısını artır",
+    "decreaseChildren": "Çocuk sayısını azalt",
+    "increaseChildren": "Çocuk sayısını artır",
+    "decreaseRooms": "Oda sayısını azalt",
+    "increaseRooms": "Oda sayısını artır",
+    "countStatus": "{label}: {count}",
+    "done": "Tamam"
   },
   "picker": {
     "prevMonth": "Önceki ay",
-    "nextMonth": "Sonraki ay"
+    "nextMonth": "Sonraki ay",
+    "dialogLabel": "Giriş ve çıkış tarihlerini seçin",
+    "checkIn": "giriş tarihi",
+    "checkOut": "çıkış tarihi",
+    "inRange": "konaklama süresinde",
+    "hintCheckIn": "Giriş tarihi için bir gün seçin. Günler arasında ok tuşlarıyla gezinebilirsiniz.",
+    "hintCheckOut": "Giriş: {date}. Şimdi çıkış tarihini seçin.",
+    "hintDone": "Seçilen tarihler: giriş {checkIn}, çıkış {checkOut}."
   },
   "autocomplete": {
     "placeholder": "Şehir, otel veya bölge",
     "popular": "Popüler destinasyonlar",
     "searching": "Aranıyor...",
     "suggestions": "Öneriler",
-    "noResults": "Sonuç bulunamadı"
+    "noResults": "Sonuç bulunamadı",
+    "count": "{count} öneri"
   },
   "mapView": {
     "initFailed": "harita başlatılamadı",
     "error": "harita hatası",
     "fallback": "Harita yüklenemedi; liste görünümü kullanılıyor.",
-    "cluster": "{count} konaklama; yakınlaştırmak için tıklayın"
+    "cluster": "{count} konaklama; yakınlaştırmak için tıklayın",
+    "title": "Sonuç haritası",
+    "zoomIn": "Yakınlaştır",
+    "zoomOut": "Uzaklaştır",
+    "resetBearing": "Haritayı döndürmek için sürükleyin, kuzeye çevirmek için tıklayın",
+    "closePopup": "Ayrıntıyı kapat",
+    "toggleAttribution": "Harita kaynak bilgisini göster veya gizle",
+    "mapFeedback": "Harita hakkında geri bildirim",
+    "marker": "Harita işaretçisi"
   },
   "smart": {
     "label": "Akıllı filtre — ne aradığınızı yazın",
@@ -110,7 +148,13 @@
     "taxesOnDates": "tarih seçince vergi ve ücretler eklenir",
     "seeDeal": "Fırsatı Gör",
     "addFavorite": "Favorilere ekle",
-    "removeFavorite": "Favorilerden çıkar"
+    "removeFavorite": "Favorilerden çıkar",
+    "favoriteAdded": "Favorilere eklendi",
+    "favoriteRemoved": "Favorilerden çıkarıldı",
+    "favoriteAddFailed": "Favorilere eklenemedi, lütfen tekrar deneyin.",
+    "favoriteRemoveFailed": "Favorilerden çıkarılamadı, lütfen tekrar deneyin.",
+    "ratingLabel": "Misafir puanı: {value}",
+    "noRating": "Henüz puan yok"
   },
   "visual": {
     "showSimilar": "Benzerlerini göster",
@@ -131,6 +175,29 @@
     "suggestion": "{dates} tarihlerinde {savings} daha ucuz",
     "total": "Toplam {total}",
     "view": "Bu tarihleri gör",
-    "needsDates": "Esnek tarih için önce giriş ve çıkış tarihi seçin."
+    "needsDates": "Esnek tarih için önce giriş ve çıkış tarihi seçin.",
+    "pickDates": "Tarih seç"
+  },
+  "noResultsDestination": "“{destination}” için konaklama bulunamadı",
+  "noResultsDestinationHint": "Yazımı kontrol edin ya da başka bir şehir deneyin.",
+  "noResultsFiltersHint": "Seçtiğiniz filtrelere uyan konaklama yok. Filtreleri gevşetin ya da temizleyin.",
+  "allStays": "Tüm konaklama yerlerini gör",
+  "skipToResults": "Sonuçlara geç",
+  "loadMore": "Daha fazla göster ({remaining} konaklama kaldı)",
+  "guestCountDefault": "{count} misafir (varsayılan)",
+  "mapPrice": {
+    "total": "{price} toplam",
+    "perNight": "{price} / gece"
+  },
+  "edit": {
+    "toggle": "Aramayı düzenle",
+    "destination": "Nereye?",
+    "checkIn": "Giriş tarihi",
+    "checkOut": "Çıkış tarihi",
+    "guests": "Misafir sayısı",
+    "submit": "Aramayı güncelle",
+    "datesBoth": "Giriş ve çıkış tarihini birlikte seçin.",
+    "datesOrder": "Çıkış tarihi giriş tarihinden sonra olmalı.",
+    "guestsInvalid": "Misafir sayısı 1 ile 30 arasında olmalı."
   }
 }

@@ -6,6 +6,9 @@ import { formatMoney, money } from "@/lib/money/money";
 import { convert } from "@/lib/money/fx";
 import type { QuoteView } from "./useQuote";
 
+/** Arayüz dilinde adı bilinen vergi/ücret kodları; bilinmeyen kodda sunucu etiketi kullanılır. */
+const KNOWN_CHARGE_CODES = new Set(["VAT", "ACCOMMODATION_TAX", "SERVICE_FEE"]);
+
 /**
  * Şeffaf, vergi dahil ("all-in") fiyat kırılımı. Tüm tutarlar sunucudaki teklifin
  * birebir kopyasıdır; burada hesaplama yapılmaz.
@@ -29,6 +32,8 @@ export default function QuoteBreakdown({ quote }: { quote: QuoteView }) {
   const reference = quote.lowestPrice30dMinor ?? null;
   const omnibusDays = quote.omnibusDays ?? 30;
   const strike = discounted && reference !== null && reference > quote.total;
+  const chargeLabel = (x: { code: string; label: string }) =>
+    KNOWN_CHARGE_CODES.has(x.code) ? t(`taxKind.${x.code}`) : x.label;
   const uniform = quote.nights.every((x) => x.amount === quote.nights[0].amount);
   return (
     <div className="space-y-2 text-sm">
@@ -57,7 +62,7 @@ export default function QuoteBreakdown({ quote }: { quote: QuoteView }) {
         ))}
         {quote.fees.map((f) => (
           <div key={f.code} className="flex justify-between text-gray-600">
-            <dt>{f.label}</dt>
+            <dt>{chargeLabel(f)}</dt>
             <dd>{fmt(f.amount, quote.currency)}</dd>
           </div>
         ))}
@@ -66,7 +71,7 @@ export default function QuoteBreakdown({ quote }: { quote: QuoteView }) {
           .map((x) => (
             <div key={x.code} className="flex justify-between text-gray-600">
               <dt>
-                {x.label}
+                {chargeLabel(x)}
                 {rate(x.rateBps)}
               </dt>
               <dd>{fmt(x.amount, quote.currency)}</dd>
@@ -103,7 +108,7 @@ export default function QuoteBreakdown({ quote }: { quote: QuoteView }) {
         .map((x) => (
           <p key={x.code} className="text-xs text-gray-500" data-testid="quote-included-tax">
             {t("includedTax", {
-              label: x.label,
+              label: chargeLabel(x),
               rate: rate(x.rateBps),
               amount: fmt(x.amount, quote.currency),
             })}

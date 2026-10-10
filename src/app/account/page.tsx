@@ -1,12 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
-import { logout } from "@/lib/api-client";
+import { ApiError, apiFetch, logout } from "@/lib/api-client";
+import { Button, PageShell, Status, focusRing, loginHref, useErrorText } from "@/components/ui/ui";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import PasskeyManager from "@/components/account/PasskeyManager";
 import IdentityVerification from "@/components/account/IdentityVerification";
 import AgentMandates from "@/components/account/AgentMandates";
@@ -56,98 +58,171 @@ interface Favorite {
   property: Property;
 }
 
+/** Kart içi eylem sonucu (iptal/favori): sayfayı hata ekranına çevirmeden ilgili kartta gösterilir. */
+interface ActionNotice {
+  key: string;
+  kind: "error" | "info";
+  text: string;
+}
+
+const secondaryLinkClass = `inline-flex min-h-[44px] items-center rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 sm:min-h-0 ${focusRing}`;
+const primaryLinkClass = `inline-flex min-h-[44px] items-center rounded-md bg-[#003580] px-4 py-2 text-sm font-semibold text-white hover:bg-[#002b66] sm:min-h-0 ${focusRing}`;
+
 export default function AccountPage() {
   const t = useTranslations("account");
+  const tCommon = useTranslations("common");
   const tPwa = useTranslations("pwa.trips");
   const tRes = useTranslations("resolution");
   const fmt = useFormat();
   const router = useRouter();
+  const errorText = useErrorText();
+  const { confirm, confirmDialog } = useConfirm();
   const [user, setUser] = useState<User | null>(null);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [favorites, setFavorites] = useState<Favorite[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sessionExpired, setSessionExpired] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [notice, setNotice] = useState<ActionNotice | null>(null);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [favoritingId, setFavoritingId] = useState<string | null>(null);
 
-  const fetchFavorites = useCallback(async () => {
-    const res = await fetch("/api/favorites");
-    if (!res.ok) throw new Error(t("errors.favoritesLoad"));
-    return res.json() as Promise<Favorite[]>;
-  }, [t]);
-
   useEffect(() => {
+    let active = true;
     async function loadData() {
       try {
-        const [userRes, bookingsRes] = await Promise.all([
-          fetch("/api/user/me"),
-          fetch("/api/bookings"),
+        // apiFetch: süresi dolan erişim belirtecinde bir kez yenileyip yeniden dener.
+        const [userData, bookingsData, favoritesData] = await Promise.all([
+          apiFetch<User>("/api/user/me"),
+          apiFetch<Booking[]>("/api/bookings"),
+          apiFetch<Favorite[]>("/api/favorites"),
         ]);
-
-        if (!userRes.ok || !bookingsRes.ok) {
-          throw new Error(t("errors.userLoad"));
-        }
-
-        const [userData, bookingsData] = await Promise.all([
-          userRes.json() as Promise<User>,
-          bookingsRes.json() as Promise<Booking[]>,
-        ]);
-
-        const favoritesData = await fetchFavorites();
-
+        if (!active) return;
         setUser(userData);
         setBookings(bookingsData);
         setFavorites(favoritesData);
+        setError(null);
+        setSessionExpired(false);
       } catch (err) {
-        setError(err instanceof Error ? err.message : t("errors.generic"));
+        if (!active) return;
+        if (err instanceof ApiError && err.status === 401) {
+          setSessionExpired(true);
+        } else {
+          setError(err instanceof ApiError ? errorText(err) : t("errors.userLoad"));
+        }
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     }
 
     loadData();
-  }, [fetchFavorites, t]);
+    return () => {
+      active = false;
+    };
+  }, [errorText, t, reloadKey]);
 
-  const toggleFavorite = async (propertyId: string) => {
+  const retry = () => {
+    setLoading(true);
+    setError(null);
+    setReloadKey((k) => k + 1);
+  };
+
+  const toggleFavorite = async (propertyId: string, noticeKey: string) => {
     setFavoritingId(propertyId);
+    setNotice(null);
+    const isFavorite = favorites.some((f) => f.propertyId === propertyId);
     try {
-      const isFavorite = favorites.some((f) => f.propertyId === propertyId);
-
       if (isFavorite) {
-        const res = await fetch(`/api/favorites?propertyId=${propertyId}`, {
+        await apiFetch(`/api/favorites?propertyId=${encodeURIComponent(propertyId)}`, {
           method: "DELETE",
         });
-        if (!res.ok) throw new Error(t("errors.favoriteRemove"));
         setFavorites((prev) => prev.filter((f) => f.propertyId !== propertyId));
       } else {
-        const res = await fetch("/api/favorites", {
+        const newFavorite = await apiFetch<Favorite>("/api/favorites", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ propertyId }),
         });
-        if (!res.ok) throw new Error(t("errors.favoriteAdd"));
-        const newFavorite = (await res.json()) as Favorite;
         setFavorites((prev) => [newFavorite, ...prev]);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("errors.favoriteFailed"));
+      setNotice({
+        key: noticeKey,
+        kind: "error",
+        text:
+          err instanceof ApiError
+            ? errorText(err)
+            : isFavorite
+              ? t("errors.favoriteRemove")
+              : t("errors.favoriteAdd"),
+      });
     } finally {
       setFavoritingId(null);
     }
   };
 
-  const cancelBooking = async (bookingId: string) => {
-    setCancellingId(bookingId);
+  const cancelBooking = async (booking: Booking) => {
+    const ok = await confirm({
+      title: t("bookings.cancelConfirm.title"),
+      body: (
+        <>
+          <p className="font-medium text-gray-900">{booking.property.title}</p>
+          <p>
+            {t("bookings.cancelConfirm.summary", {
+              checkIn: formatDate(booking.checkIn),
+              checkOut: formatDate(booking.checkOut),
+              total: formatPrice(booking.totalPriceMinor, booking.currency),
+            })}
+          </p>
+          <p className="mt-2">
+            {t.rich("bookings.cancelConfirm.refundNote", {
+              link: (chunks) => (
+                <Link
+                  href={`/booking/${booking.id}`}
+                  className={`font-medium text-blue-700 underline ${focusRing}`}
+                >
+                  {chunks}
+                </Link>
+              ),
+            })}
+          </p>
+        </>
+      ),
+      confirmLabel: t("bookings.cancelConfirm.confirm"),
+      cancelLabel: t("bookings.cancelConfirm.keep"),
+      tone: "danger",
+    });
+    if (!ok) return;
+
+    setCancellingId(booking.id);
+    setNotice(null);
     try {
-      const res = await fetch(`/api/bookings/${bookingId}`, {
-        method: "DELETE",
-      });
-      if (!res.ok) throw new Error(t("errors.cancelBooking"));
+      const res = await apiFetch<{
+        refund?: { refundMinor: number; currency: string; refundPercent: number };
+      }>(`/api/bookings/${booking.id}`, { method: "DELETE" });
       setBookings((prev) =>
-        prev.map((b) => (b.id === bookingId ? { ...b, status: "CANCELLED" } : b))
+        prev.map((b) => (b.id === booking.id ? { ...b, status: "CANCELLED" } : b))
       );
+      const refund = res?.refund;
+      setNotice({
+        key: `booking-${booking.id}`,
+        kind: "info",
+        text:
+          refund && refund.refundMinor > 0
+            ? t("bookings.cancelDone.refunded", {
+                amount: formatPrice(refund.refundMinor, refund.currency),
+                percent: String(refund.refundPercent),
+              })
+            : refund
+              ? t("bookings.cancelDone.noRefund")
+              : t("bookings.cancelDone.plain"),
+      });
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("errors.cancelFailed"));
+      setNotice({
+        key: `booking-${booking.id}`,
+        kind: "error",
+        text: err instanceof ApiError ? errorText(err) : t("errors.cancelFailed"),
+      });
     } finally {
       setCancellingId(null);
     }
@@ -159,12 +234,14 @@ export default function AccountPage() {
 
   const getStatusLabel = (status: string) => {
     const labels: Record<string, string> = {
+      HELD: t("status.held"),
       PENDING: t("status.pending"),
       CONFIRMED: t("status.confirmed"),
       CANCELLED: t("status.cancelled"),
       COMPLETED: t("status.completed"),
+      EXPIRED: t("status.expired"),
     };
-    return labels[status] || status;
+    return labels[status] ?? t("status.unknown");
   };
 
   const getStatusColor = (status: string) => {
@@ -180,27 +257,67 @@ export default function AccountPage() {
     }
   };
 
+  // Kalıcı canlı bölge: içerik sonradan eklendiğinde ekran okuyucu duyurur.
+  const renderNotice = (key: string) => {
+    const current = notice?.key === key ? notice : null;
+    return (
+      <div aria-live="polite" className="text-sm">
+        {current?.kind === "error" && (
+          <p role="alert" className="mt-3 text-red-700">
+            {current.text}
+          </p>
+        )}
+        {current?.kind === "info" && <p className="mt-3 text-green-800">{current.text}</p>}
+      </div>
+    );
+  };
+
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary-600 border-t-transparent" />
-      </div>
+      <PageShell title={t("title")}>
+        <div className="flex items-center gap-3" role="status">
+          <div
+            aria-hidden="true"
+            className="h-8 w-8 animate-spin rounded-full border-4 border-primary-600 border-t-transparent"
+          />
+          <p className="text-sm text-gray-700">{tCommon("loading")}</p>
+        </div>
+      </PageShell>
+    );
+  }
+
+  if (sessionExpired) {
+    return (
+      <PageShell title={t("title")}>
+        <p className="text-sm text-gray-800">
+          {t.rich("errors.sessionExpired", {
+            link: (chunks) => (
+              <Link
+                href={loginHref("/account")}
+                className={`font-semibold text-[#003580] underline ${focusRing}`}
+              >
+                {chunks}
+              </Link>
+            ),
+          })}
+        </p>
+      </PageShell>
     );
   }
 
   if (error) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="rounded-lg bg-red-50 p-6 text-center">
-          <p className="text-red-600">{error}</p>
-          <button
-            onClick={() => window.location.reload()}
-            className="mt-4 rounded-md bg-primary-600 px-4 py-2 text-white hover:bg-primary-700"
-          >
+      <PageShell title={t("title")}>
+        <Status error={error} />
+        <div className="flex flex-wrap items-center gap-3">
+          <Button onClick={retry} className="min-h-[44px] sm:min-h-0">
             {t("retry")}
-          </button>
+          </Button>
+          <Link href="/" className={secondaryLinkClass}>
+            {t("backHome")}
+          </Link>
         </div>
-      </div>
+      </PageShell>
     );
   }
 
@@ -211,11 +328,12 @@ export default function AccountPage() {
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold text-gray-900">{t("title")}</h1>
           <button
+            type="button"
             onClick={async () => {
               await logout();
               router.push("/");
             }}
-            className="rounded-md border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+            className={`min-h-[44px] rounded-md border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 sm:min-h-0 ${focusRing}`}
           >
             {t("logout")}
           </button>
@@ -225,7 +343,10 @@ export default function AccountPage() {
         {user && (
           <div className="mt-6 rounded-2xl bg-white p-6 shadow-sm">
             <div className="flex items-center gap-4">
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary-600 text-2xl font-bold text-white">
+              <div
+                aria-hidden="true"
+                className="flex h-16 w-16 items-center justify-center rounded-full bg-primary-600 text-2xl font-bold text-white"
+              >
                 {user.firstName.charAt(0)}
                 {user.lastName.charAt(0)}
               </div>
@@ -246,14 +367,6 @@ export default function AccountPage() {
           </div>
         )}
 
-        <WalletPanel />
-
-        <IdentityVerification role={user?.role} />
-
-        <PasskeyManager />
-
-        <AgentMandates />
-
         <p className="mt-4 text-sm">
           <Link href="/account/sessions" className="font-medium text-blue-700 hover:underline">
             {t("sessions.manageLink")}
@@ -268,10 +381,13 @@ export default function AccountPage() {
           </Link>
         </p>
 
+        {/* Sık kullanılan bölümler (rezervasyonlar, favoriler) gelişmiş panellerden önce gelir. */}
         <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-2">
           {/* Rezervasyonlar */}
-          <section>
-            <h2 className="text-2xl font-semibold text-gray-900">{t("bookings.title")}</h2>
+          <section aria-labelledby="account-bookings-title">
+            <h2 id="account-bookings-title" className="text-2xl font-semibold text-gray-900">
+              {t("bookings.title")}
+            </h2>
             <div className="mt-4 space-y-4">
               {bookings.length === 0 ? (
                 <div className="rounded-2xl bg-white p-8 text-center shadow-sm">
@@ -283,7 +399,12 @@ export default function AccountPage() {
                     <div className="flex items-start justify-between gap-4">
                       <div>
                         <h3 className="text-lg font-semibold text-gray-900">
-                          {booking.property.title}
+                          <Link
+                            href={`/booking/${booking.id}`}
+                            className={`hover:underline ${focusRing}`}
+                          >
+                            {booking.property.title}
+                          </Link>
                         </h3>
                         <p className="text-sm text-gray-500">
                           {booking.property.location.city}, {booking.property.location.country}
@@ -323,11 +444,23 @@ export default function AccountPage() {
                     </div>
 
                     <div className="mt-4 flex flex-wrap gap-3">
+                      {booking.status === "HELD" && (
+                        <Link href={`/booking/${booking.id}`} className={primaryLinkClass}>
+                          {t("bookings.completePayment")}
+                          <span className="sr-only">: {booking.property.title}</span>
+                        </Link>
+                      )}
+                      <Link href={`/booking/${booking.id}`} className={secondaryLinkClass}>
+                        {t("bookings.details")}
+                        <span className="sr-only">: {booking.property.title}</span>
+                      </Link>
                       {(booking.status === "PENDING" || booking.status === "CONFIRMED") && (
                         <button
-                          onClick={() => cancelBooking(booking.id)}
+                          type="button"
+                          onClick={() => cancelBooking(booking)}
                           disabled={cancellingId === booking.id}
-                          className="rounded-md border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                          aria-busy={cancellingId === booking.id || undefined}
+                          className={`min-h-[44px] rounded-md border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-0 ${focusRing}`}
                         >
                           {cancellingId === booking.id
                             ? t("bookings.cancelling")
@@ -335,9 +468,12 @@ export default function AccountPage() {
                         </button>
                       )}
                       <button
-                        onClick={() => toggleFavorite(booking.propertyId)}
+                        type="button"
+                        onClick={() => toggleFavorite(booking.propertyId, `booking-${booking.id}`)}
                         disabled={favoritingId === booking.propertyId}
-                        className={`rounded-md border px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                        aria-busy={favoritingId === booking.propertyId || undefined}
+                        aria-pressed={favorites.some((f) => f.propertyId === booking.propertyId)}
+                        className={`min-h-[44px] rounded-md border px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-0 ${focusRing} ${
                           favorites.some((f) => f.propertyId === booking.propertyId)
                             ? "border-primary-600 bg-primary-50 text-primary-700 hover:bg-primary-100"
                             : "border-gray-300 text-gray-700 hover:bg-gray-50"
@@ -350,6 +486,7 @@ export default function AccountPage() {
                             : t("bookings.addFavorite")}
                       </button>
                     </div>
+                    {renderNotice(`booking-${booking.id}`)}
                   </div>
                 ))
               )}
@@ -357,8 +494,10 @@ export default function AccountPage() {
           </section>
 
           {/* Favoriler */}
-          <section>
-            <h2 className="text-2xl font-semibold text-gray-900">{t("favorites.title")}</h2>
+          <section aria-labelledby="account-favorites-title">
+            <h2 id="account-favorites-title" className="text-2xl font-semibold text-gray-900">
+              {t("favorites.title")}
+            </h2>
             <div className="mt-4 space-y-4">
               {favorites.length === 0 ? (
                 <div className="rounded-2xl bg-white p-8 text-center shadow-sm">
@@ -370,7 +509,12 @@ export default function AccountPage() {
                     <div className="flex items-start justify-between gap-4">
                       <div>
                         <h3 className="text-lg font-semibold text-gray-900">
-                          {favorite.property.title}
+                          <Link
+                            href={`/property/${favorite.propertyId}`}
+                            className={`hover:underline ${focusRing}`}
+                          >
+                            {favorite.property.title}
+                          </Link>
                         </h3>
                         <p className="text-sm text-gray-500">
                           {favorite.property.location.city}, {favorite.property.location.country}
@@ -395,23 +539,38 @@ export default function AccountPage() {
                         </p>
                       </div>
                       <button
-                        onClick={() => toggleFavorite(favorite.propertyId)}
+                        type="button"
+                        onClick={() =>
+                          toggleFavorite(favorite.propertyId, `favorite-${favorite.id}`)
+                        }
                         disabled={favoritingId === favorite.propertyId}
-                        className="shrink-0 rounded-md border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        aria-busy={favoritingId === favorite.propertyId || undefined}
+                        className={`min-h-[44px] shrink-0 rounded-md border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-0 ${focusRing}`}
                       >
                         {favoritingId === favorite.propertyId
                           ? t("favorites.removing")
                           : t("favorites.remove")}
+                        <span className="sr-only">: {favorite.property.title}</span>
                       </button>
                     </div>
+                    {renderNotice(`favorite-${favorite.id}`)}
                   </div>
                 ))
               )}
             </div>
           </section>
         </div>
+
+        <WalletPanel />
+
+        <IdentityVerification role={user?.role} />
+
+        <PasskeyManager />
+
+        <AgentMandates />
       </main>
       <Footer />
+      {confirmDialog}
     </div>
   );
 }

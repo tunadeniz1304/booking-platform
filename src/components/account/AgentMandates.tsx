@@ -1,20 +1,13 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { useTranslations } from "next-intl";
 import { apiFetch } from "@/lib/api-client";
 import { useFormat } from "@/i18n/use-format";
-import { toMinor } from "@/lib/money/money";
-import {
-  Button,
-  Card,
-  Field,
-  Status,
-  errorMessage,
-  inputClass,
-  useLoader,
-} from "@/components/ui/ui";
-import { ReauthCancelledError, useReauth } from "./ReauthDialog";
+import { parseAmountToMinor } from "@/lib/ui/amount-input";
+import { Button, Card, Field, Status, inputClass, useLoader } from "@/components/ui/ui";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { ReauthCancelledError, useAccountErrorText, useReauth } from "./ReauthDialog";
 
 /**
  * P2-1a / P1-11: yapay zekâ ajanına ödeme yetkisi (AP2 intent mandate) — tutar limiti, süre,
@@ -44,6 +37,8 @@ export default function AgentMandates() {
   const t = useTranslations("account.mandates");
   const f = useFormat();
   const reauth = useReauth();
+  const { confirm, confirmDialog } = useConfirm();
+  const errorText = useAccountErrorText();
   const list = useLoader(() =>
     apiFetch<{ mandates: MandateSummary[] }>("/api/account/agent-mandates").then((r) => r.mandates)
   );
@@ -51,14 +46,21 @@ export default function AgentMandates() {
   const [amountError, setAmountError] = useState<string | null>(null);
   const [issued, setIssued] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [revoking, setRevoking] = useState<string | null>(null);
+  const [amountText, setAmountText] = useState("");
+  const [currency, setCurrency] = useState<string>("TRY");
+  const amountInput = useRef<HTMLInputElement>(null);
+  // F188: TR/EN binlik ve ondalık ayırıcıları doğru çözülür ("1.500" = bin beş yüz).
+  const previewMinor = amountText.trim() ? parseAmountToMinor(amountText) : null;
 
   async function create(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (busy) return;
     const form = new FormData(e.currentTarget);
-    const currency = String(form.get("currency") ?? "TRY");
-    const amount = Number(String(form.get("amount") ?? "").replace(",", "."));
-    if (!Number.isFinite(amount) || amount <= 0) {
-      setAmountError(t("amountInvalid"));
+    const maxAmountMinor = parseAmountToMinor(String(form.get("amount") ?? ""));
+    if (maxAmountMinor === null || maxAmountMinor <= 0) {
+      setAmountError(maxAmountMinor === null ? t("amountFormat") : t("amountInvalid"));
+      amountInput.current?.focus();
       return;
     }
     setAmountError(null);
@@ -73,7 +75,7 @@ export default function AgentMandates() {
         apiFetch<{ mandate: string }>("/api/account/agent-mandates", {
           method: "POST",
           body: JSON.stringify({
-            maxAmountMinor: toMinor(amount, currency),
+            maxAmountMinor,
             currency,
             expiresInMinutes: Number(form.get("duration")),
             ...(propertyIds.length > 0 ? { propertyIds } : {}),
@@ -84,13 +86,27 @@ export default function AgentMandates() {
       setStatus({ message: t("created") });
       list.reload();
     } catch (err) {
-      if (!(err instanceof ReauthCancelledError)) setStatus({ error: errorMessage(err) });
+      if (!(err instanceof ReauthCancelledError))
+        setStatus({ error: errorText(err, t("createFailed")) });
     } finally {
       setBusy(false);
     }
   }
 
   async function revoke(m: MandateSummary) {
+    if (revoking) return;
+    // F189: iptal geri alınamaz — önce hangi yetkinin iptal edileceğini söyleyen onay.
+    const ok = await confirm({
+      title: t("revokeConfirmTitle"),
+      body: t("revokeConfirmBody", {
+        amount: f.money(m.maxAmountMinor, m.currency),
+        date: f.dateTime(m.expiresAt),
+      }),
+      confirmLabel: t("revokeConfirm"),
+      tone: "danger",
+    });
+    if (!ok) return;
+    setRevoking(m.nonce);
     setStatus({});
     try {
       await apiFetch(`/api/account/agent-mandates/${encodeURIComponent(m.nonce)}`, {
@@ -99,7 +115,9 @@ export default function AgentMandates() {
       setStatus({ message: t("revoked") });
       list.reload();
     } catch (err) {
-      setStatus({ error: errorMessage(err) });
+      setStatus({ error: errorText(err, t("revokeFailed")) });
+    } finally {
+      setRevoking(null);
     }
   }
 
@@ -114,20 +132,40 @@ export default function AgentMandates() {
       <Card title={t("title")} id="agent-mandates">
         <p className="mb-3 text-sm text-gray-700">{t("intro")}</p>
         <form onSubmit={create} className="grid gap-3 sm:grid-cols-3" noValidate>
-          <Field id="mandate-amount" label={t("amount")} error={amountError}>
-            <input
+          <div>
+            <Field
               id="mandate-amount"
-              name="amount"
-              type="number"
-              inputMode="decimal"
-              min="1"
-              step="0.01"
-              required
-              className={inputClass}
-            />
-          </Field>
+              label={t("amount")}
+              hint={t("amountHint")}
+              error={amountError}
+            >
+              <input
+                ref={amountInput}
+                id="mandate-amount"
+                name="amount"
+                type="text"
+                inputMode="decimal"
+                autoComplete="off"
+                required
+                value={amountText}
+                onChange={(e) => setAmountText(e.target.value)}
+                className={inputClass}
+              />
+            </Field>
+            <p aria-live="polite" className="mt-1 min-h-[1rem] text-xs text-gray-700">
+              {previewMinor !== null && previewMinor > 0
+                ? t("amountPreview", { amount: f.money(previewMinor, currency) })
+                : ""}
+            </p>
+          </div>
           <Field id="mandate-currency" label={t("currency")}>
-            <select id="mandate-currency" name="currency" defaultValue="TRY" className={inputClass}>
+            <select
+              id="mandate-currency"
+              name="currency"
+              value={currency}
+              onChange={(e) => setCurrency(e.target.value)}
+              className={inputClass}
+            >
               {CURRENCIES.map((c) => (
                 <option key={c} value={c}>
                   {c}
@@ -155,7 +193,7 @@ export default function AgentMandates() {
             </Field>
           </div>
           <div className="sm:col-span-3">
-            <Button type="submit" disabled={busy}>
+            <Button type="submit" busy={busy}>
               {busy ? t("creating") : t("create")}
             </Button>
           </div>
@@ -212,6 +250,8 @@ export default function AgentMandates() {
               {m.status === "active" && (
                 <Button
                   variant="danger"
+                  busy={revoking === m.nonce}
+                  className="min-h-[44px] sm:min-h-0"
                   onClick={() => void revoke(m)}
                   aria-label={t("revokeLabel", {
                     amount: f.money(m.maxAmountMinor, m.currency),
@@ -225,6 +265,7 @@ export default function AgentMandates() {
         </ul>
       </Card>
       {reauth.dialog}
+      {confirmDialog}
     </div>
   );
 }

@@ -39,8 +39,14 @@ function luhn(digits: string): boolean {
   return sum % 10 === 0;
 }
 
+/** Arayüzün `payment.errors.<code>` ile yerelleştirebileceği dil bağımsız hata kodu (F54). */
+export type CardValidationCode = "CARD_NUMBER_INVALID" | "CVC_INVALID" | "CARD_EXPIRED";
+
 export class CardValidationError extends Error {
-  constructor(message: string) {
+  constructor(
+    message: string,
+    readonly code?: CardValidationCode
+  ) {
     super(message);
     this.name = "CardValidationError";
   }
@@ -53,12 +59,12 @@ export function tokenizeCard(
 ): string {
   const digits = input.number.replace(/[\s-]/g, "");
   if (!/^\d{13,19}$/.test(digits) || !luhn(digits)) {
-    throw new CardValidationError("Kart numarası geçersiz");
+    throw new CardValidationError("Kart numarası geçersiz", "CARD_NUMBER_INVALID");
   }
-  if (!/^\d{3,4}$/.test(input.cvc)) throw new CardValidationError("CVC geçersiz");
+  if (!/^\d{3,4}$/.test(input.cvc)) throw new CardValidationError("CVC geçersiz", "CVC_INVALID");
   const expEnd = Date.UTC(input.expYear, input.expMonth, 1);
   if (!(input.expMonth >= 1 && input.expMonth <= 12) || expEnd <= now.getTime()) {
-    throw new CardValidationError("Kartın son kullanma tarihi geçmiş");
+    throw new CardValidationError("Kartın son kullanma tarihi geçmiş", "CARD_EXPIRED");
   }
   const scenario: MockCardScenario =
     digits === "4000000000000002" ? "decline" : digits.endsWith("3220") ? "3ds" : "ok";

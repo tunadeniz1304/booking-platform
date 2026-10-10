@@ -3,5 +3,7 @@
   "subtitle": "Search, compare and book stays using demo data",
   "popularDestinations": "Popular destinations",
   "featured": "Featured stays",
-  "empty": "No listings yet."
+  "empty": "No listings yet.",
+  "featuredError": "Featured stays couldn't be loaded right now. You can still use the search form above.",
+  "retry": "Try again"
 }

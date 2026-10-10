@@ -20,6 +20,7 @@ import {
   inputClass,
   useLoader,
 } from "@/components/ui/ui";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 /**
  * P2-1a / P1-13(e): ev sahibi erişilebilirlik beyanları — özellik ekle, kanıt fotoğrafı bağla,
@@ -78,19 +79,32 @@ export default function AccessibilityPanel({
   const [status, setStatus] = useState<{ error?: string; message?: string }>({});
   const [code, setCode] = useState<AccessibilityCodeValue>("STEP_FREE_ENTRANCE");
   const [widthError, setWidthError] = useState<string | null>(null);
+  // Satır içi kanıt seçimi yalnız yerel taslaktır; "Kanıtı kaydet" ile gönderilir (WCAG 3.2.2).
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [addEvidence, setAddEvidence] = useState("");
+  const [busy, setBusy] = useState<string | null>(null);
+  const { confirm, confirmDialog } = useConfirm();
 
   const photoOptions = photos.data ?? [];
   const photoLabel = (id: string) =>
     t("host.photoOption", { index: String(photoOptions.findIndex((p) => p.id === id) + 1) });
 
-  async function run(fn: () => Promise<unknown>, ok: string) {
+  const photoUrl = (id: string) => photoOptions.find((p) => p.id === id)?.url ?? null;
+
+  async function run(key: string, fn: () => Promise<unknown>, ok: string): Promise<boolean> {
+    if (busy) return false;
+    setBusy(key);
     setStatus({});
     try {
       await fn();
       setStatus({ message: ok });
       features.reload();
+      return true;
     } catch (err) {
       setStatus({ error: errorMessage(err) });
+      return false;
+    } finally {
+      setBusy(null);
     }
   }
 
@@ -107,23 +121,40 @@ export default function AccessibilityPanel({
     }
     setWidthError(null);
     const form = e.currentTarget;
-    void run(async () => {
-      await apiFetch(`/api/host/properties/${propertyId}/accessibility`, {
-        method: "POST",
-        body: JSON.stringify({
-          code,
-          roomTypeId: String(f.get("roomTypeId") ?? "") || null,
-          widthCm: code === WIDTH_CODE && width ? Number(width) : null,
-          note: String(f.get("note") ?? "").trim() || null,
-          evidencePhotoId: String(f.get("evidencePhotoId") ?? "") || null,
-        }),
-      });
-      form.reset();
-    }, t("host.added"));
+    void run(
+      "add",
+      async () => {
+        await apiFetch(`/api/host/properties/${propertyId}/accessibility`, {
+          method: "POST",
+          body: JSON.stringify({
+            code,
+            roomTypeId: String(f.get("roomTypeId") ?? "") || null,
+            widthCm: code === WIDTH_CODE && width ? Number(width) : null,
+            note: String(f.get("note") ?? "").trim() || null,
+            evidencePhotoId: String(f.get("evidencePhotoId") ?? "") || null,
+          }),
+        });
+        form.reset();
+        setAddEvidence("");
+      },
+      t("host.added")
+    );
   }
 
-  const setEvidence = (feature: Feature, photoId: string) =>
-    run(
+  async function saveEvidence(feature: Feature, photoId: string) {
+    const name = t(`codes.${feature.code}`);
+    if (
+      feature.verified &&
+      !(await confirm({
+        title: t("host.evidenceConfirmTitle", { name }),
+        body: t("host.evidenceVerifiedWarning"),
+        confirmLabel: t("host.saveEvidence"),
+        tone: "danger",
+      }))
+    )
+      return;
+    const ok = await run(
+      `evidence-${feature.id}`,
       () =>
         apiFetch(`/api/host/properties/${propertyId}/accessibility/${feature.id}`, {
           method: "PATCH",
@@ -131,15 +162,50 @@ export default function AccessibilityPanel({
         }),
       t("host.evidenceSaved")
     );
+    if (ok)
+      setDrafts((d) => {
+        const next = { ...d };
+        delete next[feature.id];
+        return next;
+      });
+  }
 
-  const remove = (feature: Feature) =>
-    run(
+  async function remove(feature: Feature) {
+    const name = t(`codes.${feature.code}`);
+    const scope = feature.roomTypeName
+      ? t("roomType", { name: feature.roomTypeName })
+      : t("wholeProperty");
+    if (
+      !(await confirm({
+        title: t("host.deleteConfirmTitle", { name, scope }),
+        body: feature.verified ? t("host.deleteConfirmVerified") : t("host.deleteConfirmBody"),
+        confirmLabel: t("host.deleteConfirm"),
+        tone: "danger",
+      }))
+    )
+      return;
+    await run(
+      `delete-${feature.id}`,
       () =>
         apiFetch(`/api/host/properties/${propertyId}/accessibility/${feature.id}`, {
           method: "DELETE",
         }),
       t("host.deleted")
     );
+  }
+
+  const evidencePreview = (id: string) => {
+    const url = id ? photoUrl(id) : null;
+    if (!url) return null;
+    return (
+      // eslint-disable-next-line @next/next/no-img-element -- kanıt önizlemesi, optimize edilmez
+      <img
+        src={url}
+        alt={t("host.evidencePreviewAlt", { photo: photoLabel(id) })}
+        className="h-16 w-24 rounded object-cover"
+      />
+    );
+  };
 
   if (properties.length === 0) return null;
 
@@ -164,91 +230,119 @@ export default function AccessibilityPanel({
       )}
 
       <Status error={features.error ?? photos.error} />
-      {features.data === null && !features.error && (
-        <p aria-live="polite" className="text-sm text-gray-600">
-          {t("host.loading")}
-        </p>
-      )}
+      <div role="status" aria-live="polite">
+        {features.data === null && !features.error && (
+          <p className="text-sm text-gray-600">{t("host.loading")}</p>
+        )}
+      </div>
       {features.data?.length === 0 && (
         <p className="mt-2 text-sm text-gray-700">{t("host.empty")}</p>
       )}
       {features.data && features.data.length > 0 && (
         <ul className="mt-3 divide-y divide-gray-200" aria-label={t("host.listLabel")}>
-          {features.data.map((feature) => (
-            <li key={feature.id} className="flex flex-wrap items-start gap-3 py-3 text-sm">
-              <div className="min-w-0 flex-1">
-                <p className="font-medium text-gray-900">
-                  {t(`codes.${feature.code}`)}
-                  {feature.widthCm !== null && (
-                    <span className="font-normal text-gray-700">
-                      {" "}
-                      · {t("width", { width: feature.widthCm })}
-                    </span>
-                  )}
-                </p>
-                <p className="text-gray-700">
-                  {feature.roomTypeName
-                    ? t("roomType", { name: feature.roomTypeName })
-                    : t("wholeProperty")}
-                </p>
-                <p
-                  className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${
-                    feature.verified
-                      ? "bg-green-100 text-green-900"
+          {features.data.map((feature) => {
+            const saved = feature.evidencePhotoId ?? "";
+            const draft = drafts[feature.id] ?? saved;
+            const dirty = draft !== saved;
+            const hintId = `a11y-evidence-${feature.id}-hint`;
+            return (
+              <li key={feature.id} className="flex flex-wrap items-start gap-3 py-3 text-sm">
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium text-gray-900">
+                    {t(`codes.${feature.code}`)}
+                    {feature.widthCm !== null && (
+                      <span className="font-normal text-gray-700">
+                        {" "}
+                        · {t("width", { width: feature.widthCm })}
+                      </span>
+                    )}
+                  </p>
+                  <p className="text-gray-700">
+                    {feature.roomTypeName
+                      ? t("roomType", { name: feature.roomTypeName })
+                      : t("wholeProperty")}
+                  </p>
+                  <p
+                    className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${
+                      feature.verified
+                        ? "bg-green-100 text-green-900"
+                        : feature.evidencePhotoId
+                          ? "bg-amber-100 text-amber-900"
+                          : "bg-gray-200 text-gray-900"
+                    }`}
+                  >
+                    {feature.verified
+                      ? t("verified")
                       : feature.evidencePhotoId
-                        ? "bg-amber-100 text-amber-900"
-                        : "bg-gray-200 text-gray-900"
-                  }`}
-                >
-                  {feature.verified
-                    ? t("verified")
-                    : feature.evidencePhotoId
-                      ? t("host.pendingReview")
-                      : t("host.needsEvidence")}
-                </p>
-              </div>
-              <div className="flex flex-wrap items-end gap-2">
-                <div>
-                  <label
-                    htmlFor={`a11y-evidence-${feature.id}`}
-                    className="block text-xs font-medium text-gray-800"
-                  >
-                    {t("evidence")}
-                  </label>
-                  <select
-                    id={`a11y-evidence-${feature.id}`}
-                    value={feature.evidencePhotoId ?? ""}
-                    onChange={(e) => void setEvidence(feature, e.target.value)}
-                    className={`${inputClass} min-h-[2.5rem]`}
-                  >
-                    <option value="">{t("host.noEvidence")}</option>
-                    {photoOptions.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {photoLabel(p.id)}
-                      </option>
-                    ))}
-                  </select>
+                        ? t("host.pendingReview")
+                        : t("host.needsEvidence")}
+                  </p>
                 </div>
-                {feature.evidencePhotoUrl && (
-                  <a
-                    href={feature.evidencePhotoUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className={`inline-flex min-h-[2.5rem] items-center text-sm font-semibold text-[#003580] underline ${focusRing}`}
+                <div className="flex flex-wrap items-end gap-2">
+                  <div>
+                    <label
+                      htmlFor={`a11y-evidence-${feature.id}`}
+                      className="block text-xs font-medium text-gray-800"
+                    >
+                      {t("evidence")}
+                    </label>
+                    <select
+                      id={`a11y-evidence-${feature.id}`}
+                      value={draft}
+                      aria-describedby={hintId}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setDrafts((d) => ({ ...d, [feature.id]: value }));
+                      }}
+                      className={`${inputClass} min-h-[44px]`}
+                    >
+                      <option value="">{t("host.noEvidence")}</option>
+                      {photoOptions.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {photoLabel(p.id)}
+                        </option>
+                      ))}
+                    </select>
+                    <p id={hintId} className="mt-1 max-w-[16rem] text-xs text-gray-600">
+                      {feature.verified
+                        ? t("host.evidenceVerifiedWarning")
+                        : t("host.evidenceHint")}
+                    </p>
+                  </div>
+                  {evidencePreview(draft)}
+                  <Button
+                    variant="secondary"
+                    className="min-h-[44px]"
+                    disabled={!dirty}
+                    busy={busy === `evidence-${feature.id}`}
+                    onClick={() => void saveEvidence(feature, draft)}
+                    aria-label={t("host.saveEvidenceLabel", { name: t(`codes.${feature.code}`) })}
                   >
-                    {t("host.viewEvidence")}
-                  </a>
-                )}
-                <Button
-                  variant="danger"
-                  onClick={() => void remove(feature)}
-                  aria-label={t("host.deleteLabel", { name: t(`codes.${feature.code}`) })}
-                >
-                  {t("host.delete")}
-                </Button>
-              </div>
-            </li>
-          ))}
+                    {t("host.saveEvidence")}
+                  </Button>
+                  {feature.evidencePhotoUrl && (
+                    <a
+                      href={feature.evidencePhotoUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className={`inline-flex min-h-[44px] items-center text-sm font-semibold text-[#003580] underline ${focusRing}`}
+                    >
+                      {t("host.viewEvidence")}
+                    </a>
+                  )}
+                  <Button
+                    variant="danger"
+                    className="min-h-[44px]"
+                    busy={busy === `delete-${feature.id}`}
+                    onClick={() => void remove(feature)}
+                    aria-label={t("host.deleteLabel", { name: t(`codes.${feature.code}`) })}
+                  >
+                    {t("host.delete")}
+                  </Button>
+                </div>
+              </li>
+            );
+          })}
         </ul>
       )}
 
@@ -299,7 +393,13 @@ export default function AccessibilityPanel({
           </Field>
         )}
         <Field id="a11y-evidence" label={t("evidence")} hint={t("host.evidenceHint")}>
-          <select id="a11y-evidence" name="evidencePhotoId" defaultValue="" className={inputClass}>
+          <select
+            id="a11y-evidence"
+            name="evidencePhotoId"
+            value={addEvidence}
+            onChange={(e) => setAddEvidence(e.target.value)}
+            className={inputClass}
+          >
             <option value="">{t("host.noEvidence")}</option>
             {photoOptions.map((p) => (
               <option key={p.id} value={p.id}>
@@ -308,18 +408,20 @@ export default function AccessibilityPanel({
             ))}
           </select>
         </Field>
+        {addEvidence && <div className="sm:col-span-2">{evidencePreview(addEvidence)}</div>}
         <div className="sm:col-span-2">
           <Field id="a11y-note" label={t("host.note")}>
             <textarea id="a11y-note" name="note" maxLength={500} rows={2} className={inputClass} />
           </Field>
         </div>
         <div className="sm:col-span-2">
-          <Button type="submit" disabled={!propertyId}>
+          <Button type="submit" disabled={!propertyId} busy={busy === "add"}>
             {t("host.add")}
           </Button>
         </div>
       </form>
       <Status error={status.error} message={status.message} />
+      {confirmDialog}
     </Card>
   );
 }

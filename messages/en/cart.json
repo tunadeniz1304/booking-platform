@@ -10,7 +10,7 @@
   "totalNotice": "Taxes included. All rooms are held together and confirmed with one payment; if one is unavailable, none are booked.",
   "proceed": "Proceed to payment",
   "cancelCart": "Empty cart",
-  "cancelConfirm": "Remove every item from the cart?",
+  "cancelConfirm": "Empty your cart?",
   "lockedNotice": "The cart is held for payment. Release the hold to make changes.",
   "release": "Release hold",
   "updateFailed": "Could not update the cart",
@@ -22,7 +22,9 @@
     "children": "Children",
     "quantity": "Rooms",
     "remove": "Remove",
-    "removeLabel": "Remove {name}"
+    "removeLabel": "Remove {name}",
+    "adultsRange": "Adults must be a whole number from {min} to {max}. The saved value ({saved}) was restored.",
+    "childrenRange": "Children must be a whole number from {min} to {max}. The saved value ({saved}) was restored."
   },
   "add": {
     "button": "Add to cart",
@@ -30,7 +32,8 @@
     "added": "Added to cart.",
     "goToCart": "Go to cart",
     "failed": "Could not add to cart",
-    "hint": "Book several rooms or properties with one payment."
+    "hint": "Book several rooms or properties with one payment.",
+    "loginHint": "You'll be asked to sign in to add to your cart; your selections are kept."
   },
   "checkout": {
     "title": "Group booking",
@@ -43,14 +46,25 @@
     "itemUnavailable": "One of the rooms is no longer available; no rooms were held.",
     "holdFailed": "Could not hold the rooms",
     "declined": "Payment declined; all holds were released. You can hold again and try another card.",
-    "expired": "The hold expired.",
-    "confirmPending": "Your payment was received; the booking confirmation will complete within a few seconds. Refresh your cart to see the status.",
+    "expired": "The hold expired and the rooms were released. You can restore the cart and hold the rooms again.",
+    "confirmPending": "Your payment was received; the booking confirmation is being completed.",
     "success": "Your bookings are confirmed!",
     "successHint": "A total of {amount} was charged in a single payment.",
     "viewBooking": "View booking",
     "trips": "My trips",
     "backToCart": "Back to cart",
-    "noCart": "There is no cart to pay."
+    "noCart": "There is no cart to pay.",
+    "remaining": "({minutes, plural, =0 {less than 1 minute left} one {# minute left} other {# minutes left}})",
+    "expiringSoon": "Less than 2 minutes are left on your hold. Complete the payment now.",
+    "expiredTitle": "The hold expired",
+    "expiredHint": "The rooms are no longer reserved for you. Hold them again to continue to payment.",
+    "reholdButton": "Hold the rooms again",
+    "rehold": "Press \"Hold rooms\" to hold the rooms again.",
+    "expiredNoCart": "The cart closed because the hold expired. You can restore the cart and hold the rooms again.",
+    "reopened": "The cart was restored. Hold the rooms to continue to payment.",
+    "pendingTitle": "Your payment was received",
+    "pendingWait": "The booking confirmation will complete within a few seconds. This page updates by itself; do not pay again.",
+    "pendingSlow": "Confirmation is taking longer than expected. Your payment was received; do not pay again. Your bookings will appear in My trips once confirmed and we will email you."
   },
   "split": {
     "title": "Split the payment with your group",
@@ -115,7 +129,78 @@
       "closed": "This split payment is no longer open.",
       "alreadyPaid": "This share has already been paid.",
       "deadlinePassed": "The payment deadline has passed.",
-      "declined": "Card declined; you can try again with another card."
+      "declined": "Card declined; you can try again with another card.",
+      "home": "Home",
+      "threeDsIntro": "Your bank wants you to approve this payment. Enter the verification code sent to your phone.",
+      "threeDsDemoHint": "Demo verification code: {code}",
+      "resendVerify": "Resend verification email",
+      "resendSending": "Sending…",
+      "resendSent": "We sent a verification link to your email address. Click the link in the email, then refresh this page.",
+      "alreadyVerified": "Your email address is already verified. Refresh the page and try again.",
+      "resendFailed": "We couldn't send the verification email. Please try again shortly.",
+      "refresh": "Refresh page",
+      "signedInAs": "You're currently signed in as {email}.",
+      "switchAccount": "Sign out and sign in with the invited account"
+    },
+    "modeLegend": "How should the amount be split?",
+    "amountHint": "e.g. 1,250.50",
+    "equalShare": "Share: {amount}",
+    "removeParticipantN": "Remove participant {n}",
+    "organizerPending": "Your share is calculated once every amount is valid.",
+    "overTotal": "The shares exceed the cart total ({total}) by {excess}. Lower the amounts.",
+    "beforeCreate": "Once the shares are created, participants must pay within a limited time; the deadline is shown in the next step. At the deadline, unpaid shares either fall to you or every payment is refunded and the rooms are released.",
+    "deadlineLeft": "({minutes, plural, =0 {less than 1 minute left} one {# minute left} other {# minutes left}})",
+    "copyLinkFor": "Copy link: {name}",
+    "sendEmailFor": "Send by email: {name}",
+    "inviteEmailLabel": "Invite email",
+    "errors": {
+      "amountRequired": "Enter an amount.",
+      "amountInvalid": "Enter a valid amount, e.g. 1,250.50",
+      "emailDuplicate": "This email is also used for another participant.",
+      "SPLIT_DUPLICATE_EMAIL": "The same email cannot be used for more than one participant.",
+      "SPLIT_AMOUNT_INVALID": "The share amounts are invalid. Each amount must be above zero and the total must not exceed the cart total.",
+      "SPLIT_SHARE_COUNT": "The number of participants is outside the allowed range.",
+      "SPLIT_EXISTS": "A split payment already exists for this cart. Refresh the page.",
+      "SPLIT_CLOSED": "This split payment is no longer open.",
+      "SPLIT_DEADLINE_PASSED": "The split payment deadline has passed.",
+      "SHARE_EMAIL_REQUIRED": "Enter an email address to send the invitation.",
+      "SHARE_NOT_INVITABLE": "An invitation can no longer be sent for this share.",
+      "CART_NOT_HELD": "The cart is no longer held for payment. Hold the rooms again.",
+      "CART_PAYMENT_IN_PROGRESS": "A payment for this cart is in progress. Try again in a few seconds.",
+      "VALIDATION_ERROR": "Some of the details are invalid. Check the fields."
     }
+  },
+  "cancelConfirmBody": "All rooms in the cart will be removed and the cart will be closed. This can't be undone.",
+  "cancelConfirmHeld": "The rooms are currently held for you. If you empty the cart, the hold is released and the cart is closed. If you started a group payment, participants' payments are cancelled and refunded. This can't be undone.",
+  "cancelKeep": "Keep my cart",
+  "announce": {
+    "updated": "Cart updated. New total: {total}",
+    "removed": "{name} was removed from the cart. New total: {total}",
+    "cleared": "Your cart was emptied.",
+    "released": "The room hold was released. You can now edit the cart.",
+    "reopened": "Your cart was restored."
+  },
+  "errors": {
+    "CART_LOCKED": "The cart is held for payment. To make changes, first press \"Release hold\".",
+    "CART_NOT_OPEN": "This cart can no longer be changed. Refresh the page to see its latest state.",
+    "CONCURRENT_UPDATE": "The cart was changed somewhere else at the same time. We loaded the latest version, please try again.",
+    "CONFLICT": "The cart was changed somewhere else at the same time. We loaded the latest version, please try again.",
+    "VALIDATION_ERROR": "Some of the details are invalid. Check the fields and try again.",
+    "NOT_FOUND": "This item is no longer in your cart. We loaded the latest version of your cart.",
+    "CART_NOT_HELD": "The cart is no longer held for payment. Hold the rooms again and retry.",
+    "CART_PAYMENT_IN_PROGRESS": "A payment for this cart is already in progress. Wait a few seconds and refresh the page.",
+    "CART_NOT_CONFIRMABLE": "The cart can no longer be confirmed. Go back to the cart and check its status.",
+    "FRAUD_BLOCKED": "This payment could not be made because of a security check. Try another card or contact support.",
+    "NO_PENDING_CHALLENGE": "There is no payment waiting for verification. Start the payment again.",
+    "CHALLENGE_FAILED": "The verification code is wrong. Check the code and try again."
+  },
+  "released": "Hold released; the rooms are no longer reserved for you.",
+  "releasedSplit": "The split payment was cancelled and the hold released. Payments already made will be cancelled or refunded.",
+  "releaseConfirm": {
+    "title": "Release the hold?",
+    "body": "The rooms will no longer be reserved for you and someone else may book them. To pay, you will need to hold them again.",
+    "splitTitle": "Cancel the split payment?",
+    "splitBody": "{count, plural, =0 {Nobody has paid their share yet.} one {# payment made so far ({funded}) will be cancelled or refunded.} other {# payments made so far ({funded}) will be cancelled or refunded.}} Invite links will stop working and the rooms will be released. This cannot be undone.",
+    "splitConfirm": "Cancel split and release rooms"
   }
 }

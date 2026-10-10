@@ -40,5 +40,11 @@
     "mostFlexible": "Most flexible"
   },
   "onlyHere": "Only here",
-  "commentary": "Commentary"
+  "commentary": "Commentary",
+  "fullHint": "{max}/{max} listings selected. Remove one to add another.",
+  "ready": "Ready to compare.",
+  "retry": "Try again",
+  "resetAndBack": "Clear selection and go back to search",
+  "errorHelp": "One of the listings you picked may no longer be available. Try again, or clear your selection and go back to search.",
+  "tableLabel": "Comparison table of the selected listings"
 }

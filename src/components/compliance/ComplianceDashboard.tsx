@@ -28,7 +28,7 @@ type PropertyPreview =
   | { state: "missing" };
 
 const input =
-  "mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-[#003580] focus:outline-none focus:ring-1 focus:ring-[#003580]";
+  "mt-1 w-full rounded-md border border-gray-500 px-3 py-2 text-sm focus:border-[#003580] focus:outline-none focus:ring-1 focus:ring-[#003580]";
 
 /** Kaldırılan öğeden sonra odağı listedeki komşu öğeye (yoksa kart başlığına) taşır. */
 function focusById(id: string) {

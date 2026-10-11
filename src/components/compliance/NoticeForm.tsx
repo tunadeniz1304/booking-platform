@@ -22,7 +22,7 @@ type FieldErrors = Partial<Record<FieldName, string>>;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const input =
-  "mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#003580] focus:outline-none focus:ring-1 focus:ring-[#003580]";
+  "mt-1 w-full rounded-lg border border-gray-500 px-3 py-2 text-sm focus:border-[#003580] focus:outline-none focus:ring-1 focus:ring-[#003580]";
 
 /** DSA md. 16 bildirim formu: içerik URL'si, kategori, gerekçe, ad/e-posta, iyi niyet beyanı. */
 export default function NoticeForm({ propertyId }: { propertyId?: string }) {

@@ -81,3 +81,25 @@ html {
     min-width: 1.5rem;
   }
 }
+
+/* Harita popup'ı (F209): kart yüzeyi ve sayfa metni temayı izler; ok ucu yöne göre aynı renk. */
+.results-popup .maplibregl-popup-content {
+  background-color: rgb(var(--bg-white, 255 255 255));
+  color: rgb(var(--page-fg, 17 24 39));
+}
+.results-popup.maplibregl-popup-anchor-top .maplibregl-popup-tip,
+.results-popup.maplibregl-popup-anchor-top-left .maplibregl-popup-tip,
+.results-popup.maplibregl-popup-anchor-top-right .maplibregl-popup-tip {
+  border-bottom-color: rgb(var(--bg-white, 255 255 255));
+}
+.results-popup.maplibregl-popup-anchor-bottom .maplibregl-popup-tip,
+.results-popup.maplibregl-popup-anchor-bottom-left .maplibregl-popup-tip,
+.results-popup.maplibregl-popup-anchor-bottom-right .maplibregl-popup-tip {
+  border-top-color: rgb(var(--bg-white, 255 255 255));
+}
+.results-popup.maplibregl-popup-anchor-left .maplibregl-popup-tip {
+  border-right-color: rgb(var(--bg-white, 255 255 255));
+}
+.results-popup.maplibregl-popup-anchor-right .maplibregl-popup-tip {
+  border-left-color: rgb(var(--bg-white, 255 255 255));
+}

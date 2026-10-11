@@ -23,9 +23,9 @@ const STATUS_TONE: Record<string, string> = {
   AUTHORIZED: "bg-blue-100 text-blue-800",
   CAPTURED: "bg-green-100 text-green-800",
   FAILED: "bg-red-100 text-red-700",
-  VOIDED: "bg-gray-100 text-gray-500",
-  REFUNDED: "bg-gray-100 text-gray-500",
-  EXPIRED: "bg-gray-100 text-gray-500",
+  VOIDED: "bg-gray-100 text-gray-700",
+  REFUNDED: "bg-gray-100 text-gray-700",
+  EXPIRED: "bg-gray-100 text-gray-700",
 };
 
 /** Sunucu hata kodları → `cart.split.errors.*` (sunucunun Türkçe iletisi gösterilmez). */

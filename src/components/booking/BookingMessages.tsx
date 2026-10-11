@@ -265,7 +265,7 @@ export default function BookingMessages({
             onChange={(e) => setText(e.target.value)}
             aria-invalid={error ? true : undefined}
             aria-describedby={error ? "msg-error" : undefined}
-            className="w-full rounded-lg border border-gray-300 p-2 text-sm"
+            className="w-full rounded-lg border border-gray-500 p-2 text-sm placeholder:text-gray-500"
             placeholder={t("placeholder")}
           />
           {fromDraft && <p className="text-xs text-amber-800">{t("aiDraftNotice")}</p>}

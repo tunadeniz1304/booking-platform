@@ -145,7 +145,7 @@ export default function PasskeyManager() {
             maxLength={60}
             onChange={(e) => setName(e.target.value)}
             placeholder={t("passkeys.namePlaceholder")}
-            className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            className="flex-1 rounded-lg border border-gray-500 px-3 py-2 text-sm"
           />
           <button
             type="submit"

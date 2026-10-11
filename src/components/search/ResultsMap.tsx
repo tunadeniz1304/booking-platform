@@ -278,6 +278,7 @@ export default function ResultsMap({
               longitude={selected.longitude}
               latitude={selected.latitude}
               anchor="top"
+              className="results-popup"
               onClose={closePopup}
               closeOnClick={false}
               closeButton

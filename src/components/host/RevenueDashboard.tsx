@@ -91,7 +91,7 @@ function PickupChart({ points }: { points: Overview["pickup"] }) {
           x2={CHART.width - CHART.pad}
           y1={CHART.pad + innerH}
           y2={CHART.pad + innerH}
-          stroke="#9ca3af"
+          className="stroke-gray-500"
         />
         {points.map((p, i) =>
           p.pickup > 0 ? (
@@ -101,24 +101,24 @@ function PickupChart({ points }: { points: Overview["pickup"] }) {
               y={y(p.pickup)}
               width={barW}
               height={CHART.pad + innerH - y(p.pickup)}
-              fill="#93c5fd"
+              className="fill-primary-500"
             >
               <title>{`${f.date(p.date, "short")}: +${p.pickup}`}</title>
             </rect>
           ) : null
         )}
-        <path d={line} fill="none" stroke="#003580" strokeWidth={2} />
-        <text x={CHART.pad} y={CHART.pad - 8} fontSize={11} fill="#374151">
+        <path d={line} fill="none" strokeWidth={2} className="stroke-brand" />
+        <text x={CHART.pad} y={CHART.pad - 8} fontSize={11} className="fill-gray-700">
           {max}
         </text>
-        <text x={CHART.pad} y={CHART.height - 6} fontSize={11} fill="#374151">
+        <text x={CHART.pad} y={CHART.height - 6} fontSize={11} className="fill-gray-700">
           {f.date(points[0].date, "short")}
         </text>
         <text
           x={CHART.width - CHART.pad}
           y={CHART.height - 6}
           fontSize={11}
-          fill="#374151"
+          className="fill-gray-700"
           textAnchor="end"
         >
           {f.date(last.date, "short")}

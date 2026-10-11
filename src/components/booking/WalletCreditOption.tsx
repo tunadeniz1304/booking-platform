@@ -112,7 +112,7 @@ export default function WalletCreditOption({
               onBlur={() => setDraft(null)}
               aria-invalid={!valid || undefined}
               aria-describedby={valid ? hintId : `${hintId} ${errorId}`}
-              className="mt-1 min-h-[44px] w-full rounded-lg border border-gray-300 px-3 py-2 text-sm sm:min-h-0"
+              className="mt-1 min-h-[44px] w-full rounded-lg border border-gray-500 px-3 py-2 text-sm sm:min-h-0"
             />
           </label>
           <p id={hintId} className="text-xs text-gray-500">

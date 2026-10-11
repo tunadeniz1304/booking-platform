@@ -1503,7 +1503,7 @@
       "dupCount": 2,
       "area": "shell",
       "id": "F43",
-      "fixOutcome": "color_approved",
+      "fixOutcome": "fixed",
       "colorApproved": true
     },
     {
@@ -1686,7 +1686,7 @@
       "dupCount": 1,
       "area": "auth",
       "id": "F47",
-      "fixOutcome": "color_approved",
+      "fixOutcome": "fixed",
       "colorApproved": true
     },
     {
@@ -3849,7 +3849,7 @@
       "dupCount": 1,
       "area": "home",
       "id": "F119",
-      "fixOutcome": "color_approved",
+      "fixOutcome": "fixed",
       "colorApproved": true
     },
     {
@@ -5952,7 +5952,7 @@
       "sources": ["area:account"],
       "dupCount": 1,
       "area": "account",
-      "fixOutcome": "color_approved",
+      "fixOutcome": "fixed",
       "colorApproved": true
     },
     {
@@ -6536,7 +6536,7 @@
       "sources": ["area:cards"],
       "dupCount": 1,
       "area": "cards",
-      "fixOutcome": "color_approved",
+      "fixOutcome": "fixed",
       "colorApproved": true
     },
     {
@@ -6927,7 +6927,7 @@
       "sources": ["area:cart"],
       "dupCount": 1,
       "area": "cart",
-      "fixOutcome": "color_approved",
+      "fixOutcome": "fixed",
       "colorApproved": true
     },
     {
@@ -7490,7 +7490,7 @@
       "sources": ["area:checkout"],
       "dupCount": 1,
       "area": "checkout",
-      "fixOutcome": "color_approved",
+      "fixOutcome": "fixed",
       "colorApproved": true
     },
     {
@@ -8035,7 +8035,7 @@
       "sources": ["area:compliance"],
       "dupCount": 1,
       "area": "compliance",
-      "fixOutcome": "color_approved",
+      "fixOutcome": "fixed",
       "colorApproved": true
     },
     {
@@ -9130,7 +9130,7 @@
       "sources": ["area:host2"],
       "dupCount": 1,
       "area": "host",
-      "fixOutcome": "color_approved",
+      "fixOutcome": "fixed",
       "colorApproved": true
     },
     {
@@ -9154,7 +9154,7 @@
       "sources": ["area:host2"],
       "dupCount": 1,
       "area": "host",
-      "fixOutcome": "color_approved",
+      "fixOutcome": "fixed",
       "colorApproved": true
     },
     {
@@ -10344,7 +10344,7 @@
       "sources": ["area:results"],
       "dupCount": 1,
       "area": "results",
-      "fixOutcome": "color_approved",
+      "fixOutcome": "fixed",
       "colorApproved": true
     },
     {
@@ -10896,7 +10896,7 @@
       "sources": ["area:trips"],
       "dupCount": 1,
       "area": "trips",
-      "fixOutcome": "color_approved",
+      "fixOutcome": "fixed",
       "colorApproved": true
     },
     {

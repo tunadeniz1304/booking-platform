@@ -179,7 +179,12 @@ export default function PromotionsPanel({
       ) : promotions.length === 0 ? (
         <p className="text-sm text-gray-700">{t("promotions.empty")}</p>
       ) : (
-        <div className="overflow-x-auto">
+        <div
+          className="relative max-w-full overflow-x-auto focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+          role="region"
+          aria-label={t("promotions.caption")}
+          tabIndex={0}
+        >
           <table className="min-w-full text-left text-sm">
             <caption className="sr-only">{t("promotions.caption")}</caption>
             <thead className="border-b text-gray-700">

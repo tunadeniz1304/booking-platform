@@ -259,10 +259,10 @@
 | Prensip             | accessibility · WCAG 1.4.11 Non-text Contrast / 1.4.3 Contrast |
 | Sezgisel madde      | H14 — Erişilebilirlik                                          |
 | WCAG                | 1.4.11                                                         |
-| Renk/tema           | Evet — onaylandı, sonraki oturumda uygulanacak                 |
+| Renk/tema           | Evet — onaylandı ve uygulandı                                  |
 | Efor                | S                                                              |
 | Kaynak denetçiler   | area:trips                                                     |
-| **Düzeltme durumu** | **Onaylandı — sonraki oturumda uygulanacak (renk)**            |
+| **Düzeltme durumu** | **Düzeltildi (onaylı renk düzeltmesi)**                        |
 
 **Kanıt:** `className='w-full rounded-lg border border-gray-300 p-2 text-sm'`. #d1d5db beyaz üzerinde ≈1.5:1 (eşik 3:1). Yer tutucu Tailwind preflight varsayılanı gray-400 #9ca3af, ≈2.5:1 (eşik 4.5:1). Etiket `className='sr-only'` (179). Alanın görsel olarak fark edilmesi bu iki zayıf ipucuna kalıyor (docs/img/messaging.png).
 

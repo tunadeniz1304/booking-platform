@@ -104,7 +104,7 @@ const TYPE_KEYS: Record<string, string> = {
   BED_AND_BREAKFAST: "bedAndBreakfast",
 };
 
-const smallInput = `w-full rounded-sm border border-gray-400 px-2 py-1 text-sm ${focusRing}`;
+const smallInput = `w-full rounded-sm border border-gray-500 px-2 py-1 text-sm ${focusRing}`;
 /** Mobilde 44px dokunma hedefi; masaüstünde mevcut yoğunluk korunur. */
 const touchTarget = "min-h-[44px] lg:min-h-0";
 
@@ -736,7 +736,7 @@ function SearchPageContent() {
                 <div
                   role="group"
                   aria-label={t("view")}
-                  className="flex overflow-hidden rounded-md border border-gray-400"
+                  className="flex overflow-hidden rounded-md border border-gray-500"
                 >
                   {(["list", "map"] as const).map((v) => (
                     <button

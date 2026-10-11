@@ -626,10 +626,10 @@
 | Prensip             | accessibility · Metin dışı kontrast                                                |
 | Sezgisel madde      | H14 — Erişilebilirlik                                                              |
 | WCAG                | 1.4.11                                                                             |
-| Renk/tema           | Evet — onaylandı, sonraki oturumda uygulanacak                                     |
+| Renk/tema           | Evet — onaylandı ve uygulandı                                                      |
 | Efor                | S                                                                                  |
 | Kaynak denetçiler   | area:checkout                                                                      |
-| **Düzeltme durumu** | **Onaylandı — sonraki oturumda uygulanacak (renk)**                                |
+| **Düzeltme durumu** | **Düzeltildi (onaylı renk düzeltmesi)**                                            |
 
 **Kanıt:** BookingActions.tsx:235 `const input = "mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm";` → #d1d5db / beyaz zemin ≈ 1,48:1, gereken 3:1. Bu sınıf kart numarası, son kullanma, CVC ve 3DS kodu girdilerinde kullanılıyor. WalletCreditOption.tsx:192 da border-gray-300. Paylaşılan inputClass (ui.tsx:21) border-gray-400 kullanıyor (≈2,5:1, o da yetersiz).
 

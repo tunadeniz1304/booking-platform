@@ -230,7 +230,7 @@ export default function BookingWidget({ propertyId, rooms, initial }: BookingWid
           aria-expanded={calendarOpen}
           aria-haspopup="dialog"
           aria-describedby={datesLabelId}
-          className={`mt-1 min-h-[44px] w-full rounded-lg border border-gray-300 px-3 py-2 text-left text-sm text-gray-900 hover:border-[#003580] ${focusRing}`}
+          className={`mt-1 min-h-[44px] w-full rounded-lg border border-gray-500 px-3 py-2 text-left text-sm text-gray-900 hover:border-[#003580] ${focusRing}`}
         >
           {dateSummary}
         </button>
@@ -269,7 +269,7 @@ export default function BookingWidget({ propertyId, rooms, initial }: BookingWid
           }}
           aria-invalid={overCapacity || undefined}
           aria-describedby={overCapacity ? capacityMsgId : undefined}
-          className="mt-1 min-h-[44px] w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#003580] focus:outline-none focus:ring-1 focus:ring-[#003580]"
+          className="mt-1 min-h-[44px] w-full rounded-lg border border-gray-500 px-3 py-2 text-sm focus:border-[#003580] focus:outline-none focus:ring-1 focus:ring-[#003580]"
         >
           {Array.from({ length: guestMax }, (_, i) => i + 1).map((count) => (
             <option key={count} value={count}>
@@ -292,7 +292,7 @@ export default function BookingWidget({ propertyId, rooms, initial }: BookingWid
           }}
           aria-invalid={overCapacity || undefined}
           aria-describedby={overCapacity ? capacityMsgId : undefined}
-          className="mt-1 min-h-[44px] w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#003580] focus:outline-none focus:ring-1 focus:ring-[#003580]"
+          className="mt-1 min-h-[44px] w-full rounded-lg border border-gray-500 px-3 py-2 text-sm focus:border-[#003580] focus:outline-none focus:ring-1 focus:ring-[#003580]"
         >
           {availableRooms.length === 0 && <option value="">{t("widget.noRooms")}</option>}
           {availableRooms.map((room) => (

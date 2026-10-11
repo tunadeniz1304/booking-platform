@@ -145,7 +145,7 @@ export default function ReauthDialog({
           onChange={(e) => setPassword(e.target.value)}
           aria-invalid={error ? true : undefined}
           aria-describedby={error ? errorId : undefined}
-          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+          className="w-full rounded-lg border border-gray-500 px-3 py-2 text-sm"
         />
         {error && (
           <p id={errorId} role="alert" className="text-sm text-red-700">

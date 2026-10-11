@@ -405,7 +405,7 @@ export default function BookingActions({
     }
   }
 
-  const input = `mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm ${focusRing}`;
+  const input = `mt-1 w-full rounded-lg border border-gray-500 px-3 py-2 text-sm ${focusRing}`;
   const submitClass = `w-full rounded-lg bg-[#003580] px-4 py-3 text-sm font-semibold text-white disabled:bg-gray-300 disabled:text-gray-700 aria-disabled:bg-gray-300 aria-disabled:text-gray-700 ${focusRing}`;
   const held = status === "HELD" && !expired;
   const remainingText =

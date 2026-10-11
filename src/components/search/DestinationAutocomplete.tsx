@@ -239,7 +239,7 @@ export default function DestinationAutocomplete({ value, onChange }: Destination
           onFocus={() => setOpen(true)}
           onKeyDown={handleKeyDown}
           placeholder={t("autocomplete.placeholder")}
-          className="w-full rounded-sm border border-gray-300 bg-white py-2.5 pl-10 pr-3 text-sm text-gray-900 placeholder-gray-500 focus:border-[#003580] focus:outline-none focus:ring-1 focus:ring-[#003580]"
+          className="w-full rounded-sm border border-gray-500 bg-white py-2.5 pl-10 pr-3 text-sm text-gray-900 placeholder-gray-500 focus:border-[#003580] focus:outline-none focus:ring-1 focus:ring-[#003580]"
         />
       </div>
 
@@ -251,7 +251,7 @@ export default function DestinationAutocomplete({ value, onChange }: Destination
         <div className="absolute left-0 right-0 z-20 mt-1 max-h-72 overflow-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
           <p
             id={HEADING_ID}
-            className="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-gray-400"
+            className="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-gray-600"
           >
             {heading}
           </p>

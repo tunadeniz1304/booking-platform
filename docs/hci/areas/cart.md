@@ -596,19 +596,19 @@
 
 ## F222 — İptal/iade/süresi doldu durum çiplerinde metin kontrastı 4.5:1'in altında
 
-| Alan                | Değer                                               |
-| ------------------- | --------------------------------------------------- |
-| Severity            | High                                                |
-| Durum               | Aday                                                |
-| Konum               | `src/components/cart/SplitPayPanel.tsx:25`          |
-| Kullanıcılar        | misafir                                             |
-| Prensip             | accessibility · Contrast (Minimum)                  |
-| Sezgisel madde      | H14 — Erişilebilirlik                               |
-| WCAG                | 1.4.3                                               |
-| Renk/tema           | Evet — onaylandı, sonraki oturumda uygulanacak      |
-| Efor                | S                                                   |
-| Kaynak denetçiler   | area:cart                                           |
-| **Düzeltme durumu** | **Onaylandı — sonraki oturumda uygulanacak (renk)** |
+| Alan                | Değer                                      |
+| ------------------- | ------------------------------------------ |
+| Severity            | High                                       |
+| Durum               | Aday                                       |
+| Konum               | `src/components/cart/SplitPayPanel.tsx:25` |
+| Kullanıcılar        | misafir                                    |
+| Prensip             | accessibility · Contrast (Minimum)         |
+| Sezgisel madde      | H14 — Erişilebilirlik                      |
+| WCAG                | 1.4.3                                      |
+| Renk/tema           | Evet — onaylandı ve uygulandı              |
+| Efor                | S                                          |
+| Kaynak denetçiler   | area:cart                                  |
+| **Düzeltme durumu** | **Düzeltildi (onaylı renk düzeltmesi)**    |
 
 **Kanıt:** 25-27 `VOIDED: "bg-gray-100 text-gray-500"`, `REFUNDED: ...`, `EXPIRED: ...`, 314 `text-xs font-medium`: #6B7280 / #F3F4F6 ≈ 4.40:1 (12px normal metin için 4.5:1 gerekir). Durum metin olarak verildiği için 1.4.1 sorunu yok.
 

@@ -19,7 +19,7 @@ import { ApiError, fetchCurrentUser, type SessionUser } from "@/lib/api-client";
 export const focusRing =
   "focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003580] focus-visible:ring-offset-2";
 
-export const inputClass = `mt-1 block w-full rounded-md border border-gray-400 bg-white px-3 py-2 text-sm text-gray-900 ${focusRing}`;
+export const inputClass = `mt-1 block w-full rounded-md border border-gray-500 bg-white px-3 py-2 text-sm text-gray-900 ${focusRing}`;
 
 const buttonVariants = {
   primary: "bg-[#003580] text-white hover:bg-[#002b66]",

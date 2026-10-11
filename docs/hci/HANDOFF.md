@@ -1,6 +1,6 @@
 # HCI düzeltme işi — Handoff
 
-> Son güncelleme: 2026-10-11 · Durum: **Düzeltme workflow'u BİTTİ (24/24 paket)** · mesaj yamaları birleştirildi · kalite kapıları koşuluyor/koşuldu (bkz. §4.1)
+> Son güncelleme: 2026-10-11 · Durum: Critical/High turu birleştirildi (PR #9) · **onaylı 12 renk düzeltmesi + 2 gerileme UYGULANDI** (§1.1, §7) · sırada: crossOwner istekleri (§4.3), çalışma zamanı taraması, Medium/Low turu
 > Bu dosya, haftalık kullanım limiti dolarsa ya da oturum kesilirse işi kaldığı yerden sürdürmek içindir.
 
 ## 1. Hedef ve kullanıcı kararları
@@ -14,7 +14,9 @@
 - **Park kuralı:** 5 saatlik oturum limiti **%95** ya da haftalık limit **%99** olunca çalışan workflow durdurulur, bu dosya güncellenir, iş park edilir.
 - **Renk/tema istisnası (2026-10-11, kullanıcı onayı):** aşağıdaki 12 Critical/High renk bulgusu **uygulanacak — SONRAKİ OTURUMDA**. Bu oturumda başlanmadı. Palet, `tailwind.config.ts` ve tema değişkenleri yine değişmez; yalnız mevcut tonlara geçiş ve mevcut tema token'larına bağlama yapılır. Kayıt: `docs/hci/color-approved.json`; `hci-findings.json`'da `colorApproved: true`.
 
-## 1.1 SONRAKİ OTURUM — onaylı renk düzeltmeleri (12)
+## 1.1 Onaylı renk düzeltmeleri (12) — UYGULANDI
+
+Hepsi `fixed`; ayrıntı `docs/hci/fix-status.json` → `color`, raporda §7.6. Karanlık temada çalışan uygulamada ölçüldü: giriş alanı kenarlığı kart zemininde 6,99:1, grafik çubukları 4,82:1, harita popup'ı koyu zemin + açık metin. Açık temada çubuklar 3,68:1.
 
 | #    | Konum                                                                                                                    | Yapılacak                                                                                                                                             |
 | ---- | ------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -79,7 +81,7 @@ Dalga 1 merkez kontrol notları: `next build` (34 geçiş layout'u + kök `title
    `node "<scratchpad>\merge-messages.mjs" C:/Users/tuna9/projects/booking "<scratchpad>\msg" --dry` → çakışma yoksa `--dry` olmadan çalıştır → `npx prettier --write messages`.
 2. **Kapılar:** `npm run lint`, `npm run typecheck`, `npx tsx scripts/i18n-check.ts`, `npm run format:check`, `npx vitest run --project unit`.
    Temel durum (düzeltmeden önce): hepsi yeşil; unit'te 1 kararsız (flaky) test bir kez düştü, tekrarında geçti.
-3. Ajan çıktılarındaki `testUpdates` (e2e metin/onay adımı değişiklikleri) ve `crossOwner` isteklerini uygula.
+3. ~~`testUpdates`~~ (YAPILDI, PR #9 içindeki e2e commit'i). `crossOwner` isteklerini uygula — sınıflandırma ve uygulama sürüyor.
 4. **Çalışma zamanı karşılaştırması:** dev sunucusu açıkken `node "<scratchpad>\runtime\sweep.mjs" "<scratchpad>\runtime\after"` → önce/sonra: genel `<title>` sayısı (önce 102/128), mobil yatay taşma (önce 23/66/142 px), axe ihlalleri, <24px hedefler.
 5. **Raporu güncelle:** her Critical/High bulguya ajan `results[].outcome/summary` → "Düzeltme durumu" sütunu; "Düzeltme Günlüğü" bölümü; kullanıcı istedi: bulgular tam belgelenmiş olsun (alan bazında ayrıntılı dosyalar `docs/hci/` altında).
 6. Medium/Low turu (kullanıcı onayıyla).
@@ -107,7 +109,7 @@ Dalga 1 merkez kontrol notları: `next build` (34 geçiş layout'u + kök `title
 | h1'i olmayan sayfa               | 4    | 0     |
 | axe serious                      | 3    | 6     |
 
-Düzeltme sonrası ortaya çıkan 2 gerileme (sonraki oturumda ilk iş):
+Düzeltme sonrası ortaya çıkan 2 gerileme — **İKİSİ DE DÜZELTİLDİ** (`fix-status.json` → `regressions`; çalışan uygulamada doğrulandı: 1280 px'te admin sayfalarında axe `target-size` 0, mobil promosyon taşması 0 px):
 
 1. **Admin başlık menüsü, 1280 px:** `target-size` (serious) ihlali, 6 admin sayfasında. Header'da masaüstü menü artık `xl:flex`; admin'in ek bağlantılarıyla "Posta kutusu (demo)" bağlantısı komşusuna çok yakın kalıyor. Sahip: `src/components/layout/Header.tsx` (shell).
 2. **Ev sahibi promosyon tablosu, mobil:** sayfa 181 px yatay taşıyor (önce 142 px). Tablo kaydırılabilir bir kapsayıcıya alınmamış: `tabIndex=0` + `role="region"` + `aria-label` + `overflow-x-auto`. Sahip: `src/components/host/PromotionsPanel.tsx` (hostB).

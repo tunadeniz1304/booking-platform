@@ -418,20 +418,20 @@
 
 ## F209 — Karanlık temada harita popup metni beyaz zemin üzerinde okunamıyor
 
-| Alan                | Değer                                               |
-| ------------------- | --------------------------------------------------- |
-| Severity            | High                                                |
-| Durum               | Aday                                                |
-| Konum               | `src/components/search/ResultsMap.tsx:237`          |
-| Diğer konumlar      | `src/styles/globals.css:22`                         |
-| Kullanıcılar        | misafir                                             |
-| Prensip             | accessibility · WCAG 1.4.3 Contrast (Minimum)       |
-| Sezgisel madde      | H14 — Erişilebilirlik                               |
-| WCAG                | 1.4.3                                               |
-| Renk/tema           | Evet — onaylandı, sonraki oturumda uygulanacak      |
-| Efor                | S                                                   |
-| Kaynak denetçiler   | area:cards                                          |
-| **Düzeltme durumu** | **Onaylandı — sonraki oturumda uygulanacak (renk)** |
+| Alan                | Değer                                         |
+| ------------------- | --------------------------------------------- |
+| Severity            | High                                          |
+| Durum               | Aday                                          |
+| Konum               | `src/components/search/ResultsMap.tsx:237`    |
+| Diğer konumlar      | `src/styles/globals.css:22`                   |
+| Kullanıcılar        | misafir                                       |
+| Prensip             | accessibility · WCAG 1.4.3 Contrast (Minimum) |
+| Sezgisel madde      | H14 — Erişilebilirlik                         |
+| WCAG                | 1.4.3                                         |
+| Renk/tema           | Evet — onaylandı ve uygulandı                 |
+| Efor                | S                                             |
+| Kaynak denetçiler   | area:cards                                    |
+| **Düzeltme durumu** | **Düzeltildi (onaylı renk düzeltmesi)**       |
 
 **Kanıt:** ResultsMap.tsx:237: `<div className='text-sm text-gray-900'>`, 240: `text-[#003580]`. maplibre-gl.css: `.maplibregl-popup-content{background:#fff}` tema token'ı değil. tailwind.config.ts DARK_SHADE_MAP `tx: {900: '50'}` ile text-gray-900'ü gray-50'ye çeviriyor. globals.css:23-26 `text-[#003580]` değerini `--brand-fg` (blue-300) yapıyor. Sonuç olarak koyu temada gri-50 metin #fff üzerinde (yaklaşık 1:1) ve blue-300 bağlantı #fff üzerinde (yaklaşık 2:1) kalıyor.
 

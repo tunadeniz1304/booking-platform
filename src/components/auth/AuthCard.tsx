@@ -59,7 +59,7 @@ export function Notice({ kind, children }: { kind: "error" | "success"; children
 
 /** Kimlik formlarındaki alanların ortak (değişmeyen) görünümü. */
 export const authInputClass =
-  "mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#003580] focus:outline-none focus:ring-1 focus:ring-[#003580]";
+  "mt-1 w-full rounded-lg border border-gray-500 px-3 py-2 text-sm focus:border-[#003580] focus:outline-none focus:ring-1 focus:ring-[#003580]";
 
 /** Birincil gönder düğmesi; `aria-disabled` iken odak düğmede kalır (bkz. `submitButtonProps`). */
 export const authSubmitClass =

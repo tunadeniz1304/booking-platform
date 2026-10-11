@@ -359,10 +359,10 @@
 | Prensip             | accessibility · Non-text Contrast (WCAG 1.4.11)                                       |
 | Sezgisel madde      | H14 — Erişilebilirlik                                                                 |
 | WCAG                | 1.4.11                                                                                |
-| Renk/tema           | Evet — onaylandı, sonraki oturumda uygulanacak                                        |
+| Renk/tema           | Evet — onaylandı ve uygulandı                                                         |
 | Efor                | S                                                                                     |
 | Kaynak denetçiler   | area:compliance                                                                       |
-| **Düzeltme durumu** | **Onaylandı — sonraki oturumda uygulanacak (renk)**                                   |
+| **Düzeltme durumu** | **Düzeltildi (onaylı renk düzeltmesi)**                                               |
 
 **Kanıt:** NoticeForm.tsx:17-18 `"mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 ..."`: beyaz kart üzerinde #d1d5db kenarlığın kontrastı yaklaşık 1.5:1. ComplianceDashboard.tsx:24-25'te de aynı `border-gray-300` var. Ortak ui.tsx:21 `inputClass` ise `border-gray-400` (#9ca3af) kullanıyor ve kontrastı yaklaşık 2.5:1, yani o da eşiğin altında.
 

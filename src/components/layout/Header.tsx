@@ -14,6 +14,8 @@ interface NavItem {
   key: NavKey;
   href: string;
   roles?: ReadonlyArray<SessionUser["role"]>;
+  /** Rol paneli ya da demo bağlantısı: menü kalabalıksa masaüstünde de menü düğmesinde. */
+  extra?: true;
 }
 
 const NAV_ITEMS: readonly NavItem[] = [
@@ -24,9 +26,9 @@ const NAV_ITEMS: readonly NavItem[] = [
   { key: "cart", href: "/cart", roles: ["USER", "HOST", "ADMIN"] },
   // v5 P2-1: AI destek asistanı oturum ister.
   { key: "support", href: "/support", roles: ["USER", "HOST", "ADMIN"] },
-  { key: "host", href: "/host", roles: ["HOST", "ADMIN"] },
-  { key: "admin", href: "/admin", roles: ["ADMIN"] },
-  { key: "mailbox", href: "/dev/mailbox" },
+  { key: "host", href: "/host", roles: ["HOST", "ADMIN"], extra: true },
+  { key: "admin", href: "/admin", roles: ["ADMIN"], extra: true },
+  { key: "mailbox", href: "/dev/mailbox", extra: true },
 ];
 
 export const headerFocusRing =
@@ -87,6 +89,10 @@ export default function Header() {
     (item) =>
       (item.key !== "mailbox" || demo) && (!item.roles || (user && item.roles.includes(user.role)))
   );
+  // Birden fazla ek bağlantı (yönetici, demo) max-w-7xl başlığa sığmaz: masaüstünde de menüde.
+  const crowded = items.filter((item) => item.extra).length > 1;
+  const barItems = crowded ? items.filter((item) => !item.extra) : items;
+  const menuHidden = crowded ? "" : "xl:hidden";
   const isCurrent = (href: string) =>
     href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
 
@@ -101,7 +107,7 @@ export default function Header() {
             booking<span className="text-[#febb02]">.com</span>
           </Link>
           <nav className="hidden items-center gap-1 xl:flex" aria-label={t("primary")}>
-            {items.map((item) => (
+            {barItems.map((item) => (
               <Link
                 key={item.key}
                 href={item.href}
@@ -164,7 +170,7 @@ export default function Header() {
           <button
             type="button"
             onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className={`shrink-0 rounded-sm p-2.5 text-white transition hover:bg-white/10 xl:hidden ${headerFocusRing}`}
+            className={`shrink-0 rounded-sm p-2.5 text-white transition hover:bg-white/10 ${menuHidden} ${headerFocusRing}`}
             aria-label={t("toggleMenu")}
             aria-expanded={isMenuOpen}
             aria-controls="mobile-menu"
@@ -199,7 +205,7 @@ export default function Header() {
       {isMenuOpen && (
         <div
           id="mobile-menu"
-          className="border-t border-white/20 bg-[#003580] px-4 pb-4 pt-2 xl:hidden"
+          className={`border-t border-white/20 bg-[#003580] px-4 pb-4 pt-2 ${menuHidden}`}
         >
           <div className="mb-2 flex flex-col gap-2 border-b border-white/20 pb-3 sm:hidden">
             <ThemeToggle showLabel className={headerFocusRing} />
@@ -211,12 +217,12 @@ export default function Header() {
                 key={item.key}
                 href={item.href}
                 aria-current={isCurrent(item.href) ? "page" : undefined}
-                className={`flex min-h-[44px] items-center rounded-sm px-3 py-2 text-sm font-medium text-white transition hover:bg-white/10 ${headerFocusRing}`}
+                className={`flex min-h-[44px] items-center rounded-sm px-3 py-2 text-sm font-medium text-white transition hover:bg-white/10 ${crowded && !item.extra ? "xl:hidden" : ""} ${headerFocusRing}`}
               >
                 {t(item.key)}
               </Link>
             ))}
-            <div className="mt-2 flex flex-col gap-2 border-t border-white/20 pt-2">
+            <div className="mt-2 flex flex-col gap-2 border-t border-white/20 pt-2 xl:hidden">
               {user ? (
                 <button
                   type="button"

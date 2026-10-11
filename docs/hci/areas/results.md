@@ -328,10 +328,10 @@
 | Prensip             | accessibility · WCAG 1.4.11 Metin dışı kontrast              |
 | Sezgisel madde      | H14 — Erişilebilirlik                                        |
 | WCAG                | 1.4.11                                                       |
-| Renk/tema           | Evet — onaylandı, sonraki oturumda uygulanacak               |
+| Renk/tema           | Evet — onaylandı ve uygulandı                                |
 | Efor                | S                                                            |
 | Kaynak denetçiler   | area:results                                                 |
-| **Düzeltme durumu** | **Onaylandı — sonraki oturumda uygulanacak (renk)**          |
+| **Düzeltme durumu** | **Düzeltildi (onaylı renk düzeltmesi)**                      |
 
 **Kanıt:** page.tsx:120 `smallInput = 'w-full rounded-sm border border-gray-400 ...'` fiyat alanlarında ve sıralama/esneklik select'lerinde kullanılıyor; akıllı filtre girişi ui.tsx:21'deki inputClass ile aynı border-gray-400'ü kullanıyor. gray-400 = #9ca3af; beyaz kart zemininde kontrast ≈2.5:1. Alanların arka planı da beyaz olduğu için alanın sınırını belirten tek görsel ipucu bu kenarlık. Görünüm anahtarının kenarlığı (437) da aynı renkte.
 

@@ -235,10 +235,10 @@
 | Prensip             | accessibility · Accessibility                           |
 | Sezgisel madde      | H14 — Erişilebilirlik                                   |
 | WCAG                | 1.4.3 Contrast (Minimum)                                |
-| Renk/tema           | Evet — onaylandı, sonraki oturumda uygulanacak          |
+| Renk/tema           | Evet — onaylandı ve uygulandı                           |
 | Efor                | S                                                       |
 | Kaynak denetçiler   | runtime:home                                            |
-| **Düzeltme durumu** | **Onaylandı — sonraki oturumda uygulanacak (renk)**     |
+| **Düzeltme durumu** | **Düzeltildi (onaylı renk düzeltmesi)**                 |
 
 **Kanıt:** RUNTIME probes/home/axe-open.mjs light: color-contrast (serious) '.uppercase | Element has insufficient color contrast of 2.53 (foreground color: #9ca3af, background color: #ffffff, font size: 9.0pt (12px)'. Dark: 3.66 (#6b7280 / #111827). Ekran görüntüsü C:/Users/tuna9/AppData/Local/Temp/claude/C--Users-tuna9-projects-booking/62fc84fa-09c9-431e-a0a0-680b0434666c/scratchpad/runtime/probes/home/cb-noresult-tr.png. Kod: 152 'text-xs font-semibold uppercase tracking-wide text-gray-400'.
 

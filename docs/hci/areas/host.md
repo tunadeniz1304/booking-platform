@@ -855,19 +855,19 @@
 
 ## F296 — Pickup çubukları ve eksen çizgisi beyaz zeminde 3:1 grafik kontrastını sağlamıyor
 
-| Alan                | Değer                                               |
-| ------------------- | --------------------------------------------------- |
-| Severity            | High                                                |
-| Durum               | Aday                                                |
-| Konum               | `src/components/host/RevenueDashboard.tsx:101`      |
-| Kullanıcılar        | ev sahibi, admin                                    |
-| Prensip             | accessibility · Non-text Contrast                   |
-| Sezgisel madde      | H14 — Erişilebilirlik                               |
-| WCAG                | 1.4.11                                              |
-| Renk/tema           | Evet — onaylandı, sonraki oturumda uygulanacak      |
-| Efor                | S                                                   |
-| Kaynak denetçiler   | area:host2                                          |
-| **Düzeltme durumu** | **Onaylandı — sonraki oturumda uygulanacak (renk)** |
+| Alan                | Değer                                          |
+| ------------------- | ---------------------------------------------- |
+| Severity            | High                                           |
+| Durum               | Aday                                           |
+| Konum               | `src/components/host/RevenueDashboard.tsx:101` |
+| Kullanıcılar        | ev sahibi, admin                               |
+| Prensip             | accessibility · Non-text Contrast              |
+| Sezgisel madde      | H14 — Erişilebilirlik                          |
+| WCAG                | 1.4.11                                         |
+| Renk/tema           | Evet — onaylandı ve uygulandı                  |
+| Efor                | S                                              |
+| Kaynak denetçiler   | area:host2                                     |
+| **Düzeltme durumu** | **Düzeltildi (onaylı renk düzeltmesi)**        |
 
 **Kanıt:** RevenueDashboard.tsx:101 `fill="#93c5fd"` beyaz kart üzerinde ≈1.9:1; 91 `stroke="#9ca3af"` eksen ≈2.5:1. Çubuklar veri taşıyor (günlük pickup).
 
@@ -886,10 +886,10 @@
 | Prensip             | accessibility · Non-text Contrast / Contrast (Minimum) |
 | Sezgisel madde      | H14 — Erişilebilirlik                                  |
 | WCAG                | 1.4.11                                                 |
-| Renk/tema           | Evet — onaylandı, sonraki oturumda uygulanacak         |
+| Renk/tema           | Evet — onaylandı ve uygulandı                          |
 | Efor                | S                                                      |
 | Kaynak denetçiler   | area:host2                                             |
-| **Düzeltme durumu** | **Onaylandı — sonraki oturumda uygulanacak (renk)**    |
+| **Düzeltme durumu** | **Düzeltildi (onaylı renk düzeltmesi)**                |
 
 **Kanıt:** RevenueDashboard.tsx:107 `stroke="#003580"`, 108/111/118 `fill="#374151"`. Karanlık temada kart zemini gray-900 olur (tailwind.config.ts:130 `"--bg-white": gray[900]`); src/styles/globals.css:22-53 yalnız `.text-[#003580]` gibi sınıfları yeniden eşliyor, SVG özniteliklerini değil. #003580 / #111827 ≈1.4:1, #374151 / #111827 ≈1.6:1.
 

@@ -3404,5 +3404,121 @@
       }
     ],
     "notes": "I did not run tsc, vitest or next build. I ran eslint on src/components/compliance/ (clean) and prettier on all 5 changed files and the patch JSON. The page files (trust, report, report/appeal, admin/compliance) were not changed. Tests: no e2e test touches these components except the a11y.spec scans; the #appeals id and all existing labels and button texts are unchanged. ConfirmDialog uses the common.confirm.cancel key from the wave 1 patch, and the takedown close form also uses tc('confirm.cancel') for its Vazgeç button. The listing preview calls GET /api/properties/{id}, which only returns active, verified listings; any other ID shows a 'not found' warning but does not block submitting. New patch keys: compliance.report.{sentTitle, errors.*}, compliance.admin.{propertyIdHint, preview.*, confirmTakedown.*, saving, retry, noTakedowns, closeForm.*, choose, confirmDecision.*}, compliance.appeal.{sentTitle, admin.chooseOutcome, admin.confirm.*}, in both tr and en."
+  },
+  "color": {
+    "results": [
+      {
+        "id": "F43",
+        "outcome": "fixed",
+        "summary": "Shared inputClass border-gray-400 -> border-gray-500. Auth forms use authInputClass (AuthCard.tsx), BookingWidget and DestinationAutocomplete use local strings that differ in radius/size, so they got the same shade (border-gray-500) instead of switching to inputClass.",
+        "files": [
+          "src/components/ui/ui.tsx",
+          "src/components/auth/AuthCard.tsx",
+          "src/components/booking/BookingWidget.tsx",
+          "src/components/search/DestinationAutocomplete.tsx"
+        ]
+      },
+      {
+        "id": "F47",
+        "outcome": "fixed",
+        "summary": "Login, register, forgot-password and reset-password all style inputs with authInputClass; its border-gray-300 -> border-gray-500.",
+        "files": ["src/components/auth/AuthCard.tsx"]
+      },
+      {
+        "id": "F119",
+        "outcome": "fixed",
+        "summary": "Suggestion list heading text-gray-400 -> text-gray-600.",
+        "files": ["src/components/search/DestinationAutocomplete.tsx"]
+      },
+      {
+        "id": "F190",
+        "outcome": "fixed",
+        "summary": "ReauthDialog password input and PasskeyManager name input border-gray-300 -> border-gray-500.",
+        "files": [
+          "src/components/account/ReauthDialog.tsx",
+          "src/components/account/PasskeyManager.tsx"
+        ]
+      },
+      {
+        "id": "F209",
+        "outcome": "fixed",
+        "summary": "Map Popup gets className results-popup; globals.css binds .maplibregl-popup-content background to --bg-white and text to --page-fg, and each anchor's tip border to --bg-white, so the popup follows the dark theme.",
+        "files": ["src/components/search/ResultsMap.tsx", "src/styles/globals.css"]
+      },
+      {
+        "id": "F222",
+        "outcome": "fixed",
+        "summary": "VOIDED / REFUNDED / EXPIRED chip text text-gray-500 -> text-gray-700 (bg-gray-100 kept).",
+        "files": ["src/components/cart/SplitPayPanel.tsx"]
+      },
+      {
+        "id": "F240",
+        "outcome": "fixed",
+        "summary": "BookingActions shared card input class and WalletCreditOption amount input border -> border-gray-500.",
+        "files": [
+          "src/components/booking/BookingActions.tsx",
+          "src/components/booking/WalletCreditOption.tsx"
+        ]
+      },
+      {
+        "id": "F258",
+        "outcome": "fixed",
+        "summary": "NoticeForm and ComplianceDashboard shared input class border-gray-300 -> border-gray-500.",
+        "files": [
+          "src/components/compliance/NoticeForm.tsx",
+          "src/components/compliance/ComplianceDashboard.tsx"
+        ]
+      },
+      {
+        "id": "F296",
+        "outcome": "fixed",
+        "summary": "Pickup bars fill #93c5fd -> className fill-primary-500 (#3b82f6, ~3.7:1 on white, ~4.8:1 on the dark card); baseline stroke #9ca3af -> className stroke-gray-500.",
+        "files": ["src/components/host/RevenueDashboard.tsx"]
+      },
+      {
+        "id": "F297",
+        "outcome": "fixed",
+        "summary": "No hex left in the chart: on-books line stroke-brand, labels fill-gray-700; both are remapped by the dark theme variables.",
+        "files": ["src/components/host/RevenueDashboard.tsx"]
+      },
+      {
+        "id": "F339",
+        "outcome": "fixed",
+        "summary": "Search page smallInput and list/map view toggle border-gray-400 -> border-gray-500.",
+        "files": ["src/app/search/page.tsx"]
+      },
+      {
+        "id": "F359",
+        "outcome": "fixed",
+        "summary": "Message textarea border -> border-gray-500 and placeholder:text-gray-500.",
+        "files": ["src/components/booking/BookingMessages.tsx"]
+      }
+    ],
+    "extraChanges": [],
+    "messagePatch": null,
+    "testUpdates": [],
+    "crossOwner": [],
+    "notes": "Approved color fixes (docs/hci/color-approved.json), applied 2026-10-10. Palette, tailwind.config.ts and theme variables unchanged; only existing shades and existing theme tokens."
+  },
+  "regressions": {
+    "results": [
+      {
+        "id": "R1",
+        "outcome": "fixed",
+        "summary": "Header: when a user has more than one extra nav link (admin, or host in demo mode) the desktop bar shows only the general links and the host/admin/mailbox links move into the hamburger menu, which stays available at xl+. Removes the 1280px target-size overlap (the header is capped at max-w-7xl, so a wider breakpoint gives no extra room).",
+        "files": ["src/components/layout/Header.tsx"]
+      },
+      {
+        "id": "R2",
+        "outcome": "fixed",
+        "summary": "PromotionsPanel: table wrapped in a focusable, labelled scroll region (role=region, tabIndex=0, aria-label host.promotions.caption, relative max-w-full overflow-x-auto) so the page no longer overflows on mobile.",
+        "files": ["src/components/host/PromotionsPanel.tsx"]
+      }
+    ],
+    "extraChanges": [],
+    "messagePatch": null,
+    "testUpdates": [],
+    "crossOwner": [],
+    "notes": "Two regressions measured after the Critical/High pass (HANDOFF §7)."
   }
 }

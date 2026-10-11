@@ -722,10 +722,10 @@
 | Prensip             | accessibility · Non-text Contrast                                              |
 | Sezgisel madde      | H14 — Erişilebilirlik                                                          |
 | WCAG                | 1.4.11                                                                         |
-| Renk/tema           | Evet — onaylandı, sonraki oturumda uygulanacak                                 |
+| Renk/tema           | Evet — onaylandı ve uygulandı                                                  |
 | Efor                | S                                                                              |
 | Kaynak denetçiler   | area:account                                                                   |
-| **Düzeltme durumu** | **Onaylandı — sonraki oturumda uygulanacak (renk)**                            |
+| **Düzeltme durumu** | **Düzeltildi (onaylı renk düzeltmesi)**                                        |
 
 **Kanıt:** ReauthDialog.tsx:99 `border border-gray-300` (#d1d5db beyaz zeminde yaklaşık 1,5:1). PasskeyManager.tsx:155'te de aynısı. Ortak inputClass (ui.tsx:21) gray-400 kullanıyor, o da yaklaşık 2,5:1.
 

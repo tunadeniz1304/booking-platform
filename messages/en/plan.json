@@ -27,6 +27,7 @@
     "holding": "Holding…",
     "holdLabel": "Hold room: {city}",
     "noStay": "No available stay was found for these dates.",
+    "searchCity": "Search in {city}",
     "total": "Stays total: <b>{amount}</b>",
     "note": "The plan doesn't book anything. \"Hold room\" reserves the room for a short time; complete each stop with \"Pay\". Your plan is kept in this tab.",
     "held": "Held — pay soon to keep it.",

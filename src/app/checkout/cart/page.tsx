@@ -16,7 +16,8 @@ import {
   type CardFieldErrors,
 } from "@/components/payment/CardFields";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
-import { Button, Field, focusFirstInvalid, inputClass, useErrorText } from "@/components/ui/ui";
+import { ThreeDsForm } from "@/components/payment/ThreeDsForm";
+import { Button, ErrorText, focusFirstInvalid, useErrorText } from "@/components/ui/ui";
 import type { SplitPlanDTO } from "@/lib/cart/split-payment";
 
 type PayOutcome =
@@ -732,14 +733,10 @@ export default function CartCheckoutPage() {
   // Hata (role=alert) ve bilgi (role=status) ayrı bölgelerde; iç içe canlı bölge yok.
   const statusRegion = (
     <>
+      {/* F2-44: odak kabı ref/tabIndex taşır; metin ortak ErrorText ile. */}
       {message && (
-        <div
-          ref={alertRef}
-          role="alert"
-          tabIndex={-1}
-          className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 focus:outline-none"
-        >
-          {message}
+        <div ref={alertRef} tabIndex={-1} className="mt-4 focus:outline-none">
+          <ErrorText>{message}</ErrorText>
         </div>
       )}
       <div role="status" className={notice ? "mt-4 text-sm text-gray-700" : undefined}>
@@ -1255,46 +1252,17 @@ export default function CartCheckoutPage() {
         )}
 
         {step === "challenge" && (
-          <form
+          <ThreeDsForm
+            idPrefix="cart"
+            headingRef={challengeHeadingRef}
+            intro={challenge}
+            code={code}
+            onCodeChange={setCode}
+            busy={busy}
             onSubmit={confirm3ds}
-            aria-labelledby={`${formIds}-3ds-title`}
-            aria-busy={busy}
-            className="mt-6 space-y-3 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm"
-          >
-            <h2
-              id={`${formIds}-3ds-title`}
-              ref={challengeHeadingRef}
-              tabIndex={-1}
-              className="text-lg font-semibold text-gray-900 focus:outline-none"
-            >
-              {tp("threeDsTitle")}
-            </h2>
-            <p className="text-sm text-gray-600">{challenge}</p>
-            <Field label={tp("verificationCode")} id="cart-3ds-code">
-              <input
-                id="cart-3ds-code"
-                className={inputClass}
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                maxLength={6}
-                value={code}
-                onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-                required
-              />
-            </Field>
-            <Button type="submit" busy={busy} size="lg" fullWidth className={PRIMARY_DISABLED}>
-              {busy ? tp("processing") : tp("verify")}
-            </Button>
-            <p className="text-sm text-gray-600">{t("checkout.threeDsNoCode")}</p>
-            <button
-              type="button"
-              onClick={backToCard}
-              aria-disabled={busy || undefined}
-              className="min-h-[44px] w-full rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-800"
-            >
-              {tp("threeDsBack")}
-            </button>
-          </form>
+            onBack={backToCard}
+            noCodeText={t("checkout.threeDsNoCode")}
+          />
         )}
 
         {/* Yıkıcı eylem ödeme yollarının altında, birincil düğmelerden ayrık durur. */}

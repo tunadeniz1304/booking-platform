@@ -9,6 +9,7 @@ import Footer from "@/components/layout/Footer";
 import { ApiError, apiFetch, logout } from "@/lib/api-client";
 import {
   Button,
+  ErrorText,
   PageShell,
   Status,
   focusRing,
@@ -385,7 +386,8 @@ export default function AccountPage() {
   const cancelBooking = async (booking: Booking) => {
     if (cancellingId) return;
     const ok = await confirm({
-      title: t("bookings.cancelConfirm.title"),
+      // F2-42: rezervasyon sayfasındaki iptal penceresiyle aynı başlık, düğmeler ve uyarı.
+      title: tPayment("cancel.dialogTitle"),
       body: (
         <>
           <p className="font-medium text-gray-900">{booking.property.title}</p>
@@ -408,10 +410,11 @@ export default function AccountPage() {
               ),
             })}
           </p>
+          <p className="mt-2">{tPayment("cancel.irreversible")}</p>
         </>
       ),
-      confirmLabel: t("bookings.cancelConfirm.confirm"),
-      cancelLabel: t("bookings.cancelConfirm.keep"),
+      confirmLabel: tPayment("cancel.confirmButton"),
+      cancelLabel: tPayment("cancel.keep"),
       tone: "danger",
     });
     if (!ok) return;
@@ -466,11 +469,7 @@ export default function AccountPage() {
     const current = notice?.key === key ? notice : null;
     return (
       <div aria-live="polite" className="text-sm">
-        {current?.kind === "error" && (
-          <p role="alert" className="mt-3 text-red-700">
-            {current.text}
-          </p>
-        )}
+        {current?.kind === "error" && <ErrorText className="mt-3">{current.text}</ErrorText>}
         {current?.kind === "info" && <p className="mt-3 text-green-800">{current.text}</p>}
       </div>
     );

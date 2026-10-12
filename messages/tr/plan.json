@@ -27,6 +27,7 @@
     "holding": "Ayrılıyor…",
     "holdLabel": "Odayı ayır: {city}",
     "noStay": "Bu tarihlerde uygun konaklama bulunamadı.",
+    "searchCity": "{city} için ara",
     "total": "Konaklama toplamı: <b>{amount}</b>",
     "note": "Plan rezervasyon yapmaz. «Odayı ayır» odayı kısa bir süre sizin için ayırır; her durak için «Öde» ile ödemeyi tamamlayın. Planınız bu sekmede saklanır.",
     "held": "Ayrıldı; kısa süre içinde ödeyin.",

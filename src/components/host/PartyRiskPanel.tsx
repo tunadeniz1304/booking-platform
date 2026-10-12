@@ -5,7 +5,9 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { apiFetch } from "@/lib/api-client";
 import { useFormat } from "@/i18n/use-format";
+import { shortRef } from "@/lib/ui/short-ref";
 import { Button, Card, Status, focusRing, useLoader } from "@/components/ui/ui";
+import { useHostLeaveGuard } from "./useHostUnsavedChanges";
 
 interface PartyRiskItem {
   bookingId: string;
@@ -42,8 +44,10 @@ export default function PartyRiskPanel() {
   const items = data?.items ?? null;
   const threshold = typeof data?.threshold === "number" ? data.threshold : null;
   const label = (r: string) => (t.has(`reasons.${r}`) ? t(`reasons.${r}`) : r);
-  // Aynı sayfadaki rezervasyon tablosuyla eşleşsin diye aynı kısa kimlik (HostDashboard).
-  const bookingRef = (id: string) => id.slice(-8);
+  // Aynı sayfadaki rezervasyon tablosuyla eşleşsin diye ortak kısa kimlik (F2-41).
+  const bookingRef = shortRef;
+  // Aynı sayfadaki kaydedilmemiş takvim/ilan düzenlemeleri korunur (F2-23).
+  const { guardLeave, confirmDialog } = useHostLeaveGuard();
 
   return (
     <Card title={t("title")} id="host-party-risk">
@@ -86,7 +90,11 @@ export default function PartyRiskPanel() {
                       {t("dateRange", { from, to: f.date(i.checkOut, "short") })}
                     </p>
                     {i.status === "CONFIRMED" ? (
-                      <Link href={"/host/messages/" + i.bookingId} className={cardLinkClass}>
+                      <Link
+                        href={"/host/messages/" + i.bookingId}
+                        className={cardLinkClass}
+                        onNavigate={guardLeave("/host/messages/" + i.bookingId)}
+                      >
                         {t("messageGuest")}
                         <span className="sr-only">
                           : {i.propertyTitle}, {from}
@@ -154,7 +162,11 @@ export default function PartyRiskPanel() {
                         <td className="py-2">
                           {/* Mesajlaşma yalnız onaylı rezervasyonda açık (message-service). */}
                           {i.status === "CONFIRMED" ? (
-                            <Link href={"/host/messages/" + i.bookingId} className={linkClass}>
+                            <Link
+                              href={"/host/messages/" + i.bookingId}
+                              className={linkClass}
+                              onNavigate={guardLeave("/host/messages/" + i.bookingId)}
+                            >
                               {t("messageGuest")}
                               <span className="sr-only">
                                 : {i.propertyTitle}, {from}
@@ -173,6 +185,7 @@ export default function PartyRiskPanel() {
           </>
         )}
       </div>
+      {confirmDialog}
     </Card>
   );
 }

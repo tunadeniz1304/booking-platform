@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { apiFetch } from "@/lib/api-client";
-import { Button, Field, focusRing, inputClass, useErrorText } from "@/components/ui/ui";
+import { Button, ErrorText, Field, focusRing, inputClass, useErrorText } from "@/components/ui/ui";
 
 /** reply API sınırları (`/api/reviews/[id]/reply`: trim sonrası 2–1000 karakter). */
 const REPLY_MIN = 2;
@@ -23,7 +23,6 @@ export default function ReviewHostReplyForm({
   onReplied: (text: string, repliedAt: string | null) => void;
 }) {
   const t = useTranslations("reviews.reply");
-  const tc = useTranslations("common");
   const errorText = useErrorText();
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
@@ -130,12 +129,7 @@ export default function ReviewHostReplyForm({
               {t("cancel")}
             </Button>
           </div>
-          {error && (
-            <p role="alert" className="text-gray-700">
-              <span aria-hidden="true">{"⚠︎"} </span>
-              <span className="font-semibold">{tc("errorPrefix")}</span> {error}
-            </p>
-          )}
+          {error && <ErrorText>{error}</ErrorText>}
         </div>
       )}
     </div>

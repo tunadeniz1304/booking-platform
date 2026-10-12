@@ -12,7 +12,7 @@ import { useTranslations } from "next-intl";
 import { apiFetch } from "@/lib/api-client";
 import { useFormat } from "@/i18n/use-format";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
-import { Button, Status } from "@/components/ui/ui";
+import { Button, ErrorText, Status } from "@/components/ui/ui";
 import { passkeySupported, registerPasskey } from "@/lib/auth/passkey-client";
 import { ReauthCancelledError, useAccountErrorText, useReauth } from "./ReauthDialog";
 
@@ -176,11 +176,7 @@ export default function PasskeyManager() {
         {t("passkeys.title")}
       </h2>
       <p className="mt-1 text-sm text-gray-600">{t("passkeys.description")}</p>
-      {status?.kind === "error" && (
-        <p role="alert" className={`mt-3 text-sm ${STATUS_TONE.error}`}>
-          {status.text}
-        </p>
-      )}
+      {status?.kind === "error" && <ErrorText className="mt-3">{status.text}</ErrorText>}
       {/* Başarı ve nötr bilgi her zaman DOM'da duran role="status" bölgesinde duyurulur. */}
       <div role="status" className="text-sm">
         {status && status.kind !== "error" && (

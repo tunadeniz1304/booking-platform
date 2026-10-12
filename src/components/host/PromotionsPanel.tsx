@@ -18,6 +18,7 @@ import {
   useLoader,
 } from "@/components/ui/ui";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { useHostUnsavedChanges } from "./useHostUnsavedChanges";
 
 /** Bu oranın üstündeki indirimler gönderimden önce onay ister (yanlışlıkla %100). */
 const HIGH_DISCOUNT_PERCENT = 50;
@@ -196,6 +197,15 @@ export default function PromotionsPanel({
   const [editing, setEditing] = useState<Promotion | null>(null);
   const { confirm, confirmDialog } = useConfirm();
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
+  // Formun son "temiz" hali (boş form ya da düzenlenen kayıt): fark varsa taslak var (F2-24).
+  const [baseline, setBaseline] = useState<FormState>(EMPTY_FORM);
+  const dirty = (Object.keys(form) as Array<keyof FormState>).some((k) => form[k] !== baseline[k]);
+  useHostUnsavedChanges(dirty);
+  /** Formu verilen hale getirir ve onu temiz kabul eder. */
+  function resetForm(next: FormState) {
+    setForm(next);
+    setBaseline(next);
+  }
   const formRef = useRef<HTMLFormElement>(null);
   const nameRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -322,14 +332,27 @@ export default function PromotionsPanel({
     focusFirstInvalid(formRef.current);
   }
 
-  function startEdit(p: Promotion) {
+  async function startEdit(p: Promotion) {
+    // Yarım taslak ya da başka satırın düzenlemesi sorulmadan ezilmez (F2-24).
+    if (
+      dirty &&
+      !(await confirm({
+        title: t("unsaved.discardConfirm.title"),
+        body: t("unsaved.discardConfirm.body"),
+        confirmLabel: t("unsaved.discardConfirm.confirm"),
+        cancelLabel: t("unsaved.discardConfirm.cancel"),
+        tone: "danger",
+      }))
+    ) {
+      return;
+    }
     const key = CONDITION[p.type];
     const value = key ? p[key] : null;
     const digits = p.currency ? fractionDigitsOf(p.currency) : 2;
     setEditing(p);
     setFieldErrors({});
     setFormStatus({});
-    setForm({
+    resetForm({
       name: p.name,
       type: p.type,
       discountKind: p.discountMinor !== null ? "fixed" : "percent",
@@ -359,7 +382,7 @@ export default function PromotionsPanel({
   function cancelEdit() {
     const id = editing?.id;
     setEditing(null);
-    setForm(EMPTY_FORM);
+    resetForm(EMPTY_FORM);
     setFieldErrors({});
     setFormStatus({});
     if (id) focusVisibleAction(actionRefs.current, `${id}:edit`);
@@ -429,12 +452,14 @@ export default function PromotionsPanel({
       if (editingId) {
         // Düzenleme bitince odak ve sonuç satırın "Düzenle" düğmesinde.
         setEditing(null);
-        setForm(EMPTY_FORM);
+        resetForm(EMPTY_FORM);
         setStatus({ message: t("promotions.updated") });
         pendingFocus.current = `${editingId}:edit`;
       } else {
         setFormStatus({ message: t("promotions.created") });
         setForm((prev) => ({ ...prev, name: "", couponCode: "" }));
+        // Seçili tür/indirim benzer kayıt için kalır; bu hal temiz sayılır.
+        setBaseline({ ...form, name: "", couponCode: "" });
       }
       reload();
     } catch (err) {
@@ -509,11 +534,12 @@ export default function PromotionsPanel({
       setStatus({ message: res.deleted ? t("promotions.deleted") : t("promotions.deactivated") });
       if (editing?.id === p.id && res.deleted) {
         setEditing(null);
-        setForm(EMPTY_FORM);
+        resetForm(EMPTY_FORM);
       }
       // Silinen satırın düğmesi DOM'dan kalkar: odak komşu satıra, yoksa listeye (F864).
+      // Durdurulan kullanılmış kayıtta Sil kalkar (F2-53): odak "Etkinleştir"e.
       pendingFocus.current = !res.deleted
-        ? `${p.id}:delete`
+        ? `${p.id}:toggle`
         : neighbour
           ? `${neighbour.id}:edit`
           : "list";
@@ -561,7 +587,7 @@ export default function PromotionsPanel({
         <button
           type="button"
           ref={actionRef(`${p.id}:edit${suffix}`)}
-          onClick={() => startEdit(p)}
+          onClick={() => void startEdit(p)}
           className={`${action} text-[#003580]`}
         >
           {t("promotions.edit")}
@@ -578,17 +604,24 @@ export default function PromotionsPanel({
           {p.active ? t("promotions.deactivate") : t("promotions.activate")}
           <span className="sr-only">: {p.name}</span>
         </button>
-        <button
-          type="button"
-          ref={actionRef(`${p.id}:delete${suffix}`)}
-          onClick={() => remove(p)}
-          aria-disabled={rowBusy === p.id || undefined}
-          aria-busy={rowBusy === p.id || undefined}
-          className={`${action} ml-4 text-red-700`}
-        >
-          {t("promotions.delete")}
-          <span className="sr-only">: {p.name}</span>
-        </button>
+        {/* Kullanılmış ve durdurulmuş kayıt silinemez: düğme yerine satır içi açıklama (F2-53). */}
+        {p.usageCount > 0 && !p.active ? (
+          <span className={`ml-4 text-gray-700 ${variant === "card" ? "py-2" : "py-1"}`}>
+            {t("promotions.cannotDeleteInline")}
+          </span>
+        ) : (
+          <button
+            type="button"
+            ref={actionRef(`${p.id}:delete${suffix}`)}
+            onClick={() => remove(p)}
+            aria-disabled={rowBusy === p.id || undefined}
+            aria-busy={rowBusy === p.id || undefined}
+            className={`${action} ml-4 text-red-700`}
+          >
+            {t("promotions.delete")}
+            <span className="sr-only">: {p.name}</span>
+          </button>
+        )}
       </div>
     );
   };

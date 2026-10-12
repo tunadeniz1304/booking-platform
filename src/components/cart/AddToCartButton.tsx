@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { ApiError, apiFetch } from "@/lib/api-client";
-import { loginHref, useErrorText, useSession } from "@/components/ui/ui";
+import { ErrorText, loginHref, useErrorText, useSession } from "@/components/ui/ui";
 import { setHeaderCartCount } from "@/components/layout/useHeaderCartCount";
 
 /** Girişten dönüşte tamamlanacak bekleyen eylem (sorgu parametresi). */
@@ -181,7 +181,12 @@ export default function AddToCartButton({
         )}
       </div>
       <div role="alert">
-        {current?.kind === "error" && <p className="mt-2 text-sm text-red-600">{current.text}</p>}
+        {/* F2-44: kalıcı alert bölgesi korunur; içerik ortak ErrorText (rolsüz). */}
+        {current?.kind === "error" && (
+          <ErrorText live={false} className="mt-2">
+            {current.text}
+          </ErrorText>
+        )}
       </div>
     </div>
   );

@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { Button, LlmBadge, focusRing, inputClass } from "@/components/ui/ui";
 import { useFormat } from "@/i18n/use-format";
 import { amenityNameKey } from "@/lib/i18n/amenity-display-names";
+import { usePlaceLabel } from "@/lib/i18n/use-place-label";
 import { propertyTypeKey } from "@/lib/i18n/property-type";
 
 export interface SmartFilters {
@@ -49,13 +50,18 @@ export interface ChipFormatters {
   price?: (value: number) => string;
   /** Veritabanındaki olanak adı → arayüz dilindeki ad. */
   amenity?: (name: string) => string;
+  /** Veritabanındaki şehir adı → arayüz dilindeki ad (F2-18). */
+  city?: (name: string) => string;
 }
 
 export function filtersToChips(f: SmartFilters, t: Translate, fmt: ChipFormatters = {}): Chip[] {
   const chips: Chip[] = [];
   const date = fmt.date ?? ((iso: string) => iso);
   const price = fmt.price ?? ((value: number) => value);
-  if (f.city) chips.push({ key: "city", label: t("smart.chips.city", { value: f.city }) });
+  if (f.city) {
+    const value = fmt.city ? fmt.city(f.city) : f.city;
+    chips.push({ key: "city", label: t("smart.chips.city", { value }) });
+  }
   if (f.query) chips.push({ key: "query", label: t("smart.chips.query", { value: f.query }) });
   if (f.guests) chips.push({ key: "guests", label: t("smart.chips.guests", { count: f.guests }) });
   if (f.minPrice !== undefined)
@@ -120,6 +126,7 @@ export default function SmartFilter({
   const tProperty = useTranslations("property");
   const tCommon = useTranslations("common");
   const fmt = useFormat();
+  const placeLabel = usePlaceLabel();
   const [text, setText] = useState("");
   /** Gönderilen metin en kısa sınırın altında: görünür hata + aria-invalid (F1141). */
   const [tooShort, setTooShort] = useState(false);
@@ -128,6 +135,7 @@ export default function SmartFilter({
   const chips = filters
     ? filtersToChips(filters, t, {
         date: (iso) => fmt.date(iso, "medium"),
+        city: placeLabel.city,
         price: (value) => {
           const amount = priceCurrency ? fmt.decimal(value, priceCurrency) : fmt.number(value);
           // Toplam fiyatta gece sayısı burada bilinmediğinden yalnız tutar gösterilir.

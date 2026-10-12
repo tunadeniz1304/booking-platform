@@ -29,6 +29,7 @@ const buttonVariants = {
   primary: "bg-[#003580] text-white hover:bg-[#002b66]",
   secondary: "border border-[#003580] bg-white text-[#003580] hover:bg-blue-50",
   danger: "bg-red-700 text-white hover:bg-red-800",
+  dangerOutline: "border border-red-700 bg-white text-red-700 hover:bg-red-50",
 } as const;
 
 const buttonSizes = {
@@ -290,6 +291,32 @@ export function Status({
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * F2-44: `Status`un sığmadığı satır içi hata metni (alan altı, kart içi, diyalog). Status ile
+ * aynı görünüm: `role="alert"`, simge ve gizli "Hata:" öneki, `text-red-700`. `live={false}`
+ * ise canlı bölge olmadan çizilir (hata başka bir yoldan, ör. alan `aria-describedby` ile okunur).
+ */
+export function ErrorText({
+  children,
+  id,
+  className = "",
+  live = true,
+}: {
+  children: React.ReactNode;
+  id?: string;
+  className?: string;
+  live?: boolean;
+}) {
+  const t = useTranslations("common");
+  return (
+    <p id={id} role={live ? "alert" : undefined} className={`text-sm text-red-700 ${className}`}>
+      <span aria-hidden="true">{ERROR_ICON} </span>
+      <span className="sr-only">{t("errorPrefix")} </span>
+      {children}
+    </p>
   );
 }
 

@@ -15,6 +15,6 @@
   },
   "actions": {
     "verify": "E-posta adresimi doğrula",
-    "reset": "Parola sıfırlama sayfasını aç"
+    "reset": "Şifre sıfırlama sayfasını aç"
   }
 }

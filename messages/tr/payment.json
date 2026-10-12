@@ -12,39 +12,41 @@
   "cvc": "CVC",
   "testCards": "Demo test kartları: {success} (onay), {decline} (ret), {threeDs} (3D Secure). Gerçek ödeme alınmaz.",
   "stripeTestMode": "Stripe test modu — gerçek ödeme alınmaz.",
-  "processing": "İşleniyor...",
+  "processing": "İşleniyor…",
   "payAndConfirm": "Öde ve onayla",
   "threeDsTitle": "3D Secure doğrulaması",
   "verificationCode": "Doğrulama kodu",
   "verify": "Doğrula",
   "cancel": {
-    "confirm": "Rezervasyonu iptal etmek istediğinize emin misiniz?",
     "refunded": "İptal edildi. İade: {amount} (%{percent}).",
     "noRefund": "İptal edildi. Politika gereği iade yok.",
     "failed": "İptal edilemedi",
     "button": "Rezervasyonu iptal et",
     "dialogTitle": "Rezervasyon iptal edilsin mi?",
     "dialogBodyHeld": "Henüz ödeme alınmadı. İptal ederseniz odanın tutulması kaldırılır.",
-    "dialogBodyConfirmed": "İade tutarı, rezervasyon sırasında kabul ettiğiniz iptal politikasına göre hesaplanır ve iptalden hemen sonra gösterilir.",
+    "dialogBodyConfirmed": "İade tutarı, rezervasyon sırasında kabul ettiğiniz iptal politikasına ve ne zaman iptal ettiğinize göre hesaplanır.",
+    "dialogRefundUntil": "Ücretsiz iptal {date} {time} tarihine kadar (tesisin yerel saatiyle): şimdi iptal ederseniz tutarın tamamı iade edilir.",
+    "dialogRefundEnded": "Ücretsiz iptal süresi {date} {time} itibarıyla bitti: iptal politikasına göre kısmi iade alırsınız ya da iade yapılmaz.",
+    "dialogRefundNone": "Bu rezervasyonda ücretsiz iptal yok: iptal politikasına göre kısmi iade alırsınız ya da iade yapılmaz.",
     "irreversible": "Bu işlem geri alınamaz.",
     "confirmButton": "Evet, iptal et",
     "keep": "Rezervasyonu koru",
     "cancelledNoCharge": "İptal edildi. Kartınızdan ödeme alınmadı.",
-    "processing": "İptal ediliyor..."
+    "processing": "İptal ediliyor…"
   },
   "stepUp": {
     "failed": "Doğrulama başarısız",
     "title": "Ek doğrulama gerekli",
-    "description": "Hesabınızı korumak için bu ödemeyi passkey'inizle onaylamanızı istiyoruz. Onaydan sonra ödeme otomatik olarak yeniden denenir.",
-    "managePasskeys": "Passkey oluştur veya yönet (yeni sekmede açılır)",
-    "waiting": "Passkey onayı bekleniyor…",
-    "verify": "Passkey ile doğrula",
+    "description": "Hesabınızı korumak için bu ödemeyi geçiş anahtarınızla (passkey) onaylamanızı istiyoruz. Onaydan sonra ödeme otomatik olarak yeniden denenir.",
+    "managePasskeys": "Geçiş anahtarı oluştur veya yönet (yeni sekmede açılır)",
+    "waiting": "Geçiş anahtarı onayı bekleniyor…",
+    "verify": "Geçiş anahtarıyla doğrula",
     "cancel": "Vazgeç",
-    "whatIsPasskey": "Passkey, telefonunuzun ya da bilgisayarınızın kilidini açtığınız yöntemle (parmak izi, yüz tanıma veya PIN) yaptığınız, şifre gerektirmeyen bir doğrulamadır.",
-    "noPasskey": "Passkey'iniz yoksa hesap sayfasında birkaç saniyede oluşturabilir, sonra bu pencereye dönüp yeniden deneyebilirsiniz.",
+    "whatIsPasskey": "Geçiş anahtarı, telefonunuzun ya da bilgisayarınızın kilidini açtığınız yöntemle (parmak izi, yüz tanıma veya PIN) yaptığınız, şifre gerektirmeyen bir doğrulamadır.",
+    "noPasskey": "Geçiş anahtarınız yoksa hesap sayfasında birkaç saniyede oluşturabilir, sonra bu pencereye dönüp yeniden deneyebilirsiniz.",
     "holdUntil": "Odanız sizin için tutuluyor; tutma süresi saat {time} itibarıyla doluyor.",
-    "waitingHint": "Cihazınızın açtığı passkey penceresinde parmak izi, yüz tanıma veya PIN ile onay verin. Telefonunuzla doğruluyorsanız telefonunuza gelen isteği onaylayın.",
-    "cancelled": "Passkey onayı iptal edildi veya zaman aşımına uğradı. Ödeme alınmadı; yeniden deneyebilirsiniz.",
+    "waitingHint": "Cihazınızın açtığı geçiş anahtarı penceresinde parmak izi, yüz tanıma veya PIN ile onay verin. Telefonunuzla doğruluyorsanız telefonunuza gelen isteği onaylayın.",
+    "cancelled": "Geçiş anahtarı onayı iptal edildi veya zaman aşımına uğradı. Ödeme alınmadı; yeniden deneyebilirsiniz.",
     "cancelledNoCharge": "Ek doğrulamadan vazgeçtiniz; ödeme alınmadı. Hazır olduğunuzda ödemeyi yeniden deneyebilirsiniz."
   },
   "rnpl": {
@@ -84,14 +86,13 @@
   "threeDsDemoHint": "Demo doğrulama kodu: {code}",
   "threeDsAnnounce": "3D Secure doğrulaması gerekiyor. Bankanızın gönderdiği kodu girin.",
   "threeDsBack": "Geri dön, başka kart kullan",
-  "paidAnnounce": "Ödemeniz alındı, rezervasyonunuz onaylandı.",
   "hold": {
     "remaining": "Kalan süre: {time}",
     "warnMinutes": "Odanın tutulma süresinin bitmesine {minutes} dakika kaldı.",
     "expired": "Tutma süresi doldu. Oda artık sizin için ayrılmış değil.",
     "expiredTitle": "Tutma süresi doldu",
     "expiredBody": "Ödeme süresi içinde tamamlanmadığı için oda serbest bırakıldı. Ücret alınmadı. Aynı tarihler için yeniden arama yapabilirsiniz.",
-    "rebook": "Yeniden ara ve rezervasyon yap"
+    "rebook": "Aynı tarihler için yeniden ara"
   },
   "errors": {
     "EXPIRY_FORMAT": "Son kullanma tarihini AA/YY biçiminde girin, ör. 08/28.",
@@ -119,7 +120,7 @@
     "left": "Kalan deneme hakkı: {count}.",
     "lockedTitle": "Bu rezervasyon için kartla ödeme kapatıldı",
     "lockedBody": "Çok fazla başarısız deneme yapıldığı için bu rezervasyonda kartla ödeme güvenliğiniz adına durduruldu. Kartınızdan ücret alınmadı. Destek ekibimize yazabilir ya da rezervasyonu iptal ederek odayı serbest bırakabilirsiniz.",
-    "contactSupport": "Destekle iletişime geç"
+    "contactSupport": "Destek ekibine yazın"
   },
   "threeDsNoCode": "Kod gelmedi mi? Birkaç dakika bekleyin; yine gelmezse aşağıdan başka bir kartla ödeyebilirsiniz. Kartınızdan ödeme alınmadı.",
   "otherOptions": "Diğer seçenekler",

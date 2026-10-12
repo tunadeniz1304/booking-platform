@@ -34,7 +34,7 @@
     "verifiedAt": "Doğrulama tarihi: {date}",
     "lastError": "Hata kodu (destek için): {code}",
     "start": "Doğrulamayı başlat",
-    "retry": "Yeniden dene",
+    "retry": "Tekrar dene",
     "starting": "Başlatılıyor…",
     "startFailed": "Doğrulama başlatılamadı.",
     "redirecting": "Doğrulama sayfasına yönlendiriliyorsunuz…",
@@ -48,7 +48,7 @@
       "expired": "Süresi dolmuş belge",
       "fake": "Sahte belge"
     },
-    "supportLink": "Destek ekibiyle iletişime geçin",
+    "supportLink": "Destek ekibine yazın",
     "errors": {
       "document_unreadable": "Belge fotoğrafı okunamadı. Işıklı bir ortamda, parlama olmadan ve belgenin tamamı görünecek şekilde yeniden çekin.",
       "document_expired": "Belgenizin süresi dolmuş. Süresi geçerli bir kimlik belgesiyle yeniden deneyin.",

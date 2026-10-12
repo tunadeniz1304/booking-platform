@@ -9,7 +9,7 @@
     "controller": {
       "title": "1. Veri sorumlusu",
       "body": "6698 sayılı Kişisel Verilerin Korunması Kanunu (\"KVKK\") uyarınca veri sorumlusu, bu demo platformun işletmecisidir. Demo ortamında gerçek ödeme alınmaz ve gerçek kişisel veri girilmemelidir.",
-      "contact": "Başvuru kanalı: Bilgi talebi, düzeltme veya itiraz gibi başvurularınızı giriş yaptıktan sonra <link>Destek</link> sayfasında \"İnsana bağlan\" seçeneğiyle doğrudan insan destek ekibine iletebilirsiniz."
+      "contact": "Başvuru kanalı: Bilgi talebi, düzeltme veya itiraz gibi başvurularınızı giriş yaptıktan sonra <link>Yardım ve destek</link> sayfasında \"İnsana bağlan\" seçeneğiyle doğrudan insan destek ekibine iletebilirsiniz."
     },
     "data": {
       "title": "2. İşlenen kişisel veriler",
@@ -38,7 +38,7 @@
     "rights": {
       "title": "7. Haklarınız (KVKK md. 11)",
       "body": "Verilerinizin işlenip işlenmediğini öğrenme, bilgi talep etme, düzeltme, silme ve itiraz haklarına sahipsiniz. Verilerinizi indirmek veya hesabınızı silmek için <link>Gizlilik ve verilerim</link> sayfasını kullanabilirsiniz.",
-      "requests": "Bilgi talebi, düzeltme (ör. adınızın veya e-posta adresinizin düzeltilmesi) ve itiraz haklarınızı kullanmak için <link>Destek</link> sayfasından insan destek ekibine yazabilirsiniz."
+      "requests": "Bilgi talebi, düzeltme (ör. adınızın veya e-posta adresinizin düzeltilmesi) ve itiraz haklarınızı kullanmak için <link>Yardım ve destek</link> sayfasından insan destek ekibine yazabilirsiniz."
     },
     "lastUpdated": "Son güncelleme: <time>{date}</time>",
     "summary": {
@@ -80,6 +80,7 @@
     },
     "exportFailed": "Verileriniz indirilemedi. Lütfen tekrar deneyin.",
     "deleteFailed": "Hesabınız silinemedi. Lütfen tekrar deneyin.",
+    "deleteCancelled": "İşlem iptal edildi; hesabınız silinmedi.",
     "obligations": {
       "title": "Hesabınız şu an silinemiyor. Önce aşağıdakileri tamamlayın:",
       "hostedBookings": "{count, plural, other {Ev sahibi olarak # yaklaşan onaylı rezervasyonunuz var.}}",

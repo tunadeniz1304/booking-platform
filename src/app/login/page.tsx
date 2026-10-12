@@ -24,7 +24,7 @@ import {
 import { invalidateFavoriteIds } from "@/components/property/useFavoriteIds";
 import { Button, ButtonLink, buttonClass } from "@/components/ui/ui";
 import { logout } from "@/lib/api-client";
-import { rememberAuthEmail } from "@/lib/auth/auth-email-handoff";
+import { readRememberedAuthEmail, rememberAuthEmail } from "@/lib/auth/auth-email-handoff";
 import { loginWithPasskeyAutofill } from "@/lib/auth/passkey-autofill-login";
 import type { PowChallenge, PowSolution } from "@/lib/auth/pow-solver";
 import { isAbortError, solvePowCancellable } from "@/lib/auth/pow-solve-cancellable";
@@ -88,8 +88,10 @@ export default function LoginPage() {
   const sessionUser = useSessionUserCache();
   // Kayıt sayfasındaki "giriş yapın" bağlantısı adresi `?email=` ile getirir.
   const emailParam = useSearchParam("email");
+  // F2-34: şifre sıfırlama/değiştirme akışından dönülünce aynı sekmede yazılan e-posta.
+  const rememberedEmail = useSyncExternalStore(noopSubscribe, readRememberedAuthEmail, () => null);
   const [typedEmail, setTypedEmail] = useState<string | null>(null);
-  const email = typedEmail ?? emailParam ?? "";
+  const email = typedEmail ?? emailParam ?? rememberedEmail ?? "";
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<LoginField, string>>>({});

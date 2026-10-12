@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import Image from "next/image";
 import Link from "next/link";
@@ -12,17 +12,25 @@ import { useSessionUserCache } from "@/components/layout/useSessionUserCache";
 import PropertyCard, { propertyHref, type SearchContext } from "@/components/property/PropertyCard";
 import RankingWhy, { type RankingWeightsSet } from "@/components/search/RankingWhy";
 import SmartFilter, { type SmartFilters } from "@/components/search/SmartFilter";
+import SearchBar, { type SearchBarFocusField } from "@/components/search/SearchBar";
 import CompareToggle from "@/components/compare/CompareToggle";
 import CompareBar from "@/components/compare/CompareBar";
 import AccessibilityFilter from "@/components/search/AccessibilityFilter";
 import { SearchPageSkeleton, SearchResultSkeletons } from "@/components/search/SearchPageSkeleton";
 import { parseAccessibilityParam } from "@/lib/compliance/accessibility-codes";
 import { propertyTypeKey } from "@/lib/i18n/property-type";
+import { usePlaceLabel } from "@/lib/i18n/use-place-label";
 import type { MapPoint } from "@/components/search/ResultsMap";
 import { ApiError, apiFetch } from "@/lib/api-client";
 import { useFormat } from "@/i18n/use-format";
 import { parseAmountToMinor } from "@/lib/ui/amount-input";
-import { Button, focusRing, useErrorText, usePageHeadingFocus } from "@/components/ui/ui";
+import {
+  Button,
+  ErrorText,
+  focusRing,
+  useErrorText,
+  usePageHeadingFocus,
+} from "@/components/ui/ui";
 
 // Harita yalnızca istemcide ve yalnızca istenince yüklenir (maplibre ağır, SSR'siz).
 const ResultsMap = dynamic(() => import("@/components/search/ResultsMap"), {
@@ -104,6 +112,10 @@ interface SmartResponse {
 const PROPERTY_TYPES = ["HOTEL", "APARTMENT", "VILLA", "HOSTEL", "BED_AND_BREAKFAST"];
 const SORT_VALUES = ["recommended", "price_asc", "price_desc", "rating"];
 const PAGE_SIZE = 24;
+/** F2-17: URL'den geri yüklenecek en fazla "Daha fazla göster" sayfası. */
+const MAX_RESTORED_PAGES = 10;
+/** F2-17: ilana gidilen kartın id'si (dönüşte kaydırma + odak). */
+const LAST_RESULT_KEY = "search:lastResult";
 
 /** iOS Safari 16px altı alanda odakta sayfayı büyütür; küçük ekranda `text-base` (F424). */
 const smallInput = `w-full rounded-sm border border-gray-500 px-2 py-1 text-base sm:text-sm ${focusRing}`;
@@ -160,12 +172,13 @@ const PARAM_LABEL_KEYS: Record<string, string> = {
   flexDays: "flex.label",
 };
 
-/** Geçersiz parametre → "Aramayı düzenle" formunda odaklanacak alan. */
-const PARAM_EDIT_FIELDS: Record<string, string> = {
-  destination: "edit-destination",
-  checkIn: "edit-checkin",
-  checkOut: "edit-checkout",
-  guests: "edit-guests",
+/** Geçersiz parametre → "Aramayı düzenle" çubuğunda odaklanacak alan (F2-05). */
+const PARAM_EDIT_FIELDS: Record<string, SearchBarFocusField> = {
+  destination: "destination",
+  city: "destination",
+  checkIn: "dates",
+  checkOut: "dates",
+  guests: "guests",
 };
 
 /** ZodError.flatten() ayrıntısından geçersiz alan adları. */
@@ -179,6 +192,8 @@ function SearchPageContent() {
   const t = useTranslations("search");
   const f = useFormat();
   const tA11y = useTranslations("compliance.accessibility");
+  // F2-18: görünen şehir/ülke adları arayüz dilinde (API'ye giden değerler değişmez).
+  const placeLabel = usePlaceLabel();
   // F967: teknik durum ayrıntıları (önbellek, görsel arama nedeni) yalnızca yöneticiye gösterilir.
   const isAdmin = useSessionUserCache()?.role === "ADMIN";
   // F429: sayfa kendi `main` öğesini kurar; istemci tarafı gezinmede odak h1'e taşınır.
@@ -212,16 +227,31 @@ function SearchPageContent() {
   const view: "list" | "map" = searchParams.get("view") === "map" ? "map" : "list";
   const rawFlex = Number(searchParams.get("flexDays"));
   const flexDays = FLEX_OPTIONS.includes(rawFlex as (typeof FLEX_OPTIONS)[number]) ? rawFlex : 0;
+  // F2-06: akıllı filtre sonucu da URL'de (city/amenities + çipler için smart/smartKeys).
+  const cityParam = searchParams.get("city") || "";
+  const amenitiesParam = searchParams.get("amenities") || "";
+  const smartText = searchParams.get("smart") || "";
+  const smartKeysParam = searchParams.get("smartKeys") || "";
+  // F2-17: yüklenmiş "Daha fazla göster" sayfa sayısı.
+  const rawPages = Number(searchParams.get("pages"));
+  const pagesParam =
+    Number.isInteger(rawPages) && rawPages > 1 ? Math.min(rawPages, MAX_RESTORED_PAGES) : 1;
 
-  /** Mevcut URL'yi koruyarak verilen parametreleri yazar (null/"" → siler). */
+  /**
+   * Mevcut URL'yi koruyarak verilen parametreleri yazar (null/"" → siler). Arama değişince
+   * yüklenen sayfa sayısı sıfırlanır (görünüm değişimi hariç).
+   */
   const updateParams = useCallback(
-    (patch: Record<string, string | null>) => {
+    (patch: Record<string, string | null>, mode: "replace" | "push" = "replace") => {
       const next = new URLSearchParams(searchParams.toString());
       for (const [key, value] of Object.entries(patch)) {
         if (value === null || value === "") next.delete(key);
         else next.set(key, value);
       }
-      router.replace(`/search?${next.toString()}`, { scroll: false });
+      if (!("pages" in patch) && !("view" in patch)) next.delete("pages");
+      const url = `/search?${next.toString()}`;
+      if (mode === "push") router.push(url, { scroll: false });
+      else router.replace(url, { scroll: false });
     },
     [searchParams, router]
   );
@@ -231,6 +261,7 @@ function SearchPageContent() {
     const next = new URLSearchParams(searchParams.toString());
     if (photoId) next.set("similarToPhotoId", photoId);
     else next.delete("similarToPhotoId");
+    next.delete("pages"); // F2-17: yeni görsel arama ilk sayfadan başlar
     return `/search?${next.toString()}`;
   };
 
@@ -248,7 +279,41 @@ function SearchPageContent() {
   const [weightsSet, setWeightsSet] = useState<RankingWeightsSet | undefined>(undefined);
   const [stay, setStay] = useState<StayContext>({ checkIn, checkOut, guests });
 
-  const [smartFilters, setSmartFilters] = useState<SmartFilters | null>(null);
+  // F2-06: çipler URL'den türetilir; başlık, form ve "Sonuçlara dön" aynı aramayı gösterir.
+  const smartFilters = useMemo<SmartFilters | null>(() => {
+    if (!smartText) return null;
+    const keys = new Set(smartKeysParam.split(",").filter(Boolean));
+    const out: SmartFilters = { amenities: [] };
+    if (keys.has("city") && (cityParam || destination)) out.city = cityParam || destination;
+    if (keys.has("query") && destination) out.query = destination;
+    if (keys.has("guests") && guestsParam > 0) out.guests = guestsParam;
+    if (keys.has("checkIn") && checkIn && checkOut) {
+      out.checkIn = checkIn;
+      out.checkOut = checkOut;
+    }
+    if (keys.has("propertyType") && typeParam) out.propertyType = typeParam;
+    if (keys.has("minPrice") && minParam !== undefined) out.minPrice = minParam;
+    if (keys.has("maxPrice") && maxParam !== undefined) out.maxPrice = maxParam;
+    if (keys.has("sort") && rawSort) out.sort = sortParam;
+    if (keys.has("amenities") && amenitiesParam) {
+      out.amenities = amenitiesParam.split(",").filter(Boolean);
+    }
+    return out;
+  }, [
+    smartText,
+    smartKeysParam,
+    cityParam,
+    destination,
+    guestsParam,
+    checkIn,
+    checkOut,
+    typeParam,
+    minParam,
+    maxParam,
+    rawSort,
+    sortParam,
+    amenitiesParam,
+  ]);
   const [llmMode, setLlmMode] = useState<string | null>(null);
   const [smartBusy, setSmartBusy] = useState(false);
   /** F961: akıllı filtre hatası arama hatasından ayrı; mevcut sonuçlar gizlenmez. */
@@ -260,46 +325,36 @@ function SearchPageContent() {
   /** Mobilde filtre paneli varsayılan olarak kapalı (F142). */
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
-  const [editRequest, setEditRequest] = useState(0);
-  const editFocusRef = useRef<string | null>(null);
+  const [editFocus, setEditFocus] = useState<{ field: SearchBarFocusField; seq: number }>({
+    field: "destination",
+    seq: 0,
+  });
   const requestSeq = useRef(0);
   const pendingFocusId = useRef<string | null>(null);
 
-  // F340: tek filtre durumu — akıllı filtrenin çıkardığı alan varsa o, yoksa paneldeki (URL) değer.
-  const effType = smartFilters?.propertyType ?? typeParam;
-  const effSort = smartFilters?.sort ?? sortParam;
-  const effMin = smartFilters?.minPrice ?? minParam;
-  const effMax = smartFilters?.maxPrice ?? maxParam;
+  // F340 + F2-06: tek filtre durumu URL'dir; akıllı filtre sonucu da URL'ye yazılır.
+  const effType = typeParam;
+  const effSort = sortParam;
+  const effMin = minParam;
+  const effMax = maxParam;
+  const smartDestination = Boolean(smartFilters?.city || smartFilters?.query);
 
-  // F67 + F338: akıllı filtre URL'deki temel aramanın ÜZERİNE birleştirilir (tarih/misafir korunur).
   const requestKey = useMemo(() => {
     const p = new URLSearchParams();
     if (destination) {
       p.set("destination", destination);
       // pgvector semantik arama: sorgu-odaklı olduğunda daha iyi sıralar;
       // vektör katmanı yoksa servis otomatik olarak keyword yoluna döner.
-      p.set("semantic", "1");
+      // Akıllı filtrenin çıkardığı varış yeri anahtar kelimeyle aranır.
+      if (!smartDestination) p.set("semantic", "1");
     }
+    if (cityParam && cityParam !== destination) p.set("city", cityParam);
     if (checkIn && checkOut) {
       p.set("checkIn", checkIn);
       p.set("checkOut", checkOut);
     }
     p.set("guests", String(guests));
-    const s = smartFilters;
-    if (s) {
-      const smartDestination = s.city && s.query ? s.query : (s.city ?? s.query);
-      if (smartDestination) {
-        p.set("destination", smartDestination);
-        p.delete("semantic");
-      }
-      if (s.city && s.query) p.set("city", s.city);
-      if (s.guests) p.set("guests", String(s.guests));
-      if (s.checkIn && s.checkOut) {
-        p.set("checkIn", s.checkIn);
-        p.set("checkOut", s.checkOut);
-      }
-      if (s.amenities.length > 0) p.set("amenities", s.amenities.join(","));
-    }
+    if (amenitiesParam) p.set("amenities", amenitiesParam);
     if (effType) p.set("propertyType", effType);
     // F8/F68: fiyat süzgeci sunucuda (tarih varsa vergi dahil toplam, yoksa gecelik fiyat).
     const priceOrderOk = effMin === undefined || effMax === undefined || effMin <= effMax;
@@ -314,10 +369,12 @@ function SearchPageContent() {
     return p.toString();
   }, [
     destination,
+    smartDestination,
+    cityParam,
     checkIn,
     checkOut,
     guests,
-    smartFilters,
+    amenitiesParam,
     effType,
     effMin,
     effMax,
@@ -331,7 +388,8 @@ function SearchPageContent() {
   const effCheckOut = requestParams.get("checkOut") || "";
   const effDestination = requestParams.get("destination") || requestParams.get("city") || "";
   const effGuests = Number(requestParams.get("guests")) || guests;
-  const guestsDefaulted = !(guestsParam > 0) && !smartFilters?.guests;
+  const guestsDefaulted = !(guestsParam > 0);
+  const destinationLabel = effDestination ? placeLabel.city(effDestination) : "";
   const hasDates = Boolean(effCheckIn && effCheckOut);
 
   const fetchPage = useCallback(
@@ -354,18 +412,33 @@ function SearchPageContent() {
     [errorText, t]
   );
 
+  // F2-17: URL'deki sayfa sayısı yükleme anında okunur; "Daha fazla göster" URL'yi güncelleyince
+  // arama yeniden yüklenmez (efekt, aşağıdaki yükleme efektinden önce çalışır).
+  const pagesRef = useRef(pagesParam);
+  useEffect(() => {
+    pagesRef.current = pagesParam;
+  }, [pagesParam]);
+
   const load = useCallback(async () => {
     const seq = ++requestSeq.current;
     setLoading(true);
     setError(null);
     setMoreError(null);
     try {
-      const data = await fetchPage(1);
+      const pageCount = pagesRef.current;
+      const pages = await Promise.all(
+        Array.from({ length: pageCount }, (_, i) => fetchPage(i + 1))
+      );
       if (seq !== requestSeq.current) return; // eski istek: daha yeni bir arama başladı
+      const data = pages[pages.length - 1];
+      // Sayfalar arasında kayan (yinelenen) sonuçlar bir kez gösterilir.
+      const byId = new Map<string, SearchResultItem>();
+      for (const r of pages.flatMap((p) => p.results)) if (!byId.has(r.id)) byId.set(r.id, r);
+      const merged = [...byId.values()];
       const params = new URLSearchParams(requestKey);
-      setResults(data.results);
+      setResults(merged);
       setTotal(data.total);
-      setPage(1);
+      setPage(Math.max(1, Math.min(pageCount, data.totalPages)));
       setTotalPages(data.totalPages);
       setCached(data.cached);
       setVisual(data.visual);
@@ -404,6 +477,9 @@ function SearchPageContent() {
       setPage(data.page);
       setTotal(data.total);
       setTotalPages(data.totalPages);
+      // F2-17: yüklenen sayfa sayısı URL'de; ilandan dönünce aynı liste geri yüklenir.
+      pagesRef.current = data.page;
+      updateParams({ pages: data.page > 1 ? String(data.page) : null });
     } catch (err) {
       if (seq === requestSeq.current) setMoreError(errorText(err, t("errors.load")));
     } finally {
@@ -418,19 +494,53 @@ function SearchPageContent() {
     document.getElementById(`result-${id}`)?.focus();
   }, [results]);
 
-  // "Aramayı düzenle" bölümünü açıp istenen alana odaklanır (F141).
-  const openEdit = (fieldId: string) => {
-    editFocusRef.current = fieldId;
-    setEditOpen(true);
-    setEditRequest((n) => n + 1);
-  };
+  // F2-17: ilandan dönüşte tıklanan kart görünür yapılır ve odaklanır (sonuçlar yüklenince bir kez).
+  const restoreDone = useRef(false);
   useEffect(() => {
-    const id = editFocusRef.current;
-    if (!id || editRequest === 0) return;
-    editFocusRef.current = null;
-    document.getElementById(id)?.focus();
-  }, [editRequest]);
+    if (restoreDone.current || loading) return;
+    restoreDone.current = true;
+    let id: string | null = null;
+    try {
+      const raw = window.sessionStorage.getItem(LAST_RESULT_KEY);
+      if (raw) window.sessionStorage.removeItem(LAST_RESULT_KEY);
+      // Yalnızca aynı aramaya dönüşte geri yüklenir; başka arama saklanan kartı atlar.
+      const saved = raw ? (JSON.parse(raw) as { id?: unknown; query?: unknown }) : null;
+      if (saved && typeof saved.id === "string" && saved.query === searchParams.toString()) {
+        id = saved.id;
+      }
+    } catch {
+      return; // depolama kapalı ya da bozuk kayıt: geri yükleme yapılmaz
+    }
+    if (!id) return;
+    const el = document.getElementById(`result-${id}`);
+    if (!el) return;
+    el.scrollIntoView({ block: "center" });
+    el.focus({ preventScroll: true });
+  }, [loading, results, searchParams]);
+  /** Karttan ilana gidilirken kartın id'si saklanır (tıklama yakalama aşamasında). */
+  const rememberResult = (id: string) => (e: React.MouseEvent) => {
+    // Yeni sekmede açma (değiştirici tuş) bu sekmeden ayrılmaz; konum saklanmaz.
+    if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+    // Yalnızca ilan bağlantısı; aynı sayfadaki "Benzerlerini göster" saklanmaz.
+    const a = (e.target as HTMLElement).closest("a");
+    if (!a || !a.pathname.startsWith("/property/")) return;
+    try {
+      window.sessionStorage.setItem(
+        LAST_RESULT_KEY,
+        JSON.stringify({ id, query: searchParams.toString() })
+      );
+    } catch {
+      // depolama kapalı: dönüşte konum geri yüklenmez
+    }
+  };
 
+  // "Aramayı düzenle" bölümünü açıp istenen alana odaklanır (F141, F2-05: arama çubuğu).
+  const openEdit = (field: SearchBarFocusField) => {
+    setEditOpen(true);
+    setEditFocus((prev) => ({ field, seq: prev.seq + 1 }));
+  };
+
+  // F2-06: akıllı filtre sonucu URL'ye yazılır (geri tuşu önceki aramaya döner).
   const runSmart = async (text: string) => {
     if (smartBusy) return;
     lastSmartText.current = text;
@@ -443,60 +553,138 @@ function SearchPageContent() {
         body: JSON.stringify({ text, filtersOnly: true }),
       });
       setLlmMode(data.llmMode);
-      setSmartFilters({ ...data.filters, amenities: data.filters.amenities ?? [] });
+      const s = data.filters;
+      const amenities = s.amenities ?? [];
+      const keys: string[] = [];
+      // Önceki akıllı filtrenin panelde karşılığı olmayan alanları (şehir, olanak) taşınmaz.
+      const patch: Record<string, string | null> = {
+        smart: text,
+        city: null,
+        amenities: amenities.length > 0 ? amenities.join(",") : null,
+      };
+      if (s.city || s.query) {
+        patch.destination = s.query ?? s.city ?? null;
+        if (s.city && s.query) patch.city = s.city;
+        if (s.city) keys.push("city");
+        if (s.query) keys.push("query");
+      }
+      if (s.guests) {
+        patch.guests = String(s.guests);
+        // Yetişkin/çocuk dağılımı yeni toplamla tutmaz.
+        patch.adults = null;
+        patch.children = null;
+        keys.push("guests");
+      }
+      if (s.checkIn && s.checkOut) {
+        patch.checkIn = s.checkIn;
+        patch.checkOut = s.checkOut;
+        keys.push("checkIn");
+      }
+      if (s.propertyType) {
+        patch.propertyType = s.propertyType;
+        keys.push("propertyType");
+      }
+      if (s.minPrice !== undefined) {
+        patch.minPrice = String(s.minPrice);
+        keys.push("minPrice");
+      }
+      if (s.maxPrice !== undefined) {
+        patch.maxPrice = String(s.maxPrice);
+        keys.push("maxPrice");
+      }
+      if (s.sort) {
+        patch.sort = s.sort === "recommended" ? null : s.sort;
+        keys.push("sort");
+      }
+      if (amenities.length > 0) keys.push("amenities");
+      patch.smartKeys = keys.join(",");
+      updateParams(patch, "push");
     } catch (err) {
       setSmartError(errorText(err, t("errors.smart")));
     } finally {
       setSmartBusy(false);
     }
   };
+  /** Akıllı filtre kaldırılır: varış/tarih/misafir kalır, panelde karşılığı olmayan alanlar silinir. */
+  const smartClearPatch = (): Record<string, string | null> => ({
+    smart: null,
+    smartKeys: null,
+    city: null,
+    amenities: null,
+    // Şehir + serbest sorgu birlikte çıkarıldıysa varış yeri şehre döner.
+    ...(smartFilters?.city && smartFilters.query ? { destination: smartFilters.city } : {}),
+  });
   const clearSmart = () => {
-    setSmartFilters(null);
     setLlmMode(null);
     setSmartError(null);
+    if (smartFilters) updateParams(smartClearPatch());
   };
 
-  /** Çip kaldırılınca panelle eşlenen alan URL'den de silinir (F340). */
+  /** Çip kaldırılınca karşılık gelen alan URL'den silinir (F340, F2-06). */
   const onSmartChange = (next: SmartFilters) => {
+    if (!smartFilters) return;
+    const prev = smartFilters;
     const patch: Record<string, string | null> = {};
-    if (smartFilters?.sort !== undefined && next.sort === undefined) patch.sort = null;
-    if (smartFilters?.propertyType !== undefined && next.propertyType === undefined) {
+    if (prev.city !== undefined && next.city === undefined) {
+      patch.city = null;
+      if (next.query === undefined) patch.destination = null;
+    }
+    if (prev.query !== undefined && next.query === undefined) {
+      patch.destination = next.city ?? null;
+      patch.city = null;
+    }
+    if (prev.guests !== undefined && next.guests === undefined) {
+      patch.guests = null;
+      patch.adults = null;
+      patch.children = null;
+    }
+    // Giriş ya da çıkış çipi kaldırılınca tarih çifti birlikte kalkar (F2-06).
+    const datesRemoved =
+      (prev.checkIn !== undefined && next.checkIn === undefined) ||
+      (prev.checkOut !== undefined && next.checkOut === undefined);
+    if (datesRemoved) {
+      patch.checkIn = null;
+      patch.checkOut = null;
+      patch.flexDays = null;
+    }
+    if (prev.propertyType !== undefined && next.propertyType === undefined) {
       patch.propertyType = null;
     }
-    if (smartFilters?.minPrice !== undefined && next.minPrice === undefined) patch.minPrice = null;
-    if (smartFilters?.maxPrice !== undefined && next.maxPrice === undefined) patch.maxPrice = null;
-    if (Object.keys(patch).length > 0) updateParams(patch);
-    setSmartFilters(next);
+    if (prev.minPrice !== undefined && next.minPrice === undefined) patch.minPrice = null;
+    if (prev.maxPrice !== undefined && next.maxPrice === undefined) patch.maxPrice = null;
+    if (prev.sort !== undefined && next.sort === undefined) patch.sort = null;
+    if (next.amenities.join(",") !== prev.amenities.join(",")) {
+      patch.amenities = next.amenities.length > 0 ? next.amenities.join(",") : null;
+    }
+    const keys = new Set(smartKeysParam.split(",").filter(Boolean));
+    const keyOf: Record<string, unknown> = {
+      city: next.city,
+      query: next.query,
+      guests: next.guests,
+      checkIn: next.checkIn && next.checkOut ? next.checkIn : undefined,
+      propertyType: next.propertyType,
+      minPrice: next.minPrice,
+      maxPrice: next.maxPrice,
+      sort: next.sort,
+      amenities: next.amenities.length > 0 ? next.amenities : undefined,
+    };
+    for (const key of [...keys]) if (keyOf[key] === undefined) keys.delete(key);
+    patch.smartKeys = keys.size > 0 ? [...keys].join(",") : null;
+    // Çip kalmadıysa akıllı filtre kapanır.
+    if (keys.size === 0) patch.smart = null;
+    updateParams(patch);
   };
 
-  const setSort = (value: string) => {
-    updateParams({ sort: value === "recommended" ? null : value });
-    if (smartFilters?.sort !== undefined) setSmartFilters({ ...smartFilters, sort: value });
-  };
-  const setType = (value: string) => {
-    updateParams({ propertyType: value || null });
-    if (smartFilters?.propertyType !== undefined) {
-      setSmartFilters({ ...smartFilters, propertyType: value || undefined });
-    }
-  };
+  const setSort = (value: string) => updateParams({ sort: value === "recommended" ? null : value });
+  const setType = (value: string) => updateParams({ propertyType: value || null });
   const applyPrice = useCallback(
     (min: number | undefined, max: number | undefined) => {
       updateParams({
         minPrice: min === undefined ? null : String(min),
         maxPrice: max === undefined ? null : String(max),
       });
-      if (
-        smartFilters &&
-        (smartFilters.minPrice !== undefined || smartFilters.maxPrice !== undefined)
-      ) {
-        setSmartFilters({
-          ...smartFilters,
-          minPrice: smartFilters.minPrice !== undefined ? min : undefined,
-          maxPrice: smartFilters.maxPrice !== undefined ? max : undefined,
-        });
-      }
     },
-    [smartFilters, updateParams]
+    [updateParams]
   );
 
   // Fiyat alanları: yazarken taslak tutulur, geçerli değer kısa bir beklemeden sonra uygulanır.
@@ -524,7 +712,11 @@ function SearchPageContent() {
   }, [minValue, maxValue, priceOrderError, effMin, effMax, applyPrice]);
 
   const clearAllFilters = () => {
+    setLlmMode(null);
+    setSmartError(null);
+    // Tek URL güncellemesi (iki ayrı replace aynı anlık görüntüden yazıp birbirini ezerdi).
     updateParams({
+      ...(smartFilters ? smartClearPatch() : {}),
       propertyType: null,
       minPrice: null,
       maxPrice: null,
@@ -532,7 +724,6 @@ function SearchPageContent() {
       similarToPhotoId: null,
       flexDays: null,
     });
-    clearSmart();
   };
   /** Boş durum eylemleri: kutu yüklemede kaybolacağı için odak önce sonuç bölümüne taşınır. */
   const recover = (action: () => void) => {
@@ -589,7 +780,7 @@ function SearchPageContent() {
       {
         id: p.id,
         title: p.title,
-        city: p.location.city,
+        city: placeLabel.city(p.location.city),
         latitude: p.location.latitude,
         longitude: p.location.longitude,
         // F346/F549: kartla aynı bağlam ve birim — tarih varsa "N gece toplam", yoksa gecelik.
@@ -638,8 +829,8 @@ function SearchPageContent() {
             tabIndex={-1}
             className="text-xl font-bold text-gray-900 focus:outline-none"
           >
-            {effDestination
-              ? t("heading.destination", { destination: effDestination })
+            {destinationLabel
+              ? t("heading.destination", { destination: destinationLabel })
               : t("heading.all")}
           </h1>
           <p className="mt-1 text-sm text-gray-700">
@@ -650,28 +841,32 @@ function SearchPageContent() {
               ? t("guestCountDefault", { count: effGuests })
               : t("guestCount", { count: effGuests })}
           </p>
-          <EditSearch
-            key={searchParams.toString()}
-            open={editOpen}
-            onOpenChange={setEditOpen}
-            initial={{ destination, checkIn, checkOut, guests }}
-            onSubmit={(values) => {
-              const next = new URLSearchParams(searchParams.toString());
-              const set = (k: string, v: string) => (v ? next.set(k, v) : next.delete(k));
-              set("destination", values.destination);
-              set("checkIn", values.checkIn);
-              set("checkOut", values.checkOut);
-              set("guests", String(values.guests));
-              // F360: form yalnız toplamı düzenler; artık tutmayan yetişkin/çocuk dağılımı silinir.
-              if (values.guests !== adultsParam + childrenParam) {
-                next.delete("adults");
-                next.delete("children");
-              }
-              clearSmart();
-              setEditOpen(false);
-              router.push(`/search?${next.toString()}`);
-            }}
-          />
+          <EditSearch open={editOpen} onOpenChange={setEditOpen}>
+            {/* F2-05: ana sayfadaki arama çubuğu (öneriler, takvim, yetişkin/çocuk); filtreler korunur. */}
+            <SearchBar
+              key={searchParams.toString()}
+              initial={{
+                destination,
+                checkIn,
+                checkOut,
+                ...(Number.isInteger(adultsParam) &&
+                Number.isInteger(childrenParam) &&
+                adultsParam > 0 &&
+                childrenParam >= 0 &&
+                adultsParam + childrenParam === guests
+                  ? { adults: adultsParam, children: childrenParam }
+                  : { adults: guests, children: 0 }),
+              }}
+              preserveParams={searchParams.toString()}
+              focusRequest={editFocus}
+              onSubmitted={() => {
+                setLlmMode(null);
+                setSmartError(null);
+                setEditOpen(false);
+                h1Ref.current?.focus({ preventScroll: true });
+              }}
+            />
+          </EditSearch>
           {similarToPhotoId && visual && (
             <div className="mt-3 flex flex-wrap items-center gap-3 text-sm" role="status">
               {/* İlan adı metinde yazılı; küçük resim yalnızca görsel hatırlatıcı (alt boş). */}
@@ -720,9 +915,9 @@ function SearchPageContent() {
           />
           {smartError && (
             <div className="mt-2 flex flex-wrap items-center gap-3 rounded-md bg-amber-50 p-3 text-sm">
-              <p id="smart-filter-error" role="alert" className="text-amber-950">
+              <ErrorText id="smart-filter-error">
                 {smartError} {t("errors.smartKept")}
-              </p>
+              </ErrorText>
               <Button
                 variant="secondary"
                 className={touchTarget}
@@ -819,7 +1014,8 @@ function SearchPageContent() {
                   {["", ...PROPERTY_TYPES].map((type) => (
                     <label
                       key={type || "any"}
-                      className={`flex items-center gap-2 text-sm text-gray-800 ${touchTarget}`}
+                      // F2-59: masaüstünde de satır en az 24px (16px radyo tıklanabilir etiketle büyür).
+                      className="flex min-h-[44px] items-center gap-2 text-sm text-gray-800 lg:min-h-[24px]"
                     >
                       <input
                         type="radio"
@@ -855,28 +1051,34 @@ function SearchPageContent() {
               </div>
 
               <div className="mt-4">
-                <label htmlFor="flex-days" className="text-sm font-medium text-gray-800">
-                  {t("flex.label")}
-                </label>
-                <select
-                  id="flex-days"
-                  value={flexDays}
-                  onChange={(e) => {
-                    // aria-disabled: odaklanabilir kalır ama tarih yokken değer değişmez.
-                    if (!hasDates) return;
-                    const d = Number(e.target.value);
-                    updateParams({ flexDays: d > 0 ? String(d) : null });
-                  }}
-                  aria-disabled={!hasDates || undefined}
-                  aria-describedby={hasDates ? "flex-days-desc" : "flex-days-desc flex-days-hint"}
-                  className={`mt-2 ${smallInput} ${touchTarget} aria-disabled:bg-gray-100`}
-                >
-                  {FLEX_OPTIONS.map((d) => (
-                    <option key={d} value={d}>
-                      {d === 0 ? t("flex.exact") : t("flex.plusMinus", { days: d })}
-                    </option>
-                  ))}
-                </select>
+                {hasDates ? (
+                  <label htmlFor="flex-days" className="text-sm font-medium text-gray-800">
+                    {t("flex.label")}
+                  </label>
+                ) : (
+                  <p className="text-sm font-medium text-gray-800">{t("flex.label")}</p>
+                )}
+                {/* F2-50: tarih yokken seçim kutusu yerine durum metni + "Tarih seç" (sessiz geri alma yok). */}
+                {hasDates ? (
+                  <select
+                    id="flex-days"
+                    value={flexDays}
+                    onChange={(e) => {
+                      const d = Number(e.target.value);
+                      updateParams({ flexDays: d > 0 ? String(d) : null });
+                    }}
+                    aria-describedby="flex-days-desc"
+                    className={`mt-2 ${smallInput} ${touchTarget}`}
+                  >
+                    {FLEX_OPTIONS.map((d) => (
+                      <option key={d} value={d}>
+                        {d === 0 ? t("flex.exact") : t("flex.plusMinus", { days: d })}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <p className="mt-2 text-sm text-gray-800">{t("flex.exact")}</p>
+                )}
                 <p id="flex-days-desc" className="mt-1 text-xs text-gray-600">
                   {t("flex.hint")}
                 </p>
@@ -885,8 +1087,8 @@ function SearchPageContent() {
                     {t("flex.needsDates")}{" "}
                     <button
                       type="button"
-                      onClick={() => openEdit("edit-checkin")}
-                      className={`font-medium text-blue-700 underline ${focusRing}`}
+                      onClick={() => openEdit("dates")}
+                      className={`inline-flex min-h-[24px] items-center font-medium text-blue-700 underline ${focusRing}`}
                     >
                       {t("flex.pickDates")}
                     </button>
@@ -903,6 +1105,25 @@ function SearchPageContent() {
                   {t("filters.clearAll")}
                 </Button>
               )}
+              {/* F2-22: mobilde panel sonuçları aşağı iter; sayıyı gösterip panele kapatan düğme. */}
+              <div
+                className="sticky bottom-0 -mx-4 -mb-4 mt-4 rounded-b-lg border-t border-gray-200 bg-white p-4 lg:hidden"
+                style={{ bottom: "var(--compare-bar-h, var(--cookie-banner-h, 0px))" }}
+              >
+                <Button
+                  fullWidth
+                  busy={loading}
+                  className={touchTarget}
+                  onClick={() => {
+                    setFiltersOpen(false);
+                    const resultsEl = document.getElementById("results");
+                    resultsEl?.focus({ preventScroll: true });
+                    resultsEl?.scrollIntoView({ block: "start" });
+                  }}
+                >
+                  {loading ? t("loading") : t("filters.showResults", { total })}
+                </Button>
+              </div>
             </div>
           </section>
 
@@ -999,7 +1220,7 @@ function SearchPageContent() {
 
             {error && (
               <div className="rounded-lg bg-red-50 p-6 text-center shadow-sm">
-                <p role="alert" className="text-red-700">
+                <ErrorText>
                   {error.text}
                   {error.fields && error.fields.length > 0 && (
                     <>
@@ -1015,7 +1236,7 @@ function SearchPageContent() {
                       })}
                     </>
                   )}
-                </p>
+                </ErrorText>
                 <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
                   <Button
                     variant="secondary"
@@ -1035,7 +1256,7 @@ function SearchPageContent() {
                       onClick={() =>
                         openEdit(
                           error.fields?.map((name) => PARAM_EDIT_FIELDS[name]).find(Boolean) ??
-                            "edit-destination"
+                            "destination"
                         )
                       }
                     >
@@ -1050,8 +1271,8 @@ function SearchPageContent() {
               <div className="rounded-lg bg-white p-12 text-center shadow-sm">
                 <div role="status">
                   <p className="text-lg font-semibold text-gray-900">
-                    {!hasActiveFilters && effDestination
-                      ? t("noResultsDestination", { destination: effDestination })
+                    {!hasActiveFilters && destinationLabel
+                      ? t("noResultsDestination", { destination: destinationLabel })
                       : t("noResults")}
                   </p>
                   <p className="mt-2 text-sm text-gray-700">
@@ -1109,7 +1330,7 @@ function SearchPageContent() {
                   <Button
                     variant="secondary"
                     className={touchTarget}
-                    onClick={() => openEdit(hasDates ? "edit-checkin" : "edit-destination")}
+                    onClick={() => openEdit(hasDates ? "dates" : "destination")}
                   >
                     {t("edit.toggle")}
                   </Button>
@@ -1162,11 +1383,12 @@ function SearchPageContent() {
                     id={`result-${property.id}`}
                     tabIndex={-1}
                     className={focusRing}
+                    onClickCapture={rememberResult(property.id)}
                   >
                     <PropertyCard
                       id={property.id}
                       title={property.title}
-                      location={`${property.location.city}, ${property.location.country}`}
+                      location={placeLabel.place(property.location.city, property.location.country)}
                       // F973: fotoğraf yoksa stok görsel değil, kartın "fotoğraf yok" yer tutucusu.
                       imageUrl={property.images?.[0]}
                       priceMinor={property.basePriceMinor}
@@ -1225,11 +1447,7 @@ function SearchPageContent() {
 
             {!error && !loading && page < totalPages && remaining > 0 && (
               <div className="mt-6 flex flex-col items-center gap-2">
-                {moreError && (
-                  <p role="alert" className="text-sm text-red-700">
-                    {moreError}
-                  </p>
-                )}
+                {moreError && <ErrorText>{moreError}</ErrorText>}
                 <Button
                   variant="secondary"
                   className={touchTarget}
@@ -1247,6 +1465,9 @@ function SearchPageContent() {
         checkIn={stay.checkIn || undefined}
         checkOut={stay.checkOut || undefined}
         guests={stay.guests}
+        // F2-19: yetişkin/çocuk dağılımı karşılaştırma → ilan geçişinde kaybolmaz.
+        adults={party.adults}
+        childCount={party.children}
         // F675: karşılaştırmadaki "Aramaya dön" bu aramayı (filtreler dahil) geri yükler.
         from={fromQuery}
       />
@@ -1255,59 +1476,17 @@ function SearchPageContent() {
   );
 }
 
-/** F141: sonuç sayfasında varış, tarih ve misafir sayısını düzenleme (URL'den dolu). */
+/** F141 + F2-05: sonuç sayfasında aramayı düzenleme bölümü (içerik ana sayfadaki arama çubuğu). */
 function EditSearch({
   open,
   onOpenChange,
-  initial,
-  onSubmit,
+  children,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  initial: { destination: string; checkIn: string; checkOut: string; guests: number };
-  onSubmit: (values: {
-    destination: string;
-    checkIn: string;
-    checkOut: string;
-    guests: number;
-  }) => void;
+  children: React.ReactNode;
 }) {
   const t = useTranslations("search");
-  const [destination, setDestination] = useState(initial.destination);
-  const [checkIn, setCheckIn] = useState(initial.checkIn);
-  const [checkOut, setCheckOut] = useState(initial.checkOut);
-  const [guests, setGuests] = useState(String(initial.guests));
-  const [error, setError] = useState<{ field: string; message: string } | null>(null);
-
-  const submit = (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    let next: { field: string; message: string } | null = null;
-    if (Boolean(checkIn) !== Boolean(checkOut)) {
-      next = {
-        field: checkIn ? "edit-checkout" : "edit-checkin",
-        message: t("edit.datesBoth"),
-      };
-    } else if (checkIn && checkOut && checkOut <= checkIn) {
-      next = { field: "edit-checkout", message: t("edit.datesOrder") };
-    }
-    const guestCount = Number(guests);
-    if (!next && !(Number.isInteger(guestCount) && guestCount >= 1 && guestCount <= 30)) {
-      next = { field: "edit-guests", message: t("edit.guestsInvalid") };
-    }
-    setError(next);
-    if (next) {
-      document.getElementById(next.field)?.focus();
-      return;
-    }
-    onSubmit({ destination: destination.trim(), checkIn, checkOut, guests: guestCount });
-  };
-
-  const fieldProps = (id: string) => ({
-    id,
-    "aria-invalid": error?.field === id || undefined,
-    "aria-describedby": error?.field === id ? "edit-error" : undefined,
-  });
-
   return (
     <details
       className="mt-3"
@@ -1319,72 +1498,7 @@ function EditSearch({
       >
         {t("edit.toggle")}
       </summary>
-      <form noValidate onSubmit={submit} className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-5">
-        <div className="sm:col-span-2">
-          <label htmlFor="edit-destination" className="text-sm font-medium text-gray-800">
-            {t("edit.destination")}
-          </label>
-          <input
-            {...fieldProps("edit-destination")}
-            type="text"
-            value={destination}
-            onChange={(e) => setDestination(e.target.value)}
-            placeholder={t("autocomplete.placeholder")}
-            autoComplete="off"
-            className={`mt-1 ${smallInput} ${touchTarget}`}
-          />
-        </div>
-        <div>
-          <label htmlFor="edit-checkin" className="text-sm font-medium text-gray-800">
-            {t("edit.checkIn")}
-          </label>
-          <input
-            {...fieldProps("edit-checkin")}
-            type="date"
-            value={checkIn}
-            onChange={(e) => setCheckIn(e.target.value)}
-            className={`mt-1 ${smallInput} ${touchTarget}`}
-          />
-        </div>
-        <div>
-          <label htmlFor="edit-checkout" className="text-sm font-medium text-gray-800">
-            {t("edit.checkOut")}
-          </label>
-          <input
-            {...fieldProps("edit-checkout")}
-            type="date"
-            value={checkOut}
-            min={checkIn || undefined}
-            onChange={(e) => setCheckOut(e.target.value)}
-            className={`mt-1 ${smallInput} ${touchTarget}`}
-          />
-        </div>
-        <div>
-          <label htmlFor="edit-guests" className="text-sm font-medium text-gray-800">
-            {t("edit.guests")}
-          </label>
-          <input
-            {...fieldProps("edit-guests")}
-            type="number"
-            inputMode="numeric"
-            min={1}
-            max={30}
-            value={guests}
-            onChange={(e) => setGuests(e.target.value)}
-            className={`mt-1 ${smallInput} ${touchTarget}`}
-          />
-        </div>
-        <p
-          id="edit-error"
-          aria-live="polite"
-          className="text-sm text-red-700 sm:col-span-4 sm:self-center"
-        >
-          {error?.message ?? ""}
-        </p>
-        <Button type="submit" className={`sm:col-span-1 ${touchTarget}`}>
-          {t("edit.submit")}
-        </Button>
-      </form>
+      <div className="mt-3">{children}</div>
     </details>
   );
 }

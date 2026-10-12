@@ -18,7 +18,7 @@ import NewPasswordField, { newPasswordOk } from "@/components/auth/NewPasswordFi
 import PasswordRevealInput from "@/components/auth/PasswordRevealInput";
 import { setSessionUserCache, useSessionUserCache } from "@/components/layout/useSessionUserCache";
 import { invalidateFavoriteIds } from "@/components/property/useFavoriteIds";
-import { Button, ButtonLink, buttonClass, focusRing, inputClass } from "@/components/ui/ui";
+import { Button, ButtonLink, Status, buttonClass, focusRing, inputClass } from "@/components/ui/ui";
 import { logout } from "@/lib/api-client";
 import { postJsonWithPowCancellable } from "@/lib/auth/pow-fetch-cancellable";
 import { isAbortError } from "@/lib/auth/pow-solve-cancellable";
@@ -217,8 +217,18 @@ export default function RegisterPage() {
 
   if (registeredEmail) {
     return (
-      <AuthCard title={t("register.successTitle")}>
-        <Notice kind="success">{t("register.successBody", { email: registeredEmail })}</Notice>
+      // F2-36: form ve odaklı gönder düğmesi kalkar; odak başlığa taşınır, duyuru formdan beri
+      // DOM'daki AuthCard bölgesinden yapılır (görünür kutu rolsüz).
+      <AuthCard
+        title={t("register.successTitle")}
+        focusTitle
+        status={
+          <span className="sr-only">{t("register.successBody", { email: registeredEmail })}</span>
+        }
+      >
+        <Notice kind="success" live={false}>
+          {t("register.successBody", { email: registeredEmail })}
+        </Notice>
         <Link
           href={redirect}
           className="mt-6 flex min-h-[44px] w-full items-center justify-center rounded-lg bg-[#003580] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#002b66]"
@@ -371,11 +381,8 @@ export default function RegisterPage() {
           />
         </NewPasswordField>
 
-        {error && (
-          <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
-            {error}
-          </div>
-        )}
+        {/* F2-44: ortak Status (simge + gizli "Hata:" öneki). */}
+        {error && <Status error={error} />}
 
         <p className="text-xs text-gray-600">
           {t.rich("register.privacy", {

@@ -39,7 +39,8 @@
     "priceOrder": "The minimum can't be higher than the maximum.",
     "anyType": "All",
     "toggle": "Filters and sorting ({count} active)",
-    "clearAll": "Clear all filters"
+    "clearAll": "Clear all filters",
+    "showResults": "Show {total, plural, one {# stay} other {# stays}}"
   },
   "sort": {
     "recommended": "Recommended",
@@ -73,7 +74,6 @@
     "decrease": "Decrease",
     "increase": "Increase",
     "submit": "Search",
-    "datesDialog": "Check-in and check-out dates",
     "roomsHint": "Each room needs at least one adult",
     "decreaseAdults": "Decrease number of adults",
     "increaseAdults": "Increase number of adults",
@@ -118,8 +118,9 @@
     "count": "{count, plural, one {# suggestion} other {# suggestions}}",
     "error": "Suggestions could not be loaded. You can still search for what you typed.",
     "searchFor": "Search for “{query}”",
+    "didYouMean": "Did you mean: {place}",
     "clear": "Clear destination",
-    "properties": "Properties"
+    "properties": "Listings"
   },
   "mapView": {
     "initFailed": "the map could not be initialised",
@@ -242,11 +243,7 @@
     "destination": "Where to?",
     "checkIn": "Check-in date",
     "checkOut": "Check-out date",
-    "guests": "Number of guests",
-    "submit": "Update search",
-    "datesBoth": "Choose both a check-in and a check-out date.",
-    "datesOrder": "Check-out must be after check-in.",
-    "guestsInvalid": "Number of guests must be between 1 and 30."
+    "guests": "Number of guests"
   },
   "resultsHeading": "Results",
   "retry": "Try again",

@@ -48,6 +48,8 @@ export default function PrivacyCenter() {
   const [acknowledged, setAcknowledged] = useState(false);
   const [busy, setBusy] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  /** F2-55: yeniden doğrulamadan vazgeçilince nötr bilgi (hesap silinmedi). */
+  const [deleteNotice, setDeleteNotice] = useState<string | null>(null);
   const [obligations, setObligations] = useState<Obligations | null>(null);
   const [deleted, setDeleted] = useState<{ bookings: number; transfers: number } | null>(null);
   const ackRef = useRef<HTMLInputElement>(null);
@@ -115,6 +117,7 @@ export default function PrivacyCenter() {
     }
     setBusy(true);
     setDeleteError(null);
+    setDeleteNotice(null);
     setObligations(null);
     try {
       const result = await reauth.run(() =>
@@ -129,7 +132,10 @@ export default function PrivacyCenter() {
       router.refresh();
     } catch (err) {
       // F640: kullanıcı yeniden doğrulamadan kendisi vazgeçtiyse hata gösterilmez.
+      // F2-55: diğer hesap ekranları gibi vazgeçme duyurulur; onay kutusu yeniden işaretlenmeli.
       if (err instanceof ReauthCancelledError) {
+        setAcknowledged(false);
+        setDeleteNotice(t("deleteCancelled"));
         setBusy(false);
         return;
       }
@@ -248,6 +254,7 @@ export default function PrivacyCenter() {
                   setConfirming(false);
                   setAcknowledged(false);
                   setDeleteError(null);
+                  setDeleteNotice(null);
                   setObligations(null);
                 }}
               >
@@ -257,6 +264,10 @@ export default function PrivacyCenter() {
           </div>
         )}
         <div className="mt-3">
+          {/* F2-55: iptal bilgisi nötr tonda, "Başarılı" öneki olmadan; bölge her zaman DOM'da. */}
+          <p role="status" className="text-sm text-gray-700">
+            {deleteNotice}
+          </p>
           <Status error={deleteError} />
           {obligations && (
             <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-gray-900">

@@ -9,6 +9,7 @@ import {
   Button,
   Card,
   Field,
+  focusFirstInvalid,
   focusRing,
   LlmBadge,
   LoadError,
@@ -17,6 +18,7 @@ import {
   useLoader,
 } from "@/components/ui/ui";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { AdminCopyableId } from "@/components/admin/AdminCopyableId";
 import { isStaleRecord, useAdminErrorText } from "@/components/admin/admin-error-text";
 
 interface OutboxState {
@@ -152,38 +154,6 @@ function LimitNote({ shown, limit }: { shown: number; limit: number }) {
   if (shown < limit) return null;
   return (
     <p className="mb-2 text-sm font-medium text-gray-900">{t("limitNote", { count: limit })}</p>
-  );
-}
-
-/** Uzun kimlik: kısaltılmış görünür, tam değer `title`da; düğme tam değeri panoya kopyalar. */
-function IdText({ id, label }: { id: string; label: (short: string) => string }) {
-  const t = useTranslations("admin");
-  const [copied, setCopied] = useState(false);
-  const short = id.length > 12 ? `${id.slice(0, 6)}…${id.slice(-4)}` : id;
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(id);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // Pano erişimi yok: tam değer `title` ipucunda duruyor.
-    }
-  }
-  return (
-    <span className="inline-flex flex-wrap items-center gap-1">
-      <span title={id}>{label(short)}</span>
-      <button
-        type="button"
-        onClick={copy}
-        aria-label={t("ids.copyLabel", { name: label(short) })}
-        className={`rounded text-xs font-semibold text-[#003580] underline ${focusRing}`}
-      >
-        {copied ? t("ids.copied") : t("ids.copy")}
-      </button>
-      <span role="status" className="sr-only">
-        {copied ? t("ids.copied") : ""}
-      </span>
-    </span>
   );
 }
 
@@ -553,6 +523,7 @@ function EventsCard({ title, loader }: { title: string; loader: Loaded<DemandEve
   const errorText = useAdminErrorText();
   const { data, error, reload } = loader;
   const [text, setText] = useState("");
+  const [textError, setTextError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<Feedback>({});
   const [rowFb, setRowFb] = useState<RowFeedback | null>(null);
@@ -592,9 +563,17 @@ function EventsCard({ title, loader }: { title: string; loader: Loaded<DemandEve
     setRowFb(null);
   }
 
-  async function propose(e: FormEvent) {
+  async function propose(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (busy) return;
+    // F2-25: tarayıcı balonu yerine alan hatası (noValidate).
+    if (text.trim().length < EVENT_TEXT.min) {
+      setTextError(t("events.textTooShort", { min: EVENT_TEXT.min }));
+      setFeedback({});
+      focusFirstInvalid(e.currentTarget);
+      return;
+    }
+    setTextError(null);
     setBusy(true);
     setFeedback({});
     try {
@@ -663,11 +642,13 @@ function EventsCard({ title, loader }: { title: string; loader: Loaded<DemandEve
   return (
     <Card title={title} id="events">
       <RefreshBar loader={loader} name={t("events.title")} />
-      <form onSubmit={propose} className="space-y-2">
+      <form onSubmit={propose} noValidate className="space-y-2">
         <Field
           label={t("events.textLabel")}
           id="event-text"
           hint={t("events.textHint", { min: EVENT_TEXT.min, max: EVENT_TEXT.max })}
+          error={textError}
+          required
         >
           <textarea
             id="event-text"
@@ -677,7 +658,10 @@ function EventsCard({ title, loader }: { title: string; loader: Loaded<DemandEve
             minLength={EVENT_TEXT.min}
             maxLength={EVENT_TEXT.max}
             required
-            onChange={(e) => setText(e.target.value)}
+            onChange={(e) => {
+              setText(e.target.value);
+              if (e.target.value.trim().length >= EVENT_TEXT.min) setTextError(null);
+            }}
           />
         </Field>
         <p aria-hidden="true" className="text-xs text-gray-600">
@@ -941,8 +925,8 @@ function FraudCard({
                 className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3 text-sm"
               >
                 <div className="min-w-0">
-                  <IdText id={f.bookingId} label={(id) => t("fraud.booking", { id })} /> ·{" "}
-                  <IdText id={f.userId} label={(id) => t("fraud.user", { id })} />
+                  <AdminCopyableId id={f.bookingId} label={(id) => t("fraud.booking", { id })} /> ·{" "}
+                  <AdminCopyableId id={f.userId} label={(id) => t("fraud.user", { id })} />
                   {onPickUser && (
                     <>
                       {" "}
@@ -1245,14 +1229,26 @@ function RoleCard({ prefill = null }: { prefill?: { id: string } | null }) {
   const [role, setRole] = useState<Role | "">("");
   const [feedback, setFeedback] = useState<Feedback>({});
   const [busy, setBusy] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<{ userId?: string; role?: string }>({});
   const { confirm, confirmDialog } = useConfirm();
   const roleLabel = (r: string) =>
     (ROLES as readonly string[]).includes(r) ? t(`roles.options.${r as Role}`) : r;
 
-  async function submit(e: FormEvent) {
+  async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (busy || !role) return;
+    if (busy) return;
     const target = userId.trim();
+    // F2-25: boş alanlar tarayıcı balonu yerine alan hatasıyla bildirilir (noValidate).
+    const errors = {
+      ...(target ? {} : { userId: t("roles.errors.userIdRequired") }),
+      ...(role ? {} : { role: t("roles.errors.roleRequired") }),
+    };
+    setFieldErrors(errors);
+    if (!target || !role) {
+      setFeedback({});
+      focusFirstInvalid(e.currentTarget);
+      return;
+    }
     const ok = await confirm({
       title: t("roles.confirm.title", { user: target }),
       body:
@@ -1295,8 +1291,14 @@ function RoleCard({ prefill = null }: { prefill?: { id: string } | null }) {
 
   return (
     <Card title={t("roles.title")} id="roles">
-      <form onSubmit={submit} className="grid gap-3 md:grid-cols-3">
-        <Field label={t("roles.userId")} id="role-user" hint={t("roles.userIdHint")}>
+      <form onSubmit={submit} noValidate className="grid gap-3 md:grid-cols-3">
+        <Field
+          label={t("roles.userId")}
+          id="role-user"
+          hint={t("roles.userIdHint")}
+          error={fieldErrors.userId}
+          required
+        >
           <input
             id="role-user"
             className={inputClass}
@@ -1305,16 +1307,28 @@ function RoleCard({ prefill = null }: { prefill?: { id: string } | null }) {
             autoComplete="off"
             autoCapitalize="none"
             spellCheck={false}
-            onChange={(e) => setUserId(e.target.value)}
+            onChange={(e) => {
+              setUserId(e.target.value);
+              if (e.target.value.trim()) setFieldErrors((prev) => ({ ...prev, userId: undefined }));
+            }}
           />
         </Field>
-        <Field label={t("roles.newRole")} id="role-value" hint={t("roles.newRoleHint")}>
+        <Field
+          label={t("roles.newRole")}
+          id="role-value"
+          hint={t("roles.newRoleHint")}
+          error={fieldErrors.role}
+          required
+        >
           <select
             id="role-value"
             className={inputClass}
             value={role}
             required
-            onChange={(e) => setRole(e.target.value as Role | "")}
+            onChange={(e) => {
+              setRole(e.target.value as Role | "");
+              if (e.target.value) setFieldErrors((prev) => ({ ...prev, role: undefined }));
+            }}
           >
             <option value="">{t("roles.choose")}</option>
             {ROLES.map((r) => (

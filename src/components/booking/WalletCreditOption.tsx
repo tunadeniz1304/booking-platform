@@ -4,6 +4,7 @@ import { type Ref, useEffect, useId, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { apiFetch } from "@/lib/api-client";
 import { useFormat } from "@/i18n/use-format";
+import { inputClass } from "@/components/ui/ui";
 import { parseAmountToMinor } from "@/lib/ui/amount-input";
 
 interface CreditOptions {
@@ -201,7 +202,7 @@ export default function WalletCreditOption({
               onBlur={onBlur}
               aria-invalid={errorShown || undefined}
               aria-describedby={describedBy}
-              className="mt-1 min-h-[44px] w-full rounded-lg border border-gray-500 px-3 py-2 text-sm sm:min-h-0"
+              className={`${inputClass} min-h-[44px] sm:min-h-0`}
             />
             <p id={hintId} className="text-xs text-gray-500">
               {t("max", { amount: maxText })}

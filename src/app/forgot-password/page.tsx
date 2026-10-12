@@ -13,6 +13,8 @@ import AuthCard, {
   useSearchParam,
   withRedirect,
 } from "@/components/auth/AuthCard";
+import { POST_RESET_REDIRECT_KEY, storeAuthRedirect } from "@/components/auth/authRedirectStorage";
+import { useSessionUserCache } from "@/components/layout/useSessionUserCache";
 import { Button, Status } from "@/components/ui/ui";
 import { readRememberedAuthEmail } from "@/lib/auth/auth-email-handoff";
 import { postJsonWithPow } from "@/lib/auth/pow-fetch";
@@ -46,7 +48,10 @@ export default function ForgotPasswordPage() {
   const emailParam = useSearchParam("email");
   const rememberedEmail = useSyncExternalStore(noopSubscribe, readRememberedAuthEmail, () => null);
   const [typedEmail, setTypedEmail] = useState<string | null>(null);
-  const email = typedEmail ?? emailParam ?? rememberedEmail ?? "";
+  // F2-35: oturum açıkken bu sayfa "Şifre değiştir" olarak görünür; dönüş hesaba yapılır.
+  const sessionUser = useSessionUserCache();
+  const signedIn = Boolean(sessionUser);
+  const email = typedEmail ?? emailParam ?? rememberedEmail ?? sessionUser?.email ?? "";
   const [state, setState] = useState<"idle" | "sending" | "sent" | "invalid" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
   const [resending, setResending] = useState(false);
@@ -134,6 +139,8 @@ export default function ForgotPasswordPage() {
       return;
     }
     setState("sending");
+    // F2-34: sıfırlama bitince dönüş adresi reset sayfasında kullanılır (yeni sekmede de).
+    storeAuthRedirect(POST_RESET_REDIRECT_KEY, redirect, email);
     const result = await requestLink();
     if (!result) {
       setState("idle");
@@ -201,9 +208,15 @@ export default function ForgotPasswordPage() {
 
   const backToLogin = (
     <p className="mt-6 text-center text-sm text-gray-600">
-      <Link href={withRedirect("/login", redirect)} className={linkClass}>
-        {t("backToLogin")}
-      </Link>
+      {signedIn ? (
+        <Link href={redirect === "/" ? "/account" : redirect} className={linkClass}>
+          {t("forgot.backToAccount")}
+        </Link>
+      ) : (
+        <Link href={withRedirect("/login", redirect)} className={linkClass}>
+          {t("backToLogin")}
+        </Link>
+      )}
     </p>
   );
 
@@ -264,7 +277,7 @@ export default function ForgotPasswordPage() {
 
   return (
     <AuthCard
-      title={t("forgot.title")}
+      title={signedIn ? t("forgot.changeTitle") : t("forgot.title")}
       subtitle={t("forgot.subtitle")}
       status={
         state === "sending" && !verifying ? (

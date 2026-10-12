@@ -136,3 +136,29 @@ Notlar:
 
 - `next dev` her açılışta `next-env.d.ts` dosyasını değiştirir; commit edilmez (yerelde `git update-index --assume-unchanged next-env.d.ts`).
 - Unit testler `runtime/env.sh` yüklenmeden koşulmalı (env ile 12 test yanlış düşer).
+
+## 9. 2. tur — taze holistik inceleme + otomatik düzeltme (2026-10-13, yerel oturum) — BİTTİ
+
+Kullanıcı isteği: `/sevgi-ai:hci-review` "direkt review et, ardından bulgulara otomatik fix at; commit, push, PR, merge her şey sende". Soru sorulmadı (gri noktalar §1–§2'deki kullanıcı modelinden alındı).
+
+- Dal: `hci/round-2` (main `4eac946` üzerinden). Yerel demo DB `npm run demo:reset` ile yeni migration/seed'e çekildi.
+- Girdi: (1) çalışma zamanı taraması `sweep.mjs` (128 ziyaret, axe WCAG 2.2 AA, Tab sırası, taşma, hedef boyutu) — scratchpad `runtime/r2-before`; (2) 5 salt-okur inceleme ajanı (rezervasyon hunisi, keşif, kimlik/hesap/sepet, ev sahibi/admin, kabuk/kesişen tutarlılık + destek sohbeti).
+- Çıktı: `HCI_REVIEW_booking-platform-tur2.md` (rapor + düzeltme durumu).
+- Kurallar aynı: palet/tema değişmez; arka uç ucu/şema/ürün kararı gerektirenler raporlanır ama düzeltilmez; alt ajan ≤~120k token, dosya sahipliği ayrık; kapılar merkezde.
+
+### 9.1 Durum (2026-10-13, sürüyor)
+
+- İnceleme bitti: 59 bulgu (11 High / 34 Medium / 14 Low), rapor `HCI_REVIEW_booking-platform-tur2.md` §4.
+- 1. dalga düzeltme (10 paket, dosya sahipliği ayrık) BİTTİ; sonuçlar scratchpad `fix-results.jsonl` → rapor §7'ye işlenecek. Merkezde: login hatırlanan e-posta (F2-34), RankingWhy bağlantısı (F2-59), CompareBar `adults`/`childCount` (F2-19), SearchBar odak isteği render-zamanı durum ayarı (lint), `ErrorText` bileşeni (ui.tsx).
+- Kapılar (1. dalga sonrası): typecheck ✓, i18n ✓, format ✓, lint ✓ (3 sorun giderildi), unit koşuluyor.
+- 2. dalga workflow `wf_efd64603-bd6` (script: oturum dizini `workflows/scripts/hci-round2-wave2-verify-wf_efd64603-bd6.js`): ErrorText geçişi (F2-44), shortRef (F2-41), terminoloji (F2-43/56/57) → 5 alan × 2 mercek karşıt doğrulama → onarım.
+- Sonra: kapılar + unit, çalışma zamanı sonrası taraması, rapor §7, commit/push/PR/CI/merge. Ardından kullanıcı isteğiyle sonraki tur `feza-hci:hci-review` + `feza-hci:hci-execute` ile (sevgi-ai kaldırıldı, feza-hci kuruldu).
+- Kullanım kuralı: 5 saatlik limit %95 → limit yenilenene kadar bekle, sonra kendiliğinden devam; soru sorma.
+
+### 9.2 Sonuç
+
+- 59/59 bulgu düzeltildi (rapor §7); 122 karşıt doğrulama kontrolü, bulunan 10 major + 5 minor sorun onarıldı.
+- Kapılar: typecheck, lint, format, i18n, unit (154 dosya / 1.336 test), build ✓; integration + e2e CI'da.
+- Çalışma zamanı (128 ziyaret): axe 0 → 0, taşma 0 → 0, tutarsız `<title>` 13 rota → 0, küçük hedef 228 → 212 (atlama bağlantıları hariç).
+- Kayıt: `docs/hci/tur2-fix-status.json` (paket sonuçları, doğrulama kararları, onarımlar).
+- Sonraki tur: `feza-hci:hci-review` → `feza-hci:hci-execute` (kullanıcı isteği; döngü, soru yok, %95'te bekle-devam et).

@@ -2,15 +2,16 @@
 
 import { useEffect, useState, type ComponentProps, type FormEvent } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { ApiError, apiFetch } from "@/lib/api-client";
 import { isoDay } from "@/lib/ui/format";
+import { shortRef } from "@/lib/ui/short-ref";
 import { parseAmountToMinor } from "@/lib/ui/amount-input";
 import { useFormat } from "@/i18n/use-format";
 import {
   Button,
   Card,
+  ErrorText,
   Field,
   LlmBadge,
   Status,
@@ -27,7 +28,11 @@ import BookingStatusBadge, {
 import DepositSettings from "./DepositSettings";
 import PromotionsPanel from "./PromotionsPanel";
 import AccessibilityPanel from "./AccessibilityPanel";
-import { hasHostUnsavedChanges, useHostUnsavedChanges } from "./useHostUnsavedChanges";
+import {
+  HOST_DRAFT_PREFIX,
+  useHostLeaveGuard,
+  useHostUnsavedChanges,
+} from "./useHostUnsavedChanges";
 import { notifyHostPhotosChanged } from "./host-photos-changed";
 import { CURRENCIES, toMajorNumber } from "@/lib/money/money";
 import { BED_TYPES, DEFAULT_BED_TYPE } from "@/lib/i18n/bed-type";
@@ -193,7 +198,7 @@ function DescriptionTextarea({
  * Uzun metin taslakları sekme oturumunda (sessionStorage) tutulur: oturum dolup girişe gidip
  * dönünce kaybolmaz (F402). Depolama kapalıysa sessizce atlanır.
  */
-const DRAFT_PREFIX = "host-draft:";
+const DRAFT_PREFIX = HOST_DRAFT_PREFIX;
 
 function readDraft(key: string): string | null {
   try {
@@ -212,20 +217,31 @@ function writeDraft(key: string, value: string | null): void {
   }
 }
 
-/** "Kaydetmeden ayrıl" onayından sonra taslaklar geri getirilmez. */
-function clearDrafts(): void {
+const CREATE_DRAFT_KEY = "create";
+
+/** Rezervasyon süzgeçleri (F2-28); taslak öneki dışında: "ayrıl" onayında silinmez. */
+const BOOKING_FILTERS_KEY = "host-booking-filters";
+
+function readBookingFilters(): { status: string; property: string } {
   try {
-    const store = window.sessionStorage;
-    const keys = Array.from({ length: store.length }, (_, i) => store.key(i));
-    for (const key of keys) {
-      if (key?.startsWith(DRAFT_PREFIX)) store.removeItem(key);
-    }
+    const raw = window.sessionStorage.getItem(BOOKING_FILTERS_KEY);
+    const parsed = raw ? (JSON.parse(raw) as { status?: unknown; property?: unknown }) : {};
+    return {
+      status: typeof parsed.status === "string" ? parsed.status : "",
+      property: typeof parsed.property === "string" ? parsed.property : "",
+    };
   } catch {
-    /* yok say */
+    return { status: "", property: "" };
   }
 }
 
-const CREATE_DRAFT_KEY = "create";
+function writeBookingFilters(value: { status: string; property: string }): void {
+  try {
+    window.sessionStorage.setItem(BOOKING_FILTERS_KEY, JSON.stringify(value));
+  } catch {
+    /* depolama kapalı: süzgeç tutulmaz */
+  }
+}
 
 /** Yeni ilan taslağı: yalnız serbest metin alanları (başlık, açıklama). */
 function readCreateDraft(): { title: string; description: string } | null {
@@ -271,12 +287,33 @@ export default function HostDashboard() {
     properties?.filter((p) => !query || p.title.toLocaleLowerCase().includes(query)) ?? [];
   const hasProperties = !!properties && properties.length > 0;
 
-  // Rezervasyon süzgeçleri (F834): çok kayıtta durum/mülke göre daraltma.
-  const [statusFilter, setStatusFilter] = useState("");
-  const [propertyFilter, setPropertyFilter] = useState("");
+  // Rezervasyon süzgeçleri (F834): çok kayıtta durum/mülke göre daraltma. Mesaj sayfasından
+  // dönünce kaybolmasın diye sekme oturumunda tutulur (F2-28). Süzgeçler yalnız istemcide
+  // yüklenen rezervasyonlarla çizildiği için tembel okuma hidrasyonu bozmaz.
+  const [statusFilterRaw, setStatusFilterRaw] = useState(() => readBookingFilters().status);
+  const [propertyFilterRaw, setPropertyFilterRaw] = useState(() => readBookingFilters().property);
+  const setStatusFilter = (status: string) => {
+    setStatusFilterRaw(status);
+    writeBookingFilters({ status, property: propertyFilterRaw });
+  };
+  const setPropertyFilter = (property: string) => {
+    setPropertyFilterRaw(property);
+    writeBookingFilters({ status: statusFilterRaw, property });
+  };
   const showBookingFilters = !!bookings && bookings.length > FILTER_THRESHOLD;
   const bookingStatuses = BOOKING_STATUSES.filter((s) => bookings?.some((b) => b.status === s));
   const bookingPropertyIds = [...new Set(bookings?.map((b) => b.propertyId) ?? [])];
+  // Saklı süzgeç artık geçersizse (seçenek yok ya da süzgeçler gizli) uygulanmaz.
+  const statusFilter =
+    showBookingFilters && (bookingStatuses as readonly string[]).includes(statusFilterRaw)
+      ? statusFilterRaw
+      : "";
+  const propertyFilter =
+    showBookingFilters &&
+    bookingPropertyIds.length > 1 &&
+    bookingPropertyIds.includes(propertyFilterRaw)
+      ? propertyFilterRaw
+      : "";
   const visibleBookings =
     bookings?.filter(
       (b) =>
@@ -285,27 +322,12 @@ export default function HostDashboard() {
     ) ?? [];
   const hasGuestNames = visibleBookings.some((b) => b.guestName);
   const bookingTableClass = visibleBookings.length > 0 ? "md:block" : "";
-  /** Kısa rezervasyon no: kimliğin son 8 karakteri. */
-  const bookingRef = (id: string) => id.slice(-8);
+  /** Kısa rezervasyon no: ortak `shortRef` (F2-41). */
+  const bookingRef = shortRef;
 
-  // Sayfa içi gezinme `beforeunload` tetiklemez: kaydedilmemiş değişiklikte onay istenir (F839).
-  const router = useRouter();
-  const { confirm, confirmDialog } = useConfirm();
-  const guardLeave = (href: string) => (e: { preventDefault: () => void }) => {
-    if (!hasHostUnsavedChanges()) return;
-    e.preventDefault();
-    void confirm({
-      title: t("unsaved.leaveConfirm.title"),
-      body: t("unsaved.leaveConfirm.body"),
-      confirmLabel: t("unsaved.leaveConfirm.confirm"),
-      cancelLabel: t("unsaved.leaveConfirm.cancel"),
-      tone: "danger",
-    }).then((ok) => {
-      if (!ok) return;
-      clearDrafts();
-      router.push(href);
-    });
-  };
+  // Sayfa içi gezinme `beforeunload` tetiklemez: kaydedilmemiş değişiklikte onay istenir
+  // (F839); ortak kanca, parti riski paneli de kullanır (F2-23).
+  const { guardLeave, confirmDialog } = useHostLeaveGuard();
 
   return (
     <div className="space-y-6">
@@ -1935,11 +1957,7 @@ function ListingCopy({
             : t("listingCopy.suggest")}
       </Button>
       <div aria-live="polite" className="mt-3 space-y-2">
-        {error && (
-          <p role="alert" className="text-sm text-red-700">
-            {error}
-          </p>
-        )}
+        {error && <ErrorText>{error}</ErrorText>}
         {draft && (
           <div className="space-y-2 rounded-md bg-gray-50 p-3 text-sm text-gray-900">
             <p className="flex items-center gap-2 font-medium">
@@ -2200,9 +2218,12 @@ function PhotoUpload({ propertyId, onChanged }: { propertyId: string; onChanged:
           </p>
         )}
         {errors.length > 0 && (
-          <div role="alert" className="space-y-1 text-red-700">
+          // F2-44: tek canlı bölge; her satır ortak ErrorText (ikon + "Hata:" öneki).
+          <div role="alert" className="space-y-1">
             {errors.map((text, i) => (
-              <p key={i}>{text}</p>
+              <ErrorText key={i} live={false}>
+                {text}
+              </ErrorText>
             ))}
           </div>
         )}

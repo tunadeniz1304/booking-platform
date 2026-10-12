@@ -13,7 +13,15 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { ApiError, apiFetch } from "@/lib/api-client";
 import { useFormat } from "@/i18n/use-format";
-import { Button, LlmBadge, focusRing, loginHref, useErrorText } from "@/components/ui/ui";
+import {
+  Button,
+  ErrorText,
+  LlmBadge,
+  Status,
+  focusRing,
+  loginHref,
+  useErrorText,
+} from "@/components/ui/ui";
 
 interface Msg {
   id: string;
@@ -535,15 +543,12 @@ export default function BookingMessages({
         {needsLogin ? (
           loginPrompt
         ) : loadError ? (
-          <div className="mt-2 space-y-2">
-            <p role="alert" className="text-sm text-red-600">
-              {loadError.message}
-            </p>
-            {loadError.retryable && (
-              <Button variant="secondary" onClick={retryLoad} className="min-h-[44px] sm:min-h-0">
-                {t("retry")}
-              </Button>
-            )}
+          <div className="mt-2">
+            {/* F2-44: ortak Status (simge + "Hata:" öneki + yeniden dene). */}
+            <Status
+              error={loadError.message}
+              onRetry={loadError.retryable ? retryLoad : undefined}
+            />
           </div>
         ) : (
           <p role="status" className="mt-2 text-sm text-gray-500">
@@ -702,11 +707,7 @@ export default function BookingMessages({
             >
               {loadingOlder ? t("loadingOlder") : t("loadOlder")}
             </Button>
-            {olderFailed && (
-              <p role="alert" className="text-sm text-red-600">
-                {t("loadOlderFailed")}
-              </p>
-            )}
+            {olderFailed && <ErrorText>{t("loadOlderFailed")}</ErrorText>}
           </div>
         )}
         {thread.messages.length === 0 && <p className="text-sm text-gray-500">{t("empty")}</p>}
@@ -840,30 +841,31 @@ export default function BookingMessages({
           )}
           <div aria-live="polite">
             {shownError && (
-              <p id="msg-error" className="text-sm text-red-600">
+              <ErrorText id="msg-error" live={false}>
                 {shownError}
-              </p>
+              </ErrorText>
             )}
           </div>
           <div className="flex flex-wrap gap-2">
-            <button
+            {/* F2-11: ortak Button; busy odağı korur (aria-disabled, native disabled yok). */}
+            <Button
               type="submit"
+              busy={busy === "send"}
               aria-disabled={sendDisabled || undefined}
-              aria-busy={busy === "send" || undefined}
-              className="min-h-[44px] rounded-lg bg-[#003580] px-4 py-2 text-sm font-semibold text-white aria-disabled:cursor-not-allowed aria-disabled:opacity-50 sm:min-h-0"
+              className="min-h-[44px] sm:min-h-0"
             >
               {busy === "send" ? t("sending") : t("send")}
-            </button>
+            </Button>
             {thread.role === "HOST" && (
-              <button
-                type="button"
+              <Button
+                variant="secondary"
                 onClick={() => void draft()}
+                busy={busy === "draft"}
                 aria-disabled={busy !== null || undefined}
-                aria-busy={busy === "draft" || undefined}
-                className="min-h-[44px] rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 aria-disabled:cursor-not-allowed aria-disabled:opacity-50 sm:min-h-0"
+                className="min-h-[44px] sm:min-h-0"
               >
                 {busy === "draft" ? t("drafting") : t("suggestDraft")}
-              </button>
+              </Button>
             )}
           </div>
         </form>

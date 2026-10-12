@@ -7,7 +7,9 @@ import { useFormat } from "@/i18n/use-format";
 import { Button, Card, Field, Status, focusRing, inputClass, useLoader } from "@/components/ui/ui";
 import { useRowFocusRecovery } from "@/components/admin/AdminDashboard";
 import { AdminCopyableId } from "@/components/admin/AdminCopyableId";
+import { shortRef } from "@/lib/ui/short-ref";
 import { isStaleRecord, useAdminErrorText } from "@/components/admin/admin-error-text";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 type TicketStatus = "OPEN" | "IN_PROGRESS" | "RESOLVED";
 /** "ACTIVE": açık + inceleniyor (varsayılan; incelemeye alınan talep listede kalır). */
@@ -91,6 +93,7 @@ export default function SupportAdmin({ currentUserId }: { currentUserId?: string
   // Bu oturumda güncellenen talepler: filtre değişene kadar listede kalır.
   const [touched, setTouched] = useState<ReadonlyMap<string, TicketRow>>(() => new Map());
   const markFocus = useRowFocusRecovery(data, "support-admin");
+  const { confirm, confirmDialog } = useConfirm();
 
   const rows = useMemo(() => {
     if (!data) return null;
@@ -126,7 +129,13 @@ export default function SupportAdmin({ currentUserId }: { currentUserId?: string
     });
 
   /** Tek ya da toplu durum geçişi; istekler sırayla gönderilir, başarısızlar sayılır. */
-  const update = async (key: string, targets: TicketRow[], next: TicketStatus, index: number) => {
+  const update = async (
+    key: string,
+    targets: TicketRow[],
+    next: TicketStatus,
+    index: number,
+    skipped = 0
+  ) => {
     if (busy || targets.length === 0) return;
     setBusy({ key, ids: new Set(targets.map((r) => r.id)) });
     setMessage(null);
@@ -164,11 +173,12 @@ export default function SupportAdmin({ currentUserId }: { currentUserId?: string
         // Yeni durum ve talebin bundan sonra listelendiği filtre adıyla.
         const statusLabel = t(`status.${next}`);
         const filter = next === "RESOLVED" ? statusLabel : t("active");
-        setMessage(
-          targets.length === 1
+        const result =
+          targets.length === 1 && skipped === 0
             ? t("updatedTo", { status: statusLabel, filter })
-            : t("bulkUpdatedTo", { count: done.length, status: statusLabel, filter })
-        );
+            : t("bulkUpdatedTo", { count: done.length, status: statusLabel, filter });
+        // F2-29: uygun olmadığı için atlanan seçili talepler de sonuçta söylenir.
+        setMessage(skipped > 0 ? `${result} ${t("bulkSkipped", { count: skipped })}` : result);
         markFocus(index);
         reload();
       } else if (stale) {
@@ -186,16 +196,41 @@ export default function SupportAdmin({ currentUserId }: { currentUserId?: string
     }
   };
 
-  const bulk = (next: TicketStatus) => {
+  const bulk = async (next: TicketStatus) => {
+    if (busy) return;
     const targets = selectedRows.filter((r) =>
       next === "IN_PROGRESS" ? r.status === "OPEN" : r.status !== "RESOLVED"
     );
+    setMessage(null);
+    setActionError(null);
+    // F2-29: uygun talep kalmadıysa sessizce dönmek yerine nedeni söylenir.
+    if (targets.length === 0) {
+      setActionError(t("bulkNoneEligible", { count: selectedRows.length }));
+      return;
+    }
+    if (next === "RESOLVED") {
+      const ok = await confirm({
+        title: t("confirmBulkResolve.title", { count: targets.length }),
+        body: t("confirmBulkResolve.body"),
+        confirmLabel: t("confirmBulkResolve.confirm"),
+      });
+      if (!ok) return;
+    }
     const first = visible?.findIndex((r) => r.id === targets[0]?.id) ?? 0;
-    void update(`bulk:${next}`, targets, next, Math.max(first, 0));
+    void update(
+      `bulk:${next}`,
+      targets,
+      next,
+      Math.max(first, 0),
+      selectedRows.length - targets.length
+    );
   };
 
   const renderRow = (row: TicketRow, index: number) => {
     const rowBusy = !!busy?.ids.has(row.id);
+    // F2-52: satır düğmelerinin adı kaydı da tanıtır (admin.rowAction).
+    const rowName = `${t(`reason.${row.reason}`)} · ${t("ticketId", { id: shortRef(row.id) })}`;
+    const rowLabel = (action: string) => ta("rowAction", { action, name: rowName });
     const mine =
       row.status === "IN_PROGRESS" &&
       ((!!currentUserId && row.handlerId === currentUserId) ||
@@ -253,19 +288,25 @@ export default function SupportAdmin({ currentUserId }: { currentUserId?: string
                 <Button
                   variant="secondary"
                   busy={rowBusy}
+                  aria-label={rowLabel(t("markInProgress"))}
                   onClick={() => update(row.id, [row], "IN_PROGRESS", index)}
                 >
                   {t("markInProgress")}
                 </Button>
               )}
               {row.status !== "RESOLVED" ? (
-                <Button busy={rowBusy} onClick={() => update(row.id, [row], "RESOLVED", index)}>
+                <Button
+                  busy={rowBusy}
+                  aria-label={rowLabel(t("markResolved"))}
+                  onClick={() => update(row.id, [row], "RESOLVED", index)}
+                >
                   {t("markResolved")}
                 </Button>
               ) : (
                 <Button
                   variant="secondary"
                   busy={rowBusy}
+                  aria-label={rowLabel(t("reopen"))}
                   onClick={() => update(row.id, [row], "OPEN", index)}
                 >
                   {t("reopen")}
@@ -282,6 +323,7 @@ export default function SupportAdmin({ currentUserId }: { currentUserId?: string
 
   return (
     <Card title={t("title")} id="support-admin">
+      {confirmDialog}
       <div className="mb-4 flex flex-wrap gap-4">
         <div className="w-full max-w-xs">
           <Field id={filterId} label={t("filter")}>
@@ -355,7 +397,7 @@ export default function SupportAdmin({ currentUserId }: { currentUserId?: string
               variant="secondary"
               aria-disabled={noneSelected || undefined}
               busy={busy?.key === "bulk:IN_PROGRESS"}
-              onClick={() => bulk("IN_PROGRESS")}
+              onClick={() => void bulk("IN_PROGRESS")}
             >
               {t("bulkInProgress")}
             </Button>
@@ -363,7 +405,7 @@ export default function SupportAdmin({ currentUserId }: { currentUserId?: string
               variant="secondary"
               aria-disabled={noneSelected || undefined}
               busy={busy?.key === "bulk:RESOLVED"}
-              onClick={() => bulk("RESOLVED")}
+              onClick={() => void bulk("RESOLVED")}
             >
               {t("bulkResolve")}
             </Button>

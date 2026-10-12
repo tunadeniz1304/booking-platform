@@ -4,6 +4,7 @@ import { useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { useFormat } from "@/i18n/use-format";
+import { shortRef } from "@/lib/ui/short-ref";
 import { focusRing } from "@/components/ui/ui";
 import { ClaimStatusBadge, ClaimStatusHelp, usePartyLabel, type ClaimSummary } from "./shared";
 
@@ -22,7 +23,7 @@ function BookingIdCopy({ id }: { id: string }) {
   const t = useTranslations("resolution");
   const ta = useTranslations("admin");
   const [copied, setCopied] = useState(false);
-  const label = t("list.bookingRef", { id: id.slice(-8) });
+  const label = t("list.bookingRef", { id: shortRef(id) });
   async function copy() {
     try {
       await navigator.clipboard.writeText(id);
@@ -89,7 +90,7 @@ export default function ClaimList({
       {claims.map((c) => {
         const selected = selectedId === c.id;
         // Mülk adı yoksa ham kimlik yerine kısa rezervasyon referansı (son 8 karakter).
-        const subject = c.propertyTitle ?? t("list.bookingRef", { id: c.bookingId.slice(-8) });
+        const subject = c.propertyTitle ?? t("list.bookingRef", { id: shortRef(c.bookingId) });
         const typeLabel = t(`type.${c.type}`);
         // Satırlarda tekrar eden bağlantı/düğme adlarını ekran okuyucu için ayırt eder.
         const context = (

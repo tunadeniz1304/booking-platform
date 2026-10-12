@@ -7,7 +7,11 @@ import { useTranslations } from "next-intl";
 import { ApiError, apiFetch, isNetworkError, isTimeoutError } from "@/lib/api-client";
 import { MOCK_3DS_CODE } from "@/lib/payment/card-token";
 import { useFormat } from "@/i18n/use-format";
-import { Field, focusRing } from "@/components/ui/ui";
+import { Button, ErrorText, Field, focusRing } from "@/components/ui/ui";
+import {
+  freeCancellation,
+  type PolicySnapshotView,
+} from "@/lib/booking/free-cancellation-deadline";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import {
   CardFields,
@@ -41,8 +45,23 @@ interface Props {
    * (ör. önceden tamamen iade edilmiş ödeme) iptal sonucunda "ödeme alınmadı" diye gösterilmez.
    */
   chargePending?: boolean;
-  onChanged: () => void;
+  /**
+   * Durum değişti (ödeme/iptal): sayfa yeniden okur. F2-04: iptal sonucu (iade metni) sayfanın
+   * durum duyurusuna ve başlık altındaki açıklamaya eklenir; burada ayrıca gösterilmez.
+   */
+  onChanged: (resultText?: string) => void;
+  /** F2-15: süresi dolan tutmada "aynı tarihlerle yeniden ara" bağlantısı (sayfayla aynı hedef). */
+  rebookHref?: string;
+  /** F2-01: onay penceresinde ücretsiz iptal sonucu için (CancellationDeadlineNote ile aynı veri). */
+  policySnapshot?: unknown;
+  checkIn?: string;
+  createdAt?: string | null;
+  timeZone?: string | null;
+  checkInTime?: string | null;
 }
+
+/** Tesis saat dilimi bilinmiyorsa (freeCancellation ile aynı varsayılan). */
+const DEFAULT_TIME_ZONE = "Europe/Istanbul";
 
 /**
  * `at: "cancel"` → hata iptal düğmesinin yanında; aksi hâlde etkin ödeme formunda gösterilir.
@@ -51,6 +70,8 @@ interface Props {
 interface Message {
   kind: "error" | "info" | "note";
   text: string;
+  /** F2-47: yalnız başarı yeşil; nötr gri, uyarı (ör. zaman aşımı kontrolü) amber. */
+  tone?: "success" | "neutral" | "warning";
   at?: "cancel";
   /** Yalnız rezervasyon HELD iken geçerli (ör. zaman aşımından sonraki durum kontrolü notu). */
   whileHeld?: boolean;
@@ -87,6 +108,12 @@ export default function BookingActions({
   currency,
   chargePending,
   onChanged,
+  rebookHref = "/search",
+  policySnapshot,
+  checkIn,
+  createdAt,
+  timeZone,
+  checkInTime,
 }: Props) {
   const t = useTranslations("payment");
   const tc = useTranslations("common");
@@ -136,7 +163,7 @@ export default function BookingActions({
   const codeRef = useRef<HTMLInputElement>(null);
   const creditInputRef = useRef<HTMLInputElement>(null);
   const payButtonRef = useRef<HTMLButtonElement>(null);
-  const errorRef = useRef<HTMLParagraphElement>(null);
+  const errorRef = useRef<HTMLDivElement>(null);
   const lockedRef = useRef<HTMLHeadingElement>(null);
   const stripeBoxRef = useRef<HTMLDivElement>(null);
   /** Stripe akışı: step-up doğrulamasından sonra form bir kez kendiliğinden yeniden gönderilir. */
@@ -267,7 +294,7 @@ export default function BookingActions({
    */
   function handleTimeout(err: unknown): boolean {
     if (!isTimeoutError(err)) return false;
-    setMessage({ kind: "info", text: t("timeoutCheck"), whileHeld: true });
+    setMessage({ kind: "info", tone: "warning", text: t("timeoutCheck"), whileHeld: true });
     onChanged();
     return true;
   }
@@ -302,8 +329,8 @@ export default function BookingActions({
     focusNext.current = "code";
   }
 
+  // F2-46: başarı duyurusu tek yerden (sayfanın durum bölgesi) yapılır.
   function paid() {
-    setAnnouncement(t("paidAnnounce"));
     onChanged();
   }
 
@@ -338,7 +365,7 @@ export default function BookingActions({
       // Stripe'ta PaymentMethod yeniden kullanılamaz: form yeniden gönderilir (yeni pm_ oluşur).
       const form = stripeBoxRef.current?.querySelector("form");
       if (form && "requestSubmit" in form) resubmitStripe.current = true;
-      else setMessage({ kind: "info", text: t("verifiedRetry") });
+      else setMessage({ kind: "info", tone: "neutral", text: t("verifiedRetry") });
       return;
     }
     if (!startBusy()) return;
@@ -455,6 +482,24 @@ export default function BookingActions({
     }
   }
 
+  /** F2-01: onaylı rezervasyonda iptalin iade sonucu (ücretsiz iptal son anına göre). */
+  function refundOutlook(): string {
+    const snapshot =
+      policySnapshot && typeof policySnapshot === "object"
+        ? (policySnapshot as PolicySnapshotView)
+        : null;
+    const state = checkIn
+      ? freeCancellation(snapshot, { checkIn, createdAt, timeZone, checkInTime })
+      : null;
+    if (!state) return t("cancel.dialogBodyConfirmed");
+    if (state.kind === "none") return t("cancel.dialogRefundNone");
+    const zone = timeZone || DEFAULT_TIME_ZONE;
+    const when = { date: f.date(state.deadline, "long", zone), time: f.time(state.deadline, zone) };
+    return state.kind === "until"
+      ? t("cancel.dialogRefundUntil", when)
+      : t("cancel.dialogRefundEnded", when);
+  }
+
   async function cancel() {
     if (busyRef.current) return;
     // HELD rezervasyonda henüz tahsilat yoktur: "iade yok" yerine "ödeme alınmadı" denir.
@@ -463,9 +508,7 @@ export default function BookingActions({
       title: t("cancel.dialogTitle"),
       body: (
         <>
-          <span className="block">
-            {wasHeld ? t("cancel.dialogBodyHeld") : t("cancel.dialogBodyConfirmed")}
-          </span>
+          <span className="block">{wasHeld ? t("cancel.dialogBodyHeld") : refundOutlook()}</span>
           <span className="mt-2 block">{t("cancel.irreversible")}</span>
         </>
       ),
@@ -483,19 +526,17 @@ export default function BookingActions({
       }>(`/api/bookings/${bookingId}`, { method: "DELETE" });
       // `not_paid`: tahsil edilmiş tutar yok (HELD ya da tahsilatı yapılmamış RNPL planı).
       const notCharged = wasHeld || (res.refund.reason === "not_paid" && chargePending !== false);
-      setMessage({
-        kind: "info",
-        text:
-          res.refund.refundMinor > 0
-            ? t("cancel.refunded", {
-                amount: f.money(res.refund.refundMinor, res.refund.currency),
-                percent: String(res.refund.refundPercent),
-              })
-            : notCharged
-              ? t("cancel.cancelledNoCharge")
-              : t("cancel.noRefund"),
-      });
-      onChanged();
+      // F2-04: sonuç sayfanın başlık altı açıklamasında ve tek durum duyurusunda gösterilir.
+      onChanged(
+        res.refund.refundMinor > 0
+          ? t("cancel.refunded", {
+              amount: f.money(res.refund.refundMinor, res.refund.currency),
+              percent: String(res.refund.refundPercent),
+            })
+          : notCharged
+            ? t("cancel.cancelledNoCharge")
+            : t("cancel.noRefund")
+      );
     } catch (err) {
       showError(err, t("cancel.failed"), "cancel");
     } finally {
@@ -505,8 +546,6 @@ export default function BookingActions({
   }
 
   const input = `mt-1 w-full rounded-lg border border-gray-500 px-3 py-2 text-base sm:text-sm ${focusRing}`;
-  const submitClass = `w-full rounded-lg bg-[#003580] px-4 py-3 text-sm font-semibold text-white disabled:bg-gray-300 disabled:text-gray-700 aria-disabled:bg-gray-300 aria-disabled:text-gray-700 ${focusRing}`;
-  const secondaryClass = `min-h-[44px] w-full rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 ${focusRing}`;
   const held = status === "HELD" && !expired;
   const remainingText =
     remainingMs !== null && remainingMs > 0
@@ -538,9 +577,10 @@ export default function BookingActions({
               : "page";
   const errorAlert =
     message?.kind === "error" ? (
-      <p ref={errorRef} role="alert" className="text-sm text-red-700">
-        {message.text}
-      </p>
+      // F2-44: ortak ErrorText; kaydırma için ref saran öğede.
+      <div ref={errorRef}>
+        <ErrorText>{message.text}</ErrorText>
+      </div>
     ) : null;
   // Nötr not ödeme düğmesinin yanında görünür; duyuru `role=status` bölgesinden yapılır.
   const noteText =
@@ -566,7 +606,7 @@ export default function BookingActions({
           <h2 className="text-lg font-semibold text-gray-900">{t("hold.expiredTitle")}</h2>
           <p>{t("hold.expiredBody")}</p>
           <Link
-            href="/search"
+            href={rebookHref}
             className={`inline-flex min-h-[44px] items-center font-semibold text-[#003580] underline ${focusRing}`}
           >
             {t("hold.rebook")}
@@ -602,12 +642,10 @@ export default function BookingActions({
             <div className="min-h-[18rem] space-y-3" aria-busy={!configFailed}>
               {configFailed ? (
                 <>
-                  <p role="alert" className="text-sm text-red-700">
-                    {t("config.failed")}
-                  </p>
-                  <button type="button" onClick={retryConfig} className={secondaryClass}>
+                  <ErrorText>{t("config.failed")}</ErrorText>
+                  <Button variant="secondary" size="lg" fullWidth onClick={retryConfig}>
                     {tc("errorPage.retry")}
-                  </button>
+                  </Button>
                 </>
               ) : (
                 <p className="text-sm text-gray-600">{t("config.loading")}</p>
@@ -621,6 +659,7 @@ export default function BookingActions({
               disabled={busy}
               selected={rnpl}
               onChange={setRnpl}
+              creditMinor={creditMinor}
               onLoaded={() => setRnplReady(true)}
             />
           )}
@@ -669,14 +708,9 @@ export default function BookingActions({
               />
               {noteText}
               {errorAt === "card" && errorAlert}
-              <button
-                ref={payButtonRef}
-                aria-disabled={busy || undefined}
-                aria-busy={busy}
-                className={submitClass}
-              >
+              <Button ref={payButtonRef} type="submit" size="lg" fullWidth busy={busy}>
                 {busy ? t("processing") : rnpl ? t("rnpl.reserve") : payLabel}
-              </button>
+              </Button>
             </form>
           )}
 
@@ -698,21 +732,22 @@ export default function BookingActions({
                 />
               </Field>
               {errorAt === "code" && errorAlert}
-              <button aria-disabled={busy || undefined} aria-busy={busy} className={submitClass}>
+              <Button type="submit" size="lg" fullWidth busy={busy}>
                 {busy ? t("processing") : t("verify")}
-              </button>
+              </Button>
               <p id={`${ids}-nocode`} className="text-sm text-gray-600">
                 {t("threeDsNoCode")}
               </p>
-              <button
-                type="button"
+              <Button
+                variant="secondary"
+                size="lg"
+                fullWidth
+                busy={busy}
                 onClick={backToCard}
-                disabled={busy}
                 aria-describedby={`${ids}-nocode`}
-                className={secondaryClass}
               >
                 {t("threeDsBack")}
-              </button>
+              </Button>
             </form>
           )}
         </section>
@@ -742,15 +777,9 @@ export default function BookingActions({
         </div>
       )}
       {status === "CONFIRMED" && (
-        <button
-          type="button"
-          onClick={() => void cancel()}
-          aria-disabled={busy || undefined}
-          aria-busy={cancelling || undefined}
-          className={`rounded-lg border border-red-300 px-6 py-3 text-sm font-semibold text-red-700 hover:bg-red-50 ${cancelBusyClass} ${focusRing}`}
-        >
+        <Button variant="dangerOutline" size="lg" busy={busy} onClick={() => void cancel()}>
           {cancelLabel}
-        </button>
+        </Button>
       )}
       {errorAt === "cancel" && errorAlert}
 
@@ -766,7 +795,15 @@ export default function BookingActions({
       <p
         role="status"
         aria-live="polite"
-        className={statusMessage?.kind === "info" ? "text-sm text-green-700" : "sr-only"}
+        className={
+          statusMessage?.kind !== "info"
+            ? "sr-only"
+            : statusMessage.tone === "success"
+              ? "text-sm text-green-700"
+              : statusMessage.tone === "warning"
+                ? "text-sm text-amber-700"
+                : "text-sm text-gray-700"
+        }
       >
         {statusMessage && statusMessage.kind !== "error"
           ? statusMessage.text

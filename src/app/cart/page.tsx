@@ -8,7 +8,7 @@ import { ApiError, apiFetch } from "@/lib/api-client";
 import { useFormat } from "@/i18n/use-format";
 import { useCart, type CartDTO, type CartItemDTO } from "@/components/cart/useCart";
 import { SplitPayPanel } from "@/components/cart/SplitPayPanel";
-import { Button, PageShell, useErrorText } from "@/components/ui/ui";
+import { Button, ErrorText, PageShell, Status, useErrorText } from "@/components/ui/ui";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { GuestCountStepper } from "@/components/booking/GuestCountStepper";
 import { propertyHref } from "@/components/property/PropertyCard";
@@ -380,9 +380,7 @@ export default function CartPage() {
         {t("item.undo")}
       </Button>
       {message?.scope === "undo" && (
-        <p role="alert" className="w-full font-medium text-red-700">
-          {message.text}
-        </p>
+        <ErrorText className="w-full font-medium">{message.text}</ErrorText>
       )}
     </div>
   );
@@ -401,11 +399,8 @@ export default function CartPage() {
         >
           {notice}
         </div>
-        {topError && (
-          <div role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
-            {topError}
-          </div>
-        )}
+        {/* F2-44: ortak Status (simge + gizli "Hata:" öneki). */}
+        {topError && <Status error={topError} />}
 
         {!cart || items.length === 0 ? (
           <>
@@ -803,13 +798,9 @@ function CartItemRow({
         </button>
       </div>
       {error && (
-        <p
-          id={errorId}
-          role="alert"
-          className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700"
-        >
+        <ErrorText id={errorId} className="mt-3">
           {error}
-        </p>
+        </ErrorText>
       )}
     </li>
   );

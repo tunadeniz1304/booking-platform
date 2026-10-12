@@ -11,6 +11,8 @@ import QuoteBreakdown from "./QuoteBreakdown";
 import { GuestCountStepper } from "./GuestCountStepper";
 import PriceInsight from "./PriceInsight";
 import { useQuote } from "./useQuote";
+import { useQuoteError } from "./quote-error";
+import { MEAL_PLAN_KEYS } from "@/lib/i18n/meal-plan";
 import { publishStaySelection, subscribeStaySelection } from "./stay-selection";
 import { subscribeStaySelectionClear } from "./stay-selection-clear";
 import AddToCartButton from "@/components/cart/AddToCartButton";
@@ -56,20 +58,6 @@ interface BookingWidgetProps {
 }
 
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
-
-/** Arayüz dilinde gösterilen teklif hata kodları (sunucu metni yalnız bilinmeyen kodda). */
-const QUOTE_ERROR_CODES = new Set(["SOLD_OUT", "RESTRICTED", "NOT_FOUND", "OVER_CAPACITY"]);
-/** Belirli bir geceye bağlı kısıtlar (mesajda tarih gösterilir). */
-const DATE_RESTRICTIONS = new Set(["STOP_SELL", "CLOSED_TO_ARRIVAL", "CLOSED_TO_DEPARTURE"]);
-/** Tarih değiştirerek çözülen teklif hataları ("Başka tarih seç"). */
-const DATE_ERROR_CODES = new Set(["SOLD_OUT", "RESTRICTED"]);
-
-const MEAL_PLAN_KEYS: Record<string, string> = {
-  ROOM_ONLY: "widget.mealRoomOnly",
-  BREAKFAST: "widget.breakfastIncluded",
-  HALF_BOARD: "widget.mealHalfBoard",
-  FULL_BOARD: "widget.mealFullBoard",
-};
 
 type GuestField = "adults" | "children";
 
@@ -303,31 +291,8 @@ export default function BookingWidget({ propertyId, rooms, initial }: BookingWid
     window.history.replaceState(null, "", `${pathname}${search ? `?${search}` : ""}${hash}`);
   }, [edited, checkIn, checkOut, adults, children, urlRoomId, urlPlanId]);
 
-  // Kısıt ihlalinde sunucunun ayrıntısıyla (en az/en çok gece, kapalı gün) somut mesaj.
-  const restrictionText = (() => {
-    if (code !== "RESTRICTED" || !details) return null;
-    const { restriction, minStay, maxStay, date } = details;
-    if (restriction === "MIN_STAY" && typeof minStay === "number") {
-      return t("widget.errors.RESTRICTED_MIN_STAY", { minStay });
-    }
-    if (restriction === "MAX_STAY" && typeof maxStay === "number") {
-      return t("widget.errors.RESTRICTED_MAX_STAY", { maxStay });
-    }
-    if (
-      typeof restriction === "string" &&
-      DATE_RESTRICTIONS.has(restriction) &&
-      typeof date === "string" &&
-      ISO_DAY.test(date)
-    ) {
-      return t(`widget.errors.RESTRICTED_${restriction}`, { date: f.date(date, "medium") });
-    }
-    return null;
-  })();
-  const errorText = (() => {
-    if (error === null) return null;
-    if (restrictionText) return restrictionText;
-    return code && QUOTE_ERROR_CODES.has(code) ? t(`widget.errors.${code}`) : error;
-  })();
+  // F2-16: hata metni ve eylemi checkout ile ortak yardımcıdan.
+  const { text: errorText, action: quoteErrorAction } = useQuoteError(error, code, details);
 
   const datesComplete = Boolean(checkIn && checkOut && checkIn < checkOut);
   const canSubmit = Boolean(selectedRoom && quote);
@@ -343,12 +308,6 @@ export default function BookingWidget({ propertyId, rooms, initial }: BookingWid
   const reasonColor = errorText ? "text-red-600" : loading ? "text-gray-500" : "text-gray-700";
   const reasonTarget =
     availableRooms.length === 0 ? noRoomsId : blockReason ? submitReasonId : null;
-  // Hatada eylem: tarih kaynaklıysa takvimi aç, bilinmeyen/ağ hatasında yeniden dene.
-  const quoteErrorAction = (() => {
-    if (errorText === null) return null;
-    if (code && DATE_ERROR_CODES.has(code)) return "dates";
-    return code && QUOTE_ERROR_CODES.has(code) ? null : "retry";
-  })();
   // Ekran okuyucuya yalnız kısa durum (döküm duyurulmaz); ilk yüklemede sessiz.
   const liveText = (() => {
     if (!edited) return "";
@@ -441,6 +400,9 @@ export default function BookingWidget({ propertyId, rooms, initial }: BookingWid
       checkIn,
       checkOut,
       guestCount: String(guestCount),
+      // F2-13: yetişkin/çocuk ayrımı checkout ve geri dönüşte korunur.
+      adults: String(adults),
+      children: String(children),
       quoteId: quote.quoteId,
     });
 
@@ -642,7 +604,8 @@ export default function BookingWidget({ propertyId, rooms, initial }: BookingWid
                     setSelectedPlanId(plan.id);
                     setEdited(true);
                   }}
-                  className={`mt-1 ${focusRing}`}
+                  // F2-59: hedef en az 20px; satırın tamamı (etiket) de tıklanabilir.
+                  className={`h-5 w-5 shrink-0 ${focusRing}`}
                 />
                 <span>
                   <span lang={contentLang}>{plan.name}</span>

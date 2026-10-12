@@ -9,6 +9,7 @@ import { draftDates, useSearchDraft } from "@/components/search/useSearchDraft";
 import { localizeCountryName, placeCityKey } from "@/lib/i18n/place-display-names";
 import { POPULAR_DESTINATIONS } from "@/lib/popular-destinations";
 import { normalizePlace } from "@/lib/search/normalize-place";
+import { closestPlace } from "@/lib/search/place-suggest";
 
 /**
  * "Nereye?" alanı için otomatik tamamlama. Gerçek lokasyon verisini
@@ -72,6 +73,14 @@ export default function DestinationAutocomplete({ value, onChange }: Destination
   const [open, setOpen] = useState(false);
   // Klavyeyle vurgulanan öneri (aria-activedescendant); -1 = yok.
   const [activeIndex, setActiveIndex] = useState(-1);
+  // F2-18: seçilen önerinin ekrandaki (çevrilmiş) adı; üst bileşene DB adı gider.
+  // Değer dışarıdan değişirse ya da kullanıcı yazarsa yazılan metin gösterilir.
+  // Başlangıç değeri bilinen bir şehirse (ör. URL'den) o da çevrilmiş adla gösterilir.
+  const [selected, setSelected] = useState<{ value: string; label: string } | null>(() => {
+    const key = placeCityKey(value.trim());
+    return key ? { value, label: tHome(`places.${key}`) } : null;
+  });
+  const displayValue = selected && selected.value === value ? selected.label : value;
   const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -168,14 +177,22 @@ export default function DestinationAutocomplete({ value, onChange }: Destination
   // Tesis eşleşmeleri şehirlerden sonra, kendi grubunda.
   const properties: readonly PropertyOption[] =
     remoteQuery && !pending ? (remote?.properties ?? []) : [];
-  const suggestionCount = items.length + properties.length;
+  const matchCount = items.length + properties.length;
+  // F2-21: doğrudan şehir eşleşmesi yoksa yazım hatasına en yakın popüler destinasyon önerilir.
+  const typoSuggestion =
+    remoteQuery && !pending && items.length === 0
+      ? closestPlace(query, POPULAR_DESTINATIONS, (p) => [p.city, cityName(p.city)])
+      : null;
+  const typoIndex = matchCount;
+  const suggestionCount = matchCount + (typoSuggestion ? 1 : 0);
 
   // Öneri yoksa (ya da yüklenemediyse) yazılan metinle arama seçeneği sunulur.
-  const searchOption = query.length > 0 && !pending && suggestionCount === 0;
+  const searchOption = query.length > 0 && !pending && matchCount === 0;
   const optionCount = suggestionCount + (searchOption ? 1 : 0);
   const showList = open && optionCount > 0;
 
   const changeValue = (next: string) => {
+    setSelected(null);
     onChange(next);
     setOpen(true);
     setActiveIndex(-1);
@@ -184,6 +201,7 @@ export default function DestinationAutocomplete({ value, onChange }: Destination
   // Odak input'ta kalır (öneriye tıklarken mousedown engellenir), böylece
   // seçimden sonra klavye kullanıcısı formdaki yerini kaybetmez.
   const selectOption = (opt: LocationOption) => {
+    setSelected({ value: opt.city, label: cityName(opt.city) });
     onChange(opt.city);
     setOpen(false);
     setActiveIndex(-1);
@@ -218,7 +236,8 @@ export default function DestinationAutocomplete({ value, onChange }: Destination
 
   const choose = (idx: number) => {
     if (idx < items.length) selectOption(items[idx]);
-    else if (idx < suggestionCount) selectProperty(properties[idx - items.length]);
+    else if (idx < matchCount) selectProperty(properties[idx - items.length]);
+    else if (typoSuggestion && idx === typoIndex) selectOption(typoSuggestion);
     else if (searchOption) submitQuery();
   };
 
@@ -253,6 +272,7 @@ export default function DestinationAutocomplete({ value, onChange }: Destination
           setActiveIndex(-1);
         } else if (value) {
           e.preventDefault();
+          setSelected(null);
           onChange("");
         }
         return;
@@ -270,16 +290,22 @@ export default function DestinationAutocomplete({ value, onChange }: Destination
 
   const emptyText = failed
     ? t("autocomplete.error")
-    : query.length > 0 && !pending && suggestionCount === 0
+    : query.length > 0 && !pending && matchCount === 0
       ? t("autocomplete.noResults")
       : "";
 
-  // Ekran okuyucu duyurusu: yükleniyor / hata / öneri sayısı / sonuç yok.
+  const typoLabel = typoSuggestion
+    ? t("autocomplete.didYouMean", { place: cityName(typoSuggestion.city) })
+    : "";
+
+  // Ekran okuyucu duyurusu: yükleniyor / hata / öneri sayısı / sonuç yok (+ yazım önerisi).
   const statusText = !open
     ? ""
     : loading
       ? t("autocomplete.searching")
-      : emptyText || t("autocomplete.count", { count: suggestionCount });
+      : emptyText
+        ? [emptyText, typoLabel].filter(Boolean).join(" ")
+        : t("autocomplete.count", { count: suggestionCount });
 
   const optionClass = (idx: number) =>
     `flex w-full cursor-pointer items-center gap-3 px-4 py-2.5 text-left text-sm text-gray-800 transition hover:bg-blue-50 ${
@@ -333,7 +359,7 @@ export default function DestinationAutocomplete({ value, onChange }: Destination
           autoCapitalize="words"
           spellCheck={false}
           enterKeyHint="search"
-          value={value}
+          value={displayValue}
           onChange={(e) => changeValue(e.target.value)}
           onFocus={() => setOpen(true)}
           onKeyDown={handleKeyDown}
@@ -467,6 +493,40 @@ export default function DestinationAutocomplete({ value, onChange }: Destination
                       );
                     })}
                   </ul>
+                </li>
+              )}
+              {typoSuggestion && (
+                <li
+                  id={`${OPTION_ID_PREFIX}${typoIndex}`}
+                  role="option"
+                  aria-selected={activeIndex === typoIndex}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => selectOption(typoSuggestion)}
+                  onMouseEnter={() => setActiveIndex(typoIndex)}
+                  className={optionClass(typoIndex)}
+                >
+                  <svg
+                    className="h-4 w-4 shrink-0 text-gray-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                    />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+                    />
+                  </svg>
+                  <span className="font-medium">{typoLabel}</span>
+                  <span className="text-gray-500">{countryName(typoSuggestion.country)}</span>
                 </li>
               )}
               {searchOption && (

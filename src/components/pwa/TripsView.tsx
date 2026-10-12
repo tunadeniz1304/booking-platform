@@ -5,9 +5,10 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { useFormat } from "@/i18n/use-format";
 import type { Formatter } from "@/lib/i18n/format";
-import { Button, ButtonLink, focusRing, loginHref } from "@/components/ui/ui";
+import { Button, ButtonLink, ErrorText, focusRing, loginHref } from "@/components/ui/ui";
 import { refreshSessionUser } from "@/components/layout/useSessionUserCache";
 import BookingNumberText from "@/components/booking/BookingNumberText";
+import { shortRef } from "@/lib/ui/short-ref";
 import { APP_RECONNECT_EVENT } from "@/components/pwa/NetworkStatusBanner";
 
 interface ItineraryItem {
@@ -181,9 +182,8 @@ export default function TripsView() {
   if (state.kind === "error") {
     return (
       <div className="space-y-3">
-        <p key={attempt} role="alert" className="text-sm text-red-700">
-          {t("loadError")}
-        </p>
+        {/* F2-44: ortak ErrorText; düğme `busy` tuttuğu için Status yerine ayrı. */}
+        <ErrorText key={attempt}>{t("loadError")}</ErrorText>
         <Button variant="secondary" busy={retrying} onClick={retry}>
           {tc("errorPage.retry")}
         </Button>
@@ -286,9 +286,16 @@ export default function TripsView() {
                       />
                       <figcaption className="text-center text-sm text-gray-700">
                         <span className="block text-xs font-medium">{t("codeLabel")}</span>
+                        {/* Ev sahibinin gördüğü kısa no; altında QR/destek için tam kimlik (F2-41). */}
+                        <span
+                          translate="no"
+                          className="block font-mono text-base font-semibold text-gray-900"
+                        >
+                          {shortRef(item.id)}
+                        </span>
                         <code
                           id={numberId}
-                          className="break-all font-mono text-sm text-gray-900"
+                          className="break-all font-mono text-xs text-gray-700"
                           data-testid="booking-code"
                         >
                           <BookingNumberText id={item.id} className="font-mono" />

@@ -2,12 +2,15 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { ApiError, apiFetch, logout } from "@/lib/api-client";
 import { useFormat } from "@/i18n/use-format";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { Button, Status, focusRing, loginHref } from "@/components/ui/ui";
+import { withRedirect } from "@/components/auth/AuthCard";
+import { useSessionUserCache } from "@/components/layout/useSessionUserCache";
+import { rememberAuthEmail } from "@/lib/auth/auth-email-handoff";
 import { ReauthCancelledError, useAccountErrorText, useReauth } from "./ReauthDialog";
 
 interface SessionView {
@@ -25,8 +28,11 @@ const fetchSessions = () =>
 /** "Diğer tüm oturumlar" sorgusu; `revoking` anahtarı olarak da kullanılır. */
 const OTHERS = "scope=others";
 
-/** F793: şifre değişikliği "Şifremi unuttum" akışındaki e-posta bağlantısıyla yapılır. */
-const CHANGE_PASSWORD_HREF = "/forgot-password";
+/**
+ * F793: şifre değişikliği "Şifremi unuttum" akışındaki e-posta bağlantısıyla yapılır.
+ * F2-35: oturumun e-postası ve bu sayfaya dönüş adresi taşınır (form boş açılmaz).
+ */
+const CHANGE_PASSWORD_PATH = "/forgot-password";
 const changePasswordClass = `text-sm font-semibold text-[#003580] hover:underline ${focusRing}`;
 
 /** `info`: kullanıcının kendi vazgeçmesi gibi nötr bilgi; `changePassword`: şifre bağlantısı da. */
@@ -61,6 +67,12 @@ export default function SessionManager() {
   const ta = useTranslations("account");
   const fmt = useFormat();
   const router = useRouter();
+  const pathname = usePathname();
+  const sessionUser = useSessionUserCache();
+  const changePasswordHref = withRedirect(CHANGE_PASSWORD_PATH, pathname || "/");
+  const rememberSessionEmail = () => {
+    if (sessionUser?.email) rememberAuthEmail(sessionUser.email);
+  };
   const reauth = useReauth();
   const { confirm, confirmDialog } = useConfirm();
   const [loaded, setLoaded] = useState<{ sessions: SessionView[]; at: number } | null>(null);
@@ -209,7 +221,11 @@ export default function SessionManager() {
           {status?.kind === "info" ? status.text : null}
         </p>
         {status?.changePassword && (
-          <Link href={CHANGE_PASSWORD_HREF} className={`mt-1 inline-block ${changePasswordClass}`}>
+          <Link
+            href={changePasswordHref}
+            onClick={rememberSessionEmail}
+            className={`mt-1 inline-block ${changePasswordClass}`}
+          >
             {t("changePassword")}
           </Link>
         )}
@@ -295,7 +311,11 @@ export default function SessionManager() {
             {revoking === OTHERS ? t("revoking") : t("revokeOthers", { count: others })}
           </button>
           <p className="mt-4">
-            <Link href={CHANGE_PASSWORD_HREF} className={changePasswordClass}>
+            <Link
+              href={changePasswordHref}
+              onClick={rememberSessionEmail}
+              className={changePasswordClass}
+            >
               {t("changePassword")}
             </Link>
           </p>

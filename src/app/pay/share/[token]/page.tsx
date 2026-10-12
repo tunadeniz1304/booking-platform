@@ -7,7 +7,17 @@ import { useTranslations } from "next-intl";
 import { ApiError, apiFetch, logout } from "@/lib/api-client";
 import { useFormat } from "@/i18n/use-format";
 import type { ShareOutcome, ShareViewDTO } from "@/lib/cart/split-payment";
-import { PageShell, focusRing, loginHref, useErrorText, useSession } from "@/components/ui/ui";
+import {
+  Button,
+  ErrorText,
+  PageShell,
+  Status,
+  focusRing,
+  loginHref,
+  useErrorText,
+  useSession,
+} from "@/components/ui/ui";
+import { ThreeDsForm } from "@/components/payment/ThreeDsForm";
 import {
   CardFields,
   cardFieldId,
@@ -21,9 +31,12 @@ const newKey = () =>
     ? crypto.randomUUID()
     : String(Date.now());
 
-const field = "mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm";
 const linkClass = `inline-flex min-h-[44px] items-center text-primary-600 hover:underline sm:min-h-0 ${focusRing}`;
-const actionClass = `min-h-[44px] rounded-md border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-800 ${focusRing}`;
+// İkincil eylemler ortak Button ile (F2-11); dokunma hedefi 44px.
+const actionClass = "min-h-[44px]";
+/** Birincil düğmenin pasif / meşgul görünümü (mevcut gri renkler korunur). */
+const PRIMARY_DISABLED =
+  "aria-disabled:bg-gray-300 aria-disabled:text-gray-700 aria-disabled:opacity-100";
 
 type ResendState = "idle" | "sending" | "sent" | "verified" | "failed";
 
@@ -70,6 +83,8 @@ export default function SharePayPage() {
   const [result, setResult] = useState<"authorized" | "confirmed" | null>(null);
   const challengeHeadingRef = useRef<HTMLHeadingElement>(null);
   const paidRef = useRef<HTMLParagraphElement>(null);
+  const messageRef = useRef<HTMLDivElement>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   const errorText = useCallback(
     (err: unknown): string => {
@@ -180,10 +195,24 @@ export default function SharePayPage() {
           : `${errorText(err)} ${t("share.attemptsLeft", { count: left })}`
       );
     }
+    // F2-31: 3DS formu kalkınca odak <body>'ye düşmesin; hata kutusuna taşınır.
+    const moveFocus = challenge !== null;
     setChallenge(null);
     setAnnouncement("");
+    setCode("");
     setPayKey(newKey());
     await load();
+    if (moveFocus) requestAnimationFrame(() => messageRef.current?.focus());
+  }
+
+  /** Paylaşılan bağlantıdan durumu yeniden okur (katılımcı rezervasyonu burada izler, F2-09). */
+  async function refreshStatus() {
+    if (refreshing) return;
+    setRefreshing(true);
+    setAnnouncement("");
+    await load();
+    setRefreshing(false);
+    setAnnouncement(t("share.statusRefreshed"));
   }
 
   async function pay(e: React.FormEvent) {
@@ -278,18 +307,21 @@ export default function SharePayPage() {
   const verifyActions = (
     <>
       <div className="flex flex-wrap gap-3">
-        <button
-          type="button"
+        <Button
+          variant="secondary"
           onClick={() => void resendVerification()}
-          aria-disabled={resend === "sending" || undefined}
-          aria-busy={resend === "sending" || undefined}
+          busy={resend === "sending"}
           className={actionClass}
         >
           {resend === "sending" ? t("share.resendSending") : t("share.resendVerify")}
-        </button>
-        <button type="button" onClick={() => window.location.reload()} className={actionClass}>
+        </Button>
+        <Button
+          variant="secondary"
+          onClick={() => window.location.reload()}
+          className={actionClass}
+        >
           {t("share.refresh")}
-        </button>
+        </Button>
       </div>
       <p role="status">{resendStatus[resend]}</p>
     </>
@@ -305,9 +337,9 @@ export default function SharePayPage() {
         {session.status === "ready" && session.user && (
           <p>{t("share.signedInAs", { email: session.user.email })}</p>
         )}
-        <button type="button" onClick={() => void switchAccount()} className={actionClass}>
+        <Button variant="secondary" onClick={() => void switchAccount()} className={actionClass}>
           {t("share.switchAccount")}
-        </button>
+        </Button>
       </div>
     ) : errorCode === "SHARE_LINK_INVALID" || errorCode === "SHARE_LINK_EXPIRED" ? (
       <p className="mt-3 text-sm text-gray-800">
@@ -326,7 +358,9 @@ export default function SharePayPage() {
       {t("share.backToStatus")}
     </Link>
   ) : null;
-  const exitLinks = (
+  // F2-09: rezervasyon organizatöre aittir; Seyahatlerim yalnız organizatöre gösterilir.
+  // Katılımcı durumu bu bağlantıdan izler ("Durumu yenile").
+  const exitLinks = share?.isOrganizer ? (
     <div className="mt-4 flex flex-wrap gap-4">
       {statusLink}
       <Link href="/trips" className={linkClass}>
@@ -334,25 +368,42 @@ export default function SharePayPage() {
       </Link>
       {homeLink}
     </div>
+  ) : (
+    <div className="mt-4 space-y-3">
+      <p className="text-sm text-gray-700">
+        {share?.organizerName
+          ? t("share.trackHere", { name: share.organizerName })
+          : t("share.trackHereGeneric")}
+      </p>
+      <div className="flex flex-wrap items-center gap-4">
+        <Button
+          variant="secondary"
+          onClick={() => void refreshStatus()}
+          busy={refreshing}
+          className={actionClass}
+        >
+          {t("share.refreshStatus")}
+        </Button>
+        {homeLink}
+      </div>
+    </div>
   );
 
   if (loadError) {
     return (
       <PageShell title={t("share.title")}>
         <div className="max-w-xl">
-          <p role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
-            {loadError}
-          </p>
+          <Status error={loadError} />
           {recovery ??
             (errorCode === null && (
               <div className="mt-3">
-                <button
-                  type="button"
+                <Button
+                  variant="secondary"
                   onClick={() => window.location.reload()}
                   className={actionClass}
                 >
                   {t("share.refresh")}
-                </button>
+                </Button>
               </div>
             ))}
           <div className="mt-4">{homeLink}</div>
@@ -380,7 +431,6 @@ export default function SharePayPage() {
   const payInfoId = `${cardIds}-info`;
   const summaryTitleId = `${cardIds}-summary-title`;
   const payTitleId = `${cardIds}-pay-title`;
-  const challengeTitleId = `${cardIds}-3ds-title`;
 
   /** Pay ödenemiyorsa nedeni: başka hesapça ödendi, plan iptal/tamamlandı ya da süre doldu. */
   const closedText =
@@ -451,9 +501,10 @@ export default function SharePayPage() {
 
         {message && (
           <div className="mt-4">
-            <p role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
-              {message}
-            </p>
+            {/* F2-44: odak kabı ref/tabIndex taşır; metin ortak ErrorText ile. */}
+            <div ref={messageRef} tabIndex={-1} className="focus:outline-none">
+              <ErrorText>{message}</ErrorText>
+            </div>
             {recovery}
             {locked && <div className="mt-4">{homeLink}</div>}
           </div>
@@ -522,66 +573,33 @@ export default function SharePayPage() {
               disabled={busy}
             />
             {/* Meşgulken `disabled` yerine aria-disabled: odak düğmede kalır, çift gönderim yok. */}
-            <button
+            <Button
               type="submit"
-              aria-disabled={busy || undefined}
-              aria-busy={busy || undefined}
+              busy={busy}
+              size="lg"
+              fullWidth
               aria-describedby={payInfoId}
               data-testid="share-pay"
-              className={`w-full rounded-lg bg-[#003580] px-4 py-3 text-sm font-semibold text-white hover:bg-[#002b66] aria-disabled:bg-gray-300 aria-disabled:text-gray-700 ${focusRing}`}
+              className={PRIMARY_DISABLED}
             >
               {busy
                 ? tp("processing")
                 : `${t("share.pay")} · ${f.money(share.amountMinor, share.currency)}`}
-            </button>
+            </Button>
           </form>
         )}
 
         {challenge && (
-          <form
+          <ThreeDsForm
+            idPrefix={cardIds}
+            headingRef={challengeHeadingRef}
+            intro={challenge}
+            code={code}
+            onCodeChange={setCode}
+            busy={busy}
             onSubmit={confirm3ds}
-            aria-labelledby={challengeTitleId}
-            className="mt-6 space-y-3 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm"
-          >
-            <h2
-              id={challengeTitleId}
-              ref={challengeHeadingRef}
-              tabIndex={-1}
-              className="text-lg font-semibold text-gray-900 focus:outline-none"
-            >
-              {tp("threeDsTitle")}
-            </h2>
-            <p className="text-sm text-gray-600">{challenge}</p>
-            <label className="block text-sm font-medium text-gray-700">
-              {tp("verificationCode")}
-              <input
-                className={field}
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                required
-              />
-            </label>
-            <button
-              type="submit"
-              aria-disabled={busy || undefined}
-              aria-busy={busy || undefined}
-              className={`w-full rounded-lg bg-[#003580] px-4 py-3 text-sm font-semibold text-white aria-disabled:bg-gray-300 aria-disabled:text-gray-700 ${focusRing}`}
-            >
-              {busy ? tp("processing") : tp("verify")}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                if (!busy) backToCard();
-              }}
-              aria-disabled={busy || undefined}
-              className={`w-full ${actionClass}`}
-            >
-              {tp("threeDsBack")}
-            </button>
-          </form>
+            onBack={backToCard}
+          />
         )}
       </div>
     </PageShell>

@@ -47,6 +47,7 @@
   "events": {
     "title": "Olay sinyali kuyruğu",
     "textLabel": "Metinden olay öner",
+    "textTooShort": "Metin en az {min} karakter olmalı.",
     "textHint": "{min}–{max} karakter. Ör. haber metni: 'İzmir'de 12–15 Ekim arası uluslararası fuar düzenlenecek.' Öneri onaylanmadan fiyata yansımaz.",
     "extracting": "Çıkarılıyor…",
     "create": "Öneri oluştur",
@@ -160,7 +161,7 @@
     "remove": "Kaldır",
     "confirmRemove": {
       "title": "“{property}” yorumu kaldırılsın mı?",
-      "body": "Yorum yayından kalkar ve tesisin puanı yeniden hesaplanır. Bu karar buradan geri alınamaz.",
+      "body": "Yorum yayından kalkar ve ilanın puanı yeniden hesaplanır. Bu karar buradan geri alınamaz.",
       "confirm": "Yorumu kaldır"
     },
     "reviewOf": "“{property}” yorumu",
@@ -221,7 +222,9 @@
     "updatedFromTo": "{user} kimlikli kullanıcının rolü değişti: {from} → {to}. Oturumları kapatıldı; yeni rol bir sonraki girişte geçerli olur.",
     "errors": {
       "notFound": "Bu kimlikle kullanıcı bulunamadı. Kimliği kontrol edin.",
-      "forbidden": "Bu rol değiştirilemez: kendi rolünüzü değiştiremezsiniz ya da yönetici yetkiniz artık yok."
+      "forbidden": "Bu rol değiştirilemez: kendi rolünüzü değiştiremezsiniz ya da yönetici yetkiniz artık yok.",
+      "userIdRequired": "Kullanıcı kimliğini girin.",
+      "roleRequired": "Yeni rolü seçin."
     }
   },
   "nav": {
@@ -241,6 +244,13 @@
     "RATE_LIMITED": "Kısa sürede çok fazla işlem yapıldı. Biraz bekleyip tekrar deneyin."
   },
   "staleRecord": "Bu kayıt başka bir yönetici tarafından işlenmiş olabilir; liste yenilendi.",
+  "confirmResume": {
+    "title": "{name} ({shortId}) için ödemeler devam etsin mi?",
+    "body": "{count, plural, =0 {Bekleyen ödeme yok.} other {Bekleyen # ödeme hemen gönderime açılır.}}",
+    "reason": "Durdurma gerekçesi: {reason}",
+    "noReason": "Durdurma gerekçesi kayıtlı değil.",
+    "confirm": "Ödemelere devam et"
+  },
   "refresh": {
     "button": "Yenile",
     "updatedAt": "Son güncelleme: {time}"

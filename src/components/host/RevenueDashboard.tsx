@@ -597,10 +597,51 @@ function PropertyRevenue({
     if (busy || roomSuggestions.length === 0) return;
     const total = roomSuggestions.length;
     const args = { count: total, room: selectedRoomName };
+    // Toplu kararın kapsamı onayda özetlenir: tarih aralığı, uç değişimler, toplam fark (F2-27).
+    const days = roomSuggestions.map((s) => s.date).sort();
+    const ratios = roomSuggestions
+      .filter((s) => s.currentMinor > 0)
+      .map((s) => (s.suggestedMinor - s.currentMinor) / s.currentMinor);
+    const maxUp = Math.max(0, ...ratios);
+    const maxDown = Math.min(0, ...ratios);
+    const pct = (r: number) =>
+      f.number(r, { style: "percent", signDisplay: "exceptZero", maximumFractionDigits: 1 });
+    const currency = roomSuggestions[0].currency;
+    const sameCurrency = roomSuggestions.every((s) => s.currency === currency);
+    const diffMinor = roomSuggestions.reduce(
+      (sum, s) => sum + s.suggestedMinor - s.currentMinor,
+      0
+    );
+    const lowerCount = roomSuggestions.filter((s) => s.suggestedMinor < s.currentMinor).length;
+    const summary = [
+      t("suggestions.allSummary.range", {
+        from: f.date(days[0], "short"),
+        to: f.date(days[days.length - 1], "short"),
+      }),
+      maxUp > 0 ? t("suggestions.allSummary.maxIncrease", { percent: pct(maxUp) }) : null,
+      maxDown < 0 ? t("suggestions.allSummary.maxDecrease", { percent: pct(maxDown) }) : null,
+      sameCurrency
+        ? t("suggestions.allSummary.total", {
+            amount: `${diffMinor > 0 ? "+" : ""}${f.money(diffMinor, currency)}`,
+          })
+        : null,
+      t("suggestions.allSummary.lower", { count: lowerCount }),
+    ].filter((line): line is string => line !== null);
     if (
       !(await confirm({
         title: t(`suggestions.${action}AllConfirmTitle`, args),
-        body: t(action === "accept" ? "suggestions.acceptNote" : "suggestions.rejectAllNote"),
+        body: (
+          <>
+            <ul className="list-disc space-y-1 pl-5">
+              {summary.map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
+            <p className="mt-2">
+              {t(action === "accept" ? "suggestions.acceptNote" : "suggestions.rejectAllNote")}
+            </p>
+          </>
+        ),
         confirmLabel: t(`suggestions.${action}AllConfirm`, args),
         tone: "primary",
       }))

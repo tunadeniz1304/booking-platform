@@ -218,7 +218,7 @@
     "title": "Accessibility",
     "verified": "Verified",
     "verifiedHint": "Our team verified this feature against photo evidence provided by the host.",
-    "wholeProperty": "Whole property",
+    "wholeProperty": "Entire listing",
     "roomType": "Room: {name}",
     "width": "{width} cm clear width",
     "evidence": "Evidence photo",
@@ -394,9 +394,11 @@
         "upheldRestore": "The earlier takedown is reversed; the listing may be republished.",
         "rejected": "The earlier decision stays in place.",
         "final": "A saved appeal decision cannot be changed and is emailed to the appellant.",
-        "confirm": "Confirm appeal decision"
+        "confirm": "Confirm appeal decision",
+        "summary": "Content: {url} · Appellant: {role} · Appealed on: {date}"
       },
-      "rowTitle": "Appellant: {role} · Decision: {decision}",
+      "rowTitle": "{content} · Appellant: {role} · Decision: {decision} · {date}",
+      "noContent": "no content on record",
       "noDecision": "not on record",
       "appealedAt": "Appeal date: {date}",
       "responseHint": "At least 10 characters.",

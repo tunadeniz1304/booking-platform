@@ -6,7 +6,8 @@ import { useTranslations } from "next-intl";
 import { ApiError, apiFetch } from "@/lib/api-client";
 import { useFormat } from "@/i18n/use-format";
 import { parseAmountToMinor } from "@/lib/ui/amount-input";
-import { useErrorText } from "@/components/ui/ui";
+import { Button, ButtonLink, ErrorText, inputClass, useErrorText } from "@/components/ui/ui";
+import { AmountPreview } from "@/components/ui/AmountPreview";
 import type { ShareDTO, SplitPlanDTO } from "@/lib/cart/split-payment";
 
 interface Row {
@@ -17,8 +18,10 @@ interface Row {
 /** Plan okumasının durumu: ilk yanıt gelene kadar "loading", okunamazsa "error". */
 export type SplitLoadState = "loading" | "ready" | "error";
 
-const field =
-  "mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003580]";
+// F2-38: alanlar ortak inputClass (border-gray-500, 3:1 kontrast; küçük ekranda 16px).
+const field = inputClass;
+/** Pay satırı eylemleri: dokunmatikte 44px, masaüstünde 32px hedef (F2-38). */
+const rowAction = "inline-flex min-h-[44px] items-center sm:min-h-[32px]";
 
 const STATUS_TONE: Record<string, string> = {
   INVITED: "bg-gray-100 text-gray-700",
@@ -125,6 +128,8 @@ export function SplitPayPanel({
   const inFlight = useRef(false);
   const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const focusRow = useRef<number | null>(null);
+  // F2-30: toplam aşılınca odak en son düzenlenen tutar alanına gider.
+  const lastAmountRow = useRef<number | null>(null);
   const headingId = `${baseId}-title`;
 
   /** Bilinen kodu çevirir; genel kodlar `common.errors`, gerisi verilen yerel metin. */
@@ -350,10 +355,11 @@ export function SplitPayPanel({
       // Gönderim engellenir; nedeni alan altında yazar ve odak ilk hatalı alana gider.
       setAttempted(true);
       const first = rowErrors.findIndex((r) => r.email || r.amount);
+      const lastEdited = Math.min(lastAmountRow.current ?? 0, rows.length - 1);
       const target =
         first >= 0
           ? fieldId(rowErrors[first].email ? "email" : "amount", first)
-          : fieldId("amount", 0);
+          : fieldId("amount", lastEdited);
       document.getElementById(target)?.focus();
       return;
     }
@@ -484,30 +490,23 @@ export function SplitPayPanel({
         <h2 id={headingId} className="text-lg font-semibold text-gray-900">
           {t("title")}
         </h2>
-        <p role="alert" className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
-          {t("loadFailed")}
-        </p>
-        <button
-          type="button"
-          onClick={() => {
-            if (!refreshing) void load(true);
-          }}
-          aria-busy={refreshing || undefined}
-          className="mt-3 min-h-[44px] rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-800"
+        {/* F2-44: ortak ErrorText (simge + "Hata:" öneki); yeniden dene düğmesi ayrı kalır. */}
+        <ErrorText className="mt-3 rounded-lg bg-red-50 px-3 py-2">{t("loadFailed")}</ErrorText>
+        <Button
+          variant="secondary"
+          onClick={() => void load(true)}
+          busy={refreshing}
+          className="mt-3 min-h-[44px]"
         >
           {refreshing ? t("refreshing") : t("retry")}
-        </button>
+        </Button>
       </section>
     );
   }
 
   const alerts = (
     <div aria-live="polite">
-      {message && (
-        <p role="alert" className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
-          {message}
-        </p>
-      )}
+      {message && <ErrorText className="mt-3 rounded-lg bg-red-50 px-3 py-2">{message}</ErrorText>}
     </div>
   );
 
@@ -538,29 +537,26 @@ export function SplitPayPanel({
             {actions && s.inviteUrl && (
               <div className="mt-2 flex flex-wrap items-end gap-2 text-sm">
                 {s.isOrganizer ? (
-                  <Link
-                    href={localPath(s.inviteUrl)}
-                    className="rounded-md bg-[#003580] px-3 py-1 font-semibold text-white"
-                  >
+                  <ButtonLink href={localPath(s.inviteUrl)} className={rowAction}>
                     {s.isFallback ? t("payRemaining") : t("payMine")}
-                  </Link>
+                  </ButtonLink>
                 ) : (
                   <>
                     {canShare && (
-                      <button
-                        type="button"
+                      <Button
+                        variant="secondary"
                         onClick={() => void shareLink(s)}
                         aria-label={t("shareLinkFor", { name })}
-                        className="rounded-md border border-gray-300 px-3 py-1 font-semibold text-gray-800"
+                        className={rowAction}
                       >
                         {t("shareLink")}
-                      </button>
+                      </Button>
                     )}
-                    <button
-                      type="button"
+                    <Button
+                      variant="secondary"
                       onClick={() => void copy(s)}
                       aria-label={copied ? t("copiedFor", { name }) : t("copyLinkFor", { name })}
-                      className="rounded-md border border-gray-300 px-3 py-1 font-semibold text-gray-800"
+                      className={rowAction}
                     >
                       {copied ? (
                         <>
@@ -569,7 +565,7 @@ export function SplitPayPanel({
                       ) : (
                         t("copyLink")
                       )}
-                    </button>
+                    </Button>
                     <form
                       onSubmit={(e) => void sendInvite(e, s)}
                       className="flex flex-wrap items-end gap-2"
@@ -585,7 +581,7 @@ export function SplitPayPanel({
                             type="email"
                             autoComplete="off"
                             placeholder={t("invitePlaceholder")}
-                            className="w-48 rounded-md border border-gray-300 px-2 py-1 text-sm"
+                            className={`${inputClass} sm:w-48`}
                             value={emails[s.id] ?? ""}
                             aria-invalid={inviteErr ? true : undefined}
                             aria-describedby={inviteErr ? `${inviteId}-err` : undefined}
@@ -596,11 +592,12 @@ export function SplitPayPanel({
                           />
                         </div>
                       )}
-                      <button
+                      <Button
                         type="submit"
-                        disabled={busy}
+                        variant="secondary"
+                        busy={busy}
                         aria-label={sent ? t("sentTo", { name }) : t("sendEmailFor", { name })}
-                        className="rounded-md border border-gray-300 px-3 py-1 font-semibold text-gray-800 disabled:text-gray-400"
+                        className={rowAction}
                       >
                         {sent ? (
                           <>
@@ -609,7 +606,7 @@ export function SplitPayPanel({
                         ) : (
                           t("sendEmail")
                         )}
-                      </button>
+                      </Button>
                     </form>
                   </>
                 )}
@@ -678,6 +675,7 @@ export function SplitPayPanel({
       );
     }
     const countLabelId = `${baseId}-people-label`;
+    const overId = `${baseId}-over`;
     const countHintId = `${baseId}-people-hint`;
     return (
       <form
@@ -792,18 +790,24 @@ export function SplitPayPanel({
                       inputMode="decimal"
                       className={field}
                       value={row.amount}
-                      aria-invalid={amountErr ? true : undefined}
-                      aria-describedby={
-                        amountErr ? `${amountId}-err ${amountId}-hint` : `${amountId}-hint`
-                      }
+                      aria-invalid={amountErr || overTotal ? true : undefined}
+                      aria-describedby={[
+                        amountErr ? `${amountId}-err` : null,
+                        overTotal ? overId : null,
+                        `${amountId}-hint`,
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
                       onBlur={() => touch(`amount-${i}`)}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        lastAmountRow.current = i;
                         setRows(
                           rows.map((r, j) => (j === i ? { ...r, amount: e.target.value } : r))
-                        )
-                      }
+                        );
+                      }}
                       required
                     />
+                    <AmountPreview value={row.amount} currency={currency} fractionDigits={digits} />
                     {amountErr && (
                       <p id={`${amountId}-err`} className="mt-1 text-xs text-red-700">
                         {amountErr}
@@ -855,7 +859,7 @@ export function SplitPayPanel({
         </div>
         <div aria-live="polite">
           {overTotal ? (
-            <p className="text-sm text-red-700">
+            <p id={overId} className="text-sm text-red-700">
               {t("overTotal", {
                 total: f.money(totalMinor, currency),
                 excess: f.money(-organizerMinor, currency),
@@ -870,15 +874,16 @@ export function SplitPayPanel({
           {t("beforeCreate")}
         </p>
         {alerts}
-        <button
+        <Button
           type="submit"
-          disabled={busy}
-          aria-busy={busy}
+          variant="secondary"
+          size="lg"
+          fullWidth
+          busy={busy}
           aria-describedby={`${baseId}-terms`}
-          className="w-full rounded-lg border border-[#003580] px-4 py-3 text-sm font-semibold text-[#003580] hover:bg-blue-50 disabled:border-gray-300 disabled:text-gray-500"
         >
           {busy ? t("creating") : t("create")}
-        </button>
+        </Button>
       </form>
     );
   }

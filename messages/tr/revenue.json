@@ -95,6 +95,13 @@
     "rejectAllConfirmTitle": "{room} için {count} önerinin tümü reddedilsin mi?",
     "rejectAllConfirm": "Tümünü reddet",
     "rejectAllNote": "Reddetmek hiçbir fiyatı değiştirmez; öneriler listeden kalkar.",
+    "allSummary": {
+      "range": "Tarihler: {from} – {to}",
+      "maxIncrease": "En büyük artış: {percent}",
+      "maxDecrease": "En büyük düşüş: {percent}",
+      "total": "Toplam fark (önerilen − mevcut): {amount}",
+      "lower": "{count, plural, =0 {Fiyatı düşüren öneri yok} other {# öneri fiyatı düşürüyor}}"
+    },
     "acceptAllDone": "{room} için {count} öneri kabul edildi; fiyatlar ayarlandı ve sabitlendi.",
     "rejectAllDone": "{room} için {count} öneri reddedildi; fiyatlar değişmedi.",
     "bulkFailed": "{total} önerinin {done} tanesi işlendi, ardından işlem durdu: {reason}"

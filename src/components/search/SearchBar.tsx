@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, useState, useSyncExternalStore, useTransition
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useFormat } from "@/i18n/use-format";
-import { Button } from "@/components/ui/ui";
+import { Button, ErrorText } from "@/components/ui/ui";
 import DateRangePicker from "@/components/search/DateRangePicker";
 import DestinationAutocomplete from "@/components/search/DestinationAutocomplete";
 import { publishSearchDraft } from "@/components/search/useSearchDraft";
@@ -36,6 +36,30 @@ export interface SearchBarInitial {
   /** Arama oda sayısını desteklemiyor; yok sayılır (geriye dönük uyumluluk). */
   rooms?: number;
 }
+
+/** Arama çubuğunun dışarıdan odaklanacak alanı (sonuç sayfası "Aramayı düzenle", F2-05). */
+export type SearchBarFocusField = "destination" | "dates" | "guests";
+
+/** Bugünün yerel tarihi (YYYY-MM-DD); geçmiş giriş tarihi önceden doldurulmaz. */
+const todayIso = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+
+/** Sonuç sayfasından gönderimde yeniden yazılan / anlamını yitiren parametreler. */
+const REPLACED_PARAMS = [
+  "destination",
+  "city",
+  "checkIn",
+  "checkOut",
+  "guests",
+  "adults",
+  "children",
+  "smart",
+  "smartKeys",
+  "amenities",
+  "pages",
+];
 
 /** Takvimde seçili (yoksa ilk seçilebilir) güne odak taşır. */
 const focusSelectedDay = (panel: HTMLElement | null) => {
@@ -132,10 +156,22 @@ function CounterRow({
   );
 }
 
-export default function SearchBar({ initial }: { initial?: SearchBarInitial } = {}) {
+export default function SearchBar({
+  initial,
+  preserveParams,
+  focusRequest,
+  onSubmitted,
+}: {
+  initial?: SearchBarInitial;
+  /** Korunacak mevcut sorgu (sonuç sayfası: filtre, sıralama, görünüm); arama alanları üzerine yazılır. */
+  preserveParams?: string;
+  /** `seq` her değiştiğinde ilgili alana odak taşınır (tarih/misafir paneli açılır). */
+  focusRequest?: { field: SearchBarFocusField; seq: number };
+  /** Gönderim sonrası (ör. düzenleme bölümünü kapatmak için). */
+  onSubmitted?: () => void;
+} = {}) {
   const router = useRouter();
   const t = useTranslations("search");
-  const tc = useTranslations("common");
   const f = useFormat();
   const isDesktop = useSyncExternalStore(subscribeDesktop, getDesktop, () => false);
   const [isPending, startTransition] = useTransition();
@@ -145,12 +181,16 @@ export default function SearchBar({ initial }: { initial?: SearchBarInitial } = 
   const [destination, setDestination] = useState(initial?.destination ?? "");
   const [dateOpen, setDateOpen] = useState(false);
   const [guestsOpen, setGuestsOpen] = useState(false);
-  const [checkIn, setCheckIn] = useState(
-    initial?.checkIn && ISO_DATE.test(initial.checkIn) ? initial.checkIn : ""
-  );
-  const [checkOut, setCheckOut] = useState(
-    initial?.checkOut && ISO_DATE.test(initial.checkOut) ? initial.checkOut : ""
-  );
+  // F2-05: geçmiş ya da sırasız tarih önceden doldurulmaz (takvim de geçmiş günü kabul etmez).
+  const [initialDates] = useState(() => {
+    const ci = initial?.checkIn ?? "";
+    const co = initial?.checkOut ?? "";
+    return ISO_DATE.test(ci) && ISO_DATE.test(co) && ci >= todayIso() && co > ci
+      ? { checkIn: ci, checkOut: co }
+      : { checkIn: "", checkOut: "" };
+  });
+  const [checkIn, setCheckIn] = useState(initialDates.checkIn);
+  const [checkOut, setCheckOut] = useState(initialDates.checkOut);
   const initialAdults = clamp(initial?.adults, 1, MAX_ADULTS, 2);
   const [adults, setAdults] = useState(initialAdults);
   const [children, setChildren] = useState(
@@ -194,6 +234,28 @@ export default function SearchBar({ initial }: { initial?: SearchBarInitial } = 
     document.addEventListener("pointerdown", handler);
     return () => document.removeEventListener("pointerdown", handler);
   }, [dateOpen, guestsOpen]);
+
+  // Dış odak isteği: bağlanırkenki istek yok sayılır (URL değişip yeniden bağlanınca odak çalınmaz).
+  // Panel durumu render sırasında ayarlanır (efektte setState yok); DOM odağı efektte taşınır.
+  const [panelSeq, setPanelSeq] = useState(focusRequest?.seq);
+  if (focusRequest && focusRequest.seq !== panelSeq) {
+    setPanelSeq(focusRequest.seq);
+    setDateOpen(focusRequest.field === "dates");
+    setGuestsOpen(focusRequest.field !== "dates" && focusRequest.field !== "destination");
+  }
+  const handledFocusSeq = useRef(focusRequest?.seq);
+  useEffect(() => {
+    if (!focusRequest || focusRequest.seq === handledFocusSeq.current) return;
+    handledFocusSeq.current = focusRequest.seq;
+    if (focusRequest.field === "destination") {
+      document.getElementById("destination")?.focus();
+    } else if (focusRequest.field === "dates") {
+      // Panel zaten açıksa açılış efekti çalışmaz; odak doğrudan güne taşınır.
+      focusSelectedDay(datePanelRef.current);
+    } else {
+      guestsPanelRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
+    }
+  }, [focusRequest]);
 
   // Tarih seçici açılınca odağı seçili (yoksa ilk seçilebilir) güne taşı.
   useEffect(() => {
@@ -242,7 +304,9 @@ export default function SearchBar({ initial }: { initial?: SearchBarInitial } = 
       else setDateOpen(true);
       return;
     }
-    const params = new URLSearchParams();
+    // F2-05: sonuç sayfasında filtre/sıralama/görünüm korunur; arama alanları yeniden yazılır.
+    const params = new URLSearchParams(preserveParams ?? "");
+    for (const key of REPLACED_PARAMS) params.delete(key);
     if (destination.trim()) params.set("destination", destination.trim());
     if (checkIn && checkOut) {
       params.set("checkIn", checkIn);
@@ -252,6 +316,7 @@ export default function SearchBar({ initial }: { initial?: SearchBarInitial } = 
     params.set("adults", String(adults));
     if (children > 0) params.set("children", String(children));
     startTransition(() => router.push(`/search?${params.toString()}`));
+    onSubmitted?.();
   };
 
   const toggleOpen = (target: "date" | "guests", next: boolean) => {
@@ -368,19 +433,16 @@ export default function SearchBar({ initial }: { initial?: SearchBarInitial } = 
             )}
           </div>
           {dateError && (
-            <p id={dateErrorId} role="alert" className="mt-1 text-xs font-medium text-red-700">
-              <span aria-hidden="true">{"⚠︎"} </span>
-              <span className="sr-only">{tc("errorPrefix")} </span>
+            <ErrorText id={dateErrorId} className="mt-1 font-medium">
               {t("bar.checkOutRequired")}
-            </p>
+            </ErrorText>
           )}
           {dateOpen && (
             // Mobilde akış içinde açılır (alttaki alanları örtmez), masaüstünde açılır pencere.
+            // F2-49: diyalog rolü yalnız DateRangePicker'da (iç içe diyalog duyurulmaz).
             <div
               ref={datePanelRef}
               id={datePanelId}
-              role="dialog"
-              aria-label={t("bar.datesDialog")}
               className="mt-1 lg:absolute lg:left-0 lg:z-30 lg:w-[560px]"
             >
               <DateRangePicker

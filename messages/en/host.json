@@ -338,6 +338,7 @@
     "activatedNamed": "“{name}” activated.",
     "updated": "Promotion updated.",
     "cannotDelete": "“{name}” has been used, so it can't be deleted. It is already paused.",
+    "cannotDeleteInline": "Used, so it can't be deleted",
     "deleteConfirm": {
       "title": "Delete “{name}”?",
       "body": "The promotion will be deleted permanently. This can't be undone.",
@@ -391,6 +392,12 @@
       "body": "You have changes on this page that are not saved. They will be lost if you leave.",
       "confirm": "Leave without saving",
       "cancel": "Stay on this page"
+    },
+    "discardConfirm": {
+      "title": "Discard changes?",
+      "body": "The form has changes you have not saved. They will be lost if you continue.",
+      "confirm": "Discard changes",
+      "cancel": "Keep editing"
     }
   }
 }

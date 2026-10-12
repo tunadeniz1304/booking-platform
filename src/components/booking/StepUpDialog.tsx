@@ -7,7 +7,7 @@ import { WebAuthnAbortService } from "@simplewebauthn/browser";
 import { ApiError } from "@/lib/api-client";
 import { passkeyErrorCode, performStepUp } from "@/lib/auth/passkey-client";
 import { useFormat } from "@/i18n/use-format";
-import { focusRing, useErrorText } from "@/components/ui/ui";
+import { ErrorText, focusRing, useErrorText } from "@/components/ui/ui";
 
 /**
  * P1-8 step-up penceresi: kural motoru ödemeyi riskli bulduğunda (403 STEP_UP_REQUIRED)
@@ -139,11 +139,7 @@ export default function StepUpDialog({
       <p role="status" className={busy ? "mt-3 text-sm text-gray-700" : "sr-only"}>
         {busy ? t("waitingHint") : ""}
       </p>
-      {error && (
-        <p role="alert" className="mt-3 text-sm text-red-700">
-          {error}
-        </p>
-      )}
+      {error && <ErrorText className="mt-3">{error}</ErrorText>}
       <div className="mt-5 flex gap-2">
         <button
           ref={primary}

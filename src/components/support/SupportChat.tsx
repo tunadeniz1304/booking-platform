@@ -4,6 +4,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { ApiError, apiFetch } from "@/lib/api-client";
 import { useFormat } from "@/i18n/use-format";
+import { shortRef } from "@/lib/ui/short-ref";
 import {
   Button,
   Card,
@@ -186,7 +187,7 @@ export default function SupportChat() {
       ...prev.filter((x) => !(x.status === "failed" && x.text === text)),
       { id, role: "user", text, status: "sending", ...(requestHuman ? { requestHuman } : {}) },
     ]);
-    // Taslak yalnız gönderilen metinse temizlenir ("İnsana bağlan" taslağı silmez).
+    // F2-10: gönderilen metin taslaksa temizlenir ("İnsana bağlan" da taslağı gönderir).
     setMessage((cur) => (cur.trim() === text ? "" : cur));
     const booking = selectedBooking;
     try {
@@ -214,7 +215,7 @@ export default function SupportChat() {
     } catch (err) {
       setTurns((prev) => prev.map((x): Turn => (x.id === id ? { ...x, status: "failed" } : x)));
       // Yazılan metin kaybolmasın: kutu boşsa geri konur (düzenlenip yeniden gönderilebilir).
-      if (!requestHuman) setMessage((cur) => (cur === "" ? text : cur));
+      setMessage((cur) => (cur === "" && text !== t("humanMessage") ? text : cur));
       // Asistan kapalı: genel "hizmet yanıt vermiyor" yerine insana devir yolu gösterilir (F406).
       const agentOff =
         !requestHuman && err instanceof ApiError && err.code === "SERVICE_UNAVAILABLE";
@@ -271,10 +272,21 @@ export default function SupportChat() {
     inputRef.current?.focus();
   };
 
-  /** P2-1 "İnsana bağlan": metinden bağımsız, doğrudan insan kuyruğuna devir. */
-  const connectHuman = () => void ask(t("humanMessage"), true);
-  const handedOff = turns.some((turn) => turn.ticketId);
   const myTickets = tickets.data?.tickets ?? [];
+  // F2-40: açık talep varken "Yeni konuşma" devir kilidini sıfırlamaz.
+  const handedOff =
+    turns.some((turn) => turn.ticketId) || myTickets.some((x) => x.status !== "RESOLVED");
+  /**
+   * P2-1 "İnsana bağlan": doğrudan insan kuyruğuna devir. F2-10: talep sunucuda bu metinle
+   * açılır; taslak (yoksa son gönderilemeyen mesaj) ekibe iletilir, ikisi de yoksa sabit metin.
+   */
+  const connectHuman = () => {
+    if (handedOff) return;
+    const lastFailed = [...turns]
+      .reverse()
+      .find((x) => x.role === "user" && x.status === "failed")?.text;
+    void ask(message.trim() || lastFailed || t("humanMessage"), true);
+  };
   const remaining = MAX_MESSAGE - message.length;
   const limitNote =
     truncated && remaining <= 0
@@ -300,9 +312,10 @@ export default function SupportChat() {
           </h2>
           <ul className="mt-1 space-y-1 break-words text-sm text-gray-700">
             {myTickets.map((ticket) => (
-              <li key={ticket.id}>
+              <li key={ticket.id} title={ticket.id}>
                 {t("ticketLine", {
-                  id: ticket.id,
+                  // F2-41: yöneticinin gördüğü kısa referansla aynı biçim.
+                  id: shortRef(ticket.id),
                   date: f.date(ticket.createdAt),
                   status: tStatus(ticket.status),
                 })}
@@ -342,13 +355,13 @@ export default function SupportChat() {
             {turn.ticketId && (
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <p className="text-xs font-medium text-amber-900">
-                  {t("handoff", { id: turn.ticketId.slice(-6).toUpperCase() })}
+                  {t("handoff", { id: shortRef(turn.ticketId) })}
                 </p>
                 <Button
                   type="button"
                   variant="secondary"
                   title={turn.ticketId}
-                  aria-label={t("copyRefLabel", { id: turn.ticketId.slice(-6).toUpperCase() })}
+                  aria-label={t("copyRefLabel", { id: shortRef(turn.ticketId) })}
                   onClick={() => void copyTicket(turn)}
                 >
                   {copiedTicket === turn.ticketId ? t("copied") : t("copyRef")}
@@ -444,14 +457,16 @@ export default function SupportChat() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <Button type="submit" disabled={busy || message.trim() === ""}>
+          {/* F2-40: disabled yerine busy/aria-disabled (odak düğmede kalır). */}
+          <Button type="submit" busy={busy} aria-disabled={message.trim() === "" || undefined}>
             {busy ? t("sending") : t("send")}
           </Button>
           <Button
             type="button"
             variant="secondary"
             onClick={connectHuman}
-            disabled={busy || handedOff}
+            busy={busy}
+            aria-disabled={handedOff || undefined}
             data-testid="support-connect-human"
           >
             {t("connectHuman")}

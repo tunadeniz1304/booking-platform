@@ -6,6 +6,7 @@ import { apiFetch } from "@/lib/api-client";
 import { useFormat } from "@/i18n/use-format";
 import { Button, Card, Field, Status, inputClass, useLoader } from "@/components/ui/ui";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { shortRef } from "@/lib/ui/short-ref";
 import { isStaleRecord, useAdminErrorText } from "@/components/admin/admin-error-text";
 
 type BlockReason = "PAUSED" | "PROVIDER_DISABLED" | "IDENTITY_UNVERIFIED";
@@ -38,11 +39,6 @@ function blockReasonOf(row: AccountRow): BlockReason | null {
   if (row.payoutsPaused) return "PAUSED";
   if (!row.payoutsEnabled) return "PROVIDER_DISABLED";
   return null;
-}
-
-/** Aynı ada sahip ev sahiplerini ayırmak için kısaltılmış kullanıcı kimliği. */
-function shortId(userId: string): string {
-  return userId.length > 6 ? `…${userId.slice(-6)}` : userId;
 }
 
 interface RowFeedback {
@@ -102,10 +98,31 @@ export default function PayoutAdmin() {
       }
       const ok = await confirm({
         title: t("admin.confirmPause.title", {
-          name: `${row.displayName} (${shortId(row.userId)})`,
+          name: `${row.displayName} (${shortRef(row.userId)})`,
         }),
         body: t("admin.confirmPause.body", { count: row.pendingPayouts, reason }),
         confirmLabel: t("admin.confirmPause.confirm"),
+        tone: "danger",
+      });
+      if (!ok) return;
+    } else {
+      // F2-08: devam ettirme de bekleyen ödemeleri serbest bırakır; yanlış tıklamaya karşı onay.
+      const ok = await confirm({
+        title: ta("confirmResume.title", {
+          name: row.displayName,
+          shortId: shortRef(row.userId),
+        }),
+        body: (
+          <>
+            <span className="block">{ta("confirmResume.body", { count: row.pendingPayouts })}</span>
+            <span className="mt-1 block break-words">
+              {row.pausedReason
+                ? ta("confirmResume.reason", { reason: row.pausedReason })
+                : ta("confirmResume.noReason")}
+            </span>
+          </>
+        ),
+        confirmLabel: ta("confirmResume.confirm"),
         tone: "danger",
       });
       if (!ok) return;
@@ -157,7 +174,8 @@ export default function PayoutAdmin() {
     return (
       !needle ||
       row.displayName.toLocaleLowerCase(locale).includes(needle) ||
-      row.userId.toLocaleLowerCase(locale).includes(needle)
+      // Kimlik yerel kuralsız karşılaştırılır (tr'de "I" -> "ı" eşleşmeyi bozar).
+      row.userId.toLowerCase().includes(query.trim().toLowerCase())
     );
   });
 
@@ -232,7 +250,7 @@ export default function PayoutAdmin() {
                   <p className="font-medium">
                     {row.displayName}{" "}
                     <span className="break-all font-normal text-gray-600">
-                      {t("admin.userId", { id: shortId(row.userId) })}
+                      {t("admin.userId", { id: shortRef(row.userId) })}
                     </span>
                   </p>
                   <p>
@@ -288,6 +306,11 @@ export default function PayoutAdmin() {
                       aria-describedby={
                         row.payoutsPaused ? undefined : `payout-pause-hint-${row.userId}`
                       }
+                      // F2-52: düğme adı ev sahibini de söyler (admin.rowAction).
+                      aria-label={ta("rowAction", {
+                        action: row.payoutsPaused ? t("admin.resume") : t("admin.pause"),
+                        name: row.displayName,
+                      })}
                       onClick={() => toggle(row)}
                     >
                       {row.payoutsPaused ? t("admin.resume") : t("admin.pause")}

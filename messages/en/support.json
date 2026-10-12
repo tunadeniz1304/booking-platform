@@ -1,6 +1,7 @@
 {
   "chat": {
-    "pageTitle": "Support assistant",
+    "pageTitle": "Help & support",
+    "loginToChat": "<link>Sign in</link> to use the assistant.",
     "pageIntro": "Ask about your booking, the estimated refund if you cancel, or property rules.",
     "disclosure": "You are chatting with an AI assistant. It cannot approve refunds, cancellations or payments; when needed it hands the conversation to our human support team.",
     "label": "Your message",
@@ -14,7 +15,7 @@
     "empty": "No messages yet.",
     "connectHuman": "Talk to a human",
     "humanMessage": "I would like to talk to a human agent.",
-    "humanHint": "If the AI answer is not enough, you can hand the conversation straight to our human support team.",
+    "humanHint": "If the AI answer is not enough, you can hand the conversation straight to our human support team; your message is passed to the team.",
     "humanPending": "Your request was forwarded to our human support team. An agent will reply to the email address on your account; you can follow the ticket status in the list at the top of this page.",
     "bookingLabel": "Which booking is this about?",
     "bookingNone": "None selected (your nearest booking is used)",
@@ -79,6 +80,13 @@
     "selectedCount": "{count, plural, one {# ticket selected} other {# tickets selected}}",
     "bulkInProgress": "Start review for selected",
     "bulkResolve": "Mark selected resolved",
+    "bulkNoneEligible": "{count, plural, =0 {Select at least one ticket first.} one {The selected ticket is not eligible for this action; its status is already up to date.} other {None of the # selected tickets are eligible for this action; their statuses are already up to date.}}",
+    "bulkSkipped": "{count, plural, one {# selected ticket was} other {# selected tickets were}} skipped as not eligible.",
+    "confirmBulkResolve": {
+      "title": "Mark {count, plural, one {# ticket} other {# tickets}} as resolved?",
+      "body": "The tickets leave the active queue; they can be reopened from the “Resolved” filter if needed.",
+      "confirm": "Mark as resolved"
+    },
     "bulkUpdated": "{count, plural, one {# ticket updated.} other {# tickets updated.}}",
     "bulkFailed": "{count, plural, one {# ticket} other {# tickets}} could not be updated: {error}",
     "groupTitle": "{count, plural, one {# ticket} other {# tickets}} for the same booking",

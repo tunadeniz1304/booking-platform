@@ -1,0 +1,1410 @@
+{
+  "round": 2,
+  "date": "2026-10-13",
+  "base": "4eac946",
+  "findings": 59,
+  "severity": {
+    "High": 11,
+    "Medium": 34,
+    "Low": 14
+  },
+  "wave1": [
+    {
+      "pkg": "P3c",
+      "results": [
+        {
+          "id": "F2-18",
+          "part": "autocomplete",
+          "outcome": "fixed",
+          "summary": "Seçimden sonra giriş alanı yerelleştirilmiş şehir adını gösteriyor; üst bileşene DB adı gidiyor."
+        },
+        {
+          "id": "F2-21",
+          "outcome": "fixed",
+          "summary": "Levenshtein (≤2) ile 'Bunu mu demek istediniz: X' seçeneği; place-suggest.ts + unit test."
+        }
+      ],
+      "testUpdates": ["NEW tests/unit/search/place-suggest.test.ts"]
+    },
+    {
+      "pkg": "P3b",
+      "results": [
+        {
+          "id": "F2-18",
+          "part": "hook+compare+plan",
+          "outcome": "fixed",
+          "summary": "usePlaceLabel kancası; karşılaştırma konum satırı ve gezi planı durak başlıkları yerelleştirilmiş adla."
+        },
+        {
+          "id": "F2-19",
+          "outcome": "fixed",
+          "summary": "Karşılaştırma sütun bağlantıları from + adults/children taşıyor; CompareBar'a isteğe bağlı adults/children."
+        },
+        {
+          "id": "F2-20",
+          "outcome": "fixed",
+          "summary": "Konaklama başlığı ilana bağlantı; boş durakta '{şehir} için ara' bağlantısı."
+        },
+        {
+          "id": "F2-51",
+          "outcome": "fixed",
+          "summary": "İlk istemci anlık görüntüsü saklanıyor; duyuru yalnız kullanıcı eylemiyle değişince."
+        }
+      ],
+      "pending": "search page must pass adults/children to CompareBar (P3a or central)"
+    },
+    {
+      "pkg": "P2",
+      "results": [
+        {
+          "id": "F2-03",
+          "outcome": "fixed",
+          "summary": "Checkout ana düğmesi native disabled yerine aria-disabled; odak düğmede kalıyor."
+        },
+        {
+          "id": "F2-13",
+          "outcome": "fixed",
+          "summary": "Widget adults/children gönderiyor; checkout 'X yetişkin, Y çocuk' gösterip geri bağlantılarda taşıyor."
+        },
+        {
+          "id": "F2-14",
+          "outcome": "fixed",
+          "summary": "MEAL_PLAN_KEYS ortak modülde (src/lib/i18n/meal-plan.ts); checkout tüm yemek planlarını yazıyor."
+        },
+        {
+          "id": "F2-16",
+          "outcome": "fixed",
+          "summary": "Ortak useQuoteError kancası; checkout yerelleştirilmiş metin, 'Yeniden hesapla' yalnız kodsuz/bilinmeyen hatada."
+        },
+        {
+          "id": "F2-59",
+          "part": "widget",
+          "outcome": "fixed",
+          "summary": "Fiyat planı radyoları h-5 w-5; etiket satırı ≥28px tıklanabilir."
+        }
+      ],
+      "notes": "checkout.soldOut, checkout.breakfastIncluded unused now"
+    },
+    {
+      "pkg": "P4",
+      "results": [
+        {
+          "id": "F2-34",
+          "outcome": "partially_fixed",
+          "summary": "Dönüş adresi postResetRedirect anahtarında saklanıyor; sıfırlama sonrası bağlantılar onu kullanıyor; e-posta hatırlanıyor. Login'in hatırlanan e-postayı okuması merkezde eklenecek."
+        },
+        {
+          "id": "F2-35",
+          "outcome": "fixed",
+          "summary": "Şifre değiştirme bağlantıları dönüş adresi ve e-postayı taşıyor; oturum açıkken 'Şifre değiştir' başlığı ve 'Hesabıma dön'."
+        },
+        {
+          "id": "F2-36",
+          "outcome": "fixed",
+          "summary": "Kayıt başarı ekranı focusTitle; başarı metni baştan bağlı durum bölgesinde."
+        },
+        {
+          "id": "F2-37",
+          "outcome": "fixed",
+          "summary": "ReauthDialog: PasswordRevealInput + inputClass + Button busy; boş gönderimde alan hatası ve odak."
+        },
+        {
+          "id": "F2-55",
+          "outcome": "fixed",
+          "summary": "Yeniden doğrulama iptalinde 'hesabınız silinmedi' durumu; onay kutusu sıfırlanıyor."
+        }
+      ],
+      "pending": [
+        "login/page.tsx: read readRememberedAuthEmail in email fallback",
+        "account.reauth.showPassword unused",
+        "Status shows success icon for cancel notice"
+      ]
+    },
+    {
+      "pkg": "P8",
+      "results": [
+        {
+          "id": "F2-10",
+          "outcome": "fixed",
+          "summary": "İnsana bağlan: taslak → son başarısız tur → sabit metin; gönderilince taslak temizleniyor, hata olursa geri geliyor; ipucu güncellendi."
+        },
+        {
+          "id": "F2-40",
+          "outcome": "fixed",
+          "summary": "Devir kilidi açık taleplerden de hesaplanıyor; Gönder ve İnsana bağlan busy/aria-disabled."
+        },
+        {
+          "id": "F2-39",
+          "outcome": "fixed",
+          "summary": "Başlıktaki giriş zorunluluğu kalktı; dört ad 'Yardım ve destek'/'Help & support'; oturumsuz kullanıcıya sohbet kartında giriş bağlantısı."
+        },
+        {
+          "id": "F2-58",
+          "outcome": "fixed",
+          "summary": "nav.mobile → 'Tüm bağlantılar'/'All links'."
+        },
+        {
+          "id": "F2-45",
+          "outcome": "fixed",
+          "summary": "34 başlık layout'u {default, template}; property.metaTitle '{title}'; 19 rota curl ile ' — booking-platform' ile bitiyor."
+        }
+      ],
+      "testUpdates": [
+        "tests/e2e/a11y.spec.ts:190-192 İnsana bağlan aria-disabled; toBeDisabled check"
+      ]
+    },
+    {
+      "pkg": "P6",
+      "results": [
+        {
+          "id": "F2-23",
+          "outcome": "fixed",
+          "summary": "guardLeave ortak useHostLeaveGuard kancasında; PartyRiskPanel mesaj bağlantıları korunuyor."
+        },
+        {
+          "id": "F2-24",
+          "outcome": "fixed",
+          "summary": "Promosyon, depozito ve erişilebilirlik formları kirli sayılıyor; startEdit öncesi 'Değişiklikler atılsın mı?' onayı."
+        },
+        {
+          "id": "F2-27",
+          "outcome": "fixed",
+          "summary": "Tümünü kabul/ret onayında tarih aralığı, en büyük artış/azalış %, toplam fark ve düşüş sayısı."
+        },
+        {
+          "id": "F2-28",
+          "outcome": "fixed",
+          "summary": "Rezervasyon süzgeçleri sessionStorage'da tutulup dönüşte geri yükleniyor."
+        },
+        {
+          "id": "F2-53",
+          "outcome": "fixed",
+          "summary": "Kullanılmış+durdurulmuş promosyonda Sil yerine 'Kullanıldığı için silinemez'; odak toggle'a."
+        }
+      ]
+    },
+    {
+      "pkg": "P1",
+      "results": [
+        {
+          "id": "F2-01",
+          "outcome": "fixed",
+          "summary": "İptal onayı freeCancellation sonucunu yazıyor: '…'e kadar ücretsiz (tam iade)', 'süresi bitti' ya da 'iade yok'."
+        },
+        {
+          "id": "F2-42",
+          "outcome": "fixed",
+          "summary": "Hesabım iptal onayı payment.cancel.* anahtarlarını kullanıyor (başlık, düğme, 'geri alınamaz'); eski ve kullanılmayan anahtarlar silindi."
+        },
+        {
+          "id": "F2-02",
+          "outcome": "fixed",
+          "summary": "Durum bandı STATUS_BAND eşlemesiyle: yeşil / #003580 / gray-700."
+        },
+        {
+          "id": "F2-04",
+          "outcome": "fixed",
+          "summary": "onChanged(resultText): iade tutarı tek duyuruda ve başlık altında; alttaki kopya kaldırıldı."
+        },
+        {
+          "id": "F2-46",
+          "outcome": "fixed",
+          "summary": "paid() içindeki ikinci duyuru kaldırıldı; tek duyuru sayfadan."
+        },
+        {
+          "id": "F2-15",
+          "outcome": "fixed",
+          "summary": "Süresi dolan blok rebookHref'e gidiyor; alttaki yinelenen CTA gizli."
+        },
+        {
+          "id": "F2-12",
+          "outcome": "fixed",
+          "summary": "RnplOption creditMinor alıyor; 'Şimdi öde' tutarı krediden sonra."
+        },
+        {
+          "id": "F2-47",
+          "outcome": "fixed",
+          "summary": "Mesaja tone (success/neutral/warning); yeşil yalnız başarıda, zaman aşımı amber."
+        },
+        {
+          "id": "F2-48",
+          "outcome": "fixed",
+          "summary": "Kredi alanı inputClass (+min-h-44px mobil)."
+        },
+        {
+          "id": "F2-11",
+          "part": "booking",
+          "outcome": "fixed",
+          "summary": "BookingActions ve StripePaymentForm düğmeleri Button (busy, lg); iptal için dangerOutline varyantı."
+        }
+      ],
+      "notes": "payment.paidAnnounce unused"
+    },
+    {
+      "pkg": "P5",
+      "results": [
+        {
+          "id": "F2-09",
+          "outcome": "fixed",
+          "summary": "Organizatör olmayana organizatör adlı 'durumu bu bağlantıdan izleyin' metni + 'Durumu yenile'; /trips yalnız organizatöre."
+        },
+        {
+          "id": "F2-30",
+          "outcome": "fixed",
+          "summary": "Toplam aşımı paragrafına id; tutar alanlarına aria-invalid + aria-describedby; odak son düzenlenen alana."
+        },
+        {
+          "id": "F2-31",
+          "outcome": "fixed",
+          "summary": "Ortak ThreeDsForm (Field, 6 hane, rakam filtresi, 'kod gelmedi', geri); paylaşım sayfasında hata kutusuna odak."
+        },
+        {
+          "id": "F2-32",
+          "outcome": "fixed",
+          "summary": "busy; başarıda bağlantı alanına odak + seçim; gönderilmeden iç bağlantı tıklamasında onay."
+        },
+        {
+          "id": "F2-33",
+          "outcome": "fixed",
+          "summary": "Ortak AmountPreview; vekâlet, devir fiyatı ve bölüşme tutarlarında."
+        },
+        {
+          "id": "F2-38",
+          "outcome": "fixed",
+          "summary": "Bölüşme/pay alanları inputClass; 'Payımı öde' birincil ButtonLink; satır eylemleri min-h-44px (sm:32px)."
+        },
+        {
+          "id": "F2-11",
+          "part": "share+split",
+          "outcome": "fixed",
+          "summary": "Paylaşım sayfasının 7 ve SplitPayPanel'in eylem düğmeleri Button."
+        }
+      ]
+    },
+    {
+      "pkg": "P3a",
+      "results": [
+        {
+          "id": "F2-05",
+          "outcome": "fixed",
+          "summary": "'Aramayı düzenle' artık SearchBar (yetişkin/çocuk dolu, geçmiş tarih yok); preserveParams filtre/sıralama/görünümü koruyor."
+        },
+        {
+          "id": "F2-06",
+          "outcome": "fixed",
+          "summary": "Akıllı filtre sonucu URL'ye yazılıyor (smart, smartKeys); çipler ve panel URL'den."
+        },
+        {
+          "id": "F2-17",
+          "outcome": "fixed",
+          "summary": "pages=n URL'de; dönüşte tıklanan karta kaydırma + odak (sessionStorage)."
+        },
+        {
+          "id": "F2-22",
+          "outcome": "fixed",
+          "summary": "Mobil filtre panelinin altında yapışkan '{toplam} konaklamayı göster' düğmesi."
+        },
+        {
+          "id": "F2-18",
+          "part": "search",
+          "outcome": "fixed",
+          "summary": "H1, sonuçsuz durum, kart konumu ve harita listesi usePlaceLabel ile."
+        },
+        {
+          "id": "F2-49",
+          "outcome": "fixed",
+          "summary": "SearchBar tarih paneli sarmalayıcısından role=dialog kaldırıldı."
+        },
+        {
+          "id": "F2-50",
+          "outcome": "fixed",
+          "summary": "Tarih yokken esneklik seçici yerine ipucu + 'Tarih seç' düğmesi."
+        },
+        {
+          "id": "F2-59",
+          "part": "search",
+          "outcome": "partially_fixed",
+          "summary": "Tür radyo satırları min-h-44px (lg 24px); RankingWhy bağlantısı merkezde."
+        }
+      ],
+      "pending": [
+        "RankingWhy.tsx:102 inline-flex min-h-[24px]",
+        "unused keys edit.submit/datesBoth/datesOrder/guestsInvalid, bar.datesDialog"
+      ]
+    },
+    {
+      "pkg": "P7",
+      "results": [
+        {
+          "id": "F2-07",
+          "outcome": "fixed",
+          "summary": "İtiraz satır başlığına kısaltılmış içerik URL'si + tarih; onay gövdesinde tam URL, rol, tarih."
+        },
+        {
+          "id": "F2-08",
+          "outcome": "fixed",
+          "summary": "Ödemelere devam et danger onayı: ad, kısa kimlik, bekleyen ödeme sayısı, durdurma gerekçesi."
+        },
+        {
+          "id": "F2-25",
+          "outcome": "fixed",
+          "summary": "ClaimAdmin ve AdminDashboard iki formu noValidate + alan hataları + ilk geçersiz alana odak."
+        },
+        {
+          "id": "F2-26",
+          "outcome": "fixed",
+          "summary": "Karar sonrası 'Sıradaki talep' ya da 'Listeye dön'."
+        },
+        {
+          "id": "F2-29",
+          "outcome": "fixed",
+          "summary": "0 uygun hedefte açıklayıcı hata; toplu çözmede onay; atlanan sayısı sonuçta."
+        },
+        {
+          "id": "F2-52",
+          "outcome": "fixed",
+          "summary": "Destek ve ödeme satır düğmelerine kayıt adlı aria-label."
+        },
+        {
+          "id": "F2-54",
+          "outcome": "fixed",
+          "summary": "Ev sahibine misafir yönergesi gizli; bağlantı adı 'Mesajlar ve hasar talebi'."
+        }
+      ]
+    }
+  ],
+  "wave2": [
+    {
+      "key": "errortext-app",
+      "results": [
+        {
+          "id": "F2-44",
+          "outcome": "fixed",
+          "files": [
+            "src/app/cart/page.tsx",
+            "src/app/search/page.tsx",
+            "src/app/report/appeal/page.tsx",
+            "src/app/pay/share/[token]/page.tsx",
+            "src/app/checkout/page.tsx",
+            "src/app/checkout/cart/page.tsx",
+            "src/app/booking/[id]/page.tsx",
+            "src/app/register/page.tsx",
+            "src/app/compare/page.tsx",
+            "src/app/account/page.tsx"
+          ],
+          "summary": "Found 21 role=\"alert\" sites across the 10 files. Converted 19 and deliberately kept 2. Texts are unchanged.\n\nConverted to Status (3), each a standalone async error; local bg-red-50 and text-red-700 dropped:\n- cart topError banner\n- pay/share loadError\n- register form error\n\nConverted to ErrorText (14); ids kept where one existed (cart row errorId, smart-filter-error, checkout-quote-error), so aria-describedby still works:\n- cart: undo-row message, row error\n- search: smart-filter error inside its amber box (box kept), main results error inside its red box (box and retry/edit buttons kept, ErrorText replaces only the message p), load-more error\n- report/appeal: loadError, windowClosed (server component rendering the client ErrorText)\n- checkout: quote error (was text-red-600, now uses the shared red-700)\n- booking/[id]: full-page error message under the red h1, and the refresh-failed message in its box (box keeps bg-red-50, text-red-700 removed)\n- compare: error\n- account: renderNotice error\n\nOther restructures (2):\n- pay/share action message and checkout/cart statusRegion message: both carried ref + tabIndex for focus management. ErrorText does not forward refs, so the focusable element is now a plain div (no role, focus:outline-none) holding a live ErrorText. In pay/share messageRef changed from HTMLParagraphElement to HTMLDivElement.\n- checkout compound error box (message + hints + support link): kept role=\"alert\" on the wrapper and wrapped the first message line in ErrorText live={false}, which adds the icon and sr-only \"Hata:\" prefix without nesting live regions.\n\nKept as is (2): the load-failed panels in cart/page.tsx (around line 350) and checkout/cart/page.tsx (around line 878). Each is a deliberately different pattern: role=alert wraps an h2 heading plus a gray hint, with a retry button below. Wrapping the gray hint in ErrorText would turn guidance text red, so I left them.\n\nGates:\n- npx prettier --write on all 10 files: done.\n- npx eslint on those files with --max-warnings=0: passed.\n- No tsc, tests or dev server run, per the brief.\n- Not checked in the Browser pane, as the brief bars running dev servers."
+        }
+      ],
+      "testUpdates": [
+        "No test needs changing: I grepped tests/ for the classes and ids involved and none are asserted.",
+        "tests/e2e/cart.spec.ts:116 asserts appAlert(page) toContainText(\"Ödeme reddedildi\") on the checkout/cart message. role=alert moved from the outer focus div to the inner ErrorText, which holds the same text, so the assertion should still pass. Because the check is a contains, the new sr-only \"Hata:\" prefix does not break it.",
+        "tests/e2e/booking-flow.spec.ts:93 only checks appAlert(page) toBeVisible, which still holds."
+      ],
+      "notes": "Visual changes to review:\n- The cart, register and pay/share error banners and the cart row error lost their bg-red-50 boxes; they now render as plain red-700 text with an icon.\n- The search smart-filter error now shows red-700 text inside its existing amber box.\n- The full-page booking error message is now red-700 instead of gray-600."
+    },
+    {
+      "key": "errortext-components",
+      "results": [
+        {
+          "id": "F2-44",
+          "outcome": "fixed",
+          "summary": "I replaced the hand-written role=\"alert\" error paragraphs in all 19 owned files with the shared components. Each one now has the warning icon, the screen-reader \"Hata:\" prefix and the text-red-700 colour. Spacing classes were kept through className and the local red text classes were removed. Ids referenced by aria-describedby were kept: SearchBar dateErrorId, ReauthDialog errorId and BookingMessages msg-error.\n\nUsed <Status> (standalone load error): BookingMessages loadError, with retry passed to onRetry and the retry text unchanged (chat.retry and common.errorPage.retry are both \"Tekrar dene\"); MailboxClient failure, wrapped in a div with mt-4.\n\nUsed <ErrorText> instead of Status, because Status would change the retry button's text, its busy state, or its size/ref: ReviewsSection load error (its button says \"Yorumları yeniden yükle\"), SplitPayPanel load error, TripsView, WalletPanel, PriceCalendar (retry button has a focus ref), and BookingActions config.failed (lg fullWidth button). The key props on TripsView and WalletPanel were kept.\n\nUsed <ErrorText> for inline, field and dialog errors: BookingMessages loadOlderFailed; msg-error with live={false} so its polite region stays; ReviewsSection report error; ReviewHostReplyForm; SplitPayPanel action message (the bg-red-50 box classes are kept); BookingActions errorAlert, wrapped in <div ref={errorRef}> because the ref is only used for scrollIntoView (ref type changed to HTMLDivElement); SearchBar; TripPlanner hold error; AccessibilityPanel row error; StepUpDialog; PasskeyLoginButton; ReauthDialog; PasskeyManager; IdentityVerification.\n\nAddToCartButton: the always-present role=alert wrapper div stays as it is, and its content is now ErrorText live={false}.\n\nAuthCard: the error variant of Notice now adds the same icon and sr-only prefix, which covers the 4 Notice error uses on the login, forgot-password and reset-password pages.\n\nTwo sites stay as they are, on purpose: the BookingMessages sr-only role=alert announcer (a hidden live region, not a visible error) and the AuthCard doc comment.\n\nVisual changes to note: ReviewsSection and ReviewHostReplyForm used grey text with a visible bold \"Hata:\" prefix. They are now red, and the prefix is screen-reader only (same as ErrorText). SearchBar's date error went from text-xs to text-sm, because ErrorText sets text-sm. The common translator (tc) became unused in ReviewsSection, ReviewHostReplyForm, SearchBar and AccessibilityPanel, so I removed it there.",
+          "files": [
+            "src/components/booking/BookingMessages.tsx",
+            "src/components/property/ReviewsSection.tsx",
+            "src/components/cart/SplitPayPanel.tsx",
+            "src/components/booking/BookingActions.tsx",
+            "src/components/search/SearchBar.tsx",
+            "src/components/pwa/TripsView.tsx",
+            "src/components/property/ReviewHostReplyForm.tsx",
+            "src/components/property/PriceCalendar.tsx",
+            "src/components/plan/TripPlanner.tsx",
+            "src/components/host/AccessibilityPanel.tsx",
+            "src/components/dev/MailboxClient.tsx",
+            "src/components/cart/AddToCartButton.tsx",
+            "src/components/booking/StepUpDialog.tsx",
+            "src/components/auth/PasskeyLoginButton.tsx",
+            "src/components/auth/AuthCard.tsx",
+            "src/components/account/WalletPanel.tsx",
+            "src/components/account/ReauthDialog.tsx",
+            "src/components/account/PasskeyManager.tsx",
+            "src/components/account/IdentityVerification.tsx"
+          ]
+        },
+        {
+          "id": "F2-11",
+          "outcome": "fixed",
+          "summary": "In BookingMessages.tsx, the last two raw buttons (send and suggestDraft) are now <Button>. Send is <Button type=\"submit\" busy={busy===\"send\"} aria-disabled={sendDisabled}> and suggestDraft is <Button variant=\"secondary\" busy={busy===\"draft\"} aria-disabled={busy!==null}>. Neither has native disabled, so focus stays on the button. Their local rounded-lg, colour and opacity classes are gone; only min-h-[44px] sm:min-h-0 is kept. The send() and draft() handlers still return early on busy or empty text. There are no raw <button> elements left in the file.",
+          "files": ["src/components/booking/BookingMessages.tsx"]
+        }
+      ],
+      "notes": "Checks: prettier --write on all 19 files, then npx eslint on the same files with --max-warnings=0 exited 0. I did not run tsc or any test suites (left to the central gates). No translation files were changed and nothing was committed.\n\nTests: tests/e2e and tests/unit have no assertions on the changed classes, the msg-error id, or exact alert text. cart.spec.ts uses toContainText on appAlert, which still passes with the sr-only prefix added. host-and-search.spec.ts expects 0 alerts inside the calendar, which still holds.\n\nOne side effect: the textContent of every converted error now starts with the sr-only \"Hata: \" prefix. Any exact-match toHaveText on these alerts elsewhere would need updating, but I found none.",
+      "testUpdates": []
+    },
+    {
+      "key": "shortref",
+      "results": [
+        {
+          "id": "F2-41",
+          "outcome": "fixed",
+          "summary": "Added shortRef(id) in src/lib/ui/short-ref.ts. It returns the last 8 characters in uppercase. All reference displays now use it. SupportChat: the handoff message, the copy button aria-label and the ticket list show shortRef (the list item keeps the full id in its title). AdminCopyableId: the label is shortRef; title and copy still use the full id. AdminDashboard: removed the duplicate IdText and switched to AdminCopyableId. SupportAdmin: removed the shortTicketId copy and the row name now uses shortRef. PayoutAdmin: removed the shortId helper (it showed '…' + last 6) and uses shortRef. HostDashboard and PartyRiskPanel: bookingRef now comes from shortRef. ClaimList (both places) and resolution/[id]/page.tsx use shortRef. No message changes were needed because the templates only take {id}/{ref}/{shortId}. Unit test added and passing (2/2).",
+          "files": [
+            "src/lib/ui/short-ref.ts",
+            "tests/unit/ui/short-ref.test.ts",
+            "src/components/support/SupportChat.tsx",
+            "src/components/admin/AdminCopyableId.tsx",
+            "src/components/admin/AdminDashboard.tsx",
+            "src/components/admin/SupportAdmin.tsx",
+            "src/components/admin/PayoutAdmin.tsx",
+            "src/components/host/HostDashboard.tsx",
+            "src/components/host/PartyRiskPanel.tsx",
+            "src/components/resolution/ClaimList.tsx",
+            "src/app/resolution/[id]/page.tsx"
+          ]
+        },
+        {
+          "id": "F2-44",
+          "outcome": "fixed",
+          "summary": "HostDashboard part 3: the listing-copy error <p role=alert> is now <ErrorText>. The photo-upload error list keeps a single role=alert container, and each line is now <ErrorText live={false}>, which adds the icon and the sr-only 'Hata:' prefix. The text itself is unchanged.",
+          "files": ["src/components/host/HostDashboard.tsx"]
+        }
+      ],
+      "testUpdates": [
+        "No test in tests/e2e or tests/unit asserts any of the old ref formats (last-6 uppercase, first6…last4, last-8 lowercase, …last6) or the IdText/shortTicketId/shortId helpers. tests/e2e/booking-flow.spec.ts:70 matches 'Rezervasyon no: ${bookingId}' against a dev mailbox item, which is outside these files and was not changed.",
+        "New file tests/unit/ui/short-ref.test.ts passes (npx vitest run tests/unit/ui/short-ref.test.ts: 2/2)."
+      ],
+      "notes": "Prettier ran on all owned files, and eslint --max-warnings=0 on the same files passed. tsc and the full test suites were not run, as the brief says. Visible change: PayoutAdmin and the admin panels now show an 8-character uppercase ref instead of '…'+6 or first6…last4, and host/claims refs are now uppercase."
+    },
+    {
+      "key": "terminology",
+      "results": [
+        {
+          "id": "F2-43",
+          "outcome": "fixed",
+          "files": [
+            "messages/tr/account.json",
+            "messages/tr/auth.json",
+            "messages/tr/mailbox.json",
+            "messages/tr/payment.json",
+            "messages/tr/cart.json",
+            "messages/en/cart.json",
+            "messages/tr/resolution.json",
+            "messages/en/resolution.json"
+          ],
+          "summary": "TR now uses only 'şifre' (parolanızı→şifrenizi, parolasız→şifresiz, Parola→Şifre in auth.passwordRequired/hint/whatIsBody/cancelled, account.reauth.descriptionPasswordOnly, mailbox reset). Every standalone TR 'passkey' became 'geçiş anahtarı' with the right suffixes (account.passkeys.*, account.reauth.description/withPasskey, auth.passkey.alreadyRegistered, payment step-up keys). '(passkey)' is kept only as a first-mention gloss: account.passkeys.title/description, reauth.description, payment step-up description, auth.passkey.login/whatIsBody. The group-payment wording is unified: TR 'bölünmüş ödeme'/'bölme'/'bölüşme' → 'grup ödemesi' and EN 'split payment'/'split' → 'group payment' in cart.split.*, cart errors SPLIT_*, cart.releasedSplit, cart.releaseConfirm.splitTitle/splitConfirm, cart.lockedNoticeSplit, abortedSummary, resolution deposit note/noteGuest and CLAIM_SPLIT_CAPACITY. account.reauth.showPassword was deleted (cleanup). Not touched because they are outside messages/: the server-side strings in src/lib that still say 'passkey' in TR (passkey-client error 'Hesapta kayıtlı passkey yok', the user-sessions notification 'Hesabınıza yeni bir passkey eklendi') are asserted in tests/unit/auth/passkey-client.test.ts:14-15 and tests/unit/auth/user-sessions.test.ts:59."
+        },
+        {
+          "id": "F2-56",
+          "outcome": "fixed",
+          "files": [
+            "messages/en/checkout.json",
+            "messages/tr/booking.json",
+            "messages/en/booking.json",
+            "messages/tr/search.json",
+            "messages/en/search.json",
+            "messages/tr/compliance.json",
+            "messages/en/compliance.json",
+            "messages/tr/admin.json",
+            "messages/en/admin.json"
+          ],
+          "summary": "Changed: en checkout.backToProperty → '← Back to listing'; booking.detail.viewProperty → 'İlanı görüntüle' / 'View listing'; search.mapList.view TR → 'İlanı görüntüle' (EN was already 'View listing'); compliance.accessibility.wholeProperty → 'İlanın tamamı' / 'Entire listing'. Also aligned: en checkout loadFailed/loadFailedTitle/loadFailedHint/invalidDatesHint/pastDatesHint/invalidGuestsHint now say 'listing' / 'listing page'; the search autocomplete group header 'properties' → 'İlanlar' / 'Listings'; the admin review-removal body → 'ilanın puanı' / 'the listing's rating'. Left as is because they name the physical place: local time, stay rules, noRooms, QR check-in, transfers reviewNote, support property rules / accessibility prefill, 'list your property', 'Property type', checkout.stay."
+        },
+        {
+          "id": "F2-57",
+          "outcome": "fixed",
+          "files": [
+            "messages/tr/compare.json",
+            "messages/tr/home.json",
+            "messages/tr/host.json",
+            "messages/tr/trust.json",
+            "messages/tr/checkout.json",
+            "messages/en/checkout.json",
+            "messages/en/booking.json",
+            "messages/en/transfers.json",
+            "messages/en/support.json",
+            "messages/tr/auth.json",
+            "messages/en/auth.json",
+            "messages/tr/payment.json",
+            "messages/en/payment.json",
+            "messages/tr/compliance.json",
+            "messages/tr/resolution.json"
+          ],
+          "summary": "The remaining 'Yeniden dene' retry values (compare, home, host, trust) are now 'Tekrar dene', and checkout.retrySafeHint now starts 'Tekrar denemek'. EN 'log in' → 'sign in' in booking.widget.loginNext, transfers.claim.loginPrompt and support.loginToChat. Trailing '...' → '…' at the end of 28 values in tr/en auth, checkout and payment; a grep found no other locales or files with '...', and no placeholders or ICU syntax were touched. TR contact-support labels → 'Destek ekibine yazın' in payment contactSupport (2 keys), compliance.appeal.contactSupport, resolution contactSupport and trust.kyc.supportLink; checkout.contactSupport already had it and EN already said 'Contact support'. Cleanup: grepping src/, including template-literal and messageKey patterns, found no use of these keys, so they were deleted in both locales: account.reauth.showPassword, payment.paidAnnounce, checkout.soldOut, checkout.breakfastIncluded (booking.widget.breakfastIncluded is still used and was kept), search.edit.submit/datesBoth/datesOrder/guestsInvalid and search.bar.datesDialog. All edited JSON files parse, and tr/en key sets match in every namespace (checked with node)."
+        }
+      ],
+      "testUpdates": [
+        "No test updates needed: grepping tests/e2e and tests/unit for every old visible string changed here (parola, passkey labels, bölünmüş/split payment, Yeniden dene, log in, the trailing-'...' loading labels, Back to/View property, Tüm tesis, Tesisler, Destekle iletişime geç, Show password, Aramayı güncelle, Ödemeniz alındı, Kahvaltı dahil) found no assertion on a message value. The only hits are amenity data (host-and-search.spec.ts:35 'Olanak: Kahvaltı dahil') and code comments.",
+        "Not a messages change, for info only: tests/unit/auth/passkey-client.test.ts:14-15 and tests/unit/auth/user-sessions.test.ts:59 assert server-side TR strings in src/lib that still say 'passkey'. If F2-43 is extended to src/lib, those expectations need to move to 'geçiş anahtarı' as well."
+      ],
+      "notes": "Edits were made with a node script that does exact-substring replacements (each one checked for existence before applying) and re-reads each file immediately before writing. It preserves formatting and line endings and does not rewrite or reformat whole files. Script: <scratchpad> All old strings were found and every file passed JSON.parse. No tsc, eslint or test runs, per the brief."
+    }
+  ],
+  "verification": [
+    {
+      "area": "booking",
+      "verdicts": [
+        {
+          "id": "F2-01",
+          "verdict": "fixed",
+          "note": "refundOutlook() runs freeCancellation() and shows until/ended/none with the deadline in the property time zone. If the policy can't be read it falls back to dialogBodyConfirmed. Keys are present in tr and en and the placeholders match."
+        },
+        {
+          "id": "F2-02",
+          "verdict": "fixed",
+          "note": "STATUS_BAND follows shownStatus: green, #003580 or gray-700, defaulting to gray. A client-side lapsed hold shows gray."
+        },
+        {
+          "id": "F2-03",
+          "verdict": "fixed",
+          "note": "The button uses aria-disabled instead of native disabled. handleSubmit checks exactly submitDisabled (!quote || !idempotencyKey), so a click or Enter while disabled does nothing."
+        },
+        {
+          "id": "F2-04",
+          "verdict": "fixed",
+          "note": "onChanged(result) passes the refund text to a single announcement and to resultNote under the heading. The copy in BookingActions is gone. The e2e status regex still matches. The announcement now repeats 'cancelled' (minor)."
+        },
+        {
+          "id": "F2-11",
+          "verdict": "fixed",
+          "note": "In BookingActions and StripePaymentForm the pay, verify, back, retry and cancel buttons now use Button with busy/dangerOutline. Stripe's aria-disabled={!stripe} is covered by the onSubmit guard. Button forwards ref correctly on React 19."
+        },
+        {
+          "id": "F2-12",
+          "verdict": "fixed",
+          "note": "RnplChoice now subtracts creditMinor from the pay-now amount. Side effect: the credit note that used to be dead code now renders as a duplicate (see problems)."
+        },
+        {
+          "id": "F2-13",
+          "verdict": "fixed",
+          "note": "The widget sends adults and children. Checkout checks they add up to guestCount, shows them via the guestSplit ICU message (tr and en valid), and passes them back to the listing. The listing page reads adults and children."
+        },
+        {
+          "id": "F2-14",
+          "verdict": "fixed",
+          "note": "MEAL_PLAN_KEYS moved to a shared module. Checkout shows every meal plan and the keys exist in booking.widget in both locales. f.locale is 'tr-TR', so lang='tr' is always set. That is harmless and the widget does the same."
+        },
+        {
+          "id": "F2-15",
+          "verdict": "fixed",
+          "note": "The expired-hold link uses sameDatesHref and the bottom CTA is hidden while the hold has lapsed on the client. Two edge cases remain: the label is wrong when canRebook is false, and the server HOLD_EXPIRED path still shows duplicate links (see problems)."
+        },
+        {
+          "id": "F2-16",
+          "verdict": "fixed",
+          "note": "useQuoteError is shared by the widget and checkout. Hooks are called before any early return. The retry action appears only for errors with no code or an unknown code. Known errors point aria-describedby at checkout-quote-error."
+        },
+        {
+          "id": "F2-42",
+          "verdict": "fixed",
+          "note": "Account uses payment.cancel.dialogTitle, confirmButton, keep and irreversible. The removed account keys and payment.cancel.confirm are not referenced anywhere."
+        },
+        {
+          "id": "F2-46",
+          "verdict": "fixed",
+          "note": "The paidAnnounce call and its keys are removed (no remaining references). Payment success is now announced only by the page's status region."
+        },
+        {
+          "id": "F2-47",
+          "verdict": "fixed",
+          "note": "Message.tone was added: the timeout message is amber, verifiedRetry is gray, and the no-refund text moved to the page band. The same no-refund notice is still green on the account page (minor)."
+        },
+        {
+          "id": "F2-48",
+          "verdict": "fixed",
+          "note": "The wallet credit input now uses inputClass: text-base on mobile and the focus ring."
+        },
+        {
+          "id": "F2-59",
+          "verdict": "fixed",
+          "note": "The rate-plan radios in the widget are now h-5 w-5 (20px)."
+        },
+        {
+          "id": "F2-01",
+          "verdict": "fixed",
+          "note": "BookingActions.tsx:486-512: the CONFIRMED cancel dialog now shows refundOutlook() from freeCancellation(), with until/ended/none copy in tr+en and the same property time zone as CancellationDeadlineNote. If the policy can't be read it falls back to dialogBodyConfirmed."
+        },
+        {
+          "id": "F2-02",
+          "verdict": "fixed",
+          "note": "page.tsx:81-88 and 480-482: the band colour now comes from STATUS_BAND by shownStatus (green for CONFIRMED/COMPLETED, #003580 for HELD/PENDING, gray-700 for CANCELLED/EXPIRED, gray fallback). White and green-50 text stays readable on all of them."
+        },
+        {
+          "id": "F2-03",
+          "verdict": "fixed",
+          "note": "checkout/page.tsx:743-756: native disabled is replaced by aria-disabled, so the button stays focusable when the quote drops. handleSubmit:318 already ignores a submit with no quote or idempotencyKey, and aria-describedby points to the reason ids that exist."
+        },
+        {
+          "id": "F2-04",
+          "verdict": "fixed",
+          "note": "The cancel result goes through onChanged(result). The page joins it into the single role=status text (page.tsx:232) and shows it under the h1 in the band (page.tsx:504). The copy at the bottom of BookingActions is removed. Small wording and edge-case problems are listed below."
+        },
+        {
+          "id": "F2-11",
+          "verdict": "fixed",
+          "note": "Booking part: BookingActions now uses Button for pay, verify, 3DS back, config retry and the CONFIRMED cancel (new dangerOutline variant). In StripePaymentForm, native disabled became busy/aria-disabled, and onSubmit still checks !stripe. The HELD cancel text link stays a raw button on purpose and has aria-disabled."
+        },
+        {
+          "id": "F2-12",
+          "verdict": "fixed",
+          "note": "RnplOption.tsx:103,128: the 'Pay now' amount is offer.amountMinor - creditMinor. offer.amountMinor equals booking.totalPriceMinor, so it now matches the pay button's amountMinor - creditMinor."
+        },
+        {
+          "id": "F2-13",
+          "verdict": "fixed",
+          "note": "BookingWidget.tsx:404-405 sends adults/children. Checkout checks that they add up to guestCount, shows widget.guestSplit (tr+en) and passes them back through propertyParams. The property page reads them at page.tsx:139-146."
+        },
+        {
+          "id": "F2-14",
+          "verdict": "fixed",
+          "note": "MEAL_PLAN_KEYS moved to src/lib/i18n/meal-plan.ts and the widget and checkout both use it. Checkout now shows room only, half board and full board as well as breakfast, and the keys exist in both locales."
+        },
+        {
+          "id": "F2-15",
+          "verdict": "fixed",
+          "note": "The top 'Search again' link uses rebookHref = sameDatesHref (property page with the same dates). The bottom CTA is hidden while expiredHoldShown is true, and both labels now read 'Search again for the same dates'. One remaining edge case is listed below."
+        },
+        {
+          "id": "F2-16",
+          "verdict": "fixed",
+          "note": "The new shared useQuoteError (quote-error.ts) gives localised text for the restriction, sold-out, not-found and over-capacity codes. Checkout shows 'Recalculate' only when action is 'retry', and the change link (changeDates) also covers guests and room."
+        },
+        {
+          "id": "F2-42",
+          "verdict": "fixed",
+          "note": "account/page.tsx:390,413-417: Account now uses payment.cancel.dialogTitle, confirmButton and keep, plus the cancel.irreversible warning. The old account keys are removed and not referenced anywhere. The dialog body still differs (see below)."
+        },
+        {
+          "id": "F2-46",
+          "verdict": "fixed",
+          "note": "paid() no longer calls setAnnouncement and paidAnnounce is removed. Success is now announced once from the page region (statusChanged.CONFIRMED, which includes the email sentence), plus focus moving to the heading."
+        },
+        {
+          "id": "F2-47",
+          "verdict": "fixed",
+          "note": "Message.tone was added: timeoutCheck uses warning (amber-700), verifiedRetry uses neutral (gray). The 'no refund' result moved to the page band in white on gray, so green is no longer used for uncertain or negative outcomes in BookingActions."
+        },
+        {
+          "id": "F2-48",
+          "verdict": "fixed",
+          "note": "WalletCreditOption.tsx:205 uses the shared inputClass (text-base on mobile, focusRing) with min-h-[44px] sm:min-h-0."
+        },
+        {
+          "id": "F2-59",
+          "verdict": "fixed",
+          "note": "Widget plan radios are now h-5 w-5 shrink-0 inside a label row of min-h-[44px] on mobile, so the whole row can be tapped. The search sort link is outside this area."
+        }
+      ],
+      "problems": [],
+      "repair": null
+    },
+    {
+      "area": "discovery",
+      "verdicts": [
+        {
+          "id": "F2-05",
+          "verdict": "fixed",
+          "note": "The results page now uses <SearchBar initial preserveParams focusRequest>. That brings back suggestions, the calendar (no past dates), the adult/child split and the filter params. Past or out-of-order URL dates are no longer prefilled."
+        },
+        {
+          "id": "F2-06",
+          "verdict": "fixed",
+          "note": "Smart-filter results are written to the URL (smart, smartKeys, city, amenities, plus the panel fields) and the chips are rebuilt from it. The heading, the form and 'back to results' (fromQuery) now agree. Removing the check-out chip is broken; see problems."
+        },
+        {
+          "id": "F2-17",
+          "verdict": "fixed",
+          "note": "pages=n is kept in the URL and restored on load by fetching pages in parallel (max 10). The clicked card is remembered in sessionStorage (with try/catch) and scrolled to and focused when you come back. Minor leaks are listed under problems."
+        },
+        {
+          "id": "F2-18",
+          "verdict": "partial",
+          "note": "Labels are localized in the heading, cards, map, compare, the planner and the autocomplete after a selection. But the 'Edit search' bar on the results page starts from the URL destination and shows the database name ('Roma'), while the heading shows 'Rome'."
+        },
+        {
+          "id": "F2-19",
+          "verdict": "fixed",
+          "note": "CompareBar passes adults and children. The compare page's listing links now carry adults, children and from=backHref. When there is no search context, a bogus from value is sent (minor)."
+        },
+        {
+          "id": "F2-20",
+          "verdict": "fixed",
+          "note": "The stay title links to the listing with the stop's dates, guests and roomId. A stop with no stay gets a 'Search in {city}' link. The plan.result.searchCity key is in both TR and EN."
+        },
+        {
+          "id": "F2-21",
+          "verdict": "fixed",
+          "note": "closestPlace (Levenshtein ≤2, ≤1 for short queries) adds a 'Did you mean' option when no city matches. Option indexes, the keyboard path and choose() line up. The didYouMean key is in TR and EN, and unit tests pass."
+        },
+        {
+          "id": "F2-22",
+          "verdict": "fixed",
+          "note": "Added a sticky lg:hidden 'Show {total} stays' button at the end of the panel. It closes the panel and focuses #results. filters.showResults is in TR and EN and the ICU placeholders match."
+        },
+        {
+          "id": "F2-49",
+          "verdict": "fixed",
+          "note": "Removed role=dialog from the wrapper; only DateRangePicker keeps role=dialog. The unused bar.datesDialog key was removed and nothing else references it."
+        },
+        {
+          "id": "F2-50",
+          "verdict": "fixed",
+          "note": "Without dates, the select is replaced by status text plus a 'Choose dates' button that opens the bar's date panel."
+        },
+        {
+          "id": "F2-51",
+          "verdict": "fixed",
+          "note": "useCompareBaseline holds back announcements until the selection differs from the one loaded on mount. Hydration is handled through useSyncExternalStore and the render-phase setState converges."
+        },
+        {
+          "id": "F2-59",
+          "verdict": "fixed",
+          "note": "Search part only: the RankingWhy link, type radio rows and the flex 'Choose dates' button now have a min height of 24px. The BookingWidget radios belong to another area and were not checked."
+        },
+        {
+          "id": "F2-05",
+          "verdict": "fixed",
+          "note": "The old EditSearch form is gone. The section now renders <SearchBar initial preserveParams focusRequest>, which brings back the destination autocomplete, a date picker that does not accept past days (past or out-of-order URL dates are no longer prefilled) and the adult/child counters. REPLACED_PARAMS rewrites only the search fields, so filter, sort and view params are kept. Error and empty-state buttons map to the right field through focusRequest, and after submit focus goes to the h1. The edit field still shows the raw DB place name; that is filed under F2-18."
+        },
+        {
+          "id": "F2-06",
+          "verdict": "fixed",
+          "note": "runSmart now writes its result to the URL with router.push (smart, smartKeys, city, amenities, guests, dates, type, price, sort), and smartFilters is derived from the URL with useMemo. The h1, the edit form and fromQuery ('Back to results') now all read the same state, and chip removal updates the URL. One small gap: llmMode is still only in component state (see problems)."
+        },
+        {
+          "id": "F2-17",
+          "verdict": "fixed",
+          "note": "pages=n is written to the URL on 'Show more' (replace), and on load pages 1..n are fetched and de-duplicated. Changing a filter resets pages. The clicked card id is saved in sessionStorage; on return the card is scrolled into view and focused, and this runs after the h1 focus, so the card ends up focused. The key is global, though, so a later unrelated search can also jump to that card (see problems)."
+        },
+        {
+          "id": "F2-18",
+          "verdict": "partial",
+          "note": "usePlaceLabel is now applied to the search h1, the no-results text, cards, map points, the compare table and TripPlanner. Two places still show the raw DB name. First, DestinationAutocomplete only shows the translated label for a choice made in the current mount (selected state). The results-page edit SearchBar is remounted on every URL change and starts from the URL value, so in EN the field shows 'Roma' while the h1 says 'Rome'. Second, the SmartFilter city chip renders the raw f.city."
+        },
+        {
+          "id": "F2-19",
+          "verdict": "fixed",
+          "note": "The search page passes adults and childCount to CompareBar, which adds them to the /compare URL. The compare page ctx now carries adults, children and from=backHref, and propertyHref puts them on the listing link. The property page accepts from in both the '/search?…' form and the bare query-string form."
+        },
+        {
+          "id": "F2-20",
+          "verdict": "fixed",
+          "note": "The stay title is now a link to the listing with the same dates, guests and roomId, so the guest can view it before 'Hold room'. A stop with no stay now gets a '{city} için ara' / 'Search in {city}' link with the stop's dates and guests, using the 44px/sm:min-h-0 pattern. TR and EN keys were both added."
+        },
+        {
+          "id": "F2-21",
+          "verdict": "fixed",
+          "note": "closestPlace (Levenshtein ≤2, ≤1 for 3–4 characters, none below 3, run on normalizePlace text) is checked against popular destinations and their translated names whenever there is no city match. The suggestion is a real option, its index sits between the matches and the 'Search for' option, and it is announced once in the existing role=status region. TR 'Bunu mu demek istediniz' and EN 'Did you mean' match. The unit tests pass (6/6)."
+        },
+        {
+          "id": "F2-22",
+          "verdict": "partial",
+          "note": "A sticky 'Show {total} stays' button (lg:hidden) was added at the end of the panel. It closes the panel and moves focus to #results. However, it sticks to bottom:0 underneath the fixed z-40 CompareBar, and the cookie banner offset is not accounted for. When a compare selection exists the button is hidden while the user scrolls the panel, and keyboard focus on it is obscured."
+        },
+        {
+          "id": "F2-49",
+          "verdict": "fixed",
+          "note": "role=dialog and aria-label were removed from the SearchBar wrapper. Only DateRangePicker keeps role=dialog with picker.dialogLabel, and the unused bar.datesDialog key was removed in both locales."
+        },
+        {
+          "id": "F2-50",
+          "verdict": "fixed",
+          "note": "With no dates, the select is no longer rendered. A heading <p>, the static 'exact dates' text and the needsDates hint with a 'Pick dates' button (inline-flex min-h-24) are shown instead. The button calls openEdit('dates'), which opens the details, opens the date panel and moves focus to a day, so the value no longer reverts silently."
+        },
+        {
+          "id": "F2-51",
+          "verdict": "fixed",
+          "note": "useCompareBaseline captures the selection stored at mount plus a hydration flag. CompareBar keeps the live-region text empty until ids differ from that baseline after hydration, so a page load no longer announces the count. User changes, and undo via 'cleared', still announce in the single role=status <p>."
+        },
+        {
+          "id": "F2-59",
+          "verdict": "fixed",
+          "note": "The RankingWhy 'How ranking works' link is now inline-flex min-h-[24px] items-center. The search property-type radio rows are min-h-44 on touch and lg:min-h-24. The BookingWidget plan radios are outside this area and were not checked."
+        }
+      ],
+      "problems": [
+        {
+          "file": "src/app/search/page.tsx",
+          "line": 630,
+          "severity": "major",
+          "findingId": "F2-06",
+          "description": "Removing the smart-filter check-out chip does nothing. SmartFilter shows separate checkIn and checkOut chips (SmartFilter.tsx:69-72), and removeChip deletes only checkOut. onSmartChange only acts when next.checkIn becomes undefined, so no checkIn/checkOut patch is made and the 'checkIn' key stays in smartKeys. updateParams then rewrites the same URL, smartFilters (rebuilt from the URL) is unchanged, and the chip stays. Before this change, setSmartFilters(next) removed the chip and dropped the smart dates.",
+          "fix": "Treat removing either date chip as removing the pair: `if ((prev.checkIn !== undefined && next.checkIn === undefined) || (prev.checkOut !== undefined && next.checkOut === undefined)) { patch.checkIn = null; patch.checkOut = null; patch.flexDays = null; }` and in keyOf use `checkIn: next.checkIn && next.checkOut ? next.checkIn : undefined`. Alternatively, make SmartFilter render a single date-range chip."
+        },
+        {
+          "file": "src/app/search/page.tsx",
+          "line": 518,
+          "severity": "minor",
+          "findingId": "F2-17",
+          "description": "rememberResult records any link click inside the card, including the same-page 'Show similar' link (similarHref). That click does not remount the page, so the key is not used and stays in sessionStorage. A later, unrelated search-page mount (e.g. a new search from the header) then scrolls to and focuses that card. Also, similarHref (line 260) keeps 'pages', so the new visual search fetches N pages up front.",
+          "fix": "Only store the id when the clicked anchor points to a listing (`a.pathname.startsWith('/property/')`). Delete 'pages' in similarHref."
+        },
+        {
+          "file": "src/app/search/page.tsx",
+          "line": 1094,
+          "severity": "major",
+          "findingId": "F2-22",
+          "description": "The new mobile 'Show N stays' button sits in a `sticky bottom-0` container, but CompareBar is `fixed bottom-0 z-40` (offset by --cookie-banner-h). CompareBar's body padding-bottom and scroll-padding-bottom do not move sticky elements. Whenever a compare selection exists (it is stored in localStorage, so it is common), the sticky button stays under the bar while the user scrolls the filter panel. That defeats the F2-22 fix, and keyboard focus on the button is obscured (WCAG 2.4.11).",
+          "fix": "Offset the sticky container by the compare bar height. For example, have CompareBar also set a CSS variable (--compare-bar-h) next to body.style.paddingBottom and use style={{ bottom: 'var(--compare-bar-h, 0px)' }}. Alternatively, hide CompareBar while the mobile filter panel is open."
+        },
+        {
+          "file": "src/components/search/DestinationAutocomplete.tsx",
+          "line": 79,
+          "severity": "major",
+          "findingId": "F2-18",
+          "description": "The translated label is only shown for a suggestion picked in the current mount (`selected` state). The results-page edit SearchBar is remounted on every URL change (key=searchParams) with initial.destination taken raw from the URL. An EN guest who picked 'Rome' therefore sees 'Roma' in the 'Edit search' field while the h1 says 'Rome', which is the F2-18 symptom on the new F2-05 surface. The SmartFilter city chip (SmartFilter.tsx:58) also renders the raw f.city.",
+          "fix": "Show the translated label when the incoming value is a known DB city. For example, set displayValue = selected?.value === value ? selected.label : (placeCityKey(value) && !userTyped ? cityName(value) : value), or seed `selected` from value on mount. Pass usePlaceLabel().city(f.city) into the smart city chip."
+        },
+        {
+          "file": "src/app/search/page.tsx",
+          "line": 497,
+          "severity": "minor",
+          "findingId": "F2-17",
+          "description": "search:lastResult is one global sessionStorage key and is cleared only when a search page mounts again. Example: the user opens card X, goes on to checkout or elsewhere, then later runs a new search from home in the same tab. If X is in the results, the page scrolls X to the center and takes focus from the h1. That is an unexpected jump that skips the earlier results.",
+          "fix": "Store {id, query: searchParams.toString()} and restore only when the current query matches, or only on back/forward or 'from' returns. Otherwise discard the stored id."
+        }
+      ],
+      "repair": {
+        "repaired": [
+          {
+            "file": "src/app/search/page.tsx",
+            "summary": "F2-06: onSmartChange now treats removing either the check-in or the check-out chip as removing both dates (clears checkIn, checkOut and flexDays). keyOf keeps the checkIn key only while both dates are present, so the chip actually goes away."
+          },
+          {
+            "file": "src/app/search/page.tsx",
+            "summary": "F2-17 (both findings): rememberResult stores the id only when the clicked anchor's pathname starts with /property/, so the 'Show similar' link is ignored. It now stores JSON {id, query: searchParams.toString()}, and restore runs only when the stored query matches the current query; any other stored id is discarded. searchParams was added to the effect deps; the restoreDone guard keeps it a one-time restore. similarHref now deletes 'pages'."
+          },
+          {
+            "file": "src/app/search/page.tsx",
+            "summary": "F2-22: the mobile sticky 'Show N stays' container gets style bottom: var(--compare-bar-h, var(--cookie-banner-h, 0px)), so it sits above the compare bar (or the cookie banner)."
+          },
+          {
+            "file": "src/components/compare/CompareBar.tsx",
+            "summary": "F2-22: in apply() CompareBar now also sets the --compare-bar-h CSS variable on the root element, with the same calc() value it uses for body padding-bottom (bar height plus cookie offset). Cleanup removes the variable."
+          },
+          {
+            "file": "src/components/search/DestinationAutocomplete.tsx",
+            "summary": "F2-18: the `selected` state is seeded on mount from the incoming value when it is a known DB city (placeCityKey), so the remounted 'Edit search' field shows the translated name (e.g. 'Rome') while the DB value is still what gets submitted."
+          },
+          {
+            "file": "src/components/search/SmartFilter.tsx",
+            "summary": "F2-18: added an optional ChipFormatters.city. filtersToChips uses it for the city chip, and the SmartFilter component passes usePlaceLabel().city, so the chip shows the translated city name."
+          }
+        ],
+        "rejected": [],
+        "testUpdates": [
+          "No tests in tests/unit or tests/e2e assert the changed strings, roles or ids (checked with grep for SmartFilter/filtersToChips/DestinationAutocomplete/CompareBar/compare-bar-h). Prettier has been run on all 4 changed files. eslint --max-warnings=0 passes on all 4 files."
+        ]
+      }
+    },
+    {
+      "area": "identity-money",
+      "verdicts": [
+        {
+          "id": "F2-09",
+          "verdict": "fixed",
+          "note": "Participants (non-organizer share) get the trackHere/trackHereGeneric text, a 'Refresh status' Button and the home link. Only organizers see /trips. Keys are present in tr and en and the {name} placeholder matches. Two edge cases are listed under problems."
+        },
+        {
+          "id": "F2-11",
+          "verdict": "fixed",
+          "note": "Covers the share/split/reauth part. The raw buttons in the pay/share page, SplitPayPanel (retry, row actions, send, create) and ReauthDialog are now the shared Button with busy/aria-disabled, so nothing uses native disabled. Button defaults to type=button and the explicit type=submit overrides it. The busy onClick calls preventDefault, which blocks double submits; the submit handlers also guard on busy."
+        },
+        {
+          "id": "F2-30",
+          "verdict": "fixed",
+          "note": "The over-total paragraph now has an id. Amount inputs get aria-invalid and aria-describedby (error id, then overId, then hint). Focus goes to the last edited amount, clamped to the number of rows."
+        },
+        {
+          "id": "F2-31",
+          "verdict": "fixed",
+          "note": "There is now one shared ThreeDsForm (Field, max 6 characters, digit filter, no-code help, back button guarded while busy), used by both checkout/cart and pay/share. On the share page a 3DS failure clears the code and moves focus to the error container with requestAnimationFrame after load. This matches how checkout handles the same failure. The mock OTP is 6 digits, so maxLength 6 is safe."
+        },
+        {
+          "id": "F2-32",
+          "verdict": "fixed",
+          "note": "The submit button now uses busy. The claim-url input gets focus and is selected when claimUrl changes. A capture-phase click listener on document asks for confirmation before following in-app links while !sent. It skips hash links, _blank links and modified clicks, and replays the click through bypassRef. ConfirmDialog resolves synchronously, so the anchor is still in the DOM when the click is replayed."
+        },
+        {
+          "id": "F2-33",
+          "verdict": "fixed",
+          "note": "AmountPreview is used in TransferMarket (with the currency's fractionDigits), SplitPayPanel (digits) and AgentMandates (default 2). Each uses the same parse settings as its submit path, and AgentMandates behaves as before."
+        },
+        {
+          "id": "F2-34",
+          "verdict": "fixed",
+          "note": "The return address is saved to localStorage on forgot-password submit and read on reset-password through useSyncExternalStore with safeRedirect. The reset page's login and new-link links carry it. On success it is cleared and the email is remembered, and the login page now prefills the remembered email. Stale-storage caveat listed under problems."
+        },
+        {
+          "id": "F2-35",
+          "verdict": "fixed",
+          "note": "SessionManager and the ReauthDialog 'forgot password' link now carry the account email (via the sessionStorage handoff) and the current page as redirect. When signed in, the forgot page shows 'Change password' and a 'Back to my account' link, and falls back to sessionUser.email for the email field."
+        },
+        {
+          "id": "F2-36",
+          "verdict": "fixed",
+          "note": "The success view and the form view are both the root AuthCard, so React keeps the same instance and the status region that already existed is reused for the announcement. The focusTitle effect depends on [focusTitle, title], so it runs when the title changes."
+        },
+        {
+          "id": "F2-37",
+          "verdict": "fixed",
+          "note": "ReauthDialog now uses PasswordRevealInput, inputClass and Button busy. Submitting an empty password shows passwordRequired (present in tr and en), wired through aria-describedby and aria-invalid, and focus returns to the field. The error clears when the user starts typing."
+        },
+        {
+          "id": "F2-38",
+          "verdict": "fixed",
+          "note": "SplitPayPanel and the 3DS field now use inputClass. Row actions are min-h 44px on mobile and 32px from sm up. 'Pay my share' is a primary ButtonLink. CardFields already used inputClass."
+        },
+        {
+          "id": "F2-55",
+          "verdict": "fixed",
+          "note": "A cancelled reauth now resets the acknowledgement checkbox and shows privacy.center.deleteCancelled (present in tr and en) in Status's always-present role=status region."
+        },
+        {
+          "id": "F2-09",
+          "verdict": "fixed",
+          "note": "pay/share/[token]/page.tsx:363-390: participants no longer see the /trips link. They get the trackHere text (organizer's name or a generic version, in both tr and en) and a 'Durumu yenile' Button that stays focused while busy and announces statusRefreshed in role=status. Organizers still see the /trips and status links."
+        },
+        {
+          "id": "F2-11",
+          "verdict": "fixed",
+          "note": "Share/split/reauth part. pay/share has no raw <button> left (resend, refresh, switch account, pay and 3DS all use Button busy/size=lg/fullWidth). SplitPayPanel's load retry, row actions, invite send and create now use Button/ButtonLink. ReauthDialog's submit, passkey and cancel use Button and none of them uses native disabled. Four raw buttons remain in SplitPayPanel (stepper +/-, remove-row x, refresh text link); none is a pay or primary button."
+        },
+        {
+          "id": "F2-30",
+          "verdict": "fixed",
+          "note": "SplitPayPanel.tsx:793-800,859: the over-total paragraph now has id=overId. Amount inputs get aria-invalid and aria-describedby pointing at overId only while overTotal, so the reference always resolves. Focus goes to the last edited amount field (lastAmountRow, clamped)."
+        },
+        {
+          "id": "F2-31",
+          "verdict": "fixed",
+          "note": "New shared ThreeDsForm (Field label, digits only, maxLength 6 which matches MOCK_3DS_CODE '123456', threeDsNoCode help, back button guarded by aria-disabled), used by both checkout/cart and pay/share. When pay/share rejects the code, focus moves to the error container (messageRef). Minor timing gap noted under problems."
+        },
+        {
+          "id": "F2-32",
+          "verdict": "fixed",
+          "note": "TransferMarket.tsx: the submit Button now uses busy. A new link focuses and selects #claim-url. A document-level capture click guard asks for confirmation on in-app <a href> clicks while !sent; it skips modifier keys, target=_blank, download and #hash links, and re-clicks the link through a bypass flag. Small wording and description gaps listed under problems."
+        },
+        {
+          "id": "F2-33",
+          "verdict": "fixed",
+          "note": "The preview from AgentMandates was extracted into a shared AmountPreview (same parse, aria-live=polite) and is used in TransferMarket (ask price, with the currency's fraction digits), SplitPayPanel (each custom amount row) and AgentMandates (keeps its 'Limit: {amount}' format). The new uses show an unlabeled '= {money}' (minor)."
+        },
+        {
+          "id": "F2-34",
+          "verdict": "fixed",
+          "note": "forgot-password saves the safeRedirect'ed return address in localStorage (postResetRedirect), so it also works when the email opens a new tab. reset-password reads it, runs safeRedirect, and every login and request-new link carries it. On success it clears the key once and calls rememberAuthEmail(email). The login page now prefills from the remembered email."
+        },
+        {
+          "id": "F2-35",
+          "verdict": "fixed",
+          "note": "The SessionManager and ReauthDialog links now carry redirect=pathname and save the session email. On forgot-password a signed-in user sees 'Şifre değiştir' / 'Change password', the email is prefilled, and the back link reads 'Hesabıma dön' and goes to the redirect or /account. tr and en both have changeTitle and backToAccount."
+        },
+        {
+          "id": "F2-36",
+          "verdict": "fixed",
+          "note": "The register success view uses AuthCard focusTitle, so focus moves to the h1. The announcement comes from AuthCard's status region, which was already in the DOM with the form (same component at the same position). The visible Notice has live=false."
+        },
+        {
+          "id": "F2-37",
+          "verdict": "fixed",
+          "note": "ReauthDialog now uses PasswordRevealInput with inputClass and Button busy. The submit button is no longer disabled while the field is empty. An empty submit shows 'Şifrenizi girin.' / 'Enter your password.' in ErrorText, with id linked through aria-describedby and aria-invalid, and moves focus to the field. The error clears as the user types."
+        },
+        {
+          "id": "F2-38",
+          "verdict": "fixed",
+          "note": "SplitPayPanel fields, including the invite email, and the pay/share 3DS code now use the shared inputClass (border-gray-500, text-base on mobile). Row actions are 44px on touch and 32px from sm up. 'Payımı öde' is a primary ButtonLink, and the share pay button is a primary Button size=lg."
+        },
+        {
+          "id": "F2-55",
+          "verdict": "fixed",
+          "note": "When re-authentication is cancelled, PrivacyCenter.tsx:134-139 now calls setAcknowledged(false) and shows deleteCancelled ('İşlem iptal edildi; hesabınız silinmedi.' / 'Cancelled; your account was not deleted.'). The notice is cleared on retry and on cancel. It is rendered with success styling (see problems)."
+        }
+      ],
+      "problems": [
+        {
+          "file": "src/app/reset-password/page.tsx",
+          "line": 54,
+          "severity": "minor",
+          "findingId": "F2-34",
+          "description": "POST_RESET_REDIRECT_KEY lives in localStorage with no expiry and no link to an account or token. It is only overwritten or removed on the next forgot-password submit in the same browser. Scenario: user A starts a reset from a group-payment link, so '/pay/share/<tokenA>' is stored, and never finishes it. Later, user B on the same shared computer (or A, with a reset requested from a phone) opens a reset email link in this browser. The reset page applies the stale return address, so after reset and login B lands on A's share page, carrying A's share token in the URL. B gets a SHARE_EMAIL_MISMATCH error or an unrelated page.",
+          "fix": "Store a small record such as {redirect, email, savedAt} and apply it only when the email matches the one the token preview returns (setEmail(body.email)) and savedAt is within the reset-link lifetime. Otherwise ignore it and clear it."
+        },
+        {
+          "findingId": "F2-55",
+          "file": "src/components/privacy/PrivacyCenter.tsx",
+          "line": 267,
+          "severity": "minor",
+          "description": "The cancellation notice goes through Status's `message` slot, so it renders green with a check mark and a screen reader hears 'Başarılı: İşlem iptal edildi; hesabınız silinmedi.' ('Success: …'). Other account screens such as PasskeyManager's addCancelled/deleteCancelled show the same kind of cancel in a neutral gray 'info' tone with no success prefix. Saying 'Success' around account deletion is a mixed signal on exactly the point the finding is about.",
+          "fix": "Render deleteNotice in a neutral role=\"status\" paragraph (text-gray-700) that is always in the DOM, without the success icon or prefix. Keep Status for deleteError only."
+        }
+      ],
+      "repair": {
+        "repaired": [
+          {
+            "file": "src/components/auth/authRedirectStorage.ts",
+            "summary": "F2-34: storeAuthRedirect now takes the email too and saves {redirect, email, savedAt} as JSON (email lowercased). New matchAuthRedirect(raw, email) returns the redirect only when the email matches and the record is no older than 24h, the highest value AUTH_RESET_TOKEN_TTL_MINUTES allows. Anything else returns null, including old plain-string records."
+          },
+          {
+            "file": "src/app/forgot-password/page.tsx",
+            "summary": "F2-34: the call is now storeAuthRedirect(POST_RESET_REDIRECT_KEY, redirect, email). This one-line change was needed because the function signature changed."
+          },
+          {
+            "file": "src/app/reset-password/page.tsx",
+            "summary": "F2-34: the stored redirect is used only after the token preview returns an email and matchAuthRedirect accepts it. If the record belongs to another account or is too old, it is cleared from localStorage as soon as the preview arrives. Until then, the login and forgot-password links carry no redirect."
+          },
+          {
+            "file": "src/components/privacy/PrivacyCenter.tsx",
+            "summary": "F2-55: deleteNotice now shows in a neutral <p role=\"status\" class=\"text-sm text-gray-700\"> that is always in the DOM, with no success icon or 'Başarılı' prefix. Status now handles deleteError only."
+          }
+        ],
+        "rejected": [],
+        "testUpdates": [
+          "No assertions found in tests/ for postResetRedirect, deleteNotice or the cancel message (grep returned nothing). If any e2e test seeded localStorage 'postResetRedirect' with a plain string, it would now be ignored; none were found. Prettier and eslint --max-warnings=0 pass on all 4 changed files. tsc and the test suites were not run, as the rules required."
+        ]
+      }
+    },
+    {
+      "area": "host-admin",
+      "verdicts": [
+        {
+          "id": "F2-07",
+          "verdict": "fixed",
+          "note": "rowTitle now includes the shortened content URL and appeal date, and the confirm body shows URL, role and date. Keys exist in tr and en. The submit button's aria-labelledby picks up the new title."
+        },
+        {
+          "id": "F2-08",
+          "verdict": "fixed",
+          "note": "Resume now asks for confirmation (danger tone) showing name, shortRef, pending count and pause reason. admin.confirmResume keys exist in tr and en."
+        },
+        {
+          "id": "F2-23",
+          "verdict": "fixed",
+          "note": "guardLeave moved into the shared useHostLeaveGuard hook. PartyRiskPanel uses it on both message links and renders confirmDialog."
+        },
+        {
+          "id": "F2-24",
+          "verdict": "partial",
+          "note": "Promotions (baseline diff plus confirm before startEdit) and Deposit rows are done. In AccessibilityPanel only the evidence-picker drafts are registered. The edit form (width/note), the add form and changeProperty() still throw away typed input without warning."
+        },
+        {
+          "id": "F2-25",
+          "verdict": "partial",
+          "note": "noValidate and field errors are in place for ClaimAdmin, EventsCard and RoleCard. But in ClaimAdmin, focusFirstInvalid only looks for [aria-invalid=true], and the decision radios never get that attribute. A missing decision therefore moves focus nowhere. The old code focused the first radio."
+        },
+        {
+          "id": "F2-26",
+          "verdict": "fixed",
+          "note": "The closed card shows 'Next claim' or 'Back to the list', using the list as it was at decision time. ClaimDetail is keyed by selectedId, so form state resets."
+        },
+        {
+          "id": "F2-27",
+          "verdict": "fixed",
+          "note": "The bulk confirm shows the date range, largest increase and decrease, total difference (only when all suggestions share one currency) and the count of price cuts. Keys exist in both locales."
+        },
+        {
+          "id": "F2-28",
+          "verdict": "fixed",
+          "note": "Filters are kept in sessionStorage with try/catch. A stale saved value is ignored when it is not among the current options. No hydration problem, because the filters only render after bookings load on the client."
+        },
+        {
+          "id": "F2-29",
+          "verdict": "fixed",
+          "note": "Clicking with nothing eligible now shows an explanatory error. Bulk Resolve asks for confirmation, and the skipped count is added to the result. Keys are in support.json for both locales."
+        },
+        {
+          "id": "F2-52",
+          "verdict": "fixed",
+          "note": "Support row buttons and the Payout pause/resume button now have aria-labels built from admin.rowAction. Each label starts with the visible text."
+        },
+        {
+          "id": "F2-53",
+          "verdict": "fixed",
+          "note": "Used and paused promotions show inline text instead of the Delete button. After a used promotion is paused, focus goes to the toggle button, which still exists."
+        },
+        {
+          "id": "F2-54",
+          "verdict": "fixed",
+          "note": "isHost hides the guest instructions and the /trips link. The hostOpen body now uses the 'Messages & damage claim' link name, matching the host dashboard."
+        },
+        {
+          "id": "F2-07",
+          "verdict": "fixed",
+          "note": "AppealQueue rowTitle now includes the short content URL and the appeal date (tr and en). The submit button is labelled by submit + title, so each row has a unique name. The confirm body adds a confirm.summary line with the full URL, role and date, and the dialog is aria-describedby that body."
+        },
+        {
+          "id": "F2-08",
+          "verdict": "fixed",
+          "note": "PayoutAdmin toggle(): the resume branch now calls useConfirm with tone danger (initial focus on Cancel). The title has the name and shortRef; the body has the plural pending count and the pause reason, or noReason. Keys match in tr and en."
+        },
+        {
+          "id": "F2-23",
+          "verdict": "fixed",
+          "note": "guardLeave is moved into a shared useHostLeaveGuard hook in useHostUnsavedChanges.ts. Both PartyRiskPanel message links (card and table) use onNavigate={guardLeave(...)}, and the panel renders confirmDialog. The dirty-form set is module-scoped, so it is shared with HostDashboard."
+        },
+        {
+          "id": "F2-24",
+          "verdict": "partial",
+          "note": "Fixed for PromotionsPanel (baseline diff + useHostUnsavedChanges + discard confirm before startEdit) and DepositRow (counted as dirty). AccessibilityPanel only counts evidence drafts as dirty. Its inline edit form (width/note, uncontrolled) and its add form are not tracked, and clicking another row's Edit (line ~594, setEditing) still throws away the typed note with no warning."
+        },
+        {
+          "id": "F2-25",
+          "verdict": "partial",
+          "note": "noValidate is set, Field errors show for the note, and fixErrors appears in Status. But focusFirstInvalid only looks for [aria-invalid=\"true\"], and the decision radios never get it, so focus does not reach the decision field (details in problems)."
+        },
+        {
+          "id": "F2-26",
+          "verdict": "fixed",
+          "note": "The closed DecisionCard shows 'Next claim' (calls select, which moves focus to the detail heading) or 'No other claim' + 'Back to the list' (calls closeDetail, which restores focus to the row). Next is worked out from the list as shown at decision time. Keys present in tr and en."
+        },
+        {
+          "id": "F2-27",
+          "verdict": "fixed",
+          "note": "The accept-all/reject-all confirm body now lists the date range (UTC dates), the largest increase and decrease %, the total difference (only when all suggestions share one currency) and how many suggestions lower the price. It renders inside the dialog's div body, which is aria-describedby. tr and en match."
+        },
+        {
+          "id": "F2-28",
+          "verdict": "fixed",
+          "note": "Booking status/property filters are kept in sessionStorage (key host-booking-filters, outside the draft prefix, so the leave confirm does not clear them). A saved value that no longer applies is ignored. Filters are not rendered during SSR, so there is no hydration mismatch. They come back after returning via /host#host-bookings."
+        },
+        {
+          "id": "F2-29",
+          "verdict": "fixed",
+          "note": "With no eligible targets, the toolbar Status (role=alert) shows bulkNoneEligible (=0 gives 'select at least one'). Bulk resolve now asks for confirmation, and the result message appends the bulkSkipped count."
+        },
+        {
+          "id": "F2-52",
+          "verdict": "fixed",
+          "note": "Support row buttons now have aria-label admin.rowAction with the reason + ticket shortRef. The Payout pause/resume button has rowAction with displayName. Each label starts with the visible text. Small caveat for payouts noted in problems."
+        },
+        {
+          "id": "F2-53",
+          "verdict": "fixed",
+          "note": "For a promotion that is used (usageCount>0) and inactive, the Delete button is replaced by the inline text cannotDeleteInline (tr and en). After a used, active promotion is deactivated, focus moves to the row's :toggle button, which exists through actionRef."
+        },
+        {
+          "id": "F2-54",
+          "verdict": "fixed",
+          "note": "MyClaims now gets isHost. For HOST, the guest emptyHow text and the /trips link are hidden, and HostOpenClaimCard is the path instead. hostOpen.body now names the real host link label, 'Mesajlar ve hasar talebi' / 'Messages & damage claim', which matches host.bookings.messagesAndClaimsLink."
+        }
+      ],
+      "problems": [
+        {
+          "file": "src/components/admin/ClaimAdmin.tsx",
+          "line": 429,
+          "severity": "major",
+          "findingId": "F2-25",
+          "description": "focusFirstInvalid(formEl) only queries [aria-invalid=\"true\"]. The decision radios (line 533) never get aria-invalid; only the fieldset gets aria-describedby. Failure case: the admin writes a valid note but picks no decision and presses submit. Nothing gets focus, which stays on the submit button. The old code moved focus to the first radio, so this is a regression. When both fields are wrong, focus jumps to the note (the second field) instead of the first invalid one. Screen readers also may not announce the error text tied to the fieldset by aria-describedby when focus is on a radio.",
+          "fix": "While decisionError is set, give each radio aria-invalid={!!decisionError || undefined} and aria-describedby pointing at the error id. That way focusFirstInvalid finds the first radio first, in DOM order. Or, when missingDecision is true, focus the first radio directly in a requestAnimationFrame callback, as the old code did."
+        },
+        {
+          "file": "src/components/admin/PayoutAdmin.tsx",
+          "line": 252,
+          "severity": "major",
+          "description": "These changes switch the displayed IDs to shortRef(), which upper-cases them (last 8 chars of a cuid). The search filters in PayoutAdmin (lines 168-177) and ClaimAdmin (lines 126-131) lower-case both sides with toLocaleLowerCase(locale). With locale 'tr', 'I' lower-cases to the dotless 'ı'. Failure case: in the Turkish UI, an admin types the shown ref 'ABCDI123' (or the shown claim booking ref, which the hint explicitly suggests: 'son 8 karakter'). The needle becomes 'abcdı123', which never matches the stored 'abcdi123'. Any ref containing 'i' fails, about 20% of cuid suffixes. Before, the refs were shown in lower case and this did not happen.",
+          "fix": "Match ID fields without locale rules: v.toLowerCase().includes(query.trim().toLowerCase()), or toLocaleLowerCase('en') for IDs, while keeping locale-aware matching for displayName/propertyTitle. Do this in both PayoutAdmin and ClaimAdmin."
+        },
+        {
+          "file": "src/components/host/AccessibilityPanel.tsx",
+          "line": 594,
+          "severity": "major",
+          "findingId": "F2-24",
+          "description": "Only the evidence-picker drafts are passed to useHostUnsavedChanges. The inline edit form (uncontrolled width/note, line 682) and the add form are not tracked as unsaved. Failure case: the host opens 'Düzenle' on row A, types a long note, then clicks 'Düzenle' on row B. setEditing(feature.id) unmounts A's form and the note is lost, with no confirm and no leave guard. changeProperty() (line 270) also wipes unsaved evidence drafts with setDrafts({}) without asking. The finding asks for both 'kirli sayılma' and a confirm before switching edits.",
+          "fix": "Track whether the edit form and the add form are dirty (for example compare the textarea/width values on change, or use the existing noteLength/editNoteLength values), and add those to useHostUnsavedChanges. Before setEditing(otherId) and in changeProperty, ask for confirmation with host.unsaved.discardConfirm when something is unsaved, the same way PromotionsPanel.startEdit does."
+        },
+        {
+          "file": "src/components/admin/ClaimAdmin.tsx",
+          "line": 429,
+          "severity": "major",
+          "findingId": "F2-25",
+          "description": "focusFirstInvalid(formEl) only focuses [aria-invalid=\"true\"], and the decision radios never get aria-invalid. The old firstRadioRef focus was removed. Result: with no decision chosen and a valid note, focus stays on the submit button. With no decision and a short note, focus jumps to the note and skips the decision group. The specific 'Choose a decision first.' text is not in a live region, so screen-reader users only hear the generic fixErrors. This is a regression from main, where focus went to the first radio, and it misses the 'focus the first invalid field' part of the recommendation.",
+          "fix": "When missingDecision, focus the first radio directly: restore firstRadioRef and call requestAnimationFrame(() => firstRadioRef.current?.focus()). Otherwise call focusFirstInvalid. Alternatively, set aria-invalid on the radios while decisionError is set."
+        },
+        {
+          "file": "src/components/host/AccessibilityPanel.tsx",
+          "line": 594,
+          "severity": "major",
+          "findingId": "F2-24",
+          "description": "Only evidence-picker drafts are registered as dirty. The inline edit form (widthCm/note, uncontrolled defaultValue) and the add-feature form are not tracked. Clicking 'Edit' on another row calls setEditing(feature.id) and throws away the open form's typed note/width with no confirm. changeProperty() also clears the now-tracked evidence drafts silently. Both are the 'another row's Edit drops the draft without warning' problem from the finding.",
+          "fix": "Track the edit form as dirty (make width/note controlled, or compare against feature values on input) and the add form (scope/note/addEvidence). Put them into useHostUnsavedChanges. Before setEditing to another row and before changeProperty, ask the same unsaved.discardConfirm dialog that PromotionsPanel uses."
+        },
+        {
+          "file": "src/components/admin/ClaimAdmin.tsx",
+          "line": 126,
+          "severity": "major",
+          "description": "New regression from the shared shortRef (uppercase, F2-41) meeting Turkish-locale search. ClaimList now shows booking refs uppercase (e.g. QZI7A8BK). The ClaimAdmin search lowercases the needle with toLocaleLowerCase('tr'), which turns 'I' into dotless 'ı', so pasting a displayed ref that contains I no longer matches the cuid's 'i'. Checked in node: includes() returns false. The same thing happens in PayoutAdmin search (line ~168) against the uppercase userId shortRef. Roughly 20% of 8-char base36 refs contain an I, so search by the visible ref fails for them in the TR UI.",
+          "fix": "Compare ID fields without locale rules: needleId = query.trim().toLowerCase() checked against c.id.toLowerCase() / c.bookingId.toLowerCase() / row.userId.toLowerCase(). Keep toLocaleLowerCase(locale) only for property titles and display names. Alternatively, map 'ı' back to 'i' before matching IDs."
+        }
+      ],
+      "repair": {
+        "repaired": [
+          {
+            "file": "src/components/admin/ClaimAdmin.tsx",
+            "summary": "F2-25 (both reports): brought back firstRadioRef on the first decision radio. When no decision is picked, submit now focuses that radio in a requestAnimationFrame callback; otherwise it calls focusFirstInvalid as before. The radios also get aria-describedby pointing at the decision error, so a screen reader reads the error on the focused radio. I first tried aria-invalid on the radios but dropped it: eslint jsx-a11y/role-supports-aria-props flags it as unsupported on role radio."
+          },
+          {
+            "file": "src/components/admin/ClaimAdmin.tsx",
+            "summary": "Turkish-locale search fix: claim id and booking id are now matched with plain toLowerCase() against query.trim().toLowerCase(), so the uppercase shortRef with an 'I' matches again. Property title still uses toLocaleLowerCase(locale)."
+          },
+          {
+            "file": "src/components/admin/PayoutAdmin.tsx",
+            "summary": "Same fix in the payout search: userId is matched with plain toLowerCase(). displayName still uses locale-aware matching."
+          },
+          {
+            "file": "src/components/host/AccessibilityPanel.tsx",
+            "summary": "F2-24 (both reports): the inline edit form is now tracked as dirty (editDirty). A form onChange handler compares widthCm and note with the saved feature values. The add form is tracked too (addDirty: note length > 0, evidence chosen, or width filled). Edit-form dirty, add-form dirty and evidence-draft dirty are all passed to useHostUnsavedChanges. A new confirmDiscard() shows the host.unsaved.discardConfirm dialog, the same one PromotionsPanel uses. It runs before the Edit toggle when the edit form is dirty, and in changeProperty (now async) when evidence drafts, the edit form or the add form's evidence choice would be lost. The dirty flags reset on closeEdit, on a successful add, and after a property switch. No message keys changed; the existing host.unsaved.discardConfirm.* keys are reused."
+          }
+        ],
+        "rejected": [],
+        "testUpdates": []
+      }
+    },
+    {
+      "area": "shell-crosscutting",
+      "verdicts": [
+        {
+          "id": "F2-10",
+          "verdict": "fixed",
+          "note": "connectHuman sends draft, then the last failed user turn, then the fixed text. The draft is cleared on send and restored on failure. humanHint now says the message is passed to the team (tr+en). The server opens the ticket with input.message (agent.ts:344-346)."
+        },
+        {
+          "id": "F2-39",
+          "verdict": "partial",
+          "note": "requiresLogin was removed from the Header item. /support renders for anonymous users with a sign-in card. nav, footer, titles and pageTitle all say 'Yardım ve destek' / 'Help & support'. privacy.json still calls it the 'Destek'/'Support' page (keys contact and requests)."
+        },
+        {
+          "id": "F2-40",
+          "verdict": "fixed",
+          "note": "handedOff now also counts non-RESOLVED tickets, so 'Yeni konuşma' no longer resets the lock. Send and 'İnsana bağlan' use Button busy plus aria-disabled. Side effects are reported as problems."
+        },
+        {
+          "id": "F2-41",
+          "verdict": "fixed",
+          "note": "Shared shortRef (last 8 chars, uppercase) is used in SupportChat, AdminCopyableId, ClaimList, resolution detail, HostDashboard, PartyRiskPanel, PayoutAdmin and SupportAdmin. Copy still uses the full id. Admin search lowercases the query, so an uppercase ref still matches."
+        },
+        {
+          "id": "F2-43",
+          "verdict": "fixed",
+          "note": "No 'parola' left in the tr messages. Passkey is 'geçiş anahtarı' throughout. ReauthDialog uses the shared PasswordRevealInput."
+        },
+        {
+          "id": "F2-44",
+          "verdict": "fixed",
+          "note": "ErrorText was added. 12 hand-written role=alert remain, all deliberate wrapper live regions. No ErrorText ends up nested inside a <p>. Keys and remount keys are kept. tsc and eslint are clean for these files."
+        },
+        {
+          "id": "F2-45",
+          "verdict": "fixed",
+          "note": "All 34 nested layouts now return {default, template}. Next 16 resolve-title applies the parent template to default, so sub-routes get the brand suffix. property.metaTitle is '{title}'."
+        },
+        {
+          "id": "F2-56",
+          "verdict": "partial",
+          "note": "Most page/entity strings now say ilan/listing. compliance.wholeProperty is about physical accessibility and was changed to 'İlanın tamamı'/'Entire listing', which goes against the finding's own rule."
+        },
+        {
+          "id": "F2-57",
+          "verdict": "fixed",
+          "note": "'Tekrar dene', 'Sign in', '…' and 'Destek ekibine yazın' / 'Contact support' are now consistent. The remaining 'Yeniden deneyin' is in prose sentences, not button labels."
+        },
+        {
+          "id": "F2-58",
+          "verdict": "fixed",
+          "note": "nav.mobile is now 'Tüm bağlantılar' / 'All links'. It is used only on the menu nav landmark (Header.tsx:406)."
+        },
+        {
+          "id": "F2-10",
+          "verdict": "fixed",
+          "note": "SupportChat.tsx:283 connectHuman sends the draft, then the last failed message, then the fixed text. agent.ts:346 opens the ticket with input.message. The draft is cleared on send and put back on failure. humanHint tr/en now says the typed message is passed to the team."
+        },
+        {
+          "id": "F2-39",
+          "verdict": "fixed",
+          "note": "Header.tsx:44 no longer has requiresLogin. Signed-out /support shows the FAQ plus a chat card with a sign-in link (/login?redirect=%2Fsupport, checked at runtime). nav, footer, titles and pageTitle all read 'Yardım ve destek' / 'Help & support'. Leftover: privacy.json still calls it the 'Destek'/'Support' page."
+        },
+        {
+          "id": "F2-40",
+          "verdict": "fixed",
+          "note": "handedOff now also counts myTickets that are not RESOLVED, so 'Yeni konuşma' no longer clears the lock. Send and connect-human use busy plus aria-disabled instead of disabled, so focus stays on the button. Side effect: when a ticket is open, the agentOff error now points to a button that does nothing."
+        },
+        {
+          "id": "F2-41",
+          "verdict": "partial",
+          "note": "shortRef (last 8 chars, uppercase) is used in SupportChat, AdminCopyableId, ClaimList, resolution/[id], HostDashboard, PartyRiskPanel, PayoutAdmin and SupportAdmin. But the guest booking page and TripsView still show the full lowercase id in groups of 5 (BookingNumberText), while the host sees 'Rezervasyon no' as a shortRef."
+        },
+        {
+          "id": "F2-43",
+          "verdict": "fixed",
+          "note": "TR messages no longer contain 'parola'. Every TR passkey string reads 'geçiş anahtarı (passkey)'. auth.show is 'Şifreyi göster'. EN uses password/passkey throughout."
+        },
+        {
+          "id": "F2-44",
+          "verdict": "fixed",
+          "note": "7 hand-written role=alert remain, all on purpose (load-failure blocks, persistent wrappers with ErrorText live=false, BookingMessages sr-only). ErrorText ids match their aria-describedby (cart errorId, checkout-quote-error, smart-filter-error, ReauthDialog, msg-error, SearchBar dateErrorId). 3 earlier nested live regions are still there."
+        },
+        {
+          "id": "F2-45",
+          "verdict": "fixed",
+          "note": "Every intermediate layout returns {default, template:'%s — brand'}. property.metaTitle is '{title}'. Runtime tab title: 'Yardım ve destek — booking-platform'."
+        },
+        {
+          "id": "F2-56",
+          "verdict": "fixed",
+          "note": "checkout.backToProperty EN is '← Back to listing', matching TR 'İlana dön'. tesis/property only appears for the physical place. One small mismatch: compliance.report.privacyNote, TR 'ilan sahibi' vs EN 'property owner'."
+        },
+        {
+          "id": "F2-57",
+          "verdict": "fixed",
+          "note": "All 18 retry buttons read 'Tekrar dene' / 'Try again'. EN has no 'log in' and no message uses '...'. 'Destek ekibine yazın' is always 'Contact support'."
+        },
+        {
+          "id": "F2-58",
+          "verdict": "fixed",
+          "note": "nav.mobile is 'Tüm bağlantılar' / 'All links' and is used on Header.tsx:406."
+        }
+      ],
+      "problems": [
+        {
+          "file": "messages/tr/privacy.json",
+          "line": 12,
+          "severity": "minor",
+          "findingId": "F2-39",
+          "description": "The privacy texts still name the support page '<link>Destek</link> sayfası' / 'the <link>Support</link> page' (keys contact and requests, lines 12 and 41, same in en). The page, nav, footer and tab title are now all 'Yardım ve destek' / 'Help & support', so a fifth name for the same page remains, which F2-39 set out to remove.",
+          "fix": "Change both keys in tr and en to 'Yardım ve destek' / 'Help & support'. The 'after signing in' clause can stay, since the chat still needs sign-in."
+        },
+        {
+          "file": "src/app/booking/[id]/page.tsx",
+          "line": 511,
+          "severity": "major",
+          "findingId": "F2-41",
+          "description": "The booking number still has two formats. The guest booking page (and TripsView.tsx:293) shows the full lowercase id in 5-character groups through BookingNumberText. The host dashboard (HostDashboard.tsx:497/576, PartyRiskPanel) shows 'Rezervasyon no' as shortRef, the last 8 characters in uppercase. A guest reading their number to a host still cannot match it quickly. short-ref.ts says user, host and admin see the same reference, which is not true for bookings.",
+          "fix": "Show shortRef(booking.id) as the guest-facing booking number on the booking page and TripsView. Keep the full id in a copy button or title for support."
+        }
+      ],
+      "repair": {
+        "repaired": [
+          {
+            "file": "messages/tr/privacy.json",
+            "summary": "F2-39: in the keys contact (line 12) and requests (line 41), the link text '<link>Destek</link>' is now '<link>Yardım ve destek</link>'. The sign-in clause is kept."
+          },
+          {
+            "file": "messages/en/privacy.json",
+            "summary": "F2-39: in the keys contact and requests, '<link>Support</link>' is now '<link>Help & support</link>'. tr and en key sets are unchanged and both files parse as JSON."
+          },
+          {
+            "file": "src/app/booking/[id]/page.tsx",
+            "summary": "F2-41: the booking number in the detail header now shows shortRef(booking.id), the last 8 characters in uppercase, the same as the host dashboard. The full id is in the title attribute for support. The BookingNumberText import is replaced by shortRef."
+          },
+          {
+            "file": "src/components/pwa/TripsView.tsx",
+            "summary": "F2-41: the trip card shows shortRef(item.id) in large bold type under the 'Rezervasyon numarası' label. The full grouped id stays below it in smaller gray text inside the data-testid=booking-code element, because tests/e2e/pwa-offline.spec.ts:94 checks that element's text equals the full bookingId. The copy button still copies the full id."
+          }
+        ],
+        "rejected": [],
+        "testUpdates": [
+          "tests/e2e/pwa-offline.spec.ts:94 checks that getByTestId('booking-code') has the full bookingId as its text. I kept the full id in that element, so the test should still pass, and the short ref is added as a separate element. If the full id is ever removed from the card, this test must be updated.",
+          "Gates: npx prettier --write and npx eslint --max-warnings=0 on page.tsx and TripsView.tsx passed. The JSON.parse check on both privacy.json files passed."
+        ]
+      }
+    }
+  ]
+}

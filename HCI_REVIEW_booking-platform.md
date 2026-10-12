@@ -5,6 +5,8 @@
 > Üretici: SevgiAI v1.1.0 · `/sevgi-ai:hci-review`  
 > Standart/Kaynak: SENG 477 — ISO 13407 (kullanıcı merkezli tasarım), Alan Dix kullanılabilirlik prensipleri, 15 maddelik sezgisel kontrol listesi, WCAG 2.2 AA
 
+> **2. tur (2026-10-13):** güncel kod üzerinde taze holistik inceleme ve düzeltme — [HCI_REVIEW_booking-platform-tur2.md](HCI_REVIEW_booking-platform-tur2.md) (59 bulgu, tamamı düzeltildi).
+
 > **Kapsam kısıtı:** Genel renk paleti ve temaya dokunulmayacak. Renk/kontrast kaynaklı bulgular raporlandı ancak **Renk/Tema** sütununda işaretlendi ve düzeltme kapsamı dışında tutuldu.
 
 ## 0. Yöntem ve Durum

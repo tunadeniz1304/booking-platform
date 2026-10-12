@@ -10,21 +10,39 @@
     "you": "You",
     "assistant": "Assistant",
     "log": "Support conversation",
-    "handoff": "Handed over to our human support team (ticket: {id}).",
+    "handoff": "Handed over to our human support team. Ticket no: {id}.",
     "empty": "No messages yet.",
     "connectHuman": "Talk to a human",
     "humanMessage": "I would like to talk to a human agent.",
     "humanHint": "If the AI answer is not enough, you can hand the conversation straight to our human support team.",
-    "humanPending": "Your request was forwarded to our human support team; an agent will get back to you.",
+    "humanPending": "Your request was forwarded to our human support team. An agent will reply to the email address on your account; you can follow the ticket status in the list at the top of this page.",
     "bookingLabel": "Which booking is this about?",
     "bookingNone": "None selected (your nearest booking is used)",
-    "context": "Booking: {booking}"
+    "context": "Booking: {booking}",
+    "tickets": "Your support tickets",
+    "ticketLine": "Ticket from {date} ({id}): {status}",
+    "failed": "Not sent.",
+    "retry": "Try again",
+    "thinking": "The assistant is preparing a reply…",
+    "standaloneHint": "The assistant answers each message on its own and does not remember earlier ones; ask your full question in one message.",
+    "newConversation": "Start a new conversation",
+    "suggestTitle": "Start with a ready-made question (it is sent as soon as you choose it):",
+    "suggest": {
+      "bookingStatus": "What is the status of my booking?",
+      "cancellationQuote": "If I cancel now, how much will I get back?",
+      "checkInTimes": "What are the check-in and check-out times?"
+    },
+    "shortcutHint": "Press Ctrl+Enter (⌘+Enter on Mac) to send.",
+    "counter": "{count}/{max} characters",
+    "nearLimit": "Messages can be at most {max} characters; you are close to the limit.",
+    "truncated": "The pasted text did not fit; your message was cut to {max} characters.",
+    "prefillAccessibility": "{hasProperty, select, yes {I have a question about the accessibility of “{property}”: } other {I have a question about a property’s accessibility: }}"
   },
   "admin": {
     "link": "Support queue",
     "pageTitle": "Support queue",
     "pageIntro": "Tickets the AI support assistant handed over to humans. Decisions are made by a human agent.",
-    "title": "Tickets",
+    "title": "Support tickets",
     "filter": "Filter by status",
     "all": "All",
     "empty": "No tickets in the queue.",
@@ -47,6 +65,23 @@
       "USER_REQUEST": "User asked for a human"
     },
     "ticketId": "Ticket no: {id}",
-    "user": "User: {id}"
+    "user": "User: {id}",
+    "active": "Active (open + in progress)",
+    "search": "Search by ticket, booking or user ID",
+    "noMatch": "No tickets match your search.",
+    "selectRow": "Select ticket {id}",
+    "selectAll": "Select all ({count})",
+    "selectedCount": "{count, plural, one {# ticket selected} other {# tickets selected}}",
+    "bulkInProgress": "Start review for selected",
+    "bulkResolve": "Mark selected resolved",
+    "bulkUpdated": "{count, plural, one {# ticket updated.} other {# tickets updated.}}",
+    "bulkFailed": "{count, plural, one {# ticket} other {# tickets}} could not be updated: {error}",
+    "groupTitle": "{count, plural, one {# ticket} other {# tickets}} for the same booking",
+    "groupResolveAll": "Mark all resolved",
+    "assignedToYou": "Assigned to you",
+    "handler": "Reviewer: {id}"
+  },
+  "agent": {
+    "localTime": "property local time"
   }
 }

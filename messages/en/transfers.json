@@ -9,18 +9,26 @@
     "loading": "Loading…",
     "empty": "No listings right now.",
     "guests": "{count, plural, one {# guest} other {# guests}}",
-    "terms": "Asking: <b>{ask}</b> (original {original}) · seller {seller} · expires {expires}"
+    "terms": "Asking: <b>{ask}</b> (original {original}) · seller {seller} · listing valid until {expires}",
+    "itemNote": "You can take over this booking only through the link the seller sends you.",
+    "how": {
+      "title": "How do transfers work?",
+      "step1": "The seller picks a confirmed booking, sets a price and creates a single-use transfer link.",
+      "step2": "The seller sends the link to the buyer themselves; sellers can't be contacted from this list.",
+      "step3": "The buyer opens the link and pays. Once the payment is approved, the booking moves to the buyer.",
+      "step4": "The price is paid out to the seller. If nobody pays or the link expires, the booking stays with the seller."
+    }
   },
   "loginToSell": "<link>Sign in</link> to transfer your own booking.",
   "sell": {
     "title": "Transfer my booking",
-    "created": "Transfer listing created ({amount}).",
+    "created": "Transfer link created ({amount}). The link is valid until {expires}; when the buyer pays, the booking moves to them and the amount is paid out to you.",
     "copyFailed": "Could not copy; select and copy the link manually.",
-    "none": "You have no transferable (confirmed) bookings.",
+    "none": "You have no transferable bookings. Only confirmed bookings with more than {hours} hours until check-in can be transferred.",
     "booking": "Booking",
-    "askPrice": "Asking price ({currency})",
-    "askHint": "Example: 1,250 or 1,250.50. Cannot exceed what you paid.",
-    "submit": "Transfer",
+    "askPrice": "Your price ({currency})",
+    "askHint": "Up to {max}. Example: 1,250 or 1,250.50.",
+    "submit": "Create transfer link",
     "linkOnce": "The transfer link is shown only now — copy it and share it with the buyer.",
     "linkLabel": "Transfer link",
     "copy": "Copy",
@@ -36,7 +44,10 @@
     "linkLost": "If you lose the link you can create a new one; the old one will stop working.",
     "closeTitle": "Close without copying the link?",
     "closeBody": "This link will not be shown again. If you haven't copied it, you can't send it to the buyer.",
-    "closeConfirm": "Close anyway"
+    "closeConfirm": "Close anyway",
+    "tooLateSuffix": "(less than {hours} hours to check-in; can't be transferred)",
+    "askTooHigh": "Your price can be at most {max}.",
+    "keepNote": "This doesn't transfer the booking yet: it stays yours until the buyer pays through the link. Once the payment is approved, your price is paid out to you."
   },
   "claim": {
     "title": "Take over booking",
@@ -47,7 +58,7 @@
     "paymentTitle": "Payment details",
     "owned": "The booking is now yours: <link>view booking</link>",
     "cardNumber": "Card number",
-    "cardHint": "Demo cards: approve {success}, decline {decline}. Card details are never sent to the server; only a token is.",
+    "cardHint": "Demo cards: approve {success}, decline {decline}. Your card number never reaches our servers; the payment provider creates a single-use code instead. Cards that need extra verification (3D Secure) aren't supported for transfers.",
     "month": "Month",
     "year": "Year",
     "cvc": "CVC",
@@ -58,7 +69,12 @@
     "confirmTitle": "Make the payment?",
     "confirmBody": "The transfer price set by the seller will be charged to your card and the booking will move to you. This cannot be undone.",
     "confirmAction": "Pay and take over",
-    "maybeCharged": "Your previous attempt may already have been charged and the transfer completed. Check <link>your trips</link> before paying again."
+    "maybeCharged": "Your previous attempt may already have been charged and the transfer completed. Check <link>your trips</link> before paying again.",
+    "threeDsUnsupported": "This card needs extra verification (3D Secure), which isn't supported for transfers. Please use another card.",
+    "linkExpired": "This transfer link expired on {date}. Ask the seller for a new link.",
+    "linkGone": "This transfer is no longer available: the booking went to another buyer or the seller withdrew the listing.",
+    "selfClaim": "This link belongs to your own transfer listing; you can't take over your own booking. Share the link with the buyer.",
+    "invalidLinkHelp": "If you already completed the transfer, the booking appears under My trips."
   },
   "mine": {
     "title": "My transfer listings",
@@ -91,5 +107,9 @@
     "sent": "Verification email sent. Check your inbox.",
     "alreadyVerified": "Your email is already verified. Please try again.",
     "failed": "We couldn't send the email. Please try again shortly."
+  },
+  "jump": {
+    "label": "On this page",
+    "discover": "Browse listings"
   }
 }

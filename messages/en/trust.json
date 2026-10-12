@@ -32,7 +32,7 @@
     },
     "statusLabel": "Status:",
     "verifiedAt": "Verified on {date}",
-    "lastError": "Provider code: {code}",
+    "lastError": "Error code (for support): {code}",
     "start": "Start verification",
     "retry": "Try again",
     "starting": "Starting…",
@@ -47,7 +47,36 @@
       "blurry": "Blurry photo",
       "expired": "Expired document",
       "fake": "Fake document"
-    }
+    },
+    "supportLink": "Contact support",
+    "errors": {
+      "document_unreadable": "We couldn't read the document photo. Retake it in good light, without glare, with the whole document visible.",
+      "document_expired": "Your document has expired. Try again with a valid identity document.",
+      "document_fraudulent": "The document could not be verified. Contact support before trying again.",
+      "document_type_not_supported": "This document type isn't supported. Use an ID card, passport or driving licence.",
+      "document_unverified_other": "The document could not be verified. Try again with a new photo where the whole document is clearly visible.",
+      "consent_declined": "You didn't give the consent needed for verification. Start again and accept the consent step.",
+      "abandoned": "Verification was not finished. Start again when you have your document with you.",
+      "device_not_supported": "Your device can't be used for verification. Try again on a phone or computer with a camera.",
+      "country_not_supported": "The country that issued your document isn't supported. Use another identity document or contact support.",
+      "under_supported_age": "The age requirement for verification wasn't met. If you think this is a mistake, contact support.",
+      "unknown": "Verification couldn't be completed. Try again; if the problem continues, contact support."
+    },
+    "resultAnnounce": "Verification result: {status}",
+    "returnPending": "You're back from the verification provider. Your result is being processed; this can take a few minutes.",
+    "pendingHelp": "Your document is in review. This usually takes a few minutes; this section updates by itself when the result arrives.",
+    "pendingRestart": "If you didn't finish verification on the provider's page, you can start it again below.",
+    "stillPending": "Verification is still in review. Check again in a few minutes.",
+    "refresh": "Refresh status",
+    "refreshing": "Refreshing…",
+    "providerNotice": "Verification happens on the page of our secure verification provider, Stripe; you'll come back to this page when it's done. You need a valid identity document and a device with a camera (a phone or a computer with a webcam).",
+    "dailyLimit": "You can start verification up to {count, plural, one {# time} other {# times}} a day.",
+    "dailyLimitGeneric": "Daily attempts are limited, so start when you have your document with you.",
+    "startProvider": "Continue to verification (provider's page)",
+    "requiredHostDone": "The identity verification required to create listings is complete.",
+    "requiredGuestDone": "The identity verification required for booking is complete.",
+    "emailSent": "Verification email sent. After clicking the link in the email, start verification here again.",
+    "emailAlreadyVerified": "Your email address is verified; you can start identity verification again."
   },
   "partyRisk": {
     "title": "Party-risk warnings",
@@ -61,7 +90,9 @@
       "dates": "Dates",
       "guests": "Guests",
       "score": "Score",
-      "reasons": "Reasons"
+      "reasons": "Reasons",
+      "booking": "Booking no.",
+      "contact": "Contact"
     },
     "reasons": {
       "YOUNG_ACCOUNT": "New account",
@@ -69,6 +100,13 @@
       "LARGE_GROUP": "Large group",
       "NEAR_DATE": "Near date",
       "WEEKEND": "Weekend"
-    }
+    },
+    "scale": "Scores range from 0 to 100; only bookings above the warning threshold are listed.",
+    "scaleWithThreshold": "Scores range from 0 to 100; bookings scoring {threshold} or higher are listed.",
+    "retry": "Try again",
+    "dateRange": "{from} – {to}",
+    "scoreValue": "{score}/100 · High",
+    "messageGuest": "Message the guest",
+    "messageAfterConfirm": "Messaging opens once confirmed"
   }
 }

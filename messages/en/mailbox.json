@@ -1,5 +1,20 @@
 {
   "title": "Mailbox (demo)",
-  "subtitle": "When SMTP is not configured, emails appear here.",
-  "empty": "No emails yet."
+  "subtitle": "Emails sent to your account in the demo environment appear here. You only see your own emails.",
+  "empty": "No emails yet.",
+  "refresh": "Refresh",
+  "lastUpdated": "Last updated: {time}",
+  "limitNote": "Showing the latest {count} emails; older ones are not listed.",
+  "to": "To: {email}",
+  "delivery": {
+    "sentMailbox": "Delivered to the demo mailbox",
+    "sentSmtp": "Sent by email",
+    "pending": "Waiting to send",
+    "failed": "Could not be sent",
+    "unknown": "Status unknown"
+  },
+  "actions": {
+    "verify": "Verify my email address",
+    "reset": "Open the password reset page"
+  }
 }

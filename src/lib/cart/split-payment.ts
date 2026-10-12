@@ -515,6 +515,7 @@ export async function sendShareInvite(input: {
 interface Payer {
   id: string;
   email: string;
+  emailVerified: boolean;
 }
 
 async function loadShareByToken(token: string) {
@@ -551,9 +552,12 @@ function assertPayer(share: TokenShare, payer: Payer): void {
 }
 
 async function loadPayer(userId: string): Promise<Payer> {
-  const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { email: true, emailVerifiedAt: true },
+  });
   if (!user) throw new NotFoundError("Kullanıcı bulunamadı");
-  return { id: userId, email: user.email };
+  return { id: userId, email: user.email, emailVerified: user.emailVerifiedAt != null };
 }
 
 export interface ShareViewDTO {
@@ -570,12 +574,15 @@ export interface ShareViewDTO {
   items: Array<{ propertyTitle: string; roomTypeName: string; checkIn: string; checkOut: string }>;
   canPay: boolean;
   paidByMe: boolean;
+  /** Ödeyen hesabın e-postası doğrulanmış mı (doğrulanmamışsa ödeme 403 alır; F99). */
+  emailVerified: boolean;
 }
 
 /** Katılımcı ödeme sayfası: link + oturum + (varsa) e-posta eşleşmesi. */
 export async function getShareView(token: string, userId: string): Promise<ShareViewDTO> {
   const share = await loadShareByToken(token);
-  assertPayer(share, await loadPayer(userId));
+  const payer = await loadPayer(userId);
+  assertPayer(share, payer);
   const [organizer, items] = await Promise.all([
     prisma.user.findUnique({ where: { id: share.plan.organizerId }, select: { firstName: true } }),
     prisma.cartItem.findMany({
@@ -610,6 +617,7 @@ export async function getShareView(token: string, userId: string): Promise<Share
     })),
     canPay: open && PAYABLE.includes(share.status),
     paidByMe: FUNDED.includes(share.status) && share.payerUserId === userId,
+    emailVerified: payer.emailVerified,
   };
 }
 

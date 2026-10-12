@@ -4,7 +4,7 @@
   "login": "Giriş yap",
   "register": "Kayıt ol",
   "logout": "Çıkış yap",
-  "transfers": "Devir pazarı",
+  "transfers": "Rezervasyon devri",
   "plan": "Gezi planla",
   "stays": "Konaklama",
   "host": "Ev sahibi paneli",
@@ -12,9 +12,16 @@
   "mailbox": "Posta kutusu (demo)",
   "primary": "Ana menü",
   "mobile": "Mobil menü",
-  "toggleMenu": "Menüyü aç/kapat",
+  "toggleMenu": "Menü",
   "privacy": "Gizlilik",
   "skipToContent": "İçeriğe geç",
   "cart": "Sepetim",
-  "support": "Destek"
+  "support": "Destek",
+  "trips": "Seyahatlerim",
+  "requiresLogin": "(giriş gerekir)",
+  "home": "Ana sayfa",
+  "loggingOut": "Çıkış yapılıyor…",
+  "cartItems": "{count, plural, one {# kalem} other {# kalem}}",
+  "verifyStrip": "E-postanızı doğrulayın — rezervasyon için gerekli",
+  "verifyStripLabel": "E-posta doğrulama"
 }

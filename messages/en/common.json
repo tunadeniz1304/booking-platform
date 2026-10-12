@@ -6,19 +6,20 @@
   "demo": {
     "tag": "DEMO",
     "banner": "Demo environment — no real payments are taken, no real stays are sold.",
-    "ariaLabel": "Demo mode notice"
+    "ariaLabel": "Demo mode notice",
+    "bannerShort": "Demo — no real payments"
   },
   "loading": "Loading…",
   "unexpectedError": "An unexpected error occurred",
-  "loginRequired": "Please <link>sign in</link> to view this page.",
-  "forbidden": "You don't have access to this page (requires the {roles} role).",
+  "loginRequired": "Please <link>sign in</link> or <register>create an account</register> to view this page.",
+  "forbidden": "Only {roles} accounts can view this page.",
   "ai": {
     "generated": "AI-generated",
-    "hint": "AI output — please verify its accuracy",
+    "hint": "Check it for accuracy",
     "modes": {
-      "live": "Live LLM",
-      "demo": "Demo (deterministic)",
-      "fallback": "Fallback (LLM failed)"
+      "live": "Live AI",
+      "demo": "Sample answer (demo)",
+      "fallback": "Basic answer (AI unavailable)"
     }
   },
   "theme": {
@@ -53,10 +54,50 @@
     "network": "Couldn't connect. Check your internet connection and try again.",
     "EMAIL_NOT_VERIFIED": "Verify your email address to continue. The verification link is in your inbox.",
     "INTERNAL_ERROR": "Something went wrong. Please try again.",
-    "INVALID_JSON": "The request couldn't be read. Refresh the page and try again."
+    "INVALID_JSON": "The request couldn't be read. Refresh the page and try again.",
+    "TIMEOUT": "The request timed out. Check your connection and try again."
   },
   "confirm": {
     "cancel": "Cancel"
   },
-  "errorPrefix": "Error:"
+  "errorPrefix": "Error:",
+  "bookingStatus": {
+    "PENDING": "Pending",
+    "HELD": "Awaiting payment",
+    "CONFIRMED": "Confirmed",
+    "CANCELLED": "Cancelled",
+    "EXPIRED": "Expired",
+    "COMPLETED": "Completed",
+    "UNKNOWN": "Unknown status"
+  },
+  "bedTypes": {
+    "SINGLE": "Single",
+    "DOUBLE": "Double",
+    "TWIN": "Twin (two singles)",
+    "QUEEN": "Queen",
+    "KING": "King",
+    "SOFA_BED": "Sofa bed",
+    "BUNK": "Bunk bed",
+    "MIXED": "Several beds"
+  },
+  "brand": "booking-platform",
+  "successPrefix": "Success:",
+  "requiredLegend": "Fields marked * are required.",
+  "access": {
+    "roles": {
+      "USER": "guest",
+      "HOST": "host",
+      "ADMIN": "administrator"
+    },
+    "becomeHost": "You need a host account to list your property. You can request one by <link>contacting support</link>.",
+    "switchAccount": "Sign in with a different account"
+  },
+  "refreshing": "Updating…",
+  "breadcrumb": "Breadcrumb",
+  "sessionExpired": {
+    "title": "Your session has expired",
+    "body": "For your security, you were signed out. After you sign in, you'll return to this page. If you have unsaved text, copy it first.",
+    "login": "Sign in",
+    "stay": "Stay on this page"
+  }
 }

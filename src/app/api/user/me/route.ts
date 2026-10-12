@@ -20,6 +20,7 @@ export async function GET(req: NextRequest) {
         role: true,
         avatarUrl: true,
         createdAt: true,
+        emailVerifiedAt: true,
       },
     });
 
@@ -27,7 +28,9 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    return NextResponse.json(record);
+    // Ham zaman damgası yerine yalnız doğrulama durumu (hesap ve başlık rozeti için).
+    const { emailVerifiedAt, ...profile } = record;
+    return NextResponse.json({ ...profile, emailVerified: emailVerifiedAt != null });
   } catch (error) {
     logger.error(errorFields(error), "Failed to fetch user");
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });

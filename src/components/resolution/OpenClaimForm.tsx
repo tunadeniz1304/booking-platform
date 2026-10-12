@@ -1,35 +1,53 @@
 "use client";
 
 import { useRef, useState, type FormEvent } from "react";
-import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { ApiError, apiFetch } from "@/lib/api-client";
 import { useFormat } from "@/i18n/use-format";
-import { Button, Field, Status, focusRing, inputClass } from "@/components/ui/ui";
-import { CLAIM_GUEST_WINDOW_DAYS, parseMajorInput, useClaimErrorText } from "./shared";
+import { Button, Field, Status, inputClass } from "@/components/ui/ui";
+import { ResendVerificationButton } from "@/components/auth/AuthCard";
+import OpenClaimSummaryCard from "./OpenClaimSummaryCard";
+import {
+  CLAIM_GUEST_WINDOW_DAYS,
+  isEmailNotVerifiedError,
+  parseMajorInput,
+  useClaimErrorText,
+  type ClaimStatus,
+} from "./shared";
 
 const DESCRIPTION_MIN = 10;
 const DESCRIPTION_MAX = 4000;
+/** Bu uzunluktan sonra sınıra yaklaşıldığı (bir kez) duyurulur. */
+const DESCRIPTION_WARN_AT = 3600;
 
 type FieldErrors = { amount?: string; description?: string };
+type CreatedClaim = { id: string; status: ClaimStatus; amountMinor: number };
 
 /**
  * Talep açma formu. Tür role göre sabittir: misafir → iade (GUEST_REFUND),
  * ev sahibi → hasar (HOST_DAMAGE). Tutar ana birimde girilir ("1.250,50"), minor-unit
  * gönderilir; çözümlenen tutar alanın altında canlı olarak gösterilir.
+ * `maxMinor` (misafir: iade edilebilir üst sınır) ve `depositMinor` (ev sahibi: depozito;
+ * `null` = depozito yok) verilirse ipucunda gösterilir; üst sınır istemcide de denetlenir.
+ * Başarıdan sonra form yerine talep özeti gösterilir ve odak "Kanıt ekle"ye taşınır.
  */
 export default function OpenClaimForm({
   bookingId,
   role,
   currency,
   onCreated,
+  maxMinor,
+  depositMinor,
 }: {
   bookingId: string;
   role: "GUEST" | "HOST";
   currency: string;
-  onCreated: () => void;
+  onCreated: (claim: { id: string; status: string }) => void;
+  maxMinor?: number | null;
+  depositMinor?: number | null;
 }) {
   const t = useTranslations("resolution.open");
+  const tErr = useTranslations("resolution.errors");
   const f = useFormat();
   const claimError = useClaimErrorText();
   const type = role === "GUEST" ? "GUEST_REFUND" : "HOST_DAMAGE";
@@ -39,12 +57,16 @@ export default function OpenClaimForm({
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
   const [busy, setBusy] = useState(false);
-  const [createdId, setCreatedId] = useState<string | null>(null);
-  const [feedback, setFeedback] = useState<{ error?: string; message?: string }>({});
+  const [created, setCreated] = useState<CreatedClaim | null>(null);
+  const [feedback, setFeedback] = useState<{ error?: string }>({});
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [needsVerify, setNeedsVerify] = useState(false);
 
   const parsedAmount = amount.trim() ? parseMajorInput(amount, currency) : null;
   const trimmedLength = description.trim().length;
+  const guestMax = role === "GUEST" && typeof maxMinor === "number" ? maxMinor : null;
+  const hostDeposit = role === "HOST" && typeof depositMinor === "number" ? depositMinor : null;
+  const hostNoDeposit = role === "HOST" && (depositMinor === null || depositMinor === 0);
 
   function formatAmount(minor: number): string {
     try {
@@ -63,15 +85,24 @@ export default function OpenClaimForm({
     e.preventDefault();
     if (busy) return;
     setFeedback({});
-    setCreatedId(null);
+    setNeedsVerify(false);
     const amountMinor = parseMajorInput(amount, currency);
     const errors: FieldErrors = {};
-    if (amountMinor === null) errors.amount = t("invalidAmount");
+    if (!amount.trim()) errors.amount = t("amountRequired");
+    else if (amountMinor === null) errors.amount = t("invalidAmount");
+    else if (guestMax !== null && amountMinor > guestMax) {
+      errors.amount = tErr("CLAIM_AMOUNT_EXCEEDS_REFUNDABLE", { amount: formatAmount(guestMax) });
+    }
     if (trimmedLength < DESCRIPTION_MIN) {
-      errors.description = t("descriptionTooShort", { min: DESCRIPTION_MIN });
+      errors.description = t("descriptionTooShortCount", {
+        min: DESCRIPTION_MIN,
+        count: trimmedLength,
+      });
+    } else if (trimmedLength > DESCRIPTION_MAX) {
+      errors.description = t("descriptionTooLong", { max: DESCRIPTION_MAX, count: trimmedLength });
     }
     setFieldErrors(errors);
-    if (amountMinor === null || errors.description) {
+    if (amountMinor === null || errors.amount || errors.description) {
       focusFirst(errors);
       return;
     }
@@ -81,11 +112,10 @@ export default function OpenClaimForm({
         method: "POST",
         body: JSON.stringify({ bookingId, type, amountMinor, description: description.trim() }),
       });
-      setCreatedId(res.id);
+      setCreated({ id: res.id, status: res.status as ClaimStatus, amountMinor });
       setAmount("");
       setDescription("");
-      setFeedback({ message: t("created", { amount: formatAmount(amountMinor) }) });
-      onCreated();
+      onCreated(res);
     } catch (err) {
       const text = claimError(err, currency);
       if (err instanceof ApiError && err.code === "CLAIM_AMOUNT_EXCEEDS_REFUNDABLE") {
@@ -95,11 +125,48 @@ export default function OpenClaimForm({
         focusFirst(next);
       } else {
         setFeedback({ error: text });
+        setNeedsVerify(isEmailNotVerifiedError(err));
       }
     } finally {
       setBusy(false);
     }
   }
+
+  if (created) {
+    return (
+      <OpenClaimSummaryCard
+        claim={{
+          id: created.id,
+          type,
+          status: created.status,
+          amountRequestedMinor: created.amountMinor,
+          currency,
+          slaDueAt: null,
+        }}
+        justCreated
+      />
+    );
+  }
+
+  const amountHint =
+    guestMax !== null
+      ? `${t("amountHint")} ${t("amountMaxGuest", { amount: formatAmount(guestMax) })}`
+      : hostDeposit !== null && hostDeposit > 0
+        ? `${t("amountHint")} ${t("amountDepositHost", { amount: formatAmount(hostDeposit) })}`
+        : t("amountHint");
+  const overDeposit =
+    parsedAmount !== null && hostDeposit !== null && hostDeposit > 0 && parsedAmount > hostDeposit
+      ? parsedAmount - hostDeposit
+      : null;
+  const limitNote =
+    description.length > DESCRIPTION_MAX
+      ? t("descriptionOverLimit", {
+          max: DESCRIPTION_MAX,
+          over: description.length - DESCRIPTION_MAX,
+        })
+      : description.length >= DESCRIPTION_WARN_AT
+        ? t("descriptionNearLimit", { max: DESCRIPTION_MAX })
+        : "";
 
   return (
     <form
@@ -115,10 +182,15 @@ export default function OpenClaimForm({
       <p className="text-sm text-gray-700">
         {role === "GUEST" ? t("infoGuest", { days: CLAIM_GUEST_WINDOW_DAYS }) : t("infoHost")}
       </p>
+      {hostNoDeposit && (
+        <p className="rounded-md border border-gray-200 bg-gray-50 p-3 text-sm text-gray-800">
+          {t("noDepositHost")}
+        </p>
+      )}
       <Field
         label={t("amount", { currency })}
         id={`${fid}-amount`}
-        hint={t("amountHint")}
+        hint={amountHint}
         error={fieldErrors.amount}
       >
         <input
@@ -137,6 +209,8 @@ export default function OpenClaimForm({
       </Field>
       <p aria-live="polite" className="text-sm font-medium text-gray-900">
         {parsedAmount !== null ? t("amountPreview", { amount: formatAmount(parsedAmount) }) : ""}
+        {overDeposit !== null &&
+          ` ${t("amountOverDeposit", { amount: formatAmount(overDeposit) })}`}
       </p>
       <Field
         label={t("description")}
@@ -151,33 +225,29 @@ export default function OpenClaimForm({
           className={inputClass}
           value={description}
           minLength={DESCRIPTION_MIN}
-          maxLength={DESCRIPTION_MAX}
           required
           onChange={(e) => {
             setDescription(e.target.value);
-            if (fieldErrors.description && e.target.value.trim().length >= DESCRIPTION_MIN) {
+            const length = e.target.value.trim().length;
+            if (fieldErrors.description && length >= DESCRIPTION_MIN && length <= DESCRIPTION_MAX) {
               setFieldErrors((prev) => ({ ...prev, description: undefined }));
             }
           }}
         />
       </Field>
-      <p className="text-xs text-gray-600">
-        {t("descriptionCount", { count: trimmedLength, max: DESCRIPTION_MAX })}
-      </p>
-      <Button type="submit" disabled={busy} aria-busy={busy || undefined}>
+      <div className="flex flex-wrap justify-between gap-x-3 text-xs">
+        <p className="text-gray-600">
+          {t("descriptionCount", { count: trimmedLength, max: DESCRIPTION_MAX })}
+        </p>
+        <p aria-live="polite" className="text-gray-700">
+          {limitNote}
+        </p>
+      </div>
+      <Button type="submit" busy={busy}>
         {busy ? t("submitting") : t("submit")}
       </Button>
-      <Status error={feedback.error} message={feedback.message} />
-      {createdId && (
-        <p className="text-sm">
-          <Link
-            href={`/resolution/${encodeURIComponent(createdId)}`}
-            className={`font-semibold text-[#003580] underline ${focusRing}`}
-          >
-            {t("viewCreated")}
-          </Link>
-        </p>
-      )}
+      <Status error={feedback.error} />
+      {needsVerify && <ResendVerificationButton />}
     </form>
   );
 }

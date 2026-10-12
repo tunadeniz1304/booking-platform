@@ -14,7 +14,10 @@
     "cons": "Cons",
     "sources": "Sources:",
     "unavailable": "The review summary is not available right now.",
-    "inTurkish": "This summary is written in Turkish."
+    "inTurkish": "This summary is written in Turkish.",
+    "ready": "The review summary is ready.",
+    "retry": "Reload summary",
+    "cardSource": "Source [{n}] in summary"
   },
   "subScores": {
     "cleanliness": "Cleanliness",
@@ -24,19 +27,32 @@
   },
   "report": {
     "received": "Your report was received, thank you.",
-    "loginRequired": "You need to sign in to report.",
+    "loginRequired": "You need to <link>sign in</link> to report; you'll return to this review afterwards.",
     "failed": "The report could not be sent",
     "reasonLabel": "Reason for report",
-    "submit": "Send",
+    "submit": "Send report",
     "cancel": "Cancel",
-    "open": "Report",
+    "open": "Report this review",
     "reasons": {
       "OFFENSIVE": "Offensive / inappropriate",
       "SPAM": "Spam / advertising",
       "FAKE": "Fake review",
       "PRIVACY": "Contains personal information",
       "OTHER": "Other"
-    }
+    },
+    "illegalHint": "Illegal content? Use the <link>Report content</link> form for an official notice.",
+    "signIn": "Sign in to report",
+    "sending": "Sending…",
+    "alreadyReported": "You have already reported this review.",
+    "ownReview": "You can't report your own review.",
+    "notFound": "This review is no longer published.",
+    "openContext": "(by {author})",
+    "reasonPlaceholder": "Choose a reason",
+    "reasonRequired": "Choose a reason for the report.",
+    "noteLabel": "Details",
+    "noteLabelOptional": "Details (optional)",
+    "noteRequired": "Briefly describe the problem when the reason is “Other”.",
+    "noteCount": "{count}/{max} characters"
   },
   "highlights": {
     "title": "Highlighted themes",
@@ -48,6 +64,40 @@
       "mixed": "Mixed",
       "negative": "Negative"
     },
-    "unavailable": "Highlights are unavailable right now."
+    "unavailable": "Highlights are unavailable right now.",
+    "retry": "Reload highlights",
+    "backToHighlights": "Back to highlighted themes"
+  },
+  "list": {
+    "sortLabel": "Sort by",
+    "sort": {
+      "newest": "Newest",
+      "highest": "Highest rating",
+      "lowest": "Lowest rating"
+    },
+    "filterLabel": "Rating",
+    "allRatings": "All ratings ({count})",
+    "starsOption": "{stars, plural, one {# star} other {# stars}} ({count})",
+    "showing": "Showing {shown} of {total, plural, one {# review} other {# reviews}}",
+    "loadMore": "Show more reviews ({shown}/{total})",
+    "truncated": "The {count} most recent of {total} reviews are listed.",
+    "latestOnly": "Only the {count} most recent reviews are listed."
+  },
+  "verificationTitle": "How are reviews verified?",
+  "verificationBody": "Only a guest who booked on this platform and completed their stay can write a review, once per booking. Reviews containing profanity or personal information are checked before publication; reviews that exceed the report threshold are hidden. No payment or incentive is given for reviews; negative reviews are published too.",
+  "loadFailed": "Reviews could not be loaded.",
+  "retry": "Reload reviews",
+  "hostReplyDate": "Replied on {date}",
+  "reply": {
+    "open": "Reply",
+    "openContext": "(by {author})",
+    "label": "Your reply to the guest",
+    "hint": "Your reply is published publicly on the listing page; {min}–{max} characters ({count}/{max}).",
+    "tooShort": "Your reply must be at least {min} characters long.",
+    "submit": "Publish reply",
+    "sending": "Publishing…",
+    "cancel": "Cancel",
+    "done": "Your reply has been published.",
+    "failed": "The reply could not be published"
   }
 }

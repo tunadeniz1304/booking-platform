@@ -15,7 +15,9 @@ import AuthCard, {
   useSearchParam,
   withRedirect,
 } from "@/components/auth/AuthCard";
-import { postJsonWithPow } from "@/lib/auth/pow-fetch";
+import NewPasswordField, { newPasswordOk } from "@/components/auth/NewPasswordField";
+import { focusRing } from "@/components/ui/ui";
+import { postJsonWithPowChallenge } from "@/lib/auth/pow-fetch-challenge";
 
 interface RegisterResponse {
   user: {
@@ -37,7 +39,11 @@ interface RegisterError {
 type FieldName = "firstName" | "lastName" | "email" | "password";
 const FIELD_ORDER: FieldName[] = ["firstName", "lastName", "email", "password"];
 
-const passwordOk = (v: string) => v.length >= 8 && /[0-9]/.test(v);
+/** E-posta doğrulandıktan sonra dönülecek adres; verify-email sayfası okuyup siler. */
+const POST_VERIFY_REDIRECT_KEY = "postVerifyRedirect";
+
+const inlineLinkClass = `font-semibold text-[#003580] underline ${focusRing}`;
+const recoveryClass = `inline-flex min-h-[44px] items-center sm:min-h-[24px] ${inlineLinkClass}`;
 
 export default function RegisterPage() {
   const t = useTranslations("auth");
@@ -51,6 +57,9 @@ export default function RegisterPage() {
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<FieldName, string>>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  /** Zaten kayıtlı çıkan adres: giriş ve şifre sıfırlama bağlantıları bu adresle açılır. */
+  const [takenEmail, setTakenEmail] = useState<string | null>(null);
   const [registeredEmail, setRegisteredEmail] = useState<string | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -71,6 +80,12 @@ export default function RegisterPage() {
   const clearFieldError = (name: FieldName) =>
     setFieldErrors((prev) => (prev[name] ? { ...prev, [name]: undefined } : prev));
 
+  /** Kayıtlı e-posta için kurtarma bağlantısı: dönüş adresi ve e-posta (ön doldurma) taşınır. */
+  const recoveryHref = (base: "/login" | "/forgot-password", address: string) => {
+    const href = withRedirect(base, redirect);
+    return `${href}${href.includes("?") ? "&" : "?"}email=${encodeURIComponent(address)}`;
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (submitting) return;
@@ -79,7 +94,7 @@ export default function RegisterPage() {
     const clientInvalid: FieldName[] = [];
     if (firstName.trim().length < 2) clientInvalid.push("firstName");
     if (lastName.trim().length < 2) clientInvalid.push("lastName");
-    if (!passwordOk(password)) clientInvalid.push("password");
+    if (!newPasswordOk(password)) clientInvalid.push("password");
     if (clientInvalid.length > 0) {
       showFieldErrors(clientInvalid);
       return;
@@ -87,12 +102,12 @@ export default function RegisterPage() {
     setFieldErrors({});
     setSubmitting(true);
     try {
-      const res = await postJsonWithPow("/api/auth/register", {
-        firstName,
-        lastName,
-        email,
-        password,
-      });
+      const res = await postJsonWithPowChallenge(
+        "/api/auth/register",
+        { firstName, lastName, email, password },
+        () => setVerifying(true)
+      );
+      setVerifying(false);
       const data = (await res.json().catch(() => ({}))) as RegisterResponse & RegisterError;
       if (!res.ok) {
         const serverFields = FIELD_ORDER.filter(
@@ -105,6 +120,7 @@ export default function RegisterPage() {
         }
         if (data.code === "EMAIL_TAKEN") {
           setFieldErrors({ email: authErrorText("EMAIL_TAKEN", t("register.failed")) });
+          setTakenEmail(email.trim());
           focusField("email");
           setSubmitting(false);
           return;
@@ -114,11 +130,19 @@ export default function RegisterPage() {
       // Oturum açıldı: başlık güncellensin; doğrulama e-postası ayrıca bildirilsin.
       router.refresh();
       if (data.user?.emailVerified === false) {
+        // Doğrulama bağlantısı açılınca kaldığı yere dönebilsin (verify-email okur).
+        try {
+          if (redirect === "/") localStorage.removeItem(POST_VERIFY_REDIRECT_KEY);
+          else localStorage.setItem(POST_VERIFY_REDIRECT_KEY, redirect);
+        } catch {
+          // Depolama kapalıysa yalnız doğrulama sonrası dönüş bağlantısı gösterilmez.
+        }
         setRegisteredEmail(data.user.email);
         return;
       }
       router.push(redirect);
     } catch (err) {
+      setVerifying(false);
       setError(
         err instanceof TypeError
           ? authErrorText("NETWORK", t("register.failed"))
@@ -149,7 +173,7 @@ export default function RegisterPage() {
   return (
     <AuthCard title={t("register.title")} subtitle={t("register.subtitle")}>
       <form ref={formRef} onSubmit={handleSubmit} className="mt-6 space-y-4">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-3">
           <AuthField
             id="firstName"
             label={t("register.firstName")}
@@ -162,6 +186,8 @@ export default function RegisterPage() {
               required
               minLength={2}
               autoComplete="given-name"
+              autoCapitalize="words"
+              spellCheck={false}
               value={firstName}
               onChange={(e) => {
                 setFirstName(e.target.value);
@@ -182,6 +208,8 @@ export default function RegisterPage() {
               required
               minLength={2}
               autoComplete="family-name"
+              autoCapitalize="words"
+              spellCheck={false}
               value={lastName}
               onChange={(e) => {
                 setLastName(e.target.value);
@@ -192,25 +220,38 @@ export default function RegisterPage() {
           </AuthField>
         </div>
 
-        <AuthField id="email" label={t("email")} error={fieldErrors.email}>
-          <input
-            id="email"
-            type="email"
-            required
-            autoComplete="email"
-            value={email}
-            onChange={(e) => {
-              setEmail(e.target.value);
-              clearFieldError("email");
-            }}
-            className={authInputClass}
-          />
-        </AuthField>
+        <div>
+          <AuthField id="email" label={t("email")} error={fieldErrors.email}>
+            <input
+              id="email"
+              type="email"
+              required
+              autoComplete="email"
+              value={email}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                setTakenEmail(null);
+                clearFieldError("email");
+              }}
+              className={authInputClass}
+            />
+          </AuthField>
+          {takenEmail && (
+            <p className="mt-1 flex flex-wrap gap-x-4 text-sm">
+              <Link href={recoveryHref("/login", takenEmail)} className={recoveryClass}>
+                {t("register.loginInstead")}
+              </Link>
+              <Link href={recoveryHref("/forgot-password", takenEmail)} className={recoveryClass}>
+                {t("login.forgotPassword")}
+              </Link>
+            </p>
+          )}
+        </div>
 
-        <AuthField
+        <NewPasswordField
           id="password"
           label={t("password")}
-          hint={t("register.passwordHint")}
+          value={password}
           error={fieldErrors.password}
         >
           <input
@@ -226,13 +267,13 @@ export default function RegisterPage() {
             }}
             onBlur={() => {
               // Hata yazarken değil, alandan çıkınca gösterilir.
-              if (password.length > 0 && !passwordOk(password)) {
+              if (password.length > 0 && !newPasswordOk(password)) {
                 setFieldErrors((prev) => ({ ...prev, password: fieldMessage("password") }));
               }
             }}
             className={authInputClass}
           />
-        </AuthField>
+        </NewPasswordField>
 
         {error && (
           <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
@@ -240,8 +281,28 @@ export default function RegisterPage() {
           </div>
         )}
 
+        <p className="text-xs text-gray-600">
+          {t.rich("register.privacy", {
+            link: (chunks) => (
+              <Link
+                href="/privacy"
+                target="_blank"
+                rel="noopener noreferrer"
+                className={inlineLinkClass}
+              >
+                {chunks}
+                <span className="sr-only"> {t("register.newTab")}</span>
+              </Link>
+            ),
+          })}
+        </p>
+
         <button {...submitButtonProps(submitting)}>
-          {submitting ? t("saving") : t("register.submit")}
+          {verifying
+            ? t("login.verifying")
+            : submitting
+              ? t("register.submitting")
+              : t("register.submit")}
         </button>
       </form>
 

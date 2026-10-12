@@ -11,12 +11,14 @@ import {
   extractCitations,
 } from "@/lib/llm/guards";
 import { reviewsVersion } from "@/lib/reviews/review-service";
+import { DEFAULT_LOCALE, type Locale } from "@/i18n/config";
 
 /**
  * Atıflı yorum özeti (P1-4). Son N yorum KVKK redaksiyonundan geçerek LLM'e gider;
  * çıktıdaki her `[r:<id>]` verilen yorum kimliklerinden biri olmalı, metindeki her
  * sayı yorum verisinden türetilmiş olmalı (aksi hâlde demo özetine düşülür).
- * Önbellek anahtarı yorum sürümünü içerir → yeni yorumda özet yenilenir.
+ * Önbellek anahtarı yorum sürümünü ve dili içerir → yeni yorumda özet yenilenir, EN arayüz
+ * Türkçe önbelleği görmez (F329).
  */
 const schema = z.object({
   summary: z.string().min(1).max(800),
@@ -27,6 +29,12 @@ const schema = z.object({
 
 const MAX_REVIEWS = 30;
 const CACHE_TTL = 60 * 60 * 24;
+
+/** Özetin yazılacağı dil (modele verilen talimat; yorumlar özgün dillerinde kalır). */
+const LANGUAGE_INSTRUCTION: Record<Locale, string> = {
+  tr: "Doğrulanmış misafir yorumlarını Türkçe özetle.",
+  en: "Summarize the verified guest reviews in English.",
+};
 
 export interface SummaryResponse extends ReviewSummary {
   llmMode: LlmMode;
@@ -46,7 +54,8 @@ export interface ReviewInput {
  */
 export async function generateReviewSummary(
   reviews: readonly ReviewInput[],
-  knownNames: readonly string[] = []
+  knownNames: readonly string[] = [],
+  locale: Locale = DEFAULT_LOCALE
 ): Promise<{ data: ReviewSummary; llmMode: LlmMode }> {
   const ids = reviews.map((r) => r.id);
   const avg = reviews.length ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length : 0;
@@ -64,7 +73,7 @@ export async function generateReviewSummary(
       {
         role: "system",
         content:
-          "Doğrulanmış misafir yorumlarını Türkçe özetle. Yalnızca JSON: {summary, pros[], cons[], citations[]}. " +
+          `${LANGUAGE_INSTRUCTION[locale]} Yalnızca JSON: {summary, pros[], cons[], citations[]}. ` +
           "Her iddiayı dayandığı yorumun kimliğiyle [r:<id>] biçiminde atıfla. Yorumlarda olmayan bilgi veya sayı YAZMA.",
       },
       {
@@ -85,9 +94,12 @@ export async function generateReviewSummary(
   return { data: result.data, llmMode: result.llmMode };
 }
 
-export async function summarizeReviews(propertyId: string): Promise<SummaryResponse> {
+export async function summarizeReviews(
+  propertyId: string,
+  locale: Locale = DEFAULT_LOCALE
+): Promise<SummaryResponse> {
   const version = await reviewsVersion(propertyId);
-  const cacheKey = `review-summary:${propertyId}:${version}`;
+  const cacheKey = `review-summary:${propertyId}:${version}:${locale}`;
   const cached = await redis.get(cacheKey).catch(() => null);
   if (cached) return JSON.parse(cached) as SummaryResponse;
 
@@ -105,7 +117,8 @@ export async function summarizeReviews(propertyId: string): Promise<SummaryRespo
   const reviews = rows.map((r) => ({ id: r.id, rating: r.rating, comment: r.comment }));
   const result = await generateReviewSummary(
     reviews,
-    rows.map((r) => `${r.user.firstName} ${r.user.lastName}`)
+    rows.map((r) => `${r.user.firstName} ${r.user.lastName}`),
+    locale
   );
 
   const response: SummaryResponse = {

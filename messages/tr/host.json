@@ -1,16 +1,25 @@
 {
   "page": {
     "title": "Ev sahibi paneli",
-    "intro": "İlan oluşturun ve düzenleyin, oda ekleyin, takvimi toplu güncelleyin, rezervasyonları ve misafir mesajlarını izleyin."
+    "intro": "Rezervasyonları ve misafir mesajlarını izleyin; ilan oluşturup düzenleyin, oda ekleyin, takvimi toplu güncelleyin, fotoğrafları, depozitoyu ve promosyonları yönetin, parti riski uyarılarını görün."
   },
   "messagesPage": {
-    "back": "Ev sahibi paneli",
+    "back": "Ev sahibi paneli – Rezervasyonlar",
     "title": "Misafir yazışması",
-    "intro": "Bu rezervasyonun misafiriyle yazışın; konaklamadan sonra hasar olduysa aşağıdan depozitodan karşılanması için talep açabilirsiniz."
+    "intro": "Bu rezervasyonun misafiriyle yazışın; konaklamadan sonra hasar olduysa aşağıdan depozitodan karşılanması için talep açabilirsiniz.",
+    "context": {
+      "property": "İlan",
+      "room": "Oda",
+      "dates": "Tarihler",
+      "datesValue": "{checkIn} – {checkOut}",
+      "guest": "Misafir",
+      "guestValue": "{name} · {count} kişi",
+      "status": "Durum"
+    }
   },
   "dashboard": {
-    "revenueLink": "Gelir paneli: doluluk, ADR, RevPAR ve fiyat önerileri →",
-    "loadingProperties": "Mülkler yükleniyor…",
+    "revenueLink": "Gelir paneli: doluluk, ADR, RevPAR ve fiyat önerileri",
+    "loadingProperties": "İlanlar yükleniyor…",
     "noProperties": "Henüz bir ilanınız yok. İlk ilanınızı oluşturduğunuzda burada düzenleyebilir, oda ekleyebilir ve takvimi yönetebilirsiniz.",
     "sectionsNav": "Panel bölümleri",
     "navBookings": "Rezervasyonlar ve mesajlar",
@@ -23,30 +32,42 @@
     "filterLabel": "İlan ara",
     "filterHint": "İlanları başlığa göre süzer.",
     "filterEmpty": "Aramanızla eşleşen ilan yok.",
-    "retry": "Yeniden dene"
+    "retry": "Yeniden dene",
+    "revenueHint": "Gelir paneli: doluluk, ortalama gecelik fiyat (ADR), müsait oda başına gelir (RevPAR) ve fiyat önerileri.",
+    "openClaimLink": "Hasar talebi aç: rezervasyonu seçin"
   },
   "bookings": {
     "title": "Rezervasyonlar",
     "loading": "Yükleniyor…",
     "empty": "Rezervasyon yok.",
-    "caption": "Mülklerinize ait rezervasyonlar",
+    "caption": "İlanlarınıza ait rezervasyonlar",
     "columns": {
-      "property": "Mülk",
+      "property": "İlan",
       "checkIn": "Giriş",
       "checkOut": "Çıkış",
       "guests": "Misafir",
       "amount": "Tutar",
       "status": "Durum",
-      "messages": "Mesajlar"
+      "messages": "Mesajlar",
+      "ref": "Rezervasyon no",
+      "guestName": "Misafir adı"
     },
     "messagesLink": "Mesajlar",
-    "error": "Rezervasyonlar yüklenemedi."
+    "error": "Rezervasyonlar yüklenemedi.",
+    "filter": {
+      "status": "Duruma göre süz",
+      "property": "Mülke göre süz",
+      "all": "Tümü",
+      "count": "{total} rezervasyondan {shown} tanesi gösteriliyor.",
+      "empty": "Bu süzgeçlerle eşleşen rezervasyon yok."
+    },
+    "messagesAndClaimsLink": "Mesajlar ve hasar talebi"
   },
   "bookingStatus": {
     "PENDING": "Beklemede",
-    "HELD": "Tutuldu",
+    "HELD": "Tutuluyor — ödeme bekleniyor",
     "CONFIRMED": "Onaylandı",
-    "CANCELLED": "İptal",
+    "CANCELLED": "İptal edildi",
     "EXPIRED": "Süresi doldu",
     "COMPLETED": "Tamamlandı"
   },
@@ -57,7 +78,7 @@
   },
   "property": {
     "basePrice": "Taban fiyat: {price}",
-    "rating": "Puan {rating}",
+    "rating": "Puan {rating}/5",
     "published": "Yayında",
     "unpublished": "Yayında değil",
     "license": "Belge:",
@@ -68,7 +89,10 @@
       "licenseNumber": "İzin belgesi no",
       "licenseHint": "İl plaka kodu + sıra no, ör. 34-12345. Belgesiz ilan yayınlanamaz.",
       "isActive": "Kaydettiğimde yayına al",
-      "basePriceHint": "Örnek: 1.500 veya 1.500,50"
+      "basePriceHint": "Örnek: 1.500 veya 1.500,50",
+      "licenseNumberOptional": "İzin belgesi no (isteğe bağlı)",
+      "titleHint": "En az 2, en fazla 120 karakter.",
+      "descriptionCount": "{count}/{max} karakter"
     },
     "saving": "Kaydediliyor…",
     "save": "Kaydet",
@@ -78,7 +102,7 @@
       "live": "Aramada görünüyor.",
       "pending": "Yayına işaretli, ancak izin belgesi doğrulanana kadar aramada görünmüyor.",
       "rejected": "İzin belgesi kayıtta bulunamadı; ilan aramada görünmüyor. Belge numarasını düzeltip Kaydet düğmesine basın.",
-      "off": "Yayında değil; aramada görünmüyor."
+      "off": "Aramada görünmüyor; misafirler bu ilanı bulamaz."
     },
     "pricePreview": "Yeni gecelik fiyat: {price} (şu anki: {previous})",
     "invalidAmount": "Geçerli bir tutar girin (ör. 1.500 veya 1.500,50).",
@@ -86,6 +110,18 @@
       "title": "Fiyatta büyük değişiklik",
       "body": "Taban gecelik fiyat {from} yerine {to} olacak. Doğru mu?",
       "confirm": "Evet, fiyatı kaydet"
+    },
+    "noRating": "Henüz puan yok",
+    "noChanges": "Değişiklik yok; kaydedilecek bir şey bulunmadı.",
+    "licenseChangeNote": "Yeni belge numarası kaydedilince yeniden doğrulanır; doğrulanana kadar ilan aramada görünmez.",
+    "publish": "Yayına al",
+    "unpublish": "Yayından kaldır",
+    "publishedNow": "İlan yayına alındı.",
+    "unpublishedNow": "İlan yayından kaldırıldı; artık aramada görünmüyor.",
+    "unpublishConfirm": {
+      "title": "«{title}» yayından kaldırılsın mı?",
+      "body": "İlan aramada görünmez; yeni misafirler onu bulamaz. İstediğiniz zaman «Yayına al» düğmesiyle geri alabilirsiniz.",
+      "confirm": "Yayından kaldır"
     }
   },
   "rooms": {
@@ -102,11 +138,17 @@
       "submit": "Oda ekle",
       "added": "Oda eklendi.",
       "adding": "Ekleniyor…",
-      "priceModifierHint": "Taban fiyata eklenecek gecelik tutar; ör. 250 veya 250,50"
+      "priceModifierHint": "Taban fiyata eklenecek gecelik tutar; ör. 250 veya 250,50",
+      "priceModifierLabel": "Gecelik ek ücret ({currency})",
+      "pricePreview": "Bu odanın gecelik fiyatı: {total} (taban {base} + {modifier})",
+      "priceModifierOptionalLabel": "Gecelik ek ücret ({currency}, isteğe bağlı)",
+      "capacityHint": "1–20 kişi"
     },
     "closeSale": "Satışa kapat",
     "openSale": "Satışa aç",
-    "updated": "Oda güncellendi."
+    "updated": "Oda güncellendi.",
+    "units": "{count, plural, one {# oda} other {# oda}}",
+    "empty": "Henüz oda yok. Takvim ve fiyatları yönetmek için önce aşağıdan oda ekleyin."
   },
   "calendar": {
     "title": "Toplu takvim güncellemesi",
@@ -121,15 +163,41 @@
     "submit": "Takvimi güncelle",
     "noChange": "Fiyat veya müsaitlik değişikliği girin.",
     "result": "Güncellenen gece: {updated}, eklenen: {created}, rezervasyonlu olduğu için atlanan: {skipped}.",
-    "priceHint": "Örnek: 2.750 veya 2.750,50"
+    "priceHint": "Örnek: 2.750 veya 2.750,50",
+    "fromPast": "Başlangıç tarihi bugünden önce olamaz.",
+    "toBeforeFrom": "Bitiş tarihi başlangıç tarihinden önce olamaz.",
+    "tooLong": "Tek seferde en fazla {max} gece güncellenebilir.",
+    "rangeHint": "{count, plural, one {# gece} other {# gece}} seçili.",
+    "closeConfirm": {
+      "title": "Satışa kapatılsın mı?",
+      "body": "{room} için {from} – {to} arasındaki {count, plural, one {# gece} other {# gece}} satışa kapatılacak. Rezervasyonlu geceler etkilenmez.",
+      "confirm": "Evet, satışa kapat"
+    },
+    "noRooms": "Takvim ve gecelik fiyatlar oda bazında yönetilir. Önce yukarıdaki formdan bir oda ekleyin.",
+    "priceLabel": "Gecelik fiyat ({currency}) — boş bırakılırsa değişmez",
+    "summary": "Uygulanacak: {room}, {from} – {to} ({count, plural, one {# gece} other {# gece}}) — {changes}.",
+    "summaryPrice": "gecelik fiyat {price} olacak",
+    "summaryOpen": "satışa açılacak",
+    "summaryClose": "satışa kapatılacak",
+    "closeConfirmPrice": "Gecelik fiyat da {price} olarak güncellenecek.",
+    "bulkConfirm": {
+      "title": "Takvimde çok sayıda gece güncellensin mi?",
+      "confirm": "Evet, takvimi güncelle"
+    }
   },
   "listingCopy": {
     "suggesting": "Öneri hazırlanıyor…",
-    "suggest": "İlan metni önerisi",
-    "draft": "Taslak (otomatik yayınlanmaz, düzenleyip onaylayın)",
+    "suggest": "İlan metni öner",
+    "draft": "Taslak — otomatik yayınlanmaz. Açıklamaya aktarıp düzenleyin, sonra Kaydet düğmesine basın.",
     "title": "İlan metni önerisi",
     "trLabel": "Türkçe:",
-    "enLabel": "İngilizce:"
+    "enLabel": "İngilizce:",
+    "apply": "{lang, select, tr {Türkçe} other {İngilizce}} metni açıklamaya aktar",
+    "copy": "{lang, select, tr {Türkçe} other {İngilizce}} metni kopyala",
+    "applied": "Taslak açıklama alanına aktarıldı; düzenleyip Kaydet düğmesine basın.",
+    "copied": "Metin panoya kopyalandı.",
+    "copyFailed": "Metin kopyalanamadı; elle seçip kopyalayın.",
+    "regenerate": "Yeni öneri üret (mevcut taslak değişir)"
   },
   "photos": {
     "title": "Fotoğraflar",
@@ -152,7 +220,19 @@
       "title": "Fotoğraf kaldırılsın mı?",
       "body": "Bu fotoğraf ilandan kalıcı olarak silinir ve misafirler artık göremez.",
       "confirm": "Fotoğrafı kaldır"
-    }
+    },
+    "uploadHint": "JPEG, PNG, WebP veya AVIF; en fazla {size} MB.",
+    "limitHint": "İlan başına en fazla {max} fotoğraf (şu an {count}/{max}).",
+    "limitReached": "Bu ilan için fotoğraf sınırına ulaşıldı; yeni fotoğraf eklemek için önce birini kaldırın.",
+    "tooLarge": "\"{name}\" yüklenmedi: dosya {size} MB sınırını aşıyor.",
+    "badType": "\"{name}\" yüklenmedi: yalnızca JPEG, PNG, WebP veya AVIF görseller kabul edilir.",
+    "uploadFailed": "\"{name}\" yüklenemedi: {reason}",
+    "uploaded": "\"{name}\" yüklendi.",
+    "multipleHint": "Birden çok fotoğrafı aynı anda seçebilirsiniz; sırayla yüklenir.",
+    "tooMany": "{count, plural, one {# fotoğraf} other {# fotoğraf}} yüklenmedi: ilan başına en fazla {max} fotoğraf eklenebilir.",
+    "uploadingProgress": "Fotoğraf {current}/{total} yükleniyor ve analiz ediliyor…",
+    "uploadedMany": "Yüklenen fotoğraf: {count}/{total}.",
+    "qualityRated": "Kalite skoru: {score}/100 ({level, select, good {iyi} medium {orta} other {düşük}})"
   },
   "promotions": {
     "title": "Promosyonlar",
@@ -167,7 +247,8 @@
       "scope": "Kapsam",
       "usage": "Kullanım",
       "status": "Durum",
-      "actions": "İşlemler"
+      "actions": "İşlemler",
+      "validity": "Geçerlilik"
     },
     "types": {
       "EARLY_BIRD": "Erken rezervasyon",
@@ -184,7 +265,7 @@
     "percentOff": "%{percent}",
     "allListings": "Tüm ilanlarım",
     "active": "Aktif",
-    "inactive": "Pasif",
+    "inactive": "Durduruldu",
     "activate": "Etkinleştir",
     "deactivate": "Durdur",
     "delete": "Sil",
@@ -203,7 +284,7 @@
       "usageLimit": "Kullanım limiti (boş = sınırsız)",
       "scope": "Kapsam",
       "priority": "Öncelik",
-      "priorityHint": "Yüksek öncelik önce uygulanır.",
+      "priorityHint": "Bir rezervasyona birden çok promosyon uyarsa önce yüksek öncelikli olan uygulanır; öncelik eşitse büyük indirim kazanır. Örnek: %10 indirim «Yüksek», %15 indirim «Normal» ise misafir %10 alır.",
       "stackable": "Diğer promosyonlarla birleşebilir",
       "submit": "Promosyon ekle",
       "nameHint": "{min}–{max} karakter.",
@@ -215,7 +296,62 @@
       "highConfirm": "Evet, kaydet",
       "stackableWarning": "Birleşebilir promosyonlar birlikte uygulanır; toplam indirim tek başına bu orandan yüksek olabilir.",
       "rangeHint": "{min} ile {max} arasında bir sayı girin.",
-      "couponHint": "{min}–{max} karakter; yalnız harf, rakam, - ve _ kullanın."
+      "couponHint": "{min}–{max} karakter; yalnız harf, rakam, - ve _ kullanın.",
+      "editTitle": "Promosyonu düzenle: {name}",
+      "save": "Değişiklikleri kaydet",
+      "cancelEdit": "Vazgeç",
+      "discountKind": "İndirim biçimi",
+      "kindPercent": "Yüzde",
+      "kindFixed": "Sabit tutar",
+      "amount": "İndirim tutarı",
+      "amountHint": "{currency} cinsinden. Konaklama toplamından düşülür, toplamı aşamaz.",
+      "amountInvalid": "0'dan büyük geçerli bir tutar girin.",
+      "fixedNeedsListing": "İlanlarınızın para birimleri farklı. Sabit tutar için kapsamda tek bir ilan seçin.",
+      "startDate": "Başlangıç tarihi (isteğe bağlı)",
+      "startHint": "Boş bırakırsanız hemen başlar.",
+      "endDate": "Bitiş tarihi (isteğe bağlı)",
+      "endHint": "Bu gün dahil geçerlidir. Boş bırakırsanız süresizdir.",
+      "endBeforeStart": "Bitiş tarihi başlangıç tarihinden önce olamaz.",
+      "dateInvalid": "Geçerli bir tarih girin.",
+      "fieldRejected": "Bu değer kabul edilmedi. {hint}",
+      "valueRejected": "Bu değer kabul edilmedi.",
+      "fixFields": "Promosyon kaydedilemedi. İşaretli alanları düzeltip yeniden deneyin.",
+      "couponTaken": "Bu kupon kodu zaten kullanılıyor. Başka bir kod girin.",
+      "usageLimitHint": "En az {count} (şimdiye kadarki kullanım sayısı).",
+      "priorityLow": "Düşük",
+      "priorityNormal": "Normal",
+      "priorityHigh": "Yüksek",
+      "priorityCustom": "Özel ({value})",
+      "nameFieldHint": "Misafirler indirimi teklifte bu adla görür. {min}–{max} karakter.",
+      "advanced": "Gelişmiş ayarlar",
+      "advancedSummary": "(Öncelik: {priority}; {stackable, select, true {diğer promosyonlarla birleşebilir} other {birleşmez}})",
+      "stackableHint": "İşaretlenmezse bu promosyon diğerleriyle birlikte uygulanmaz; yalnız biri seçilir. Örnek: ikisi de birleşebilir olan %10 erken rezervasyon ve %5 mobil fiyat birlikte uygulanır."
+    },
+    "validity": {
+      "range": "{start} – {end}",
+      "from": "{start} itibarıyla",
+      "until": "{end} tarihine kadar",
+      "always": "Süresiz"
+    },
+    "edit": "Düzenle",
+    "pausedNamed": "«{name}» durduruldu.",
+    "activatedNamed": "«{name}» etkinleştirildi.",
+    "updated": "Promosyon güncellendi.",
+    "cannotDelete": "«{name}» kullanıldığı için silinemez; zaten durdurulmuş durumda.",
+    "deleteConfirm": {
+      "title": "«{name}» silinsin mi?",
+      "body": "Promosyon kalıcı olarak silinir. Bu işlem geri alınamaz.",
+      "confirm": "Promosyonu sil",
+      "usedTitle": "«{name}» silinemez, durdurulsun mu?",
+      "usedBody": "Bu promosyon {count} kez kullanıldı, bu yüzden silinemez. Onaylarsanız durdurulur ve yeni rezervasyonlara uygulanmaz; istediğiniz zaman yeniden etkinleştirebilirsiniz.",
+      "usedConfirm": "Promosyonu durdur"
+    },
+    "typeHelp": {
+      "EARLY_BIRD": "Varıştan en az belirlediğiniz gün sayısı kadar önce yapılan rezervasyonlara uygulanır.",
+      "LAST_MINUTE": "Varışa en çok belirlediğiniz gün sayısı kala yapılan rezervasyonlara uygulanır.",
+      "LONG_STAY": "En az belirlediğiniz gece sayısı kadar süren konaklamalara uygulanır.",
+      "MOBILE_RATE": "Yalnız telefon veya tabletten yapılan rezervasyonlara uygulanır.",
+      "COUPON": "Yalnız rezervasyonda kupon kodunu giren misafirlere uygulanır. Kodu misafirlerinizle siz paylaşırsınız."
     }
   },
   "form": {
@@ -246,5 +382,15 @@
     "cancel": "Vazgeç",
     "kycRequired": "İlan oluşturabilmek için önce kimliğinizi doğrulamanız gerekiyor. Bu, misafirlerin güvenliği için zorunludur.",
     "kycLink": "Hesabım sayfasında kimliğimi doğrula"
+  },
+  "pagesNav": "Ev sahibi sayfaları",
+  "unsaved": {
+    "indicator": "Kaydedilmemiş değişiklikler var.",
+    "leaveConfirm": {
+      "title": "Kaydedilmemiş değişiklikler silinsin mi?",
+      "body": "Bu sayfada kaydetmediğiniz değişiklikler var. Sayfadan ayrılırsanız kaybolur.",
+      "confirm": "Kaydetmeden ayrıl",
+      "cancel": "Sayfada kal"
+    }
   }
 }

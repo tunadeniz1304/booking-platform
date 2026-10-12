@@ -46,6 +46,7 @@ async function addItem(page: Page, baseURL: string, stay: StayTarget) {
 async function payCartWithCard(page: Page, cardNumber: string) {
   const form = page.getByRole("form", { name: "Ödeme" });
   await form.getByLabel("Kart numarası").fill(cardNumber);
+  await form.getByLabel("Son kullanma (AA/YY)").fill("12/30");
   await form.getByLabel("CVC").fill("123");
   await form.getByRole("button", { name: "Öde ve onayla" }).click();
 }
@@ -59,7 +60,10 @@ test.describe("grup sepeti (P1-1)", () => {
 
   test("PDP'den sepete ekle → sepet sayfasında kalem görünür", async ({ page, baseURL }) => {
     const stay = await findStay(page.request, 0);
-    await page.goto(`/property/${stay.propertyId}`);
+    const dates = farFutureStay();
+    await page.goto(
+      `/property/${stay.propertyId}?checkIn=${dates.checkIn}&checkOut=${dates.checkOut}`
+    );
     const add = page.getByRole("button", { name: "Sepete ekle" });
     await expect(add).toBeEnabled();
     await add.click();
@@ -80,7 +84,7 @@ test.describe("grup sepeti (P1-1)", () => {
     await page.goto("/cart");
     await expect(page.getByTestId("cart-item")).toHaveCount(2);
     await expect(page.getByTestId("cart-total")).not.toBeEmpty();
-    await page.getByRole("link", { name: "Ödemeye geç" }).click();
+    await page.getByRole("link", { name: "Rezervasyona devam et" }).click();
     await page.waitForURL(/\/checkout\/cart$/);
 
     await page.getByRole("button", { name: "Odaları tut" }).click();

@@ -16,7 +16,14 @@
     "noPhotos": "No photos for this listing yet.",
     "thumbnails": "Photos",
     "show": "Show photo {index} of {total}",
-    "counter": "Showing photo {index} of {total}"
+    "counter": "Showing photo {index} of {total}",
+    "previous": "Previous photo",
+    "next": "Next photo",
+    "position": "{index} / {total}",
+    "enlarge": "View full screen",
+    "more": "{count, plural, one {+# photo} other {+# photos}}",
+    "lightbox": "Photos of {title}",
+    "close": "Close"
   },
   "calendar": {
     "title": "Price calendar",
@@ -29,20 +36,20 @@
     "nextMonthShort": "Next",
     "caption": "Price calendar for {month}",
     "loading": "Loading prices…",
-    "error": "Could not load the price calendar",
+    "error": "Could not load the price calendar. Try again, or choose your dates in the booking form.",
     "unavailable": "Unavailable",
     "noPrices": "No available nights this month.",
     "cheapest": "Cheapest",
     "cheapestAria": "cheapest night of the month",
-    "minStay": "minimum {count} nights",
-    "minStayShort": "min {count} nights",
+    "minStay": "{count, plural, one {minimum # night} other {minimum # nights}}",
+    "minStayShort": "{count, plural, one {min # night} other {min # nights}}",
     "closedToArrival": "closed to arrival",
     "closedToArrivalHint": "Check-in is not possible on {date}; please pick another day.",
     "dayAria": "{date}: {price}, price level {level}{extras}",
     "dayAriaUnavailable": "{date}: unavailable",
     "dayAriaPast": "{date}: past date",
     "selectHint": "Pick a check-in day; the second pick sets check-out. Your selection fills in the booking form.",
-    "selectCheckOut": "Check-in: {date}. Now pick your check-out date.",
+    "selectCheckOut": "Check-in: {date}. The booking form uses {checkOut} as a provisional check-out; pick another check-out day if you like.",
     "selected": "Selected: {checkIn} – {checkOut}. The booking form has been updated.",
     "estimateNote": "The calendar shows the cheapest room and rate plan for each night; the exact amount is the quote in the booking form.",
     "legend": {
@@ -57,7 +64,30 @@
     "rangeBlocked": "The night of {date} is booked. Choose an earlier check-out date or a different check-in date.",
     "dayAriaCheckoutOnly": "{date}: available as a check-out date only",
     "checkoutOnly": "Check-out",
-    "goToBooking": "Go to the booking form"
+    "goToBooking": "Go to the booking form",
+    "retry": "Try again",
+    "keyboardHint": "Use the arrow keys to move between days; Home/End go to the start/end of the week and Page Up/Page Down to the previous/next month. Press Enter to select.",
+    "uniformPrice": "All available nights this month have the same price.",
+    "dayAriaUniform": "{date}: {price}{extras}",
+    "rangeStart": "Check-in",
+    "rangeEnd": "Check-out",
+    "rangeAria": {
+      "start": "check-in date",
+      "end": "check-out date",
+      "between": "within your selected stay"
+    },
+    "currentSelection": "Selected dates: {checkIn} – {checkOut}.",
+    "clearSelection": "Clear selection",
+    "selectionCleared": "Selection cleared. Pick a new check-in day.",
+    "booked": "Full",
+    "closedToArrivalMark": "No check-in",
+    "minStayTiny": "min {count}",
+    "legendMinStay": "min N: minimum stay of N nights",
+    "legendClosedToArrival": "Closed to arrival",
+    "currencyNote": "Prices are in {currency}.",
+    "monthSelect": "Choose month",
+    "horizonNote": "The price calendar shows prices up to {date}.",
+    "dayAriaBeyondHorizon": "{date}: no prices available"
   },
   "ratingOutOf": "{rating}/5",
   "noRatingYet": "No ratings yet",
@@ -92,7 +122,28 @@
     "tierHours": "Cancel {hours, plural, one {# hour} other {# hours}} or more before check-in: {percent, plural, =0 {no refund} other {{percent}% of what you paid is refunded}}",
     "tierLater": "Cancel later: {percent, plural, =0 {no refund} other {{percent}% of what you paid is refunded}}",
     "tierAny": "If you cancel: {percent, plural, =0 {no refund} other {{percent}% of what you paid is refunded}}",
-    "grace": "You can cancel for free within {hours} hours of booking, as long as check-in is far enough away.",
+    "grace": "You can cancel for free within {hours, plural, one {# hour} other {# hours}} of booking, as long as check-in is far enough away.",
     "note": "Times count back from the check-in time on your arrival day. If you choose a non-refundable rate, there is no refund; the exact terms are also shown before you pay."
-  }
+  },
+  "loading": "Loading listing…",
+  "notFoundDescription": "This listing has been removed or is no longer available. You can search for similar stays or continue from the home page.",
+  "breadcrumb": {
+    "label": "Breadcrumb",
+    "home": "Home",
+    "cityStays": "Stays in {city}",
+    "backToResults": "Back to search results"
+  },
+  "actions": {
+    "share": "Share",
+    "shareCopied": "Link copied to clipboard.",
+    "shareFailed": "Couldn't copy the link. You can copy it from the address bar."
+  },
+  "sectionNav": {
+    "label": "Page sections",
+    "booking": "Booking",
+    "policies": "Policies",
+    "prices": "Prices",
+    "reviews": "Reviews"
+  },
+  "ratingAria": "Guest rating: {rating} out of 5"
 }

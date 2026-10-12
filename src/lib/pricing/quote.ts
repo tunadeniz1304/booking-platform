@@ -3,7 +3,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { redis } from "@/lib/redis";
 import { getConfig } from "@/lib/config/app-config";
-import { ConflictError, NotFoundError, ValidationError } from "@/lib/http/errors";
+import { ConflictError, HttpError, NotFoundError, ValidationError } from "@/lib/http/errors";
 import {
   add,
   applyBps,
@@ -22,7 +22,11 @@ import {
   toDbDate,
   type IsoDate,
 } from "@/lib/time/nights";
-import { checkRestrictions, describeViolation } from "@/lib/booking/restrictions";
+import {
+  checkRestrictions,
+  describeViolation,
+  type RestrictionViolation,
+} from "@/lib/booking/restrictions";
 import { chargeAmount, getCurrentFx, resolveChargeCurrency } from "@/lib/fx/store";
 import { computeTaxes, taxRulesFor, type TaxLine, type TaxRule } from "@/lib/pricing/tax";
 import { isListable } from "@/lib/compliance/listing";
@@ -230,10 +234,17 @@ export class SoldOutError extends ConflictError {
   }
 }
 
+/** İstemcinin çevirebilmesi için ihlal parametreleri (minStay/maxStay/date) ayrıntıda döner. */
+function restrictionDetails(code: string, violation?: RestrictionViolation) {
+  if (!violation) return { restriction: code };
+  const { code: restriction, ...params } = violation;
+  return { restriction, ...params };
+}
+
 /** Satış kısıtı ihlali (min konaklama, varışa kapalı, satış durdurma…) → 409. */
 export class RestrictionError extends ConflictError {
-  constructor(message: string, code: string) {
-    super(message, "RESTRICTED", { restriction: code });
+  constructor(message: string, code: string, violation?: RestrictionViolation) {
+    super(message, "RESTRICTED", restrictionDetails(code, violation));
     this.name = "RestrictionError";
   }
 }
@@ -342,7 +353,9 @@ export async function computeTotal(req: QuoteRequest, now: Date = new Date()): P
     throw error;
   }
   if (req.guests > room.maxOccupancy * units) {
-    throw new ValidationError(`Bu oda en fazla ${room.maxOccupancy} kişiliktir`);
+    throw new HttpError(400, "OVER_CAPACITY", `Bu oda en fazla ${room.maxOccupancy} kişiliktir`, {
+      capacity: room.maxOccupancy,
+    });
   }
   if (!room.available || units > room.units) throw new SoldOutError();
   const plan = pickRatePlan(room.ratePlans, req.ratePlanId);
@@ -364,7 +377,9 @@ export async function computeTotal(req: QuoteRequest, now: Date = new Date()): P
     }),
   ]);
   const violation = checkRestrictions(stay, restrictions);
-  if (violation) throw new RestrictionError(describeViolation(violation), violation.code);
+  if (violation) {
+    throw new RestrictionError(describeViolation(violation), violation.code, violation);
+  }
   const nights = nightsFromInventory(rows, stay.nights, currency, units);
   if (!nights) throw new SoldOutError();
 

@@ -1,5 +1,20 @@
 {
   "title": "Posta kutusu (demo)",
-  "subtitle": "SMTP yapılandırılmadığında e-postalar burada görünür.",
-  "empty": "Henüz e-posta yok."
+  "subtitle": "Demo ortamında hesabınıza gönderilen e-postalar burada görünür. Yalnızca kendi e-postalarınızı görürsünüz.",
+  "empty": "Henüz e-posta yok.",
+  "refresh": "Yenile",
+  "lastUpdated": "Son güncelleme: {time}",
+  "limitNote": "En son {count} e-posta gösteriliyor; daha eskileri listelenmez.",
+  "to": "Alıcı: {email}",
+  "delivery": {
+    "sentMailbox": "Demo posta kutusuna teslim edildi",
+    "sentSmtp": "E-postayla gönderildi",
+    "pending": "Gönderim bekliyor",
+    "failed": "Gönderilemedi",
+    "unknown": "Durum bilinmiyor"
+  },
+  "actions": {
+    "verify": "E-posta adresimi doğrula",
+    "reset": "Parola sıfırlama sayfasını aç"
+  }
 }

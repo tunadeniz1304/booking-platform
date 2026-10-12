@@ -3,7 +3,7 @@
   "loading": "Yükleniyor…",
   "page": {
     "title": "Ödemeler",
-    "intro": "Emanetteki, serbest bırakılmış, rezervdeki ve ödenmiş tutarlarınızı ve payout geçmişinizi izleyin."
+    "intro": "Emanetteki, serbest bırakılmış, rezervdeki ve ödenmiş tutarlarınızı ve ödeme geçmişinizi izleyin."
   },
   "provider": {
     "mock": "Demo ödeme sağlayıcısı (gerçek para yok)",
@@ -37,10 +37,20 @@
     "scheduleLabel": "Ödeme takvimi",
     "keepSchedule": "Değiştirme",
     "connect": "Ödeme hesabını bağla",
-    "refresh": "Durumu yenile / kaydet",
-    "saved": "Ödeme hesabı güncellendi."
+    "refresh": "Durumu yenile",
+    "saved": "Ödeme hesabı güncellendi.",
+    "connected": "Ödeme hesabı bağlandı.",
+    "saveSchedule": "Ödeme takvimini kaydet",
+    "scheduleSaved": "Ödeme takvimi kaydedildi.",
+    "scheduleCurrent": "Geçerli takvim: {schedule}. Değiştirmek için yeni bir takvim seçip kaydedin.",
+    "scheduleNew": "Hesabınız bu takvimle bağlanır; daha sonra değiştirebilirsiniz.",
+    "destination": "Ödemenin gönderileceği hesap",
+    "endingIn": "son 4 hane {last4}",
+    "destinationDemo": "Demo hesap; gerçek bir banka hesabına ödeme yapılmaz",
+    "destinationProvider": "Banka hesabınız Stripe'ta yönetilir",
+    "manageAtProvider": "Banka hesabını Stripe'ta görüntüle veya değiştir"
   },
-  "policy": "Tutar, girişten {hours} saat sonra emanetten serbest bırakılır; %{commission} platform komisyonu düşülür ve payınızın %{reserve}'i {days} gün rezervde tutulur.",
+  "policy": "Tutar, girişten {hours} saat sonra emanetten serbest bırakılır; %{commission} platform komisyonu düşülür ve payınızın %{reserve} oranındaki kısmı {days} gün rezervde tutulur.",
   "identityRequired": "Ödeme için kimlik doğrulaması gereklidir.",
   "balances": {
     "title": "Bakiye",
@@ -51,7 +61,15 @@
     "availableMinor": "Serbest",
     "reserveMinor": "Rezervde",
     "paidMinor": "Ödenen",
-    "hint": "Emanetteki tutar konaklama başlayana kadar misafir adına tutulur; yalnızca serbest bakiye ödenir."
+    "hint": "Sütunlar, paranın izlediği sırayla dizilir; yalnızca serbest bakiye ödenir.",
+    "pendingMinor": "Gönderimde",
+    "terms": {
+      "escrowMinor": "Misafirin ödemesi platformda tutulur; girişten {hours} saat sonra komisyon düşülerek serbest bırakılır.",
+      "reserveMinor": "Olası iade ve itirazlara karşı {days} gün tutulur, ardından serbest bakiyeye geçer.",
+      "availableMinor": "Ödenmeye hazır tutar; ödeme takviminize göre gönderilir.",
+      "pendingMinor": "Gönderilmek üzere sıraya alındı; henüz banka hesabınıza ulaşmadı.",
+      "paidMinor": "Banka hesabınıza gönderildi."
+    }
   },
   "history": {
     "title": "Ödeme geçmişi",
@@ -69,7 +87,26 @@
       "PENDING": "Bekliyor",
       "PAID": "Ödendi",
       "FAILED": "Başarısız"
-    }
+    },
+    "failureReasons": {
+      "INSUFFICIENT_BALANCE": "Gönderim sırasında serbest bakiye yetersizdi (ör. sonradan yapılan bir iade nedeniyle).",
+      "no_destination": "Bağlı bir banka hesabı bulunamadı. Ödeme hesabınızı kontrol edin.",
+      "invalid_amount": "Ödeme tutarı geçersizdi.",
+      "other": "Ödeme sağlayıcısı işlemi tamamlayamadı. Sorun sürerse destek ekibine yazın.",
+      "account_closed": "Banka hesabınız kapalı olduğu için ödeme gönderilemedi. Ödeme hesabınızdaki banka bilgilerini güncelleyin.",
+      "account_restricted": "Banka hesabınız dondurulmuş veya kısıtlanmış olduğu için ödeme gönderilemedi. Bankanızla görüşün ya da başka bir banka hesabı ekleyin.",
+      "invalid_account": "Banka hesap bilgileri geçersiz ya da hesap bulunamadı. Banka bilgilerinizi kontrol edip güncelleyin."
+    },
+    "createdAt": "Oluşturulma",
+    "paidAt": "Ödeme tarihi",
+    "notPaid": "Henüz ödenmedi",
+    "reference": "Referans",
+    "noReference": "Referans yok",
+    "limitNote": "Yalnızca en son {limit} ödeme gösteriliyor. Daha eski kayıtlar için tüm geçmişi indirin.",
+    "downloadCsv": "Tüm ödeme geçmişini indir (CSV)",
+    "failedRetry": "Serbest bakiyenizde kalan tutar, sorun giderildiğinde bir sonraki ödemeyle gönderilir.",
+    "failureCode": "Destek için hata kodu: {code}",
+    "fixAccountLink": "Ödeme hesabınıza gidin"
   },
   "disclaimer": "Portföy projesidir; gerçek ödeme hizmeti değildir.",
   "admin": {
@@ -89,7 +126,22 @@
       "title": "{name} için ödemeler durdurulsun mu?",
       "body": "{count, plural, =0 {Bekleyen ödeme yok.} other {# bekleyen ödeme siz devam ettirene kadar gönderilmeyecek.}} Gerekçe: {reason}",
       "confirm": "Ödemeleri durdur"
-    }
+    },
+    "userId": "Kimlik: {id}",
+    "pausedAt": "Durdurulma tarihi: {date}",
+    "pausedReason": "Durdurma gerekçesi: {reason}",
+    "search": {
+      "label": "Ad veya kullanıcı kimliğiyle ara",
+      "hint": "Kimliğin bir bölümünü (ör. son 6 karakter) yazmanız yeterli."
+    },
+    "filter": {
+      "label": "Göster",
+      "all": "Tüm hesaplar",
+      "paused": "Durdurulanlar",
+      "pending": "Bekleyen ödemesi olanlar"
+    },
+    "resultCount": "{total} hesaptan {shown} tanesi gösteriliyor.",
+    "noMatch": "Arama ya da filtreyle eşleşen hesap yok."
   },
   "policyNoReserve": "Tutar, girişten {hours} saat sonra emanetten serbest bırakılır; %{commission} platform komisyonu düşülür ve payınızın bir kısmı {days} gün rezervde tutulur. Rezerv oranı hesabınızı bağladığınızda gösterilir.",
   "resolve": {
@@ -98,6 +150,14 @@
     "identityLink": "Kimliğinizi doğrulayın",
     "paused": "Ödemeleriniz platform ekibi tarafından durduruldu. Nedenini öğrenmek için destekle iletişime geçin.",
     "supportLink": "Destek ekibine yazın",
-    "providerDisabled": "Ödeme sağlayıcısı hesabınızı henüz onaylamadı. Birkaç dakika sonra aşağıdaki \"Durumu yenile / kaydet\" düğmesiyle tekrar kontrol edin."
+    "providerDisabled": "Ödeme sağlayıcısı hesabınızı henüz onaylamadı. Birkaç dakika sonra aşağıdaki \"Durumu yenile\" düğmesiyle tekrar kontrol edin.",
+    "identityPending": "Kimlik doğrulamanız inceleniyor. Sonuçlandığında aşağıdaki \"Durumu yenile\" düğmesiyle tekrar kontrol edin.",
+    "identityStatusLink": "Doğrulama durumunu görün"
+  },
+  "policyList": {
+    "release": "Tutar, girişten {hours} saat sonra emanetten serbest bırakılır.",
+    "commission": "Serbest bırakılan tutardan %{commission} platform komisyonu düşülür.",
+    "reserve": "Payınızın %{reserve} kadarı {days} gün rezervde tutulur, sonra serbest bırakılır.",
+    "reserveUnknown": "Payınızın bir kısmı {days} gün rezervde tutulur; oran, hesabınızı bağladığınızda gösterilir."
   }
 }

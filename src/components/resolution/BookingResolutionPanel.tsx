@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { apiFetch } from "@/lib/api-client";
@@ -14,6 +15,17 @@ interface DepositResponse {
   currency: string;
   role: "GUEST" | "HOST" | "ADMIN";
 }
+
+/** Panel başlığının kimliği; sayfa içi "Sorun bildir" bağlantıları buna yönelir (F1346). */
+export const RESOLUTION_PANEL_TITLE_ID = "resolution-panel-title";
+
+/**
+ * Canlı bölge önce boş eklenir, metin sonradan yazılır ki ekran okuyucu duyursun; hızlı
+ * yanıtta duyuru yapılmaz (F1347).
+ */
+const LOADING_ANNOUNCE_DELAY_MS = 400;
+
+const skeletonBlock = "rounded-md bg-gray-100 motion-safe:animate-pulse";
 
 /**
  * Rezervasyon sayfasındaki "Hasar depozitosu ve çözüm merkezi" bölümü (P1-5):
@@ -32,6 +44,19 @@ export default function BookingResolutionPanel({ bookingId }: { bookingId: strin
     [bookingId]
   );
   const [deposit, claimsRes] = data ?? [null, null];
+  const loading = !data && !error;
+  const [announceLoading, setAnnounceLoading] = useState(false);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setAnnounceLoading(true), LOADING_ANNOUNCE_DELAY_MS);
+    return () => window.clearTimeout(timer);
+  }, []);
+  // Başlık role göre misafirin/ev sahibinin görevini adlandırır (F1346).
+  const title =
+    deposit?.role === "GUEST"
+      ? t("panel.titleGuest")
+      : deposit?.role === "HOST"
+        ? t("panel.titleHost")
+        : t("panel.title");
   // Sunucu aynı rezervasyonda ikinci açık talebi reddeder (CLAIM_ALREADY_OPEN); formu
   // göstermek yerine açık talebe yönlendir.
   const openOwnClaim =
@@ -40,17 +65,31 @@ export default function BookingResolutionPanel({ bookingId }: { bookingId: strin
 
   return (
     <section
-      aria-labelledby="resolution-panel-title"
+      aria-labelledby={RESOLUTION_PANEL_TITLE_ID}
       className="space-y-5 border-t border-gray-100 pt-6"
     >
-      <h2 id="resolution-panel-title" className="text-lg font-semibold text-gray-900">
-        {t("panel.title")}
+      <h2
+        id={RESOLUTION_PANEL_TITLE_ID}
+        className="scroll-mt-24 text-lg font-semibold text-gray-900"
+      >
+        {title}
       </h2>
-      <Status error={error} />
-      {!data && !error && (
-        <p aria-live="polite" className="text-sm text-gray-600">
-          {t("loading")}
-        </p>
+      {/* Her zaman DOM'da; sr-only olduğu için hata/yükleme yokken boşluk bırakmaz (F1135). */}
+      <p role="status" className="sr-only">
+        {loading && announceLoading ? t("panel.loading") : null}
+      </p>
+      {error && <Status error={error} />}
+      {loading && (
+        <div aria-hidden="true" className="space-y-5">
+          <div className="space-y-2">
+            <div className={`h-6 w-40 ${skeletonBlock}`} />
+            <div className={`h-28 ${skeletonBlock}`} />
+          </div>
+          <div className="space-y-2">
+            <div className={`h-6 w-56 ${skeletonBlock}`} />
+            <div className={`h-16 ${skeletonBlock}`} />
+          </div>
+        </div>
       )}
       {deposit && (
         <div>
@@ -82,7 +121,18 @@ export default function BookingResolutionPanel({ bookingId }: { bookingId: strin
       )}
       {deposit &&
         (deposit.role === "ADMIN" ? (
-          <p className="text-sm text-gray-700">{t("open.adminInfo")}</p>
+          <p className="text-sm text-gray-700">
+            {t.rich("open.adminInfo", {
+              link: (chunks) => (
+                <Link
+                  href="/admin/claims"
+                  className={`font-semibold text-[#003580] underline ${focusRing}`}
+                >
+                  {chunks}
+                </Link>
+              ),
+            })}
+          </p>
         ) : openOwnClaim ? (
           <div className="space-y-2">
             <p className="text-sm text-gray-700">{t("open.alreadyOpen")}</p>

@@ -20,7 +20,7 @@
     "goodFaith": "I believe in good faith that the information and allegations in this notice are accurate and complete.",
     "submit": "Send notice",
     "sending": "Sending…",
-    "sent": "We received your notice. Your reference: {reference}. A confirmation email was sent.",
+    "sent": "We received your notice. Your reference: {reference}. A confirmation email will be sent within a few minutes; if it doesn't arrive, check your spam folder.",
     "invalid": "Please fill in all required fields correctly.",
     "rateLimited": "Too many notices sent; please try again later.",
     "error": "The notice could not be sent; please try again.",
@@ -30,12 +30,36 @@
       "category": "Choose a report type.",
       "explanation": "The explanation must be at least 20 characters, not counting spaces.",
       "reporterName": "The name can be at most 120 characters.",
-      "reporterEmail": "Enter a valid email address, for example name@example.com."
-    }
+      "reporterEmail": "Enter a valid email address, for example name@example.com.",
+      "goodFaith": "Confirm the good-faith statement to send the notice.",
+      "propertyNotFound": "This listing can no longer be found. Check the content address and send again."
+    },
+    "contentUrlHint": "Full address, e.g. https://example.com/property/123. The “Report this listing” link on a listing page fills this in for you.",
+    "categoryPlaceholder": "Choose a type…",
+    "linkedTitle": "Listing being reported",
+    "reportAnother": "Report other content",
+    "errorSummary": "Please fix {count, plural, one {# problem} other {# problems}} in the form:",
+    "sentEmail": "A confirmation email was sent to {email}.",
+    "referenceLabel": "Your reference number",
+    "referenceHint": "Share this number if you contact support.",
+    "copyReference": "Copy number",
+    "copied": "Copied.",
+    "copyFailed": "Could not copy; select the number and copy it manually.",
+    "nextTitle": "What happens next?",
+    "next": {
+      "review": "A member of our team reviews your notice.",
+      "decision": "The decision and its reasons are emailed to you.",
+      "appeal": "If you disagree, you can appeal using the link in the decision email (DSA Art. 20)."
+    },
+    "backToListing": "Back to the listing",
+    "home": "Back to home",
+    "reporterEmailHint": "Confirmation and decision emails are sent to this address. It is used only to contact you about this notice.",
+    "privacyNote": "Your name and email address are not shared with the property owner; only our team reviewing the notice sees them. For details, read the <link>privacy notice</link>.",
+    "timeout": "The connection timed out. What you entered is kept; you can send the notice again."
   },
   "admin": {
     "title": "Compliance",
-    "intro": "7565 takedown requests (24-hour SLA), DSA notices and the transparency report.",
+    "intro": "7565 takedown requests (24-hour SLA), DSA notices, Art. 20 appeals, the accessibility verification queue and the transparency report.",
     "open": "Compliance panel",
     "takedowns": "7565 takedown requests",
     "source": "Source",
@@ -48,23 +72,23 @@
     "referenceNo": "Document no.",
     "reason": "Reason",
     "createTakedown": "Record request and take listing down",
-    "takedownCreated": "Request recorded; the listing was taken down.",
-    "takedownClosed": "Request closed.",
+    "takedownCreated": "Request recorded; the listing “{listing}” was taken down.",
+    "takedownClosed": "Request “{item}” closed.",
     "defaultResolution": "Closed by an administrator",
     "status": {
       "RECEIVED": "Received",
       "ACTIONED": "Listing removed",
       "CLOSED": "Closed"
     },
-    "slaDue": "SLA due {at} UTC",
+    "slaDue": "SLA due",
     "breached": "SLA breached",
-    "close": "Close",
+    "close": "Close request…",
     "notices": "Pending DSA notices",
     "noNotices": "No pending notices.",
     "decision": "Decision",
     "decisions": {
-      "REMOVED": "Remove",
-      "NO_ACTION": "No action"
+      "REMOVED": "Remove (listing is taken down)",
+      "NO_ACTION": "Take no action"
     },
     "ground": "Ground",
     "grounds": {
@@ -74,10 +98,10 @@
     "facts": "Facts and reasoning",
     "legalReference": "Legal reference",
     "decide": "Record decision",
-    "noticeDecided": "Decision recorded; the statement of reasons will be sent.",
+    "noticeDecided": "Decision recorded for “{url}”; the statement of reasons will be sent.",
     "transparency": "Transparency report",
-    "exportCsv": "Download CSV (this year)",
-    "exportJson": "View JSON (this year)",
+    "exportCsv": "Download CSV",
+    "exportJson": "View JSON (opens in a new tab)",
     "propertyIdHint": "Paste the listing ID; when you leave the field, the listing name is shown below.",
     "preview": {
       "loading": "Looking up the listing…",
@@ -105,6 +129,85 @@
       "noActionEffect": "The content stays online; the reporter and the host receive a statement of reasons by email.",
       "final": "A saved decision cannot be changed; it is only reviewed again if one of the parties appeals.",
       "confirm": "Confirm and send decision"
+    },
+    "sectionsNav": "Compliance sections",
+    "receivedAt": "Date and time the order was received (Turkey time)",
+    "receivedAtHint": "Enter it in Turkey time (UTC+3); the 24-hour deadline starts from this moment. Default: now.",
+    "reasonHint": "At least 3 characters.",
+    "factsHint": "At least 10 characters. This text is sent to the parties in the statement of reasons.",
+    "takedownList": {
+      "title": "Recorded requests",
+      "filter": "Request status",
+      "filters": {
+        "open": "Open",
+        "closed": "Closed",
+        "all": "All"
+      },
+      "empty": {
+        "open": "No open requests.",
+        "closed": "No closed requests."
+      },
+      "item": "{source} · {ref}",
+      "listing": "Listing",
+      "statusLabel": "Status",
+      "received": "Order received",
+      "at": "{at} (Turkey time)",
+      "none": "None",
+      "remaining": "{hours} h {minutes} min left",
+      "overdue": "Deadline passed"
+    },
+    "report": {
+      "period": "Report period",
+      "presets": "Quick periods",
+      "thisYear": "This year",
+      "lastYear": "Last year",
+      "last6Months": "Last 6 months",
+      "from": "Start date",
+      "to": "End date (inclusive)",
+      "dateRequired": "Choose a date.",
+      "invalidRange": "The end date cannot be before the start date."
+    },
+    "errors": {
+      "validation": "Some fields are missing or invalid. Fix the marked fields and try again.",
+      "propertyNotFound": "No listing was found with this ID. Check the listing ID.",
+      "takedownDuplicate": "An open request already exists for this listing and document number.",
+      "takedownNotFound": "Request “{item}” no longer exists; the list was refreshed.",
+      "takedownClosed": "Request “{item}” was already closed; the list was refreshed.",
+      "noticeNotFound": "The notice for “{url}” no longer exists; the list was refreshed.",
+      "noticeDecided": "A decision was already recorded for “{url}”; the list was refreshed.",
+      "fields": {
+        "source": "Choose a source.",
+        "propertyId": "Enter the listing ID (up to 64 characters).",
+        "referenceNo": "The document number can be up to 120 characters.",
+        "reason": "The reason must be 3 to 2,000 characters.",
+        "receivedAt": "Enter a valid date and time.",
+        "decision": "Choose a decision.",
+        "ground": "Choose a ground for the removal decision.",
+        "facts": "Facts and reasoning must be 10 to 5,000 characters.",
+        "legalReference": "The legal reference can be up to 300 characters.",
+        "resolution": "The reason for closing must be 3 to 2,000 characters.",
+        "other": "Check this field."
+      }
+    },
+    "noticeQueue": {
+      "title": "Pending DSA notices ({count})",
+      "order": "Notices waiting longest are listed first.",
+      "received": "Received",
+      "waitedDays": "waiting {days} d {hours} h",
+      "waitedHours": "waiting {hours} h {minutes} min",
+      "reporter": "Reported by",
+      "reporterUnknown": "Name not given",
+      "noListing": "Not linked to a listing",
+      "removeUnavailable": "This notice isn't linked to a listing, so it can't be removed; you can only choose to take no action.",
+      "newTab": "(opens in a new tab)"
+    },
+    "fieldLimits": {
+      "count": "{count}/{max} characters",
+      "near": "You're close to the character limit.",
+      "reached": "You've reached the character limit; extra text won't be added."
+    },
+    "slaWarning": {
+      "dueSoon": "SLA deadline approaching"
     }
   },
   "accessibility": {
@@ -133,7 +236,7 @@
     },
     "host": {
       "title": "Accessibility features",
-      "intro": "Declare your property's accessibility features and link evidence from your listing photos to each one. Only features our team has verified against the evidence appear on the listing and in search.",
+      "intro": "Declare your listing's accessibility features and link evidence from your listing photos to each one. Only features our team has verified against the evidence appear on the listing and in search.",
       "property": "Listing",
       "loading": "Loading features…",
       "empty": "No features declared yet.",
@@ -164,29 +267,72 @@
       "deleteConfirmTitle": "Delete {name} ({scope})?",
       "deleteConfirmBody": "The feature is permanently removed from the list.",
       "deleteConfirmVerified": "The verified badge is removed and the feature no longer shows on the listing or in search. If you add it again, the platform team must review it again.",
-      "deleteConfirm": "Delete permanently"
+      "deleteConfirm": "Delete permanently",
+      "wholeListing": "Entire listing",
+      "alreadyAdded": "This feature is already added for the selected scope. Choose another feature or scope.",
+      "alreadyAddedOption": "{name} (already added)",
+      "noPhotosHint": "Evidence is chosen from this listing's photos; no photos have been uploaded yet.",
+      "uploadPhotos": "Upload listing photos",
+      "noteShown": "Note: {note}",
+      "edit": "Edit",
+      "editLabel": "Edit {name}",
+      "editWidthHint": "Enter a whole number between {min} and {max} cm. Changing the width removes verification and our team reviews it again.",
+      "editNoteHint": "Changing the note doesn't affect verification.",
+      "saveEdit": "Save changes",
+      "cancelEdit": "Cancel",
+      "editSaved": "Feature updated.",
+      "editConfirmTitle": "Change the width for {name}?",
+      "widthVerifiedWarning": "This feature is verified. If you change the width, verification is removed and our team reviews it again.",
+      "photoOptionDated": "Photo {index} (uploaded {date})",
+      "featureScoped": "{name} ({scope})",
+      "verifiedStatusHint": "Shown on the listing and in search.",
+      "pendingReviewHint": "Appears on the listing and in search once our team reviews and verifies the evidence.",
+      "needsEvidenceHint": "Choose and save evidence from your listing photos; it appears on the listing once our team verifies it.",
+      "newTab": "(opens in a new tab)",
+      "noteHint": "Up to {max} characters; {remaining, plural, one {# character} other {# characters}} left."
     },
     "admin": {
       "title": "Accessibility verification queue",
       "intro": "Host declarations with evidence photos. Verify only when the photo clearly shows the feature.",
-      "filter": "Queue filter",
+      "filter": "Show",
       "tabs": {
-        "pending": "Pending",
-        "verified": "Verified"
+        "pending": "Awaiting review",
+        "verified": "Verified features"
       },
       "empty": "The queue is empty.",
       "evidenceAlt": "Evidence photo for {name}",
       "verify": "Verify",
       "unverify": "Remove verification",
       "verifiedOk": "Feature verified.",
-      "unverifiedOk": "Verification removed."
+      "unverifiedOk": "Verification removed.",
+      "verifiedDone": "{name} ({property}) verified.",
+      "unverifiedDone": "Verification removed for {name} ({property}).",
+      "undo": "Undo",
+      "undoLabel": "Undo: {name} ({property})",
+      "enlargeEvidence": "Enlarge evidence: {name}",
+      "closePreview": "Close",
+      "submittedAt": "Submitted: {date}",
+      "verifiedAt": "Verified: {date}",
+      "confirm": {
+        "verifyTitle": "Verify this feature?",
+        "unverifyTitle": "Remove verification?",
+        "body": "Feature: {name} · Listing: {property} · {scope}",
+        "verifyEffect": "The feature is shown as verified on the listing and in search.",
+        "unverifyEffect": "The feature is hidden on the listing and in search and returns to the awaiting-review list.",
+        "verify": "Verify",
+        "unverify": "Remove verification"
+      }
     },
-    "askSupport": "Ask Support"
+    "askSupport": "Ask Support",
+    "noneVerified": "There is no verified accessibility information for this listing yet; this does not mean the features are missing. If you have a specific need, contact Support before booking and mention the listing name.",
+    "evidenceLabel": "Evidence photo for {feature} (opens in a new tab)",
+    "verifiedExplainer": "The “Verified” badge means our team checked the feature against photo evidence provided by the host.",
+    "filterSummary": "{count, plural, =0 {Choose features} one {# feature selected} other {# features selected}}"
   },
   "appeal": {
     "title": "Appeal a decision",
     "intro": "Under DSA Art. 20 you can appeal a content moderation decision. A qualified member of staff reviews your appeal and emails you the outcome.",
-    "invalidLink": "This appeal link is invalid or has expired. Please use the link in your decision email.",
+    "invalidLink": "This appeal link is incomplete or incorrect. Use the full link from your decision email; if the problem continues, contact our support team with the decision ID and your email address.",
     "decisionTitle": "Decision under appeal",
     "decision": "Decision",
     "decisions": {
@@ -238,8 +384,20 @@
         "rejected": "The earlier decision stays in place.",
         "final": "A saved appeal decision cannot be changed and is emailed to the appellant.",
         "confirm": "Confirm appeal decision"
-      }
+      },
+      "rowTitle": "Appellant: {role} · Decision: {decision}",
+      "noDecision": "not on record",
+      "appealedAt": "Appeal date: {date}"
     },
-    "sentTitle": "Your appeal has been received"
+    "sentTitle": "Your appeal has been received",
+    "notDecided": "No appealable decision was found for this link. The notice may not have been decided yet; you will be emailed when a decision is made.",
+    "loadFailed": "The decision details could not be loaded right now. Please refresh the page in a moment.",
+    "contactSupport": "Contact support",
+    "newReport": "Submit a new notice",
+    "statementRaw": "Official statement of reasons (TR/EN)",
+    "windowEndsAt": "{date}, {time} (Turkey time, GMT+3)",
+    "daysLeft": "{days, plural, =0 {Ends today} one {# day left} other {# days left}}",
+    "appealDecidedAt": "Appeal decision date",
+    "disputeHelp": "Ask our support team about out-of-court dispute settlement (DSA Art. 21)"
   }
 }

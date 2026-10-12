@@ -37,8 +37,18 @@
     "scheduleLabel": "Payout schedule",
     "keepSchedule": "Keep current",
     "connect": "Connect payout account",
-    "refresh": "Refresh status / save",
-    "saved": "Payout account updated."
+    "refresh": "Refresh status",
+    "saved": "Payout account updated.",
+    "connected": "Payout account connected.",
+    "saveSchedule": "Save payout schedule",
+    "scheduleSaved": "Payout schedule saved.",
+    "scheduleCurrent": "Current schedule: {schedule}. To change it, choose a new schedule and save.",
+    "scheduleNew": "Your account will be connected with this schedule; you can change it later.",
+    "destination": "Payout destination",
+    "endingIn": "ending in {last4}",
+    "destinationDemo": "Demo account; no payouts are made to a real bank account",
+    "destinationProvider": "Your bank account is managed in Stripe",
+    "manageAtProvider": "View or change your bank account in Stripe"
   },
   "policy": "Funds are released from escrow {hours} hours after check-in; a {commission}% platform commission is deducted and {reserve}% of your share is held in reserve for {days} days.",
   "identityRequired": "Identity verification is required for payouts.",
@@ -51,7 +61,15 @@
     "availableMinor": "Released",
     "reserveMinor": "In reserve",
     "paidMinor": "Paid out",
-    "hint": "Escrowed funds are held on the guest's behalf until the stay starts; only the released balance is paid out."
+    "hint": "The columns follow the order in which funds move; only the released balance is paid out.",
+    "pendingMinor": "In transit",
+    "terms": {
+      "escrowMinor": "The guest's payment is held by the platform and released, minus commission, {hours, plural, one {# hour} other {# hours}} after check-in.",
+      "reserveMinor": "Held for {days, plural, one {# day} other {# days}} to cover possible refunds and disputes, then moved to your released balance.",
+      "availableMinor": "Ready to be paid out; sent on your payout schedule.",
+      "pendingMinor": "Queued to be sent; it has not reached your bank account yet.",
+      "paidMinor": "Sent to your bank account."
+    }
   },
   "history": {
     "title": "Payout history",
@@ -69,7 +87,26 @@
       "PENDING": "Pending",
       "PAID": "Paid",
       "FAILED": "Failed"
-    }
+    },
+    "failureReasons": {
+      "INSUFFICIENT_BALANCE": "The released balance was too low at the time of sending (for example, because of a later refund).",
+      "no_destination": "No connected bank account was found. Check your payout account.",
+      "invalid_amount": "The payout amount was invalid.",
+      "other": "The payment provider could not complete the payout. If this keeps happening, contact support.",
+      "account_closed": "The payout could not be sent because your bank account is closed. Update the bank details in your payout account.",
+      "account_restricted": "The payout could not be sent because your bank account is frozen or restricted. Contact your bank or add a different bank account.",
+      "invalid_account": "The bank account details are invalid or the account could not be found. Check and update your bank details."
+    },
+    "createdAt": "Created",
+    "paidAt": "Paid on",
+    "notPaid": "Not paid yet",
+    "reference": "Reference",
+    "noReference": "No reference",
+    "limitNote": "Only the latest {limit} payouts are shown. Download the full history for older records.",
+    "downloadCsv": "Download full payout history (CSV)",
+    "failedRetry": "Any amount left in your released balance is sent with the next payout once the issue is resolved.",
+    "failureCode": "Error code for support: {code}",
+    "fixAccountLink": "Go to your payout account"
   },
   "disclaimer": "This is a portfolio project; it is not a real payment service.",
   "admin": {
@@ -89,7 +126,22 @@
       "title": "Pause payouts for {name}?",
       "body": "{count, plural, =0 {No payouts are pending.} one {# pending payout will not be sent until you resume.} other {# pending payouts will not be sent until you resume.}} Reason: {reason}",
       "confirm": "Pause payouts"
-    }
+    },
+    "userId": "ID: {id}",
+    "pausedAt": "Paused on: {date}",
+    "pausedReason": "Reason for pausing: {reason}",
+    "search": {
+      "label": "Search by name or user ID",
+      "hint": "Part of the ID (e.g. the last 6 characters) is enough."
+    },
+    "filter": {
+      "label": "Show",
+      "all": "All accounts",
+      "paused": "Paused",
+      "pending": "With pending payouts"
+    },
+    "resultCount": "Showing {shown} of {total, plural, one {# account} other {# accounts}}.",
+    "noMatch": "No accounts match your search or filter."
   },
   "policyNoReserve": "The amount is released from escrow {hours} hours after check-in; a {commission}% platform commission is deducted and part of your share is held in reserve for {days} days. The reserve rate is shown once you connect your account.",
   "resolve": {
@@ -98,6 +150,14 @@
     "identityLink": "Verify your identity",
     "paused": "Your payouts were paused by the platform team. Contact support to find out why.",
     "supportLink": "Contact support",
-    "providerDisabled": "The payment provider has not approved your account yet. Check again in a few minutes with the \"Refresh status / save\" button below."
+    "providerDisabled": "The payment provider has not approved your account yet. Check again in a few minutes with the \"Refresh status\" button below.",
+    "identityPending": "Your identity verification is being reviewed. Once it is complete, check again with the \"Refresh status\" button below.",
+    "identityStatusLink": "See verification status"
+  },
+  "policyList": {
+    "release": "Funds are released from escrow {hours, plural, one {# hour} other {# hours}} after check-in.",
+    "commission": "A {commission}% platform commission is deducted from the released amount.",
+    "reserve": "{reserve}% of your share is held in reserve for {days, plural, one {# day} other {# days}}, then released.",
+    "reserveUnknown": "Part of your share is held in reserve for {days, plural, one {# day} other {# days}}; the rate is shown once you connect your account."
   }
 }

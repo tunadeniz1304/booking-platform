@@ -184,6 +184,7 @@ export const RESPONSE_SCHEMAS: Record<string, JsonSchema> = {
     role: { type: "string", enum: ["USER", "HOST", "ADMIN"] },
     avatarUrl: nullable(str),
     createdAt: dateTime,
+    emailVerified: bool,
   }),
   Quote: obj(
     {
@@ -306,7 +307,7 @@ export const RESPONSE_SCHEMAS: Record<string, JsonSchema> = {
   },
   RnplOffer: obj(
     { available: bool, dueTodayMinor: { const: 0 }, amountMinor: minor, currency },
-    { reason: str, dueAt: str, freeCancellationUntil: str }
+    { reason: str, dueAt: str, freeCancellationUntil: str, timeZone: str }
   ),
   SupportChatResult: obj(
     {

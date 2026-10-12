@@ -55,7 +55,14 @@ export interface QuoteState {
   error: string | null;
   /** Hata kodu (ör. SOLD_OUT) — UI mesajı için. */
   code: string | null;
+  /** Hata ayrıntısı (ör. RESTRICTED → { restriction, ...parametreler }); parametreli mesaj için. */
+  details: Record<string, unknown> | null;
 }
+
+const asDetails = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
 
 /**
  * Sunucudan fiyat teklifi alır. Fiyat YALNIZCA sunucuda hesaplanır (computeTotal);
@@ -97,6 +104,7 @@ export function useQuote(params: {
     loading: false,
     error: null,
     code: null,
+    details: null,
   });
 
   useEffect(() => {
@@ -104,7 +112,7 @@ export function useQuote(params: {
     let active = true;
     const controller = new AbortController();
     const timer = setTimeout(() => {
-      setState({ key, quote: null, loading: true, error: null, code: null });
+      setState({ key, quote: null, loading: true, error: null, code: null, details: null });
       fetch(`/api/quote?${key}`, { signal: controller.signal, cache: "no-store" })
         .then(async (res) => {
           const body = await res.json();
@@ -116,14 +124,29 @@ export function useQuote(params: {
               loading: false,
               error: body.error ?? FETCH_FAILED,
               code: body.code ?? null,
+              details: asDetails(body.details),
             });
           } else {
-            setState({ key, quote: body as QuoteView, loading: false, error: null, code: null });
+            setState({
+              key,
+              quote: body as QuoteView,
+              loading: false,
+              error: null,
+              code: null,
+              details: null,
+            });
           }
         })
         .catch(() => {
           if (active)
-            setState({ key, quote: null, loading: false, error: FETCH_FAILED, code: null });
+            setState({
+              key,
+              quote: null,
+              loading: false,
+              error: FETCH_FAILED,
+              code: null,
+              details: null,
+            });
         });
     }, 150);
     return () => {
@@ -133,7 +156,8 @@ export function useQuote(params: {
     };
   }, [key]);
 
-  if (!key) return { quote: null, loading: false, error: null, code: null };
-  if (state.key !== key) return { quote: null, loading: true, error: null, code: null };
+  if (!key) return { quote: null, loading: false, error: null, code: null, details: null };
+  if (state.key !== key)
+    return { quote: null, loading: true, error: null, code: null, details: null };
   return state.error === FETCH_FAILED ? { ...state, error: t("fetchFailed") } : state;
 }

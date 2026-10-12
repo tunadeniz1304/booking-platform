@@ -1,7 +1,8 @@
 {
   "page": {
     "title": "Admin dashboard",
-    "intro": "Monitor the queues, approve event signals and manage user roles."
+    "intro": "Monitor the queues, approve event signals and manage user roles.",
+    "sectionsNav": "Admin pages"
   },
   "decisionSaved": "Decision saved.",
   "percent": "{value}%",
@@ -18,21 +19,35 @@
     "no": "No",
     "unknown": "Unknown",
     "supported": "Supported",
-    "unsupported": "Not supported"
+    "unsupported": "Not supported",
+    "modes": {
+      "auto": "Automatic (live if a key is set)",
+      "live": "Live",
+      "demo": "Demo"
+    }
   },
   "outbox": {
-    "title": "Outbox",
-    "empty": "Outbox is empty.",
-    "deadTitle": "DEAD messages",
-    "deadEmpty": "No DEAD messages.",
+    "title": "Event delivery queue (outbox)",
+    "empty": "The event delivery queue is empty.",
+    "deadTitle": "Permanently failed messages",
+    "deadEmpty": "No permanently failed messages.",
     "attempts": "{count, plural, one {# attempt} other {# attempts}}",
     "requeue": "Requeue",
-    "requeued": "Message requeued."
+    "requeued": "Message requeued.",
+    "description": "System events processed in the background (e.g. booking emails). Requeue permanently failed ones to try them again.",
+    "requeuedNamed": "Message {name} requeued.",
+    "status": {
+      "PENDING": "Pending",
+      "PROCESSING": "Processing",
+      "DONE": "Done",
+      "FAILED": "Failed, will retry",
+      "DEAD": "Permanently failed"
+    }
   },
   "events": {
     "title": "Event signal queue",
     "textLabel": "Propose an event from text",
-    "textHint": "E.g. a news snippet: 'An international trade fair will be held in İzmir on 12–15 October.' A proposal does not affect prices until it is approved.",
+    "textHint": "{min}–{max} characters. E.g. a news snippet: 'An international trade fair will be held in İzmir on 12–15 October.' A proposal does not affect prices until it is approved.",
     "extracting": "Extracting…",
     "create": "Create proposal",
     "created": "Proposal created: {title}",
@@ -57,14 +72,47 @@
       "title": "Undo the approval of “{title}”?",
       "body": "This event's effect on prices will be removed. A rolled-back event cannot be approved again here.",
       "confirm": "Undo approval"
-    }
+    },
+    "filter": {
+      "label": "Filter by status",
+      "option": "{label} ({count})"
+    },
+    "cityLabel": "City",
+    "allCities": "All cities",
+    "sortedNote": "Sorted by start date.",
+    "emptyFiltered": "No events match this filter.",
+    "showMore": "Show more ({count} left)",
+    "done": {
+      "approve": "{title}: proposal approved.",
+      "reject": "{title}: proposal rejected.",
+      "rollback": "{title}: approval undone."
+    },
+    "categories": {
+      "konser": "Concert",
+      "festival": "Festival",
+      "spor": "Sports",
+      "fuar": "Trade fair",
+      "kongre": "Congress",
+      "tatil": "Holiday",
+      "diğer": "Other"
+    },
+    "sources": {
+      "llm": "AI extraction ({mode})"
+    },
+    "sourceLabel": "Source: {source}",
+    "approveEffect": "Approving immediately recalculates prices for nights around {start}–{end} in {city}.",
+    "doneRepriced": {
+      "approve": "{title}: proposal approved; {count, plural, =0 {no night prices changed} one {# night price recalculated} other {# night prices recalculated}}. You can undo it from the “Approved” filter.",
+      "rollback": "{title}: approval undone; {count, plural, =0 {no night prices changed} one {# night price recalculated} other {# night prices recalculated}}."
+    },
+    "textCount": "{count}/{max} characters"
   },
   "fraud": {
     "title": "Fraud review queue",
     "empty": "Nothing to review.",
     "booking": "Booking {id}",
     "user": "user {id}",
-    "score": "score",
+    "score": "risk score",
     "reasonsLabel": "Reason codes",
     "noReasons": "No reasons recorded",
     "legit": "Mark as legitimate",
@@ -73,7 +121,33 @@
       "title": "Mark booking {booking} as fraud?",
       "body": "The record leaves the queue and the user ({user}) is flagged with a fraud record. This decision cannot be undone here.",
       "confirm": "Mark as fraud"
-    }
+    },
+    "description": "High-risk bookings. Review the reason codes and mark each record as legitimate or fraud.",
+    "points": "+{points} points",
+    "decisions": {
+      "review": "Needs review",
+      "deny": "Automatically declined",
+      "block": "Blocked (legacy record)"
+    },
+    "rules": {
+      "velocity": "Many attempts in a short time",
+      "velocity_user": "Many attempts by the same user in a short time",
+      "velocity_ip": "Many attempts from the same IP address",
+      "velocity_card": "Many attempts with the same card",
+      "new_account_high_amount": "High amount on a new account",
+      "country_mismatch": "Country mismatch",
+      "bin_ip_country_mismatch": "Card country does not match IP country",
+      "failed_payments": "Recent failed payments",
+      "new_device": "New device",
+      "device_shared": "Device used by several accounts"
+    },
+    "done": {
+      "legit": "{booking}: marked as legitimate.",
+      "fraud": "{booking}: marked as fraud."
+    },
+    "changeRole": "Change role",
+    "scoreValue": "{score}/100",
+    "effectHint": "“Mark as legitimate” removes the record from the queue; the booking stays as it is. “Mark as fraud” closes the record as confirmed fraud and flags the user with a fraud record; this decision cannot be undone here."
   },
   "moderation": {
     "title": "Review moderation queue",
@@ -88,7 +162,23 @@
       "title": "Remove the review of “{property}”?",
       "body": "The review is unpublished and the property's rating is recalculated. This decision cannot be undone here.",
       "confirm": "Remove review"
-    }
+    },
+    "reviewOf": "Review of “{property}”",
+    "codes": {
+      "PROFANITY": "Profanity/insult",
+      "PII_PHONE": "Phone number",
+      "PII_EMAIL": "Email address",
+      "PII_IBAN": "IBAN",
+      "PII_URL": "Link",
+      "PII_CARD": "Card number",
+      "PII_TCKN": "Turkish ID number",
+      "REPORT_THRESHOLD": "Report threshold reached"
+    },
+    "done": {
+      "publish": "Review of “{property}” published.",
+      "remove": "Review of “{property}” removed."
+    },
+    "writtenAt": "Written: {date}"
   },
   "experiments": {
     "title": "A/B experiments",
@@ -96,14 +186,15 @@
     "on": "on",
     "off": "off",
     "columns": {
-      "arm": "Arm",
+      "arm": "Variant",
       "exposures": "Exposures",
       "users": "Users",
       "conversions": "Conversions",
       "rate": "Rate",
-      "ci": "95% Wilson"
+      "ci": "95% confidence interval (Wilson)"
     },
-    "tableLabel": "{flag} experiment results"
+    "tableLabel": "{flag} experiment results",
+    "description": "Conversion rates per variant for each experiment. If the variants' confidence intervals overlap, the difference is not yet significant."
   },
   "roles": {
     "title": "Change user role",
@@ -111,7 +202,7 @@
     "userIdHint": "You cannot change your own role.",
     "newRole": "New role",
     "submit": "Update role",
-    "updated": "Role updated: {role} (takes effect within 15 minutes).",
+    "updated": "Role updated: {role}. All of the user's sessions were signed out; the new role applies when they sign in again.",
     "submitting": "Updating…",
     "options": {
       "USER": "Guest (USER)",
@@ -123,6 +214,41 @@
       "body": "New role: {role}. All of the user's sessions will be signed out and they will need to sign in again.",
       "adminBody": "New role: {role}. This user will have access to all admin actions (payouts, claims, roles). All of the user's sessions will be signed out.",
       "confirm": "Change role"
+    },
+    "newRoleHint": "Changing the role signs the user out on all devices.",
+    "choose": "Choose a role",
+    "updatedFor": "Role of user {user} updated: {role}. Their sessions were signed out; the new role applies at their next sign-in.",
+    "updatedFromTo": "Role of user {user} changed: {from} → {to}. Their sessions were signed out; the new role applies at their next sign-in.",
+    "errors": {
+      "notFound": "No user found with this ID. Check the ID.",
+      "forbidden": "This role cannot be changed: you cannot change your own role, or you no longer have admin rights."
     }
+  },
+  "nav": {
+    "label": "Dashboard sections",
+    "pending": "{label} ({count, plural, =0 {empty} other {# pending}})",
+    "failed": "{label} ({count, plural, =0 {no failures} other {# failed}})"
+  },
+  "rowAction": "{action}: {name}",
+  "rowError": "{name}: {error}",
+  "errors": {
+    "NOT_FOUND": "Record not found; another admin may have handled or deleted it.",
+    "INVALID_STATE": "The record’s status has changed; another admin may have handled it.",
+    "CONFLICT": "The record was changed at the same time. Refresh the list and try again.",
+    "LAST_ADMIN": "The last admin account cannot be demoted. Make another user an admin first.",
+    "FORBIDDEN": "You are not allowed to do this. If your admin rights changed, sign in again.",
+    "VALIDATION_ERROR": "The submitted details are invalid. Check the fields and try again.",
+    "RATE_LIMITED": "Too many actions in a short time. Wait a moment and try again."
+  },
+  "staleRecord": "Another admin may have already handled this record; the list was refreshed.",
+  "refresh": {
+    "button": "Refresh",
+    "updatedAt": "Last updated: {time}"
+  },
+  "limitNote": "Only {count} records are shown; more may be waiting in the queue. The next ones appear as you handle these.",
+  "ids": {
+    "copy": "Copy",
+    "copied": "Copied",
+    "copyLabel": "Copy full ID: {name}"
   }
 }

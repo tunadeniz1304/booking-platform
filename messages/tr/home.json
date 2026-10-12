@@ -5,5 +5,32 @@
   "featured": "Öne çıkan konaklama yerleri",
   "empty": "Henüz konaklama ilanı yok.",
   "featuredError": "Öne çıkan konaklama yerleri şu anda yüklenemedi. Yukarıdaki arama formunu kullanmaya devam edebilirsiniz.",
-  "retry": "Yeniden dene"
+  "retry": "Yeniden dene",
+  "featuredLoading": "Öne çıkan konaklama yerleri yükleniyor…",
+  "places": {
+    "istanbul": "İstanbul",
+    "antalya": "Antalya",
+    "bodrum": "Bodrum",
+    "izmir": "İzmir",
+    "trabzon": "Trabzon",
+    "cappadocia": "Kapadokya",
+    "ankara": "Ankara",
+    "mugla": "Muğla",
+    "alanya": "Alanya",
+    "cesme": "Çeşme",
+    "kusadasi": "Kuşadası",
+    "paris": "Paris",
+    "rome": "Roma",
+    "barcelona": "Barselona",
+    "amsterdam": "Amsterdam",
+    "vienna": "Viyana",
+    "dubai": "Dubai",
+    "london": "Londra",
+    "newYork": "New York",
+    "tokyo": "Tokyo"
+  },
+  "destinationLinkLabel": "{city}, {country} — konaklamaları gör",
+  "featuredHint": "En yüksek misafir puanına göre sıralanır; ücretli yerleşim bu listeyi etkilemez.",
+  "emptySearch": "Konaklama ara",
+  "emptyCreateListing": "İlan oluştur"
 }

@@ -1,12 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { ApiError, apiFetch, logout } from "@/lib/api-client";
 import { useFormat } from "@/i18n/use-format";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
-import { useAccountErrorText, useReauth } from "./ReauthDialog";
+import { Button, Status, loginHref } from "@/components/ui/ui";
+import { ReauthCancelledError, useAccountErrorText, useReauth } from "./ReauthDialog";
 
 interface SessionView {
   id: string;
@@ -20,58 +21,113 @@ interface SessionView {
 const fetchSessions = () =>
   apiFetch<{ sessions: SessionView[] }>("/api/account/sessions").then((r) => r.sessions);
 
+/** "Diğer tüm oturumlar" sorgusu; `revoking` anahtarı olarak da kullanılır. */
+const OTHERS = "scope=others";
+
+const RELATIVE_STEPS: ReadonlyArray<[Intl.RelativeTimeFormatUnit, number]> = [
+  ["day", 86_400_000],
+  ["hour", 3_600_000],
+  ["minute", 60_000],
+];
+
+/** "3 gün önce" / "3 days ago"; `now` listenin alındığı andır (render sırasında saat okunmaz). */
+function relativeTime(iso: string, now: number, locale: string): string {
+  const diff = new Date(iso).getTime() - now;
+  const rtf = new Intl.RelativeTimeFormat(locale, { numeric: "auto" });
+  for (const [unit, ms] of RELATIVE_STEPS) {
+    if (Math.abs(diff) >= ms) return rtf.format(Math.round(diff / ms), unit);
+  }
+  return rtf.format(0, "second");
+}
+
 /**
  * Hesap ▸ Oturumlar (P0-4): etkin oturumları listeler, tek oturumu veya mevcut dışındaki
  * tümünü uzaktan kapatır. Kapatma yakın zamanda yeniden doğrulama ister (REAUTH_REQUIRED).
  */
 export default function SessionManager() {
   const t = useTranslations("account.sessions");
+  const ta = useTranslations("account");
   const fmt = useFormat();
   const router = useRouter();
   const reauth = useReauth();
   const { confirm, confirmDialog } = useConfirm();
-  const [sessions, setSessions] = useState<SessionView[] | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [loaded, setLoaded] = useState<{ sessions: SessionView[]; at: number } | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  // İşlemdeki düğme: oturum kimliği ya da OTHERS (F634: yalnız o düğmenin metni değişir).
+  const [revoking, setRevoking] = useState<string | null>(null);
   const [status, setStatus] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
+  // F631: kaldırılan satırın sırası (-1: bölüm başlığı); yenilenen listede odak oraya taşınır.
+  const pendingFocus = useRef<number | null>(null);
 
   // F191: sunucu/tarayıcı metni yerine arayüz dilinde hata.
   const errorText = useAccountErrorText();
 
-  const load = useCallback(
-    () =>
-      fetchSessions()
-        .then(setSessions)
-        .catch((err: unknown) =>
-          setStatus({ kind: "error", text: errorText(err, t("loadFailed")) })
-        ),
-    [errorText, t]
+  const onLoadError = useCallback(
+    (err: unknown) => {
+      pendingFocus.current = null;
+      if ((err as { status?: number }).status === 401) router.push(loginHref());
+      else setLoadError(errorText(err, t("loadFailed")));
+    },
+    [errorText, router, t]
   );
+
+  const load = useCallback(() => {
+    setLoading(true);
+    return fetchSessions()
+      .then((sessions) => {
+        setLoaded({ sessions, at: Date.now() });
+        setLoadError(null);
+      })
+      .catch(onLoadError)
+      .finally(() => setLoading(false));
+  }, [onLoadError]);
 
   useEffect(() => {
     let cancelled = false;
     fetchSessions()
-      .then((list) => {
-        if (!cancelled) setSessions(list);
+      .then((sessions) => {
+        if (!cancelled) setLoaded({ sessions, at: Date.now() });
       })
       .catch((err: unknown) => {
-        if (cancelled) return;
-        if ((err as { status?: number }).status === 401) router.push("/login");
-        else setStatus({ kind: "error", text: errorText(err, t("loadFailed")) });
+        if (!cancelled) onLoadError(err);
       });
     return () => {
       cancelled = true;
     };
-  }, [errorText, router, t]);
+  }, [onLoadError]);
 
-  async function revoke(query: string | null, confirmText: string) {
-    if (busy) return;
+  useEffect(() => {
+    const index = pendingFocus.current;
+    if (index === null || !loaded) return;
+    pendingFocus.current = null;
+    // Yalnız odaktaki düğme DOM'dan kalktıysa taşı; kullanıcının başka yerdeki odağını çalma.
+    if (document.activeElement && document.activeElement !== document.body) return;
+    let target: HTMLElement | null | undefined = headingRef.current;
+    if (index >= 0) {
+      // Sonraki satırın düğmesi; son satır kalktıysa bir öncekinin, liste boşsa başlık.
+      const buttons = listRef.current?.querySelectorAll<HTMLButtonElement>("button");
+      target = buttons?.item(index) ?? buttons?.item(index - 1) ?? target;
+    }
+    target?.focus();
+  }, [loaded]);
+
+  function retry() {
+    pendingFocus.current = -1;
+    void load();
+  }
+
+  async function revoke(key: string, query: string | null, confirmText: string, index = -1) {
+    if (revoking) return;
     const ok = await confirm({
       title: confirmText,
       confirmLabel: query === null ? t("confirmLogoutLabel") : t("confirmRevokeLabel"),
       tone: "danger",
     });
     if (!ok) return;
-    setBusy(true);
+    setRevoking(key);
     setStatus(null);
     try {
       if (query === null) {
@@ -81,85 +137,136 @@ export default function SessionManager() {
         router.push("/login");
         return;
       }
-      await reauth.run(() => apiFetch(`/api/account/sessions?${query}`, { method: "DELETE" }));
-      setStatus({ kind: "ok", text: t("revokedOk") });
+      const res = await reauth.run(() =>
+        apiFetch<{ revoked?: number }>(`/api/account/sessions?${query}`, { method: "DELETE" })
+      );
+      setStatus({
+        kind: "ok",
+        text: key === OTHERS ? t("revokedCount", { count: res.revoked ?? 0 }) : t("revokedOk"),
+      });
+      pendingFocus.current = index;
     } catch (err) {
+      // F1187: kullanıcı yeniden doğrulamadan kendisi vazgeçti; hata değil, liste de değişmedi.
+      if (err instanceof ReauthCancelledError) {
+        setRevoking(null);
+        return;
+      }
       // 404: oturum zaten kapanmış; liste yenilenince kaybolur.
       if (err instanceof ApiError && err.code === "NOT_FOUND") {
         setStatus({ kind: "ok", text: t("alreadyClosed") });
+        pendingFocus.current = index;
       } else {
         setStatus({ kind: "error", text: errorText(err, t("revokeFailed")) });
       }
-    } finally {
-      setBusy(false);
     }
     await load();
+    setRevoking(null);
   }
 
+  const sessions = loaded?.sessions ?? null;
+  const loadedAt = loaded?.at ?? 0;
+  // F459: mevcut oturum her zaman ilk sırada; diğerleri sunucunun son etkinlik sırasında kalır.
+  const ordered = sessions
+    ? [...sessions].sort((a, b) => Number(b.current) - Number(a.current))
+    : null;
   const others = sessions?.filter((s) => !s.current).length ?? 0;
+  const busy = revoking !== null;
 
   return (
     <section aria-labelledby="sessions-title" className="mt-8 rounded-xl bg-white p-6 shadow-sm">
-      <h2 id="sessions-title" className="text-xl font-semibold text-gray-900">
+      <h2
+        id="sessions-title"
+        ref={headingRef}
+        tabIndex={-1}
+        className="text-xl font-semibold text-gray-900 focus:outline-none"
+      >
         {t("listTitle")}
       </h2>
-      {status && (
-        <p
-          role={status.kind === "error" ? "alert" : "status"}
-          className={`mt-3 text-sm ${status.kind === "error" ? "text-red-700" : "text-green-800"}`}
-        >
-          {status.text}
-        </p>
+      {/* F632: başarı, her zaman DOM'da duran role="status" bölgesinde duyurulur. */}
+      <div className="mt-2">
+        <Status
+          error={status?.kind === "error" ? status.text : null}
+          message={status?.kind === "ok" ? status.text : null}
+        />
+      </div>
+      {loadError && (
+        <div className="mt-2">
+          <Status error={loadError} />
+          <Button variant="secondary" busy={loading} onClick={retry} className="mt-2">
+            {ta("retry")}
+          </Button>
+        </div>
       )}
-      {sessions === null ? (
-        <p className="mt-3 text-sm text-gray-500">{t("loading")}</p>
-      ) : sessions.length === 0 ? (
+      {ordered === null ? (
+        loadError ? null : (
+          <p className="mt-3 text-sm text-gray-500">{t("loading")}</p>
+        )
+      ) : ordered.length === 0 ? (
         <p className="mt-3 text-sm text-gray-700">{t("empty")}</p>
       ) : (
-        <ul className="mt-3 divide-y divide-gray-100">
-          {sessions.map((s) => (
-            <li key={s.id} className="flex items-center justify-between gap-2 py-3 text-sm">
-              <span>
-                <span className="font-medium text-gray-900">
-                  {s.device ?? t("unknownDevice")}
-                  {s.current && (
-                    <span className="ml-2 rounded bg-green-100 px-2 py-0.5 text-xs text-green-800">
-                      {t("current")}
-                    </span>
-                  )}
-                </span>
-                <span className="block text-xs text-gray-600">
-                  {t("started", { date: fmt.dateTime(s.createdAt) })}
-                  {" · "}
-                  {t("lastSeen", { date: fmt.dateTime(s.lastSeenAt) })}
-                  {s.ipHint && ` · ${t("ip", { ip: s.ipHint })}`}
-                </span>
-              </span>
-              <button
-                type="button"
-                onClick={() =>
-                  void revoke(
-                    s.current ? null : `id=${encodeURIComponent(s.id)}`,
-                    s.current ? t("confirmRevokeCurrent") : t("confirmRevoke")
-                  )
-                }
-                aria-disabled={busy || undefined}
-                className="min-h-[44px] shrink-0 rounded-lg border border-red-300 px-3 py-1 text-xs font-semibold text-red-700 aria-disabled:opacity-50 sm:min-h-0"
+        <ul ref={listRef} aria-busy={busy || undefined} className="mt-3 divide-y divide-gray-100">
+          {ordered.map((s, index) => {
+            const device = s.device ?? t("unknownDevice");
+            const lastSeen = fmt.dateTime(s.lastSeenAt);
+            const isRevoking = revoking === s.id;
+            // F635: mevcut cihaz görünür metinle, diğerleri cihaz + son etkinlikle ayırt edilir.
+            const label =
+              s.current || isRevoking ? undefined : t("revokeLabel", { device, date: lastSeen });
+            return (
+              <li
+                key={s.id}
+                className="flex flex-col items-start gap-2 py-3 text-sm sm:flex-row sm:items-center sm:justify-between"
               >
-                {t("revoke")}
-              </button>
-            </li>
-          ))}
+                <span>
+                  <span className="font-medium text-gray-900">
+                    {device}
+                    {s.current && (
+                      <span className="ml-2 rounded bg-green-100 px-2 py-0.5 text-xs text-green-800">
+                        {t("current")}
+                      </span>
+                    )}
+                  </span>
+                  <span className="block text-xs text-gray-600">
+                    {t("started", { date: fmt.dateTime(s.createdAt) })}
+                    {" · "}
+                    {t("lastSeen", {
+                      ago: relativeTime(s.lastSeenAt, loadedAt, fmt.locale),
+                      date: lastSeen,
+                    })}
+                    {s.ipHint && ` · ${t("ip", { ip: s.ipHint })}`}
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    void revoke(
+                      s.id,
+                      s.current ? null : `id=${encodeURIComponent(s.id)}`,
+                      s.current ? t("confirmRevokeCurrent") : t("confirmRevoke"),
+                      index
+                    )
+                  }
+                  aria-disabled={busy || undefined}
+                  aria-busy={isRevoking || undefined}
+                  aria-label={label}
+                  className="min-h-[44px] shrink-0 rounded-lg border border-red-300 px-3 py-1 text-xs font-semibold text-red-700 aria-disabled:opacity-50 sm:min-h-0"
+                >
+                  {isRevoking ? t("revoking") : s.current ? t("revokeCurrent") : t("revoke")}
+                </button>
+              </li>
+            );
+          })}
         </ul>
       )}
       {others > 0 && (
         <button
           type="button"
-          onClick={() => void revoke("scope=others", t("confirmRevokeOthers"))}
+          onClick={() => void revoke(OTHERS, OTHERS, t("confirmRevokeOthers"))}
           aria-disabled={busy || undefined}
+          aria-busy={revoking === OTHERS || undefined}
           className="mt-4 min-h-[44px] rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white aria-disabled:opacity-50 sm:min-h-0"
         >
-          {t("revokeOthers")}
+          {revoking === OTHERS ? t("revoking") : t("revokeOthers", { count: others })}
         </button>
       )}
       {reauth.dialog}

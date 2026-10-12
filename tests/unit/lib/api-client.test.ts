@@ -61,7 +61,7 @@ describe("api-client", () => {
     fetchMock.mockResolvedValueOnce(new Response("<html>502</html>", { status: 502 }));
     await expect(apiFetch("/api/search")).rejects.toMatchObject({
       status: 502,
-      message: "İstek başarısız (502)",
+      message: "HTTP 502",
       code: undefined,
     });
   });

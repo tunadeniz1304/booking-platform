@@ -8,7 +8,7 @@
   "nightsUniform": "{price} × {count} gece",
   "nightsVariable": "{count} gece (gecelik fiyatlar değişken)",
   "includedTax": "{label}{rate} dahil: {amount}",
-  "rate": " (%{rate})",
+  "rate": " ({rate})",
   "promotion": "{name}",
   "coupon": "Kupon {code}",
   "discountTotal": "Toplam indirim",
@@ -20,7 +20,7 @@
   "couponRemove": "Kaldır",
   "couponStatus": {
     "APPLIED": "Kupon uygulandı.",
-    "NOT_FOUND": "Kupon bulunamadı.",
+    "NOT_FOUND": "Kupon bulunamadı. Kodu kontrol edip yeniden uygulayın ya da kaldırın.",
     "USAGE_LIMIT_REACHED": "Kuponun kullanım limiti doldu.",
     "EXPIRED": "Kuponun süresi dolmuş.",
     "NOT_STARTED": "Kupon henüz geçerli değil.",
@@ -31,5 +31,15 @@
     "VAT": "KDV",
     "ACCOMMODATION_TAX": "Konaklama vergisi",
     "SERVICE_FEE": "Hizmet bedeli"
-  }
+  },
+  "couponAppliedCode": "{code} kuponu uygulandı.",
+  "couponApplying": "Uygulanıyor…",
+  "couponRemoveLabel": "{code} kuponunu kaldır",
+  "couponEmpty": "Kupon kodu girin.",
+  "couponUnapplied": "Bu kupon kodunu uygulamadınız. Uygula'ya basın ya da alanı temizleyin.",
+  "rateNet": " ({rate}, {excluded} hariç tutar üzerinden)",
+  "priceDetails": "Fiyat ayrıntıları",
+  "nightsShow": "Gecelik fiyatları göster",
+  "validUntil": "Bu fiyat {time} saatine kadar geçerlidir.",
+  "expired": "Bu fiyatın geçerlilik süresi doldu; devam ettiğinizde güncel fiyat hesaplanır."
 }

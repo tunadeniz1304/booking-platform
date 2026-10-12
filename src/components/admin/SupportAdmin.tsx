@@ -1,13 +1,23 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { apiFetch } from "@/lib/api-client";
 import { useFormat } from "@/i18n/use-format";
-import { Button, Card, Status, errorMessage, inputClass, useLoader } from "@/components/ui/ui";
+import {
+  Button,
+  Card,
+  Status,
+  focusRing,
+  inputClass,
+  useErrorText,
+  useLoader,
+} from "@/components/ui/ui";
 import { useRowFocusRecovery } from "@/components/admin/AdminDashboard";
 
 type TicketStatus = "OPEN" | "IN_PROGRESS" | "RESOLVED";
+/** "ACTIVE": açık + inceleniyor (varsayılan; incelemeye alınan talep listede kalır). */
+type TicketFilter = TicketStatus | "ACTIVE" | "";
 
 interface TicketRow {
   id: string;
@@ -20,116 +30,354 @@ interface TicketRow {
   summary: string;
   locale: string;
   createdAt: string;
+  /** Talebi üstlenen yönetici (API sağlıyorsa). */
+  handlerId?: string | null;
+}
+
+interface TicketGroup {
+  key: string;
+  rows: TicketRow[];
+  /** Grubun ilk satırının düz listedeki sırası (odak kurtarma için). */
+  start: number;
 }
 
 const STATUSES: readonly TicketStatus[] = ["OPEN", "IN_PROGRESS", "RESOLVED"];
 
-/** v5 P1-4: insan destek kuyruğu — filtrele, incelemeye al, çöz (denetim kayıtlı). */
-export default function SupportAdmin() {
+const byCreatedAt = (a: TicketRow, b: TicketRow) =>
+  a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : 0;
+
+async function fetchTickets(filter: TicketFilter): Promise<TicketRow[]> {
+  const get = (s?: TicketStatus) =>
+    apiFetch<{ tickets: TicketRow[] }>(
+      `/api/admin/support${s ? `?status=${encodeURIComponent(s)}` : ""}`
+    ).then((r) => r.tickets);
+  if (filter !== "ACTIVE") return get(filter || undefined);
+  const [open, inProgress] = await Promise.all([get("OPEN"), get("IN_PROGRESS")]);
+  return [...open, ...inProgress].sort(byCreatedAt);
+}
+
+/** Aynı kullanıcının aynı rezervasyona ait talepleri tek grupta (ilk görülme sırası). */
+function groupTickets(rows: TicketRow[]): TicketGroup[] {
+  const groups = new Map<string, TicketGroup>();
+  for (const row of rows) {
+    const key = row.bookingId ? `${row.userId ?? ""}|${row.bookingId}` : row.id;
+    const group = groups.get(key);
+    if (group) group.rows.push(row);
+    else groups.set(key, { key, rows: [row], start: 0 });
+  }
+  let start = 0;
+  for (const group of groups.values()) {
+    group.start = start;
+    start += group.rows.length;
+  }
+  return [...groups.values()];
+}
+
+/**
+ * v5 P1-4: insan destek kuyruğu — filtrele, ara, incelemeye al, çöz (denetim kayıtlı).
+ * Aynı rezervasyonun yinelenen talepleri gruplanır; seçilenlere toplu işlem uygulanır.
+ */
+export default function SupportAdmin({ currentUserId }: { currentUserId?: string } = {}) {
   const t = useTranslations("support.admin");
+  const tc = useTranslations("common");
   const f = useFormat();
+  const errorText = useErrorText();
   const filterId = useId();
-  const [status, setStatus] = useState<TicketStatus | "">("OPEN");
-  const { data, error, reload } = useLoader(
-    () =>
-      apiFetch<{ tickets: TicketRow[] }>(
-        `/api/admin/support${status ? `?status=${encodeURIComponent(status)}` : ""}`
-      ),
-    [status]
-  );
-  const [busy, setBusy] = useState<string | null>(null);
+  const searchId = useId();
+  const [status, setStatus] = useState<TicketFilter>("ACTIVE");
+  const [query, setQuery] = useState("");
+  const { data, error, reload } = useLoader(() => fetchTickets(status), [status]);
+  const [busy, setBusy] = useState<{ key: string; ids: ReadonlySet<string> } | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set());
+  // Bu oturumda güncellenen talepler: filtre değişene kadar listede kalır.
+  const [touched, setTouched] = useState<ReadonlyMap<string, TicketRow>>(() => new Map());
   const markFocus = useRowFocusRecovery(data, "support-admin");
 
-  const update = async (id: string, index: number, next: TicketStatus) => {
-    if (busy) return;
-    setBusy(id);
+  const rows = useMemo(() => {
+    if (!data) return null;
+    const ids = new Set(data.map((r) => r.id));
+    const kept = [...touched.values()].filter((r) => !ids.has(r.id));
+    return kept.length > 0 ? [...data, ...kept].sort(byCreatedAt) : data;
+  }, [data, touched]);
+
+  const visible = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!rows || !q) return rows;
+    return rows.filter((r) =>
+      [r.id, r.bookingId, r.userId].some((v) => v?.toLowerCase().includes(q))
+    );
+  }, [rows, query]);
+
+  const groups = useMemo(() => (visible ? groupTickets(visible) : []), [visible]);
+  const selectedRows = visible?.filter((r) => selected.has(r.id)) ?? [];
+  const allSelected = !!visible && visible.length > 0 && selectedRows.length === visible.length;
+
+  const changeFilter = (next: TicketFilter) => {
+    setStatus(next);
+    setTouched(new Map());
+    setSelected(new Set());
+  };
+
+  const toggle = (id: string, on: boolean) =>
+    setSelected((s) => {
+      const next = new Set(s);
+      if (on) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+
+  /** Tek ya da toplu durum geçişi; istekler sırayla gönderilir, başarısızlar sayılır. */
+  const update = async (key: string, targets: TicketRow[], next: TicketStatus, index: number) => {
+    if (busy || targets.length === 0) return;
+    setBusy({ key, ids: new Set(targets.map((r) => r.id)) });
     setMessage(null);
     setActionError(null);
+    const done: TicketRow[] = [];
+    let failure: unknown = null;
+    let failed = 0;
     try {
-      await apiFetch(`/api/admin/support/${encodeURIComponent(id)}`, {
-        method: "PATCH",
-        body: JSON.stringify({ status: next }),
-      });
-      setMessage(t("updated"));
-      markFocus(index);
-      reload();
-    } catch (e) {
-      setActionError(errorMessage(e));
+      for (const row of targets) {
+        try {
+          await apiFetch(`/api/admin/support/${encodeURIComponent(row.id)}`, {
+            method: "PATCH",
+            body: JSON.stringify({ status: next }),
+          });
+          done.push({ ...row, status: next });
+        } catch (e) {
+          failure = e;
+          failed += 1;
+        }
+      }
+      if (done.length > 0) {
+        setTouched((m) => {
+          const copy = new Map(m);
+          for (const row of done) copy.set(row.id, row);
+          return copy;
+        });
+        setSelected((s) => {
+          const copy = new Set(s);
+          for (const row of done) copy.delete(row.id);
+          return copy;
+        });
+        setMessage(targets.length === 1 ? t("updated") : t("bulkUpdated", { count: done.length }));
+        markFocus(index);
+        reload();
+      }
+      if (failed > 0) {
+        setActionError(
+          targets.length === 1
+            ? errorText(failure)
+            : t("bulkFailed", { count: failed, error: errorText(failure) })
+        );
+      }
     } finally {
       setBusy(null);
     }
   };
 
+  const bulk = (next: TicketStatus) => {
+    const targets = selectedRows.filter((r) =>
+      next === "IN_PROGRESS" ? r.status === "OPEN" : r.status !== "RESOLVED"
+    );
+    const first = visible?.findIndex((r) => r.id === targets[0]?.id) ?? 0;
+    void update(`bulk:${next}`, targets, next, Math.max(first, 0));
+  };
+
+  const renderRow = (row: TicketRow, index: number) => {
+    const rowBusy = !!busy?.ids.has(row.id);
+    const mine =
+      row.status === "IN_PROGRESS" &&
+      ((!!currentUserId && row.handlerId === currentUserId) ||
+        touched.get(row.id)?.status === "IN_PROGRESS");
+    return (
+      <li key={row.id} data-row className="rounded-md border border-gray-200 p-3 text-sm">
+        <div className="flex items-start gap-3">
+          <label className="-m-2 inline-flex min-h-[44px] min-w-[44px] items-center justify-center p-2">
+            <input
+              type="checkbox"
+              checked={selected.has(row.id)}
+              onChange={(e) => toggle(row.id, e.target.checked)}
+              className={`h-4 w-4 rounded border-gray-400 text-[#003580] ${focusRing}`}
+            />
+            <span className="sr-only">{t("selectRow", { id: row.id })}</span>
+          </label>
+          <div className="min-w-0 flex-1">
+            <p className="font-medium text-gray-900">
+              {t(`reason.${row.reason}`)} · {t(`status.${row.status}`)} ·{" "}
+              {f.dateTime(row.createdAt)}
+              {mine && (
+                <span className="ml-2 inline-block rounded bg-gray-100 px-1.5 py-0.5 text-xs font-semibold text-gray-800">
+                  {t("assignedToYou")}
+                </span>
+              )}
+            </p>
+            <p className="break-words text-gray-700">
+              {t("ticketId", { id: row.id })}
+              {row.userId ? ` · ${t("user", { id: row.userId })}` : ""}
+            </p>
+            <p className="text-gray-700">
+              {row.intent} · {t("confidence", { value: row.confidence.toFixed(2) })}
+              {row.bookingId ? ` · ${t("booking", { id: row.bookingId })}` : ""}
+            </p>
+            {row.status === "IN_PROGRESS" && row.handlerId && !mine && (
+              <p className="break-words text-gray-700">{t("handler", { id: row.handlerId })}</p>
+            )}
+            <p className="mt-1 whitespace-pre-line text-gray-900">{row.summary}</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {row.status === "OPEN" && (
+                <Button
+                  variant="secondary"
+                  busy={rowBusy}
+                  onClick={() => update(row.id, [row], "IN_PROGRESS", index)}
+                >
+                  {t("markInProgress")}
+                </Button>
+              )}
+              {row.status !== "RESOLVED" ? (
+                <Button busy={rowBusy} onClick={() => update(row.id, [row], "RESOLVED", index)}>
+                  {t("markResolved")}
+                </Button>
+              ) : (
+                <Button
+                  variant="secondary"
+                  busy={rowBusy}
+                  onClick={() => update(row.id, [row], "OPEN", index)}
+                >
+                  {t("reopen")}
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      </li>
+    );
+  };
+
+  const noneSelected = selectedRows.length === 0;
+
   return (
     <Card title={t("title")} id="support-admin">
-      <label htmlFor={filterId} className="block text-sm font-medium text-gray-900">
-        {t("filter")}
-      </label>
-      <select
-        id={filterId}
-        className={`${inputClass} mb-4 max-w-xs`}
-        value={status}
-        onChange={(e) => setStatus(e.target.value as TicketStatus | "")}
-      >
-        <option value="">{t("all")}</option>
-        {STATUSES.map((s) => (
-          <option key={s} value={s}>
-            {t(`status.${s}`)}
-          </option>
-        ))}
-      </select>
+      <div className="mb-4 flex flex-wrap gap-4">
+        <div className="w-full max-w-xs">
+          <label htmlFor={filterId} className="block text-sm font-medium text-gray-900">
+            {t("filter")}
+          </label>
+          <select
+            id={filterId}
+            className={inputClass}
+            value={status}
+            onChange={(e) => changeFilter(e.target.value as TicketFilter)}
+          >
+            <option value="ACTIVE">{t("active")}</option>
+            {STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {t(`status.${s}`)}
+              </option>
+            ))}
+            <option value="">{t("all")}</option>
+          </select>
+        </div>
+        <div className="w-full max-w-xs">
+          <label htmlFor={searchId} className="block text-sm font-medium text-gray-900">
+            {t("search")}
+          </label>
+          <input
+            id={searchId}
+            type="search"
+            className={inputClass}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            autoComplete="off"
+          />
+        </div>
+      </div>
       {error ? (
-        <Status error={error} />
-      ) : !data ? (
-        <p className="text-sm text-gray-600">{t("loading")}</p>
-      ) : data.tickets.length === 0 ? (
+        <div className="space-y-2">
+          <Status error={error} />
+          <Button variant="secondary" onClick={reload}>
+            {tc("errorPage.retry")}
+          </Button>
+        </div>
+      ) : !rows || !visible ? (
+        <p role="status" className="text-sm text-gray-600">
+          {t("loading")}
+        </p>
+      ) : rows.length === 0 ? (
         <p className="text-sm text-gray-700">{t("empty")}</p>
       ) : (
-        <ul className="space-y-3">
-          {data.tickets.map((row, index) => (
-            <li key={row.id} data-row className="rounded-md border border-gray-200 p-3 text-sm">
-              <p className="font-medium text-gray-900">
-                {t(`reason.${row.reason}`)} · {t(`status.${row.status}`)} ·{" "}
-                {f.dateTime(row.createdAt)}
-              </p>
-              <p className="break-words text-gray-700">
-                {t("ticketId", { id: row.id })}
-                {row.userId ? ` · ${t("user", { id: row.userId })}` : ""}
-              </p>
-              <p className="text-gray-700">
-                {row.intent} · {t("confidence", { value: row.confidence.toFixed(2) })}
-                {row.bookingId ? ` · ${t("booking", { id: row.bookingId })}` : ""}
-              </p>
-              <p className="mt-1 whitespace-pre-line text-gray-900">{row.summary}</p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {row.status === "OPEN" && (
-                  <Button
-                    variant="secondary"
-                    busy={busy === row.id}
-                    onClick={() => update(row.id, index, "IN_PROGRESS")}
-                  >
-                    {t("markInProgress")}
-                  </Button>
-                )}
-                {row.status !== "RESOLVED" ? (
-                  <Button busy={busy === row.id} onClick={() => update(row.id, index, "RESOLVED")}>
-                    {t("markResolved")}
-                  </Button>
-                ) : (
-                  <Button
-                    variant="secondary"
-                    busy={busy === row.id}
-                    onClick={() => update(row.id, index, "OPEN")}
-                  >
-                    {t("reopen")}
-                  </Button>
-                )}
-              </div>
-            </li>
-          ))}
-        </ul>
+        <>
+          <div className="mb-3 flex flex-wrap items-center gap-2 rounded-md bg-gray-50 p-2 text-sm">
+            <label className="inline-flex min-h-[44px] items-center gap-2 px-1 font-medium text-gray-900">
+              <input
+                type="checkbox"
+                checked={allSelected}
+                ref={(el) => {
+                  if (el) el.indeterminate = !allSelected && selectedRows.length > 0;
+                }}
+                onChange={(e) =>
+                  setSelected(e.target.checked ? new Set(visible.map((r) => r.id)) : new Set())
+                }
+                disabled={visible.length === 0}
+                className={`h-4 w-4 rounded border-gray-400 text-[#003580] ${focusRing}`}
+              />
+              {t("selectAll", { count: visible.length })}
+            </label>
+            <span className="text-gray-700">
+              {t("selectedCount", { count: selectedRows.length })}
+            </span>
+            <Button
+              variant="secondary"
+              aria-disabled={noneSelected || undefined}
+              busy={busy?.key === "bulk:IN_PROGRESS"}
+              onClick={() => bulk("IN_PROGRESS")}
+            >
+              {t("bulkInProgress")}
+            </Button>
+            <Button
+              variant="secondary"
+              aria-disabled={noneSelected || undefined}
+              busy={busy?.key === "bulk:RESOLVED"}
+              onClick={() => bulk("RESOLVED")}
+            >
+              {t("bulkResolve")}
+            </Button>
+          </div>
+          {visible.length === 0 ? (
+            <p className="text-sm text-gray-700">{t("noMatch")}</p>
+          ) : (
+            <ul className="space-y-3">
+              {groups.map(({ key, rows: groupRows, start }) => {
+                if (groupRows.length === 1) return renderRow(groupRows[0], start);
+                const headingId = `${filterId}-g-${start}`;
+                const unresolved = groupRows.filter((r) => r.status !== "RESOLVED");
+                return (
+                  <li key={key} className="rounded-md border border-gray-300 p-3">
+                    <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                      <p id={headingId} className="text-sm font-semibold text-gray-900">
+                        {t("groupTitle", { count: groupRows.length })}
+                      </p>
+                      {unresolved.length > 0 && (
+                        <Button
+                          variant="secondary"
+                          aria-describedby={headingId}
+                          busy={busy?.key === `group:${key}`}
+                          onClick={() => update(`group:${key}`, unresolved, "RESOLVED", start)}
+                        >
+                          {t("groupResolveAll")}
+                        </Button>
+                      )}
+                    </div>
+                    <ul aria-labelledby={headingId} className="space-y-3">
+                      {groupRows.map((row, i) => renderRow(row, start + i))}
+                    </ul>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </>
       )}
       <Status error={actionError} message={message} />
     </Card>

@@ -30,11 +30,69 @@ export function isNetworkError(err: unknown): boolean {
   return err instanceof TypeError;
 }
 
+/** Yanıt süresinde gelmeyen isteğin `ApiError.code` değeri (status 0). */
+export const TIMEOUT_CODE = "TIMEOUT";
+
+/**
+ * İstek zaman aşımına mı uğradı (F401)? İşlem sunucuda yine de tamamlanmış olabilir: ödeme
+ * akışları bu durumda kaydın son hâlini yeniden okumalı (Idempotency-Key ile tekrar güvenli).
+ */
+export function isTimeoutError(err: unknown): boolean {
+  return err instanceof ApiError && err.code === TIMEOUT_CODE;
+}
+
+/**
+ * Oturum süresi doldu (401 + yenileme başarısız) olayı (F402). Yalnız bu sekmede daha önce
+ * oturum görüldüyse ve olay başına bir kez yayılır; `SessionExpiredDialog` dinler.
+ */
+export const SESSION_EXPIRED_EVENT = "session-expired";
+
+/** Bu sekmede oturum görüldü mü (hiç giriş yapmamış ziyaretçiye "oturum doldu" denmez). */
+let sessionSeen = false;
+
+function notifySessionExpired(): void {
+  if (!sessionSeen || typeof window === "undefined") return;
+  sessionSeen = false;
+  window.dispatchEvent(new CustomEvent(SESSION_EXPIRED_EVENT));
+}
+
+/** Varsayılan istek süresi; ödeme ve LLM uçları daha uzun, dosya yüklemeleri en uzun (F401). */
+const DEFAULT_TIMEOUT_MS = 20_000;
+const SLOW_TIMEOUT_MS = 45_000;
+const UPLOAD_TIMEOUT_MS = 120_000;
+
+/** Kart ödemesi/3DS onayı, paylaşımlı ve devir ödemesi ile LLM çağıran uçlar. */
+const SLOW_PATHS = [
+  /^\/api\/(?:ai|pay|search\/smart|support\/chat|transfers\/claim)(?:[/?]|$)/,
+  /^\/api\/(?:search|properties|admin\/reviews|admin\/events)(?:\?|$)/,
+  /\/(?:pay|confirm|draft|summary|suggestions)(?:[/?]|$)/,
+];
+
+function canTimeout(): boolean {
+  return typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function";
+}
+
+function defaultTimeout(path: string, body: RequestInit["body"]): number {
+  if (typeof FormData !== "undefined" && body instanceof FormData) return UPLOAD_TIMEOUT_MS;
+  return SLOW_PATHS.some((re) => re.test(path)) ? SLOW_TIMEOUT_MS : DEFAULT_TIMEOUT_MS;
+}
+
+function isAbortTimeout(err: unknown): boolean {
+  return err instanceof Error && err.name === "TimeoutError";
+}
+
 let refreshing: Promise<boolean> | null = null;
 
 async function refreshSession(): Promise<boolean> {
-  refreshing ??= fetch("/api/auth/refresh", { method: "POST", credentials: "same-origin" })
-    .then((res) => res.ok)
+  refreshing ??= fetch("/api/auth/refresh", {
+    method: "POST",
+    credentials: "same-origin",
+    ...(canTimeout() ? { signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS) } : {}),
+  })
+    .then((res) => {
+      if (res.ok) sessionSeen = true;
+      return res.ok;
+    })
     .catch(() => false)
     .finally(() => {
       setTimeout(() => {
@@ -45,7 +103,8 @@ async function refreshSession(): Promise<boolean> {
 }
 
 async function toApiError(res: Response): Promise<ApiError> {
-  let message = `İstek başarısız (${res.status})`;
+  // Teknik, dilden bağımsız varsayılan: arayüz metni `useErrorText` ile yerelleştirilir (F515).
+  let message = `HTTP ${res.status}`;
   let code: string | undefined;
   let details: unknown;
   try {
@@ -59,23 +118,50 @@ async function toApiError(res: Response): Promise<ApiError> {
   return new ApiError(res.status, message, code, details);
 }
 
-export async function apiFetch<T = unknown>(path: string, options: RequestInit = {}): Promise<T> {
-  const init: RequestInit = {
-    ...options,
-    credentials: "same-origin",
-    headers: {
-      // FormData (dosya yükleme): tarayıcı multipart sınırını kendisi yazar.
-      ...(options.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
-      ...(options.headers as Record<string, string> | undefined),
-    },
-  };
+export type ApiFetchOptions = RequestInit & {
+  /**
+   * Zaman aşımı (ms); `0` kapatır. Verilmezse uca göre seçilir. Çağıran kendi `signal`'ini
+   * verdiyse uygulanmaz (iptal ve süre çağıranda).
+   */
+  timeoutMs?: number;
+};
 
-  let res = await fetch(path, init);
-  if (res.status === 401 && !path.startsWith("/api/auth/")) {
-    if (await refreshSession()) res = await fetch(path, init);
+/**
+ * Zaman aşımında `ApiError(0, "TIMEOUT", "TIMEOUT")` fırlatır (bkz. `isTimeoutError`); ağ
+ * hatası `TypeError` olarak kalır (`isNetworkError`).
+ */
+export async function apiFetch<T = unknown>(
+  path: string,
+  options: ApiFetchOptions = {}
+): Promise<T> {
+  const { timeoutMs, ...rest } = options;
+  let ms = 0;
+  if (!rest.signal && canTimeout()) ms = timeoutMs ?? defaultTimeout(path, rest.body);
+  // Her deneme (401 → yenileme → tekrar) kendi süresiyle başlar.
+  const send = () =>
+    fetch(path, {
+      ...rest,
+      credentials: "same-origin",
+      headers: {
+        // FormData (dosya yükleme): tarayıcı multipart sınırını kendisi yazar.
+        ...(rest.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
+        ...(rest.headers as Record<string, string> | undefined),
+      },
+      ...(ms > 0 ? { signal: AbortSignal.timeout(ms) } : {}),
+    });
+
+  try {
+    let res = await send();
+    if (res.status === 401 && !path.startsWith("/api/auth/")) {
+      if (await refreshSession()) res = await send();
+      else notifySessionExpired();
+    }
+    if (!res.ok) throw await toApiError(res);
+    return (await res.json()) as T;
+  } catch (err) {
+    if (ms > 0 && isAbortTimeout(err)) throw new ApiError(0, TIMEOUT_CODE, TIMEOUT_CODE);
+    throw err;
   }
-  if (!res.ok) throw await toApiError(res);
-  return (await res.json()) as T;
 }
 
 export interface SessionUser {
@@ -84,18 +170,27 @@ export interface SessionUser {
   lastName: string;
   email: string;
   role: "USER" | "HOST" | "ADMIN";
+  /** E-posta doğrulandı mı (`/api/user/me`; ham zaman damgası gönderilmez). */
+  emailVerified: boolean;
 }
 
-/** Oturumdaki kullanıcı (yoksa `null`). */
+/**
+ * Oturumdaki kullanıcı; oturum yoksa (401/403/404) `null`. Ağ hatası, zaman aşımı ve 5xx'te
+ * fırlatır (F403): çağıran "giriş yapılmamış" ile "oturum bilgisi alınamadı"yı ayırmalı.
+ */
 export async function fetchCurrentUser(): Promise<SessionUser | null> {
   try {
-    return await apiFetch<SessionUser>("/api/user/me");
-  } catch {
-    return null;
+    const user = await apiFetch<SessionUser>("/api/user/me");
+    sessionSeen = true;
+    return user;
+  } catch (err) {
+    if (err instanceof ApiError && [401, 403, 404].includes(err.status)) return null;
+    throw err;
   }
 }
 
 export async function logout(): Promise<void> {
+  sessionSeen = false;
   try {
     await fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" });
   } catch {

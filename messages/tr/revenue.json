@@ -1,7 +1,7 @@
 {
   "page": {
     "title": "Gelir paneli",
-    "intro": "Doluluk, ADR ve RevPAR'ı izleyin; fiyat önerilerini katkı tablosuyla inceleyip kabul edin veya reddedin."
+    "intro": "Doluluk, ortalama gecelik fiyat (ADR) ve müsait oda başına geliri (RevPAR) izleyin; fiyat önerilerini katkı tablosuyla inceleyip kabul edin veya reddedin."
   },
   "loading": "Yükleniyor…",
   "loadingProperties": "Mülkler yükleniyor…",
@@ -16,27 +16,38 @@
     "clamp": "Taban/tavan"
   },
   "kpis": {
-    "title": "Performans ({from} – {to})",
+    "title": "Önümüzdeki {days} gece: onaylı rezervasyonlar ({from} – {to})",
     "occupancy": "Doluluk",
-    "adr": "ADR",
-    "revpar": "RevPAR",
+    "adr": "Ort. gecelik fiyat (ADR)",
+    "revpar": "Müsait oda başına gelir (RevPAR)",
     "revenue": "Gelir",
-    "sold": "{sold} / {available} oda-gece satıldı (onaylı ve tamamlanan rezervasyonlar)."
+    "sold": "{sold} / {available} oda-gece satıldı (onaylı ve tamamlanan rezervasyonlar).",
+    "occupancyHint": "Satılan oda-gecenin müsait oda-geceye oranı.",
+    "adrHint": "Satılan oda-gece başına ortalama gelir.",
+    "revparHint": "Müsait her oda-gece başına gelir (doluluk × ADR).",
+    "revenueHint": "Bu dönemdeki gecelere düşen rezervasyon geliri.",
+    "noInventory": "Bu dönem için müsaitlik açılmamış; doluluk ve gelir hesaplanamıyor. <link>Takvimden müsaitlik açın</link>."
   },
   "pickup": {
-    "title": "Pickup",
+    "title": "Rezervasyon birikimi (pickup)",
     "noData": "Veri yok.",
-    "chartTitle": "Pickup grafiği",
-    "chartDesc": "Son {count} günde girilen rezervasyonların penceredeki oda-gece toplamı; son değer {last}.",
-    "caption": "Çizgi: penceredeki toplam oda-gece · Çubuk: o gün girilen oda-gece",
-    "trend": "Penceredeki oda-gece {first} değerinden {last} değerine çıktı; bir günde en çok {dailyMax} oda-gece girildi.",
+    "chartTitle": "Rezervasyon birikimi grafiği",
+    "chartDesc": "Son {count} günde girilen rezervasyonların bu dönemdeki oda-gece toplamı; son değer {last}.",
+    "caption": "Çizgi: dönemdeki geceler için toplam oda-gece · Çubuk: o gün girilen oda-gece",
+    "trend": "Dönemdeki oda-gece {first} değerinden {last} değerine çıktı; bir günde en çok {dailyMax} oda-gece girildi.",
     "tableToggle": "Veriyi tablo olarak göster",
     "tableCaption": "Günlük pickup verisi",
     "columns": {
       "date": "Tarih",
       "pickup": "O gün girilen oda-gece",
-      "onBooks": "Penceredeki toplam oda-gece"
-    }
+      "onBooks": "Dönemdeki toplam oda-gece"
+    },
+    "window": "{from} – {to} arasındaki geceler için son {days} günde girilen rezervasyonlar. Yatay eksen rezervasyonun girildiği günü gösterir.",
+    "empty": "Bu dönemdeki geceler için henüz rezervasyon yok. İlk rezervasyonla birlikte grafik burada görünür.",
+    "lineLabel": "Dönemdeki toplam oda-gece (çizgi)",
+    "lineScale": "Ölçek 0–{max} · son değer {last}",
+    "barLabel": "O gün girilen oda-gece (çubuk)",
+    "barScale": "Ölçek 0–{max}"
   },
   "suggestions": {
     "title": "Fiyat önerileri",
@@ -56,10 +67,50 @@
     "accept": "Kabul et",
     "reject": "Reddet",
     "acceptNote": "Kabul ettiğiniz fiyat hemen yayına girer ve sabitlenir; motor bu geceyi bir daha güncellemez. Eski fiyata dönmek için takvimden elle fiyat girmeniz gerekir.",
-    "acceptConfirmTitle": "{room} · {date} fiyatı {from} → {to} olarak ayarlansın mı?",
+    "acceptConfirmTitle": "{room} · {date} gecesinin fiyatı {from} yerine {to} olarak ayarlansın mı?",
     "acceptConfirm": "Fiyatı ayarla",
-    "accepted": "{room} · {date} fiyatı {from} → {to} olarak ayarlandı ve sabitlendi. Önceki fiyat: {from}.",
-    "rejected": "{room} · {date} önerisi reddedildi; fiyat {from} olarak kaldı."
+    "accepted": "{room} · {date} gecesinin fiyatı {from} yerine {to} olarak ayarlandı ve sabitlendi. Geri almak için takvimden {from} fiyatını yeniden girin.",
+    "rejected": "{room} · {date} önerisi reddedildi; fiyat {from} olarak kaldı.",
+    "currentLabel": "Mevcut fiyat:",
+    "suggestedLabel": "Önerilen fiyat:",
+    "changeLabel": "Değişim:",
+    "replaceNote": "Bu oda için bekleyen {count} öneri, yeni üretilenlerle değiştirilecek.",
+    "replaceConfirmTitle": "Bekleyen öneriler yenileriyle değiştirilsin mi?",
+    "replaceConfirm": "Yeni öneri üret",
+    "roomOption": "{name} ({count, plural, =0 {bekleyen öneri yok} other {# bekleyen öneri}})",
+    "generating": "Öneriler üretiliyor…",
+    "generatingStatus": "Öneriler hazırlanıyor. Her gece için ayrı açıklama yazıldığından bu işlem birkaç saniye sürebilir; sayfayı yenilemeyin.",
+    "noneGenerated": "Bu oda için yakın gecelerde açık müsaitlik olmadığından öneri üretilmedi. <link>Takvimden müsaitlik açın</link>, sonra yeniden deneyin.",
+    "pendingElsewhere": "Diğer odalarda {count} bekleyen öneri var; görmek için yukarıdan odayı seçin.",
+    "emptyForRoom": "{room} için bekleyen öneri yok.",
+    "snapshotLabel": "Öneri anındaki fiyat:",
+    "priceChanged": "Bu gecenin fiyatı öneri üretildikten sonra değişti; güncel fiyatla karşılaştırmak için öneriyi yeniden üretin.",
+    "breakdownToggle": "Fiyatın hesaplanışını göster",
+    "captionFor": "{room} · {date} önerisinin katkı tablosu",
+    "acceptAll": "Tümünü kabul et ({count})",
+    "rejectAll": "Tümünü reddet ({count})",
+    "processing": "İşleniyor…",
+    "acceptAllConfirmTitle": "{room} için {count} önerinin tümü kabul edilsin mi?",
+    "acceptAllConfirm": "{count} fiyatı ayarla",
+    "rejectAllConfirmTitle": "{room} için {count} önerinin tümü reddedilsin mi?",
+    "rejectAllConfirm": "Tümünü reddet",
+    "rejectAllNote": "Reddetmek hiçbir fiyatı değiştirmez; öneriler listeden kalkar.",
+    "acceptAllDone": "{room} için {count} öneri kabul edildi; fiyatlar ayarlandı ve sabitlendi.",
+    "rejectAllDone": "{room} için {count} öneri reddedildi; fiyatlar değişmedi.",
+    "bulkFailed": "{total} önerinin {done} tanesi işlendi, ardından işlem durdu: {reason}"
   },
-  "loaded": "{title} verileri yüklendi."
+  "loaded": "{title} verileri yüklendi.",
+  "signInAgain": "Tekrar giriş yap",
+  "factorDetail": {
+    "occupancy": "Doluluk %{percent}",
+    "leadTime": "Varışa {days} gün",
+    "lastMinute": "Son dakika ({days} gün)",
+    "holiday": "{name}",
+    "noHoliday": "Resmî tatil yok",
+    "events": "{list}",
+    "noEvents": "Onaylı etkinlik yok",
+    "ceiling": "Tavan sınırı",
+    "floor": "Taban sınırı",
+    "withinBounds": "Sınır içinde"
+  }
 }

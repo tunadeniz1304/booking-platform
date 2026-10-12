@@ -3,9 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { passkeyErrorMessage, performStepUp } from "@/lib/auth/passkey-client";
+import { WebAuthnAbortService } from "@simplewebauthn/browser";
+import { ApiError } from "@/lib/api-client";
+import { passkeyErrorCode, performStepUp } from "@/lib/auth/passkey-client";
 import { useFormat } from "@/i18n/use-format";
-import { focusRing } from "@/components/ui/ui";
+import { focusRing, useErrorText } from "@/components/ui/ui";
 
 /**
  * P1-8 step-up penceresi: kural motoru ödemeyi riskli bulduğunda (403 STEP_UP_REQUIRED)
@@ -30,11 +32,14 @@ export default function StepUpDialog({
 }) {
   const t = useTranslations("payment.stepUp");
   const f = useFormat();
+  const errorText = useErrorText();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const primary = useRef<HTMLButtonElement>(null);
   const busyRef = useRef(false);
+  // Diyalog kapandıysa (vazgeçme/zorla kapatma) geç gelen doğrulama sonucu iletilmez (F1234).
+  const closedRef = useRef(false);
   const onCancelRef = useRef(onCancel);
 
   useEffect(() => {
@@ -43,11 +48,14 @@ export default function StepUpDialog({
 
   useEffect(() => {
     const dialog = dialogRef.current;
+    closedRef.current = false;
     const returnFocus =
       document.activeElement instanceof HTMLElement ? document.activeElement : null;
     if (dialog && !dialog.open) dialog.showModal();
     primary.current?.focus();
     return () => {
+      closedRef.current = true;
+      if (busyRef.current) WebAuthnAbortService.cancelCeremony();
       if (dialog?.open) dialog.close();
       if (returnFocus?.isConnected) returnFocus.focus();
     };
@@ -60,12 +68,19 @@ export default function StepUpDialog({
     setError(null);
     try {
       const { stepUpToken } = await performStepUp(bookingId);
-      onVerified(stepUpToken);
+      if (!closedRef.current) onVerified(stepUpToken);
     } catch (err) {
-      setError(passkeyErrorMessage(err, t("failed")));
       busyRef.current = false;
+      if (closedRef.current) return;
+      setError(stepUpErrorText(err));
       setBusy(false);
     }
+  }
+
+  function stepUpErrorText(err: unknown): string {
+    if (passkeyErrorCode(err) === "CANCELLED") return t("cancelled");
+    if (err instanceof ApiError) return errorText(err, t("failed"));
+    return t("failed");
   }
 
   function cancel() {
@@ -78,15 +93,18 @@ export default function StepUpDialog({
       ref={dialogRef}
       aria-labelledby="stepup-title"
       aria-describedby="stepup-desc"
-      aria-busy={busy || undefined}
       onCancel={(e) => {
         // Escape: tören sürerken kapatma; aksi hâlde "Vazgeç" ile aynı.
         e.preventDefault();
         cancel();
       }}
       onClose={(e) => {
-        // Tarayıcı diyaloğu zorla kapattıysa (ör. art arda Escape) vazgeçilmiş say.
-        if (!e.currentTarget.open) onCancelRef.current();
+        // Tarayıcı diyaloğu zorla kapattıysa (ör. art arda Escape) vazgeçilmiş say; süren
+        // passkey töreni de iptal edilir, sonucu sonradan "doğrulandı" diye dönmez.
+        if (e.currentTarget.open) return;
+        closedRef.current = true;
+        if (busyRef.current) WebAuthnAbortService.cancelCeremony();
+        onCancelRef.current();
       }}
       className="w-[calc(100vw-2rem)] max-w-sm rounded-xl bg-white p-6 shadow-lg backdrop:bg-black/40"
     >
@@ -113,6 +131,10 @@ export default function StepUpDialog({
           {t("holdUntil", { time: f.time(holdExpiresAt) })}
         </p>
       )}
+      {/* Diyalogda aria-busy yok: meşgulken bu canlı bölge duyurulmalı (F1237). */}
+      <p role="status" className={busy ? "mt-3 text-sm text-gray-700" : "sr-only"}>
+        {busy ? t("waitingHint") : ""}
+      </p>
       {error && (
         <p role="alert" className="mt-3 text-sm text-red-700">
           {error}

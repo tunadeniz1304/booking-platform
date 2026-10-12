@@ -1,12 +1,12 @@
 {
   "title": "İlan karşılaştırma",
-  "intro": "En fazla 4 ilanı yan yana karşılaştırın. Toplam fiyatlar teklif motorundan gelir.",
+  "intro": "En fazla 4 ilanı yan yana karşılaştırın. Toplam fiyatlar, seçtiğiniz tarihler ve misafir sayısı için vergiler ve ücretler dahil ödeyeceğiniz tutardır.",
   "add": "Karşılaştırmaya ekle",
   "remove": "Karşılaştırmadan çıkar",
   "full": "En fazla 4 ilan karşılaştırılabilir",
   "bar": "{count} ilan seçildi",
   "open": "Karşılaştır",
-  "clear": "Temizle",
+  "clear": "Seçimi temizle",
   "needMore": "Karşılaştırmak için en az 2 ilan seçin.",
   "backToSearch": "Aramaya dön",
   "loading": "Karşılaştırma yükleniyor…",
@@ -17,9 +17,11 @@
     "rating": "Puan",
     "cancellation": "İptal politikası",
     "amenities": "Olanaklar",
-    "total": "Toplam fiyat"
+    "total": "Toplam fiyat",
+    "commonAmenities": "Hepsinde ortak olanaklar",
+    "otherAmenities": "Farklı olanaklar"
   },
-  "ratingValue": "{avg}/5 ({count} yorum)",
+  "ratingValue": "{avg}/5 ({count, plural, other {# yorum}})",
   "noRating": "Henüz puan yok",
   "freeCancel": "Girişten {hours} saat öncesine kadar ücretsiz iptal",
   "policy": {
@@ -40,11 +42,30 @@
     "mostFlexible": "En esnek iptal"
   },
   "onlyHere": "Yalnızca bu ilanda",
-  "commentary": "Yorum",
+  "commentary": "Yapay zekâ karşılaştırma özeti",
   "fullHint": "{max}/{max} ilan seçildi. Yeni eklemek için birini çıkarın.",
   "ready": "Karşılaştırmaya hazır.",
   "retry": "Yeniden dene",
   "resetAndBack": "Seçimi temizle ve aramaya dön",
   "errorHelp": "Seçtiğiniz ilanlardan biri artık yayında olmayabilir. Yeniden deneyin ya da seçimi temizleyip aramaya dönün.",
-  "tableLabel": "Seçilen ilanların karşılaştırma tablosu"
+  "tableLabel": "Seçilen ilanların karşılaştırma tablosu",
+  "noDatesLink": "Toplam fiyatları görmek için <link>aramada tarih seçin</link>.",
+  "updating": "Karşılaştırma güncelleniyor…",
+  "removeShort": "Çıkar",
+  "removeNamed": "Karşılaştırmadan çıkar: {title}",
+  "errors": {
+    "VALIDATION_ERROR": "Bu karşılaştırma bağlantısı geçersiz. 2–4 farklı ilan seçin; tarih verdiyseniz giriş ve çıkış tarihini birlikte seçin.",
+    "NOT_FOUND": "Seçtiğiniz ilanlardan en az biri artık yayında değil. Seçimi temizleyip aramaya dönün."
+  },
+  "freeCancelDays": "Girişe {days} gün kalana kadar ücretsiz iptal",
+  "freeCancelUntil": "{date} günü giriş saatine kadar ücretsiz iptal",
+  "freeCancelAnytime": "Giriş saatine kadar ücretsiz iptal",
+  "freeCancelPassed": "Bu tarihler için ücretsiz iptal süresi geçti",
+  "noFreeCancel": "Ücretsiz iptal yok (kısmi iade koşulları ilan sayfasında)",
+  "diffOnly": "Olanaklarda yalnızca farkları göster",
+  "noOtherAmenities": "Ortak olanaklar dışında olanak yok",
+  "noAmenities": "Olanak belirtilmemiş",
+  "cleared": "Karşılaştırma seçimi temizlendi.",
+  "undo": "Geri al",
+  "chipFallback": "İlan {n}"
 }

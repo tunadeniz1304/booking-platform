@@ -4,27 +4,44 @@
   "form": {
     "title": "Trip details",
     "cities": "Cities (comma-separated, up to 6)",
-    "days": "Total days",
+    "days": "Total nights",
     "guests": "Number of guests",
-    "startDate": "Start date",
+    "startDate": "Start date (optional)",
     "submit": "Create plan",
     "submitting": "Planning…",
-    "citiesHint": "Example: Istanbul, Cappadocia, Antalya"
+    "citiesHint": "Example: Istanbul, Cappadocia, Antalya",
+    "daysHint": "At least 1 night per city: {min}–30 nights.",
+    "daysHintCheckout": "At least 1 night per city: {min}–30 nights. Final check-out: {date}.",
+    "startDateHint": "If left empty, {date} is used.",
+    "cityOptions": "Supported cities (select to add or remove):"
   },
   "result": {
     "title": "Suggested plan",
     "route": "Route: <b>{route}</b> · about {km} km",
     "nights": "{count, plural, one {# night} other {# nights}}",
-    "hold": "Hold",
+    "hold": "Hold room",
     "holding": "Holding…",
-    "holdLabel": "Hold the stay in {city}",
+    "holdLabel": "Hold room: {city}",
     "noStay": "No available stay was found for these dates.",
     "total": "Stays total: <b>{amount}</b>",
-    "note": "The plan doesn't book anything. \"Hold\" reserves the room for a short time; complete each stop with \"Pay\". Your plan is kept in this tab.",
+    "note": "The plan doesn't book anything. \"Hold room\" reserves the room for a short time; complete each stop with \"Pay\". Your plan is kept in this tab.",
     "held": "Held — pay soon to keep it.",
     "pay": "Pay",
     "payLabel": "Pay for the {city} stay",
-    "heldSummary": "Stops held: {held}/{total}"
+    "heldSummary": "Stops held: {held}/{total}",
+    "narrativeSummary": "AI summary",
+    "holdingLabel": "Holding: {city}",
+    "heldUntil": "Held — pay by {time} to keep it.",
+    "noteTimed": "The plan doesn't book anything. \"Hold room\" reserves the room for {minutes} minutes; complete each stop with \"Pay\". Your plan is kept in this tab.",
+    "stale": "You changed the trip details, so this plan is out of date. Select \"Create plan\" to update it before holding a room.",
+    "totalPartial": "Stays total ({priced} of {count} stops): <b>{amount}</b>",
+    "missingStays": "No stay found for: {cities}",
+    "ready": "Plan ready: {count, plural, one {# stop} other {# stops}}, stays total {amount}.",
+    "readyNoStay": "Plan ready: {count, plural, one {# stop} other {# stops}}; no available stay was found.",
+    "refreshed": "Prices refreshed.",
+    "refresh": "Refresh prices",
+    "refreshing": "Refreshing…",
+    "quoteValidUntil": "Prices are valid until {time}."
   },
   "errors": {
     "citiesRequired": "Enter at least one city.",
@@ -32,7 +49,7 @@
     "cityLength": "\"{city}\" is not a valid city name; each city must be 2 to 60 characters.",
     "invalid": {
       "cities": "Check the cities: 1–6 cities, separated by commas.",
-      "days": "Days must be between 1 and 30.",
+      "days": "Nights must be between the number of cities and 30.",
       "guests": "Guests must be between 1 and 10.",
       "startDate": "Choose a valid start date."
     }

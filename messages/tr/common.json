@@ -6,19 +6,20 @@
   "demo": {
     "tag": "DEMO",
     "banner": "Demo ortamı — gerçek ödeme alınmaz, gerçek konaklama satılmaz.",
-    "ariaLabel": "Demo modu uyarısı"
+    "ariaLabel": "Demo modu uyarısı",
+    "bannerShort": "Demo — gerçek ödeme alınmaz"
   },
   "loading": "Yükleniyor…",
   "unexpectedError": "Beklenmeyen bir hata oluştu",
-  "loginRequired": "Bu sayfa için <link>giriş yapın</link>.",
-  "forbidden": "Bu sayfaya erişim yetkiniz yok ({roles} rolü gerekir).",
+  "loginRequired": "Bu sayfa için <link>giriş yapın</link> ya da <register>kayıt olun</register>.",
+  "forbidden": "Bu sayfayı yalnızca {roles} hesapları görebilir.",
   "ai": {
-    "generated": "AI tarafından üretildi",
-    "hint": "Yapay zekâ çıktısı — doğruluğunu kontrol edin",
+    "generated": "Yapay zekâ ile üretildi",
+    "hint": "Doğruluğunu kontrol edin",
     "modes": {
-      "live": "Canlı LLM",
-      "demo": "Demo (deterministik)",
-      "fallback": "Yedek (LLM başarısız)"
+      "live": "Canlı yapay zekâ",
+      "demo": "Örnek yanıt (demo)",
+      "fallback": "Basit yanıt (yapay zekâ yanıt vermedi)"
     }
   },
   "theme": {
@@ -53,10 +54,50 @@
     "network": "Bağlantı kurulamadı. İnternet bağlantınızı kontrol edip tekrar deneyin.",
     "EMAIL_NOT_VERIFIED": "Devam etmek için e-posta adresinizi doğrulayın. Doğrulama bağlantısı e-posta kutunuzda.",
     "INTERNAL_ERROR": "Bir sorun oluştu. Lütfen tekrar deneyin.",
-    "INVALID_JSON": "İstek okunamadı. Sayfayı yenileyip tekrar deneyin."
+    "INVALID_JSON": "İstek okunamadı. Sayfayı yenileyip tekrar deneyin.",
+    "TIMEOUT": "İstek zaman aşımına uğradı. Bağlantınızı kontrol edip tekrar deneyin."
   },
   "confirm": {
     "cancel": "Vazgeç"
   },
-  "errorPrefix": "Hata:"
+  "errorPrefix": "Hata:",
+  "bookingStatus": {
+    "PENDING": "Beklemede",
+    "HELD": "Ödeme bekleniyor",
+    "CONFIRMED": "Onaylandı",
+    "CANCELLED": "İptal edildi",
+    "EXPIRED": "Süresi doldu",
+    "COMPLETED": "Tamamlandı",
+    "UNKNOWN": "Durum bilinmiyor"
+  },
+  "bedTypes": {
+    "SINGLE": "Tek kişilik",
+    "DOUBLE": "Çift kişilik",
+    "TWIN": "İki tek kişilik",
+    "QUEEN": "Kraliçe yatak (queen)",
+    "KING": "Kral yatak (king)",
+    "SOFA_BED": "Çekyat",
+    "BUNK": "Ranza",
+    "MIXED": "Birden çok yatak"
+  },
+  "brand": "booking-platform",
+  "successPrefix": "Başarılı:",
+  "requiredLegend": "* işaretli alanlar zorunludur.",
+  "access": {
+    "roles": {
+      "USER": "misafir",
+      "HOST": "ev sahibi",
+      "ADMIN": "yönetici"
+    },
+    "becomeHost": "Konaklama yerinizi listelemek için ev sahibi hesabı gerekir. <link>Destek ekibine yazarak</link> başvurabilirsiniz.",
+    "switchAccount": "Farklı hesapla giriş yap"
+  },
+  "refreshing": "Güncelleniyor…",
+  "breadcrumb": "Sayfa konumu",
+  "sessionExpired": {
+    "title": "Oturumunuzun süresi doldu",
+    "body": "Güvenliğiniz için oturumunuz kapatıldı. Giriş yaptıktan sonra bu sayfaya döneceksiniz; kaydedilmemiş bir metniniz varsa önce kopyalayın.",
+    "login": "Giriş yap",
+    "stay": "Bu sayfada kal"
+  }
 }

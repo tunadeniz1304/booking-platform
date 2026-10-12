@@ -10,13 +10,17 @@ import {
   Card,
   Field,
   Status,
-  errorMessage,
   focusRing,
   inputClass,
+  useErrorText,
   useLoader,
 } from "@/components/ui/ui";
 
 type Schedule = "DAILY" | "WEEKLY" | "MONTHLY";
+
+const SCHEDULES = ["DAILY", "WEEKLY", "MONTHLY"] as const;
+/** Yeni hesapta sunucunun varsayılanı (`HostAccount.payoutSchedule @default(DAILY)`). */
+const DEFAULT_SCHEDULE: Schedule = "DAILY";
 
 interface Overview {
   account: {
@@ -29,6 +33,10 @@ interface Overview {
     payoutSchedule: Schedule;
     reservePercentBps: number;
     blockedReason: string | null;
+    /** Paranın gideceği hesap, maskeli (sunucu eklediğinde). */
+    destination?: { bankName: string | null; last4: string } | null;
+    /** Sağlayıcıda hesap/banka bilgisini tamamlama bağlantısı (Stripe Connect; sunucu eklediğinde). */
+    onboardingUrl?: string | null;
   } | null;
   policy: {
     releaseHours: number;
@@ -59,15 +67,50 @@ interface Overview {
   }>;
 }
 
-const BALANCE_KEYS = ["escrowMinor", "availableMinor", "reserveMinor", "paidMinor"] as const;
+/** Paranın akış sırası: emanet → rezerv → serbest → gönderimde → ödenen. */
+const BALANCE_KEYS = [
+  "escrowMinor",
+  "reserveMinor",
+  "availableMinor",
+  "pendingMinor",
+  "paidMinor",
+] as const;
+
+/** Payout hata kodu → `history.failureReasons.<anahtar>`; listede olmayanlar "other" olur. */
+const FAILURE_REASONS = new Map<string, string>([
+  ["INSUFFICIENT_BALANCE", "INSUFFICIENT_BALANCE"],
+  ["no_destination", "no_destination"],
+  ["invalid_amount", "invalid_amount"],
+  ["account_closed", "account_closed"],
+  ["account_frozen", "account_restricted"],
+  ["bank_account_restricted", "account_restricted"],
+  ["invalid_account_number", "invalid_account"],
+  ["no_account", "invalid_account"],
+  ["account_invalid", "invalid_account"],
+]);
+const failureReasonKey = (code: string | null) => (code && FAILURE_REASONS.get(code)) || "other";
+/** Banka/hesap bilgisi düzeltilerek çözülen nedenler; diğerlerinde destek bağlantısı gösterilir. */
+const ACCOUNT_FIX_REASONS = new Set([
+  "no_destination",
+  "account_closed",
+  "account_restricted",
+  "invalid_account",
+]);
+
+/** Ekrandaki geçmiş sınırı (overview.ts `HISTORY_LIMIT`); geçmişin tamamı CSV ile indirilir. */
+const HISTORY_LIMIT = 50;
+const HISTORY_EXPORT_URL = "/api/host/payouts/export";
+
+type Action = "connect" | "schedule" | "refresh";
 
 /** Ev sahibi ödemeleri (P1-4): hesap durumu, bakiyeler ve payout geçmişi. */
 export default function PayoutPanel() {
   const t = useTranslations("payouts");
   const f = useFormat();
+  const errorText = useErrorText();
   const { data, error, reload } = useLoader(() => apiFetch<Overview>("/api/host/payouts"), []);
   const [schedule, setSchedule] = useState<Schedule | "">("");
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<Action | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -79,6 +122,9 @@ export default function PayoutPanel() {
       </div>
     );
   const acc = data.account;
+  const selected: Schedule = schedule || acc?.payoutSchedule || DEFAULT_SCHEDULE;
+  const connected = acc?.connected ?? false;
+  const scheduleChanged = connected && selected !== acc?.payoutSchedule;
   const pct = (bps: number) => f.number(bps / 100, { maximumFractionDigits: 2 });
   // Hesap yokken %0 göstermeyelim: sunucu varsayılanı yoksa oransız metin kullanılır.
   const reserveBps = acc?.reservePercentBps ?? data.policy.reserveBps ?? null;
@@ -88,34 +134,58 @@ export default function PayoutPanel() {
   const linkClass = `inline-flex min-h-[44px] items-center font-semibold text-[#003580] underline sm:min-h-[24px] ${focusRing}`;
   const resolution = acc
     ? identityBlocked
-      ? {
-          text:
-            acc.kycStatus === "REJECTED" ? t("resolve.identityRejected") : t("resolve.identity"),
-          href: "/account#kyc-title",
-          link: t("resolve.identityLink"),
-        }
+      ? acc.kycStatus === "PENDING"
+        ? {
+            text: t("resolve.identityPending"),
+            href: "/account#kyc-title",
+            link: t("resolve.identityStatusLink"),
+          }
+        : {
+            text:
+              acc.kycStatus === "REJECTED" ? t("resolve.identityRejected") : t("resolve.identity"),
+            href: "/account#kyc-title",
+            link: t("resolve.identityLink"),
+          }
       : acc.blockedReason === "PAUSED"
         ? { text: t("resolve.paused"), href: "/support", link: t("resolve.supportLink") }
         : acc.blockedReason === "PROVIDER_DISABLED"
           ? { text: t("resolve.providerDisabled"), href: null, link: null }
           : null
     : null;
+  const dest = acc?.destination ?? null;
+  const destination = !connected
+    ? t("blocked.NO_ACCOUNT")
+    : dest
+      ? [dest.bankName, t("account.endingIn", { last4: dest.last4 })].filter(Boolean).join(" · ")
+      : acc?.provider === "stripe"
+        ? t("account.destinationProvider")
+        : t("account.destinationDemo");
+  const providerUrl = acc?.onboardingUrl ?? null;
+  const onboardingUrl = providerUrl?.startsWith("https://") ? providerUrl : null;
+  const termValues = { hours: data.policy.releaseHours, days: data.policy.reserveReleaseDays };
 
-  const onboard = async () => {
-    setBusy(true);
+  const run = async (action: Action) => {
+    if (busy || (action === "schedule" && !scheduleChanged)) return;
+    setBusy(action);
     setActionError(null);
     setMessage(null);
     try {
       await apiFetch("/api/host/payouts", {
         method: "POST",
-        body: JSON.stringify(schedule ? { schedule } : {}),
+        body: JSON.stringify(action === "refresh" ? {} : { schedule: selected }),
       });
-      setMessage(t("account.saved"));
+      setMessage(
+        action === "connect"
+          ? t("account.connected")
+          : action === "schedule"
+            ? t("account.scheduleSaved")
+            : t("account.saved")
+      );
       reload();
     } catch (e) {
-      setActionError(errorMessage(e));
+      setActionError(errorText(e));
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   };
 
@@ -141,6 +211,17 @@ export default function PayoutPanel() {
               </dd>
             </div>
             <div>
+              <dt className="text-gray-600">{t("account.destination")}</dt>
+              <dd className="font-medium">{destination}</dd>
+              {onboardingUrl && (
+                <dd>
+                  <a href={onboardingUrl} className={linkClass}>
+                    {t("account.manageAtProvider")}
+                  </a>
+                </dd>
+              )}
+            </div>
+            <div>
               <dt className="text-gray-600">{t("account.kyc")}</dt>
               <dd className="font-medium">{t(`kyc.${acc.kycStatus}`)}</dd>
             </div>
@@ -159,42 +240,85 @@ export default function PayoutPanel() {
         ) : (
           <p className="text-sm text-gray-700">{t("account.none")}</p>
         )}
+        {connected && (
+          <div className="mt-3">
+            <Button
+              variant="secondary"
+              className="min-h-[44px]"
+              onClick={() => run("refresh")}
+              busy={busy === "refresh"}
+            >
+              {t("account.refresh")}
+            </Button>
+          </div>
+        )}
         <div className="mt-4 flex flex-wrap items-end gap-3">
           <Field label={t("account.scheduleLabel")} id="payout-schedule">
             <select
               id="payout-schedule"
               className={inputClass}
-              value={schedule}
-              onChange={(e) => setSchedule(e.target.value as Schedule | "")}
+              value={selected}
+              aria-describedby="payout-schedule-hint"
+              onChange={(e) => setSchedule(e.target.value as Schedule)}
             >
-              <option value="">{t("account.keepSchedule")}</option>
-              {(["DAILY", "WEEKLY", "MONTHLY"] as const).map((s) => (
+              {SCHEDULES.map((s) => (
                 <option key={s} value={s}>
                   {t(`schedule.${s}`)}
                 </option>
               ))}
             </select>
           </Field>
-          <Button className="min-h-[44px]" onClick={onboard} busy={busy}>
-            {acc?.connected ? t("account.refresh") : t("account.connect")}
-          </Button>
+          {/* Aynı konumda kalan düğme bağlantıdan sonra odağı korur. */}
+          {connected ? (
+            <Button
+              className="min-h-[44px]"
+              onClick={() => run("schedule")}
+              busy={busy === "schedule"}
+              aria-disabled={!scheduleChanged || undefined}
+            >
+              {t("account.saveSchedule")}
+            </Button>
+          ) : (
+            <Button
+              className="min-h-[44px]"
+              onClick={() => run("connect")}
+              busy={busy === "connect"}
+            >
+              {t("account.connect")}
+            </Button>
+          )}
         </div>
-        <Status error={actionError} message={message} />
-        <p className="mt-3 text-xs text-gray-600">
-          {reserveBps !== null
-            ? t("policy", {
-                hours: data.policy.releaseHours,
-                commission: pct(data.policy.commissionBps),
-                reserve: pct(reserveBps),
-                days: data.policy.reserveReleaseDays,
-              })
-            : t("policyNoReserve", {
-                hours: data.policy.releaseHours,
-                commission: pct(data.policy.commissionBps),
-                days: data.policy.reserveReleaseDays,
-              })}
-          {data.policy.identityRequired && !resolution ? ` ${t("identityRequired")}` : ""}
+        <p id="payout-schedule-hint" className="mt-1 text-xs text-gray-600">
+          {acc && connected
+            ? t("account.scheduleCurrent", { schedule: t(`schedule.${acc.payoutSchedule}`) })
+            : t("account.scheduleNew")}
         </p>
+        <Status error={actionError} message={message} />
+        <ul className="mt-3 list-disc space-y-1 ps-5 text-xs text-gray-600">
+          <li>{t("policyList.release", { hours: data.policy.releaseHours })}</li>
+          <li>{t("policyList.commission", { commission: pct(data.policy.commissionBps) })}</li>
+          <li>
+            {reserveBps !== null
+              ? t("policyList.reserve", {
+                  reserve: pct(reserveBps),
+                  days: data.policy.reserveReleaseDays,
+                })
+              : t("policyList.reserveUnknown", { days: data.policy.reserveReleaseDays })}
+          </li>
+          {data.policy.identityRequired && !resolution && (
+            <li>
+              {t("identityRequired")}
+              {!acc && (
+                <>
+                  {" "}
+                  <Link href="/account#kyc-title" className={linkClass}>
+                    {t("resolve.identityLink")}
+                  </Link>
+                </>
+              )}
+            </li>
+          )}
+        </ul>
       </Card>
 
       <Card title={t("balances.title")} id="payout-balances">
@@ -202,7 +326,7 @@ export default function PayoutPanel() {
           <p className="text-sm text-gray-700">{t("balances.empty")}</p>
         ) : (
           <div
-            className="overflow-x-auto"
+            className={`overflow-x-auto ${focusRing}`}
             role="region"
             tabIndex={0}
             aria-label={t("balances.caption")}
@@ -211,11 +335,11 @@ export default function PayoutPanel() {
               <caption className="sr-only">{t("balances.caption")}</caption>
               <thead>
                 <tr className="border-b border-gray-200">
-                  <th scope="col" className="py-2">
+                  <th scope="col" className="py-2 pe-4">
                     {t("balances.currency")}
                   </th>
                   {BALANCE_KEYS.map((k) => (
-                    <th key={k} scope="col" className="py-2">
+                    <th key={k} scope="col" className="whitespace-nowrap py-2 pe-4 text-end">
                       {t(`balances.${k}`)}
                     </th>
                   ))}
@@ -224,11 +348,11 @@ export default function PayoutPanel() {
               <tbody>
                 {data.balances.map((b) => (
                   <tr key={b.currency} className="border-b border-gray-100">
-                    <th scope="row" className="py-2 font-medium">
+                    <th scope="row" className="py-2 pe-4 font-medium">
                       {b.currency}
                     </th>
                     {BALANCE_KEYS.map((k) => (
-                      <td key={k} className="py-2">
+                      <td key={k} className="whitespace-nowrap py-2 pe-4 text-end tabular-nums">
                         {f.money(b[k], b.currency)}
                       </td>
                     ))}
@@ -238,7 +362,21 @@ export default function PayoutPanel() {
             </table>
           </div>
         )}
-        <p className="mt-2 text-xs text-gray-600">{t("balances.hint")}</p>
+        {data.balances.length > 0 && (
+          <>
+            <p className="mt-3 text-xs text-gray-600">{t("balances.hint")}</p>
+            <dl className="mt-1 space-y-1 text-xs">
+              {BALANCE_KEYS.map((k) => (
+                <div key={k} className="sm:flex sm:gap-2">
+                  <dt className="font-medium text-gray-900 sm:w-24 sm:shrink-0">
+                    {t(`balances.${k}`)}
+                  </dt>
+                  <dd className="text-gray-600">{t(`balances.terms.${k}`, termValues)}</dd>
+                </div>
+              ))}
+            </dl>
+          </>
+        )}
       </Card>
 
       <Card title={t("history.title")} id="payout-history">
@@ -246,7 +384,7 @@ export default function PayoutPanel() {
           <p className="text-sm text-gray-700">{t("history.empty")}</p>
         ) : (
           <div
-            className="overflow-x-auto"
+            className={`overflow-x-auto ${focusRing}`}
             role="region"
             tabIndex={0}
             aria-label={t("history.caption")}
@@ -255,29 +393,53 @@ export default function PayoutPanel() {
               <caption className="sr-only">{t("history.caption")}</caption>
               <thead>
                 <tr className="border-b border-gray-200">
-                  <th scope="col" className="py-2">
-                    {t("history.date")}
+                  <th scope="col" className="whitespace-nowrap py-2 pe-4">
+                    {t("history.createdAt")}
                   </th>
-                  <th scope="col" className="py-2">
+                  <th scope="col" className="whitespace-nowrap py-2 pe-4">
+                    {t("history.paidAt")}
+                  </th>
+                  <th scope="col" className="py-2 pe-4">
                     {t("history.kind")}
                   </th>
-                  <th scope="col" className="py-2">
+                  <th scope="col" className="py-2 pe-4 text-end">
                     {t("history.amount")}
                   </th>
-                  <th scope="col" className="py-2">
+                  <th scope="col" className="py-2 pe-4">
                     {t("history.status")}
+                  </th>
+                  <th scope="col" className="py-2">
+                    {t("history.reference")}
                   </th>
                 </tr>
               </thead>
               <tbody>
                 {data.history.map((p) => (
                   <tr key={p.id} className="border-b border-gray-100">
-                    <td className="py-2">{f.date(p.paidAt ?? p.createdAt, "short")}</td>
-                    <td className="py-2">{t(`history.kinds.${p.kind}`)}</td>
-                    <td className="py-2">{f.money(p.amountMinor, p.currency)}</td>
-                    <td className="py-2">
+                    <td className="whitespace-nowrap py-2 pe-4">{f.date(p.createdAt, "short")}</td>
+                    <td className="whitespace-nowrap py-2 pe-4">
+                      {p.paidAt ? (
+                        f.date(p.paidAt, "short")
+                      ) : (
+                        <EmptyCell label={t("history.notPaid")} />
+                      )}
+                    </td>
+                    <td className="py-2 pe-4">{t(`history.kinds.${p.kind}`)}</td>
+                    <td className="whitespace-nowrap py-2 pe-4 text-end tabular-nums">
+                      {f.money(p.amountMinor, p.currency)}
+                    </td>
+                    <td className="py-2 pe-4">
                       {t(`history.statuses.${p.status}`)}
-                      {p.failureCode ? ` (${p.failureCode})` : ""}
+                      {p.status === "FAILED" && (
+                        <PayoutFailure
+                          code={p.failureCode}
+                          accountUrl={onboardingUrl}
+                          linkClass={linkClass}
+                        />
+                      )}
+                    </td>
+                    <td className="break-all py-2 font-mono text-xs">
+                      {p.reference ?? <EmptyCell label={t("history.noReference")} />}
                     </td>
                   </tr>
                 ))}
@@ -285,8 +447,59 @@ export default function PayoutPanel() {
             </table>
           </div>
         )}
+        {data.history.length > 0 && (
+          <div className="mt-3 space-y-1 text-xs text-gray-600">
+            {data.history.length >= HISTORY_LIMIT && (
+              <p>{t("history.limitNote", { limit: HISTORY_LIMIT })}</p>
+            )}
+            <a href={HISTORY_EXPORT_URL} download className={linkClass}>
+              {t("history.downloadCsv")}
+            </a>
+          </div>
+        )}
       </Card>
       <p className="text-xs text-gray-600">{t("disclaimer")}</p>
+    </div>
+  );
+}
+
+/** Boş hücre: görselde "—", ekran okuyucuda açıklaması okunur. */
+function EmptyCell({ label }: { label: string }) {
+  return (
+    <>
+      <span aria-hidden="true">—</span>
+      <span className="sr-only">{label}</span>
+    </>
+  );
+}
+
+/** Başarısız ödeme: nedeni, tutara ne olacağı ve çözüm bağlantısı (ham kod yalnız destek notu). */
+function PayoutFailure({
+  code,
+  accountUrl,
+  linkClass,
+}: {
+  code: string | null;
+  accountUrl: string | null;
+  linkClass: string;
+}) {
+  const t = useTranslations("payouts");
+  const reason = failureReasonKey(code);
+  return (
+    <div className="mt-1 space-y-1 text-xs text-gray-600">
+      <p>
+        {t(`history.failureReasons.${reason}`)} {t("history.failedRetry")}
+      </p>
+      {ACCOUNT_FIX_REASONS.has(reason) ? (
+        <a href={accountUrl ?? "#payout-account"} className={linkClass}>
+          {accountUrl ? t("account.manageAtProvider") : t("history.fixAccountLink")}
+        </a>
+      ) : (
+        <Link href="/support" className={linkClass}>
+          {t("resolve.supportLink")}
+        </Link>
+      )}
+      {code && <p>{t("history.failureCode", { code })}</p>}
     </div>
   );
 }

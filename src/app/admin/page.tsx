@@ -1,37 +1,24 @@
 "use client";
 
-import Link from "next/link";
 import { useTranslations } from "next-intl";
 import AdminDashboard from "@/components/admin/AdminDashboard";
+import AdminPagesNav from "@/components/admin/AdminPagesNav";
 import { PageShell, RoleGate } from "@/components/ui/ui";
 
 /** Yönetim paneli (P2-4): outbox, olay sinyali kuyruğu, fraud kuyruğu, LLM durumu, rol yönetimi. */
 export default function AdminPage() {
   const t = useTranslations("admin");
-  const tc = useTranslations("compliance.admin");
-  const tp = useTranslations("payouts");
-  const tr = useTranslations("resolution");
-  const ts = useTranslations("support.admin");
   return (
     <PageShell title={t("page.title")} intro={t("page.intro")}>
-      <p className="text-sm">
-        <Link href="/admin/compliance" className="font-semibold text-[#003580] underline">
-          {tc("open")}
-        </Link>
-        {" · "}
-        <Link href="/admin/payouts" className="font-semibold text-[#003580] underline">
-          {tp("admin.link")}
-        </Link>
-        {" · "}
-        <Link href="/admin/claims" className="font-semibold text-[#003580] underline">
-          {tr("adminLink")}
-        </Link>
-        {" · "}
-        <Link href="/admin/support" className="font-semibold text-[#003580] underline">
-          {ts("link")}
-        </Link>
-      </p>
-      <RoleGate roles={["ADMIN"]}>{() => <AdminDashboard />}</RoleGate>
+      <RoleGate roles={["ADMIN"]}>
+        {() => (
+          <>
+            {/* Yönetim alt sayfaları yalnızca yöneticiye, gezinme bölgesi olarak (F1193/F460). */}
+            <AdminPagesNav />
+            <AdminDashboard />
+          </>
+        )}
+      </RoleGate>
     </PageShell>
   );
 }

@@ -6,7 +6,7 @@
   "verificationFailed": "Verification failed",
   "verificationStartFailed": "Verification could not be started",
   "invalidCard": "Invalid card details",
-  "holdUntil": "Your room is held for you until {time}.",
+  "holdUntil": "Pay by {time}. After that, the room is released.",
   "cardNumber": "Card number",
   "expiry": "Expiry (MM/YY)",
   "cvc": "CVC",
@@ -28,34 +28,39 @@
     "dialogBodyConfirmed": "Your refund is calculated from the cancellation policy you accepted when booking and is shown right after cancelling.",
     "irreversible": "This cannot be undone.",
     "confirmButton": "Yes, cancel",
-    "keep": "Keep booking"
+    "keep": "Keep booking",
+    "cancelledNoCharge": "Cancelled. Your card was not charged.",
+    "processing": "Cancelling..."
   },
   "stepUp": {
     "failed": "Verification failed",
     "title": "Additional verification required",
     "description": "To protect your account, we ask you to approve this payment with your passkey. After approval the payment is retried automatically.",
     "managePasskeys": "Create or manage passkeys (opens in a new tab)",
-    "waiting": "Waiting...",
+    "waiting": "Waiting for your passkey…",
     "verify": "Verify with passkey",
     "cancel": "Cancel",
     "whatIsPasskey": "A passkey is a password-free check that uses the same method you unlock your phone or computer with (fingerprint, face or PIN).",
     "noPasskey": "If you don't have a passkey, you can create one in a few seconds on your account page, then come back to this window and try again.",
-    "holdUntil": "Your room is held for you until {time}."
+    "holdUntil": "Your room is held for you until {time}.",
+    "waitingHint": "Approve the passkey prompt your device opened with your fingerprint, face or PIN. If you're verifying with your phone, approve the request on your phone.",
+    "cancelled": "The passkey approval was cancelled or timed out. No payment was taken; you can try again.",
+    "cancelledNoCharge": "You cancelled the extra verification, so no payment was taken. You can retry the payment when you're ready."
   },
   "rnpl": {
     "legend": "When to pay",
     "payNow": "Pay now: {amount}",
     "payLater": "Reserve now, pay later: {today} today, {amount} on {date}",
     "timeline": "Cancellation timeline",
-    "stepToday": "Today: {today} is charged; your card is only saved.",
+    "stepToday": "Today: nothing is charged to your card; it is only saved.",
     "stepCharge": "{date}: {amount} is charged to your saved card.",
-    "stepFreeCancel": "Free cancellation until {date}; cancel before the charge and you pay nothing.",
+    "stepFreeCancel": "Free cancellation until {date}: cancel before the charge and you pay nothing; cancel after the charge and the full amount is refunded.",
     "stepFailure": "If the charge fails we notify you and retry; if unpaid within the grace period, the booking is cancelled automatically.",
     "reserve": "Reserve now (no payment today)",
     "plan": {
       "title": "Payment plan: reserve now, pay later",
       "summary": "{today} paid at booking; {amount} will be charged to your saved card on {date}.",
-      "retry": "The charge failed; next attempt: {date}. Please check your card.",
+      "retry": "The charge failed; next attempt: {date}. Check your card's balance, limit and expiry date; if you need to use a different card, contact support.",
       "captured": "{amount} was charged on {date}.",
       "status": {
         "SCHEDULED": "Scheduled",
@@ -66,9 +71,13 @@
       },
       "summaryCancelled": "The plan was cancelled; your card will not be charged.",
       "summaryDefaulted": "The payment could not be collected, so the booking was cancelled; your card will not be charged again.",
-      "stepBooked": "At booking: {today} paid; your card was only saved."
+      "stepBooked": "At booking: {today} paid; your card was only saved.",
+      "graceUntil": "Payment deadline: {date}. If the charge cannot be collected by then, the booking is cancelled.",
+      "contactSupport": "Contact support"
     },
-    "moment": "{date}, {time} ({tz})"
+    "moment": "{date}, {time} ({tz})",
+    "stepFailureGrace": "If the charge fails we notify you and retry; if it is still unpaid after {hours, plural, one {# hour} other {# hours}}, the booking is cancelled automatically.",
+    "creditUnavailable": "Wallet credit can't be combined with this option; choose to pay now to use your credit."
   },
   "expiryHint": "MM/YY format, e.g. 08/28",
   "threeDsIntro": "Your bank wants you to approve this payment. Enter the code sent to your phone.",
@@ -101,5 +110,19 @@
     "IDENTITY_VERIFICATION_REQUIRED": "You need to verify your identity to continue.",
     "RATE_LIMITED": "Too many requests. Please wait a moment and try again."
   },
-  "stripeLiveCharge": "When you confirm, {amount} will be charged to your card."
+  "stripeLiveCharge": "When you confirm, {amount} will be charged to your card.",
+  "config": {
+    "loading": "Loading payment options…",
+    "failed": "The payment form could not be loaded. You have not been charged; please try again."
+  },
+  "attempts": {
+    "left": "{count, plural, one {# attempt} other {# attempts}} left.",
+    "lockedTitle": "Card payment is closed for this booking",
+    "lockedBody": "After too many failed attempts, card payment for this booking has been stopped to protect you. You have not been charged. You can contact our support team, or cancel the booking to release the room.",
+    "contactSupport": "Contact support"
+  },
+  "threeDsNoCode": "Didn't get a code? Wait a few minutes; if it still doesn't arrive, you can pay with another card below. Your card has not been charged.",
+  "otherOptions": "Other options",
+  "stepUpCancelled": "Payment not completed; additional verification is needed to continue.",
+  "stepUpRetry": "You can try again whenever you're ready."
 }

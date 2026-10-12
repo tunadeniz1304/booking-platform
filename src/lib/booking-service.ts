@@ -478,7 +478,9 @@ export async function reserveBookingInTx(
     where: { roomTypeId: room.id, date: { gte: toDbDate(checkIn), lte: toDbDate(checkOut) } },
   });
   const violation = checkRestrictions({ checkIn, checkOut, nights }, restrictions);
-  if (violation) throw new RestrictionError(describeViolation(violation), violation.code);
+  if (violation) {
+    throw new RestrictionError(describeViolation(violation), violation.code, violation);
+  }
   const nightInputs = nightsFromInventory(rows, nights, currency, input.units);
   if (!nightInputs) throw new SoldOutError();
 

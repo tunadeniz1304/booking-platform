@@ -2,6 +2,7 @@ import "server-only";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getConfig } from "@/lib/config/app-config";
+import type { Locale } from "@/i18n/config";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/http/errors";
 import { getLlmClient, type LlmMode } from "@/lib/llm/client";
 import { demoMessageDraft } from "@/lib/llm/demo";
@@ -30,6 +31,7 @@ export interface ThreadAccess {
   role: ThreadRole;
   status: string;
   propertyTitle: string;
+  roomName: string;
   guestName: string;
   /** Yalnız LLM redaksiyonu (`knownNames`) için; yanıtlarda/olaylarda dışarı verilmez. */
   guestLastName: string;
@@ -54,6 +56,7 @@ export async function resolveThreadAccess(
       checkOut: true,
       guestCount: true,
       user: { select: { firstName: true, lastName: true } },
+      room: { select: { name: true } },
       property: {
         select: {
           hostId: true,
@@ -76,6 +79,7 @@ export async function resolveThreadAccess(
     role,
     status: b.status,
     propertyTitle: b.property.title,
+    roomName: b.room?.name ?? "",
     guestName: b.user.firstName || "Misafir",
     guestLastName: b.user.lastName,
     hostFirstName: b.property.host.firstName,
@@ -98,20 +102,60 @@ function toEvent(m: {
   return { ...m, createdAt: m.createdAt.toISOString() };
 }
 
-export async function listMessages(bookingId: string, userId: string) {
+/**
+ * Son `MESSAGE_PAGE_SIZE` mesaj (eskiden yeniye). `before` (mesaj kimliği) verilirse o mesajdan
+ * daha eskiler gelir; `hasMore` daha eski mesaj kaldığını bildirir (istemci "daha eski" yükler).
+ */
+export async function listMessages(
+  bookingId: string,
+  userId: string,
+  opts: { before?: string | null } = {}
+) {
   const access = await resolveThreadAccess(bookingId, userId);
   const thread = await prisma.messageThread.findUnique({ where: { bookingId } });
-  const messages = thread
+  const size = getConfig().MESSAGE_PAGE_SIZE;
+  const cursor =
+    thread && opts.before
+      ? await prisma.message.findFirst({
+          where: { id: opts.before, threadId: thread.id },
+          select: { id: true, createdAt: true },
+        })
+      : null;
+  if (opts.before && !cursor) throw new ValidationError("Geçersiz mesaj imleci");
+  const rows = thread
     ? await prisma.message.findMany({
-        where: { threadId: thread.id },
-        orderBy: { createdAt: "desc" },
-        take: getConfig().MESSAGE_PAGE_SIZE,
+        where: {
+          threadId: thread.id,
+          ...(cursor
+            ? {
+                OR: [
+                  { createdAt: { lt: cursor.createdAt } },
+                  { createdAt: cursor.createdAt, id: { lt: cursor.id } },
+                ],
+              }
+            : {}),
+        },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        take: size + 1,
       })
     : [];
+  const hasMore = rows.length > size;
+  const messages = rows.slice(0, size);
   const risks = await loadMessageRisks(messages.map((m) => m.id));
   return {
     role: access.role,
     canWrite: WRITABLE.has(access.status),
+    hasMore,
+    /** Konuşma bağlamı (ev sahibi sayfası özeti); misafirin yalnız adı verilir. */
+    context: {
+      propertyTitle: access.propertyTitle,
+      roomName: access.roomName,
+      guestFirstName: access.guestName,
+      checkIn: access.checkIn.toISOString(),
+      checkOut: access.checkOut.toISOString(),
+      status: access.status,
+      guestCount: access.guestCount,
+    },
     messages: messages.reverse().map((m) => ({ ...toEvent(m), risk: risks.get(m.id) ?? null })),
   };
 }
@@ -178,6 +222,24 @@ export interface HostReplyDraftInput {
   guestCount: number;
   /** Son mesajlar, EN YENİDEN eskiye. */
   recent: ReadonlyArray<{ senderRole: string; body: string }>;
+  /** Ev sahibinin arayüz dili; misafirin son mesajının dili belirlenemezse taslak bu dilde. */
+  locale?: Locale;
+}
+
+const DRAFT_LANGUAGE: Record<Locale, string> = { tr: "Türkçe", en: "İngilizce (English)" };
+const ENGLISH_HINTS = new Set(
+  (
+    "the and is are you your we our i my can could would will please thanks thank hi hello " +
+    "what when where how time room check there do does"
+  ).split(" ")
+);
+
+/** Kaba dil tespiti: Türkçe harf → tr; en az iki yaygın İngilizce sözcük → en; yoksa null. */
+export function detectMessageLocale(text: string | null): Locale | null {
+  if (!text) return null;
+  if (/[çğıöşüÇĞİÖŞÜ]/.test(text)) return "tr";
+  const words = text.toLowerCase().match(/[a-z]+/g) ?? [];
+  return words.filter((w) => ENGLISH_HINTS.has(w)).length >= 2 ? "en" : null;
 }
 
 /**
@@ -185,8 +247,10 @@ export interface HostReplyDraftInput {
  */
 export async function generateHostReplyDraft(
   input: HostReplyDraftInput
-): Promise<{ draft: string; llmMode: LlmMode }> {
+): Promise<{ draft: string; llmMode: LlmMode; language: Locale }> {
   const lastGuest = input.recent.find((m) => m.senderRole === "GUEST")?.body ?? null;
+  // Misafirin yazdığı dil önceliklidir; belirsizse ev sahibinin arayüz dili (varsayılan tr).
+  const language = detectMessageLocale(lastGuest) ?? input.locale ?? "tr";
   const facts = {
     propertyTitle: input.propertyTitle,
     guestName: input.guestName,
@@ -220,7 +284,7 @@ export async function generateHostReplyDraft(
     [
       {
         role: "system",
-        content: `Ev sahibi adına misafire kısa, nazik bir Türkçe yanıt taslağı yaz. Misafire hitap ederken adı yerine ${GUEST_NAME_PLACEHOLDER} yer tutucusunu aynen kullan. Söz verme, fiyat/iade taahhüdü verme, iletişim bilgisi veya harici bağlantı ekleme. JSON: {reply}`,
+        content: `Ev sahibi adına misafire kısa, nazik bir ${DRAFT_LANGUAGE[language]} yanıt taslağı yaz. Misafire hitap ederken adı yerine ${GUEST_NAME_PLACEHOLDER} yer tutucusunu aynen kullan. Söz verme, fiyat/iade taahhüdü verme, iletişim bilgisi veya harici bağlantı ekleme. JSON: {reply}`,
       },
       {
         role: "user",
@@ -231,7 +295,7 @@ export async function generateHostReplyDraft(
       },
     ],
     {
-      demo: () => demoMessageDraft(facts),
+      demo: () => demoMessageDraft({ ...facts, locale: language }),
       knownNames: [
         input.guestName,
         input.guestLastName,
@@ -245,14 +309,14 @@ export async function generateHostReplyDraft(
   );
   const reply = res.data.reply.split(GUEST_NAME_PLACEHOLDER).join(input.guestName);
   // Taslak da platform dışı iletişim içeremez.
-  return { draft: maskMessage(reply).text, llmMode: res.llmMode };
+  return { draft: maskMessage(reply).text, llmMode: res.llmMode, language };
 }
 
 /**
  * Ev sahibi için yanıt TASLAĞI: yalnızca öneridir, KAYDEDİLMEZ ve GÖNDERİLMEZ.
  * Ev sahibi metni düzenleyip `sendMessage(..., fromAiDraft: true)` ile kendisi gönderir.
  */
-export async function draftHostReply(bookingId: string, userId: string) {
+export async function draftHostReply(bookingId: string, userId: string, locale?: Locale) {
   const access = await resolveThreadAccess(bookingId, userId);
   if (access.role !== "HOST") throw new NotFoundError("Rezervasyon bulunamadı");
   const thread = await prisma.messageThread.findUnique({ where: { bookingId } });
@@ -274,5 +338,6 @@ export async function draftHostReply(bookingId: string, userId: string) {
     checkOut: access.checkOut,
     guestCount: access.guestCount,
     recent,
+    locale,
   });
 }

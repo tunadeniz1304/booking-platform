@@ -35,6 +35,7 @@ interface AppealRow {
 export default function AppealQueue() {
   const t = useTranslations("compliance.appeal.admin");
   const ta = useTranslations("compliance.admin");
+  const tp = useTranslations("compliance.appeal");
   const tc = useTranslations("common");
   const f = useFormat();
   const errorText = useErrorText();
@@ -142,10 +143,16 @@ export default function AppealQueue() {
                 tabIndex={-1}
                 className="font-semibold text-gray-900"
               >
-                {t(`roles.${row.appellantRole}`)} ·{" "}
-                {row.notice?.decision ? ta(`decisions.${row.notice.decision}`) : "-"} ·{" "}
-                {f.date(row.createdAt, "medium")}
+                {t("rowTitle", {
+                  role: t(`roles.${row.appellantRole}`),
+                  decision: row.notice?.decision
+                    ? tp(`decisions.${row.notice.decision}`)
+                    : t("noDecision"),
+                })}
               </h3>
+              <p className="text-gray-700">
+                {t("appealedAt", { date: f.date(row.createdAt, "medium") })}
+              </p>
               {row.notice && (
                 <p className="mt-1">
                   <a

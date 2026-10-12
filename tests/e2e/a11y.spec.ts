@@ -1,8 +1,10 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import {
+  CHECKOUT_SUBMIT_NAME,
   GUEST_EMAIL,
   HOST_EMAIL,
+  PDP_CONTINUE_NAME,
   acceptNecessaryCookies,
   checkoutUrl,
   completeCheckout,
@@ -50,8 +52,10 @@ test("a11y: arama", async ({ page }) => {
 
 test("a11y: ürün sayfası", async ({ page }) => {
   const stay = await findStay(page.request);
-  await page.goto(`/property/${stay.propertyId}`);
-  await expect(page.getByRole("button", { name: "Rezervasyona devam et" })).toBeEnabled();
+  await page.goto(
+    `/property/${stay.propertyId}?checkIn=${isoDaysFromNow(40)}&checkOut=${isoDaysFromNow(42)}`
+  );
+  await expect(page.getByRole("button", { name: PDP_CONTINUE_NAME })).toBeEnabled();
   await expectNoSeriousViolations(page);
 });
 
@@ -59,7 +63,7 @@ test("a11y: checkout", async ({ page }) => {
   const stay = await findStay(page.request);
   await page.goto(checkoutUrl(stay, { checkIn: isoDaysFromNow(40), checkOut: isoDaysFromNow(42) }));
   await expect(page.getByText("Konaklama vergisi")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Rezervasyonu Tamamla" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: CHECKOUT_SUBMIT_NAME })).toBeEnabled();
   await expectNoSeriousViolations(page);
 });
 
@@ -116,6 +120,7 @@ test("a11y: DSA bildirim formu ve itiraz sayfası", async ({ page }) => {
 test("a11y: hesap (ajan yetkileri) ve oturumlar", async ({ page, baseURL }) => {
   await loginViaApi(page, baseURL!, GUEST_EMAIL);
   await page.goto("/account");
+  await page.locator("#account-advanced > summary").click();
   await expect(page.locator("#agent-mandates")).toBeVisible();
   await expectNoSeriousViolations(page);
   await page.goto("/account/sessions");
@@ -199,7 +204,7 @@ test("a11y: admin destek kuyruğu", async ({ page, baseURL }) => {
 
 /** RNPL'e uygun tarife (seed: PAY_LATER, orta iptal politikası) ile HELD rezervasyon sayfası. */
 async function rnplHeldBooking(page: Page, baseURL: string): Promise<string> {
-  // Çerez bandı "Rezervasyonu Tamamla" düğmesini örtmesin (bant a11y'si ayrı testlerde taranır).
+  // Çerez bandı "Odayı ayırt ve ödemeye geç" düğmesini örtmesin (bant a11y'si ayrı testlerde taranır).
   await acceptNecessaryCookies(page.context(), baseURL);
   // RNPL yalnız risk kararı `allow` iken sunulur; misafir hesabı diğer e2e ödemeleriyle
   // `velocity_user` (10 dk'da >3 deneme) kuralına takılır → ayrı seed hesabı (ev sahibi) misafir
@@ -262,7 +267,7 @@ test.describe("karanlık tema", () => {
     await page.goto(
       checkoutUrl(stay, { checkIn: isoDaysFromNow(44), checkOut: isoDaysFromNow(46) })
     );
-    await expect(page.getByRole("button", { name: "Rezervasyonu Tamamla" })).toBeEnabled();
+    await expect(page.getByRole("button", { name: CHECKOUT_SUBMIT_NAME })).toBeEnabled();
     await expectNoSeriousViolations(page);
   });
 

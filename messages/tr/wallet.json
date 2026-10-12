@@ -8,38 +8,60 @@
     "2": "Altın",
     "3": "Platin"
   },
-  "tierBadge": "{tier} seviye",
+  "tierBadge": "{tier} seviyesi",
   "tierAria": "Sadakat seviyesi: {tier}",
-  "cashbackRate": "Tamamlanan konaklamalarınızda %{rate} cashback kazanırsınız.",
+  "cashbackRate": "Tamamlanan konaklamalarınızda %{rate} nakit iade (cashback) kazanırsınız; tutar cüzdan bakiyenize eklenir.",
   "completedStays": "{count, plural, =0 {Henüz tamamlanan konaklama yok} one {# tamamlanan konaklama} other {# tamamlanan konaklama}}",
-  "nextTier": "{count, plural, one {# konaklama} other {# konaklama}} sonra {tier} seviyesi (%{rate} cashback).",
+  "nextTier": "{count, plural, one {# konaklama} other {# konaklama}} daha tamamlayınca {tier} seviyesine geçersiniz (%{rate} nakit iade).",
   "topTier": "En üst seviyedesiniz.",
-  "balance": "Kullanılabilir kredi",
-  "noBalance": "Henüz krediniz yok. Konaklamanız tamamlandıktan sonra cashback krediniz burada görünür.",
+  "balance": "Kullanılabilir cüzdan bakiyesi",
+  "noBalance": "Henüz cüzdan bakiyeniz yok. Konaklamanız tamamlandıktan sonra nakit iadeniz burada görünür.",
   "nextExpiry": "En yakın son kullanma: {date}",
   "lots": {
-    "title": "Kredi hareketleri",
+    "title": "Cüzdan hareketleri",
     "source": {
-      "CASHBACK": "Cashback",
-      "REFUND": "İade edilen kredi"
+      "CASHBACK": "Nakit iade (cashback)",
+      "REFUND": "İade edilen bakiye"
     },
     "remaining": "Kalan {remaining} / {amount}",
     "expires": "Son kullanma: {date}",
     "expired": "Süresi doldu",
-    "used": "Kullanıldı"
+    "used": "Kullanıldı",
+    "credit": "+{amount}",
+    "debit": "−{amount}",
+    "earnedOn": {
+      "CASHBACK": "Kazanıldı: {date}",
+      "REFUND": "İade edildi: {date}"
+    },
+    "spentOn": "İşlem tarihi: {date}",
+    "spend": {
+      "SPENT": "Ödemede kullanıldı",
+      "RESERVED": "Ödeme için ayrıldı"
+    },
+    "expiredUnused": "Süresi doldu ({amount} kullanılmadan)",
+    "expiryDate": "Son kullanma tarihi: {date}"
   },
   "pending": {
-    "title": "Bekleyen cashback",
-    "item": "{date} tarihinde krediye dönüşür (%{rate}); iade/talep penceresi bekleniyor."
+    "title": "Bekleyen nakit iade",
+    "item": "İptal/şikâyet süresi bitince, {date} tarihinde cüzdanınıza eklenir (%{rate}).",
+    "estimate": "Tahmini tutar: {amount}"
   },
   "checkout": {
-    "title": "Cüzdan kredisi",
-    "use": "Kredimi kullan",
+    "title": "Cüzdan bakiyesi",
+    "use": "Cüzdan bakiyemi kullan",
     "available": "Kullanılabilir: {amount}",
-    "amount": "Kullanılacak kredi",
+    "amount": "Kullanılacak bakiye",
     "max": "En fazla {amount} (kartla en az bir kısım ödenir). Örnek biçim: 150,50",
     "cardRemainder": "Kartla ödenecek: {amount}",
-    "invalid": "Kredi tutarı 0 ile {max} arasında olmalı.",
-    "notice": "Kredi önce ayrılır; kart ödemesi başarısız olursa krediniz iade edilir."
-  }
+    "invalid": "Kullanılacak bakiye 0 ile {max} arasında olmalı.",
+    "notice": "Bakiye önce ayrılır; kart ödemesi başarısız olursa bakiyeniz cüzdanınıza geri döner.",
+    "amountWithCurrency": "Kullanılacak kredi ({currency})",
+    "clamped": "En fazla {max} kullanılabilir; tutar {max} olarak düzeltildi.",
+    "rnplUnavailable": "Cüzdan kredisi \"Şimdi rezerve et, sonra öde\" seçeneğiyle birlikte kullanılamaz. Kredinizi kullanmak için \"Şimdi öde\"yi seçin."
+  },
+  "tierPrefix": "Sadakat programı:",
+  "balanceHelp": "Ödeme adımında “{action}” seçeneğiyle harcayabilirsiniz.",
+  "nextExpiryAmount": "{date} tarihinde {amount} tutarın süresi doluyor.",
+  "bookingLink": "Rezervasyon: {title}",
+  "viewBooking": "Rezervasyonu görüntüle"
 }

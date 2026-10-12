@@ -4,6 +4,7 @@ import {
   cloneElement,
   isValidElement,
   useEffect,
+  useRef,
   useState,
   useSyncExternalStore,
   type ReactElement,
@@ -15,16 +16,32 @@ import Footer from "@/components/layout/Footer";
 import { Button, Status } from "@/components/ui/ui";
 import { ApiError, apiFetch } from "@/lib/api-client";
 
-/** Kimlik sayfaları (giriş, kayıt, sıfırlama, doğrulama) için ortak kart düzeni. */
+/**
+ * Kimlik sayfaları (giriş, kayıt, sıfırlama, doğrulama) için ortak kart düzeni.
+ * `status`: ilk render'dan beri DOM'da duran `role="status"` bölgesinin içeriği (yükleniyor ve
+ * başarı metinleri; içerikle birlikte eklenen bölgeler güvenilir duyurulmaz). Görünür başarı
+ * kutusu için `<Notice kind="success" live={false}>`, yalnız duyuru için `sr-only` metin verin;
+ * hatalar (`role="alert"`) bu bölgenin dışında kalmalı (iç içe canlı bölge yok).
+ * `focusTitle`: true olduğunda (ör. işlem tamamlandı görünümü) odak başlığa taşınır.
+ */
 export default function AuthCard({
   title,
   subtitle,
   children,
+  status,
+  focusTitle = false,
 }: {
   title: string;
   subtitle?: string;
   children: ReactNode;
+  status?: ReactNode;
+  focusTitle?: boolean;
 }) {
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    if (focusTitle) titleRef.current?.focus();
+  }, [focusTitle, title]);
+
   return (
     <div className="flex min-h-screen flex-col bg-gray-50">
       <Header />
@@ -33,9 +50,18 @@ export default function AuthCard({
         className="mx-auto flex w-full max-w-md flex-1 items-center justify-center px-4 py-16"
       >
         <div className="w-full rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
-          <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
+          <h1
+            ref={titleRef}
+            tabIndex={focusTitle ? -1 : undefined}
+            className="text-2xl font-bold text-gray-900 focus:outline-none"
+          >
+            {title}
+          </h1>
           {subtitle && <p className="mt-1 text-sm text-gray-600">{subtitle}</p>}
           {children}
+          <div role="status" aria-live="polite" aria-atomic="true">
+            {status}
+          </div>
         </div>
       </main>
       <Footer />
@@ -43,11 +69,22 @@ export default function AuthCard({
   );
 }
 
-/** Sonuç / hata mesajı kutusu (ekran okuyucu için canlı bölge). */
-export function Notice({ kind, children }: { kind: "error" | "success"; children: ReactNode }) {
+/**
+ * Sonuç / hata mesajı kutusu (ekran okuyucu için canlı bölge). `live={false}`: rolsüz, yalnız
+ * görsel kutu; duyuruyu kalıcı bir bölge (ör. `AuthCard` `status`) yapıyorsa kullanın.
+ */
+export function Notice({
+  kind,
+  children,
+  live = true,
+}: {
+  kind: "error" | "success";
+  children: ReactNode;
+  live?: boolean;
+}) {
   return (
     <div
-      role={kind === "error" ? "alert" : "status"}
+      role={live ? (kind === "error" ? "alert" : "status") : undefined}
       className={`mt-4 rounded-lg px-4 py-3 text-sm ${
         kind === "error" ? "bg-red-50 text-red-700" : "bg-green-50 text-green-800"
       }`}

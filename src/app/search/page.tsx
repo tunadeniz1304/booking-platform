@@ -2,24 +2,27 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import dynamic from "next/dynamic";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
-import PropertyCard from "@/components/property/PropertyCard";
-import RankingWhy from "@/components/search/RankingWhy";
+import { useSessionUserCache } from "@/components/layout/useSessionUserCache";
+import PropertyCard, { propertyHref, type SearchContext } from "@/components/property/PropertyCard";
+import RankingWhy, { type RankingWeightsSet } from "@/components/search/RankingWhy";
 import SmartFilter, { type SmartFilters } from "@/components/search/SmartFilter";
 import CompareToggle from "@/components/compare/CompareToggle";
 import CompareBar from "@/components/compare/CompareBar";
-import { useCompareSelection } from "@/components/compare/useCompareSelection";
 import AccessibilityFilter from "@/components/search/AccessibilityFilter";
+import { SearchPageSkeleton, SearchResultSkeletons } from "@/components/search/SearchPageSkeleton";
 import { parseAccessibilityParam } from "@/lib/compliance/accessibility-codes";
+import { propertyTypeKey } from "@/lib/i18n/property-type";
 import type { MapPoint } from "@/components/search/ResultsMap";
-import { apiFetch } from "@/lib/api-client";
+import { ApiError, apiFetch } from "@/lib/api-client";
 import { useFormat } from "@/i18n/use-format";
 import { parseAmountToMinor } from "@/lib/ui/amount-input";
-import { Button, focusRing } from "@/components/ui/ui";
+import { Button, focusRing, useErrorText } from "@/components/ui/ui";
 
 // Harita yalnızca istemcide ve yalnızca istenince yüklenir (maplibre ağır, SSR'siz).
 const ResultsMap = dynamic(() => import("@/components/search/ResultsMap"), {
@@ -84,9 +87,12 @@ interface SearchResponse {
   totalPages: number;
   cached: boolean;
   visual?: { enabled: boolean; applied: boolean; reason: VisualReason | null };
+  /** "Önerilen" sıralamada kullanılan ağırlık kümesi ("Bu sıralama neden?" notu, F336). */
+  weightsSet?: RankingWeightsSet;
 }
 
-interface SmartResponse extends SearchResponse {
+/** F1361: sayfa yalnızca filtreyi kullanır; sonuçlar URL'deki aramayla birleşik GET'ten gelir. */
+interface SmartResponse {
   filters: SmartFilters;
   llmMode: string;
 }
@@ -94,15 +100,6 @@ interface SmartResponse extends SearchResponse {
 const PROPERTY_TYPES = ["HOTEL", "APARTMENT", "VILLA", "HOSTEL", "BED_AND_BREAKFAST"];
 const SORT_VALUES = ["recommended", "price_asc", "price_desc", "rating"];
 const PAGE_SIZE = 24;
-
-/** Mülk türü → `search.types.*` çeviri anahtarı. */
-const TYPE_KEYS: Record<string, string> = {
-  HOTEL: "hotel",
-  APARTMENT: "apartment",
-  VILLA: "villa",
-  HOSTEL: "hostel",
-  BED_AND_BREAKFAST: "bedAndBreakfast",
-};
 
 const smallInput = `w-full rounded-sm border border-gray-500 px-2 py-1 text-sm ${focusRing}`;
 /** Mobilde 44px dokunma hedefi; masaüstünde mevcut yoğunluk korunur. */
@@ -131,18 +128,68 @@ interface StayContext {
   guests: number;
 }
 
+/** Harita yan listesi öğesi: işaretçi verisine ek olarak puan ve tam bağlamlı ilan bağlantısı. */
+interface MapListItem extends MapPoint {
+  href: string;
+  rating: number;
+  reviewCount: number;
+}
+
+/** Arama hatası: `fields` doluysa geçersiz URL parametresi (VALIDATION_ERROR). */
+interface SearchError {
+  text: string;
+  fields: string[] | null;
+}
+
+/** Sunucunun doğruladığı arama parametresi → `search.*` etiket anahtarı. */
+const PARAM_LABEL_KEYS: Record<string, string> = {
+  destination: "edit.destination",
+  city: "edit.destination",
+  checkIn: "edit.checkIn",
+  checkOut: "edit.checkOut",
+  guests: "edit.guests",
+  minPrice: "filters.price",
+  maxPrice: "filters.price",
+  propertyType: "filters.type",
+  sort: "filters.sort",
+  flexDays: "flex.label",
+};
+
+/** Geçersiz parametre → "Aramayı düzenle" formunda odaklanacak alan. */
+const PARAM_EDIT_FIELDS: Record<string, string> = {
+  destination: "edit-destination",
+  checkIn: "edit-checkin",
+  checkOut: "edit-checkout",
+  guests: "edit-guests",
+};
+
+/** ZodError.flatten() ayrıntısından geçersiz alan adları. */
+function invalidParamNames(details: unknown): string[] {
+  if (!details || typeof details !== "object") return [];
+  const fieldErrors = (details as { fieldErrors?: unknown }).fieldErrors;
+  return fieldErrors && typeof fieldErrors === "object" ? Object.keys(fieldErrors) : [];
+}
+
 function SearchPageContent() {
   const t = useTranslations("search");
   const f = useFormat();
-  const typeLabel = (type: string) => (TYPE_KEYS[type] ? t(`types.${TYPE_KEYS[type]}`) : type);
+  const tA11y = useTranslations("compliance.accessibility");
+  // F967: teknik durum ayrıntıları (önbellek, görsel arama nedeni) yalnızca yöneticiye gösterilir.
+  const isAdmin = useSessionUserCache()?.role === "ADMIN";
+  const typeLabel = (type: string) => {
+    const key = propertyTypeKey(type);
+    return key ? t(`types.${key}`) : type;
+  };
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { ids: compareIds } = useCompareSelection();
   const destination = searchParams.get("destination") || "";
   const checkIn = searchParams.get("checkIn") || "";
   const checkOut = searchParams.get("checkOut") || "";
   const guestsParam = Number(searchParams.get("guests"));
   const guests = guestsParam > 0 ? guestsParam : 2;
+  // F360: ana sayfa arama çubuğunun yetişkin/çocuk dağılımı (toplamla tutarlıysa taşınır).
+  const adultsParam = Number(searchParams.get("adults"));
+  const childrenParam = Number(searchParams.get("children") ?? 0);
   const similarToPhotoId = searchParams.get("similarToPhotoId") || "";
   // P1-13(e): doğrulanmış erişilebilirlik filtresi URL'de tutulur (paylaşılabilir bağlantı).
   const accessibilityParam = parseAccessibilityParam(searchParams.get("accessibility")).codes.join(
@@ -186,14 +233,20 @@ function SearchPageContent() {
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<SearchError | null>(null);
+  /** "Daha fazla göster" hatası: yüklü sonuçlar gizlenmez, düğmenin yanında gösterilir. */
+  const [moreError, setMoreError] = useState<string | null>(null);
   const [cached, setCached] = useState(false);
   const [visual, setVisual] = useState<SearchResponse["visual"]>(undefined);
+  const [weightsSet, setWeightsSet] = useState<RankingWeightsSet | undefined>(undefined);
   const [stay, setStay] = useState<StayContext>({ checkIn, checkOut, guests });
 
   const [smartFilters, setSmartFilters] = useState<SmartFilters | null>(null);
   const [llmMode, setLlmMode] = useState<string | null>(null);
   const [smartBusy, setSmartBusy] = useState(false);
+  /** F961: akıllı filtre hatası arama hatasından ayrı; mevcut sonuçlar gizlenmez. */
+  const [smartError, setSmartError] = useState<string | null>(null);
+  const lastSmartText = useRef("");
   /** Harita ↔ liste senkronu: seçili mülk (işaretçi veya liste öğesi). */
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [mapError, setMapError] = useState<string | null>(null);
@@ -284,10 +337,21 @@ function SearchPageContent() {
     [requestKey]
   );
 
+  // F960: hata metni arayüz dilinde; geçersiz bağlantı parametresi alan adıyla bildirilir.
+  const errorText = useErrorText();
+  const toSearchError = useCallback(
+    (err: unknown): SearchError =>
+      err instanceof ApiError && err.code === "VALIDATION_ERROR"
+        ? { text: t("errors.invalidParams"), fields: invalidParamNames(err.details) }
+        : { text: errorText(err, t("errors.load")), fields: null },
+    [errorText, t]
+  );
+
   const load = useCallback(async () => {
     const seq = ++requestSeq.current;
     setLoading(true);
     setError(null);
+    setMoreError(null);
     try {
       const data = await fetchPage(1);
       if (seq !== requestSeq.current) return; // eski istek: daha yeni bir arama başladı
@@ -298,6 +362,7 @@ function SearchPageContent() {
       setTotalPages(data.totalPages);
       setCached(data.cached);
       setVisual(data.visual);
+      setWeightsSet(data.weightsSet);
       setStay({
         checkIn: params.get("checkIn") || "",
         checkOut: params.get("checkOut") || "",
@@ -305,11 +370,11 @@ function SearchPageContent() {
       });
     } catch (err) {
       if (seq !== requestSeq.current) return;
-      setError(err instanceof Error ? err.message : t("errors.load"));
+      setError(toSearchError(err));
     } finally {
       if (seq === requestSeq.current) setLoading(false);
     }
-  }, [fetchPage, requestKey, t]);
+  }, [fetchPage, requestKey, toSearchError]);
 
   useEffect(() => {
     const timer = setTimeout(() => void load(), 0);
@@ -321,7 +386,7 @@ function SearchPageContent() {
     if (loadingMore) return;
     const seq = requestSeq.current;
     setLoadingMore(true);
-    setError(null);
+    setMoreError(null);
     try {
       const data = await fetchPage(page + 1);
       if (seq !== requestSeq.current) return;
@@ -333,9 +398,7 @@ function SearchPageContent() {
       setTotal(data.total);
       setTotalPages(data.totalPages);
     } catch (err) {
-      if (seq === requestSeq.current) {
-        setError(err instanceof Error ? err.message : t("errors.load"));
-      }
+      if (seq === requestSeq.current) setMoreError(errorText(err, t("errors.load")));
     } finally {
       setLoadingMore(false);
     }
@@ -362,20 +425,28 @@ function SearchPageContent() {
   }, [editRequest]);
 
   const runSmart = async (text: string) => {
+    if (smartBusy) return;
+    lastSmartText.current = text;
     setSmartBusy(true);
-    setError(null);
+    setSmartError(null);
     try {
       const data = await apiFetch<SmartResponse>("/api/search/smart", {
         method: "POST",
-        body: JSON.stringify({ text }),
+        // F1361: sonuç istenmez (birleşik arama ayrıca yapılır); bilmeyen sunucu alanı yok sayar.
+        body: JSON.stringify({ text, filtersOnly: true }),
       });
       setLlmMode(data.llmMode);
       setSmartFilters({ ...data.filters, amenities: data.filters.amenities ?? [] });
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("errors.smart"));
+      setSmartError(errorText(err, t("errors.smart")));
     } finally {
       setSmartBusy(false);
     }
+  };
+  const clearSmart = () => {
+    setSmartFilters(null);
+    setLlmMode(null);
+    setSmartError(null);
   };
 
   /** Çip kaldırılınca panelle eşlenen alan URL'den de silinir (F340). */
@@ -454,9 +525,17 @@ function SearchPageContent() {
       similarToPhotoId: null,
       flexDays: null,
     });
-    setSmartFilters(null);
-    setLlmMode(null);
+    clearSmart();
   };
+  /** Boş durum eylemleri: kutu yüklemede kaybolacağı için odak önce sonuç bölümüne taşınır. */
+  const recover = (action: () => void) => {
+    document.getElementById("results")?.focus();
+    action();
+  };
+  const accessibilityCodes = parseAccessibilityParam(accessibilityParam).codes;
+  // F964: esneklik sonuç listesini değiştirmez; bulunan öneri sayısı sayım satırında duyurulur.
+  const flexRequested = Number(requestParams.get("flexDays")) > 0;
+  const flexFound = results.filter((r) => r.flexSuggestion).length;
 
   const activeFilterCount =
     (effType ? 1 : 0) +
@@ -474,25 +553,63 @@ function SearchPageContent() {
   }`;
   const priceSuffix = hasDates ? t("filters.suffixTotal") : t("filters.suffixNight");
 
-  const mapPoints: MapPoint[] = results.flatMap((p) =>
-    typeof p.location.latitude === "number" && typeof p.location.longitude === "number"
-      ? [
-          {
-            id: p.id,
-            title: p.title,
-            city: p.location.city,
-            latitude: p.location.latitude,
-            longitude: p.location.longitude,
-            // F346: kartla aynı bağlam — tarih varsa toplam, yoksa gecelik fiyat.
-            priceLabel:
-              p.quote && stay.checkIn && stay.checkOut
-                ? t("mapPrice.total", { price: f.money(p.quote.total, p.quote.currency) })
-                : t("mapPrice.perNight", { price: f.money(p.basePriceMinor, p.currency) }),
-          },
-        ]
-      : []
-  );
+  // F360: dağılım yalnızca teklifin hesaplandığı misafir sayısıyla tutarlıysa ilana taşınır.
+  const party =
+    Number.isInteger(adultsParam) &&
+    Number.isInteger(childrenParam) &&
+    adultsParam > 0 &&
+    childrenParam >= 0 &&
+    adultsParam + childrenParam === stay.guests
+      ? { adults: adultsParam, children: childrenParam }
+      : {};
+  // F93/F205: teklif olmasa da kart ve harita bağlantıları tarih/misafir bağlamını taşır.
+  const searchContext: SearchContext = {
+    checkIn: stay.checkIn || null,
+    checkOut: stay.checkOut || null,
+    guests: stay.guests,
+    ...party,
+  };
+
+  const mapPoints: MapListItem[] = results.flatMap((p) => {
+    if (typeof p.location.latitude !== "number" || typeof p.location.longitude !== "number") {
+      return [];
+    }
+    const quote = p.quote && stay.checkIn && stay.checkOut ? p.quote : null;
+    return [
+      {
+        id: p.id,
+        title: p.title,
+        city: p.location.city,
+        latitude: p.location.latitude,
+        longitude: p.location.longitude,
+        // F346/F549: kartla aynı bağlam ve birim — tarih varsa "N gece toplam", yoksa gecelik.
+        priceLabel: quote
+          ? t("mapPrice.total", {
+              price: f.money(quote.total, quote.currency),
+              nights: quote.nights,
+            })
+          : t("mapPrice.perNight", { price: f.money(p.basePriceMinor, p.currency) }),
+        // F552: liste ve açılır pencere bağlantısı kartla aynı arama bağlamını taşır.
+        href: propertyHref(p.id, {
+          ...searchContext,
+          roomId: quote?.roomId,
+          ratePlanId: quote?.ratePlanId,
+        }),
+        rating: p.ratingAvg,
+        reviewCount: p.ratingCount,
+      },
+    ];
+  });
   const showMap = view === "map" && !mapError && mapPoints.length > 0;
+  // F1364: harita gösterilemiyorsa (yüklenemedi / konum yok) içerik ve seçili düğme listedir.
+  const mapUnavailable =
+    view === "map" && (Boolean(mapError) || (!loading && mapPoints.length === 0));
+  const shownView = mapUnavailable ? "list" : view;
+  // F1362: görsel aramanın referans ilanı (kapak fotoğrafı) sonuçlardaysa adı ve küçük resmi.
+  const visualReference = similarToPhotoId
+    ? results.find((r) => r.coverPhotoId === similarToPhotoId)
+    : undefined;
+  const referenceImage = visualReference?.images?.[0];
   const remaining = Math.max(0, total - results.length);
 
   return (
@@ -529,18 +646,36 @@ function SearchPageContent() {
               set("checkIn", values.checkIn);
               set("checkOut", values.checkOut);
               set("guests", String(values.guests));
-              setSmartFilters(null);
-              setLlmMode(null);
+              // F360: form yalnız toplamı düzenler; artık tutmayan yetişkin/çocuk dağılımı silinir.
+              if (values.guests !== adultsParam + childrenParam) {
+                next.delete("adults");
+                next.delete("children");
+              }
+              clearSmart();
               setEditOpen(false);
               router.push(`/search?${next.toString()}`);
             }}
           />
           {similarToPhotoId && visual && (
             <div className="mt-3 flex flex-wrap items-center gap-3 text-sm" role="status">
+              {/* İlan adı metinde yazılı; küçük resim yalnızca görsel hatırlatıcı (alt boş). */}
+              {visual.applied && referenceImage && (
+                <Image
+                  src={referenceImage}
+                  alt=""
+                  width={64}
+                  height={48}
+                  className="h-12 w-16 rounded-sm object-cover"
+                />
+              )}
               <span className={visual.applied ? "text-gray-900" : "text-amber-800"}>
                 {visual.applied
-                  ? t("visual.similarHeading")
-                  : t(`visual.reasons.${visual.reason ?? "LOAD_FAILED"}`)}
+                  ? visualReference
+                    ? t("visual.similarHeadingNamed", { title: visualReference.title })
+                    : t("visual.similarHeading")
+                  : isAdmin
+                    ? t(`visual.reasons.${visual.reason ?? "LOAD_FAILED"}`)
+                    : t("visual.unavailable")}
               </span>
               <Link
                 href={similarHref("")}
@@ -552,22 +687,46 @@ function SearchPageContent() {
           )}
         </div>
 
-        <div className="mb-6">
+        {/* F965: akıllı filtre bir arama yer işareti (SmartFilter formu ayrıca role almaz). */}
+        <div role="search" aria-label={t("smart.region")} className="mb-6">
           <SmartFilter
             filters={smartFilters}
             llmMode={llmMode}
             busy={smartBusy}
             onSubmit={runSmart}
             onChange={onSmartChange}
-            onClear={() => {
-              setSmartFilters(null);
-              setLlmMode(null);
-            }}
+            onClear={clearSmart}
           />
+          {smartError && (
+            <div className="mt-2 flex flex-wrap items-center gap-3 rounded-md bg-amber-50 p-3 text-sm">
+              <p id="smart-filter-error" role="alert" className="text-amber-950">
+                {smartError} {t("errors.smartKept")}
+              </p>
+              <Button
+                variant="secondary"
+                className={touchTarget}
+                busy={smartBusy}
+                onClick={() => {
+                  // Bu kutu yeniden denemede kapanır; odak metin alanına döner.
+                  document.getElementById("smart-filter")?.focus();
+                  void runSmart(lastSmartText.current);
+                }}
+              >
+                {t("retry")}
+              </Button>
+            </div>
+          )}
+          {/* F551: akıllı filtreden sonra filtre panelini atlayıp sonuçlara geçiş. */}
+          <a
+            href="#results"
+            className={`sr-only font-medium text-blue-700 underline focus:not-sr-only focus:mt-3 focus:inline-block ${focusRing}`}
+          >
+            {t("skipToResults")}
+          </a>
         </div>
 
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-4">
-          <aside className="lg:col-span-1">
+          <section aria-labelledby="filters-heading" className="lg:col-span-1">
             <Button
               variant="secondary"
               className={`mb-4 w-full lg:hidden ${touchTarget}`}
@@ -581,7 +740,9 @@ function SearchPageContent() {
               id="search-filters"
               className={`${filtersOpen ? "" : "hidden"} rounded-lg bg-white p-4 shadow-sm lg:block`}
             >
-              <h2 className="text-lg font-semibold text-gray-900">{t("filters.title")}</h2>
+              <h2 id="filters-heading" className="text-lg font-semibold text-gray-900">
+                {t("filters.title")}
+              </h2>
 
               <fieldset className="mt-4">
                 <legend className="text-sm font-medium text-gray-800">{priceLegend}</legend>
@@ -653,10 +814,7 @@ function SearchPageContent() {
                 </div>
               </fieldset>
 
-              <AccessibilityFilter
-                selected={parseAccessibilityParam(accessibilityParam).codes}
-                onChange={setAccessibility}
-              />
+              <AccessibilityFilter selected={accessibilityCodes} onChange={setAccessibility} />
 
               <div className="mt-4">
                 <label htmlFor="sort-by" className="text-sm font-medium text-gray-800">
@@ -683,12 +841,14 @@ function SearchPageContent() {
                   id="flex-days"
                   value={flexDays}
                   onChange={(e) => {
+                    // aria-disabled: odaklanabilir kalır ama tarih yokken değer değişmez.
+                    if (!hasDates) return;
                     const d = Number(e.target.value);
                     updateParams({ flexDays: d > 0 ? String(d) : null });
                   }}
-                  disabled={!hasDates}
-                  aria-describedby={!hasDates ? "flex-days-hint" : undefined}
-                  className={`mt-2 ${smallInput} ${touchTarget} disabled:bg-gray-100`}
+                  aria-disabled={!hasDates || undefined}
+                  aria-describedby={hasDates ? "flex-days-desc" : "flex-days-desc flex-days-hint"}
+                  className={`mt-2 ${smallInput} ${touchTarget} aria-disabled:bg-gray-100`}
                 >
                   {FLEX_OPTIONS.map((d) => (
                     <option key={d} value={d}>
@@ -696,6 +856,9 @@ function SearchPageContent() {
                     </option>
                   ))}
                 </select>
+                <p id="flex-days-desc" className="mt-1 text-xs text-gray-600">
+                  {t("flex.hint")}
+                </p>
                 {!hasDates && (
                   <p id="flex-days-hint" className="mt-1 text-xs text-gray-600">
                     {t("flex.needsDates")}{" "}
@@ -720,15 +883,29 @@ function SearchPageContent() {
                 </Button>
               )}
             </div>
-          </aside>
+          </section>
 
-          <div id="results" tabIndex={-1} className="focus:outline-none lg:col-span-3">
+          <section
+            id="results"
+            tabIndex={-1}
+            aria-labelledby="results-heading"
+            className="focus:outline-none lg:col-span-3"
+          >
+            <h2 id="results-heading" className="sr-only">
+              {t("resultsHeading")}
+            </h2>
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
               <p aria-live="polite" className="text-sm text-gray-700">
                 {loading ? t("loading") : t("resultCount", { shown: results.length, total })}
+                {!loading && !error && flexRequested && results.length > 0 && (
+                  <>
+                    {" · "}
+                    {flexFound > 0 ? t("flex.found", { count: flexFound }) : t("flex.noneFound")}
+                  </>
+                )}
               </p>
               <div className="flex items-center gap-2">
-                {cached && (
+                {cached && isAdmin && (
                   <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs text-green-800">
                     {t("cached")}
                   </span>
@@ -742,19 +919,22 @@ function SearchPageContent() {
                     <button
                       key={v}
                       type="button"
-                      aria-pressed={view === v}
+                      aria-pressed={shownView === v}
+                      aria-describedby={
+                        v === "map" && mapUnavailable ? "map-unavailable-note" : undefined
+                      }
                       onClick={() => {
                         updateParams({ view: v === "map" ? "map" : null });
                         if (v === "map") setMapError(null);
                       }}
                       className={`px-3 py-1 text-sm ${touchTarget} ${
-                        view === v
+                        shownView === v
                           ? "bg-[#003580] font-semibold text-white underline underline-offset-4"
                           : "bg-white text-gray-800"
                       } ${focusRing}`}
                     >
                       {/* F143: seçili durum renge ek olarak işaret ve kalın/altı çizili yazıyla. */}
-                      {view === v && (
+                      {shownView === v && (
                         <span aria-hidden="true" className="mr-1">
                           ✓
                         </span>
@@ -768,20 +948,70 @@ function SearchPageContent() {
 
             <div aria-live="polite" className="text-sm">
               {view === "map" && mapError && (
-                <p role="alert" className="mb-4 rounded-md bg-amber-50 p-3 text-amber-950">
+                <p
+                  id="map-unavailable-note"
+                  role="alert"
+                  className="mb-4 rounded-md bg-amber-50 p-3 text-amber-950"
+                >
                   {t("mapFailed")}
                 </p>
               )}
               {view === "map" && !mapError && !loading && mapPoints.length === 0 && (
-                <p className="mb-4 rounded-md bg-gray-100 p-3 text-gray-800">{t("noLocation")}</p>
+                <p
+                  id="map-unavailable-note"
+                  className="mb-4 rounded-md bg-gray-100 p-3 text-gray-800"
+                >
+                  {t("noLocation")}
+                </p>
               )}
             </div>
 
             {error && (
               <div className="rounded-lg bg-red-50 p-6 text-center shadow-sm">
                 <p role="alert" className="text-red-700">
-                  {error}
+                  {error.text}
+                  {error.fields && error.fields.length > 0 && (
+                    <>
+                      {" "}
+                      {t("errors.invalidFields", {
+                        fields: [
+                          ...new Set(
+                            error.fields.map((name) =>
+                              PARAM_LABEL_KEYS[name] ? t(PARAM_LABEL_KEYS[name]) : name
+                            )
+                          ),
+                        ].join(", "),
+                      })}
+                    </>
+                  )}
                 </p>
+                <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
+                  <Button
+                    variant="secondary"
+                    className={touchTarget}
+                    onClick={() => {
+                      // Hata kutusu kaybolacağı için odak sonuç bölümüne taşınır.
+                      document.getElementById("results")?.focus();
+                      void load();
+                    }}
+                  >
+                    {t("retry")}
+                  </Button>
+                  {error.fields && (
+                    <Button
+                      variant="secondary"
+                      className={touchTarget}
+                      onClick={() =>
+                        openEdit(
+                          error.fields?.map((name) => PARAM_EDIT_FIELDS[name]).find(Boolean) ??
+                            "edit-destination"
+                        )
+                      }
+                    >
+                      {t("edit.toggle")}
+                    </Button>
+                  )}
+                </div>
               </div>
             )}
 
@@ -801,20 +1031,57 @@ function SearchPageContent() {
                         : t("noResultsHint")}
                   </p>
                 </div>
+                {/* F968: erişilebilirlik özellikleri (aynı odada AND) tek tek kaldırılabilir. */}
+                {accessibilityCodes.length > 0 && (
+                  <div className="mt-4">
+                    <p id="empty-a11y-hint" className="text-sm text-gray-700">
+                      {t("emptyA11y.hint")}
+                    </p>
+                    <ul
+                      aria-labelledby="empty-a11y-hint"
+                      className="mt-2 flex flex-wrap justify-center gap-2"
+                    >
+                      {accessibilityCodes.map((code) => {
+                        const label = tA11y(`codes.${code}`);
+                        return (
+                          <li key={code}>
+                            <button
+                              type="button"
+                              aria-label={t("smart.remove", { label })}
+                              onClick={() =>
+                                recover(() =>
+                                  setAccessibility(accessibilityCodes.filter((c) => c !== code))
+                                )
+                              }
+                              className={`inline-flex items-center gap-1 rounded-full border border-gray-500 bg-white px-3 py-1 text-sm text-gray-900 ${touchTarget} ${focusRing}`}
+                            >
+                              {label}
+                              <span aria-hidden="true">×</span>
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                )}
                 <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
-                  {hasActiveFilters ? (
-                    <Button variant="secondary" className={touchTarget} onClick={clearAllFilters}>
-                      {t("filters.clearAll")}
-                    </Button>
-                  ) : (
+                  {hasActiveFilters && (
                     <Button
                       variant="secondary"
                       className={touchTarget}
-                      onClick={() => openEdit("edit-destination")}
+                      onClick={() => recover(clearAllFilters)}
                     >
-                      {t("edit.toggle")}
+                      {t("filters.clearAll")}
                     </Button>
                   )}
+                  {/* F969/F970: tarih ya da varış yerini değiştirme her zaman sunulur. */}
+                  <Button
+                    variant="secondary"
+                    className={touchTarget}
+                    onClick={() => openEdit(hasDates ? "edit-checkin" : "edit-destination")}
+                  >
+                    {t("edit.toggle")}
+                  </Button>
                   {effDestination && (
                     <Link
                       href="/search"
@@ -835,6 +1102,7 @@ function SearchPageContent() {
                     selectedId={selectedId}
                     onSelect={setSelectedId}
                     onFail={(reason) => setMapError(reason)}
+                    searchContext={searchContext}
                   />
                 </div>
                 <MapResultList
@@ -845,10 +1113,19 @@ function SearchPageContent() {
               </div>
             )}
 
-            {!error && !showMap && (
-              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
+            {/* F966: ilk yüklemede iskelet kartlar; yeniden yüklemede eski kartlar soluk/pasif. */}
+            {!error && loading && results.length === 0 && <SearchResultSkeletons />}
+
+            {!error && !showMap && results.length > 0 && (
+              <ul
+                role="list"
+                aria-busy={loading || undefined}
+                className={`grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3 ${
+                  loading ? "pointer-events-none opacity-60" : ""
+                }`}
+              >
                 {results.map((property) => (
-                  <div
+                  <li
                     key={property.id}
                     id={`result-${property.id}`}
                     tabIndex={-1}
@@ -858,10 +1135,8 @@ function SearchPageContent() {
                       id={property.id}
                       title={property.title}
                       location={`${property.location.city}, ${property.location.country}`}
-                      imageUrl={
-                        property.images?.[0] ??
-                        "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=600&h=400&fit=crop"
-                      }
+                      // F973: fotoğraf yoksa stok görsel değil, kartın "fotoğraf yok" yer tutucusu.
+                      imageUrl={property.images?.[0]}
                       priceMinor={property.basePriceMinor}
                       currency={property.currency}
                       rating={property.ratingAvg}
@@ -876,36 +1151,51 @@ function SearchPageContent() {
                               checkIn: stay.checkIn,
                               checkOut: stay.checkOut,
                               guests: stay.guests,
+                              ...party,
                               roomId: property.quote.roomId,
                               ratePlanId: property.quote.ratePlanId,
                             }
                           : undefined
                       }
+                      searchContext={searchContext}
                     />
                     {property.flexSuggestion && (
                       <FlexSuggestionNote
                         propertyId={property.id}
+                        title={property.title}
                         suggestion={property.flexSuggestion}
                         guests={stay.guests}
+                        {...party}
                       />
                     )}
-                    <RankingWhy score={property.score} explain={property.explain} />
+                    <RankingWhy
+                      score={property.score}
+                      explain={property.explain}
+                      weightsSet={weightsSet}
+                    />
                     <CompareToggle propertyId={property.id} />
                     {property.coverPhotoId && (
                       <Link
                         href={similarHref(property.coverPhotoId)}
+                        // F972: kart dışındaki tekrarlanan bağlantı ilan adını taşır.
+                        aria-label={t("visual.showSimilarCoverNamed", { title: property.title })}
                         className={`mt-1 inline-block text-sm font-medium text-blue-700 underline ${focusRing}`}
                       >
-                        {t("visual.showSimilar")}
+                        {t("visual.showSimilarCover")}
                       </Link>
                     )}
-                  </div>
+                  </li>
                 ))}
-              </div>
+              </ul>
             )}
 
             {!error && !loading && page < totalPages && remaining > 0 && (
-              <div className="mt-6 flex justify-center">
+              <div className="mt-6 flex flex-col items-center gap-2">
+                {moreError && (
+                  <p role="alert" className="text-sm text-red-700">
+                    {moreError}
+                  </p>
+                )}
                 <Button
                   variant="secondary"
                   className={touchTarget}
@@ -916,10 +1206,8 @@ function SearchPageContent() {
                 </Button>
               </div>
             )}
-          </div>
+          </section>
         </div>
-        {/* F353: sabit karşılaştırma çubuğu son satırı/odaktaki öğeyi örtmesin. */}
-        {compareIds.length > 0 && <div aria-hidden="true" className="h-24" />}
       </main>
       <CompareBar
         checkIn={stay.checkIn || undefined}
@@ -1071,56 +1359,97 @@ function MapResultList({
   selectedId,
   onSelect,
 }: {
-  points: MapPoint[];
+  points: MapListItem[];
   selectedId: string | null;
   onSelect: (id: string | null) => void;
 }) {
   const t = useTranslations("search");
+  const f = useFormat();
   const itemRefs = useRef(new Map<string, HTMLLIElement>());
   useEffect(() => {
     if (selectedId) itemRefs.current.get(selectedId)?.scrollIntoView({ block: "nearest" });
   }, [selectedId]);
 
   return (
-    <ul
-      aria-label={t("mapResults")}
-      className="max-h-[480px] space-y-2 overflow-y-auto rounded-lg bg-white p-2 shadow-sm"
-    >
-      {points.map((p) => {
-        const active = p.id === selectedId;
-        return (
-          <li
-            key={p.id}
-            ref={(el) => {
-              if (el) itemRefs.current.set(p.id, el);
-              else itemRefs.current.delete(p.id);
-            }}
-          >
-            <button
-              type="button"
-              aria-pressed={active}
-              onClick={() => onSelect(active ? null : p.id)}
-              className={`w-full rounded-md border px-3 py-2 text-left text-sm ${
-                active
-                  ? "border-[#003580] bg-amber-100 text-gray-900"
-                  : "border-gray-200 bg-white text-gray-900 hover:bg-gray-50"
-              } ${focusRing}`}
+    <div>
+      {/* F974: seçim düğmesinin amacı (ilana gitmek için ayrı "İlanı gör" bağlantısı var). */}
+      <p id="map-list-hint" className="sr-only">
+        {t("mapList.selectHint")}
+      </p>
+      <ul
+        aria-label={t("mapResults")}
+        className="max-h-[480px] space-y-2 overflow-y-auto rounded-lg bg-white p-2 shadow-sm"
+      >
+        {points.map((p) => {
+          const active = p.id === selectedId;
+          return (
+            <li
+              key={p.id}
+              ref={(el) => {
+                if (el) itemRefs.current.set(p.id, el);
+                else itemRefs.current.delete(p.id);
+              }}
             >
-              <span className="block font-semibold">{p.title}</span>
-              <span className="text-gray-700">
-                {p.city} · {p.priceLabel}
-              </span>
-            </button>
-          </li>
-        );
-      })}
-    </ul>
+              <button
+                type="button"
+                aria-pressed={active}
+                aria-describedby="map-list-hint"
+                onClick={() => onSelect(active ? null : p.id)}
+                // F1367: seçili öğe renge ek olarak kalın kenarlık ve "✓ Seçili" metniyle ayrışır.
+                className={`w-full rounded-md text-left text-sm ${
+                  active
+                    ? "border-2 border-[#003580] bg-amber-100 px-[11px] py-[7px] text-gray-900"
+                    : "border border-gray-200 bg-white px-3 py-2 text-gray-900 hover:bg-gray-50"
+                } ${focusRing}`}
+              >
+                <span id={`map-item-${p.id}`} className="block font-semibold">
+                  {p.title}
+                </span>
+                <span className="block text-gray-700">
+                  {p.city} · {p.priceLabel}
+                </span>
+                {/* F552: harita kullanamayanlar için puan da listede. */}
+                <span className="block text-gray-700">
+                  {p.reviewCount > 0
+                    ? `${t("card.ratingLabel", {
+                        value: f.number(p.rating, {
+                          minimumFractionDigits: 1,
+                          maximumFractionDigits: 1,
+                        }),
+                      })} · ${t("card.reviews", { count: p.reviewCount })}`
+                    : t("card.noRating")}
+                </span>
+                {/* Durum ekran okuyucuya aria-pressed ile iletilir; metin yalnız görsel ipucu. */}
+                {active && (
+                  <span aria-hidden="true" className="mt-1 block font-semibold">
+                    ✓ {t("mapList.selected")}
+                  </span>
+                )}
+              </button>
+              <Link
+                href={p.href}
+                aria-describedby={`map-item-${p.id}`}
+                className={`ml-3 inline-flex items-center text-sm font-medium text-blue-700 underline ${touchTarget} ${focusRing}`}
+              >
+                {t("mapList.view")}
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
+}
+
+/** Sayfa paketi/URL parametreleri hazırlanırken: rota yükleme ekranıyla aynı iskelet (F976). */
+function SearchPageFallback() {
+  const t = useTranslations("search");
+  return <SearchPageSkeleton label={t("loading")} />;
 }
 
 export default function SearchPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-gray-50" />}>
+    <Suspense fallback={<SearchPageFallback />}>
       <SearchPageContent />
     </Suspense>
   );
@@ -1129,22 +1458,32 @@ export default function SearchPage() {
 /** P1-3: ±N gün önerisi — tutar metinle verilir (renk tek sinyal değil). */
 function FlexSuggestionNote({
   propertyId,
+  title,
   suggestion,
   guests,
+  adults,
+  children,
 }: {
   propertyId: string;
+  /** Bağlantının erişilebilir adına eklenen ilan adı (F972). */
+  title?: string;
   suggestion: NonNullable<SearchResultItem["flexSuggestion"]>;
   guests: number;
+  /** Aramadaki yetişkin/çocuk dağılımı (F360); ilan sayfasına taşınır. */
+  adults?: number;
+  children?: number;
 }) {
   const t = useTranslations("search");
   const f = useFormat();
-  const href = `/property/${propertyId}?${new URLSearchParams({
+  const href = propertyHref(propertyId, {
     checkIn: suggestion.checkIn,
     checkOut: suggestion.checkOut,
-    guests: String(guests),
+    guests,
+    adults,
+    children,
     roomId: suggestion.roomId,
     ratePlanId: suggestion.ratePlanId,
-  }).toString()}`;
+  });
   const dates = `${f.date(suggestion.checkIn, "medium")} – ${f.date(suggestion.checkOut, "medium")}`;
   return (
     <p className="mt-2 rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-gray-900">
@@ -1157,7 +1496,11 @@ function FlexSuggestionNote({
       <span className="text-gray-700">
         ({t("flex.total", { total: f.money(suggestion.total, suggestion.currency) })})
       </span>{" "}
-      <Link href={href} className={`font-medium text-blue-700 underline ${focusRing}`}>
+      <Link
+        href={href}
+        aria-label={title ? t("flex.viewNamed", { title }) : undefined}
+        className={`font-medium text-blue-700 underline ${focusRing}`}
+      >
         {t("flex.view")}
       </Link>
     </p>

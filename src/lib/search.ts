@@ -136,6 +136,9 @@ export interface SearchOptions {
   ranking?: RankingMode;
 }
 
+/** Skor ağırlık kümesi: sorgusuz, sorgulu (hibrit havuz) ya da LTR modeli. */
+export type SearchWeightsSet = "default" | "withQuery" | "ltr";
+
 export interface SearchResponse {
   results: SearchResult[];
   total: number;
@@ -147,6 +150,8 @@ export interface SearchResponse {
   semantic?: boolean;
   /** "Önerilen" sıralamada gerçekte kullanılan sıralayıcı. */
   ranking?: RankingMode;
+  /** "Önerilen" sıralamada kullanılan ağırlık kümesi ("Bu sıralama neden?" için). */
+  weightsSet?: SearchWeightsSet;
   /** P1-10: görsel arama durumu (açıksa veya `similarToPhotoId` istendiyse). */
   visual?: VisionStatus & { applied: boolean };
   /** P1-3: uygulanan esnek tarih penceresi (±gün); yalnız tarihli ve `flexDays` > 0 aramada. */
@@ -615,6 +620,7 @@ export async function searchProperties(
   // Sıralama tüm küme üzerinde (fiyat karşılaştırması tek para biriminde: görüntü birimi).
   let ordered: SearchResult[];
   let rankingMode: RankingMode | undefined;
+  let weightsSet: SearchWeightsSet | undefined;
   if (sort === "price_asc" || sort === "price_desc") {
     const dir = sort === "price_asc" ? 1 : -1;
     ordered = [...results].sort(
@@ -660,6 +666,7 @@ export async function searchProperties(
         ? await rankWithLtr(inputs, weights)
         : { items: rankResults(inputs, weights), mode: "weighted" as const };
     rankingMode = ranked.mode;
+    weightsSet = ranked.mode === "ltr" ? "ltr" : pool ? "withQuery" : "default";
     const byResult = new Map(results.map((r) => [r.id, r]));
     ordered = ranked.items.map((x) => ({
       ...byResult.get(x.id)!,
@@ -708,6 +715,7 @@ export async function searchProperties(
     cached: false,
     ...(pool ? { semantic: true } : {}),
     ...(rankingMode ? { ranking: rankingMode } : {}),
+    ...(weightsSet ? { weightsSet } : {}),
     ...(visual.enabled || params.similarToPhotoId
       ? { visual: { ...visual, applied: visual.enabled && Boolean(params.similarToPhotoId) } }
       : {}),

@@ -63,6 +63,13 @@ const LOCATIONS: Array<{ city: string; country: string; lat: number; lng: number
   { city: "Tokyo", country: "Japonya", lat: 35.6762, lng: 139.6503 },
 ];
 
+/** Şehir adı → LOCATIONS indeksi; bilinmeyen ad sessizce yanlış şehre bağlanmasın diye hata. */
+function locationIndex(city: string): number {
+  const i = LOCATIONS.findIndex((l) => l.city === city);
+  if (i < 0) throw new Error(`Seed: LOCATIONS içinde "${city}" yok`);
+  return i;
+}
+
 const AMENITIES = [
   { name: "Ücretsiz WiFi", icon: "wifi" },
   { name: "Havuz", icon: "pool" },
@@ -79,30 +86,31 @@ const AMENITIES = [
 ];
 
 // Talep sinyali için gerçekçi lokal etkinlikler (predictive pricing motoru).
-// lokasyon indeksi + bugünden itibaren gün ofsetleri (180 gün ufku içinde).
+// Şehir adı (LOCATIONS'taki `city`; indeks kaymasıyla yanlış şehre bağlanmasın diye) +
+// bugünden itibaren gün ofsetleri (180 gün ufku içinde).
 const DEMAND_EVENTS: Array<{
-  loc: number;
+  city: string;
   title: string;
   startOff: number;
   endOff: number;
   impact: number;
 }> = [
-  { loc: 0, title: "İstanbul Caz Festivali", startOff: 18, endOff: 24, impact: 8 },
-  { loc: 0, title: "İstanbul Maratonu", startOff: 45, endOff: 46, impact: 6 },
-  { loc: 1, title: "Antalya Film Festivali", startOff: 28, endOff: 35, impact: 7 },
-  { loc: 1, title: "Antalya Expo Fuarı", startOff: 80, endOff: 88, impact: 6 },
-  { loc: 2, title: "Bodrum Yat & Caz Festivali", startOff: 24, endOff: 30, impact: 8 },
-  { loc: 2, title: "Bodrum Vintage Rallisi", startOff: 70, endOff: 73, impact: 4 },
-  { loc: 5, title: "Kapadokya Balon Şenliği", startOff: 34, endOff: 40, impact: 9 },
-  { loc: 7, title: "Muğla Rock Müzik Festivali", startOff: 52, endOff: 56, impact: 6 },
-  { loc: 9, title: "Çeşme Müzik Günleri", startOff: 40, endOff: 44, impact: 5 },
-  { loc: 12, title: "Barselona Primavera Fest", startOff: 55, endOff: 62, impact: 7 },
-  { loc: 12, title: "Barselona Formula E", startOff: 95, endOff: 97, impact: 5 },
-  { loc: 16, title: "Dubai Shopping Festival", startOff: 22, endOff: 31, impact: 8 },
-  { loc: 18, title: "New York Fashion Week", startOff: 33, endOff: 42, impact: 8 },
-  { loc: 18, title: "NYC Maratonu", startOff: 78, endOff: 80, impact: 7 },
-  { loc: 19, title: "Tokyo Anime Expo", startOff: 48, endOff: 54, impact: 7 },
-  { loc: 19, title: "Sakura Başı Sezonu", startOff: 105, endOff: 130, impact: 6 },
+  { city: "İstanbul", title: "İstanbul Caz Festivali", startOff: 18, endOff: 24, impact: 8 },
+  { city: "İstanbul", title: "İstanbul Maratonu", startOff: 45, endOff: 46, impact: 6 },
+  { city: "Antalya", title: "Antalya Film Festivali", startOff: 28, endOff: 35, impact: 7 },
+  { city: "Antalya", title: "Antalya Expo Fuarı", startOff: 80, endOff: 88, impact: 6 },
+  { city: "Bodrum", title: "Bodrum Yat & Caz Festivali", startOff: 24, endOff: 30, impact: 8 },
+  { city: "Bodrum", title: "Bodrum Vintage Rallisi", startOff: 70, endOff: 73, impact: 4 },
+  { city: "Kapadokya", title: "Kapadokya Balon Şenliği", startOff: 34, endOff: 40, impact: 9 },
+  { city: "Muğla", title: "Muğla Rock Müzik Festivali", startOff: 52, endOff: 56, impact: 6 },
+  { city: "Çeşme", title: "Çeşme Müzik Günleri", startOff: 40, endOff: 44, impact: 5 },
+  { city: "Barselona", title: "Barselona Primavera Fest", startOff: 55, endOff: 62, impact: 7 },
+  { city: "Barselona", title: "Barselona Formula E", startOff: 95, endOff: 97, impact: 5 },
+  { city: "Dubai", title: "Dubai Shopping Festival", startOff: 22, endOff: 31, impact: 8 },
+  { city: "New York", title: "New York Fashion Week", startOff: 33, endOff: 42, impact: 8 },
+  { city: "New York", title: "NYC Maratonu", startOff: 78, endOff: 80, impact: 7 },
+  { city: "Tokyo", title: "Tokyo Anime Expo", startOff: 48, endOff: 54, impact: 7 },
+  { city: "Tokyo", title: "Sakura Başı Sezonu", startOff: 105, endOff: 130, impact: 6 },
 ];
 
 const REVIEW_PLANS: Array<{
@@ -217,7 +225,8 @@ function composeReview(
     ctx.amenities.length > 0 ? `Olanaklardan ${ctx.amenities[0]} özellikle işimize yaradı. ` : "";
   const noise = REVIEW_NOISE[Math.floor(rng() * REVIEW_NOISE.length)];
   const comment = `${praise} ${seasonNote} ${noise} ${amenity}${nitpick}`;
-  const rating = Math.min(10, 8 + Math.floor(rng() * 2.6));
+  // Yorum API'siyle aynı 1-5 ölçeği (4 ya da 5).
+  const rating = 4 + Math.floor(rng() * 1.6);
   return { rating, comment };
 }
 
@@ -294,6 +303,7 @@ type PropSeed = {
   type: keyof typeof PropertyType;
   loc: number;
   basePrice: number;
+  /** 1-5 ölçeği (yorum API'si ve sıralama bu ölçeği kullanır). */
   ratingAvg: number;
   ratingCount: number;
   amenities: number[];
@@ -308,7 +318,7 @@ const PROPERTIES: PropSeed[] = [
     type: "HOTEL",
     loc: 0,
     basePrice: 2450,
-    ratingAvg: 8.9,
+    ratingAvg: 4.5,
     ratingCount: 1240,
     amenities: [0, 1, 2, 4, 5, 6, 7, 9],
     rooms: [
@@ -324,7 +334,7 @@ const PROPERTIES: PropSeed[] = [
     type: "VILLA",
     loc: 2,
     basePrice: 5200,
-    ratingAvg: 9.4,
+    ratingAvg: 4.7,
     ratingCount: 386,
     amenities: [0, 1, 2, 3, 6, 7],
     rooms: [{ name: "Tüm Villa", capacity: 8, bedType: "4 Yatak Odası", priceModifier: 0 }],
@@ -336,7 +346,7 @@ const PROPERTIES: PropSeed[] = [
     type: "HOTEL",
     loc: 1,
     basePrice: 3100,
-    ratingAvg: 8.7,
+    ratingAvg: 4.4,
     ratingCount: 892,
     amenities: [0, 1, 2, 3, 4, 6, 7, 9],
     rooms: [
@@ -352,7 +362,7 @@ const PROPERTIES: PropSeed[] = [
     type: "APARTMENT",
     loc: 3,
     basePrice: 1200,
-    ratingAvg: 8.2,
+    ratingAvg: 4.1,
     ratingCount: 210,
     amenities: [0, 2, 3, 8],
     rooms: [
@@ -367,7 +377,7 @@ const PROPERTIES: PropSeed[] = [
     type: "BED_AND_BREAKFAST",
     loc: 4,
     basePrice: 1800,
-    ratingAvg: 9.1,
+    ratingAvg: 4.6,
     ratingCount: 154,
     amenities: [0, 2, 4, 8],
     rooms: [
@@ -382,7 +392,7 @@ const PROPERTIES: PropSeed[] = [
     type: "HOTEL",
     loc: 5,
     basePrice: 4100,
-    ratingAvg: 9.6,
+    ratingAvg: 4.8,
     ratingCount: 98,
     amenities: [0, 2, 4, 7, 9],
     rooms: [
@@ -401,7 +411,7 @@ const PROPERTIES: PropSeed[] = [
     type: "APARTMENT",
     loc: 0,
     basePrice: 6800,
-    ratingAvg: 9.2,
+    ratingAvg: 4.6,
     ratingCount: 76,
     amenities: [0, 2, 5, 6, 7],
     rooms: [{ name: "Boğaz Manzaralı Süit", capacity: 2, bedType: "Kral Yatak", priceModifier: 0 }],
@@ -413,7 +423,7 @@ const PROPERTIES: PropSeed[] = [
     type: "BED_AND_BREAKFAST",
     loc: 1,
     basePrice: 2100,
-    ratingAvg: 8.8,
+    ratingAvg: 4.4,
     ratingCount: 320,
     amenities: [0, 2, 4, 9],
     rooms: [
@@ -428,7 +438,7 @@ const PROPERTIES: PropSeed[] = [
     type: "HOSTEL",
     loc: 2,
     basePrice: 650,
-    ratingAvg: 8.4,
+    ratingAvg: 4.2,
     ratingCount: 512,
     amenities: [0, 3, 9],
     rooms: [
@@ -442,7 +452,7 @@ const PROPERTIES: PropSeed[] = [
     type: "VILLA",
     loc: 4,
     basePrice: 2600,
-    ratingAvg: 9.3,
+    ratingAvg: 4.7,
     ratingCount: 145,
     amenities: [0, 2, 4, 8, 3],
     rooms: [{ name: "Tüm Çiftlik Evi", capacity: 6, bedType: "3 Yatak Odası", priceModifier: 0 }],
@@ -455,7 +465,7 @@ const PROPERTIES: PropSeed[] = [
     type: "HOTEL",
     loc: 6,
     basePrice: 1450,
-    ratingAvg: 8.0,
+    ratingAvg: 4.0,
     ratingCount: 640,
     amenities: [0, 2, 3, 6, 10, 11],
     rooms: [
@@ -471,7 +481,7 @@ const PROPERTIES: PropSeed[] = [
     type: "APARTMENT",
     loc: 7,
     basePrice: 2900,
-    ratingAvg: 8.9,
+    ratingAvg: 4.5,
     ratingCount: 190,
     amenities: [0, 1, 2, 7, 10],
     rooms: [
@@ -486,7 +496,7 @@ const PROPERTIES: PropSeed[] = [
     type: "HOTEL",
     loc: 8,
     basePrice: 2750,
-    ratingAvg: 8.5,
+    ratingAvg: 4.3,
     ratingCount: 720,
     amenities: [0, 1, 2, 3, 4, 7, 9],
     rooms: [
@@ -502,7 +512,7 @@ const PROPERTIES: PropSeed[] = [
     type: "HOTEL",
     loc: 9,
     basePrice: 3400,
-    ratingAvg: 9.0,
+    ratingAvg: 4.5,
     ratingCount: 410,
     amenities: [0, 1, 2, 4, 5, 6, 7, 9],
     rooms: [
@@ -517,7 +527,7 @@ const PROPERTIES: PropSeed[] = [
     type: "HOTEL",
     loc: 10,
     basePrice: 2350,
-    ratingAvg: 8.3,
+    ratingAvg: 4.2,
     ratingCount: 560,
     amenities: [0, 1, 2, 3, 4, 9],
     rooms: [
@@ -531,14 +541,16 @@ const PROPERTIES: PropSeed[] = [
       "Eiffel Kulesi'ne 10 dakikalık yürüyüş, Haussmann mimarisi ve butik şıklık. Şampanya barıyla ünlü.",
     type: "HOTEL",
     loc: 11,
-    basePrice: 420,
-    ratingAvg: 9.1,
+    // Yurt dışı ilanlar da TRY'dir: yerel fiyat data/fx-rates.json kuruyla çevrildi
+    // (1 EUR ≈ 45, 1 USD ≈ 41, 1 GBP ≈ 53,5 TRY); ₺520 gibi gerçek dışı gecelikler olmasın.
+    basePrice: 18900,
+    ratingAvg: 4.6,
     ratingCount: 830,
     amenities: [0, 2, 9, 10, 11],
     rooms: [
       { name: "Classic Oda", capacity: 2, bedType: "Çift Kişilik Yatak", priceModifier: 0 },
-      { name: "Kule Manzaralı", capacity: 3, bedType: "Kral Yatak", priceModifier: 180 },
-      { name: "Süit", capacity: 4, bedType: "Kral Yatak", priceModifier: 320 },
+      { name: "Kule Manzaralı", capacity: 3, bedType: "Kral Yatak", priceModifier: 8100 },
+      { name: "Süit", capacity: 4, bedType: "Kral Yatak", priceModifier: 14400 },
     ],
   },
   {
@@ -547,13 +559,18 @@ const PROPERTIES: PropSeed[] = [
       "Kolezyum'a 3 dakika, tarihi merkezde restore edilmiş daireler. Mutfak ve asansör mevcut.",
     type: "APARTMENT",
     loc: 12,
-    basePrice: 290,
-    ratingAvg: 9.0,
+    basePrice: 13050,
+    ratingAvg: 4.5,
     ratingCount: 470,
     amenities: [0, 2, 10, 11],
     rooms: [
       { name: "1+1 Daire", capacity: 2, bedType: "Çift Kişilik Yatak", priceModifier: 0 },
-      { name: "2+1 Aile Dairesi", capacity: 5, bedType: "3 Tek Kişilik Yatak", priceModifier: 120 },
+      {
+        name: "2+1 Aile Dairesi",
+        capacity: 5,
+        bedType: "3 Tek Kişilik Yatak",
+        priceModifier: 5400,
+      },
     ],
   },
   {
@@ -562,14 +579,14 @@ const PROPERTIES: PropSeed[] = [
       "Barceloneta plajına sıfır, çatı terası havuzu ve deniz manzaralı odalarla Akdeniz keyfi.",
     type: "HOTEL",
     loc: 13,
-    basePrice: 310,
-    ratingAvg: 8.8,
+    basePrice: 13950,
+    ratingAvg: 4.4,
     ratingCount: 1560,
     amenities: [0, 1, 2, 4, 7, 9, 10],
     rooms: [
       { name: "Standart Oda", capacity: 2, bedType: "Çift Kişilik Yatak", priceModifier: 0 },
-      { name: "Deniz Manzaralı", capacity: 3, bedType: "Kral Yatak", priceModifier: 140 },
-      { name: "Junior Süit", capacity: 4, bedType: "Kral Yatak", priceModifier: 260 },
+      { name: "Deniz Manzaralı", capacity: 3, bedType: "Kral Yatak", priceModifier: 6300 },
+      { name: "Junior Süit", capacity: 4, bedType: "Kral Yatak", priceModifier: 11700 },
     ],
   },
   {
@@ -578,13 +595,13 @@ const PROPERTIES: PropSeed[] = [
       "Jordaan'daki kanal evinde, bisiklet kiralama ve seramik atölyesi. Şehir merkezine yürüyüşle 5 dakika.",
     type: "BED_AND_BREAKFAST",
     loc: 14,
-    basePrice: 260,
-    ratingAvg: 9.3,
+    basePrice: 11700,
+    ratingAvg: 4.7,
     ratingCount: 210,
     amenities: [0, 4, 10],
     rooms: [
       { name: "Kanal Oda", capacity: 2, bedType: "Çift Kişilik Yatak", priceModifier: 0 },
-      { name: "Aile Oda", capacity: 4, bedType: "Çift Kişilik Yatak", priceModifier: 90 },
+      { name: "Aile Oda", capacity: 4, bedType: "Çift Kişilik Yatak", priceModifier: 4050 },
     ],
   },
 
@@ -594,13 +611,13 @@ const PROPERTIES: PropSeed[] = [
       "Devlet Operası karşısında, tarihi bir sarayın dairelerinde. Müzikseverler için yürüyüşle 2 dakika konser salonlarına.",
     type: "APARTMENT",
     loc: 15,
-    basePrice: 230,
-    ratingAvg: 8.7,
+    basePrice: 10350,
+    ratingAvg: 4.4,
     ratingCount: 330,
     amenities: [0, 2, 10, 11],
     rooms: [
       { name: "Saray Dairesi", capacity: 3, bedType: "Çift Kişilik Yatak", priceModifier: 0 },
-      { name: "Aile Apartmanı", capacity: 6, bedType: "2 Çift Kişilik Yatak", priceModifier: 150 },
+      { name: "Aile Apartmanı", capacity: 6, bedType: "2 Çift Kişilik Yatak", priceModifier: 6750 },
     ],
   },
   {
@@ -609,14 +626,14 @@ const PROPERTIES: PropSeed[] = [
       "Marina manzaralı yüksek katlarda, sonsuzluk havuzu ve gökdelenlerin gölgesinde zarif konaklama.",
     type: "HOTEL",
     loc: 16,
-    basePrice: 380,
-    ratingAvg: 9.2,
+    basePrice: 15600,
+    ratingAvg: 4.6,
     ratingCount: 2140,
     amenities: [0, 1, 2, 5, 6, 7, 9],
     rooms: [
       { name: "Marina Oda", capacity: 2, bedType: "Kral Yatak", priceModifier: 0 },
-      { name: "Gökdelen Manzaralı", capacity: 3, bedType: "Kral Yatak", priceModifier: 160 },
-      { name: "Executive Süit", capacity: 4, bedType: "Kral Yatak", priceModifier: 340 },
+      { name: "Gökdelen Manzaralı", capacity: 3, bedType: "Kral Yatak", priceModifier: 6550 },
+      { name: "Executive Süit", capacity: 4, bedType: "Kral Yatak", priceModifier: 13950 },
     ],
   },
   {
@@ -625,13 +642,13 @@ const PROPERTIES: PropSeed[] = [
       "Camden Market'in kalbindeki endüstriyel loft. Canlı müzik mekanlarına yürüme mesafesi.",
     type: "APARTMENT",
     loc: 17,
-    basePrice: 340,
-    ratingAvg: 8.5,
+    basePrice: 18200,
+    ratingAvg: 4.3,
     ratingCount: 480,
     amenities: [0, 2, 10],
     rooms: [
       { name: "Loft", capacity: 2, bedType: "Çift Kişilik Yatak", priceModifier: 0 },
-      { name: "Büyük Loft", capacity: 4, bedType: "2 Çift Kişilik Yatak", priceModifier: 140 },
+      { name: "Büyük Loft", capacity: 4, bedType: "2 Çift Kişilik Yatak", priceModifier: 7500 },
     ],
   },
   {
@@ -640,14 +657,14 @@ const PROPERTIES: PropSeed[] = [
       "Central Park South'ta, Manhattan silüeti ve park manzaralı lüks odalar. Amanhattan'ın kalbi.",
     type: "HOTEL",
     loc: 18,
-    basePrice: 520,
-    ratingAvg: 9.4,
+    basePrice: 21300,
+    ratingAvg: 4.7,
     ratingCount: 1820,
     amenities: [0, 2, 5, 6, 7, 9, 10],
     rooms: [
       { name: "City Oda", capacity: 2, bedType: "Kral Yatak", priceModifier: 0 },
-      { name: "Park Manzaralı", capacity: 3, bedType: "Kral Yatak", priceModifier: 240 },
-      { name: "Corner Süit", capacity: 4, bedType: "2 Kral Yatak", priceModifier: 420 },
+      { name: "Park Manzaralı", capacity: 3, bedType: "Kral Yatak", priceModifier: 9850 },
+      { name: "Corner Süit", capacity: 4, bedType: "2 Kral Yatak", priceModifier: 17200 },
     ],
   },
   {
@@ -656,14 +673,14 @@ const PROPERTIES: PropSeed[] = [
       "Shibuya'nın ortasında yüksek teknolojili kapsül hostel. Gökdelen barlarına 5 dakika.",
     type: "HOSTEL",
     loc: 19,
-    basePrice: 90,
-    ratingAvg: 8.6,
+    basePrice: 3700,
+    ratingAvg: 4.3,
     ratingCount: 980,
     amenities: [0, 3, 9, 10],
     rooms: [
       { name: "Kapsül (erkek)", capacity: 1, bedType: "Tek Kişilik Kapsül", priceModifier: 0 },
       { name: "Kapsül (kadın)", capacity: 1, bedType: "Tek Kişilik Kapsül", priceModifier: 0 },
-      { name: "Özel Kabin", capacity: 2, bedType: "Çift Kişilik Yatak", priceModifier: 60 },
+      { name: "Özel Kabin", capacity: 2, bedType: "Çift Kişilik Yatak", priceModifier: 2450 },
     ],
   },
   {
@@ -673,7 +690,7 @@ const PROPERTIES: PropSeed[] = [
     type: "APARTMENT",
     loc: 0,
     basePrice: 2100,
-    ratingAvg: 8.8,
+    ratingAvg: 4.4,
     ratingCount: 260,
     amenities: [0, 2, 5, 10, 11],
     rooms: [
@@ -688,7 +705,7 @@ const PROPERTIES: PropSeed[] = [
     type: "HOTEL",
     loc: 1,
     basePrice: 3600,
-    ratingAvg: 8.9,
+    ratingAvg: 4.5,
     ratingCount: 1340,
     amenities: [0, 1, 2, 3, 4, 6, 9],
     rooms: [
@@ -708,7 +725,7 @@ const PROPERTIES: PropSeed[] = [
     type: "BED_AND_BREAKFAST",
     loc: 2,
     basePrice: 3900,
-    ratingAvg: 9.5,
+    ratingAvg: 4.8,
     ratingCount: 180,
     amenities: [0, 1, 2, 4, 7, 9],
     rooms: [
@@ -723,7 +740,7 @@ const PROPERTIES: PropSeed[] = [
     type: "BED_AND_BREAKFAST",
     loc: 5,
     basePrice: 3200,
-    ratingAvg: 9.7,
+    ratingAvg: 4.9,
     ratingCount: 220,
     amenities: [0, 2, 4, 7, 9],
     rooms: [
@@ -739,7 +756,7 @@ const PROPERTIES: PropSeed[] = [
     type: "APARTMENT",
     loc: 3,
     basePrice: 1500,
-    ratingAvg: 8.4,
+    ratingAvg: 4.2,
     ratingCount: 300,
     amenities: [0, 2, 3, 8, 10],
     rooms: [
@@ -758,7 +775,7 @@ const PROPERTIES: PropSeed[] = [
     type: "VILLA",
     loc: 4,
     basePrice: 2300,
-    ratingAvg: 9.0,
+    ratingAvg: 4.5,
     ratingCount: 120,
     amenities: [0, 2, 4, 8],
     rooms: [{ name: "Tüm Ev", capacity: 6, bedType: "3 Yatak Odası", priceModifier: 0 }],
@@ -769,13 +786,13 @@ const PROPERTIES: PropSeed[] = [
       "Notre-Dame ve Panthéon arasında, edebi kahveleriyle ünlü mahallede şık butik otel.",
     type: "HOTEL",
     loc: 11,
-    basePrice: 350,
-    ratingAvg: 8.9,
+    basePrice: 15750,
+    ratingAvg: 4.5,
     ratingCount: 1240,
     amenities: [0, 2, 4, 10, 11],
     rooms: [
       { name: "Chambre Classique", capacity: 2, bedType: "Çift Kişilik Yatak", priceModifier: 0 },
-      { name: "Chambre Prestige", capacity: 3, bedType: "Kral Yatak", priceModifier: 130 },
+      { name: "Chambre Prestige", capacity: 3, bedType: "Kral Yatak", priceModifier: 5850 },
     ],
   },
   {
@@ -785,7 +802,7 @@ const PROPERTIES: PropSeed[] = [
     type: "BED_AND_BREAKFAST",
     loc: 0,
     basePrice: 1600,
-    ratingAvg: 8.6,
+    ratingAvg: 4.3,
     ratingCount: 540,
     amenities: [0, 4, 10, 11],
     rooms: [
@@ -799,8 +816,8 @@ const PROPERTIES: PropSeed[] = [
       "Gotik Mahalle'nin dar sokaklarında tasarım apart. Plaj ve şehir merkezi arasında.",
     type: "APARTMENT",
     loc: 13,
-    basePrice: 250,
-    ratingAvg: 8.3,
+    basePrice: 11250,
+    ratingAvg: 4.2,
     ratingCount: 610,
     amenities: [0, 2, 10],
     rooms: [{ name: "Stüdyo", capacity: 2, bedType: "Çift Kişilik Yatak", priceModifier: 0 }],
@@ -812,7 +829,7 @@ const PROPERTIES: PropSeed[] = [
     type: "HOTEL",
     loc: 8,
     basePrice: 2050,
-    ratingAvg: 8.1,
+    ratingAvg: 4.1,
     ratingCount: 890,
     amenities: [0, 1, 2, 3, 4, 9],
     rooms: [
@@ -826,13 +843,13 @@ const PROPERTIES: PropSeed[] = [
       "Trastevere'nin samimi sokaklarında, su anda popüler restoranların ortasında rahat odalar.",
     type: "BED_AND_BREAKFAST",
     loc: 12,
-    basePrice: 180,
-    ratingAvg: 8.8,
+    basePrice: 8100,
+    ratingAvg: 4.4,
     ratingCount: 350,
     amenities: [0, 4, 10],
     rooms: [
       { name: "Standart Oda", capacity: 2, bedType: "Çift Kişilik Yatak", priceModifier: 0 },
-      { name: "Aile Odası", capacity: 4, bedType: "Çift Kişilik Yatak", priceModifier: 70 },
+      { name: "Aile Odası", capacity: 4, bedType: "Çift Kişilik Yatak", priceModifier: 3150 },
     ],
   },
   {
@@ -841,13 +858,13 @@ const PROPERTIES: PropSeed[] = [
       "Burj Khalifa manzarasına yürüme mesafesinde, servisli süitler. Dubai Mall 10 dakika.",
     type: "APARTMENT",
     loc: 16,
-    basePrice: 310,
-    ratingAvg: 9.1,
+    basePrice: 12700,
+    ratingAvg: 4.6,
     ratingCount: 720,
     amenities: [0, 1, 2, 5, 6, 7, 10],
     rooms: [
       { name: "Süit", capacity: 3, bedType: "Kral Yatak", priceModifier: 0 },
-      { name: "Panorama Süit", capacity: 5, bedType: "2 Kral Yatak", priceModifier: 200 },
+      { name: "Panorama Süit", capacity: 5, bedType: "2 Kral Yatak", priceModifier: 8200 },
     ],
   },
   {
@@ -856,7 +873,7 @@ const PROPERTIES: PropSeed[] = [
     type: "HOSTEL",
     loc: 5,
     basePrice: 700,
-    ratingAvg: 8.5,
+    ratingAvg: 4.3,
     ratingCount: 480,
     amenities: [0, 3, 9],
     rooms: [
@@ -871,7 +888,7 @@ const PROPERTIES: PropSeed[] = [
     type: "BED_AND_BREAKFAST",
     loc: 6,
     basePrice: 1900,
-    ratingAvg: 8.7,
+    ratingAvg: 4.4,
     ratingCount: 170,
     amenities: [0, 4, 10, 11],
     rooms: [
@@ -885,13 +902,13 @@ const PROPERTIES: PropSeed[] = [
       "Harrod's ve Hyde Park arasında zarif bir Viktorya evi. Kraliyet mahallelerinde kalın.",
     type: "BED_AND_BREAKFAST",
     loc: 17,
-    basePrice: 280,
-    ratingAvg: 8.9,
+    basePrice: 15000,
+    ratingAvg: 4.5,
     ratingCount: 290,
     amenities: [0, 4, 10],
     rooms: [
       { name: "Bahçe Manzaralı", capacity: 2, bedType: "Çift Kişilik Yatak", priceModifier: 0 },
-      { name: "Aile Odası", capacity: 4, bedType: "Çift Kişilik Yatak", priceModifier: 110 },
+      { name: "Aile Odası", capacity: 4, bedType: "Çift Kişilik Yatak", priceModifier: 5900 },
     ],
   },
 ];
@@ -1082,7 +1099,7 @@ async function main() {
   // Talep etkinlikleri (prediktif fiyat motorunun dinamik girdisi)
   await prisma.demandEvent.deleteMany({});
   const demandEvents = DEMAND_EVENTS.map((ev) => ({
-    locationId: locations[ev.loc],
+    locationId: locations[locationIndex(ev.city)],
     title: ev.title,
     startsAt: addDays(today, ev.startOff),
     endsAt: addDays(today, ev.endOff),
@@ -1279,7 +1296,7 @@ async function main() {
             bookingId: booking.id,
             userId: allGuests[bp.g].id,
             propertyId: target.propertyId,
-            rating: 8 + (bp.g % 3),
+            rating: 4 + (bp.g % 2),
             comment: "Konum ve temizlik harikaydı. Tekrar gelmeyi düşünüyoruz. ⭐⭐⭐⭐⭐",
           },
         });
@@ -1412,7 +1429,55 @@ async function main() {
   // v4 (P2-2): HostAccount, promosyonlar, fotoğraflar, erişilebilirlik, tahsilat jurnalleri.
   await seedV4Extras(prisma, { hostId: host.id, adminId: admin.id });
 
+  try {
+    await syncLoyaltyForSeededStays();
+  } catch (e) {
+    console.warn("Sadakat senkronu atlandı; worker'ın cüzdan taraması tamamlar:", e);
+  }
+
   console.log("Seeding tamamlandı ✅");
+}
+
+/**
+ * Seed rezervasyonları doğrudan COMPLETED yazılır; `booking.completed` olayı oluşmadığı için
+ * seviye ve cashback de oluşmaz (cüzdan "tamamlanan konaklama yok" der). Olay tüketicisini her
+ * tamamlanmış konaklama için çağırır, vadesi geçmiş cashback'leri krediye (defterle) çevirir.
+ */
+async function syncLoyaltyForSeededStays(): Promise<void> {
+  const stays = await prisma.booking.findMany({
+    where: { status: BookingStatus.COMPLETED },
+    select: {
+      id: true,
+      userId: true,
+      propertyId: true,
+      roomId: true,
+      checkIn: true,
+      checkOut: true,
+    },
+    orderBy: { checkOut: "asc" },
+  });
+  if (stays.length === 0) return;
+  const [wallet, app] = await Promise.all([
+    import("../src/lib/wallet/wallet-service"),
+    import("../src/lib/prisma"),
+  ]);
+  try {
+    for (const b of stays) {
+      await wallet.onStayCompleted({
+        bookingId: b.id,
+        propertyId: b.propertyId,
+        roomId: b.roomId,
+        checkIn: b.checkIn.toISOString().slice(0, 10),
+        checkOut: b.checkOut.toISOString().slice(0, 10),
+        userId: b.userId,
+        completedAt: b.checkOut.toISOString(),
+      });
+    }
+    const issued = await wallet.issueDueCashbacks(new Date());
+    console.log(`Sadakat: ${stays.length} tamamlanmış konaklama, ${issued} cashback kredisi`);
+  } finally {
+    await app.prisma.$disconnect();
+  }
 }
 
 main()

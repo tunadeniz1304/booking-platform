@@ -15,6 +15,8 @@ export interface RnplOffer {
   freeCancellationUntil?: string;
   /** Tesisin IANA saat dilimi (sunucu verirse); yoksa ziyaretçinin saat dilimi kullanılır. */
   timeZone?: string;
+  /** Başarısız tahsilattan sonra ödeme için tanınan ek süre (saat; sunucu verirse). */
+  graceHours?: number;
 }
 
 interface Props {
@@ -22,13 +24,15 @@ interface Props {
   disabled?: boolean;
   selected: boolean;
   onChange: (rnpl: boolean) => void;
+  /** Seçiliyken cüzdan kredisinin bu seçenekle kullanılamayacağını açıklayan notu gösterir. */
+  creditNote?: boolean;
 }
 
 /**
  * P1-3 "Şimdi rezerve et, sonra öde" seçimi. Teklif sunucudan gelir; uygun değilse (ya da
  * RNPL_ENABLED=false) hiçbir şey gösterilmez. Seçildiğinde iptal zaman çizelgesi görünür.
  */
-export default function RnplOption({ bookingId, disabled, selected, onChange }: Props) {
+export default function RnplOption({ bookingId, disabled, selected, onChange, creditNote }: Props) {
   const [offer, setOffer] = useState<RnplOffer | null>(null);
 
   useEffect(() => {
@@ -41,7 +45,15 @@ export default function RnplOption({ bookingId, disabled, selected, onChange }: 
     };
   }, [bookingId]);
 
-  return <RnplChoice offer={offer} disabled={disabled} selected={selected} onChange={onChange} />;
+  return (
+    <RnplChoice
+      offer={offer}
+      disabled={disabled}
+      selected={selected}
+      onChange={onChange}
+      creditNote={creditNote}
+    />
+  );
 }
 
 /** Sunum: teklif uygun değilse hiçbir şey; seçiliyse iptal zaman çizelgesi (test edilebilir). */
@@ -50,6 +62,7 @@ export function RnplChoice({
   disabled,
   selected,
   onChange,
+  creditNote,
 }: Omit<Props, "bookingId"> & { offer: RnplOffer | null }) {
   const t = useTranslations("payment.rnpl");
   const f = useFormat();
@@ -93,15 +106,24 @@ export function RnplChoice({
       </label>
       {selected && (
         <ol
-          className="ml-6 list-disc space-y-1 text-xs text-gray-600"
+          className="ml-6 list-decimal space-y-1 text-sm text-gray-600"
           aria-label={t("timeline")}
           data-testid="rnpl-timeline"
         >
-          <li>{t("stepToday", { today })}</li>
+          <li>{t("stepToday")}</li>
           <li>{t("stepCharge", { date: due, amount })}</li>
           <li>{t("stepFreeCancel", { date: freeUntil })}</li>
-          <li>{t("stepFailure")}</li>
+          <li>
+            {offer.graceHours
+              ? t("stepFailureGrace", { hours: offer.graceHours })
+              : t("stepFailure")}
+          </li>
         </ol>
+      )}
+      {selected && creditNote && (
+        <p className="ml-6 text-sm text-gray-600" data-testid="rnpl-credit-note">
+          {t("creditUnavailable")}
+        </p>
       )}
     </fieldset>
   );

@@ -108,6 +108,8 @@ export interface RnplOffer {
   currency: string;
   dueAt?: string;
   freeCancellationUntil?: string;
+  /** Tesisin IANA saat dilimi; istemci son tarihleri bu dilimde gösterir. */
+  timeZone?: string;
 }
 
 /** Checkout için teklif (misafirin kendi HELD rezervasyonu). RNPL kapalıyken `DISABLED`. */
@@ -126,6 +128,7 @@ export async function getRnplOffer(
     dueTodayMinor: 0 as const,
     amountMinor: minorFromDb(booking.totalPriceMinor),
     currency: booking.currency,
+    timeZone: booking.property.timeZone,
   };
   if (!terms.available) return { ...base, available: false, reason: terms.reason };
   return {

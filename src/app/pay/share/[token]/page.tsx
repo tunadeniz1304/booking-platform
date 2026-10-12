@@ -1,14 +1,20 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { ApiError, apiFetch, logout } from "@/lib/api-client";
-import { CardValidationError, TEST_CARDS, tokenizeCard } from "@/lib/payment/card-token";
 import { useFormat } from "@/i18n/use-format";
 import type { ShareOutcome, ShareViewDTO } from "@/lib/cart/split-payment";
 import { PageShell, focusRing, loginHref, useErrorText, useSession } from "@/components/ui/ui";
+import {
+  CardFields,
+  cardFieldId,
+  tokenizeCardFields,
+  type CardFieldErrors,
+  type CardValues,
+} from "@/components/payment/CardFields";
 
 const newKey = () =>
   typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -20,6 +26,13 @@ const linkClass = `inline-flex min-h-[44px] items-center text-primary-600 hover:
 const actionClass = `min-h-[44px] rounded-md border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-800 ${focusRing}`;
 
 type ResendState = "idle" | "sending" | "sent" | "verified" | "failed";
+
+/** Ret yanıtındaki kalan deneme hakkı (sunucu `details.attemptsLeft` gönderirse). */
+function attemptsLeftOf(err: unknown): number | null {
+  if (!(err instanceof ApiError) || !err.details || typeof err.details !== "object") return null;
+  const left = (err.details as { attemptsLeft?: unknown }).attemptsLeft;
+  return typeof left === "number" && left >= 0 ? left : null;
+}
 
 /**
  * Bölünmüş ödeme katılımcı sayfası (P1-2): imzalı + süreli davet linki. Oturum ve doğrulanmış
@@ -40,7 +53,15 @@ export default function SharePayPage() {
   // Hata koduna göre kurtarma yolu gösterilir (doğrulama e-postası, hesap değiştirme).
   const [errorCode, setErrorCode] = useState<string | null>(null);
   const [resend, setResend] = useState<ResendState>("idle");
-  const [card, setCard] = useState({ number: "", exp: "12/30", cvc: "" });
+  // Son kullanma boş başlar (önceden dolu tarih kontrol edilmeden gönderiliyordu).
+  const [card, setCard] = useState<CardValues>({ number: "", exp: "", cvc: "" });
+  const [cardErrors, setCardErrors] = useState<CardFieldErrors>({});
+  // Deneme sınırı aşıldı (PAYMENT_ATTEMPTS_EXCEEDED): kart formu kapanır.
+  const [locked, setLocked] = useState(false);
+  const [announcement, setAnnouncement] = useState("");
+  const [now, setNow] = useState(() => Date.now());
+  const cardIds = useId();
+  const focusCardRef = useRef(false);
   const [payKey, setPayKey] = useState(newKey);
   const [challenge, setChallenge] = useState<string | null>(null);
   const [code, setCode] = useState("");
@@ -71,6 +92,8 @@ export default function SharePayPage() {
           return t("share.closed");
         case "PAYMENT_DECLINED":
           return t("share.declined");
+        case "PAYMENT_ATTEMPTS_EXCEEDED":
+          return t("share.attemptsExceeded");
         default:
           return genericError(err);
       }
@@ -101,10 +124,22 @@ export default function SharePayPage() {
     return () => clearTimeout(timer);
   }, [load]);
 
+  // Kalan süre ödeme açıkken 30 sn'de bir güncellenir.
+  const shareOpen = share?.canPay ?? false;
+  useEffect(() => {
+    if (!shareOpen) return;
+    const timer = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(timer);
+  }, [shareOpen]);
+
   // Ödeme formu yerini 3DS formuna ya da sonuca bırakınca odak yeni içeriğe taşınır.
   useEffect(() => {
     if (challenge) challengeHeadingRef.current?.focus();
-  }, [challenge]);
+    else if (focusCardRef.current) {
+      focusCardRef.current = false;
+      document.getElementById(cardFieldId(cardIds, "number"))?.focus();
+    }
+  }, [challenge, cardIds]);
   useEffect(() => {
     if (result) paidRef.current?.focus();
   }, [result]);
@@ -122,40 +157,54 @@ export default function SharePayPage() {
   async function finish(outcome: ShareOutcome) {
     if (outcome.status === "requires_action") {
       setChallenge(challengeText(outcome));
+      setAnnouncement(tp("threeDsAnnounce"));
       return;
     }
     setChallenge(null);
+    setAnnouncement("");
     setResult(outcome.status);
     await load();
   }
 
   async function failed(err: unknown) {
-    setErrorCode(err instanceof ApiError ? (err.code ?? null) : null);
-    setMessage(errorText(err));
+    const code = err instanceof ApiError ? (err.code ?? null) : null;
+    const left = attemptsLeftOf(err);
+    setErrorCode(code);
+    if (code === "PAYMENT_ATTEMPTS_EXCEEDED" || left === 0) {
+      setLocked(true);
+      setMessage(t("share.attemptsExceeded"));
+    } else {
+      setMessage(
+        left === null
+          ? errorText(err)
+          : `${errorText(err)} ${t("share.attemptsLeft", { count: left })}`
+      );
+    }
     setChallenge(null);
+    setAnnouncement("");
     setPayKey(newKey());
     await load();
   }
 
   async function pay(e: React.FormEvent) {
     e.preventDefault();
-    if (busy) return;
+    if (busy || locked) return;
     setMessage(null);
     setErrorCode(null);
-    let cardToken: string;
-    try {
-      const [mm, yy] = card.exp.split("/").map((v) => Number(v.trim()));
-      cardToken = tokenizeCard({
-        number: card.number,
-        expMonth: mm,
-        expYear: 2000 + yy,
-        cvc: card.cvc,
-      });
-    } catch (err) {
-      const key = err instanceof CardValidationError && err.code ? `errors.${err.code}` : null;
-      setMessage(key && tp.has(key) ? tp(key) : tp("invalidCard"));
+    const tokenized = tokenizeCardFields(card);
+    if (!tokenized.ok) {
+      // Hata ilgili alanın altında gösterilir (aria-describedby) ve odak o alana taşınır.
+      if (tokenized.field) {
+        setCardErrors({ [tokenized.field]: tp(tokenized.messageKey) });
+        document.getElementById(cardFieldId(cardIds, tokenized.field))?.focus();
+      } else {
+        setCardErrors({});
+        setMessage(tp(tokenized.messageKey));
+      }
       return;
     }
+    const cardToken = tokenized.cardToken;
+    setCardErrors({});
     setBusy(true);
     try {
       await finish(
@@ -190,6 +239,15 @@ export default function SharePayPage() {
     }
   }
 
+  /** 3DS adımından vazgeçip kart formuna döner; sonraki deneme yeni bir işlemdir. */
+  function backToCard() {
+    focusCardRef.current = true;
+    setChallenge(null);
+    setCode("");
+    setAnnouncement("");
+    setPayKey(newKey());
+  }
+
   async function resendVerification() {
     if (resend === "sending") return;
     setResend("sending");
@@ -217,28 +275,33 @@ export default function SharePayPage() {
     failed: t("share.resendFailed"),
   };
 
-  /** Hata koduna bağlı kurtarma yolu: e-posta doğrulama ya da doğru hesaba geçiş. */
+  const verifyActions = (
+    <>
+      <div className="flex flex-wrap gap-3">
+        <button
+          type="button"
+          onClick={() => void resendVerification()}
+          aria-disabled={resend === "sending" || undefined}
+          aria-busy={resend === "sending" || undefined}
+          className={actionClass}
+        >
+          {resend === "sending" ? t("share.resendSending") : t("share.resendVerify")}
+        </button>
+        <button type="button" onClick={() => window.location.reload()} className={actionClass}>
+          {t("share.refresh")}
+        </button>
+      </div>
+      <p role="status">{resendStatus[resend]}</p>
+    </>
+  );
+
+  /** Hata koduna bağlı kurtarma yolu: e-posta doğrulama, doğru hesaba geçiş ya da yeni link. */
   const recovery =
     errorCode === "EMAIL_NOT_VERIFIED" ? (
-      <div className="mt-3 space-y-2 text-sm text-gray-800">
-        <div className="flex flex-wrap gap-3">
-          <button
-            type="button"
-            onClick={() => void resendVerification()}
-            aria-disabled={resend === "sending" || undefined}
-            aria-busy={resend === "sending" || undefined}
-            className={actionClass}
-          >
-            {resend === "sending" ? t("share.resendSending") : t("share.resendVerify")}
-          </button>
-          <button type="button" onClick={() => window.location.reload()} className={actionClass}>
-            {t("share.refresh")}
-          </button>
-        </div>
-        <p role="status">{resendStatus[resend]}</p>
-      </div>
+      <div className="mt-3 space-y-2 text-sm text-gray-800">{verifyActions}</div>
     ) : errorCode === "SHARE_EMAIL_MISMATCH" ? (
       <div className="mt-3 space-y-2 text-sm text-gray-800">
+        <p>{t("share.notYoursHelp")}</p>
         {session.status === "ready" && session.user && (
           <p>{t("share.signedInAs", { email: session.user.email })}</p>
         )}
@@ -246,16 +309,23 @@ export default function SharePayPage() {
           {t("share.switchAccount")}
         </button>
       </div>
+    ) : errorCode === "SHARE_LINK_INVALID" || errorCode === "SHARE_LINK_EXPIRED" ? (
+      <p className="mt-3 text-sm text-gray-800">
+        {errorCode === "SHARE_LINK_INVALID" ? t("share.invalidHelp") : t("share.expiredHelp")}
+      </p>
     ) : null;
 
+  const homeLink = (
+    <Link href="/" className={linkClass}>
+      {t("share.home")}
+    </Link>
+  );
   const exitLinks = (
     <div className="mt-4 flex flex-wrap gap-4">
       <Link href="/trips" className={linkClass}>
         {tc("checkout.trips")}
       </Link>
-      <Link href="/" className={linkClass}>
-        {t("share.home")}
-      </Link>
+      {homeLink}
     </div>
   );
 
@@ -266,8 +336,19 @@ export default function SharePayPage() {
           <p role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
             {loadError}
           </p>
-          {recovery}
-          {exitLinks}
+          {recovery ??
+            (errorCode === null && (
+              <div className="mt-3">
+                <button
+                  type="button"
+                  onClick={() => window.location.reload()}
+                  className={actionClass}
+                >
+                  {t("share.refresh")}
+                </button>
+              </div>
+            ))}
+          <div className="mt-4">{homeLink}</div>
         </div>
       </PageShell>
     );
@@ -283,6 +364,26 @@ export default function SharePayPage() {
   }
 
   const paid = share.paidByMe || result !== null;
+  const deadlineMs = Date.parse(share.deadlineAt);
+  const canPayNow = share.canPay && deadlineMs > now;
+  const minutesLeft = Math.max(0, Math.ceil((deadlineMs - now) / 60000));
+  // GET yanıtı `emailVerified` döndürürse kart formundan önce doğrulama istenir.
+  const emailUnverified =
+    (share as ShareViewDTO & { emailVerified?: boolean }).emailVerified === false;
+  const payInfoId = `${cardIds}-info`;
+
+  /** Pay ödenemiyorsa nedeni: başka hesapça ödendi, plan iptal/tamamlandı ya da süre doldu. */
+  const closedText =
+    share.status === "AUTHORIZED" || share.status === "CAPTURED"
+      ? t("share.paidByOther")
+      : share.planStatus === "ABORTED"
+        ? t("share.aborted")
+        : share.planStatus === "SETTLED"
+          ? t("share.confirmed")
+          : share.status === "EXPIRED" || deadlineMs <= now
+            ? t("share.deadlinePassed")
+            : t("share.closed");
+
   return (
     <PageShell title={t("share.title")}>
       <div className="max-w-xl">
@@ -311,8 +412,24 @@ export default function SharePayPage() {
               {f.money(share.amountMinor, share.currency)}
             </span>
           </div>
-          <p className="mt-2 text-xs text-gray-500">
-            {t(`status.${share.status}`)} · {t("deadline", { time: f.dateTime(share.deadlineAt) })}
+          <p className="mt-2 text-xs text-gray-500">{t(`status.${share.status}`)}</p>
+          {/* Son ödeme ayrı ve belirgin satırda; ödeme açıkken kalan süreyle. */}
+          <p className="mt-3 flex items-start gap-2 text-sm font-semibold text-gray-900">
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 20 20"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              className="mt-0.5 h-4 w-4 shrink-0"
+            >
+              <circle cx="10" cy="10" r="7.5" />
+              <path d="M10 6v4l2.5 2.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <span>
+              {t("deadline", { time: f.dateTime(share.deadlineAt) })}
+              {!paid && canPayNow && ` ${t("deadlineLeft", { minutes: minutesLeft })}`}
+            </span>
           </p>
         </section>
 
@@ -322,8 +439,12 @@ export default function SharePayPage() {
               {message}
             </p>
             {recovery}
+            {locked && <div className="mt-4">{homeLink}</div>}
           </div>
         )}
+        <p role="status" className="sr-only">
+          {announcement}
+        </p>
         <div aria-live="polite">
           {paid && (
             <div className="mt-4">
@@ -340,66 +461,50 @@ export default function SharePayPage() {
               {exitLinks}
             </div>
           )}
-          {!paid && !share.canPay && (
-            <p className="mt-4 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">
-              {t("share.closed")}
-            </p>
+          {!paid && !canPayNow && (
+            <div className="mt-4">
+              <p className="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                {closedText}
+              </p>
+              <div className="mt-4">{homeLink}</div>
+            </div>
           )}
         </div>
 
-        {!paid && share.canPay && !challenge && (
+        {!paid && canPayNow && emailUnverified && (
+          <div className="mt-6 space-y-2 rounded-2xl border border-gray-200 bg-white p-6 text-sm text-gray-800 shadow-sm">
+            <p>{t("share.verifyEmail")}</p>
+            {verifyActions}
+          </div>
+        )}
+
+        {!paid && canPayNow && !emailUnverified && !locked && !challenge && (
           <form
             onSubmit={pay}
             className="mt-6 space-y-3 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm"
             aria-label={tp("title")}
           >
             <h2 className="text-lg font-semibold text-gray-900">{tp("title")}</h2>
-            <label className="block text-sm font-medium text-gray-700">
-              {tp("cardNumber")}
-              <input
-                className={field}
-                inputMode="numeric"
-                autoComplete="cc-number"
-                value={card.number}
-                onChange={(e) => setCard({ ...card, number: e.target.value })}
-                required
-              />
-            </label>
-            <div className="flex gap-3">
-              <label className="block flex-1 text-sm font-medium text-gray-700">
-                {tp("expiry")}
-                <input
-                  className={field}
-                  autoComplete="cc-exp"
-                  value={card.exp}
-                  onChange={(e) => setCard({ ...card, exp: e.target.value })}
-                  required
-                />
-              </label>
-              <label className="block flex-1 text-sm font-medium text-gray-700">
-                {tp("cvc")}
-                <input
-                  className={field}
-                  inputMode="numeric"
-                  autoComplete="cc-csc"
-                  value={card.cvc}
-                  onChange={(e) => setCard({ ...card, cvc: e.target.value })}
-                  required
-                />
-              </label>
-            </div>
-            <p className="text-xs text-gray-500">
-              {tp("testCards", {
-                success: TEST_CARDS.success,
-                decline: TEST_CARDS.decline,
-                threeDs: TEST_CARDS.threeDs,
-              })}
+            {/* Provizyon: şimdi yalnız bloke edilir; tüm paylar gelince tahsil, gelmezse iptal. */}
+            <p id={payInfoId} className="text-sm text-gray-700">
+              {t("share.payInfo", { amount: f.money(share.amountMinor, share.currency) })}
             </p>
+            <CardFields
+              values={card}
+              onChange={(k, v) => {
+                setCard((c) => ({ ...c, [k]: v }));
+                setCardErrors((e) => (e[k] ? { ...e, [k]: null } : e));
+              }}
+              errors={cardErrors}
+              idPrefix={cardIds}
+              showTestCards
+            />
             {/* Meşgulken `disabled` yerine aria-disabled: odak düğmede kalır, çift gönderim yok. */}
             <button
               type="submit"
               aria-disabled={busy || undefined}
               aria-busy={busy || undefined}
+              aria-describedby={payInfoId}
               data-testid="share-pay"
               className={`w-full rounded-lg bg-[#003580] px-4 py-3 text-sm font-semibold text-white hover:bg-[#002b66] aria-disabled:bg-gray-300 aria-disabled:text-gray-700 ${focusRing}`}
             >
@@ -442,6 +547,16 @@ export default function SharePayPage() {
               className={`w-full rounded-lg bg-[#003580] px-4 py-3 text-sm font-semibold text-white aria-disabled:bg-gray-300 aria-disabled:text-gray-700 ${focusRing}`}
             >
               {busy ? tp("processing") : tp("verify")}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (!busy) backToCard();
+              }}
+              aria-disabled={busy || undefined}
+              className={`w-full ${actionClass}`}
+            >
+              {tp("threeDsBack")}
             </button>
           </form>
         )}

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { apiFetch } from "@/lib/api-client";
 import { base64UrlToBytes, pushSupported } from "@/lib/pwa/client";
+import { serviceWorkerRegistrationEnabled } from "@/components/pwa/ServiceWorkerRegistrar";
 import { Button, Card, Status } from "@/components/ui/ui";
 
 interface PushStatus {
@@ -13,15 +14,50 @@ interface PushStatus {
   subscriptions: number;
 }
 
-type View = "loading" | "unsupported" | "server-off" | "denied" | "off" | "on";
+type View = "loading" | "unsupported" | "ios-install" | "server-off" | "denied" | "off" | "on";
+
+/** Service worker hazır olmazsa (kayıt başarısız/kapalı) düğme sonsuza dek beklemesin. */
+const SW_READY_TIMEOUT_MS = 10_000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = window.setTimeout(() => reject(new Error("timeout")), ms);
+    promise.then(
+      (value) => {
+        window.clearTimeout(timer);
+        resolve(value);
+      },
+      (err: unknown) => {
+        window.clearTimeout(timer);
+        reject(err instanceof Error ? err : new Error(String(err)));
+      }
+    );
+  });
+}
+
+/** iOS/iPadOS'ta Web Push yalnız ana ekrana eklenmiş uygulamada (16.4+) vardır. */
+function iosNeedsHomeScreen(): boolean {
+  if (typeof navigator === "undefined" || typeof window === "undefined") return false;
+  const ua = navigator.userAgent;
+  const ios = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+  const standalone =
+    window.matchMedia("(display-mode: standalone)").matches ||
+    (navigator as Navigator & { standalone?: boolean }).standalone === true;
+  return ios && !standalone;
+}
 
 async function detectPushState(): Promise<{ view: View; status: PushStatus | null }> {
-  if (!pushSupported()) return { view: "unsupported", status: null };
+  const supported = pushSupported();
+  const iosInstall = !supported && iosNeedsHomeScreen();
+  if (!supported && !iosInstall) return { view: "unsupported", status: null };
   try {
     const status = await apiFetch<PushStatus>("/api/push/subscription");
     if (!status.enabled) return { view: "server-off", status };
+    if (iosInstall) return { view: "ios-install", status };
     if (Notification.permission === "denied") return { view: "denied", status };
     const reg = await navigator.serviceWorker.getRegistration();
+    // Bu derlemede service worker kaydı kapalıysa abonelik kurulamaz (F573).
+    if (!reg && !serviceWorkerRegistrationEnabled()) return { view: "server-off", status };
     const sub = await reg?.pushManager.getSubscription();
     return { view: sub ? "on" : "off", status };
   } catch {
@@ -48,7 +84,11 @@ export default function PushToggle() {
   useEffect(() => {
     if (!pendingFocus.current || busy) return;
     pendingFocus.current = false;
-    (actionRef.current ?? stateTextRef.current)?.focus();
+    const action = actionRef.current;
+    // Aynı düğme yerinde kaldıysa odak zaten orada; "reddedildi"de önce açıklama okunur.
+    if (action && action === document.activeElement) return;
+    const target = view === "denied" ? stateTextRef.current : action;
+    (target ?? stateTextRef.current)?.focus();
   }, [view, busy]);
 
   useEffect(() => {
@@ -62,6 +102,38 @@ export default function PushToggle() {
       active = false;
     };
   }, []);
+
+  // Reddedildiyken tarayıcı ayarından izin verilirse kart kendiliğinden güncellenir (F1382).
+  useEffect(() => {
+    if (view !== "denied" || !("permissions" in navigator)) return;
+    let active = true;
+    let permission: PermissionStatus | null = null;
+    const onChange = () => {
+      if (permission?.state === "denied") return;
+      void detectPushState().then((result) => {
+        if (!active || result.view === "loading") return;
+        const focused = document.activeElement;
+        if (focused && (focused === actionRef.current || focused === stateTextRef.current)) {
+          pendingFocus.current = true;
+        }
+        setStatus(result.status);
+        setView(result.view);
+        if (result.view === "off") setNotice(t("allowedNow"));
+      });
+    };
+    navigator.permissions
+      .query({ name: "notifications" })
+      .then((p) => {
+        if (!active) return;
+        permission = p;
+        p.addEventListener("change", onChange);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+      permission?.removeEventListener("change", onChange);
+    };
+  }, [view, t]);
 
   async function enable() {
     if (!status?.publicKey) return;
@@ -80,7 +152,13 @@ export default function PushToggle() {
         }
         return;
       }
-      const reg = await navigator.serviceWorker.ready;
+      let reg: ServiceWorkerRegistration;
+      try {
+        reg = await withTimeout(navigator.serviceWorker.ready, SW_READY_TIMEOUT_MS);
+      } catch {
+        setError(t("notReady"));
+        return;
+      }
       const sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: base64UrlToBytes(status.publicKey),
@@ -121,6 +199,24 @@ export default function PushToggle() {
     }
   }
 
+  /** Tarayıcı ayarından izin verildikten sonra sayfayı yenilemeden yeniden kontrol (F1382). */
+  async function recheck() {
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    pendingFocus.current = true;
+    const result = await detectPushState();
+    if (result.view === "loading") {
+      setError(t("recheckError"));
+    } else {
+      setStatus(result.status);
+      setView(result.view);
+      if (result.view === "denied") setNotice(t("stillDenied"));
+      if (result.view === "off") setNotice(t("allowedNow"));
+    }
+    setBusy(false);
+  }
+
   if (view === "loading") return null;
 
   return (
@@ -134,6 +230,7 @@ export default function PushToggle() {
         {/* Her zaman mount edilen canlı bölge: durum değişince ekran okuyucuya duyurulur. */}
         <div aria-live="polite" className="space-y-2">
           {view === "unsupported" && <p>{t("unsupported")}</p>}
+          {view === "ios-install" && <p>{t("iosInstall")}</p>}
           {view === "server-off" && <p>{t("disabledServer")}</p>}
           {view === "denied" && (
             <>
@@ -145,6 +242,11 @@ export default function PushToggle() {
           )}
           {view === "on" && <p>{t("enabled")}</p>}
         </div>
+        {view === "denied" && (
+          <Button ref={actionRef} variant="secondary" onClick={recheck} busy={busy}>
+            {busy ? t("working") : t("recheck")}
+          </Button>
+        )}
         {view === "off" && (
           <Button ref={actionRef} onClick={enable} busy={busy}>
             {busy ? t("working") : t("enable")}

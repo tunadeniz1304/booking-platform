@@ -6,7 +6,7 @@
   "verificationFailed": "Doğrulama başarısız",
   "verificationStartFailed": "Doğrulama başlatılamadı",
   "invalidCard": "Kart bilgisi geçersiz",
-  "holdUntil": "Oda sizin için {time}'e kadar tutuluyor.",
+  "holdUntil": "Son ödeme saati: {time}. Bu saatten sonra oda serbest bırakılır.",
   "cardNumber": "Kart numarası",
   "expiry": "Son kullanma (AA/YY)",
   "cvc": "CVC",
@@ -28,34 +28,39 @@
     "dialogBodyConfirmed": "İade tutarı, rezervasyon sırasında kabul ettiğiniz iptal politikasına göre hesaplanır ve iptalden hemen sonra gösterilir.",
     "irreversible": "Bu işlem geri alınamaz.",
     "confirmButton": "Evet, iptal et",
-    "keep": "Rezervasyonu koru"
+    "keep": "Rezervasyonu koru",
+    "cancelledNoCharge": "İptal edildi. Kartınızdan ödeme alınmadı.",
+    "processing": "İptal ediliyor..."
   },
   "stepUp": {
     "failed": "Doğrulama başarısız",
     "title": "Ek doğrulama gerekli",
     "description": "Hesabınızı korumak için bu ödemeyi passkey'inizle onaylamanızı istiyoruz. Onaydan sonra ödeme otomatik olarak yeniden denenir.",
     "managePasskeys": "Passkey oluştur veya yönet (yeni sekmede açılır)",
-    "waiting": "Bekleniyor...",
+    "waiting": "Passkey onayı bekleniyor…",
     "verify": "Passkey ile doğrula",
     "cancel": "Vazgeç",
     "whatIsPasskey": "Passkey, telefonunuzun ya da bilgisayarınızın kilidini açtığınız yöntemle (parmak izi, yüz tanıma veya PIN) yaptığınız, parola gerektirmeyen bir doğrulamadır.",
     "noPasskey": "Passkey'iniz yoksa hesap sayfasında birkaç saniyede oluşturabilir, sonra bu pencereye dönüp yeniden deneyebilirsiniz.",
-    "holdUntil": "Odanız sizin için tutuluyor; tutma süresi saat {time} itibarıyla doluyor."
+    "holdUntil": "Odanız sizin için tutuluyor; tutma süresi saat {time} itibarıyla doluyor.",
+    "waitingHint": "Cihazınızın açtığı passkey penceresinde parmak izi, yüz tanıma veya PIN ile onay verin. Telefonunuzla doğruluyorsanız telefonunuza gelen isteği onaylayın.",
+    "cancelled": "Passkey onayı iptal edildi veya zaman aşımına uğradı. Ödeme alınmadı; yeniden deneyebilirsiniz.",
+    "cancelledNoCharge": "Ek doğrulamadan vazgeçtiniz; ödeme alınmadı. Hazır olduğunuzda ödemeyi yeniden deneyebilirsiniz."
   },
   "rnpl": {
     "legend": "Ödeme zamanı",
     "payNow": "Şimdi öde: {amount}",
     "payLater": "Şimdi rezerve et, sonra öde: bugün {today}, {date} tarihinde {amount}",
     "timeline": "İptal zaman çizelgesi",
-    "stepToday": "Bugün: {today} tahsil edilir; kartınız yalnızca kaydedilir.",
+    "stepToday": "Bugün kartınızdan ödeme alınmaz; kartınız yalnızca kaydedilir.",
     "stepCharge": "{date}: {amount} kayıtlı kartınızdan tahsil edilir.",
-    "stepFreeCancel": "{date} saatine kadar ücretsiz iptal; tahsilattan önce iptal ederseniz hiç ödeme alınmaz.",
+    "stepFreeCancel": "Ücretsiz iptal son tarihi: {date}. Tahsilattan önce iptal ederseniz hiç ödeme alınmaz; tahsilattan sonra iptal ederseniz tutarın tamamı iade edilir.",
     "stepFailure": "Tahsilat başarısız olursa size bildirir ve yeniden deneriz; ek süre içinde ödenmezse rezervasyon otomatik iptal edilir.",
     "reserve": "Şimdi rezerve et (bugün ödeme yok)",
     "plan": {
       "title": "Ödeme planı: şimdi rezerve et, sonra öde",
       "summary": "Rezervasyon sırasında {today} ödendi; {date} tarihinde {amount} kayıtlı kartınızdan tahsil edilecek.",
-      "retry": "Tahsilat başarısız oldu; sonraki deneme: {date}. Kartınızı kontrol edin.",
+      "retry": "Tahsilat başarısız oldu; sonraki deneme: {date}. Kartınızın bakiyesini, limitini ve son kullanma tarihini kontrol edin; farklı bir kart kullanmanız gerekiyorsa destek ekibine yazın.",
       "captured": "{amount}, {date} tarihinde tahsil edildi.",
       "status": {
         "SCHEDULED": "Planlandı",
@@ -66,9 +71,13 @@
       },
       "summaryCancelled": "Plan iptal edildi; kartınızdan tahsilat yapılmayacak.",
       "summaryDefaulted": "Ödeme alınamadığı için rezervasyon iptal edildi; kartınızdan başka tahsilat yapılmayacak.",
-      "stepBooked": "Rezervasyon sırasında: {today} ödendi; kartınız yalnızca kaydedildi."
+      "stepBooked": "Rezervasyon sırasında: {today} ödendi; kartınız yalnızca kaydedildi.",
+      "graceUntil": "Son ödeme zamanı: {date}. Bu zamana kadar tahsil edilemezse rezervasyon iptal edilir.",
+      "contactSupport": "Destek ekibine yazın"
     },
-    "moment": "{date} {time} ({tz})"
+    "moment": "{date} {time} ({tz})",
+    "stepFailureGrace": "Tahsilat başarısız olursa size bildirir ve yeniden deneriz; {hours} saat içinde ödenemezse rezervasyon otomatik iptal edilir.",
+    "creditUnavailable": "Cüzdan kredisi bu seçenekle birlikte kullanılamaz; kredinizi kullanmak için şimdi ödemeyi seçin."
   },
   "expiryHint": "AA/YY biçiminde, ör. 08/28",
   "threeDsIntro": "Bankanız bu ödemeyi onaylamanızı istiyor. Telefonunuza gelen kodu girin.",
@@ -101,5 +110,19 @@
     "IDENTITY_VERIFICATION_REQUIRED": "Devam etmek için kimliğinizi doğrulamanız gerekiyor.",
     "RATE_LIMITED": "Çok fazla istek gönderildi. Lütfen biraz bekleyip tekrar deneyin."
   },
-  "stripeLiveCharge": "Onayladığınızda kartınızdan {amount} tahsil edilecek."
+  "stripeLiveCharge": "Onayladığınızda kartınızdan {amount} tahsil edilecek.",
+  "config": {
+    "loading": "Ödeme seçenekleri yükleniyor…",
+    "failed": "Ödeme formu yüklenemedi. Kartınızdan ücret alınmadı; lütfen tekrar deneyin."
+  },
+  "attempts": {
+    "left": "Kalan deneme hakkı: {count}.",
+    "lockedTitle": "Bu rezervasyon için kartla ödeme kapatıldı",
+    "lockedBody": "Çok fazla başarısız deneme yapıldığı için bu rezervasyonda kartla ödeme güvenliğiniz adına durduruldu. Kartınızdan ücret alınmadı. Destek ekibimize yazabilir ya da rezervasyonu iptal ederek odayı serbest bırakabilirsiniz.",
+    "contactSupport": "Destekle iletişime geç"
+  },
+  "threeDsNoCode": "Kod gelmedi mi? Birkaç dakika bekleyin; yine gelmezse aşağıdan başka bir kartla ödeyebilirsiniz. Kartınızdan ödeme alınmadı.",
+  "otherOptions": "Diğer seçenekler",
+  "stepUpCancelled": "Ödeme tamamlanmadı; devam etmek için ek doğrulama gerekiyor.",
+  "stepUpRetry": "Dilediğinizde yeniden deneyebilirsiniz."
 }

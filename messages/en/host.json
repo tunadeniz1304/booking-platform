@@ -1,16 +1,25 @@
 {
   "page": {
     "title": "Host dashboard",
-    "intro": "Create and edit listings, add rooms, update the calendar in bulk, and track bookings and guest messages."
+    "intro": "Track bookings and guest messages; create and edit listings, add rooms, update the calendar in bulk, manage photos, deposits and promotions, and review party-risk warnings."
   },
   "messagesPage": {
-    "back": "Host dashboard",
+    "back": "Host dashboard – Bookings",
     "title": "Guest conversation",
-    "intro": "Message the guest for this booking. If there was damage after the stay, you can open a claim below to have it covered from the deposit."
+    "intro": "Message the guest for this booking. If there was damage after the stay, you can open a claim below to have it covered from the deposit.",
+    "context": {
+      "property": "Listing",
+      "room": "Room",
+      "dates": "Dates",
+      "datesValue": "{checkIn} – {checkOut}",
+      "guest": "Guest",
+      "guestValue": "{name} · {count, plural, one {# guest} other {# guests}}",
+      "status": "Status"
+    }
   },
   "dashboard": {
-    "revenueLink": "Revenue dashboard: occupancy, ADR, RevPAR and price suggestions →",
-    "loadingProperties": "Loading properties…",
+    "revenueLink": "Revenue dashboard: occupancy, ADR, RevPAR and price suggestions",
+    "loadingProperties": "Loading listings…",
     "noProperties": "You do not have any listings yet. Once you create your first listing you can edit it, add rooms and manage its calendar here.",
     "sectionsNav": "Dashboard sections",
     "navBookings": "Bookings and messages",
@@ -23,28 +32,40 @@
     "filterLabel": "Search listings",
     "filterHint": "Filters listings by title.",
     "filterEmpty": "No listings match your search.",
-    "retry": "Try again"
+    "retry": "Try again",
+    "revenueHint": "Revenue dashboard: occupancy, average daily rate (ADR), revenue per available room (RevPAR) and price suggestions.",
+    "openClaimLink": "Open a damage claim: choose the booking"
   },
   "bookings": {
     "title": "Bookings",
     "loading": "Loading…",
     "empty": "No bookings.",
-    "caption": "Bookings for your properties",
+    "caption": "Bookings for your listings",
     "columns": {
-      "property": "Property",
+      "property": "Listing",
       "checkIn": "Check-in",
       "checkOut": "Check-out",
       "guests": "Guests",
       "amount": "Amount",
       "status": "Status",
-      "messages": "Messages"
+      "messages": "Messages",
+      "ref": "Booking no.",
+      "guestName": "Guest name"
     },
     "messagesLink": "Messages",
-    "error": "Bookings could not be loaded."
+    "error": "Bookings could not be loaded.",
+    "filter": {
+      "status": "Filter by status",
+      "property": "Filter by property",
+      "all": "All",
+      "count": "Showing {shown} of {total} bookings.",
+      "empty": "No bookings match these filters."
+    },
+    "messagesAndClaimsLink": "Messages & damage claim"
   },
   "bookingStatus": {
     "PENDING": "Pending",
-    "HELD": "On hold",
+    "HELD": "On hold — awaiting payment",
     "CONFIRMED": "Confirmed",
     "CANCELLED": "Cancelled",
     "EXPIRED": "Expired",
@@ -57,7 +78,7 @@
   },
   "property": {
     "basePrice": "Base price: {price}",
-    "rating": "Rating {rating}",
+    "rating": "Rating {rating}/5",
     "published": "Live",
     "unpublished": "Not live",
     "license": "Licence:",
@@ -68,7 +89,10 @@
       "licenseNumber": "Licence number",
       "licenseHint": "Province plate code + sequence number, e.g. 34-12345. Listings without a licence cannot go live.",
       "isActive": "Publish when I save",
-      "basePriceHint": "Example: 1,500 or 1,500.50"
+      "basePriceHint": "Example: 1,500 or 1,500.50",
+      "licenseNumberOptional": "Licence number (optional)",
+      "titleHint": "2 to 120 characters.",
+      "descriptionCount": "{count}/{max} characters"
     },
     "saving": "Saving…",
     "save": "Save",
@@ -78,7 +102,7 @@
       "live": "Visible in search.",
       "pending": "Marked as live, but not visible in search until the licence is verified.",
       "rejected": "Licence not found in the registry; the listing is not visible in search. Correct the licence number and press Save.",
-      "off": "Not live; not visible in search."
+      "off": "Not visible in search; guests cannot find this listing."
     },
     "pricePreview": "New nightly price: {price} (currently: {previous})",
     "invalidAmount": "Enter a valid amount (e.g. 1,500 or 1,500.50).",
@@ -86,6 +110,18 @@
       "title": "Large price change",
       "body": "The base nightly price will change from {from} to {to}. Is that correct?",
       "confirm": "Yes, save the price"
+    },
+    "noRating": "No rating yet",
+    "noChanges": "Nothing has changed, so there is nothing to save.",
+    "licenseChangeNote": "A new licence number is re-verified when you save; the listing will not appear in search until it is verified.",
+    "publish": "Publish",
+    "unpublish": "Unpublish",
+    "publishedNow": "The listing is now live.",
+    "unpublishedNow": "The listing has been unpublished and no longer appears in search.",
+    "unpublishConfirm": {
+      "title": "Unpublish “{title}”?",
+      "body": "The listing will no longer appear in search, so new guests cannot find it. You can make it live again at any time with the “Publish” button.",
+      "confirm": "Unpublish"
     }
   },
   "rooms": {
@@ -102,11 +138,17 @@
       "submit": "Add room",
       "added": "Room added.",
       "adding": "Adding…",
-      "priceModifierHint": "Nightly amount added to the base price, e.g. 250 or 250.50"
+      "priceModifierHint": "Nightly amount added to the base price, e.g. 250 or 250.50",
+      "priceModifierLabel": "Nightly surcharge ({currency})",
+      "pricePreview": "Nightly price for this room: {total} (base {base} + {modifier})",
+      "priceModifierOptionalLabel": "Nightly surcharge ({currency}, optional)",
+      "capacityHint": "1–20 guests"
     },
     "closeSale": "Close for sale",
     "openSale": "Open for sale",
-    "updated": "Room updated."
+    "updated": "Room updated.",
+    "units": "{count, plural, one {# unit} other {# units}}",
+    "empty": "No rooms yet. Add a room below to manage the calendar and prices."
   },
   "calendar": {
     "title": "Bulk calendar update",
@@ -121,15 +163,41 @@
     "submit": "Update calendar",
     "noChange": "Enter a price or availability change.",
     "result": "Nights updated: {updated}, added: {created}, skipped because booked: {skipped}.",
-    "priceHint": "Example: 2,750 or 2,750.50"
+    "priceHint": "Example: 2,750 or 2,750.50",
+    "fromPast": "The start date cannot be in the past.",
+    "toBeforeFrom": "The end date cannot be before the start date.",
+    "tooLong": "You can update at most {max} nights at once.",
+    "rangeHint": "{count, plural, one {# night} other {# nights}} selected.",
+    "closeConfirm": {
+      "title": "Close for sale?",
+      "body": "{count, plural, one {# night} other {# nights}} for {room} from {from} to {to} will be closed for sale. Nights that are already booked are not affected.",
+      "confirm": "Yes, close for sale"
+    },
+    "noRooms": "The calendar and nightly prices are managed per room. Add a room using the form above first.",
+    "priceLabel": "Nightly price ({currency}) — leave empty to keep it unchanged",
+    "summary": "To apply: {room}, {from} – {to} ({count, plural, one {# night} other {# nights}}) — {changes}.",
+    "summaryPrice": "nightly price becomes {price}",
+    "summaryOpen": "opened for sale",
+    "summaryClose": "closed for sale",
+    "closeConfirmPrice": "The nightly price will also be set to {price}.",
+    "bulkConfirm": {
+      "title": "Update many nights in the calendar?",
+      "confirm": "Yes, update the calendar"
+    }
   },
   "listingCopy": {
     "suggesting": "Preparing suggestion…",
     "suggest": "Suggest listing copy",
-    "draft": "Draft (not published automatically; edit and approve it)",
+    "draft": "Draft — not published automatically. Copy it into the description, edit it, then press Save.",
     "title": "Listing text suggestion",
     "trLabel": "Turkish:",
-    "enLabel": "English:"
+    "enLabel": "English:",
+    "apply": "Use the {lang, select, tr {Turkish} other {English}} text as the description",
+    "copy": "Copy the {lang, select, tr {Turkish} other {English}} text",
+    "applied": "The draft was copied into the description field; edit it and press Save.",
+    "copied": "Text copied to the clipboard.",
+    "copyFailed": "The text could not be copied; select and copy it manually.",
+    "regenerate": "Generate a new suggestion (replaces the current draft)"
   },
   "photos": {
     "title": "Photos",
@@ -152,7 +220,19 @@
       "title": "Remove this photo?",
       "body": "The photo will be permanently deleted from the listing and guests will no longer see it.",
       "confirm": "Remove photo"
-    }
+    },
+    "uploadHint": "JPEG, PNG, WebP or AVIF; up to {size} MB.",
+    "limitHint": "Up to {max} photos per listing (currently {count}/{max}).",
+    "limitReached": "This listing has reached its photo limit; remove a photo before adding a new one.",
+    "tooLarge": "\"{name}\" was not uploaded: the file is larger than the {size} MB limit.",
+    "badType": "\"{name}\" was not uploaded: only JPEG, PNG, WebP or AVIF images are accepted.",
+    "uploadFailed": "\"{name}\" could not be uploaded: {reason}",
+    "uploaded": "\"{name}\" uploaded.",
+    "multipleHint": "You can select several photos at once; they are uploaded one after another.",
+    "tooMany": "{count, plural, one {# photo was} other {# photos were}} not uploaded: a listing can have at most {max} photos.",
+    "uploadingProgress": "Uploading and analysing photo {current} of {total}…",
+    "uploadedMany": "{count} of {total} photos uploaded.",
+    "qualityRated": "Quality score: {score}/100 ({level, select, good {good} medium {fair} other {low}})"
   },
   "promotions": {
     "title": "Promotions",
@@ -167,7 +247,8 @@
       "scope": "Scope",
       "usage": "Usage",
       "status": "Status",
-      "actions": "Actions"
+      "actions": "Actions",
+      "validity": "Validity"
     },
     "types": {
       "EARLY_BIRD": "Early bird",
@@ -203,7 +284,7 @@
       "usageLimit": "Usage limit (empty = unlimited)",
       "scope": "Scope",
       "priority": "Priority",
-      "priorityHint": "Higher priority is applied first.",
+      "priorityHint": "If several promotions match a booking, the higher priority applies first; on a tie the larger discount wins. Example: with 10% off set to “High” and 15% off set to “Normal”, the guest gets 10%.",
       "stackable": "Can be combined with other promotions",
       "submit": "Add promotion",
       "nameHint": "{min}–{max} characters.",
@@ -215,7 +296,62 @@
       "highConfirm": "Yes, save",
       "stackableWarning": "Stackable promotions apply together, so the total discount can be higher than this rate alone.",
       "rangeHint": "Enter a number between {min} and {max}.",
-      "couponHint": "{min}–{max} characters; letters, digits, - and _ only."
+      "couponHint": "{min}–{max} characters; letters, digits, - and _ only.",
+      "editTitle": "Edit promotion: {name}",
+      "save": "Save changes",
+      "cancelEdit": "Cancel",
+      "discountKind": "Discount type",
+      "kindPercent": "Percentage",
+      "kindFixed": "Fixed amount",
+      "amount": "Discount amount",
+      "amountHint": "In {currency}. Deducted from the stay total and never more than the total.",
+      "amountInvalid": "Enter a valid amount greater than 0.",
+      "fixedNeedsListing": "Your listings use different currencies. Choose a single listing as the scope for a fixed amount.",
+      "startDate": "Start date (optional)",
+      "startHint": "Leave empty to start right away.",
+      "endDate": "End date (optional)",
+      "endHint": "Valid through this day. Leave empty for no end date.",
+      "endBeforeStart": "The end date can't be before the start date.",
+      "dateInvalid": "Enter a valid date.",
+      "fieldRejected": "This value wasn't accepted. {hint}",
+      "valueRejected": "This value wasn't accepted.",
+      "fixFields": "The promotion couldn't be saved. Fix the marked fields and try again.",
+      "couponTaken": "This coupon code is already in use. Enter a different code.",
+      "usageLimitHint": "At least {count} (the number of times it has been used).",
+      "priorityLow": "Low",
+      "priorityNormal": "Normal",
+      "priorityHigh": "High",
+      "priorityCustom": "Custom ({value})",
+      "nameFieldHint": "Guests see the discount under this name in their quote. {min}–{max} characters.",
+      "advanced": "Advanced settings",
+      "advancedSummary": "(Priority: {priority}; {stackable, select, true {can be combined with other promotions} other {not combined}})",
+      "stackableHint": "If unchecked, this promotion never applies together with others; only one is chosen. Example: a 10% early bird and a 5% mobile rate that are both stackable apply together."
+    },
+    "validity": {
+      "range": "{start} – {end}",
+      "from": "From {start}",
+      "until": "Until {end}",
+      "always": "No end date"
+    },
+    "edit": "Edit",
+    "pausedNamed": "“{name}” paused.",
+    "activatedNamed": "“{name}” activated.",
+    "updated": "Promotion updated.",
+    "cannotDelete": "“{name}” has been used, so it can't be deleted. It is already paused.",
+    "deleteConfirm": {
+      "title": "Delete “{name}”?",
+      "body": "The promotion will be deleted permanently. This can't be undone.",
+      "confirm": "Delete promotion",
+      "usedTitle": "“{name}” can't be deleted. Pause it?",
+      "usedBody": "This promotion has been used {count, plural, one {# time} other {# times}}, so it can't be deleted. If you confirm, it will be paused and won't apply to new bookings; you can activate it again at any time.",
+      "usedConfirm": "Pause promotion"
+    },
+    "typeHelp": {
+      "EARLY_BIRD": "Applies to bookings made at least the number of days you set before arrival.",
+      "LAST_MINUTE": "Applies to bookings made no more than the number of days you set before arrival.",
+      "LONG_STAY": "Applies to stays of at least the number of nights you set.",
+      "MOBILE_RATE": "Applies only to bookings made from a phone or tablet.",
+      "COUPON": "Applies only when the guest enters the coupon code while booking. You share the code with your guests."
     }
   },
   "form": {
@@ -246,5 +382,15 @@
     "cancel": "Cancel",
     "kycRequired": "You need to verify your identity before you can create a listing. This is required for guest safety.",
     "kycLink": "Verify my identity on the My account page"
+  },
+  "pagesNav": "Host pages",
+  "unsaved": {
+    "indicator": "You have unsaved changes.",
+    "leaveConfirm": {
+      "title": "Discard unsaved changes?",
+      "body": "You have changes on this page that are not saved. They will be lost if you leave.",
+      "confirm": "Leave without saving",
+      "cancel": "Stay on this page"
+    }
   }
 }

@@ -11,6 +11,7 @@
  *  - /trips (gezinme) ve /api/itinerary: network-first (+zaman aşımı) → önbellek → çevrimdışı.
  *  - Diğer gezinmeler: ağ; ağ yoksa /offline (önceden önbelleğe alınır). Diğer API'ler hiç önbelleğe alınmaz.
  * Oturum kapatılınca istemci CLEAR_USER_DATA mesajı gönderir → kişisel önbellekler silinir.
+ * Dil/tema değişince istemci REFRESH_OFFLINE gönderir → /offline yeni tercihlerle yenilenir.
  */
 const VERSION = "v1";
 const STATIC_CACHE = "booking-static-" + VERSION;
@@ -106,6 +107,21 @@ async function offlineFallback() {
   return hit || new Response("offline", { status: 503, headers: { "Content-Type": "text/plain" } });
 }
 
+/**
+ * /offline'ı güncel dil ve tema çerezleriyle yeniden önbelleğe alır (F1056). Ağ yoksa ya da
+ * yanıt başarısızsa eski kopya korunur.
+ */
+async function refreshOfflinePage() {
+  try {
+    const response = await fetch(new Request(OFFLINE_URL, { cache: "reload" }));
+    if (response.status !== 200 || response.redirected || response.type !== "basic") return;
+    const cache = await caches.open(STATIC_CACHE);
+    await cache.put(OFFLINE_URL, response);
+  } catch (e) {
+    // çevrimdışıyken eski kopya kalır; bir sonraki tercih değişiminde yeniden denenir
+  }
+}
+
 self.addEventListener("fetch", (event) => {
   const request = event.request;
   if (request.method !== "GET") return;
@@ -141,6 +157,11 @@ self.addEventListener("message", (event) => {
   const data = event.data || {};
   if (data.type === "CLEAR_USER_DATA") {
     event.waitUntil(Promise.all([caches.delete(DATA_CACHE), caches.delete(PAGES_CACHE)]));
+    return;
+  }
+  // Dil ya da tema değişince çevrimdışı sayfa kurulum anındaki tercihlerde donmasın.
+  if (data.type === "REFRESH_OFFLINE") {
+    event.waitUntil(refreshOfflinePage());
     return;
   }
   // İlk ziyarette sayfa henüz SW denetiminde değilken yüklenen statik parçalar (JS/CSS).

@@ -74,7 +74,7 @@ test.describe("PWA (P1-12)", () => {
     await expect
       .poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller)))
       .toBe(true);
-    const card = page.getByTestId("trip-card").filter({ hasText: `BK1.${bookingId}.` });
+    const card = page.getByTestId("trip-card").filter({ hasText: bookingId });
     await expect(card).toBeVisible();
     await expect(card.getByRole("img", { name: /QR/ })).toBeVisible();
     // Yeni sayfa da WCAG 2.1 AA'da ciddi ihlal içermez (P2-1 kapısı).
@@ -91,9 +91,7 @@ test.describe("PWA (P1-12)", () => {
       await expect(page.getByRole("heading", { name: "Seyahatlerim" })).toBeVisible();
       await expect(page.getByTestId("offline-banner")).toBeVisible();
       await expect(card).toBeVisible();
-      await expect(card.getByTestId("booking-code")).toHaveText(
-        new RegExp(`^BK1\\.${bookingId}\\.`)
-      );
+      await expect(card.getByTestId("booking-code")).toHaveText(bookingId);
     } finally {
       await context.setOffline(false);
     }

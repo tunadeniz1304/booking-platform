@@ -42,7 +42,7 @@ test("regression: v3#9 kart toplamı vergi dahil, en belirgin fiyat ve PDP ile a
   }
 
   const firstTotal = (await prices.first().getByTestId("card-total").innerText()).trim();
-  await page.getByRole("link", { name: "Fırsatı Gör" }).first().click();
+  await page.getByRole("article").first().getByRole("heading").getByRole("link").click();
   await page.waitForURL(/\/property\/.+checkIn=/);
   await expect(page.getByTestId("quote-total")).toHaveText(firstTotal);
 });

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, useSyncExternalStore, type FormEvent 
 import { useTranslations } from "next-intl";
 import { apiFetch } from "@/lib/api-client";
 import { useFormat } from "@/i18n/use-format";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { passkeySupported, registerPasskey } from "@/lib/auth/passkey-client";
 import { useAccountErrorText, useReauth } from "./ReauthDialog";
 
@@ -29,6 +30,7 @@ export default function PasskeyManager() {
   const [status, setStatus] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
   // v4#2: ekleme/silme yakın zamanda yeniden doğrulama ister (403 REAUTH_REQUIRED → pencere).
   const reauth = useReauth();
+  const { confirm, confirmDialog } = useConfirm();
 
   // F191: WebAuthn hata adları ve API hataları arayüz dilinde gösterilir.
   const errorText = useAccountErrorText();
@@ -75,14 +77,27 @@ export default function PasskeyManager() {
     }
   }
 
-  async function remove(id: string) {
+  async function remove(p: Passkey) {
     if (busy) return;
-    if (!window.confirm(t("passkeys.confirmDelete"))) return;
+    // F626: onay hangi passkey'in silineceğini ve sonucunu söyler; sonuncusu ayrıca uyarılır
+    const isLast = passkeys?.length === 1;
+    const ok = await confirm({
+      title: t("passkeys.confirmDelete", { name: p.name ?? t("passkeys.unnamed") }),
+      body: (
+        <>
+          <p>{t("passkeys.confirmDeleteBody", { date: fmt.dateTime(p.createdAt) })}</p>
+          {isLast && <p className="mt-2 font-medium">{t("passkeys.confirmDeleteLast")}</p>}
+        </>
+      ),
+      confirmLabel: t("passkeys.confirmDeleteAction"),
+      tone: "danger",
+    });
+    if (!ok) return;
     setBusy(true);
     setStatus(null);
     try {
       await reauth.run(() =>
-        apiFetch(`/api/account/passkeys?id=${encodeURIComponent(id)}`, { method: "DELETE" })
+        apiFetch(`/api/account/passkeys?id=${encodeURIComponent(p.id)}`, { method: "DELETE" })
       );
       setStatus({ kind: "ok", text: t("passkeys.deletedOk") });
       await load();
@@ -118,14 +133,18 @@ export default function PasskeyManager() {
               <span>
                 <span className="font-medium text-gray-900">{p.name ?? t("passkeys.unnamed")}</span>
                 <span className="block text-xs text-gray-600">
-                  {t("passkeys.added", { date: fmt.date(p.createdAt) })}
-                  {p.lastUsedAt && t("passkeys.lastUsed", { date: fmt.date(p.lastUsedAt) })}
+                  {t("passkeys.added", { date: fmt.dateTime(p.createdAt) })}
+                  {p.lastUsedAt && t("passkeys.lastUsed", { date: fmt.dateTime(p.lastUsedAt) })}
                 </span>
               </span>
               <button
                 type="button"
-                onClick={() => void remove(p.id)}
+                onClick={() => void remove(p)}
                 aria-disabled={busy || undefined}
+                aria-label={t("passkeys.deleteLabel", {
+                  name: p.name ?? t("passkeys.unnamed"),
+                  date: fmt.dateTime(p.createdAt),
+                })}
                 className="min-h-[44px] rounded-lg border border-red-300 px-3 py-1 text-xs font-semibold text-red-700 aria-disabled:opacity-50 sm:min-h-0"
               >
                 {t("passkeys.delete")}
@@ -135,30 +154,38 @@ export default function PasskeyManager() {
         </ul>
       )}
       {supported ? (
-        <form onSubmit={add} className="mt-4 flex flex-wrap gap-2">
-          <label htmlFor="passkey-name" className="sr-only">
+        <form onSubmit={add} className="mt-4">
+          {/* F436: görünür etiket; ipucu alanın isteğe bağlı olduğunu söyler. */}
+          <label htmlFor="passkey-name" className="block text-sm font-medium text-gray-800">
             {t("passkeys.nameLabel")}
           </label>
-          <input
-            id="passkey-name"
-            value={name}
-            maxLength={60}
-            onChange={(e) => setName(e.target.value)}
-            placeholder={t("passkeys.namePlaceholder")}
-            className="flex-1 rounded-lg border border-gray-500 px-3 py-2 text-sm"
-          />
-          <button
-            type="submit"
-            aria-disabled={busy || undefined}
-            className="rounded-lg bg-[#003580] px-4 py-2 text-sm font-semibold text-white aria-disabled:opacity-50"
-          >
-            {t("passkeys.add")}
-          </button>
+          <div className="mt-1 flex flex-wrap gap-2">
+            <input
+              id="passkey-name"
+              value={name}
+              maxLength={60}
+              onChange={(e) => setName(e.target.value)}
+              placeholder={t("passkeys.namePlaceholder")}
+              aria-describedby="passkey-name-hint"
+              className="flex-1 rounded-lg border border-gray-500 px-3 py-2 text-sm"
+            />
+            <button
+              type="submit"
+              aria-disabled={busy || undefined}
+              className="rounded-lg bg-[#003580] px-4 py-2 text-sm font-semibold text-white aria-disabled:opacity-50"
+            >
+              {t("passkeys.add")}
+            </button>
+          </div>
+          <p id="passkey-name-hint" className="mt-1 text-xs text-gray-600">
+            {t("passkeys.nameHint", { unnamed: t("passkeys.unnamed") })}
+          </p>
         </form>
       ) : (
         <p className="mt-4 text-sm text-gray-600">{t("passkeys.unsupported")}</p>
       )}
       {reauth.dialog}
+      {confirmDialog}
     </section>
   );
 }

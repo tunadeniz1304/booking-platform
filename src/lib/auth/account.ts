@@ -5,7 +5,7 @@ import { redis } from "@/lib/redis";
 import { appendOutbox } from "@/lib/cqrs";
 import { EventTypes, makeEvent, type AuthEmailRequestedPayload } from "@/lib/events/events";
 import { getConfig } from "@/lib/config/app-config";
-import { HttpError, ValidationError } from "@/lib/http/errors";
+import { HttpError, ServiceUnavailableError, ValidationError } from "@/lib/http/errors";
 import { withSerializableRetry } from "@/lib/db/transactions";
 import { hashPassword } from "./password";
 import { bumpTokenVersion, publishTokenVersion } from "./token-version";
@@ -95,7 +95,7 @@ export function loginDelayMs(failures: number, config = getConfig()): number {
  *  - Çift ya da e-posta genelindeki başarısızlıklar `AUTH_LOCKOUT_THRESHOLD`'a ulaştıysa
  *    veya e-posta başına pencere limiti (`RATE_LIMIT_LOGIN_PER_ACCOUNT_MAX`, v3#3)
  *    aşıldıysa → geçerli bir PoW çözümü gerekir; yoksa 429 `POW_REQUIRED` + bulmaca.
- * Redis yoksa fail-closed (429).
+ * Redis yoksa fail-closed: 503 `SERVICE_UNAVAILABLE` (kullanıcıya "çok fazla deneme" denmez).
  */
 export async function assertLoginAttemptAllowed(input: {
   email: string;
@@ -125,7 +125,9 @@ export async function assertLoginAttemptAllowed(input: {
     acctFails = Number(acctRaw ?? 0);
     attempts = await redis.incrWithTtl(rateKey, window);
   } catch {
-    throw new LoginRateLimitedError();
+    throw new ServiceUnavailableError(
+      "Giriş şu an geçici olarak yapılamıyor, lütfen birkaç dakika sonra tekrar deneyin"
+    );
   }
   const waitMs = Number(next ?? 0) - now;
   if (waitMs > 0) throw new LoginDelayedError(Math.ceil(waitMs / 1000));

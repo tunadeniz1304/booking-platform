@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { useTranslations } from "next-intl";
 import { ApiError } from "@/lib/api-client";
 import { money, toDecimalString } from "@/lib/money/money";
@@ -182,6 +182,65 @@ export function useClaimErrorText() {
   );
 }
 
+/** Sunucu "e-posta doğrulanmamış" dediyse (formda yeniden gönderme düğmesi gösterilir). */
+export function isEmailNotVerifiedError(err: unknown): boolean {
+  return err instanceof ApiError && err.code === "EMAIL_NOT_VERIFIED";
+}
+
+/** Ödeme sağlayıcısı (Stripe) itiraz durumları, gerekçeleri ve olayları; bilinmeyenler "Diğer". */
+const DISPUTE_STATUSES = new Set([
+  "warning_needs_response",
+  "warning_under_review",
+  "warning_closed",
+  "needs_response",
+  "under_review",
+  "won",
+  "lost",
+  "prevented",
+]);
+const DISPUTE_REASONS = new Set([
+  "bank_cannot_process",
+  "check_returned",
+  "credit_not_processed",
+  "customer_initiated",
+  "debit_not_authorized",
+  "duplicate",
+  "fraudulent",
+  "general",
+  "incorrect_account_details",
+  "insufficient_funds",
+  "noncompliant",
+  "product_not_received",
+  "product_unacceptable",
+  "subscription_canceled",
+  "unrecognized",
+]);
+const DISPUTE_EVENTS = new Set(["DISPUTE_CREATED", "DISPUTE_UPDATED", "DISPUTE_CLOSED"]);
+
+/**
+ * Ödeme sağlayıcısı kodlarını ("needs_response", "fraudulent", "PSP_DISPUTE_CREATED:…")
+ * arayüz diline çevirir; ham kod kullanıcıya gösterilmez.
+ */
+export function useDisputeText() {
+  const t = useTranslations("resolution.dispute");
+  return useMemo(() => {
+    const status = (code: string) =>
+      t(DISPUTE_STATUSES.has(code) ? `status.${code}` : "status.other");
+    const reason = (code: string) =>
+      t(DISPUTE_REASONS.has(code) ? `reason.${code}` : "reason.other");
+    /** Sistem mesajı gövdesi: `PSP_<OLAY>:<durum>` (durum boş olabilir). */
+    const event = (body: string) => {
+      const rest = body.startsWith("PSP_") ? body.slice(4) : body;
+      const sep = rest.indexOf(":");
+      const kind = sep === -1 ? rest : rest.slice(0, sep);
+      const code = sep === -1 ? "" : rest.slice(sep + 1).trim();
+      const eventText = t(DISPUTE_EVENTS.has(kind) ? `event.${kind}` : "event.other");
+      return code ? t("eventWithStatus", { event: eventText, status: status(code) }) : eventText;
+    };
+    return { status, reason, event };
+  }, [t]);
+}
+
 /**
  * Ana birimdeki kullanıcı girdisini ("1.250", "1.250,50", "250.5") pozitif minor-unit'e
  * çevirir; binlik ayırıcıyı ondalık sanmaz. Geçersiz ya da sıfırsa null.
@@ -227,38 +286,60 @@ export function ClaimStatusBadge({ status }: { status: ClaimStatus }) {
   );
 }
 
-/** Depozito özeti: tutar, durum, provizyon ve serbest bırakma zamanları. */
+/**
+ * Depozito özeti: tutar, durum, provizyon ve serbest bırakma zamanları. `viewerRole` verilirse
+ * açıklama role göre yazılır (misafire "kartınız", diğerlerine "misafirin kartı"); kesinleşmiş
+ * durumlarda (tahsil / serbest bırakma / süre dolumu / hata) gelecek zamanlı satırlar yerine
+ * duruma uygun açıklama gösterilir.
+ */
 export function DepositSummary({
   deposit,
   expectedMinor,
   currency,
+  viewerRole,
 }: {
   deposit: DepositView | null;
   expectedMinor?: number | null;
   currency: string;
+  viewerRole?: "GUEST" | "HOST" | "ADMIN";
 }) {
   const t = useTranslations("resolution.deposit");
   const f = useFormat();
+  const otherParty = viewerRole === "HOST" || viewerRole === "ADMIN";
   if (!deposit) {
     return (
       <p className="text-sm text-gray-700">
-        {expectedMinor ? t("expected", { amount: f.money(expectedMinor, currency) }) : t("none")}
+        {expectedMinor
+          ? t(otherParty ? "expectedOther" : "expected", {
+              amount: f.money(expectedMinor, currency),
+            })
+          : t("none")}
       </p>
     );
   }
+  const { status } = deposit;
+  const pending = status === "SCHEDULED" || status === "AUTHORIZED";
   const rows: Array<[string, string]> = [
-    [t("status"), t(`statuses.${deposit.status}`)],
+    [t("status"), t(`statuses.${status}`)],
     [t("amount"), f.money(deposit.amountMinor, deposit.currency)],
   ];
   if (deposit.capturedMinor > 0) {
     rows.push([t("captured"), f.money(deposit.capturedMinor, deposit.currency)]);
   }
-  rows.push(
-    deposit.authorizedAt
-      ? [t("authorizedAt"), f.dateTime(deposit.authorizedAt)]
-      : [t("authorizeAfter"), f.dateTime(deposit.authorizeAfter)]
-  );
-  rows.push([t("voidAfter"), f.dateTime(deposit.voidAfter)]);
+  if (deposit.authorizedAt) {
+    rows.push([t("authorizedAt"), f.dateTime(deposit.authorizedAt)]);
+  } else if (status === "SCHEDULED") {
+    // FAILED'da "Provizyon zamanı" geçmişte kalmış bir plandır; gösterilmez.
+    rows.push([t("authorizeAfter"), f.dateTime(deposit.authorizeAfter)]);
+  }
+  if (pending) rows.push([t("voidAfter"), f.dateTime(deposit.voidAfter)]);
+  let note: string;
+  if (status === "CAPTURED" || status === "CAPTURED_PARTIAL") {
+    note = t("noteCaptured", { amount: f.money(deposit.capturedMinor, deposit.currency) });
+  } else if (status === "VOIDED") note = t("noteVoided");
+  else if (status === "EXPIRED") note = t("noteExpired");
+  else if (status === "FAILED") note = t("noteFailed");
+  else note = viewerRole === "GUEST" ? t("noteGuest") : t("note");
   return (
     <div className="space-y-2">
       <dl className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
@@ -269,7 +350,7 @@ export function DepositSummary({
           </div>
         ))}
       </dl>
-      <p className="text-xs text-gray-600">{t("note")}</p>
+      <p className="text-xs text-gray-600">{note}</p>
     </div>
   );
 }

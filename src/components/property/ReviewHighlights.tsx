@@ -1,5 +1,6 @@
 "use client";
 
+import { useId } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { apiFetch } from "@/lib/api-client";
 import { LlmBadge, focusRing, useLoader } from "@/components/ui/ui";
@@ -8,6 +9,8 @@ export interface HighlightQuote {
   reviewId: string;
   start: number;
   end: number;
+  /** Alıntıyı açan düğmenin id'si; yorumdan geri dönüş için (focusHighlightTrigger). */
+  triggerId?: string;
 }
 
 interface Claim extends HighlightQuote {
@@ -37,6 +40,20 @@ const SENTIMENT_CLASS: Record<Cluster["sentiment"], string> = {
   negative: "bg-red-100 text-red-900",
 };
 
+/** Hareket azaltma tercihinde (WCAG 2.3.3) animasyonlu kaydırma yapılmaz. */
+function scrollBehavior(): ScrollBehavior {
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+}
+
+/** Vurgulanan yorumdan, alıntıyı açan düğmeye döner (kaydırır ve odaklar). */
+export function focusHighlightTrigger(triggerId: string): boolean {
+  const el = document.getElementById(triggerId);
+  if (!el) return false;
+  el.scrollIntoView({ behavior: scrollBehavior(), block: "center" });
+  el.focus({ preventScroll: true });
+  return true;
+}
+
 /**
  * v4 P1-9: yorum temaları (AI üretimi, `ai_generated` rozeti). Her iddianın alıntısı
  * kaynak yorumdan birebir; tıklanınca ilgili yoruma kaydırılır ve alıntı vurgulanır.
@@ -50,6 +67,7 @@ export default function ReviewHighlights({
 }) {
   const t = useTranslations("reviews.highlights");
   const locale = useLocale();
+  const idBase = useId();
   const res = useLoader(
     () =>
       apiFetch<HighlightsResponse>(
@@ -58,11 +76,11 @@ export default function ReviewHighlights({
     [propertyId, locale]
   );
 
-  function jump(claim: Claim) {
-    onQuote({ reviewId: claim.reviewId, start: claim.start, end: claim.end });
+  function jump(claim: Claim, triggerId: string) {
+    onQuote({ reviewId: claim.reviewId, start: claim.start, end: claim.end, triggerId });
     const el = document.getElementById(`review-${claim.reviewId}`);
     if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.scrollIntoView({ behavior: scrollBehavior(), block: "center" });
       el.focus({ preventScroll: true });
     }
   }
@@ -95,19 +113,27 @@ export default function ReviewHighlights({
             </div>
             <p className="mt-1 text-xs text-gray-700">{t("mentions", { count: c.mentionCount })}</p>
             <ul className="mt-2 space-y-2">
-              {c.claims.map((claim, i) => (
-                <li key={`${claim.reviewId}-${i}`}>
-                  {claim.text !== claim.quote && <p>{claim.text}</p>}
-                  <button
-                    type="button"
-                    onClick={() => jump(claim)}
-                    title={t("quoteLabel")}
-                    className={`mt-1 block w-full border-l-4 border-indigo-400 pl-2 text-left italic text-gray-800 hover:bg-indigo-50 ${focusRing}`}
-                  >
-                    <span className="sr-only">{t("quoteLabel")}: </span>“{claim.quote}”
-                  </button>
-                </li>
-              ))}
+              {c.claims.map((claim, i) => {
+                const triggerId = `${idBase}-quote-${c.id}-${i}`;
+                return (
+                  <li key={`${claim.reviewId}-${i}`}>
+                    {claim.text !== claim.quote && <p>{claim.text}</p>}
+                    <button
+                      id={triggerId}
+                      type="button"
+                      onClick={() => jump(claim, triggerId)}
+                      className={`mt-1 block w-full border-l-4 border-indigo-400 pl-2 text-left text-gray-800 hover:bg-indigo-50 ${focusRing}`}
+                    >
+                      <span className="italic">“{claim.quote}”</span>
+                      {/* Görünür eylem metni: alıntı bloğu gibi görünen düğmenin ipucu. */}
+                      <span className="mt-1 flex items-center gap-1 text-sm font-medium underline">
+                        {t("quoteLabel")}
+                        <span aria-hidden="true">↓</span>
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
           </li>
         ))}

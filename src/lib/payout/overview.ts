@@ -128,6 +128,7 @@ export async function getHostPayoutOverview(userId: string) {
     policy: {
       releaseHours: cfg.PAYOUT_RELEASE_HOURS,
       commissionBps: cfg.PLATFORM_COMMISSION_BPS,
+      reserveBps: cfg.PAYOUT_RESERVE_BPS,
       reserveReleaseDays: cfg.RESERVE_RELEASE_DAYS,
       identityRequired: cfg.PAYOUT_REQUIRE_IDENTITY_VERIFIED,
     },

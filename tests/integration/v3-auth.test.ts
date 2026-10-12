@@ -120,9 +120,10 @@ describeInt("v3 auth sertleştirme (integration)", () => {
     expect(
       (await prisma.user.findUniqueOrThrow({ where: { id: user.id } })).emailVerifiedAt
     ).not.toBeNull();
-    expect(
-      (await verifyEmailRoute(post("/api/auth/verify-email", { token }), undefined)).status
-    ).toBe(400);
+    // Aynı bağlantı ikinci kez açılınca hata değil "zaten doğrulandı" yanıtı döner.
+    const again = await verifyEmailRoute(post("/api/auth/verify-email", { token }), undefined);
+    expect(again.status).toBe(200);
+    expect((await again.json()).alreadyVerified).toBe(true);
   });
 
   it("şifre sıfırlama: her durumda 202; sıfırlama tüm oturumları kapatır", async () => {

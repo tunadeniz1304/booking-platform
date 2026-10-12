@@ -1,16 +1,27 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useTranslations } from "next-intl";
+import { useRouter } from "next/navigation";
+import { useLocale, useTranslations } from "next-intl";
+import { focusRing } from "@/components/ui/ui";
+import { propertyHref } from "@/components/property/PropertyCard";
+import { draftDates, useSearchDraft } from "@/components/search/useSearchDraft";
+import { localizeCountryName, placeCityKey } from "@/lib/i18n/place-display-names";
+import { POPULAR_DESTINATIONS } from "@/lib/popular-destinations";
+import { normalizePlace } from "@/lib/search/normalize-place";
 
 /**
  * "Nereye?" alanı için otomatik tamamlama. Gerçek lokasyon verisini
  * /api/locations?q= ucu üzerinden çeker (şehir + ülke). Boş sorguda
- * popüler destinasyonlar gösterilir.
+ * popüler destinasyonlar, tek harflik sorguda bu harfle başlayan popüler
+ * destinasyonlar gösterilir (sunucu çağrılmaz). Değer veritabanındaki adla
+ * gönderilir; ekranda şehir/ülke adı arayüz diline çevrilir. Başlığı sorguyla eşleşen
+ * tesisler ayrı bir "Tesisler" grubunda gösterilir; seçilince doğrudan ilan sayfası açılır.
  *
  * WAI-ARIA "combobox + listbox popup" deseni: odak her zaman input'ta kalır,
  * ok tuşları aria-activedescendant ile öneriler arasında gezinir, Enter
  * etkin öneriyi seçer, Escape listeyi kapatır (ikinci Escape değeri temizler).
+ * Öneri yoksa ya da yüklenemezse "“…” için ara" seçeneği formu gönderir.
  */
 
 interface LocationOption {
@@ -18,19 +29,32 @@ interface LocationOption {
   country: string;
 }
 
-const POPULAR_FALLBACK: LocationOption[] = [
-  { city: "İstanbul", country: "Türkiye" },
-  { city: "Antalya", country: "Türkiye" },
-  { city: "Bodrum", country: "Türkiye" },
-  { city: "Kapadokya", country: "Türkiye" },
-  { city: "Paris", country: "Fransa" },
-  { city: "Roma", country: "İtalya" },
-  { city: "Barselona", country: "İspanya" },
-  { city: "Dubai", country: "BAE" },
-];
+/** `/api/locations?include=properties` yanıtındaki ilan öğesi (şehir öğelerinde `type` yoktur). */
+interface PropertyOption {
+  type: "property";
+  id: string;
+  title: string;
+  city: string;
+  country: string;
+}
+
+const isPropertyOption = (r: LocationOption | PropertyOption): r is PropertyOption =>
+  "type" in r && r.type === "property";
+
+/** Sunucu yanıtı ve ait olduğu sorgu; `items: null` = istek başarısız. */
+interface RemoteResult {
+  query: string;
+  items: LocationOption[] | null;
+  properties: PropertyOption[];
+}
+
+/** Sunucu araması bu uzunluktan itibaren yapılır. */
+const MIN_REMOTE_QUERY = 2;
+const MAX_OPTIONS = 8;
 
 const LISTBOX_ID = "destination-listbox";
 const HEADING_ID = "destination-listbox-heading";
+const PROPERTY_HEADING_ID = "destination-listbox-properties";
 const OPTION_ID_PREFIX = "destination-opt-";
 
 interface DestinationAutocompleteProps {
@@ -40,13 +64,19 @@ interface DestinationAutocompleteProps {
 
 export default function DestinationAutocomplete({ value, onChange }: DestinationAutocompleteProps) {
   const t = useTranslations("search");
-  const [options, setOptions] = useState<LocationOption[]>([]);
+  const tHome = useTranslations("home");
+  const locale = useLocale();
+  const router = useRouter();
+  const draft = useSearchDraft();
+  const [remote, setRemote] = useState<RemoteResult | null>(null);
   const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
   // Klavyeyle vurgulanan öneri (aria-activedescendant); -1 = yok.
   const [activeIndex, setActiveIndex] = useState(-1);
   const rootRef = useRef<HTMLDivElement>(null);
-  const abortRef = useRef<AbortController | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const query = value.trim();
+  const remoteQuery = query.length >= MIN_REMOTE_QUERY;
 
   useEffect(() => {
     // Dış tıklamada kapat
@@ -60,61 +90,36 @@ export default function DestinationAutocomplete({ value, onChange }: Destination
   }, []);
 
   useEffect(() => {
-    abortRef.current?.abort();
+    if (!open || !remoteQuery) return;
     const controller = new AbortController();
-    abortRef.current = controller;
-
-    const query = value.trim();
-    if (!open) return;
-
-    const updateOptions = (next: LocationOption[]) => {
-      setOptions(next);
-      setActiveIndex(-1);
-    };
-
-    let cancelled = false;
     // 250 ms debounce
     const timer = setTimeout(async () => {
+      let items: LocationOption[] | null = null;
+      let properties: PropertyOption[] = [];
       try {
-        if (query.length === 0) {
-          setLoading(false);
-          updateOptions(POPULAR_FALLBACK);
-          return;
+        const url = `/api/locations?q=${encodeURIComponent(query)}&include=properties`;
+        const res = await fetch(url, { signal: controller.signal });
+        if (res.ok) {
+          const data: unknown = await res.json();
+          if (Array.isArray(data)) {
+            const rows = data as Array<LocationOption | PropertyOption>;
+            items = rows.filter((r) => !isPropertyOption(r));
+            properties = rows.filter(isPropertyOption);
+          }
         }
-        setLoading(true);
-        const res = await fetch(`/api/locations?q=${encodeURIComponent(query)}`, {
-          signal: controller.signal,
-        });
-        if (cancelled) return;
-        if (!res.ok) {
-          // Önceki sorgunun önerileri güncelmiş gibi ekranda kalmasın.
-          updateOptions([]);
-          return;
-        }
-        const data = (await res.json()) as LocationOption[];
-        updateOptions(
-          data.length > 0
-            ? data.slice(0, 8)
-            : POPULAR_FALLBACK.filter(
-                (p) =>
-                  p.city.toLowerCase().includes(query.toLowerCase()) ||
-                  p.country.toLowerCase().includes(query.toLowerCase())
-              )
-        );
       } catch (err) {
         if ((err as Error).name === "AbortError") return;
-        updateOptions([]);
-      } finally {
-        if (!cancelled) setLoading(false);
       }
+      if (controller.signal.aborted) return;
+      setRemote({ query, items, properties });
+      setActiveIndex(-1);
     }, 250);
 
     return () => {
-      cancelled = true;
       clearTimeout(timer);
       controller.abort();
     };
-  }, [value, open]);
+  }, [query, open, remoteQuery]);
 
   // Etkin öneriyi kaydırılabilir listede görünür tut.
   useEffect(() => {
@@ -124,6 +129,58 @@ export default function DestinationAutocomplete({ value, onChange }: Destination
       ?.scrollIntoView?.({ block: "nearest" });
   }, [activeIndex]);
 
+  const cityName = (city: string) => {
+    const key = placeCityKey(city);
+    return key ? tHome(`places.${key}`) : city;
+  };
+  const countryName = (country: string) => localizeCountryName(country, locale);
+
+  // Yerel eşleştirme: veritabanı adı, çevrilmiş şehir adı ya da ülke adı; aksan ve İ/ı duyarsız.
+  const needle = normalizePlace(query);
+  const placeNames = (p: LocationOption) => [p.city, cityName(p.city), countryName(p.country)];
+  const popularMatching = (match: (name: string) => boolean) =>
+    POPULAR_DESTINATIONS.filter((p) => placeNames(p).some((n) => match(normalizePlace(n))));
+
+  // Yanıt yazılan sorguya ait değilse eski öneriler gösterilmez; "Aranıyor…" görünür.
+  const pending = remoteQuery && remote?.query !== query;
+  const loading = open && pending;
+  const failed = remoteQuery && !pending && remote?.items === null;
+
+  let items: readonly LocationOption[];
+  if (query.length === 0) {
+    items = POPULAR_DESTINATIONS;
+  } else if (!remoteQuery) {
+    items = popularMatching((name) => name.startsWith(needle));
+  } else if (pending) {
+    items = [];
+  } else {
+    // Sunucu sonuçları önce; "Rome", "Cesme" gibi yazımlar için popüler eşleşmeler eklenir.
+    const seen = new Set<string>();
+    const merged: LocationOption[] = [];
+    for (const o of [...(remote?.items ?? []), ...popularMatching((n) => n.includes(needle))]) {
+      const key = `${o.city}\u0000${o.country}`;
+      if (seen.has(key) || merged.length >= MAX_OPTIONS) continue;
+      seen.add(key);
+      merged.push(o);
+    }
+    items = merged;
+  }
+  // Tesis eşleşmeleri şehirlerden sonra, kendi grubunda.
+  const properties: readonly PropertyOption[] =
+    remoteQuery && !pending ? (remote?.properties ?? []) : [];
+  const suggestionCount = items.length + properties.length;
+
+  // Öneri yoksa (ya da yüklenemediyse) yazılan metinle arama seçeneği sunulur.
+  const searchOption = query.length > 0 && !pending && suggestionCount === 0;
+  const optionCount = suggestionCount + (searchOption ? 1 : 0);
+  const showList = open && optionCount > 0;
+
+  const changeValue = (next: string) => {
+    onChange(next);
+    setOpen(true);
+    setActiveIndex(-1);
+  };
+
   // Odak input'ta kalır (öneriye tıklarken mousedown engellenir), böylece
   // seçimden sonra klavye kullanıcısı formdaki yerini kaybetmez.
   const selectOption = (opt: LocationOption) => {
@@ -132,7 +189,38 @@ export default function DestinationAutocomplete({ value, onChange }: Destination
     setActiveIndex(-1);
   };
 
-  const showList = open && options.length > 0;
+  // Tesis seçilince arama formundaki tarih ve kişi sayısı ilan sayfasına taşınır.
+  const selectProperty = (opt: PropertyOption) => {
+    setOpen(false);
+    setActiveIndex(-1);
+    const dates = draftDates(draft);
+    router.push(
+      propertyHref(
+        opt.id,
+        draft
+          ? {
+              checkIn: dates?.checkIn ?? null,
+              checkOut: dates?.checkOut ?? null,
+              guests: draft.adults + draft.children,
+              adults: draft.adults,
+              children: draft.children,
+            }
+          : undefined
+      )
+    );
+  };
+
+  const submitQuery = () => {
+    setOpen(false);
+    setActiveIndex(-1);
+    inputRef.current?.form?.requestSubmit();
+  };
+
+  const choose = (idx: number) => {
+    if (idx < items.length) selectOption(items[idx]);
+    else if (idx < suggestionCount) selectProperty(properties[idx - items.length]);
+    else if (searchOption) submitQuery();
+  };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     switch (e.key) {
@@ -143,19 +231,19 @@ export default function DestinationAutocomplete({ value, onChange }: Destination
           setOpen(true);
           return;
         }
-        if (options.length === 0) return;
+        if (optionCount === 0) return;
         const step = e.key === "ArrowDown" ? 1 : -1;
         setActiveIndex((i) => {
-          if (i < 0) return step === 1 ? 0 : options.length - 1;
-          return (i + step + options.length) % options.length;
+          if (i < 0) return step === 1 ? 0 : optionCount - 1;
+          return (i + step + optionCount) % optionCount;
         });
         return;
       }
       case "Enter":
         // Etkin öneri yoksa form normal şekilde gönderilir.
-        if (showList && activeIndex >= 0 && options[activeIndex]) {
+        if (showList && activeIndex >= 0 && activeIndex < optionCount) {
           e.preventDefault();
-          selectOption(options[activeIndex]);
+          choose(activeIndex);
         }
         return;
       case "Escape":
@@ -174,21 +262,29 @@ export default function DestinationAutocomplete({ value, onChange }: Destination
     }
   };
 
-  const heading =
-    value.trim().length === 0
+  const heading = loading
+    ? t("autocomplete.searching")
+    : !remoteQuery && items.length > 0
       ? t("autocomplete.popular")
-      : loading
-        ? t("autocomplete.searching")
-        : t("autocomplete.suggestions");
+      : t("autocomplete.suggestions");
 
-  // Ekran okuyucu duyurusu: yükleniyor / öneri sayısı / sonuç yok.
+  const emptyText = failed
+    ? t("autocomplete.error")
+    : query.length > 0 && !pending && suggestionCount === 0
+      ? t("autocomplete.noResults")
+      : "";
+
+  // Ekran okuyucu duyurusu: yükleniyor / hata / öneri sayısı / sonuç yok.
   const statusText = !open
     ? ""
     : loading
       ? t("autocomplete.searching")
-      : options.length > 0
-        ? t("autocomplete.count", { count: options.length })
-        : t("autocomplete.noResults");
+      : emptyText || t("autocomplete.count", { count: suggestionCount });
+
+  const optionClass = (idx: number) =>
+    `flex w-full cursor-pointer items-center gap-3 px-4 py-2.5 text-left text-sm text-gray-800 transition hover:bg-blue-50 ${
+      idx === activeIndex ? "bg-blue-50" : ""
+    }`;
 
   return (
     <div
@@ -220,6 +316,7 @@ export default function DestinationAutocomplete({ value, onChange }: Destination
           />
         </svg>
         <input
+          ref={inputRef}
           id="destination"
           type="text"
           role="combobox"
@@ -227,20 +324,49 @@ export default function DestinationAutocomplete({ value, onChange }: Destination
           aria-controls={showList ? LISTBOX_ID : undefined}
           aria-autocomplete="list"
           aria-activedescendant={
-            showList && activeIndex >= 0 ? `${OPTION_ID_PREFIX}${activeIndex}` : undefined
+            showList && activeIndex >= 0 && activeIndex < optionCount
+              ? `${OPTION_ID_PREFIX}${activeIndex}`
+              : undefined
           }
           autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="words"
+          spellCheck={false}
+          enterKeyHint="search"
           value={value}
-          onChange={(e) => {
-            onChange(e.target.value);
-            setOpen(true);
-            setActiveIndex(-1);
-          }}
+          onChange={(e) => changeValue(e.target.value)}
           onFocus={() => setOpen(true)}
           onKeyDown={handleKeyDown}
           placeholder={t("autocomplete.placeholder")}
-          className="w-full rounded-sm border border-gray-500 bg-white py-2.5 pl-10 pr-3 text-sm text-gray-900 placeholder-gray-500 focus:border-[#003580] focus:outline-none focus:ring-1 focus:ring-[#003580]"
+          className="w-full rounded-sm border border-gray-500 bg-white py-2.5 pl-10 pr-10 text-base text-gray-900 placeholder-gray-500 focus:border-[#003580] focus:outline-none focus:ring-1 focus:ring-[#003580] sm:text-sm"
         />
+        {value && (
+          <button
+            type="button"
+            aria-label={t("autocomplete.clear")}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => {
+              changeValue("");
+              inputRef.current?.focus();
+            }}
+            className={`absolute right-1 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-sm text-gray-500 hover:text-gray-800 ${focusRing}`}
+          >
+            <svg
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
+        )}
       </div>
 
       <p role="status" className="sr-only">
@@ -255,15 +381,15 @@ export default function DestinationAutocomplete({ value, onChange }: Destination
           >
             {heading}
           </p>
-          {options.length === 0 && !loading && (
-            // Görsel boş durum; ekran okuyucuya role=status bölgesi duyurur.
+          {emptyText && (
+            // Görsel boş/hata durumu; ekran okuyucuya role=status bölgesi duyurur.
             <p className="px-4 py-3 text-sm text-gray-500" aria-hidden="true">
-              {t("autocomplete.noResults")}
+              {emptyText}
             </p>
           )}
-          {options.length > 0 && (
+          {showList && (
             <ul id={LISTBOX_ID} role="listbox" aria-labelledby={HEADING_ID}>
-              {options.map((opt, idx) => (
+              {items.map((opt, idx) => (
                 <li
                   key={`${opt.city}-${opt.country}-${idx}`}
                   id={`${OPTION_ID_PREFIX}${idx}`}
@@ -272,9 +398,7 @@ export default function DestinationAutocomplete({ value, onChange }: Destination
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => selectOption(opt)}
                   onMouseEnter={() => setActiveIndex(idx)}
-                  className={`flex w-full cursor-pointer items-center gap-3 px-4 py-2.5 text-left text-sm text-gray-800 transition hover:bg-blue-50 ${
-                    idx === activeIndex ? "bg-blue-50" : ""
-                  }`}
+                  className={optionClass(idx)}
                 >
                   <svg
                     className="h-4 w-4 shrink-0 text-gray-400"
@@ -296,10 +420,82 @@ export default function DestinationAutocomplete({ value, onChange }: Destination
                       d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
                     />
                   </svg>
-                  <span className="font-medium">{opt.city}</span>
-                  <span className="text-gray-500">{opt.country}</span>
+                  <span className="font-medium">{cityName(opt.city)}</span>
+                  <span className="text-gray-500">{countryName(opt.country)}</span>
                 </li>
               ))}
+              {properties.length > 0 && (
+                <li role="presentation">
+                  <ul role="group" aria-labelledby={PROPERTY_HEADING_ID}>
+                    <li
+                      role="presentation"
+                      id={PROPERTY_HEADING_ID}
+                      className="px-4 pb-1 pt-3 text-xs font-semibold uppercase tracking-wide text-gray-600"
+                    >
+                      {t("autocomplete.properties")}
+                    </li>
+                    {properties.map((opt, i) => {
+                      const idx = items.length + i;
+                      return (
+                        <li
+                          key={opt.id}
+                          id={`${OPTION_ID_PREFIX}${idx}`}
+                          role="option"
+                          aria-selected={idx === activeIndex}
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => selectProperty(opt)}
+                          onMouseEnter={() => setActiveIndex(idx)}
+                          className={optionClass(idx)}
+                        >
+                          <svg
+                            className="h-4 w-4 shrink-0 text-gray-400"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                            aria-hidden="true"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
+                            />
+                          </svg>
+                          <span className="font-medium">{opt.title}</span>
+                          <span className="text-gray-500">{cityName(opt.city)}</span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </li>
+              )}
+              {searchOption && (
+                <li
+                  id={`${OPTION_ID_PREFIX}${suggestionCount}`}
+                  role="option"
+                  aria-selected={activeIndex === suggestionCount}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={submitQuery}
+                  onMouseEnter={() => setActiveIndex(suggestionCount)}
+                  className={optionClass(suggestionCount)}
+                >
+                  <svg
+                    className="h-4 w-4 shrink-0 text-gray-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z"
+                    />
+                  </svg>
+                  <span className="font-medium">{t("autocomplete.searchFor", { query })}</span>
+                </li>
+              )}
             </ul>
           )}
         </div>

@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "KVKK Privacy Notice (demo) — booking-platform",
+    "title": "KVKK Privacy Notice (demo)",
     "description": "Demo privacy notice on the processing of personal data."
   },
   "notice": {
@@ -8,7 +8,8 @@
     "disclaimer": "This text is for a portfolio/demo project and <strong>is not legal advice</strong>. For a real service it must be prepared by a legal professional.",
     "controller": {
       "title": "1. Data controller",
-      "body": "Under Personal Data Protection Law No. 6698 (\"KVKK\"), the data controller is the operator of this demo platform. No real payments are taken in the demo environment, and no real personal data should be entered."
+      "body": "Under Personal Data Protection Law No. 6698 (\"KVKK\"), the data controller is the operator of this demo platform. No real payments are taken in the demo environment, and no real personal data should be entered.",
+      "contact": "How to apply: after signing in, you can send requests such as information requests, rectification or objection directly to our human support team on the <link>Support</link> page using \"Talk to a human\"."
     },
     "data": {
       "title": "2. Personal data processed",
@@ -19,15 +20,15 @@
     },
     "purpose": {
       "title": "3. Purposes of processing and legal grounds",
-      "body": "Data is processed on the legal grounds of establishing and performing the booking contract (KVKK Art. 5/2-c), fulfilling legal obligations (Art. 5/2-ç), legitimate interest in ensuring service security and preventing fraud (Art. 5/2-f), and, for analytics cookies, your explicit consent (Art. 5/1)."
+      "body": "We process your data to create and carry out your booking (performance of a contract, KVKK Art. 5/2-c), to meet our legal obligations (Art. 5/2-ç) and to keep the service secure and prevent fraud (legitimate interest, Art. 5/2-f). We use analytics cookies only if you consent (explicit consent, Art. 5/1)."
     },
     "transfer": {
       "title": "4. Transfers",
-      "body": "Data may be transferred only to the extent required by the service to the accommodation property (booking details), to the payment service provider and to legally authorized authorities. If AI features are running in live mode, prompt content is sent to the model provider in a form that does not contain personal data."
+      "body": "Data may be transferred only to the extent required by the service to the host of the place you stay (booking details), to the payment service provider and to legally authorized authorities. If AI features are running in live mode, prompt content is sent to the model provider in a form that does not contain personal data."
     },
     "retention": {
       "title": "5. Retention period",
-      "body": "When you delete your account, personal fields are deleted or replaced with a pseudonym. Booking and payment records are kept in anonymized form due to legal retention obligations."
+      "body": "When you delete your account, personal fields are deleted or replaced with a random value that does not identify you (a pseudonym). Booking and payment records are kept in anonymized form due to legal retention obligations."
     },
     "cookies": {
       "title": "6. Cookies",
@@ -36,25 +37,35 @@
     },
     "rights": {
       "title": "7. Your rights (KVKK Art. 11)",
-      "body": "You have the right to learn whether your data is processed, to request information, and to rectification, erasure and objection. To download your data or delete your account, you can use the <link>Privacy and my data</link> page."
+      "body": "You have the right to learn whether your data is processed, to request information, and to rectification, erasure and objection. To download your data or delete your account, you can use the <link>Privacy and my data</link> page.",
+      "requests": "To exercise your rights to information, rectification (for example, correcting your name or email address) and objection, you can write to our human support team on the <link>Support</link> page."
+    },
+    "lastUpdated": "Last updated: <time>{date}</time>",
+    "summary": {
+      "title": "In short",
+      "data": "We process your name, email address and booking details so you can book. We do not store your card number.",
+      "purpose": "We use this data only to handle your booking, meet our legal obligations and keep the service secure.",
+      "sharing": "We share your data only with the host of the place you stay, the payment provider and legally authorized authorities.",
+      "cookies": "We use analytics cookies only if you consent; you can change your choice on this page at any time.",
+      "rights": "You can download a copy of your data or delete your account at any time."
     }
   },
   "accountPage": {
     "title": "Privacy and my data",
-    "intro": "You can exercise your rights under KVKK Art. 11 here."
+    "intro": "Here you can download a copy of your data or delete your account (your rights under Article 11 of KVKK, Turkey's personal data protection law)."
   },
   "center": {
     "exportFileName": "my-data.json",
-    "exported": "Your data has been downloaded ({file}).",
-    "deleted": "Your account has been deleted. Redirecting you to the home page…",
+    "exported": "Your file is ready ({file}).",
+    "deleted": "Your account has been deleted",
     "exportTitle": "Download my data",
-    "exportBody": "Download a copy of the personal data associated with your account (profile, bookings, reviews, favorites) as JSON. The password hash is not exported.",
+    "exportBody": "Download a copy of the personal data associated with your account (profile, bookings, reviews, favorites) as a JSON file. JSON is a machine-readable text file that you can open in any text editor. Your password (including its encrypted form) is not included.",
     "exportButton": "Download my data",
     "deleteTitle": "Delete my account",
-    "deleteBody": "Your personal fields are deleted or replaced with a pseudonym. Booking and payment records are kept in anonymised form because of legal retention obligations. This cannot be undone.",
+    "deleteBody": "Your personal fields are deleted or replaced with a random value that does not identify you. Booking and payment records are kept in anonymized form because of legal retention obligations. This cannot be undone.",
     "deleteButton": "Delete my account",
     "confirmTitle": "Are you sure you want to permanently delete your account?",
-    "acknowledge": "I understand that my upcoming bookings will be cancelled under their cancellation terms, my wallet credit will be deleted and this cannot be undone.",
+    "acknowledge": "I understand that my upcoming bookings will be cancelled under their cancellation terms, my wallet balance will be deleted and this cannot be undone.",
     "deleting": "Deleting…",
     "confirmDelete": "Yes, delete my account",
     "cancel": "Cancel",
@@ -62,7 +73,7 @@
     "deleteEffects": {
       "title": "When you delete your account:",
       "bookings": "Your upcoming bookings are cancelled under the cancellation terms that applied when you booked. You may get no refund or only a partial refund.",
-      "wallet": "Credit and rewards in your wallet are deleted and cannot be used later.",
+      "wallet": "Your wallet balance and rewards are deleted and cannot be used later.",
       "transfers": "Booking transfer listings you have put up for sale are withdrawn.",
       "listings": "If you are a host, your listings are taken offline.",
       "obligations": "If, as a host, you have upcoming confirmed bookings, a pending payout or an open claim, you must resolve them first."
@@ -77,6 +88,15 @@
       "pendingPayoutsLink": "Go to my payouts",
       "openClaims": "{count, plural, one {You have # open claim.} other {You have # open claims.}}",
       "openClaimsLink": "Go to my claims"
-    }
+    },
+    "exporting": "Preparing…",
+    "exportFallback": "If the download did not start, download the file here",
+    "deletedBody": "You have been signed out. Your personal fields have been deleted or replaced with a pseudonym; booking and payment records are kept in anonymized form.",
+    "deletedBookings": "{count, plural, one {# upcoming booking was cancelled under its cancellation terms.} other {# upcoming bookings were cancelled under their cancellation terms.}}",
+    "deletedTransfers": "{count, plural, one {# booking transfer listing was withdrawn.} other {# booking transfer listings were withdrawn.}}",
+    "deletedHome": "Go to the home page",
+    "cookiesTitle": "Cookie preferences",
+    "cookiesBody": "Analytics cookies are used only if you give consent. You can change your choice or withdraw your consent at any time.",
+    "requestsTitle": "Other requests (information, rectification, objection)"
   }
 }

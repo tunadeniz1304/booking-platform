@@ -8,7 +8,7 @@
   "nightsUniform": "{price} × {count, plural, one {# night} other {# nights}}",
   "nightsVariable": "{count, plural, one {# night} other {# nights}} (nightly prices vary)",
   "includedTax": "{label}{rate} included: {amount}",
-  "rate": " ({rate}%)",
+  "rate": " ({rate})",
   "promotion": "{name}",
   "coupon": "Coupon {code}",
   "discountTotal": "Total discount",
@@ -20,7 +20,7 @@
   "couponRemove": "Remove",
   "couponStatus": {
     "APPLIED": "Coupon applied.",
-    "NOT_FOUND": "Coupon not found.",
+    "NOT_FOUND": "Coupon not found. Check the code and apply it again, or remove it.",
     "USAGE_LIMIT_REACHED": "This coupon has reached its usage limit.",
     "EXPIRED": "This coupon has expired.",
     "NOT_STARTED": "This coupon is not valid yet.",
@@ -31,5 +31,15 @@
     "VAT": "VAT",
     "ACCOMMODATION_TAX": "Accommodation tax",
     "SERVICE_FEE": "Service fee"
-  }
+  },
+  "couponAppliedCode": "Coupon {code} applied.",
+  "couponApplying": "Applying…",
+  "couponRemoveLabel": "Remove coupon {code}",
+  "couponEmpty": "Enter a coupon code.",
+  "couponUnapplied": "You haven't applied this coupon code. Select Apply or clear the field.",
+  "rateNet": " ({rate} of the price excluding {excluded})",
+  "priceDetails": "Price details",
+  "nightsShow": "Show nightly prices",
+  "validUntil": "This price is valid until {time}.",
+  "expired": "This price has expired; the current price is calculated when you continue."
 }

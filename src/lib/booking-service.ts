@@ -1,10 +1,10 @@
-import { Prisma, BookingStatus } from "@prisma/client";
+import { Prisma, BookingStatus, type PaymentStatus } from "@prisma/client";
 import { withMinorNumbers } from "@/lib/money/minor-json";
 import { prisma } from "@/lib/prisma";
 import { redis } from "@/lib/redis";
 import { invalidatePropertySearchCache } from "@/lib/search";
 import { createRedlock, LockError } from "@/lib/distributed-lock/redlock";
-import { releaseBookingCreditInTx } from "@/lib/wallet/wallet-service";
+import { activeCreditSpend, releaseBookingCreditInTx } from "@/lib/wallet/wallet-service";
 import { appendOutbox } from "@/lib/cqrs";
 import {
   EventTypes,
@@ -444,7 +444,10 @@ export async function reserveBookingInTx(
   });
   if (!room) throw new BookingNotFoundError("Oda veya mülk bulunamadı");
   if (input.guestCount > room.maxOccupancy * input.units) {
-    throw new BookingValidationError(`Bu oda en fazla ${room.maxOccupancy} kişiliktir`);
+    // quote.ts ile aynı kod/ayrıntı: istemci yerelleştirilmiş kapasite mesajını gösterir.
+    throw new HttpError(400, "OVER_CAPACITY", `Bu oda en fazla ${room.maxOccupancy} kişiliktir`, {
+      capacity: room.maxOccupancy,
+    });
   }
   if (!room.available || input.units > room.units) throw new SoldOutError();
   let plan;
@@ -478,7 +481,9 @@ export async function reserveBookingInTx(
     where: { roomTypeId: room.id, date: { gte: toDbDate(checkIn), lte: toDbDate(checkOut) } },
   });
   const violation = checkRestrictions({ checkIn, checkOut, nights }, restrictions);
-  if (violation) throw new RestrictionError(describeViolation(violation), violation.code);
+  if (violation) {
+    throw new RestrictionError(describeViolation(violation), violation.code, violation);
+  }
   const nightInputs = nightsFromInventory(rows, nights, currency, input.units);
   if (!nightInputs) throw new SoldOutError();
 
@@ -911,7 +916,64 @@ const bookingDetailSelect = {
 
 export type BookingDetail = Prisma.BookingGetPayload<{ select: typeof bookingDetailSelect }>;
 
-export async function getBooking(bookingId: string, userId: string): Promise<BookingDetail> {
+/**
+ * İptal edilmiş rezervasyonun iade özeti (F501): iptal sonucu sayfa yenilense de görünür.
+ * Kart (ödeme satırı, kümülatif) ve kredi (harcama) iadeleri toplanır; oran ödenen toplama
+ * göredir. NOT_CHARGED: ödeme alınmamıştı · PENDING: PSP iadesi yeniden deneniyor.
+ */
+export interface BookingRefundSummary {
+  refundMinor: number;
+  refundPercent: number;
+  currency: string;
+  status: "REFUNDED" | "PENDING" | "NONE" | "NOT_CHARGED";
+}
+
+const SETTLED_PAYMENT_STATUSES: readonly PaymentStatus[] = [
+  "PAID",
+  "PARTIALLY_REFUNDED",
+  "REFUNDED",
+];
+
+async function cancellationRefund(
+  booking: { id: string; status: BookingStatus; currency: string },
+  payment: {
+    amountMinor: bigint;
+    refundedAmountMinor: bigint;
+    status: PaymentStatus;
+    failureCode: string | null;
+  } | null
+): Promise<BookingRefundSummary | null> {
+  if (booking.status !== BookingStatus.CANCELLED) return null;
+  const spend = await activeCreditSpend(prisma, booking.id);
+  const credit = spend?.status === "SPENT" ? spend : null;
+  const card = payment && SETTLED_PAYMENT_STATUSES.includes(payment.status) ? payment : null;
+  const paidMinor =
+    (card ? minorFromDb(card.amountMinor) : 0) + (credit ? minorFromDb(credit.amountMinor) : 0);
+  const refundMinor =
+    (card ? minorFromDb(card.refundedAmountMinor) : 0) +
+    (credit ? minorFromDb(credit.refundedMinor) : 0);
+  // `REFUND_FAILED` (payment/refund.ts): PSP iadesi düştü, refund-retry kuyruğunda.
+  const status: BookingRefundSummary["status"] =
+    paidMinor === 0
+      ? "NOT_CHARGED"
+      : card?.failureCode === "REFUND_FAILED"
+        ? "PENDING"
+        : refundMinor > 0
+          ? "REFUNDED"
+          : "NONE";
+  return {
+    refundMinor,
+    refundPercent: paidMinor > 0 ? Math.min(100, Math.round((refundMinor * 100) / paidMinor)) : 0,
+    currency: booking.currency,
+    status,
+  };
+}
+
+/** Detay + iptal edilmişse iade özeti (`refund`; diğer durumlarda null). */
+export async function getBooking(
+  bookingId: string,
+  userId: string
+): Promise<BookingDetail & { refund: BookingRefundSummary | null }> {
   const cacheKey = bookingCacheKey(bookingId);
   try {
     const cached = await redis.get(cacheKey);
@@ -923,7 +985,7 @@ export async function getBooking(bookingId: string, userId: string): Promise<Boo
         delete (parsed as Record<string, unknown>)[field];
       if (parsed.id === bookingId && parsed.userId === userId) {
         const payment = await prisma.payment.findUnique({ where: { bookingId } });
-        return { ...parsed, payment };
+        return { ...parsed, payment, refund: await cancellationRefund(parsed, payment) };
       }
     }
   } catch (error) {
@@ -947,7 +1009,7 @@ export async function getBooking(bookingId: string, userId: string): Promise<Boo
       logger.warn(errorFields(error), "booking cache write failed");
     }
   }
-  return booking;
+  return { ...booking, refund: await cancellationRefund(booking, booking.payment) };
 }
 
 const bookingListSelect = {

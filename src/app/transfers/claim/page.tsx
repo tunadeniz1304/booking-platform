@@ -38,7 +38,7 @@ export default function ClaimPage() {
           })}
         </p>
       ) : (
-        <RoleGate>{() => <ClaimForm />}</RoleGate>
+        <RoleGate>{(user) => <ClaimForm emailVerified={user.emailVerified} />}</RoleGate>
       )}
     </PageShell>
   );

@@ -42,6 +42,9 @@ interface MyBooking {
   totalPriceMinor: number;
   currency: string;
   property: { title: string };
+  /** API dönerse sunucu kuralı esas alınır; yoksa istemci varsayılanları kullanılır. */
+  transferable?: boolean;
+  maxAskMinor?: number;
 }
 
 interface MyTransfer {
@@ -55,7 +58,26 @@ interface MyTransfer {
   booking: { checkIn: string; checkOut: string };
 }
 
+interface CreatedTransfer {
+  claimUrl: string;
+  askPriceMinor: number;
+  currency: string;
+  expiresAt: string;
+}
+
 const KNOWN_STATUSES = ["LISTED", "CLAIMED", "CAPTURE_PENDING", "COMPLETED", "CANCELLED", "FAILED"];
+
+/** Sunucu varsayılanı (TRANSFER_MIN_HOURS_BEFORE_CHECKIN); girişe daha az kala devir reddedilir. */
+const MIN_HOURS_BEFORE_CHECKIN = 48;
+
+const linkClass = `font-semibold text-[#003580] underline ${focusRing}`;
+/** Atlama menüsü bağlantıları: satır kutusu + dolgu ≥ 24 px (WCAG 2.5.8). */
+const jumpLinkClass = `inline-block py-0.5 ${linkClass}`;
+
+/** Sunucu varsayılanı TRANSFER_MAX_ASK_RATIO=1: satış fiyatı ödenen tutarı aşamaz. */
+function maxAskOf(b: MyBooking): number {
+  return b.maxAskMinor ?? b.totalPriceMinor;
+}
 
 function fractionDigits(currency: string): number {
   try {
@@ -76,8 +98,43 @@ export default function TransferMarket() {
 
   return (
     <div className="space-y-6">
+      {session.status === "ready" && (
+        <nav aria-label={t("jump.label")}>
+          <ul className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
+            <li>
+              <a href="#sell" className={jumpLinkClass}>
+                {t("sell.title")}
+              </a>
+            </li>
+            <li>
+              <a href="#discover" className={jumpLinkClass}>
+                {t("jump.discover")}
+              </a>
+            </li>
+            {session.user && (
+              <li>
+                <a href="#my-transfers" className={jumpLinkClass}>
+                  {t("mine.title")}
+                </a>
+              </li>
+            )}
+          </ul>
+        </nav>
+      )}
+
       <Card title={t("discover.title")} id="discover">
         <p className="mb-3 text-sm text-gray-700">{t("discover.intro")}</p>
+        <details className="mb-3 text-sm text-gray-800">
+          <summary className={`cursor-pointer font-semibold text-gray-900 ${focusRing}`}>
+            {t("discover.how.title")}
+          </summary>
+          <ol className="mt-2 list-decimal space-y-1 pl-5">
+            <li>{t("discover.how.step1")}</li>
+            <li>{t("discover.how.step2")}</li>
+            <li>{t("discover.how.step3")}</li>
+            <li>{t("discover.how.step4")}</li>
+          </ol>
+        </details>
         <Status error={error} />
         {data === null && !error && (
           <p className="text-sm text-gray-600">{t("discover.loading")}</p>
@@ -87,23 +144,19 @@ export default function TransferMarket() {
           <ul className="space-y-2">
             {data.map((item) => (
               <li key={item.id} className="rounded-md border p-3 text-sm text-gray-900">
-                <Link
-                  href={`/property/${item.property.id}`}
-                  className={`font-semibold text-[#003580] underline ${focusRing}`}
-                >
-                  {item.property.title}
-                </Link>{" "}
-                · {item.property.city} · {f.date(item.checkIn)} – {f.date(item.checkOut)} ·{" "}
+                <strong>{item.property.title}</strong> · {item.property.city} ·{" "}
+                {f.date(item.checkIn)} – {f.date(item.checkOut)} ·{" "}
                 {t("discover.guests", { count: item.guestCount })}
                 <span className="block">
                   {t.rich("discover.terms", {
                     ask: f.money(item.askPriceMinor, item.currency),
                     original: f.money(item.originalPriceMinor, item.currency),
                     seller: item.seller,
-                    expires: f.date(item.expiresAt),
+                    expires: f.dateTime(item.expiresAt),
                     b: (chunks) => <strong>{chunks}</strong>,
                   })}
                 </span>
+                <span className="mt-1 block text-xs text-gray-600">{t("discover.itemNote")}</span>
               </li>
             ))}
           </ul>
@@ -111,15 +164,12 @@ export default function TransferMarket() {
       </Card>
 
       {session.status === "ready" && session.user ? (
-        <SellPanel userId={session.user.id} />
+        <SellPanel userId={session.user.id} emailVerified={session.user.emailVerified} />
       ) : session.status === "ready" ? (
-        <p className="text-sm text-gray-800">
+        <p id="sell" className="text-sm text-gray-800">
           {t.rich("loginToSell", {
             link: (chunks) => (
-              <Link
-                href={loginHref("/transfers")}
-                className={`font-semibold text-[#003580] underline ${focusRing}`}
-              >
+              <Link href={loginHref("/transfers")} className={linkClass}>
                 {chunks}
               </Link>
             ),
@@ -130,24 +180,33 @@ export default function TransferMarket() {
   );
 }
 
-function SellPanel({ userId }: { userId: string }) {
+function SellPanel({ userId, emailVerified }: { userId: string; emailVerified?: boolean }) {
   const t = useTranslations("transfers");
   const f = useFormat();
   const errorText = useErrorText();
   const { confirm, confirmDialog } = useConfirm();
   const { data, error } = useLoader(() => apiFetch<MyBooking[]>("/api/bookings"));
   const transfers = useLoader(() => apiFetch<MyTransfer[]>("/api/transfers"));
-  const confirmed = (data ?? []).filter((b) => b.status === "CONFIRMED");
   const [bookingId, setBookingId] = useState("");
   const [ask, setAsk] = useState("");
   const [askError, setAskError] = useState<string | null>(null);
   const [claimUrl, setClaimUrl] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ error?: string; message?: string }>({});
-  const [needsVerify, setNeedsVerify] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const [needsVerify, setNeedsVerify] = useState(emailVerified === false);
+  const [sent, setSent] = useState<"copied" | "shared" | null>(null);
+  const [shareText, setShareText] = useState("");
+  const [canShare, setCanShare] = useState(false);
   const [busy, setBusy] = useState(false);
   const [withdrawing, setWithdrawing] = useState<string | null>(null);
   const [now] = useState(() => Date.now());
+
+  // Geçmiş girişler listelenmez; girişe 48 saatten az kalanlar seçilemez (sunucu TOO_LATE).
+  const upcoming = (data ?? []).filter(
+    (b) => b.status === "CONFIRMED" && new Date(b.checkIn).getTime() > now
+  );
+  const canTransfer = (b: MyBooking) =>
+    b.transferable ?? new Date(b.checkIn).getTime() - now > MIN_HOURS_BEFORE_CHECKIN * 3_600_000;
+  const transferable = upcoming.filter(canTransfer);
 
   const mine = (transfers.data ?? []).filter((x) => x.sellerId === userId);
   const isActive = (x: MyTransfer) =>
@@ -155,19 +214,25 @@ function SellPanel({ userId }: { userId: string }) {
   const activeByBooking = new Map(mine.filter(isActive).map((x) => [x.bookingId, x]));
   const titleOf = (id: string) => (data ?? []).find((b) => b.id === id)?.property.title;
 
-  const selected = confirmed.find((b) => b.id === (bookingId || confirmed[0]?.id));
+  const selected = transferable.find((b) => b.id === bookingId) ?? transferable[0];
   const selectedListing = selected ? activeByBooking.get(selected.id) : undefined;
 
-  // Tek seferlik bağlantı kopyalanmadan sayfadan ayrılırken tarayıcı uyarısı.
+  // Paylaşım menüsü (Web Share) yalnız istemcide algılanır; sunucu çıktısıyla uyuşmazlık olmaz.
   useEffect(() => {
-    if (!claimUrl || copied) return;
+    const timer = setTimeout(() => setCanShare(typeof navigator.share === "function"), 0);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Tek seferlik bağlantı kopyalanmadan/paylaşılmadan sayfadan ayrılırken tarayıcı uyarısı.
+  useEffect(() => {
+    if (!claimUrl || sent) return;
     const warn = (e: BeforeUnloadEvent) => {
       e.preventDefault();
       e.returnValue = "";
     };
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
-  }, [claimUrl, copied]);
+  }, [claimUrl, sent]);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -177,6 +242,12 @@ function SellPanel({ userId }: { userId: string }) {
     const askPriceMinor = parseAmountToMinor(ask, fractionDigits(selected.currency));
     if (askPriceMinor === null || askPriceMinor <= 0) {
       setAskError(t("sell.askInvalid"));
+      document.getElementById("sell-ask")?.focus();
+      return;
+    }
+    const maxAsk = maxAskOf(selected);
+    if (askPriceMinor > maxAsk) {
+      setAskError(t("sell.askTooHigh", { max: f.money(maxAsk, selected.currency) }));
       document.getElementById("sell-ask")?.focus();
       return;
     }
@@ -193,15 +264,24 @@ function SellPanel({ userId }: { userId: string }) {
       return;
     }
     setBusy(true);
-    setCopied(false);
+    setSent(null);
     try {
-      const res = await apiFetch<{ claimUrl: string; askPriceMinor: number; currency: string }>(
-        "/api/transfers",
-        { method: "POST", body: JSON.stringify({ bookingId: selected.id, askPriceMinor }) }
-      );
+      const res = await apiFetch<CreatedTransfer>("/api/transfers", {
+        method: "POST",
+        body: JSON.stringify({ bookingId: selected.id, askPriceMinor }),
+      });
       setClaimUrl(res.claimUrl);
+      setShareText(
+        t("sell.shareText", {
+          property: selected.property.title,
+          amount: f.money(res.askPriceMinor, res.currency),
+        })
+      );
       setFeedback({
-        message: t("sell.created", { amount: f.money(res.askPriceMinor, res.currency) }),
+        message: t("sell.created", {
+          amount: f.money(res.askPriceMinor, res.currency),
+          expires: f.dateTime(res.expiresAt),
+        }),
       });
       transfers.reload();
     } catch (err) {
@@ -216,15 +296,27 @@ function SellPanel({ userId }: { userId: string }) {
     if (!claimUrl) return;
     try {
       await navigator.clipboard.writeText(claimUrl);
-      setCopied(true);
+      setSent("copied");
     } catch {
       setFeedback({ error: t("sell.copyFailed") });
     }
   }
 
+  /** Telefonun paylaşım menüsü (WhatsApp, SMS…); kapatılırsa sessiz, hatada kopyalamaya düşer. */
+  async function share() {
+    if (!claimUrl) return;
+    try {
+      await navigator.share({ title: t("sell.shareTitle"), text: shareText, url: claimUrl });
+      setSent("shared");
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return;
+      await copy();
+    }
+  }
+
   async function closeLink() {
     if (
-      !copied &&
+      !sent &&
       !(await confirm({
         title: t("sell.closeTitle"),
         body: t("sell.closeBody"),
@@ -267,25 +359,33 @@ function SellPanel({ userId }: { userId: string }) {
     <>
       <Card title={t("sell.title")} id="sell">
         <Status error={error} />
-        {data && confirmed.length === 0 && (
-          <p className="text-sm text-gray-700">{t("sell.none")}</p>
+        {data === null && !error && (
+          <p className="text-sm text-gray-600">{t("discover.loading")}</p>
         )}
-        {confirmed.length > 0 && (
+        {data && transferable.length === 0 && (
+          <p className="text-sm text-gray-700">
+            {t("sell.none", { hours: MIN_HOURS_BEFORE_CHECKIN })}
+          </p>
+        )}
+        {selected && (
           <form onSubmit={submit} aria-busy={busy} className="grid gap-3 md:grid-cols-3">
             <Field label={t("sell.booking")} id="sell-booking">
               <select
                 id="sell-booking"
                 className={inputClass}
-                value={selected?.id ?? ""}
+                value={selected.id}
                 onChange={(e) => setBookingId(e.target.value)}
               >
-                {confirmed.map((b) => {
+                {upcoming.map((b) => {
+                  const allowed = canTransfer(b);
                   const listing = activeByBooking.get(b.id);
-                  const suffix = listing
-                    ? ` ${t("sell.listedSuffix", { date: f.date(listing.expiresAt) })}`
-                    : "";
+                  const suffix = !allowed
+                    ? ` ${t("sell.tooLateSuffix", { hours: MIN_HOURS_BEFORE_CHECKIN })}`
+                    : listing
+                      ? ` ${t("sell.listedSuffix", { date: f.date(listing.expiresAt) })}`
+                      : "";
                   return (
-                    <option key={b.id} value={b.id}>
+                    <option key={b.id} value={b.id} disabled={!allowed}>
                       {`${b.property.title} · ${f.date(b.checkIn)} · ${f.money(b.totalPriceMinor, b.currency)}${suffix}`}
                     </option>
                   );
@@ -293,9 +393,9 @@ function SellPanel({ userId }: { userId: string }) {
               </select>
             </Field>
             <Field
-              label={t("sell.askPrice", { currency: selected?.currency ?? "TRY" })}
+              label={t("sell.askPrice", { currency: selected.currency })}
               id="sell-ask"
-              hint={t("sell.askHint")}
+              hint={t("sell.askHint", { max: f.money(maxAskOf(selected), selected.currency) })}
               error={askError}
             >
               <input
@@ -309,7 +409,12 @@ function SellPanel({ userId }: { userId: string }) {
               />
             </Field>
             <div className="flex items-end">
-              <Button type="submit" disabled={busy} className="w-full">
+              <Button
+                type="submit"
+                disabled={busy}
+                className="w-full"
+                aria-describedby="sell-submit-note"
+              >
                 {busy
                   ? t("sell.submitting")
                   : selectedListing
@@ -317,6 +422,9 @@ function SellPanel({ userId }: { userId: string }) {
                     : t("sell.submit")}
               </Button>
             </div>
+            <p id="sell-submit-note" className="text-xs text-gray-600 md:col-span-3">
+              {t("sell.keepNote")}
+            </p>
           </form>
         )}
         <div className="mt-3">
@@ -338,6 +446,7 @@ function SellPanel({ userId }: { userId: string }) {
               onFocus={(e) => e.currentTarget.select()}
             />
             <div className="mt-2 flex flex-wrap items-center gap-3">
+              {canShare && <Button onClick={share}>{t("sell.share")}</Button>}
               <Button variant="secondary" onClick={copy}>
                 {t("sell.copy")}
               </Button>
@@ -345,7 +454,7 @@ function SellPanel({ userId }: { userId: string }) {
                 {t("sell.hide")}
               </Button>
               <span aria-live="polite" className="text-green-800">
-                {copied ? t("sell.copied") : ""}
+                {sent ? t(sent === "shared" ? "sell.shared" : "sell.copied") : ""}
               </span>
             </div>
           </div>

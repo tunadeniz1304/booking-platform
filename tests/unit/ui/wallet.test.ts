@@ -25,7 +25,10 @@ function render(locale: "tr" | "en", tier: number): string {
 describe("P1-7 seviye rozeti", () => {
   it("TR/EN seviye adları ve erişilebilir etiket", () => {
     expect(render("tr", 2)).toContain("Altın seviye");
-    expect(render("tr", 2)).toContain('aria-label="Sadakat seviyesi: Altın"');
+    expect(render("tr", 2)).toContain(
+      '<span class="sr-only">Sadakat programı: </span>Altın seviyesi'
+    );
+    expect(render("tr", 2)).not.toContain("aria-label");
     expect(render("en", 3)).toContain("Platinum tier");
   });
 

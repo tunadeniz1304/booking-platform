@@ -212,9 +212,13 @@ async function assertAttemptsLeft(cartId: string): Promise<void> {
   }
 }
 
-async function recordFailedAttempt(cartId: string): Promise<void> {
-  const { PAYMENT_ATTEMPTS_WINDOW_SECONDS } = getConfig();
-  await redis.incrWithTtl(attemptsKey(cartId), PAYMENT_ATTEMPTS_WINDOW_SECONDS).catch(() => 0);
+/** Başarısız denemeyi sayar; kalan hakkı döner (Redis yanıt vermezse null). */
+async function recordFailedAttempt(cartId: string): Promise<number | null> {
+  const { PAYMENT_ATTEMPTS_WINDOW_SECONDS, PAYMENT_MAX_ATTEMPTS } = getConfig();
+  const count = await redis
+    .incrWithTtl(attemptsKey(cartId), PAYMENT_ATTEMPTS_WINDOW_SECONDS)
+    .catch(() => null);
+  return count === null ? null : Math.max(0, PAYMENT_MAX_ATTEMPTS - count);
 }
 
 /** Sepet ödemesi / bölünmüş ödeme payları / süre sonu işi aynı kilitte sıralanır. */
@@ -238,9 +242,15 @@ async function failCart(cart: PayableCart, providerRef: string, code: string): P
     data: { status: PaymentStatus.FAILED, providerRef, failureCode: code },
   });
   cartPaymentsTotal.inc({ outcome: "declined" });
-  await recordFailedAttempt(cart.id);
+  const attemptsLeft = await recordFailedAttempt(cart.id);
   await releaseCartHolds(cart.id, CartStatus.OPEN, "payment_failed");
-  throw new PaymentDeclinedError(code);
+  const declined = new PaymentDeclinedError(code);
+  if (attemptsLeft === null) throw declined;
+  // Kalan deneme hakkı sepet sayfasında gösterilir (PAYMENT_ATTEMPTS_EXCEEDED kilidinden önce).
+  throw new HttpError(declined.status, declined.code, declined.message, {
+    declineCode: code,
+    attemptsLeft,
+  });
 }
 
 /** Sepet ödemesi: toplam tutar tek yetkilendirme → capture → tüm kalemler CONFIRMED. */

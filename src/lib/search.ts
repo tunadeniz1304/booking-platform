@@ -136,6 +136,9 @@ export interface SearchOptions {
   ranking?: RankingMode;
 }
 
+/** Skor ağırlık kümesi: sorgusuz, sorgulu (hibrit havuz) ya da LTR modeli. */
+export type SearchWeightsSet = "default" | "withQuery" | "ltr";
+
 export interface SearchResponse {
   results: SearchResult[];
   total: number;
@@ -147,6 +150,8 @@ export interface SearchResponse {
   semantic?: boolean;
   /** "Önerilen" sıralamada gerçekte kullanılan sıralayıcı. */
   ranking?: RankingMode;
+  /** "Önerilen" sıralamada kullanılan ağırlık kümesi ("Bu sıralama neden?" için). */
+  weightsSet?: SearchWeightsSet;
   /** P1-10: görsel arama durumu (açıksa veya `similarToPhotoId` istendiyse). */
   visual?: VisionStatus & { applied: boolean };
   /** P1-3: uygulanan esnek tarih penceresi (±gün); yalnız tarihli ve `flexDays` > 0 aramada. */
@@ -233,6 +238,8 @@ function structuralWhere(params: SearchParams, ids?: string[]): Prisma.PropertyW
   if (params.propertyType) {
     and.push({ propertyType: params.propertyType as Prisma.PropertyWhereInput["propertyType"] });
   }
+  // F1140: asgari misafir puanı (0–5).
+  if (params.minRating !== undefined) and.push({ ratingAvg: { gte: params.minRating } });
   // Seçilen TÜM olanaklar bulunmalı (v2'de "herhangi biri" yeterliydi).
   for (const name of params.amenities ?? []) and.push({ amenities: { some: { name } } });
   // P1-13(e): yalnız doğrulanmış erişilebilirlik özellikleri (AND, aynı oda tipinde).
@@ -258,6 +265,7 @@ async function loadCatalog(params: SearchParams, ids?: string[]): Promise<Catalo
     amenities: [...(params.amenities ?? [])].sort(),
     ...(params.accessibility?.length ? { a11y: [...params.accessibility].sort() } : {}),
     guests: params.guests ?? 0,
+    ...(params.minRating !== undefined ? { minRating: params.minRating } : {}),
     ids: ids ? [...ids].sort() : null,
   };
   const key = `search:cat2:v${await getVersion(CATALOG_VERSION_KEY)}:${hashKey(structural)}`;
@@ -594,6 +602,8 @@ export async function searchProperties(
       : displayAmount(baseMinor, e.currency, currency, fx);
     if (params.minPrice !== undefined && amount < params.minPrice) continue;
     if (params.maxPrice !== undefined && amount > params.maxPrice) continue;
+    // Katalog önbelleği puan güncellemesinden eski olabilir; filtre burada da uygulanır.
+    if (params.minRating !== undefined && e.ratingAvg < params.minRating) continue;
     results.push({
       id: e.id,
       title: e.title,
@@ -615,6 +625,7 @@ export async function searchProperties(
   // Sıralama tüm küme üzerinde (fiyat karşılaştırması tek para biriminde: görüntü birimi).
   let ordered: SearchResult[];
   let rankingMode: RankingMode | undefined;
+  let weightsSet: SearchWeightsSet | undefined;
   if (sort === "price_asc" || sort === "price_desc") {
     const dir = sort === "price_asc" ? 1 : -1;
     ordered = [...results].sort(
@@ -660,6 +671,7 @@ export async function searchProperties(
         ? await rankWithLtr(inputs, weights)
         : { items: rankResults(inputs, weights), mode: "weighted" as const };
     rankingMode = ranked.mode;
+    weightsSet = ranked.mode === "ltr" ? "ltr" : pool ? "withQuery" : "default";
     const byResult = new Map(results.map((r) => [r.id, r]));
     ordered = ranked.items.map((x) => ({
       ...byResult.get(x.id)!,
@@ -708,6 +720,7 @@ export async function searchProperties(
     cached: false,
     ...(pool ? { semantic: true } : {}),
     ...(rankingMode ? { ranking: rankingMode } : {}),
+    ...(weightsSet ? { weightsSet } : {}),
     ...(visual.enabled || params.similarToPhotoId
       ? { visual: { ...visual, applied: visual.enabled && Boolean(params.similarToPhotoId) } }
       : {}),

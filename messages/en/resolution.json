@@ -5,21 +5,38 @@
   "loading": "Loading…",
   "page": {
     "title": "Resolution center",
-    "intro": "Track, answer and add evidence to the refund and damage claims you opened from a booking page or that were raised against you. If you can't agree, the claim goes to an administrator."
+    "intro": "Track, answer and add evidence to the refund and damage claims you opened from a booking page or that were raised against you. When a claim is opened, the other party is given time to reply; an administrator then reviews the claim and decides. If no reply arrives in time, the claim goes straight to an administrator."
   },
   "detailPage": {
     "title": "Claim details",
-    "back": "Back to all claims"
+    "back": "Back to all claims",
+    "titleWithType": "Claim details: {type}",
+    "reference": "Claim ref: {ref}",
+    "viewBooking": "View booking"
   },
   "admin": {
     "pageTitle": "Damage and refund claims",
-    "pageIntro": "Review and decide claims the parties could not resolve. Chargebacks are handled by the payment provider.",
+    "pageIntro": "Review and decide claims that have been answered or whose reply deadline has passed. Chargebacks are handled by the payment provider.",
     "title": "Claims",
     "filter": "Filter by status",
     "all": "All",
     "select": "Show details",
     "selected": "Selected claim",
-    "close": "Close details"
+    "close": "Close details",
+    "empty": "There are no claims yet.",
+    "emptyFiltered": "No claims with the status “{status}”.",
+    "showAll": "Show all claims",
+    "selectHint": "Select a claim from the list to see its details and the decision form.",
+    "optionCount": "{label} ({count})",
+    "decideAsAdmin": "Decide as admin",
+    "selectedBadge": "Selected",
+    "goToDetail": "Go to details",
+    "search": {
+      "label": "Search by booking ID, claim ID or property name",
+      "hint": "Part of the ID (e.g. the last 8 characters) is enough.",
+      "resultCount": "Showing {shown} of {total, plural, one {# claim} other {# claims}}.",
+      "noMatch": "No claims match your search."
+    }
   },
   "type": {
     "GUEST_REFUND": "Guest refund claim",
@@ -27,7 +44,7 @@
     "CHARGEBACK": "Chargeback (card dispute)"
   },
   "status": {
-    "OPEN": "Open",
+    "OPEN": "Replied, under review",
     "AWAITING_RESPONSE": "Awaiting response",
     "ESCALATED": "Escalated to admin",
     "RESOLVED_APPROVED": "Approved",
@@ -54,44 +71,68 @@
     "emptyHow": "Refund and damage claims are opened from the booking's page. Guests can open a claim once the stay has started, up to {days} days after check-out.",
     "goToTrips": "Go to my bookings",
     "respondCta": "Your reply is needed: respond by {date}. If the deadline passes, the claim goes to an administrator without your reply.",
-    "awaitingOther": "Waiting for the other party to reply by {date}. If they don't, the claim goes to an administrator.",
-    "respondNow": "Reply now"
+    "awaitingOther": "Waiting for the other party to reply by {date}. An administrator then decides the claim; if they don't reply, it goes straight to an administrator.",
+    "respondNow": "Reply now",
+    "titleCount": "My claims ({count})",
+    "filter": {
+      "legend": "Claims to show",
+      "all": "All ({count})",
+      "action": "Awaiting your reply ({count})",
+      "active": "In progress ({count})",
+      "resolved": "Resolved ({count})",
+      "empty": "No claims in this group. Choose “All” to see your other claims."
+    },
+    "rowContext": "({type}, {subject})",
+    "timeLeftDays": "{count, plural, one {# day left} other {# days left}}",
+    "timeLeftHours": "{count, plural, one {# hour left} other {# hours left}}",
+    "timeLeftUnderHour": "Less than an hour left",
+    "deadlinePassed": "Deadline passed"
   },
   "deposit": {
     "title": "Damage deposit",
     "none": "This booking has no damage deposit.",
-    "expected": "Expected deposit: {amount}. It is held on your card as a pre-authorization shortly before check-in.",
+    "expected": "Expected deposit: {amount}. It is held on your card as a pre-authorization (temporary hold) shortly before check-in.",
     "amount": "Amount",
-    "captured": "Captured",
+    "captured": "Charged",
     "status": "Status",
     "authorizeAfter": "Pre-authorization time",
     "authorizedAt": "Pre-authorized at",
     "voidAfter": "Release time",
-    "note": "The deposit is not charged; only a pre-authorization is placed. It is released at the end of the period unless a damage claim is approved. With a split payment the pre-authorization is placed on the organizer’s (booking owner’s) card; participants’ cards are not used.",
+    "note": "The deposit is not charged to the guest's card; only a pre-authorization (temporary hold) is placed. It is released at the end of the period unless a damage claim is approved. With a split payment the pre-authorization is placed on the organizer’s (booking owner’s) card; participants’ cards are not used.",
     "statuses": {
       "SCHEDULED": "Scheduled",
       "AUTHORIZED": "Pre-authorized",
-      "CAPTURED_PARTIAL": "Partially captured",
-      "CAPTURED": "Captured",
+      "CAPTURED_PARTIAL": "Partially charged",
+      "CAPTURED": "Charged",
       "VOIDED": "Released",
       "EXPIRED": "Expired",
       "FAILED": "Pre-authorization failed"
-    }
+    },
+    "noteGuest": "The deposit is not charged to your card; only a pre-authorization (temporary hold) is placed. It is released at the end of the period unless a damage claim is approved. With a split payment the pre-authorization is placed on the organizer’s (booking owner’s) card; participants’ cards are not used.",
+    "noteCaptured": "{amount} of the deposit was charged for an approved damage claim.",
+    "noteVoided": "The pre-authorization was released; the deposit was not charged.",
+    "noteExpired": "The pre-authorization expired and was released automatically; the deposit was not charged and can no longer be captured.",
+    "noteFailed": "The pre-authorization couldn't be placed on the card; an approved damage amount may not be collectable from the deposit.",
+    "expectedOther": "Expected deposit: {amount}. It is held on the guest's card as a pre-authorization (temporary hold) shortly before check-in."
   },
   "panel": {
     "title": "Damage deposit and resolution center",
     "claimsTitle": "Claims for this booking",
     "noClaims": "No claims have been opened for this booking.",
-    "allClaims": "Go to the resolution center"
+    "allClaims": "Go to the resolution center",
+    "titleGuest": "Had a problem? Refunds and deposit",
+    "titleHost": "Damage claims and deposit",
+    "loading": "Loading deposit and claims…",
+    "jumpLink": "Report a problem"
   },
   "open": {
     "titleGuest": "Request a refund",
     "titleHost": "File a damage claim",
-    "infoGuest": "If something went wrong with your stay, request a refund. You can open a claim once your stay has started, up to {days} days after check-out. The host is given time to reply; if they don't, the claim goes to an administrator.",
+    "infoGuest": "If something went wrong with your stay, request a refund. You can open a claim once your stay has started, up to {days} days after check-out. The host is given time to reply; an administrator then decides the claim.",
     "infoHost": "File a claim for damage that occurred during the stay. An approved amount is captured only up to the damage deposit pre-authorization.",
-    "adminInfo": "Admins cannot open claims; review claims from the admin panel.",
-    "amount": "Amount ({currency})",
-    "amountHint": "Enter the amount in the main currency unit, for example 1250 or 1,250.50.",
+    "adminInfo": "Admins cannot open claims; review claims from the <link>admin panel</link>.",
+    "amount": "Amount you are claiming ({currency})",
+    "amountHint": "Type the amount in numbers, with any cents after the decimal point. Example: 1,250 or 1,250.50",
     "description": "Description",
     "descriptionHint": "Describe what happened (10 to 4000 characters). You can add evidence after the claim is opened.",
     "submit": "Submit claim",
@@ -103,7 +144,20 @@
     "descriptionTooShort": "The description must be at least {min} characters (leading and trailing spaces don't count).",
     "descriptionCount": "{count}/{max} characters",
     "alreadyOpen": "You already have an open claim for this booking. Follow that one instead of opening a new claim.",
-    "viewOpen": "View open claim"
+    "viewOpen": "View open claim",
+    "amountRequired": "Enter the amount you are claiming.",
+    "amountMaxGuest": "You can claim up to {amount}.",
+    "amountDepositHost": "Deposit: {amount}. Any amount above it can't be collected; it is only recorded.",
+    "noDepositHost": "This booking has no damage deposit. An approved amount can't be collected from the guest automatically; it is only recorded.",
+    "amountOverDeposit": "{amount} above the deposit can't be collected.",
+    "descriptionTooShortCount": "The description must be at least {min} characters; it is now {count} (leading and trailing spaces don't count).",
+    "descriptionTooLong": "The description can be at most {max} characters; it is now {count}. Please shorten it.",
+    "descriptionNearLimit": "You're close to the character limit ({max} max).",
+    "descriptionOverLimit": "{over, plural, one {# character} other {# characters}} over the limit; shorten it before sending.",
+    "summaryTitle": "You have an open claim for this booking",
+    "summaryNext": "Next step: add evidence such as photos or documents to support your claim.",
+    "addEvidence": "Add evidence",
+    "viewClaim": "View claim"
   },
   "detail": {
     "requested": "Requested",
@@ -122,7 +176,26 @@
     "withdraw": "Withdraw claim",
     "withdrawConfirm": "Are you sure you want to withdraw this claim? This cannot be undone.",
     "withdrawn": "The claim has been withdrawn.",
-    "withdrawConfirmTitle": "Withdraw this claim?"
+    "withdrawConfirmTitle": "Withdraw this claim?",
+    "withdrawing": "Withdrawing…",
+    "withdrawConfirmDamage": "If you withdraw, the guest's deposit hold may be released and you may not be able to collect for this damage later. This can't be undone.",
+    "stale": "We couldn't load the latest version of this claim, so the details below may be out of date. {error}",
+    "replyClosed": "This claim is closed, so no new messages can be sent.",
+    "replyChargeback": "For a chargeback, communication happens through the payment provider; you can only add evidence here.",
+    "uploadClosed": "This claim is closed, so no evidence can be added.",
+    "party": {
+      "guest": "Guest",
+      "host": "Host",
+      "cardholder": "Cardholder (card dispute)"
+    },
+    "notFound": {
+      "title": "Claim not found",
+      "body": "The link may be wrong, the claim may belong to another account, or it may have been removed.",
+      "signedInAs": "You're signed in as {email}.",
+      "back": "Back to my claims",
+      "switchAccount": "Sign in with a different account",
+      "support": "Get support"
+    }
   },
   "outcome": {
     "title": "Decision",
@@ -131,7 +204,18 @@
     "settled": "Paid / captured",
     "uncollected": "Uncollected",
     "platformCovered": "Covered by the platform",
-    "note": "Decision note"
+    "note": "Decision note",
+    "withdrawnTitle": "Claim withdrawn",
+    "withdrawnByYou": "You withdrew this claim on {date}.",
+    "withdrawnByOpener": "The claimant withdrew this claim on {date}.",
+    "settledRefundGuest": "Refunded to you",
+    "settledRefund": "Refunded to the guest",
+    "refundHint": "Refunds usually appear on your card within 5–10 business days.",
+    "settledDamageGuest": "Charged to your card",
+    "settledDamage": "Captured from the deposit",
+    "uncollectedGuest": "Amount above the deposit",
+    "uncollectedGuestHint": "This amount won't be charged to you.",
+    "uncollectedHost": "Not collectable (above the deposit)"
   },
   "messages": {
     "title": "Messages",
@@ -142,7 +226,18 @@
     "sending": "Sending…",
     "sent": "Your message has been sent.",
     "slaBreach": "The response deadline passed; the claim was escalated to an admin.",
-    "psp": "Payment provider update: {status}"
+    "psp": "Payment provider update: {status}",
+    "required": "Write a message before sending.",
+    "tooLong": "A message can be at most {max} characters; it is now {count}. Please shorten it.",
+    "count": "{count}/{max} characters",
+    "nearLimit": "You're close to the character limit ({max} max).",
+    "overLimit": "{over, plural, one {# character} other {# characters}} over the limit; shorten it before sending.",
+    "sendFirstReply": "Send my response",
+    "refresh": "Refresh messages",
+    "lastChecked": "Last checked: {time}",
+    "newCount": "{count, plural, one {# new message} other {# new messages}} arrived.",
+    "adminLabel": "Message to both parties (admin)",
+    "adminHint": "Both parties will see this message."
   },
   "evidence": {
     "title": "Evidence",
@@ -160,12 +255,32 @@
     "confirmUpload": "Upload evidence",
     "cancel": "Cancel",
     "tooLarge": "The file is {size} MB; files of this type can be at most {max} MB.",
-    "badType": "This file type isn't supported. Choose a photo (JPEG, PNG, WebP, AVIF, GIF) or a PDF."
+    "badType": "This file type isn't supported. Choose a photo (JPEG, PNG, WebP, AVIF, GIF) or a PDF.",
+    "uploadMultiple": "Add evidence (photos or PDF; you can select several files)",
+    "limitsLeft": "JPEG, PNG, WebP, AVIF or GIF photos (up to {imageMb} MB) or PDF (up to {pdfMb} MB). Up to {maxFiles} files per claim; {remaining, plural, =0 {you can't add more} other {you can add # more}}.",
+    "limitReached": "This claim has reached the limit of {maxFiles} files. If you have more evidence, describe it in a message.",
+    "heicUnsupported": "{name}: HEIC/HEIF isn't supported. Save the photo as JPEG and select it again.",
+    "badTypeFile": "{name}: this file type isn't supported. Choose a photo (JPEG, PNG, WebP, AVIF, GIF) or a PDF.",
+    "tooLargeFile": "{name}: the file is {size}; files of this type can be at most {max} MB.",
+    "overLimit": "{count, plural, one {# file wasn't} other {# files weren't}} added because a claim can have at most {maxFiles} files.",
+    "queueTitle": "Files to upload ({count})",
+    "fileItem": "{name} ({size})",
+    "remove": "Remove",
+    "removeFile": "Remove: {name}",
+    "confirmUploadCount": "{count, plural, one {Upload evidence} other {Upload # files}}",
+    "progress": "Uploading file {index} of {total}: {name}",
+    "progressLabel": "Upload progress, file {index} of {total}",
+    "uploadedCount": "{count, plural, one {Evidence uploaded.} other {# files uploaded.}}",
+    "someFailed": "{uploaded} of {total} files uploaded. The others stay in the list with the reason; you can try again or remove them.",
+    "stopped": "{uploaded} of {total} files uploaded; the rest weren't: {error}",
+    "pdfDownload": "Download PDF evidence (file {index} of {total}, {size})",
+    "imageAltNumbered": "Evidence photo {index} of {total}: {role}, {date}",
+    "newTab": "(opens in a new tab)"
   },
   "decision": {
     "title": "Decide",
     "decisionLabel": "Decision",
-    "APPROVE": "Approve (full requested amount)",
+    "APPROVE": "Approve: {amount} (full requested amount)",
     "PARTIAL": "Partial approval",
     "REJECT": "Reject",
     "amount": "Partial amount ({currency})",
@@ -175,7 +290,7 @@
     "submit": "Save decision",
     "submitting": "Saving…",
     "done": "Decision saved: {status}.",
-    "invalidAmount": "The partial amount must be greater than zero and less than the requested amount.",
+    "invalidAmount": "The partial amount must be greater than zero and less than {amount}.",
     "pspManaged": "Chargebacks are handled by the payment provider and cannot be decided here.",
     "closed": "This claim is resolved; no further decision can be made.",
     "explainRefund": "Approving a refund claim refunds the guest: from escrow if the funds are still held, otherwise from the host's reserve / balance after release; the platform covers any shortfall.",
@@ -193,16 +308,26 @@
       "final": "This decision cannot be undone. Your note is shown to both parties.",
       "confirmAmount": "Confirm decision for {amount}",
       "confirmReject": "Reject claim"
-    }
+    },
+    "submitApprove": "Save full approval ({amount})",
+    "submitPartial": "Save partial approval",
+    "submitPartialAmount": "Save partial approval ({amount})",
+    "submitReject": "Save rejection",
+    "refundableMax": "Maximum refundable: {amount}.",
+    "depositAvailable": "At most {amount} can be collected from the deposit. Any excess isn't collected; it is only recorded.",
+    "depositNone": "Nothing can currently be collected from the deposit; an approved amount isn't collected, it is only recorded.",
+    "exceedsRefundable": "The requested amount ({requested}) exceeds the maximum refundable ({refundable}). Approve partially or reject the claim.",
+    "amountOverRefundable": "The partial amount can't exceed the maximum refundable ({amount}).",
+    "amountPreview": "Amount to apply: {amount}"
   },
   "errors": {
-    "CLAIM_TOO_EARLY": "This type of claim cannot be opened yet (before the stay starts / ends).",
+    "CLAIM_TOO_EARLY": "A claim can only be opened after the stay has started (from the check-in time).",
     "CLAIM_WINDOW_CLOSED": "The window for opening a claim has closed.",
-    "CLAIM_ALREADY_OPEN": "You already have an open claim for this booking.",
+    "CLAIM_ALREADY_OPEN": "You already have an open claim for this booking; you can follow it in the resolution center.",
     "CLAIM_AMOUNT_EXCEEDS_REFUNDABLE": "The amount exceeds the refundable limit (at most {amount}).",
     "CLAIM_BOOKING_NOT_ELIGIBLE": "A claim cannot be opened for this booking.",
     "CLAIM_TRANSFERRED_BOOKING": "Refund claims cannot be opened for transferred bookings.",
-    "CLAIM_REFUND_IN_PROGRESS": "This claim's refund was partly issued with a different amount; please review it with support.",
+    "CLAIM_REFUND_IN_PROGRESS": "This claim's refund was partly issued with a different amount; please contact support.",
     "CLAIM_SPLIT_CAPACITY": "There is no refundable amount left on the split-payment shares.",
     "CLAIM_EVIDENCE_LIMIT": "The evidence limit for this claim has been reached.",
     "CLAIM_PSP_MANAGED": "This claim is managed by the payment provider.",
@@ -210,7 +335,7 @@
     "CLAIM_NO_PAYMENT": "No captured payment was found for this booking.",
     "CLAIM_REFUND_FAILED": "The refund failed; please try again later.",
     "PAYMENT_IN_PROGRESS": "Another payment operation is in progress for this booking; try again shortly.",
-    "EMAIL_NOT_VERIFIED": "Please verify your email address before doing this.",
+    "EMAIL_NOT_VERIFIED": "Please verify your email address before doing this. Open the verification link in your inbox or request a new one.",
     "CLAIM_AMOUNT_EXCEEDS_REFUNDABLE_NOAMOUNT": "The amount is above the refundable limit. Try a smaller amount.",
     "NOT_FOUND": "This claim could not be found, or you don't have access to it.",
     "VALIDATION_ERROR": "Some of the details weren't accepted. Check the fields and try again.",
@@ -241,6 +366,113 @@
     "removeLabel": "Remove {scope} deposit",
     "removeConfirmTitle": "Remove the {scope} deposit?",
     "removeConfirmBody": "The {amount} deposit for {scope} will be removed. Future bookings will not hold an amount on the guest's card for damage.",
-    "removeConfirm": "Remove deposit"
+    "removeConfirm": "Remove deposit",
+    "amountListing": "Listing-wide deposit ({currency})",
+    "amountRoom": "Deposit for {room} ({currency})",
+    "currentSet": "Current: {amount}.",
+    "currentInherited": "Current: the listing-wide amount ({amount}) applies.",
+    "currentNoneRoom": "Current: no deposit is taken for this room.",
+    "currentNoneListing": "Current: no listing-wide deposit is set.",
+    "removeConfirmBodyInherit": "The {amount} deposit for {scope} will be removed. Future bookings for this room will use the listing-wide amount ({listingAmount}).",
+    "retry": "Try again"
+  },
+  "statusHelp": {
+    "AWAITING_RESPONSE": {
+      "OPENER": "Waiting for the other party to reply. An administrator then decides the claim; if no reply arrives in time, it goes straight to an administrator.",
+      "RESPONDENT": "Your reply is needed. Reply and add any evidence by the deadline; an administrator then decides the claim.",
+      "ADMIN": "Waiting for the other party to reply. Once they reply or the deadline passes, the claim comes to an administrator for a decision."
+    },
+    "OPEN": {
+      "OPENER": "The other party has replied; an administrator is reviewing the claim. You don't need to do anything, but you can still add messages and evidence.",
+      "RESPONDENT": "Your reply was received; an administrator is reviewing the claim. You can keep adding messages and evidence.",
+      "ADMIN": "The other party has replied; the claim is waiting for an administrator's decision."
+    },
+    "ESCALATED": {
+      "OPENER": "The claim was escalated to an administrator and is under review. You don't need to do anything, but you can still add messages and evidence.",
+      "RESPONDENT": "The claim was escalated to an administrator and is under review. You can still add messages and evidence.",
+      "ADMIN": "The claim was escalated to an administrator and is waiting for a decision."
+    },
+    "RESOLVED_APPROVED": {
+      "OPENER": "The claim was approved; the decision is final.",
+      "RESPONDENT": "The claim was approved; the decision is final.",
+      "ADMIN": "The claim was approved; the decision is final."
+    },
+    "RESOLVED_PARTIAL": {
+      "OPENER": "The claim was partially approved; the decision is final.",
+      "RESPONDENT": "The claim was partially approved; the decision is final.",
+      "ADMIN": "The claim was partially approved; the decision is final."
+    },
+    "RESOLVED_REJECTED": {
+      "OPENER": "The claim was rejected; no payment will be made.",
+      "RESPONDENT": "The claim was rejected; no payment will be made.",
+      "ADMIN": "The claim was rejected; no payment will be made."
+    },
+    "CLOSED": {
+      "OPENER": "The claim is closed; no further action is possible.",
+      "RESPONDENT": "The claim is closed; no further action is possible.",
+      "ADMIN": "The claim is closed; no further action is possible."
+    },
+    "chargebackActive": "Card disputes are handled by the payment provider; the decision comes from the provider."
+  },
+  "steps": {
+    "label": "Claim progress",
+    "opened": "Claim opened",
+    "response": "Other party's reply",
+    "review": "Admin review",
+    "decision": "Decision"
+  },
+  "party": {
+    "GUEST": "Guest",
+    "HOST": "Host",
+    "CARDHOLDER": "Cardholder",
+    "you": "{party} (you)"
+  },
+  "errorAction": {
+    "contactSupport": "Contact support",
+    "viewClaims": "Go to the resolution center"
+  },
+  "hostOpen": {
+    "title": "Opening a damage claim",
+    "body": "You open a damage claim from the booking's messages page: find the booking in the Bookings section of your host dashboard, open its “Messages” link and use the “File a damage claim” form at the bottom of the page. A claim can be opened after check-in and before the deposit hold period ends.",
+    "link": "Go to bookings in the host dashboard"
+  },
+  "hostLinkClaims": "My damage claims",
+  "dispute": {
+    "eventWithStatus": "{event} Status: {status}.",
+    "event": {
+      "DISPUTE_CREATED": "A card dispute was opened.",
+      "DISPUTE_UPDATED": "The card dispute was updated.",
+      "DISPUTE_CLOSED": "The card dispute was closed.",
+      "other": "Update from the payment provider."
+    },
+    "status": {
+      "warning_needs_response": "Early warning, response needed",
+      "warning_under_review": "Early warning, under review",
+      "warning_closed": "Early warning closed",
+      "needs_response": "Response needed",
+      "under_review": "Under review by the bank",
+      "won": "Dispute rejected, payment upheld",
+      "lost": "Dispute accepted, payment returned to the cardholder",
+      "prevented": "Dispute prevented",
+      "other": "Other"
+    },
+    "reason": {
+      "bank_cannot_process": "Bank couldn't process the payment",
+      "check_returned": "Check returned",
+      "credit_not_processed": "Refund not processed",
+      "customer_initiated": "Initiated by the cardholder",
+      "debit_not_authorized": "Unauthorized debit",
+      "duplicate": "Duplicate charge",
+      "fraudulent": "Suspected fraud",
+      "general": "General dispute",
+      "incorrect_account_details": "Incorrect account details",
+      "insufficient_funds": "Insufficient funds",
+      "noncompliant": "Non-compliant transaction",
+      "product_not_received": "Service not received",
+      "product_unacceptable": "Service not as described",
+      "subscription_canceled": "Subscription canceled",
+      "unrecognized": "Charge not recognized by the cardholder",
+      "other": "Other"
+    }
   }
 }

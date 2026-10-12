@@ -128,6 +128,7 @@ export async function getHostPayoutOverview(userId: string) {
     policy: {
       releaseHours: cfg.PAYOUT_RELEASE_HOURS,
       commissionBps: cfg.PLATFORM_COMMISSION_BPS,
+      reserveBps: cfg.PAYOUT_RESERVE_BPS,
       reserveReleaseDays: cfg.RESERVE_RELEASE_DAYS,
       identityRequired: cfg.PAYOUT_REQUIRE_IDENTITY_VERIFIED,
     },
@@ -143,7 +144,9 @@ export async function listPayoutAccounts() {
     take: 200,
   });
   const ids = accounts.map((a) => a.userId);
-  const [users, pending] = await Promise.all([
+  // Kimlik koşulu açıkken doğrulananlar tek sorguda (satır başına sorgu yok).
+  const identityRequired = getConfig().PAYOUT_REQUIRE_IDENTITY_VERIFIED;
+  const [users, pending, verified] = await Promise.all([
     prisma.user.findMany({
       where: { id: { in: ids } },
       select: { id: true, firstName: true, lastName: true },
@@ -153,20 +156,31 @@ export async function listPayoutAccounts() {
       where: { userId: { in: ids }, status: PayoutStatus.PENDING },
       _count: { _all: true },
     }),
+    identityRequired && ids.length
+      ? prisma.identityVerification.findMany({
+          where: { userId: { in: ids }, status: "VERIFIED" },
+          select: { userId: true },
+          distinct: ["userId"],
+        })
+      : Promise.resolve([] as Array<{ userId: string }>),
   ]);
-  return accounts.map((a) => {
-    const u = users.find((x) => x.id === a.userId);
-    return {
-      userId: a.userId,
-      // Veri minimizasyonu: yalnızca ad + soyadın baş harfi.
-      displayName: u ? `${u.firstName} ${u.lastName.slice(0, 1)}.` : a.userId,
-      provider: a.provider,
-      kycStatus: a.kycStatus,
-      payoutsEnabled: a.payoutsEnabled,
-      payoutsPaused: a.payoutsPaused,
-      pausedReason: a.pausedReason,
-      pausedAt: a.pausedAt?.toISOString() ?? null,
-      pendingPayouts: pending.find((p) => p.userId === a.userId)?._count._all ?? 0,
-    };
-  });
+  const verifiedIds = new Set(verified.map((v) => v.userId));
+  return Promise.all(
+    accounts.map(async (a) => {
+      const u = users.find((x) => x.id === a.userId);
+      return {
+        userId: a.userId,
+        // Veri minimizasyonu: yalnızca ad + soyadın baş harfi.
+        displayName: u ? `${u.firstName} ${u.lastName.slice(0, 1)}.` : a.userId,
+        provider: a.provider,
+        kycStatus: a.kycStatus,
+        payoutsEnabled: a.payoutsEnabled,
+        payoutsPaused: a.payoutsPaused,
+        pausedReason: a.pausedReason,
+        pausedAt: a.pausedAt?.toISOString() ?? null,
+        pendingPayouts: pending.find((p) => p.userId === a.userId)?._count._all ?? 0,
+        blockReason: await payoutBlockReason(a, verifiedIds.has(a.userId)),
+      };
+    })
+  );
 }

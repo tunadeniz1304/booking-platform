@@ -20,14 +20,28 @@ export interface ItineraryItem {
   checkIn: string;
   checkOut: string;
   checkInTime: string;
+  checkOutTime: string;
   guestCount: number;
 }
 
 export const ITINERARY_MAX_ITEMS = 20;
 
+/** İmzalı kod rezervasyon kimliği + sırra göre deterministiktir → QR SVG'si önbelleklenir. */
+const QR_CACHE_MAX = 500;
+const qrCache = new Map<string, string>();
+
 export async function qrDataUrl(text: string): Promise<string> {
+  const cached = qrCache.get(text);
+  if (cached) return cached;
   const svg = await QRCode.toString(text, { type: "svg", errorCorrectionLevel: "M", margin: 1 });
-  return `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
+  const url = `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
+  // Doluysa en eski girdi atılır (Map ekleme sırasını korur).
+  if (qrCache.size >= QR_CACHE_MAX) {
+    const oldest = qrCache.keys().next().value;
+    if (oldest !== undefined) qrCache.delete(oldest);
+  }
+  qrCache.set(text, url);
+  return url;
 }
 
 export async function listUpcomingItinerary(
@@ -48,6 +62,7 @@ export async function listUpcomingItinerary(
         select: {
           title: true,
           checkInTime: true,
+          checkOutTime: true,
           location: { select: { city: true, country: true } },
         },
       },
@@ -67,6 +82,7 @@ export async function listUpcomingItinerary(
         checkIn: fromDate(b.checkIn),
         checkOut: fromDate(b.checkOut),
         checkInTime: b.property.checkInTime,
+        checkOutTime: b.property.checkOutTime,
         guestCount: b.guestCount,
       };
     })

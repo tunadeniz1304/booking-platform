@@ -70,7 +70,7 @@ export const payBookingSchema = z.object({
   // BIN PSP token metadata'sından, cihaz kimliği sunucu imzalı `did` çerezinden gelir.
 });
 
-/** v5 P1-4: POST /api/support/chat gövdesi (AI destek ajanı, tek tur). */
+/** v5 P1-4: POST /api/support/chat gövdesi (AI destek ajanı; `history` isteğe bağlı bağlam). */
 export const supportChatSchema = z
   .object({
     message: z.string().trim().min(1).max(1000),
@@ -78,6 +78,21 @@ export const supportChatSchema = z
     locale: z.enum(["tr", "en"]).optional(),
     /** P2-1: "İnsana bağlan" — doğrudan insan kuyruğuna devir. */
     requestHuman: z.boolean().optional(),
+    /**
+     * F899: son turlar (güvenilmez VERİ). Asistan yanıtı 2000 karaktere kadar olabildiği için
+     * sınır 2000; ajan her turu 1000 karaktere kırpar.
+     */
+    history: z
+      .array(
+        z
+          .object({
+            role: z.enum(["user", "assistant"]),
+            text: z.string().trim().min(1).max(2000),
+          })
+          .strict()
+      )
+      .max(6)
+      .optional(),
   })
   .strict();
 

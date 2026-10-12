@@ -2,18 +2,18 @@
   "widget": {
     "selectDates": "Select dates",
     "title": "Book a stay",
-    "dates": "Check-in - Check-out",
+    "dates": "Check-in – Check-out",
     "guests": "Number of guests",
     "guestOption": "{count, plural, one {# guest} other {# guests}}",
     "room": "Room",
-    "noRooms": "No rooms available",
+    "noRooms": "There are no rooms available to book at this property right now.",
     "roomOption": "{name} - {capacity, plural, one {# person} other {# people}} - {bedType}",
     "ratePlan": "Rate option",
     "refundable": "Refundable (per cancellation terms)",
     "nonRefundable": "Non-refundable: no refund if you cancel",
     "breakfastIncluded": "Breakfast included",
     "calculating": "Calculating price…",
-    "submit": "Continue to booking",
+    "submit": "Continue: review details",
     "planDelta": "{percent}% more than the lowest option",
     "planCheapest": "lowest price",
     "policyLink": "See cancellation terms",
@@ -27,23 +27,61 @@
     "errors": {
       "SOLD_OUT": "This room is fully booked for your dates. Try other dates or another room.",
       "RESTRICTED": "Your dates don't meet this property's stay rules (for example a minimum number of nights or a day closed to arrival). Try different dates.",
-      "NOT_FOUND": "This room is no longer for sale. Choose another room."
-    }
+      "NOT_FOUND": "This room is no longer for sale. Choose another room.",
+      "RESTRICTED_MIN_STAY": "These dates require a stay of at least {minStay, plural, one {# night} other {# nights}}. Choose a later check-out date or other dates.",
+      "RESTRICTED_MAX_STAY": "On these dates you can stay at most {maxStay, plural, one {# night} other {# nights}}. Choose a shorter stay.",
+      "RESTRICTED_STOP_SELL": "This room isn't for sale for the night of {date}. Choose dates that don't include this night.",
+      "RESTRICTED_CLOSED_TO_ARRIVAL": "Check-in isn't possible on {date}. Choose another check-in date.",
+      "RESTRICTED_CLOSED_TO_DEPARTURE": "Check-out isn't possible on {date}. Choose another check-out date.",
+      "OVER_CAPACITY": "The selected room is too small for this number of guests. Reduce the number of guests or choose a larger room."
+    },
+    "sampleDates": "Sample dates shown; choose your own dates.",
+    "checkInOnly": "{date} - choose check-out date",
+    "pickCheckIn": "Choose your check-in date",
+    "pickCheckOut": "Now choose your check-out date",
+    "reasonDates": "Choose check-in and check-out dates to see the price.",
+    "reasonCheckOut": "Choose a check-out date to see the price.",
+    "reasonCapacity": "To continue, choose a room that fits your number of guests.",
+    "retry": "Try again",
+    "pickOtherDates": "Choose other dates",
+    "totalAnnounce": "Updated total: {total}",
+    "roomReplaced": "The room you picked in search is no longer for sale; showing {name} instead.",
+    "loginNext": "You'll be asked to log in or create an account in the next step.",
+    "mealRoomOnly": "Room only (no meals)",
+    "mealHalfBoard": "Half board (breakfast and dinner)",
+    "mealFullBoard": "Full board (three meals)",
+    "searchOther": "Search other stays",
+    "adults": "Adults",
+    "children": "Children (ages 0-12)",
+    "continuing": "Going to the next step…",
+    "adultsRange": "Adults must be a whole number from {min} to {max}. The previous value ({current}) was kept.",
+    "childrenRange": "Children must be a whole number from {min} to {max}. The previous value ({current}) was kept."
   },
   "priceInsight": {
-    "title": "Price insight",
-    "labelLine": "The price for these dates is <b>{label}</b> ({nightly} per night).",
+    "title": "Price check for these dates",
+    "labelLine": "The price for these dates is <b>{label}</b>.",
     "labels": {
       "low": "low",
       "typical": "typical",
       "high": "high"
     },
     "notEnoughData": "There is not enough data yet to compare this room's price.",
-    "interval": "Expected nightly price range ({level} confidence): {low} – {high}",
+    "interval": "This room's base rate is usually between {low} and {high} per night.",
     "setAlert": "Set a price alert",
     "alertCreated": "Price alert set.",
-    "alertLoginRequired": "Sign in to set a price alert.",
-    "alertFailed": "The price alert could not be set."
+    "alertLoginRequired": "<link>Sign in</link> to set a price alert; you'll come back to this page afterwards.",
+    "alertFailed": "The price alert could not be set.",
+    "howAssessed": "How is this assessed?",
+    "baseRateNote": "The comparison uses the room's base rate, excluding taxes and rate-plan differences ({nightly} per night for these dates), so it can differ from the nightly amount in the quote.",
+    "levelNote": "The range is calculated from similar rooms in the area; about {level} of prices fall within it.",
+    "setAlertLoginRequired": "Set a price alert (sign-in required)",
+    "settingAlert": "Setting price alert…",
+    "alertHint": "If the total price for this stay drops, we'll email {email}.",
+    "alertHintAnonymous": "If the total price for this stay drops, we'll email you.",
+    "undo": "Undo alert",
+    "undoing": "Undoing…",
+    "alertRemoved": "Price alert removed.",
+    "undoFailed": "The price alert could not be removed."
   },
   "status": {
     "HELD": "Your room is on hold — complete the payment",
@@ -58,7 +96,7 @@
     "loginRequiredTitle": "Sign-in required",
     "loginRequiredText": "Sign in to view your booking.",
     "login": "Sign in",
-    "loading": "Loading...",
+    "loading": "Loading booking…",
     "error": "Error",
     "backHome": "Back to home",
     "bookingNumber": "Booking number: <b>{id}</b>",
@@ -74,6 +112,30 @@
       "CONFIRMED": "Payment received, your booking is confirmed. A confirmation email has been sent.",
       "CANCELLED": "The booking has been cancelled.",
       "other": "Booking status updated: {status}"
-    }
-  }
+    },
+    "notFound": "The booking was not found or does not belong to this account. Make sure you are signed in with the account you booked with.",
+    "tryLater": "Please try again in a moment.",
+    "refreshFailed": "The booking details could not be refreshed; the information below may be out of date.",
+    "invoice": "Download invoice (PDF)",
+    "rebook": "Search again for the same dates",
+    "checkInTime": "from {time}",
+    "checkOutTime": "by {time}",
+    "statusHint": {
+      "HELD": "Payment has not been taken yet. Your booking is confirmed once you complete the payment below.",
+      "PENDING": "Your booking is not confirmed yet and no payment has been taken.",
+      "CANCELLED": "This booking is no longer valid and cannot be used for a stay.",
+      "EXPIRED": "The payment was not completed in time, so the room was released and the booking was not confirmed."
+    },
+    "priceTitle": "Price breakdown",
+    "cancellation": {
+      "until": "Free cancellation until {date}, {time} (property local time).",
+      "ended": "Free cancellation ended on {date} at {time}. If you cancel now, any refund follows the cancellation policy.",
+      "none": "This booking has no free cancellation. If you cancel, any refund follows the cancellation policy."
+    },
+    "heading": "{status}<sr> · {property}</sr>",
+    "notFoundTitle": "Booking not found",
+    "shortcuts": "Booking shortcuts",
+    "messagingAfterConfirm": "Messaging with the host opens once the booking is confirmed. Until then, <link>contact support</link> with any questions."
+  },
+  "supportLink": "Get help with this booking"
 }

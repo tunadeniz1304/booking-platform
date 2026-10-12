@@ -4,16 +4,18 @@ import { useEffect, useId, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { ApiError, apiFetch, isNetworkError } from "@/lib/api-client";
-import {
-  CardValidationError,
-  MOCK_3DS_CODE,
-  TEST_CARDS,
-  tokenizeCard,
-} from "@/lib/payment/card-token";
+import { ApiError, apiFetch, isNetworkError, isTimeoutError } from "@/lib/api-client";
+import { MOCK_3DS_CODE } from "@/lib/payment/card-token";
 import { useFormat } from "@/i18n/use-format";
 import { Field, focusRing } from "@/components/ui/ui";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import {
+  CardFields,
+  tokenizeCardFields,
+  type CardField,
+  type CardFieldErrors,
+  type CardValues,
+} from "@/components/payment/CardFields";
 import type { PayResponse } from "./StripePaymentForm";
 import StepUpDialog from "./StepUpDialog";
 import WalletCreditOption from "./WalletCreditOption";
@@ -34,11 +36,25 @@ interface Props {
   /** Tahsil edilecek tutar (Stripe Payment Element'in `amount` seçeneği için). */
   amountMinor?: number;
   currency?: string;
+  /**
+   * RNPL planı açık, tahsilat henüz yapılmadı. `false` verilirse sunucunun `not_paid` gerekçesi
+   * (ör. önceden tamamen iade edilmiş ödeme) iptal sonucunda "ödeme alınmadı" diye gösterilmez.
+   */
+  chargePending?: boolean;
   onChanged: () => void;
 }
 
-type CardField = "number" | "exp" | "cvc";
-type FieldErrors = Partial<Record<CardField, string>>;
+/**
+ * `at: "cancel"` → hata iptal düğmesinin yanında; aksi hâlde etkin ödeme formunda gösterilir.
+ * `note`: nötr bilgi (ör. ek doğrulamadan vazgeçildi); ödeme düğmesinin yanında görünür.
+ */
+interface Message {
+  kind: "error" | "info" | "note";
+  text: string;
+  at?: "cancel";
+  /** Yalnız rezervasyon HELD iken geçerli (ör. zaman aşımından sonraki durum kontrolü notu). */
+  whileHeld?: boolean;
+}
 
 /** 3DS adımında bu kodlar geldiğinde bekleyen doğrulama kapanmıştır: kart formuna dönülür. */
 const CHALLENGE_CLOSED = new Set([
@@ -47,31 +63,15 @@ const CHALLENGE_CLOSED = new Set([
   "PAYMENT_ATTEMPTS_EXCEEDED",
 ]);
 
-/** Kart doğrulama kodu → ilgili alan. */
-const CARD_ERROR_FIELD: Record<string, CardField> = {
-  CARD_NUMBER_INVALID: "number",
-  CVC_INVALID: "cvc",
-  CARD_EXPIRED: "exp",
-};
-
-/** "1230", "12/30", "12-30", "12 / 2030" → { mm, yyyy }; geçersizse null. */
-function parseExpiry(value: string): { mm: number; yyyy: number } | null {
-  const m = /^\s*(\d{1,2})\s*[/\-. ]?\s*(\d{2}|\d{4})\s*$/.exec(value);
-  if (!m) return null;
-  const mm = Number(m[1]);
-  const yy = Number(m[2]);
-  if (mm < 1 || mm > 12) return null;
-  return { mm, yyyy: m[2].length === 4 ? yy : 2000 + yy };
-}
-
-/** Yazarken AA/YY biçimine getirir (otomatik "/"). */
-function formatExpiry(value: string): string {
-  const d = value.replace(/\D/g, "").slice(0, 4);
-  return d.length > 2 ? `${d.slice(0, 2)}/${d.slice(2)}` : d;
-}
-
 function newIdemKey() {
   return typeof crypto !== "undefined" ? crypto.randomUUID() : String(Date.now());
+}
+
+/** Ret yanıtındaki kalan deneme hakkı (sunucu `details.attemptsLeft` gönderirse). */
+function attemptsLeftOf(err: unknown): number | null {
+  if (!(err instanceof ApiError) || !err.details || typeof err.details !== "object") return null;
+  const left = (err.details as { attemptsLeft?: unknown }).attemptsLeft;
+  return typeof left === "number" && left > 0 ? left : null;
 }
 
 /**
@@ -85,6 +85,7 @@ export default function BookingActions({
   holdExpiresAt,
   amountMinor,
   currency,
+  chargePending,
   onChanged,
 }: Props) {
   const t = useTranslations("payment");
@@ -92,17 +93,19 @@ export default function BookingActions({
   const f = useFormat();
   const { confirm, confirmDialog } = useConfirm();
   const ids = useId();
-  const [payConfig, setPayConfig] = useState<PaymentConfig>({
-    provider: "mock",
-    publishableKey: null,
-  });
-  const [card, setCard] = useState({ number: "", exp: "", cvc: "" });
-  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  /** Yapılandırma gelene kadar hiçbir form çizilmez (mock formdan Stripe'a geçişte veri kaybı). */
+  const [payConfig, setPayConfig] = useState<PaymentConfig | null>(null);
+  const [configFailed, setConfigFailed] = useState(false);
+  const [configAttempt, setConfigAttempt] = useState(0);
+  const [card, setCard] = useState<CardValues>({ number: "", exp: "", cvc: "" });
+  const [fieldErrors, setFieldErrors] = useState<CardFieldErrors>({});
   const [challenge, setChallenge] = useState<string | null>(null);
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
-  const [message, setMessage] = useState<{ kind: "error" | "info"; text: string } | null>(null);
+  /** İptal isteği sürüyor (düğme metni "İptal ediliyor..." olur). */
+  const [cancelling, setCancelling] = useState(false);
+  const [message, setMessage] = useState<Message | null>(null);
   /** Ekran okuyucu duyurusu (her zaman DOM'da duran tek `role=status` bölgesi). */
   const [announcement, setAnnouncement] = useState("");
   /** Step-up bekleyen ödeme (mock formda doğrulamadan sonra otomatik yeniden denenir). */
@@ -111,8 +114,15 @@ export default function BookingActions({
   const [stepUpToken, setStepUpToken] = useState<string | null>(null);
   /** P1-7: cüzdan kredisinden kullanılacak tutar (minor-unit; 0 = yalnız kart). */
   const [creditMinor, setCreditMinor] = useState(0);
+  /** Kredi tutarı geçerli mi (geçersizken ödeme gönderilmez; odak tutar alanına taşınır). */
+  const [creditValid, setCreditValid] = useState(true);
   /** P1-3: "şimdi rezerve et, sonra öde" seçili mi (kredi ile birlikte kullanılamaz). */
   const [rnpl, setRnpl] = useState(false);
+  /** Kredi ve "sonra öde" seçenekleri okundu mu: ödeme formu ancak sonra çizilir (kayma olmasın). */
+  const [creditReady, setCreditReady] = useState(false);
+  const [rnplReady, setRnplReady] = useState(false);
+  /** Deneme sınırı aşıldı (PAYMENT_ATTEMPTS_EXCEEDED): ödeme formları kapanır. */
+  const [payLocked, setPayLocked] = useState(false);
   /** Her yeni ödeme denemesi (kesin ret sonrası) yeni bir anahtar alır; ağ hatasında aynısı kalır. */
   const [idemKey, setIdemKey] = useState(newIdemKey);
   /** Tutma süresi geri sayımı için istemci saati (SSR uyumsuzluğu olmasın diye başta null). */
@@ -124,15 +134,31 @@ export default function BookingActions({
   const expRef = useRef<HTMLInputElement>(null);
   const cvcRef = useRef<HTMLInputElement>(null);
   const codeRef = useRef<HTMLInputElement>(null);
+  const creditInputRef = useRef<HTMLInputElement>(null);
+  const payButtonRef = useRef<HTMLButtonElement>(null);
+  const errorRef = useRef<HTMLParagraphElement>(null);
+  const lockedRef = useRef<HTMLHeadingElement>(null);
+  const stripeBoxRef = useRef<HTMLDivElement>(null);
+  /** Stripe akışı: step-up doğrulamasından sonra form bir kez kendiliğinden yeniden gönderilir. */
+  const resubmitStripe = useRef(false);
   /** Bir sonraki çizimden sonra odaklanacak öğe (form geçişlerinde odak kaybolmasın). */
-  const focusNext = useRef<"number" | "code" | null>(null);
+  const focusNext = useRef<"number" | "code" | "locked" | "pay" | null>(null);
 
   useEffect(() => {
     if (status !== "HELD") return;
+    let live = true;
     apiFetch<PaymentConfig>("/api/payments/config")
-      .then(setPayConfig)
-      .catch(() => undefined); // Yapılandırma okunamazsa mock form kalır.
-  }, [status]);
+      .then((config) => {
+        if (live) setPayConfig(config);
+      })
+      // Okunamazsa mock forma düşülmez: Stripe ortamında mock token "geçersiz kart" sayılır.
+      .catch(() => {
+        if (live) setConfigFailed(true);
+      });
+    return () => {
+      live = false;
+    };
+  }, [status, configAttempt]);
 
   useEffect(() => {
     if (status !== "HELD" || !holdExpiresAt) return;
@@ -162,13 +188,44 @@ export default function BookingActions({
     status === "HELD" && (serverExpired || (remainingMs !== null && remainingMs <= 0));
 
   useEffect(() => {
-    if (focusNext.current === "code") codeRef.current?.focus();
-    else if (focusNext.current === "number") numberRef.current?.focus();
+    const target = focusNext.current;
     focusNext.current = null;
+    if (target === "code") {
+      // Kod seçili gelir: hatadan sonra yeniden yazmak için silmek gerekmez.
+      codeRef.current?.focus();
+      codeRef.current?.select();
+    } else if (target === "number") {
+      // Kart formu kapandıysa (deneme sınırı) odak açıklama başlığına gider.
+      (numberRef.current ?? lockedRef.current)?.focus();
+    } else if (target === "locked") lockedRef.current?.focus();
+    else if (target === "pay") {
+      // Step-up penceresi kapandıktan sonra odak ödeme düğmesine döner (kart ya da Stripe formu).
+      const stripeButton =
+        stripeBoxRef.current?.querySelector<HTMLButtonElement>('button[type="submit"]');
+      (payButtonRef.current ?? stripeButton)?.focus();
+    }
   });
 
-  const useStripeForm =
-    payConfig.provider === "stripe" && !!payConfig.publishableKey && !!amountMinor && !!currency;
+  // Hata, gönder düğmesinin yanında çizilir; dar ekranda görünür alana kaydırılır.
+  useEffect(() => {
+    if (message?.kind === "error") errorRef.current?.scrollIntoView?.({ block: "nearest" });
+  }, [message]);
+
+  // Doğrulama token'ı yeni çizimdeki `submit` kapanışına geçtikten sonra form yeniden gönderilir.
+  useEffect(() => {
+    if (!stepUpToken || !resubmitStripe.current) return;
+    resubmitStripe.current = false;
+    stripeBoxRef.current?.querySelector("form")?.requestSubmit();
+  }, [stepUpToken]);
+
+  const stripeKey =
+    payConfig?.provider === "stripe" && amountMinor && currency ? payConfig.publishableKey : null;
+  const useStripeForm = !!stripeKey;
+
+  function retryConfig() {
+    setConfigFailed(false);
+    setConfigAttempt((n) => n + 1);
+  }
 
   /** Sunucu hata kodunu yerelleştirir; bilinmeyen kodda ham (tek dilli) metin yerine `fallback`. */
   function errorText(err: unknown, fallback: string): string {
@@ -186,12 +243,40 @@ export default function BookingActions({
     return fallback;
   }
 
-  function showError(err: unknown, fallback: string) {
+  function showError(err: unknown, fallback: string, at?: "cancel") {
     if (err instanceof ApiError && err.code === "HOLD_EXPIRED") setServerExpired(true);
+    if (err instanceof ApiError && err.code === "PAYMENT_ATTEMPTS_EXCEEDED") {
+      setPayLocked(true);
+      focusNext.current = "locked";
+    }
     // Kesin ret: sonraki deneme yeni bir işlemdir (aynı anahtar eski sonucu döndürmesin).
-    if (err instanceof ApiError && err.status < 500 && !isNetworkError(err))
-      setIdemKey(newIdemKey());
-    setMessage({ kind: "error", text: errorText(err, fallback) });
+    // Zaman aşımı (status 0) kesin ret değildir: ödeme gerçekleşmiş olabilir, anahtar korunur.
+    if (err instanceof ApiError && err.status >= 400 && err.status < 500) setIdemKey(newIdemKey());
+    const text = errorText(err, fallback);
+    const left = attemptsLeftOf(err);
+    setMessage({
+      kind: "error",
+      text: left === null ? text : `${text} ${t("attempts.left", { count: left })}`,
+      at,
+    });
+  }
+
+  /**
+   * Zaman aşımı: ödeme gerçekleşmiş olabilir. Aynı Idempotency-Key korunur (yeniden deneme iki kez
+   * tahsil etmez) ve rezervasyon yeniden okunur; onaylandıysa not kendiliğinden kalkar.
+   */
+  function handleTimeout(err: unknown): boolean {
+    if (!isTimeoutError(err)) return false;
+    setMessage({ kind: "info", text: t("timeoutCheck"), whileHeld: true });
+    onChanged();
+    return true;
+  }
+
+  /** Kredi tutarı geçersizse ödeme gönderilmez; odak tutar alanına gider (hata orada yazılı). */
+  function creditBlocked(): boolean {
+    if (rnpl || creditValid) return false;
+    creditInputRef.current?.focus();
+    return true;
   }
 
   function startBusy() {
@@ -209,7 +294,7 @@ export default function BookingActions({
   function openChallenge(hint: string | undefined) {
     setCode("");
     setChallenge(
-      payConfig.provider === "mock"
+      payConfig?.provider === "mock"
         ? t("threeDsDemoHint", { code: MOCK_3DS_CODE })
         : (hint ?? t("verificationRequired"))
     );
@@ -250,7 +335,10 @@ export default function BookingActions({
     setStepUp(null);
     if (!pending?.cardToken) {
       setStepUpToken(token);
-      setMessage({ kind: "info", text: t("verifiedRetry") });
+      // Stripe'ta PaymentMethod yeniden kullanılamaz: form yeniden gönderilir (yeni pm_ oluşur).
+      const form = stripeBoxRef.current?.querySelector("form");
+      if (form && "requestSubmit" in form) resubmitStripe.current = true;
+      else setMessage({ kind: "info", text: t("verifiedRetry") });
       return;
     }
     if (!startBusy()) return;
@@ -259,13 +347,24 @@ export default function BookingActions({
       if (out.status === "requires_action") openChallenge(out.challenge?.hint);
       else paid();
     } catch (err) {
-      showError(err, t("failed"));
+      if (!handleTimeout(err)) showError(err, t("failed"));
     } finally {
       endBusy();
     }
   }
 
+  /** Step-up'tan vazgeçildi: ödemenin yapılmadığı söylenir, odak ödeme düğmesine döner. */
+  function cancelStepUp() {
+    setStepUp(null);
+    const parts = [t("stepUpCancelled")];
+    if (holdExpiresAt) parts.push(t("holdUntil", { time: f.time(holdExpiresAt) }));
+    parts.push(t("stepUpRetry"));
+    setMessage({ kind: "note", text: parts.join(" ") });
+    focusNext.current = "pay";
+  }
+
   async function stripeSubmit(cardToken: string): Promise<PayResponse> {
+    if (creditBlocked()) return { status: "failed" };
     setMessage(null);
     setBusy(true);
     try {
@@ -273,9 +372,9 @@ export default function BookingActions({
       if (out.status !== "requires_action") paid();
       return out;
     } catch (err) {
-      // Stripe akışında token tekrar kullanılamaz: doğrulamadan sonra kullanıcı yeniden gönderir.
+      // Stripe akışında token tekrar kullanılamaz: doğrulamadan sonra form yeniden gönderilir.
       if (isStepUp(err)) setStepUp({ cardToken: "" });
-      else showError(err, t("failed"));
+      else if (!handleTimeout(err)) showError(err, t("failed"));
       return { status: "failed" };
     } finally {
       setBusy(false);
@@ -290,7 +389,7 @@ export default function BookingActions({
       });
       paid();
     } catch (err) {
-      showError(err, t("verificationFailed"));
+      if (!handleTimeout(err)) showError(err, t("verificationFailed"));
     }
   }
 
@@ -306,29 +405,17 @@ export default function BookingActions({
 
   async function pay(e: React.FormEvent) {
     e.preventDefault();
-    if (busyRef.current) return;
+    if (busyRef.current || creditBlocked()) return;
     setMessage(null);
     setFieldErrors({});
-    const exp = parseExpiry(card.exp);
-    if (!exp) {
-      failField("exp", t("errors.EXPIRY_FORMAT"));
+    // Biçim (AA/YY) ve süre ayrı doğrulanır; hata ilgili alanın altında gösterilir.
+    const result = tokenizeCardFields(card);
+    if (!result.ok) {
+      if (result.field) failField(result.field, t(result.messageKey));
+      else setMessage({ kind: "error", text: t(result.messageKey) });
       return;
     }
-    let cardToken: string;
-    try {
-      cardToken = tokenizeCard({
-        number: card.number,
-        expMonth: exp.mm,
-        expYear: exp.yyyy,
-        cvc: card.cvc,
-      });
-    } catch (err) {
-      const errCode = err instanceof CardValidationError ? err.code : undefined;
-      const field = errCode ? CARD_ERROR_FIELD[errCode] : undefined;
-      if (errCode && field) failField(field, t(`errors.${errCode}`));
-      else setMessage({ kind: "error", text: t("invalidCard") });
-      return;
-    }
+    const { cardToken } = result;
     if (!startBusy()) return;
     try {
       const out = await submitToken(cardToken);
@@ -339,7 +426,7 @@ export default function BookingActions({
         setStepUp({ cardToken });
         return;
       }
-      showError(err, t("failed"));
+      if (!handleTimeout(err)) showError(err, t("failed"));
     } finally {
       endBusy();
     }
@@ -357,21 +444,27 @@ export default function BookingActions({
       setChallenge(null);
       paid();
     } catch (err) {
+      if (handleTimeout(err)) return;
       showError(err, t("verificationFailed"));
-      // Doğrulama kapandıysa (ret / bekleyen yok / deneme sınırı) kod ekranında bırakma.
+      // Doğrulama kapandıysa (ret / bekleyen yok / deneme sınırı) kod ekranında bırakma;
+      // açık kaldıysa odak kod alanına döner (girilen kod seçili, doğrudan yeniden yazılır).
       if (err instanceof ApiError && err.code && CHALLENGE_CLOSED.has(err.code)) backToCard();
+      else focusNext.current = "code";
     } finally {
       endBusy();
     }
   }
 
   async function cancel() {
+    if (busyRef.current) return;
+    // HELD rezervasyonda henüz tahsilat yoktur: "iade yok" yerine "ödeme alınmadı" denir.
+    const wasHeld = status === "HELD";
     const ok = await confirm({
       title: t("cancel.dialogTitle"),
       body: (
         <>
           <span className="block">
-            {status === "HELD" ? t("cancel.dialogBodyHeld") : t("cancel.dialogBodyConfirmed")}
+            {wasHeld ? t("cancel.dialogBodyHeld") : t("cancel.dialogBodyConfirmed")}
           </span>
           <span className="mt-2 block">{t("cancel.irreversible")}</span>
         </>
@@ -382,11 +475,14 @@ export default function BookingActions({
     });
     if (!ok) return;
     if (!startBusy()) return;
+    setCancelling(true);
     setMessage(null);
     try {
       const res = await apiFetch<{
-        refund: { refundMinor: number; currency: string; refundPercent: number };
+        refund: { refundMinor: number; currency: string; refundPercent: number; reason?: string };
       }>(`/api/bookings/${bookingId}`, { method: "DELETE" });
+      // `not_paid`: tahsil edilmiş tutar yok (HELD ya da tahsilatı yapılmamış RNPL planı).
+      const notCharged = wasHeld || (res.refund.reason === "not_paid" && chargePending !== false);
       setMessage({
         kind: "info",
         text:
@@ -395,35 +491,76 @@ export default function BookingActions({
                 amount: f.money(res.refund.refundMinor, res.refund.currency),
                 percent: String(res.refund.refundPercent),
               })
-            : t("cancel.noRefund"),
+            : notCharged
+              ? t("cancel.cancelledNoCharge")
+              : t("cancel.noRefund"),
       });
       onChanged();
     } catch (err) {
-      showError(err, t("cancel.failed"));
+      showError(err, t("cancel.failed"), "cancel");
     } finally {
+      setCancelling(false);
       endBusy();
     }
   }
 
-  const input = `mt-1 w-full rounded-lg border border-gray-500 px-3 py-2 text-sm ${focusRing}`;
+  const input = `mt-1 w-full rounded-lg border border-gray-500 px-3 py-2 text-base sm:text-sm ${focusRing}`;
   const submitClass = `w-full rounded-lg bg-[#003580] px-4 py-3 text-sm font-semibold text-white disabled:bg-gray-300 disabled:text-gray-700 aria-disabled:bg-gray-300 aria-disabled:text-gray-700 ${focusRing}`;
+  const secondaryClass = `min-h-[44px] w-full rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 ${focusRing}`;
   const held = status === "HELD" && !expired;
   const remainingText =
     remainingMs !== null && remainingMs > 0
       ? `${Math.floor(remainingMs / 60_000)}:${String(Math.floor((remainingMs % 60_000) / 1000)).padStart(2, "0")}`
       : null;
+  /** Seçenek kutuları belirmeden form çizilmez: yazarken alanlar aşağı kaymasın (F1021/F759). */
+  const optionsReady = creditReady && (useStripeForm || rnplReady);
+  const showCardForm =
+    held && !!payConfig && optionsReady && !useStripeForm && !challenge && !payLocked;
+  const showCodeForm = held && !!challenge && !payLocked;
+  const showStripe = held && useStripeForm && optionsReady && !payLocked;
+  /** Tahsil edilecek tutar düğmede de görünür (kredi düşülmüş). */
+  const payLabel =
+    amountMinor !== undefined && currency
+      ? `${t("payAndConfirm")} · ${f.money(amountMinor - creditMinor, currency)}`
+      : t("payAndConfirm");
+  // Hata, onu doğuran eylemin yanında gösterilir: ödeme hatası gönder düğmesinin hemen üstünde.
+  const errorAt =
+    message?.kind !== "error"
+      ? null
+      : message.at === "cancel"
+        ? "cancel"
+        : showCardForm
+          ? "card"
+          : showCodeForm
+            ? "code"
+            : showStripe
+              ? "stripe"
+              : "page";
+  const errorAlert =
+    message?.kind === "error" ? (
+      <p ref={errorRef} role="alert" className="text-sm text-red-700">
+        {message.text}
+      </p>
+    ) : null;
+  // Nötr not ödeme düğmesinin yanında görünür; duyuru `role=status` bölgesinden yapılır.
+  const noteText =
+    message?.kind === "note" ? <p className="text-sm text-gray-700">{message.text}</p> : null;
+  const holdInfo =
+    held && holdExpiresAt ? (
+      <div className="text-sm text-amber-700">
+        <p>{t("holdUntil", { time: f.time(holdExpiresAt) })}</p>
+        {remainingText && (
+          <p className="font-semibold">{t("hold.remaining", { time: remainingText })}</p>
+        )}
+      </div>
+    ) : null;
+  const cancelLabel = cancelling ? t("cancel.processing") : t("cancel.button");
+  /** Zaman aşımı notu rezervasyon onaylanınca (sayfa yeni durumu duyurur) gösterilmez. */
+  const statusMessage = message?.whileHeld && status !== "HELD" ? null : message;
+  const cancelBusyClass = "aria-disabled:cursor-not-allowed aria-disabled:opacity-60";
 
   return (
     <div className="space-y-4 border-t border-gray-100 pt-6">
-      {held && holdExpiresAt && (
-        <div className="text-sm text-amber-700">
-          <p>{t("holdUntil", { time: f.time(holdExpiresAt) })}</p>
-          {remainingText && (
-            <p className="font-semibold">{t("hold.remaining", { time: remainingText })}</p>
-          )}
-        </div>
-      )}
-
       {expired && (
         <div className="space-y-2 text-sm text-amber-700">
           <h2 className="text-lg font-semibold text-gray-900">{t("hold.expiredTitle")}</h2>
@@ -437,159 +574,205 @@ export default function BookingActions({
         </div>
       )}
 
-      {held && !challenge && !useStripeForm && (
-        <RnplOption bookingId={bookingId} disabled={busy} selected={rnpl} onChange={setRnpl} />
-      )}
-      {/* Gizlenir ama kaldırılmaz: geri dönüldüğünde kutu ile gönderilen kredi tutarı aynı kalır. */}
-      {status === "HELD" && (
-        <div hidden={!held || !!challenge || rnpl}>
-          <WalletCreditOption
-            bookingId={bookingId}
-            totalMinor={amountMinor}
-            currency={currency}
-            disabled={busy}
-            onChange={setCreditMinor}
-          />
-        </div>
-      )}
-      {held && useStripeForm && (
-        <div className="space-y-3">
-          <h2 className="text-lg font-semibold text-gray-900">{t("title")}</h2>
-          <StripePaymentForm
-            publishableKey={payConfig.publishableKey!}
-            amountMinor={amountMinor! - creditMinor}
-            currency={currency!}
-            busy={busy}
-            submit={stripeSubmit}
-            confirm={stripeConfirm}
-            onError={(text) => setMessage({ kind: "error", text })}
-          />
-        </div>
-      )}
-
-      {held && !useStripeForm && !challenge && (
-        <form onSubmit={pay} noValidate className="space-y-3" aria-label={t("title")}>
-          <h2 className="text-lg font-semibold text-gray-900">{t("title")}</h2>
-          <Field label={t("cardNumber")} id={`${ids}-number`} error={fieldErrors.number}>
-            <input
-              id={`${ids}-number`}
-              ref={numberRef}
-              className={input}
-              inputMode="numeric"
-              autoComplete="cc-number"
-              maxLength={23}
-              value={card.number}
-              onChange={(e) => updateCard("number", e.target.value)}
-              required
-            />
-          </Field>
-          <div className="grid grid-cols-2 gap-3">
-            <Field
-              label={t("expiry")}
-              id={`${ids}-exp`}
-              hint={t("expiryHint")}
-              error={fieldErrors.exp}
+      {held && payLocked && (
+        <>
+          {holdInfo}
+          <div className="space-y-2 text-sm text-gray-700">
+            <h2 ref={lockedRef} tabIndex={-1} className="text-lg font-semibold text-gray-900">
+              {t("attempts.lockedTitle")}
+            </h2>
+            <p>{t("attempts.lockedBody")}</p>
+            <Link
+              href={`/support?bookingId=${encodeURIComponent(bookingId)}`}
+              className={`inline-flex min-h-[44px] items-center font-semibold text-[#003580] underline ${focusRing}`}
             >
-              <input
-                id={`${ids}-exp`}
-                ref={expRef}
-                className={input}
-                inputMode="numeric"
-                autoComplete="cc-exp"
-                maxLength={5}
-                value={card.exp}
-                onChange={(e) => updateCard("exp", formatExpiry(e.target.value))}
-                required
-              />
-            </Field>
-            <Field label={t("cvc")} id={`${ids}-cvc`} error={fieldErrors.cvc}>
-              <input
-                id={`${ids}-cvc`}
-                ref={cvcRef}
-                className={input}
-                inputMode="numeric"
-                autoComplete="cc-csc"
-                maxLength={4}
-                value={card.cvc}
-                onChange={(e) => updateCard("cvc", e.target.value)}
-                required
-              />
-            </Field>
+              {t("attempts.contactSupport")}
+            </Link>
           </div>
-          <p className="text-xs text-gray-500">
-            {t("testCards", {
-              success: TEST_CARDS.success,
-              decline: TEST_CARDS.decline,
-              threeDs: TEST_CARDS.threeDs,
-            })}
-          </p>
-          <button aria-disabled={busy || undefined} aria-busy={busy} className={submitClass}>
-            {busy ? t("processing") : rnpl ? t("rnpl.reserve") : t("payAndConfirm")}
-          </button>
-        </form>
+        </>
       )}
 
-      {held && challenge && (
-        <form onSubmit={confirm3ds} className="space-y-3" aria-label={t("threeDsTitle")}>
-          <h2 className="text-lg font-semibold text-gray-900">{t("threeDsTitle")}</h2>
-          <p className="text-sm text-gray-600">{t("threeDsIntro")}</p>
-          <Field label={t("verificationCode")} id={`${ids}-code`} hint={challenge}>
-            <input
-              id={`${ids}-code`}
-              ref={codeRef}
-              className={input}
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              required
+      {/* Tek "Ödeme" başlığı: ödeme zamanı, kredi ve kart formu bu başlığın altında sıralanır. */}
+      {held && !payLocked && (
+        <section className="space-y-4">
+          <h2 className="text-lg font-semibold text-gray-900">{t("title")}</h2>
+          {holdInfo}
+
+          {(!payConfig || !optionsReady) && (
+            <div className="min-h-[18rem] space-y-3" aria-busy={!configFailed}>
+              {configFailed ? (
+                <>
+                  <p role="alert" className="text-sm text-red-700">
+                    {t("config.failed")}
+                  </p>
+                  <button type="button" onClick={retryConfig} className={secondaryClass}>
+                    {tc("errorPage.retry")}
+                  </button>
+                </>
+              ) : (
+                <p className="text-sm text-gray-600">{t("config.loading")}</p>
+              )}
+            </div>
+          )}
+
+          {!!payConfig && !challenge && !useStripeForm && (
+            <RnplOption
+              bookingId={bookingId}
+              disabled={busy}
+              selected={rnpl}
+              onChange={setRnpl}
+              onLoaded={() => setRnplReady(true)}
             />
-          </Field>
-          <button aria-disabled={busy || undefined} aria-busy={busy} className={submitClass}>
-            {busy ? t("processing") : t("verify")}
-          </button>
+          )}
+          {/* Gizlenir, kaldırılmaz: geri dönüldüğünde kutu ile gönderilen kredi aynı kalır.
+              "Sonra öde" seçiliyken kutu kaybolmaz; devre dışı görünür ve nedeni yazılır. */}
+          <div hidden={!payConfig || !!challenge}>
+            <WalletCreditOption
+              bookingId={bookingId}
+              totalMinor={amountMinor}
+              currency={currency}
+              disabled={busy}
+              onChange={setCreditMinor}
+              onValidityChange={setCreditValid}
+              inputRef={creditInputRef}
+              rnplSelected={rnpl}
+              onLoaded={() => setCreditReady(true)}
+            />
+          </div>
+
+          {showStripe && (
+            <div ref={stripeBoxRef} className="space-y-3">
+              <StripePaymentForm
+                publishableKey={stripeKey!}
+                amountMinor={amountMinor! - creditMinor}
+                currency={currency!}
+                busy={busy}
+                submit={stripeSubmit}
+                confirm={stripeConfirm}
+                onError={(text) => setMessage({ kind: "error", text })}
+              />
+              {noteText}
+              {errorAt === "stripe" && errorAlert}
+            </div>
+          )}
+
+          {showCardForm && (
+            <form onSubmit={pay} noValidate className="space-y-3" aria-label={t("title")}>
+              <CardFields
+                values={card}
+                onChange={updateCard}
+                errors={fieldErrors}
+                disabled={busy}
+                idPrefix={ids}
+                inputRefs={{ number: numberRef, exp: expRef, cvc: cvcRef }}
+                showTestCards
+              />
+              {noteText}
+              {errorAt === "card" && errorAlert}
+              <button
+                ref={payButtonRef}
+                aria-disabled={busy || undefined}
+                aria-busy={busy}
+                className={submitClass}
+              >
+                {busy ? t("processing") : rnpl ? t("rnpl.reserve") : payLabel}
+              </button>
+            </form>
+          )}
+
+          {showCodeForm && (
+            <form onSubmit={confirm3ds} className="space-y-3" aria-label={t("threeDsTitle")}>
+              <h3 className="text-base font-semibold text-gray-900">{t("threeDsTitle")}</h3>
+              <p className="text-sm text-gray-600">{t("threeDsIntro")}</p>
+              <Field label={t("verificationCode")} id={`${ids}-code`} hint={challenge}>
+                <input
+                  id={`${ids}-code`}
+                  ref={codeRef}
+                  className={input}
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={8}
+                  value={code}
+                  onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+                  required
+                />
+              </Field>
+              {errorAt === "code" && errorAlert}
+              <button aria-disabled={busy || undefined} aria-busy={busy} className={submitClass}>
+                {busy ? t("processing") : t("verify")}
+              </button>
+              <p id={`${ids}-nocode`} className="text-sm text-gray-600">
+                {t("threeDsNoCode")}
+              </p>
+              <button
+                type="button"
+                onClick={backToCard}
+                disabled={busy}
+                aria-describedby={`${ids}-nocode`}
+                className={secondaryClass}
+              >
+                {t("threeDsBack")}
+              </button>
+            </form>
+          )}
+        </section>
+      )}
+
+      {errorAt === "page" && errorAlert}
+
+      {/* Ödeme adımında iptal birincil eylem değildir: ödeme formundan ayrı, metin bağlantısı. */}
+      {status === "HELD" && (
+        <div
+          role="group"
+          aria-labelledby={`${ids}-more`}
+          className="space-y-1 border-t border-gray-100 pt-4"
+        >
+          <p id={`${ids}-more`} className="text-sm text-gray-600">
+            {t("otherOptions")}
+          </p>
           <button
             type="button"
-            onClick={backToCard}
-            disabled={busy}
-            className={`min-h-[44px] w-full rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 ${focusRing}`}
+            onClick={() => void cancel()}
+            aria-disabled={busy || undefined}
+            aria-busy={cancelling || undefined}
+            className={`inline-flex min-h-[44px] items-center text-sm font-semibold text-red-700 underline hover:no-underline ${cancelBusyClass} ${focusRing}`}
           >
-            {t("threeDsBack")}
+            {cancelLabel}
           </button>
-        </form>
+        </div>
       )}
-
-      {message?.kind === "error" && (
-        <p role="alert" className="text-sm text-red-700">
-          {message.text}
-        </p>
-      )}
-
-      {(status === "HELD" || status === "CONFIRMED") && (
+      {status === "CONFIRMED" && (
         <button
           type="button"
           onClick={() => void cancel()}
-          disabled={busy}
-          className={`rounded-lg border border-red-300 px-6 py-3 text-sm font-semibold text-red-700 hover:bg-red-50 ${focusRing}`}
+          aria-disabled={busy || undefined}
+          aria-busy={cancelling || undefined}
+          className={`rounded-lg border border-red-300 px-6 py-3 text-sm font-semibold text-red-700 hover:bg-red-50 ${cancelBusyClass} ${focusRing}`}
         >
-          {t("cancel.button")}
+          {cancelLabel}
         </button>
       )}
+      {errorAt === "cancel" && errorAlert}
 
       {stepUp && (
         <StepUpDialog
           bookingId={bookingId}
+          holdExpiresAt={holdExpiresAt}
           onVerified={(token) => void afterStepUp(token)}
-          onCancel={() => setStepUp(null)}
+          onCancel={cancelStepUp}
         />
       )}
 
       <p
         role="status"
         aria-live="polite"
-        className={message?.kind === "info" ? "text-sm text-green-700" : "sr-only"}
+        className={statusMessage?.kind === "info" ? "text-sm text-green-700" : "sr-only"}
       >
-        {message?.kind === "info" ? message.text : expired ? t("hold.expired") : announcement}
+        {statusMessage && statusMessage.kind !== "error"
+          ? statusMessage.text
+          : expired
+            ? t("hold.expired")
+            : announcement}
       </p>
 
       {confirmDialog}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
 import { useFormat } from "@/i18n/use-format";
@@ -31,10 +31,13 @@ interface Props {
  */
 export default function StripePaymentForm(props: Props) {
   const stripePromise = useMemo(() => loadStripe(props.publishableKey), [props.publishableKey]);
+  // Kart alanları ve Stripe hata metinleri tarayıcı dilini değil arayüz dilini izler (F771).
+  const locale = useLocale() === "en" ? "en" : "tr";
   return (
     <Elements
       stripe={stripePromise}
       options={{
+        locale,
         mode: "payment",
         amount: props.amountMinor,
         currency: props.currency.toLowerCase(),
@@ -70,7 +73,15 @@ function InnerForm({
     setWorking(true);
     try {
       const { error: submitError } = await elements.submit();
-      if (submitError) return onError(submitError.message ?? t("invalidCard"));
+      if (submitError) {
+        // Alan doğrulama hatasını PaymentElement kendi altında gösterir; ikinci kez
+        // duyurmak yerine odağı forma taşı (F1238).
+        if (submitError.type === "validation_error") {
+          elements.getElement("payment")?.focus();
+          return;
+        }
+        return onError(submitError.message ?? t("invalidCard"));
+      }
       const { paymentMethod, error } = await stripe.createPaymentMethod({ elements });
       if (error || !paymentMethod) return onError(error?.message ?? t("invalidCard"));
       const out = await submit(paymentMethod.id);
@@ -99,7 +110,9 @@ function InnerForm({
         disabled={busy || working || !stripe}
         className="w-full rounded-lg bg-[#003580] px-4 py-3 text-sm font-semibold text-white disabled:bg-gray-300 disabled:text-gray-700"
       >
-        {busy || working ? t("processing") : t("payAndConfirm")}
+        {busy || working
+          ? t("processing")
+          : `${t("payAndConfirm")} · ${f.money(amountMinor, currency)}`}
       </button>
     </form>
   );

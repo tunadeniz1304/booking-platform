@@ -6,6 +6,13 @@ import { demoListingCopy } from "@/lib/llm/demo";
 import { assertNumbersGrounded, buildFactSet } from "@/lib/llm/guards";
 import { assertPropertyAccess } from "@/lib/host/host-service";
 import type { AccessClaims } from "@/lib/auth";
+import { bedTypeKey, type BedType } from "@/lib/i18n/bed-type";
+import trCommon from "../../../messages/tr/common.json";
+
+/** Yatak tipi kodunun okunur etiketi (F1306); taslak metne kod değil etiket girer. */
+function bedTypeLabel(value: string): string {
+  return bedTypeKey(value) ? trCommon.bedTypes[value as BedType] : value;
+}
 
 /** İlan açıklaması taslağı (P1-7): host düzenler/onaylar; otomatik yayınlanmaz. */
 export async function draftListingCopy(actor: AccessClaims, propertyId: string) {
@@ -25,7 +32,11 @@ export async function draftListingCopy(actor: AccessClaims, propertyId: string) 
     city: p.location.city,
     propertyType: p.propertyType,
     amenities: p.amenities.map((a) => a.name),
-    rooms: p.rooms.map((r) => ({ name: r.name, capacity: r.maxOccupancy, bedType: r.bedType })),
+    rooms: p.rooms.map((r) => ({
+      name: r.name,
+      capacity: r.maxOccupancy,
+      bedType: bedTypeLabel(r.bedType),
+    })),
   };
   const factSet = buildFactSet([JSON.stringify(facts), p.rooms.length]);
   const res = await getLlmClient().completeJson(

@@ -1,7 +1,7 @@
 {
   "manifest": {
-    "name": "Booking — Stay Reservations",
-    "shortName": "Booking",
+    "name": "booking-platform — Stay Reservations",
+    "shortName": "booking-platform",
     "description": "Search stays and view your bookings and QR card even offline (portfolio/demo project)."
   },
   "trips": {
@@ -12,17 +12,28 @@
     "loginRequired": "Sign in to see your trips.",
     "loginLink": "Sign in",
     "loadError": "Trips could not be loaded.",
-    "offlineBanner": "You are offline — showing your last saved itinerary ({time}).",
+    "offlineBanner": "You are offline — showing the itinerary saved on {time}. Later changes may not appear here.",
     "offlineUnavailable": "You are offline and no itinerary has been saved yet. Open this page once while online.",
     "room": "Room: {name}",
     "checkIn": "Check-in",
     "checkOut": "Check-out",
     "checkInFrom": "from {time}",
     "guests": "{count, plural, one {# guest} other {# guests}}",
-    "codeLabel": "Booking code",
+    "codeLabel": "Booking number",
     "qrAlt": "Booking QR code for {property}",
     "qrHint": "Show this QR code at check-in. It contains no personal data; the property verifies it on the server.",
-    "accountLink": "My trips (offline)"
+    "accountLink": "My trips & QR card (works offline)",
+    "accountQrHint": "The QR card for your upcoming stays is on <link>My trips</link>.",
+    "detailsLink": "Booking details and messages",
+    "copyNumber": "Copy number",
+    "copied": "Booking number copied.",
+    "copyFailed": "Could not copy; select the number and copy it manually.",
+    "checkOutUntil": "by {time}",
+    "stay": "Length of stay",
+    "nights": "{count, plural, one {# night} other {# nights}}",
+    "emptyNote": "Bookings awaiting payment or cancelled bookings are not shown here.",
+    "allBookingsLink": "All my bookings",
+    "introScope": "Bookings awaiting payment, past bookings and cancelled bookings are listed under <link>My account › My bookings</link>."
   },
   "push": {
     "title": "Push notifications",
@@ -31,16 +42,29 @@
     "disable": "Disable notifications on this device",
     "working": "Working…",
     "enabled": "This device receives notifications.",
-    "disabledServer": "Push notifications are not configured on this server (no VAPID keys); email notifications keep working.",
+    "disabledServer": "Push notifications are not available right now; email notifications keep working.",
     "unsupported": "Your browser does not support push notifications.",
     "denied": "Notification permission was denied. You can allow it in your browser settings.",
     "error": "The notification setting could not be changed.",
     "dismissed": "Notification permission was not granted. You can try again if you like.",
     "disabledDone": "Notifications are turned off on this device.",
-    "deniedHelp": "To allow them, tap the lock icon in the address bar, set Notifications to \"Allow\" and reload the page."
+    "deniedHelp": "To allow them, tap the lock icon in the address bar and set Notifications to \"Allow\"; then press \"Check permission again\".",
+    "iosInstall": "To get notifications on iPhone or iPad, choose \"Add to Home Screen\" from the browser's Share menu, then open the app from the Home Screen icon and come back to this page (iOS 16.4 or later).",
+    "notReady": "The notification service could not start on this device. Reload the page and try again.",
+    "recheck": "Check permission again",
+    "recheckError": "The permission could not be checked. Check your connection and try again.",
+    "stillDenied": "Notification permission is still blocked. Allow it in your browser settings and check again.",
+    "allowedNow": "Notification permission is now allowed; you can turn on notifications on this device."
   },
   "offline": {
     "title": "You are offline",
-    "body": "This page is not available offline. My trips and your booking QR card open offline too."
+    "body": "This page is not available offline. If you opened My trips earlier while online, it and your booking QR card open offline too.",
+    "retry": "Try again",
+    "home": "Home",
+    "reconnect": "When your connection is back, this page reloads by itself. If you don't want to wait, press “Try again”."
+  },
+  "network": {
+    "offline": "You are offline — try again once the connection is back.",
+    "online": "You are back online."
   }
 }

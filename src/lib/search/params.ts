@@ -2,6 +2,7 @@ import { z } from "zod";
 import { CURRENCIES } from "@/lib/money/money";
 import { isIsoDate } from "@/lib/time/nights";
 import { ACCESSIBILITY_CODES } from "@/lib/compliance/accessibility-codes";
+import { MAX_SEARCH_GUESTS } from "@/lib/search/guest-limits";
 
 /**
  * Arama parametreleri (v3#7) — sınırda tek zod şeması. v2'de `new Date(checkIn)` ve
@@ -34,10 +35,12 @@ export const SearchParamsSchema = z
     country: z.string().trim().max(100).optional(),
     checkIn: isoDate.optional(),
     checkOut: isoDate.optional(),
-    guests: optionalNumber(z.coerce.number().int().min(1).max(30)),
+    guests: optionalNumber(z.coerce.number().int().min(1).max(MAX_SEARCH_GUESTS)),
     propertyType: z.enum(["HOTEL", "APARTMENT", "VILLA", "HOSTEL", "BED_AND_BREAKFAST"]).optional(),
     minPrice: optionalNumber(z.coerce.number().min(0).max(10_000_000)),
     maxPrice: optionalNumber(z.coerce.number().min(0).max(10_000_000)),
+    /** F1140: asgari misafir puanı (`ratingAvg`, 0–5 ölçeği). */
+    minRating: optionalNumber(z.coerce.number().min(0).max(5)),
     amenities: z.array(z.string().trim().min(1).max(60)).max(30).optional(),
     currency: z.enum(CURRENCIES).optional(),
     page: optionalNumber(z.coerce.number().int().min(1).max(1000)),
@@ -112,6 +115,7 @@ export function searchParamsFromUrl(sp: URLSearchParams): Record<string, unknown
     propertyType: sp.get("propertyType") || undefined,
     minPrice: sp.get("minPrice") ?? undefined,
     maxPrice: sp.get("maxPrice") ?? undefined,
+    minRating: sp.get("minRating") ?? undefined,
     amenities: amenities && amenities.length > 0 ? amenities : undefined,
     currency: sp.get("currency") || undefined,
     page: sp.get("page") ?? undefined,

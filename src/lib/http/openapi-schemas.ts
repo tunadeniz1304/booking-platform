@@ -169,7 +169,8 @@ export const RESPONSE_SCHEMAS: Record<string, JsonSchema> = {
     { mode: { type: "string", enum: ["live", "demo"] }, effectiveMode: str, hasKey: bool },
     { model: str, baseUrlHost: nullable(str), maxConcurrency: int, visionEnabled: bool }
   ),
-  Location: obj({ city: str, country: str }),
+  // `include=properties`: ilan öğeleri `type: "property"`, `id`, `title` taşır; şehirlerde yok.
+  Location: obj({ city: str, country: str }, { type: { const: "property" }, id: str, title: str }),
   Favorite: obj({
     id: str,
     propertyId: str,
@@ -184,6 +185,7 @@ export const RESPONSE_SCHEMAS: Record<string, JsonSchema> = {
     role: { type: "string", enum: ["USER", "HOST", "ADMIN"] },
     avatarUrl: nullable(str),
     createdAt: dateTime,
+    emailVerified: bool,
   }),
   Quote: obj(
     {
@@ -306,7 +308,7 @@ export const RESPONSE_SCHEMAS: Record<string, JsonSchema> = {
   },
   RnplOffer: obj(
     { available: bool, dueTodayMinor: { const: 0 }, amountMinor: minor, currency },
-    { reason: str, dueAt: str, freeCancellationUntil: str }
+    { reason: str, dueAt: str, freeCancellationUntil: str, timeZone: str }
   ),
   SupportChatResult: obj(
     {
@@ -340,6 +342,22 @@ export const RESPONSE_SCHEMAS: Record<string, JsonSchema> = {
     ),
   }),
   SupportTicketStatus: obj({ id: str, status: str }),
+  MySupportTicketList: obj({
+    tickets: arrayOf(
+      obj({
+        id: str,
+        bookingId: nullable(str),
+        status: { type: "string", enum: ["OPEN", "IN_PROGRESS", "RESOLVED"] },
+        reason: {
+          type: "string",
+          enum: ["LOW_CONFIDENCE", "MONEY_REQUEST", "LEGAL_OR_COMPLAINT", "USER_REQUEST"],
+        },
+        createdAt: dateTime,
+        updatedAt: dateTime,
+        resolvedAt: nullable(dateTime),
+      })
+    ),
+  }),
   SearchHit: searchHit,
   SearchResult: obj(searchPage, { cached: bool, semantic: bool, ranking: str }),
   SmartSearchResult: obj(
@@ -350,6 +368,15 @@ export const RESPONSE_SCHEMAS: Record<string, JsonSchema> = {
       llmMode: str,
     },
     { cached: bool }
+  ),
+  // `filtersOnly: true`: yalnız çözümlenen filtre (sonuç listesi yok; arama istemcide).
+  SmartSearchFilters: obj(
+    {
+      filters: obj({ ai_generated: { const: true } }),
+      ai_generated: { const: true },
+      llmMode: str,
+    },
+    { reason: str }
   ),
   PropertyDetail: obj(
     {

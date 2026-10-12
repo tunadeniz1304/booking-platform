@@ -18,9 +18,30 @@ import { getConfig } from "@/lib/config/app-config";
 
 export type RevenueFactor = "occupancy" | "lead_time" | "holiday" | "event" | "clamp";
 
+export type ContributionDetailKey =
+  | "occupancy"
+  | "leadTime"
+  | "lastMinute"
+  | "holiday"
+  | "noHoliday"
+  | "events"
+  | "noEvents"
+  | "ceiling"
+  | "floor"
+  | "withinBounds";
+
+/** Arayüzde `revenue.factorDetail.<key>` ile yerelleştirilen yapılandırılmış etiket. */
+export interface ContributionDetail {
+  key: ContributionDetailKey;
+  params?: Record<string, string | number>;
+}
+
 export interface Contribution {
   factor: RevenueFactor;
+  /** Türkçe etiket (eski kayıtlar ve LLM açıklaması için korunur). */
   label: string;
+  /** Eski (JSON) kayıtlarda bulunmayabilir; yoksa istemci `label`a düşer. */
+  detail?: ContributionDetail;
   multiplier: number;
   amountMinor: number;
 }
@@ -89,28 +110,41 @@ export function suggestPrice(
 
   const lastMinute = leadDays <= params.lastMinuteDays && occupancy < params.occupancyTarget;
   const eventPoints = input.events.reduce((s, e) => s + Math.max(0, finite(e.impact, 0)), 0);
-  const steps: Array<{ factor: RevenueFactor; label: string; multiplier: number }> = [
+  const percent = Math.round(occupancy * 100);
+  const eventList = input.events.map((e) => `${e.title} (${e.impact})`).join(", ");
+  const steps: Array<{
+    factor: RevenueFactor;
+    label: string;
+    detail: ContributionDetail;
+    multiplier: number;
+  }> = [
     {
       factor: "occupancy",
-      label: `Doluluk %${Math.round(occupancy * 100)}`,
+      label: `Doluluk %${percent}`,
+      detail: { key: "occupancy", params: { percent } },
       multiplier: 1 + params.occupancyWeight * (occupancy - params.occupancyTarget),
     },
     {
       factor: "lead_time",
       label: lastMinute ? `Son dakika (${leadDays} gün)` : `Varışa ${leadDays} gün`,
+      detail: { key: lastMinute ? "lastMinute" : "leadTime", params: { days: leadDays } },
       multiplier: lastMinute ? 1 - params.lastMinuteDiscountBps / BPS : 1,
     },
     {
       factor: "holiday",
       label: input.holiday ?? "Resmî tatil yok",
+      detail: input.holiday
+        ? { key: "holiday", params: { name: input.holiday } }
+        : { key: "noHoliday" },
       multiplier: input.holiday ? 1 + params.holidayUpliftBps / BPS : 1,
     },
     {
       factor: "event",
-      label:
+      label: input.events.length > 0 ? eventList : "Onaylı etkinlik yok",
+      detail:
         input.events.length > 0
-          ? input.events.map((e) => `${e.title} (${e.impact})`).join(", ")
-          : "Onaylı etkinlik yok",
+          ? { key: "events", params: { list: eventList } }
+          : { key: "noEvents" },
       multiplier: 1 + eventPoints * params.eventFactorPerPoint,
     },
   ];
@@ -123,6 +157,7 @@ export function suggestPrice(
     contributions.push({
       factor: step.factor,
       label: step.label,
+      detail: step.detail,
       multiplier: Math.round(multiplier * BPS) / BPS,
       amountMinor: Math.round(next) - Math.round(running),
     });
@@ -139,6 +174,7 @@ export function suggestPrice(
         : clamped === "floor"
           ? "Taban sınırı"
           : "Sınır içinde",
+    detail: { key: clamped ?? "withinBounds" },
     multiplier: rawMinor === 0 ? 1 : Math.round((suggestedMinor / rawMinor) * BPS) / BPS,
     amountMinor: suggestedMinor - rawMinor,
   });

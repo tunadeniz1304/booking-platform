@@ -1,12 +1,12 @@
 {
   "page": {
     "title": "Revenue dashboard",
-    "intro": "Track occupancy, ADR and RevPAR; review price suggestions with their contribution table, then accept or reject them."
+    "intro": "Track occupancy, average daily rate (ADR) and revenue per available room (RevPAR); review price suggestions with their contribution table, then accept or reject them."
   },
   "loading": "Loading…",
-  "loadingProperties": "Loading properties…",
-  "noProperties": "You don't have any properties yet.",
-  "propertyLabel": "Property",
+  "loadingProperties": "Loading listings…",
+  "noProperties": "You don't have any listings yet.",
+  "propertyLabel": "Listing",
   "percent": "{value}%",
   "factor": {
     "occupancy": "Occupancy",
@@ -16,27 +16,38 @@
     "clamp": "Floor/ceiling"
   },
   "kpis": {
-    "title": "Performance ({from} – {to})",
+    "title": "Next {days, plural, one {# night} other {# nights}}: confirmed bookings ({from} – {to})",
     "occupancy": "Occupancy",
-    "adr": "ADR",
-    "revpar": "RevPAR",
+    "adr": "Average daily rate (ADR)",
+    "revpar": "Revenue per available room (RevPAR)",
     "revenue": "Revenue",
-    "sold": "{sold} / {available} room-nights sold (confirmed and completed bookings)."
+    "sold": "{sold} / {available} room-nights sold (confirmed and completed bookings).",
+    "occupancyHint": "Room-nights sold as a share of room-nights available.",
+    "adrHint": "Average revenue per room-night sold.",
+    "revparHint": "Revenue per available room-night (occupancy × ADR).",
+    "revenueHint": "Booking revenue for nights in this period.",
+    "noInventory": "No availability is open for this period, so occupancy and revenue can't be calculated. <link>Open availability in the calendar</link>."
   },
   "pickup": {
-    "title": "Pickup",
+    "title": "Booking pace (pickup)",
     "noData": "No data.",
-    "chartTitle": "Pickup chart",
-    "chartDesc": "Room-nights in the window from bookings made over the last {count} days; latest value {last}.",
-    "caption": "Line: total room-nights in the window · Bars: room-nights booked that day",
-    "trend": "Room-nights on the books went from {first} to {last}; the most room-nights booked in one day was {dailyMax}.",
+    "chartTitle": "Booking pace chart",
+    "chartDesc": "Room-nights in this period from bookings made over the last {count} days; latest value {last}.",
+    "caption": "Line: total room-nights booked for the period · Bars: room-nights booked that day",
+    "trend": "Room-nights booked for the period went from {first} to {last}; the most room-nights booked in one day was {dailyMax}.",
     "tableToggle": "Show data as a table",
     "tableCaption": "Daily pickup data",
     "columns": {
       "date": "Date",
       "pickup": "Room-nights booked that day",
-      "onBooks": "Total room-nights on the books"
-    }
+      "onBooks": "Total room-nights booked for the period"
+    },
+    "window": "Bookings made over the last {days} days for nights between {from} and {to}. The horizontal axis shows the day each booking was made.",
+    "empty": "There are no bookings yet for nights in this period. The chart will appear here after the first booking.",
+    "lineLabel": "Total room-nights booked for the period (line)",
+    "lineScale": "Scale 0–{max} · latest {last}",
+    "barLabel": "Room-nights booked that day (bars)",
+    "barScale": "Scale 0–{max}"
   },
   "suggestions": {
     "title": "Price suggestions",
@@ -56,10 +67,50 @@
     "accept": "Accept",
     "reject": "Reject",
     "acceptNote": "The accepted price goes live right away and is locked; the engine will not update this night again. To go back, you must enter the old price manually in the calendar.",
-    "acceptConfirmTitle": "Set the {room} · {date} price from {from} to {to}?",
+    "acceptConfirmTitle": "Change the {room} · {date} price from {from} to {to}?",
     "acceptConfirm": "Set price",
-    "accepted": "{room} · {date} price set from {from} to {to} and locked. Previous price: {from}.",
-    "rejected": "{room} · {date} suggestion rejected; the price stays at {from}."
+    "accepted": "{room} · {date} price changed from {from} to {to} and locked. To undo, enter {from} again in the calendar.",
+    "rejected": "{room} · {date} suggestion rejected; the price stays at {from}.",
+    "currentLabel": "Current price:",
+    "suggestedLabel": "Suggested price:",
+    "changeLabel": "Change:",
+    "replaceNote": "{count, plural, one {# pending suggestion for this room will be replaced by the new ones.} other {# pending suggestions for this room will be replaced by the new ones.}}",
+    "replaceConfirmTitle": "Replace pending suggestions with new ones?",
+    "replaceConfirm": "Generate new suggestions",
+    "roomOption": "{name} ({count, plural, =0 {no pending suggestions} one {# pending suggestion} other {# pending suggestions}})",
+    "generating": "Generating suggestions…",
+    "generatingStatus": "Preparing suggestions. An explanation is written for each night, so this can take a few seconds; please don't reload the page.",
+    "noneGenerated": "No suggestions were generated because this room has no open availability in the coming nights. <link>Open availability in the calendar</link>, then try again.",
+    "pendingElsewhere": "{count, plural, one {# pending suggestion is} other {# pending suggestions are}} waiting in other rooms; choose a room above to see them.",
+    "emptyForRoom": "No pending suggestions for {room}.",
+    "snapshotLabel": "Price when suggested:",
+    "priceChanged": "This night's price changed after the suggestion was generated; generate suggestions again to compare with the current price.",
+    "breakdownToggle": "Show how the price was calculated",
+    "captionFor": "Contribution table for the {room} · {date} suggestion",
+    "acceptAll": "Accept all ({count})",
+    "rejectAll": "Reject all ({count})",
+    "processing": "Processing…",
+    "acceptAllConfirmTitle": "Accept all {count, plural, one {# suggestion} other {# suggestions}} for {room}?",
+    "acceptAllConfirm": "Set {count, plural, one {# price} other {# prices}}",
+    "rejectAllConfirmTitle": "Reject all {count, plural, one {# suggestion} other {# suggestions}} for {room}?",
+    "rejectAllConfirm": "Reject all",
+    "rejectAllNote": "Rejecting doesn't change any prices; the suggestions are removed from the list.",
+    "acceptAllDone": "{count, plural, one {# suggestion} other {# suggestions}} accepted for {room}; the prices are set and locked.",
+    "rejectAllDone": "{count, plural, one {# suggestion} other {# suggestions}} rejected for {room}; no prices changed.",
+    "bulkFailed": "{done} of {total} suggestions were processed, then it stopped: {reason}"
   },
-  "loaded": "{title} data loaded."
+  "loaded": "{title} data loaded.",
+  "signInAgain": "Sign in again",
+  "factorDetail": {
+    "occupancy": "Occupancy {percent}%",
+    "leadTime": "{days, plural, one {# day} other {# days}} to arrival",
+    "lastMinute": "Last minute ({days, plural, one {# day} other {# days}})",
+    "holiday": "{name}",
+    "noHoliday": "No public holiday",
+    "events": "{list}",
+    "noEvents": "No approved events",
+    "ceiling": "Ceiling limit",
+    "floor": "Floor limit",
+    "withinBounds": "Within limits"
+  }
 }

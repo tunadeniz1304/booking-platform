@@ -1,7 +1,7 @@
 {
   "manifest": {
-    "name": "Booking — Konaklama Rezervasyonu",
-    "shortName": "Booking",
+    "name": "booking-platform — Konaklama Rezervasyonu",
+    "shortName": "booking-platform",
     "description": "Konaklama arayın, rezervasyonlarınızı ve QR kartınızı çevrimdışı da görün (portföy/demo projesi)."
   },
   "trips": {
@@ -12,35 +12,59 @@
     "loginRequired": "Seyahatlerinizi görmek için giriş yapın.",
     "loginLink": "Giriş yap",
     "loadError": "Seyahatler yüklenemedi.",
-    "offlineBanner": "Çevrimdışısınız — son kaydedilen seyahat planı gösteriliyor ({time}).",
+    "offlineBanner": "Çevrimdışısınız — {time} tarihinde kaydedilen seyahat planı gösteriliyor. Sonraki değişiklikler burada görünmeyebilir.",
     "offlineUnavailable": "Çevrimdışısınız ve kaydedilmiş seyahat planı yok. Sayfayı bir kez internete bağlıyken açın.",
     "room": "Oda: {name}",
     "checkIn": "Giriş",
     "checkOut": "Çıkış",
     "checkInFrom": "{time} itibarıyla",
     "guests": "{count, plural, one {# misafir} other {# misafir}}",
-    "codeLabel": "Rezervasyon kodu",
+    "codeLabel": "Rezervasyon numarası",
     "qrAlt": "{property} için rezervasyon QR kodu",
     "qrHint": "Girişte bu QR kodu gösterin. Kod kişisel bilgi içermez; tesis sunucuda doğrular.",
-    "accountLink": "Seyahatlerim (çevrimdışı)"
+    "accountLink": "Seyahatlerim ve QR kartı (çevrimdışı da açılır)",
+    "accountQrHint": "Yaklaşan konaklamalarınızın QR kartı <link>Seyahatlerim</link> sayfasında.",
+    "detailsLink": "Rezervasyon ayrıntıları ve mesajlar",
+    "copyNumber": "Numarayı kopyala",
+    "copied": "Rezervasyon numarası kopyalandı.",
+    "copyFailed": "Kopyalanamadı; numarayı seçip elle kopyalayın.",
+    "checkOutUntil": "{time} saatine kadar",
+    "stay": "Süre",
+    "nights": "{count, plural, one {# gece} other {# gece}}",
+    "emptyNote": "Ödemesi tamamlanmamış ya da iptal edilmiş rezervasyonlar burada görünmez.",
+    "allBookingsLink": "Tüm rezervasyonlarım",
+    "introScope": "Ödemesi bekleyen, geçmiş ve iptal edilen rezervasyonlarınız <link>Hesabım › Rezervasyonlarım</link> bölümünde listelenir."
   },
   "push": {
     "title": "Anlık bildirimler",
-    "description": "Fiyat alarmınızdaki konaklamanın fiyatı düştüğünde ve check-in'den önce bu cihaza bildirim gönderelim.",
+    "description": "Fiyat alarmınızdaki konaklamanın fiyatı düştüğünde ve giriş gününden önce bu cihaza bildirim gönderelim.",
     "enable": "Bu cihazda bildirimleri aç",
     "disable": "Bu cihazda bildirimleri kapat",
     "working": "İşleniyor…",
     "enabled": "Bu cihaz bildirim alıyor.",
-    "disabledServer": "Anlık bildirimler bu sunucuda yapılandırılmamış (VAPID anahtarları yok); e-posta bildirimleri çalışmaya devam eder.",
+    "disabledServer": "Anlık bildirimler şu an kullanılamıyor; e-posta bildirimleri çalışmaya devam eder.",
     "unsupported": "Tarayıcınız anlık bildirimleri desteklemiyor.",
     "denied": "Bildirim izni reddedildi. Tarayıcı ayarlarından izin verebilirsiniz.",
     "error": "Bildirim ayarı değiştirilemedi.",
     "dismissed": "Bildirim izni verilmedi. İsterseniz yeniden deneyebilirsiniz.",
     "disabledDone": "Bu cihazda bildirimler kapatıldı.",
-    "deniedHelp": "İzni açmak için adres çubuğundaki kilit simgesine dokunun, Bildirimler ayarını \"İzin ver\" yapın ve sayfayı yenileyin."
+    "deniedHelp": "İzni açmak için adres çubuğundaki kilit simgesine dokunun ve Bildirimler ayarını \"İzin ver\" yapın; ardından \"İzni yeniden kontrol et\" düğmesine basın.",
+    "iosInstall": "iPhone ve iPad'de bildirim almak için tarayıcının Paylaş menüsünden \"Ana Ekrana Ekle\"yi seçin, ardından uygulamayı ana ekran simgesinden açıp bu sayfaya gelin (iOS 16.4 ve üzeri).",
+    "notReady": "Bildirim hizmeti bu cihazda başlatılamadı. Sayfayı yenileyip yeniden deneyin.",
+    "recheck": "İzni yeniden kontrol et",
+    "recheckError": "İzin durumu kontrol edilemedi. Bağlantınızı kontrol edip yeniden deneyin.",
+    "stillDenied": "Bildirim izni hâlâ kapalı. Tarayıcı ayarlarından izin verip yeniden kontrol edin.",
+    "allowedNow": "Bildirim izni açıldı; bu cihazda bildirimleri açabilirsiniz."
   },
   "offline": {
     "title": "Çevrimdışısınız",
-    "body": "Bu sayfa çevrimdışı kullanılamıyor. Seyahatlerim sayfası ve rezervasyon QR kartınız çevrimdışı da açılır."
+    "body": "Bu sayfa çevrimdışı kullanılamıyor. Seyahatlerim sayfasını daha önce internete bağlıyken açtıysanız, o sayfa ve rezervasyon QR kartınız çevrimdışı da açılır.",
+    "retry": "Tekrar dene",
+    "home": "Ana sayfa",
+    "reconnect": "İnternet bağlantınız geri gelince bu sayfa kendiliğinden yenilenir. Beklemek istemezseniz “Tekrar dene”ye basın."
+  },
+  "network": {
+    "offline": "Çevrimdışısınız — bağlantı gelince işlemi yeniden deneyin.",
+    "online": "Bağlantı geri geldi."
   }
 }

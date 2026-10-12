@@ -6,16 +6,28 @@ import { getAuth } from "@/lib/auth";
 import { observed } from "@/lib/http/observed";
 import { markAiGenerated, withAiSubject } from "@/lib/http/ai";
 
-const bodySchema = z.object({ text: z.string().trim().min(3).max(300) });
+const bodySchema = z.object({
+  text: z.string().trim().min(3).max(300),
+  filtersOnly: z.boolean().optional(),
+});
 
 /**
  * Doğal dil arama: metin → doğrulanmış filtre (LLM veya demo) → DETERMİNİSTİK arama.
  * Yanıt 200 + `llmMode` (live | demo | fallback); çıkarılan filtreler UI'da çip olur.
+ * `filtersOnly: true`: arama yapılmaz, yalnız filtreler döner (arama sayfası sonuçları
+ * birleşik aramayla ayrıca çeker).
  */
 export const POST = observed("search.smart", async function smartHandler(req: NextRequest) {
-  const { text } = bodySchema.parse(await req.json());
+  const { text, filtersOnly } = bodySchema.parse(await req.json());
   const translated = await withAiSubject(req, () => translateQuery(text));
   const f = translated.data;
+  const meta = {
+    filters: markAiGenerated(f),
+    ai_generated: true,
+    llmMode: translated.llmMode,
+    reason: translated.reason,
+  };
+  if (filtersOnly) return NextResponse.json(meta);
   const userId = (await getAuth(req))?.userId;
   // Hibrit aramanın sorgu gömmesi de isteğin öznesine faturalanır (öznesiz → vektör kanalı yok).
   const results = await withAiSubject(req, () =>
@@ -36,13 +48,7 @@ export const POST = observed("search.smart", async function smartHandler(req: Ne
     })
   );
   // AI yalnızca filtre çevirisini yapar (işaretli); sonuç listesi deterministik aramadır.
-  return NextResponse.json({
-    filters: markAiGenerated(f),
-    ai_generated: true,
-    llmMode: translated.llmMode,
-    reason: translated.reason,
-    ...results,
-  });
+  return NextResponse.json({ ...meta, ...results });
 });
 
 export const dynamic = "force-dynamic";

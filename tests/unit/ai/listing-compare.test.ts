@@ -48,12 +48,12 @@ const listings = [
 ];
 
 describe("buildCompareDiff", () => {
-  it("ortak/benzersiz olanaklar, en ucuz, en iyi puan (eşitlikte yorum sayısı), en esnek", () => {
+  it("ortak/benzersiz olanaklar, en ucuz, en esnek; puan eşitliğinde en iyi puan yok (F681)", () => {
     const diff = buildCompareDiff(listings);
     expect(diff.commonAmenities).toEqual(["WiFi"]);
     expect(diff.uniqueAmenities).toEqual({ a: ["Havuz"], b: ["Otopark"], c: [] });
     expect(diff.cheapestId).toBe("b");
-    expect(diff.bestRatedId).toBe("c");
+    expect(diff.bestRatedId).toBeNull();
     expect(diff.mostFlexibleId).toBe("b");
   });
 

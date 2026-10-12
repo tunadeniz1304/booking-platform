@@ -5,6 +5,8 @@ import { observed } from "@/lib/http/observed";
 import { supportTicketStatusSchema } from "@/lib/http/api-schemas";
 import { audit } from "@/lib/admin/audit";
 import { updateSupportTicketStatus } from "@/lib/support/repo";
+import { notifySupportTicketStatus } from "@/lib/notifications/support-notifications";
+import { logger, errorFields } from "@/lib/observability/logger";
 
 /** v5 P1-4: talep durum geçişi — insan temsilcinin kararı (denetim kaydı ile). */
 export const PATCH = observed(
@@ -17,6 +19,10 @@ export const PATCH = observed(
       const updated = await updateSupportTicketStatus(id, status, admin.userId);
       if (!updated) throw new NotFoundError("Destek talebi bulunamadı");
       await audit(admin.userId, "support.ticket.status", "SupportTicket", id, { status });
+      // F895: talep sahibine durum e-postası (destek sayfası bağlantısıyla); hata geçişi bozmaz.
+      await notifySupportTicketStatus(id, status).catch((error: unknown) =>
+        logger.warn({ ticketId: id, ...errorFields(error) }, "support status email failed")
+      );
       return NextResponse.json(updated);
     } catch (error) {
       return toErrorResponse(error, "admin.support.update");

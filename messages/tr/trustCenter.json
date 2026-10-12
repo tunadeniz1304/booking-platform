@@ -1,31 +1,56 @@
 {
   "pageTitle": "Güven merkezi",
-  "pageIntro": "Platformun güvenlik, tedarik zinciri ve şeffaflık belgeleri. Buradaki her bağlantı kamuya açık bilgi içerir; kişisel veri yoktur.",
+  "pageIntro": "Bu sayfada platformu güvenle kullanmanız için bilmeniz gerekenleri, haklarınızı ve şeffaflık belgelerimizi bulursunuz. İlk bölüm herkes içindir; en alttaki teknik kaynaklar geliştiriciler ve denetçiler içindir. Kişisel veri yoktur; depo ya da yönetici erişimi gerektiren kaynaklar bağlantının yanında belirtilir.",
   "supplyChain": {
-    "title": "Tedarik zinciri",
-    "sbom": "SBOM (CycloneDX) indir",
-    "sbomNote": "SBOM, her main dalı çalıştırmasında \"Security\" CI iş akışının sbom-cyclonedx artefaktı olarak üretilir; uygulama sunucusundan servis edilmez. İndirmek için iş akışının son başarılı çalıştırmasını açıp Artifacts bölümünden alın (depo erişimi gerekir).",
-    "provenance": "SLSA provenance (build kanıtı)",
-    "provenanceNote": "Standalone derleme çıktısı için SLSA provenance aynı iş akışında üretilir ve artefakt olarak saklanır.",
+    "title": "Tedarik zinciri (kullanılan yazılım bileşenleri)",
+    "sbom": "<sbom>SBOM</sbom> (CycloneDX) — üreten CI iş akışı",
+    "sbomNote": "SBOM, uygulamanın kullandığı tüm açık kaynak paketlerin listesidir. Uygulama sunucusundan servis edilmez; \"Security\" CI iş akışının her main dalı çalıştırmasında sbom-cyclonedx artefaktı olarak üretilir. İndirmek için iş akışının son başarılı çalıştırmasını açıp Artifacts bölümünden alın.",
+    "provenance": "<slsa>SLSA</slsa> provenance (derleme kanıtı)",
+    "provenanceNote": "Provenance, yayımlanan derlemenin hangi kaynak koddan ve hangi adımlarla üretildiğini gösteren kayıttır. Aynı iş akışında üretilir ve SBOM ile aynı çalıştırmanın Artifacts bölümünde saklanır.",
     "scorecard": "OpenSSF Scorecard",
-    "scorecardNote": "Yayınlanmadı: depo şu an özel (private) ve Scorecard yalnız herkese açık depolarda puan yayınlar. İş akışı hazırdır; depo açıldığında sonuç otomatik yayımlanır."
+    "scorecardNote": "Açık kaynak projelerin güvenlik uygulamalarını otomatik puanlayan bir araçtır. Depo şu an özel (private) ve Scorecard yalnız herkese açık depolarda puan yayınlar; iş akışı hazırdır, depo açıldığında sonuç otomatik yayımlanır."
   },
   "apis": {
-    "title": "Doğrulama uçları",
-    "jwks": "JWKS — /.well-known/jwks.json",
-    "jwksNote": "Ajan yetkilerini (mandate) ve imzalı belirteçleri üçüncü tarafların doğrulayabilmesi için ES256 açık anahtarları. Özel anahtar hiçbir zaman yayımlanmaz.",
+    "title": "Doğrulama uçları (API)",
+    "jwks": "<jwks>JWKS</jwks> — /.well-known/jwks.json",
+    "jwksNote": "Platformun dijital imzalarını doğrulamak için gereken açık anahtarlar. Üçüncü taraflar, yapay zekâ ajanlarına verilen yetkileri (mandate) ve imzalı belirteçleri bu ES256 anahtarlarıyla doğrular. Özel anahtar hiçbir zaman yayımlanmaz.",
     "openapi": "OpenAPI 3.1 sözleşmesi — /api/openapi.json",
-    "openapiNote": "Tüm herkese açık ve kimlikli API uçlarının makine tarafından okunabilir tanımı; ajanlar ve entegrasyonlar keşif için kullanır."
+    "openapiNote": "Platform API'sinin makine tarafından okunabilir tanımı. Herkese açık ve kimlik doğrulamalı tüm uçları listeler; ajanlar ve entegrasyonlar keşif için kullanır."
   },
   "policies": {
     "title": "Politikalar ve şeffaflık",
-    "securityPolicy": "Güvenlik politikası ve açık bildirimi",
-    "securityNote": "Açıkları herkese açık issue yerine GitHub özel güvenlik bildirimiyle iletin; ilk yanıt hedefi 5 iş günü.",
+    "securityPolicy": "Güvenlik politikası ve güvenlik açığı bildirimi",
+    "securityNote": "Bir güvenlik açığı bulduysanız herkese açık issue yerine GitHub özel güvenlik bildirimiyle iletin; ilk yanıt hedefi 5 iş günüdür.",
     "transparency": "DSA şeffaflık raporu",
-    "transparencyNote": "Bildirim, kaldırma ve itiraz sayıları (kişisel veri içermez) uyum panelinden JSON/CSV olarak dışa aktarılır; yönetici yetkisi gerekir.",
+    "transparencyNote": "Bildirim, kaldırma ve itiraz sayılarını gösterir (kişisel veri içermez). Rapor şimdilik yalnız yöneticilerin açabildiği uyum panelinden JSON/CSV olarak dışa aktarılır.",
     "ranking": "Sıralama nasıl çalışır?",
-    "report": "Yasa dışı içerik bildir (DSA)",
+    "report": "İçerik bildir",
     "privacy": "Gizlilik ve KVKK bildirimi"
   },
-  "footnote": "Portföy/demo projesidir; bağlantılar kaynak depodaki gerçek iş akışlarını ve uçları gösterir."
+  "footnote": "Portföy/demo projesidir; bağlantılar kaynak depodaki gerçek iş akışlarını ve uçları gösterir.",
+  "rights": {
+    "title": "Güvenliğiniz ve haklarınız",
+    "reportNote": "Sahte ya da yasa dışı bir ilan veya içerik görürseniz bize bildirin. Bildiriminizi bir çalışan inceler; karar ve gerekçesi e-postanıza gönderilir (AB Dijital Hizmetler Yasası, DSA).",
+    "appeal": "Bir karara itiraz et",
+    "appealNote": "İlanınız ya da içeriğiniz hakkında verilen bir moderasyon kararına katılmıyorsanız, karar e-postanızdaki bağlantıyla itiraz edin. İtirazınızı yetkili bir çalışan inceler; sonuç e-postayla bildirilir.",
+    "rankingNote": "Arama sonuçlarının hangi ölçütlere ve ağırlıklara göre sıralandığını açıklar.",
+    "privacyNote": "Hangi kişisel verilerinizi neden işlediğimizi, ne kadar sakladığımızı ve haklarınızı nasıl kullanacağınızı anlatır.",
+    "payment": "Ödeme güvenliği",
+    "paymentNote": "Kart numaranız platformda saklanmaz; ödeme, ödeme sağlayıcısı üzerinden işlenir ve yalnızca belirteç (token) ile işlem referansı tutulur."
+  },
+  "developers": {
+    "title": "Geliştiriciler ve denetçiler için",
+    "intro": "Aşağıdaki teknik kaynaklar yazılım geliştiriciler ve güvenlik denetçileri içindir; platformu kullanmak için bunlara ihtiyacınız yoktur."
+  },
+  "badges": {
+    "github": "GitHub, depo erişimi gerekir",
+    "json": "JSON, geliştiriciler için",
+    "adminOnly": "yalnız yöneticiler",
+    "notPublished": "Yayınlanmadı"
+  },
+  "glossary": {
+    "sbom": "Yazılım malzeme listesi (Software Bill of Materials)",
+    "slsa": "Yazılım tedarik zinciri güvenlik çerçevesi (Supply-chain Levels for Software Artifacts)",
+    "jwks": "JSON Web Key Set: imzaları doğrulamak için yayımlanan açık anahtar kümesi"
+  }
 }

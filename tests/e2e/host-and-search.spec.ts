@@ -13,7 +13,7 @@ test("host paneli: toplu takvim güncellemesi", async ({ page }) => {
   await expect(calendar).toBeVisible();
   await calendar.getByLabel("Başlangıç").fill(isoDaysFromNow(320));
   await calendar.getByLabel("Bitiş (dahil)").fill(isoDaysFromNow(322));
-  await calendar.getByLabel("Gecelik fiyat (boş = değişmez)").fill("2750");
+  await calendar.getByLabel(/^Gecelik fiyat/).fill("2750");
   await calendar.getByRole("button", { name: "Takvimi güncelle" }).click();
 
   await expect(calendar.getByText(/Güncellenen gece: \d+, eklenen: \d+/)).toBeVisible();
@@ -31,8 +31,8 @@ test("Smart Filter (demo): doğal dil sorgusu filtre çiplerine dönüşür", as
   await expect(chips).toBeVisible();
   await expect(chips.getByRole("button", { name: /Şehir: İstanbul/ })).toBeVisible();
   await expect(chips.getByRole("button", { name: /2 misafir/ })).toBeVisible();
-  await expect(chips.getByRole("button", { name: /En çok 3000/ })).toBeVisible();
-  await expect(chips.getByRole("button", { name: /Kahvaltı Dahil/ })).toBeVisible();
+  await expect(chips.getByRole("button", { name: /En çok .*3\.000/ })).toBeVisible();
+  await expect(chips.getByRole("button", { name: /Olanak: Kahvaltı dahil/ })).toBeVisible();
 
   // Çip kaldırılabilir (kullanıcı düzeltebilir).
   await chips.getByRole("button", { name: /2 misafir filtresini kaldır/ }).click();

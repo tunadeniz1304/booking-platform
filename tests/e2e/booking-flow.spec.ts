@@ -3,6 +3,7 @@ import {
   appAlert,
   GUEST_EMAIL,
   MOCK_3DS_CODE,
+  PDP_CONTINUE_NAME,
   TEST_CARD_3DS,
   TEST_CARD_DECLINE,
   acceptNecessaryCookies,
@@ -31,9 +32,13 @@ test.describe("rezervasyon akışı (misafir)", () => {
     await expect(firstResult).toBeVisible();
     await firstResult.click();
     await page.waitForURL(/\/property\/[^/]+$/);
+    const pdpStay = farFutureStay();
+    await page.goto(
+      `${new URL(page.url()).pathname}?checkIn=${pdpStay.checkIn}&checkOut=${pdpStay.checkOut}`
+    );
 
     // PDP: teklif yüklenince onay butonu etkinleşir → checkout
-    const reserve = page.getByRole("button", { name: "Rezervasyona devam et" });
+    const reserve = page.getByRole("button", { name: PDP_CONTINUE_NAME });
     await expect(reserve).toBeEnabled();
     await reserve.click();
     await page.waitForURL(/\/checkout\?/);
@@ -72,7 +77,9 @@ test.describe("rezervasyon akışı (misafir)", () => {
     await page.goto(bookingUrl);
     await page.getByRole("button", { name: "Rezervasyonu iptal et" }).click();
     await page.getByRole("dialog").getByRole("button", { name: "Evet, iptal et" }).click();
-    await expect(page.getByRole("status")).toHaveText(/İptal edildi\. İade: .+ \(%\d+\)\./);
+    await expect(page.getByRole("status").filter({ hasText: "İptal edildi" })).toHaveText(
+      /İptal edildi\. İade: .+ \(%\d+\)\./
+    );
     await expect(page.getByRole("heading", { name: "Rezervasyon iptal edildi" })).toBeVisible();
   });
 

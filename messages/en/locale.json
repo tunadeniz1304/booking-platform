@@ -1,5 +1,7 @@
 {
   "label": "Language",
   "tr": "Türkçe",
-  "en": "English"
+  "en": "English",
+  "switching": "Changing language…",
+  "applyHint": "Press Enter to apply the language, or Escape to cancel."
 }

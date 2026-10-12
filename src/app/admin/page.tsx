@@ -1,37 +1,27 @@
 "use client";
 
-import Link from "next/link";
 import { useTranslations } from "next-intl";
 import AdminDashboard from "@/components/admin/AdminDashboard";
-import { PageShell, RoleGate } from "@/components/ui/ui";
+import AdminQueuePagesNav from "@/components/admin/AdminQueuePagesNav";
+import { PageShell, RoleGate, useSession } from "@/components/ui/ui";
 
 /** Yönetim paneli (P2-4): outbox, olay sinyali kuyruğu, fraud kuyruğu, LLM durumu, rol yönetimi. */
 export default function AdminPage() {
   const t = useTranslations("admin");
-  const tc = useTranslations("compliance.admin");
-  const tp = useTranslations("payouts");
-  const tr = useTranslations("resolution");
-  const ts = useTranslations("support.admin");
+  const session = useSession();
+  // Görev açıklaması yalnızca yöneticiye (F564); yetkisiz rolde yalnız RoleGate mesajı görünür.
+  const isAdmin = session.status === "ready" && session.user?.role === "ADMIN";
   return (
-    <PageShell title={t("page.title")} intro={t("page.intro")}>
-      <p className="text-sm">
-        <Link href="/admin/compliance" className="font-semibold text-[#003580] underline">
-          {tc("open")}
-        </Link>
-        {" · "}
-        <Link href="/admin/payouts" className="font-semibold text-[#003580] underline">
-          {tp("admin.link")}
-        </Link>
-        {" · "}
-        <Link href="/admin/claims" className="font-semibold text-[#003580] underline">
-          {tr("adminLink")}
-        </Link>
-        {" · "}
-        <Link href="/admin/support" className="font-semibold text-[#003580] underline">
-          {ts("link")}
-        </Link>
-      </p>
-      <RoleGate roles={["ADMIN"]}>{() => <AdminDashboard />}</RoleGate>
+    <PageShell title={t("page.title")} intro={isAdmin ? t("page.intro") : undefined} width="wide">
+      <RoleGate roles={["ADMIN"]}>
+        {() => (
+          <>
+            {/* Alt sayfalar yalnızca yöneticiye, bekleyen iş sayılarıyla (F1193/F460/F1066). */}
+            <AdminQueuePagesNav />
+            <AdminDashboard />
+          </>
+        )}
+      </RoleGate>
     </PageShell>
   );
 }

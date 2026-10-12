@@ -655,6 +655,39 @@ export async function claimTransfer(input: {
   return withClaimLock(payload.transferId, () => claimLocked(input, payload, now));
 }
 
+export type ClaimPreviewStatus = "ok" | "invalid" | "expired" | "gone" | "self";
+
+/**
+ * F907: claim linkinin salt-okur ön kontrolü (alıcı kart bilgisi girmeden önce). Kilit almaz,
+ * PSP'ye gitmez, deneme sayacına dokunmaz; `claimLocked` kontrollerinin aynısını uygular.
+ */
+export async function previewClaim(input: {
+  token: string;
+  buyerId: string;
+  now?: Date;
+}): Promise<{ status: ClaimPreviewStatus; expiresAt?: string }> {
+  assertEnabled();
+  const now = input.now ?? new Date();
+  // `now = 0`: yalnız imza/biçim doğrulanır; süre aşımı "geçersiz"den ayrı bildirilir.
+  const payload = verifyClaimToken(input.token, 0);
+  if (!payload) return { status: "invalid" };
+  if (payload.exp < now.getTime()) return { status: "expired" };
+  const transfer = await prisma.bookingTransfer.findUnique({
+    where: { id: payload.transferId },
+    select: { tokenHash: true, bookingId: true, status: true, sellerId: true, expiresAt: true },
+  });
+  if (
+    !transfer ||
+    transfer.tokenHash !== hashToken(input.token) ||
+    transfer.bookingId !== payload.bookingId
+  ) {
+    return { status: "invalid" };
+  }
+  if (transfer.status !== TransferStatus.LISTED) return { status: "gone" };
+  if (transfer.sellerId === input.buyerId) return { status: "self" };
+  return { status: "ok", expiresAt: transfer.expiresAt.toISOString() };
+}
+
 /** Kilit altında: ilan durumu burada (yeniden) okunur. */
 async function claimLocked(
   input: {

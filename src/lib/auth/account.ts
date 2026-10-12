@@ -5,7 +5,7 @@ import { redis } from "@/lib/redis";
 import { appendOutbox } from "@/lib/cqrs";
 import { EventTypes, makeEvent, type AuthEmailRequestedPayload } from "@/lib/events/events";
 import { getConfig } from "@/lib/config/app-config";
-import { HttpError, ValidationError } from "@/lib/http/errors";
+import { HttpError, ServiceUnavailableError, ValidationError } from "@/lib/http/errors";
 import { withSerializableRetry } from "@/lib/db/transactions";
 import { hashPassword } from "./password";
 import { bumpTokenVersion, publishTokenVersion } from "./token-version";
@@ -95,7 +95,7 @@ export function loginDelayMs(failures: number, config = getConfig()): number {
  *  - Çift ya da e-posta genelindeki başarısızlıklar `AUTH_LOCKOUT_THRESHOLD`'a ulaştıysa
  *    veya e-posta başına pencere limiti (`RATE_LIMIT_LOGIN_PER_ACCOUNT_MAX`, v3#3)
  *    aşıldıysa → geçerli bir PoW çözümü gerekir; yoksa 429 `POW_REQUIRED` + bulmaca.
- * Redis yoksa fail-closed (429).
+ * Redis yoksa fail-closed: 503 `SERVICE_UNAVAILABLE` (kullanıcıya "çok fazla deneme" denmez).
  */
 export async function assertLoginAttemptAllowed(input: {
   email: string;
@@ -125,7 +125,9 @@ export async function assertLoginAttemptAllowed(input: {
     acctFails = Number(acctRaw ?? 0);
     attempts = await redis.incrWithTtl(rateKey, window);
   } catch {
-    throw new LoginRateLimitedError();
+    throw new ServiceUnavailableError(
+      "Giriş şu an geçici olarak yapılamıyor, lütfen birkaç dakika sonra tekrar deneyin"
+    );
   }
   const waitMs = Number(next ?? 0) - now;
   if (waitMs > 0) throw new LoginDelayedError(Math.ceil(waitMs / 1000));
@@ -272,8 +274,36 @@ async function consumeToken(raw: string, kind: AuthTokenKind, now: Date): Promis
   return row.userId;
 }
 
-export async function verifyEmail(raw: string, now = new Date()): Promise<{ userId: string }> {
-  const userId = await consumeToken(raw, AuthTokenKind.EMAIL_VERIFY, now);
+/**
+ * Kullanılmış bir doğrulama token'ının sahibi e-postasını zaten doğrulamışsa kullanıcı kimliği;
+ * değilse null. Bağlantıya ikinci kez tıklayan kullanıcı hata yerine "zaten doğrulandı" görür.
+ */
+async function alreadyVerifiedTokenOwner(raw: string): Promise<string | null> {
+  const row = await prisma.authToken.findUnique({
+    where: { tokenHash: sha256Hex(raw) },
+    select: { kind: true, usedAt: true, user: { select: { id: true, emailVerifiedAt: true } } },
+  });
+  if (row?.kind !== AuthTokenKind.EMAIL_VERIFY || !row.usedAt) return null;
+  return row.user.emailVerifiedAt ? row.user.id : null;
+}
+
+/**
+ * E-postayı doğrular. Token daha önce kullanılmış ve e-posta zaten doğrulanmışsa hata yerine
+ * `alreadyVerified: true` döner; bilinmeyen, başka türden ve süresi dolmuş token'lar 400 alır.
+ */
+export async function verifyEmail(
+  raw: string,
+  now = new Date()
+): Promise<{ userId: string; alreadyVerified?: boolean }> {
+  let userId: string;
+  try {
+    userId = await consumeToken(raw, AuthTokenKind.EMAIL_VERIFY, now);
+  } catch (error) {
+    if (!(error instanceof ValidationError)) throw error;
+    const ownerId = await alreadyVerifiedTokenOwner(raw);
+    if (!ownerId) throw error;
+    return { userId: ownerId, alreadyVerified: true };
+  }
   await prisma.user.updateMany({
     where: { id: userId, emailVerifiedAt: null },
     data: { emailVerifiedAt: now },

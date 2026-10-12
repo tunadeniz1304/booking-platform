@@ -121,7 +121,124 @@ function sentimentOf(avg: number): HighlightSentiment {
   return "mixed";
 }
 
-/** Kümedeki en sık anlamlı sözcük (katlanmış biçimle sayılır, ilk görülen yazımla döner). */
+/** Konu başlığı olamayacak sık sözcükler (bağlaç, zarf, genel övgü; katlanmış biçimde). */
+const TOPIC_STOP_WORDS: ReadonlySet<string> = new Set(
+  [
+    "ama",
+    "gibi",
+    "için",
+    "bir",
+    "çok",
+    "daha",
+    "gayet",
+    "gerçekten",
+    "kesinlikle",
+    "biraz",
+    "fakat",
+    "ancak",
+    "sonra",
+    "önce",
+    "kadar",
+    "her",
+    "şey",
+    "hiç",
+    "biz",
+    "bize",
+    "bizi",
+    "ben",
+    "bana",
+    "beni",
+    "var",
+    "yok",
+    "değil",
+    "olarak",
+    "sadece",
+    "bile",
+    "veya",
+    "ise",
+    "diye",
+    "hemen",
+    "tekrar",
+    "iyi",
+    "güzel",
+    "harika",
+    "mükemmel",
+    "süper",
+    "kötü",
+    "the",
+    "and",
+    "very",
+    "was",
+    "were",
+    "with",
+    "but",
+    "this",
+    "that",
+    "had",
+    "have",
+    "has",
+    "are",
+    "our",
+    "all",
+    "not",
+    "too",
+    "also",
+    "would",
+    "will",
+    "there",
+    "they",
+    "from",
+    "you",
+    "your",
+    "just",
+    "quite",
+    "again",
+    "great",
+    "good",
+    "nice",
+    "bad",
+    "excellent",
+    "perfect",
+    "awesome",
+  ].map(foldToken)
+);
+
+/** -ing ile biten ama konu adı olan sık sözcükler (fiil biçimi sayılmaz). */
+const ING_NOUNS: ReadonlySet<string> = new Set([
+  "parking",
+  "building",
+  "bedding",
+  "heating",
+  "booking",
+  "ceiling",
+  "morning",
+  "evening",
+  "lighting",
+  "cleaning",
+  "housekeeping",
+]);
+
+/**
+ * Katlanmış sözcük fiil/zarf biçimi mi (F517): TR geçmiş zaman (-dı/-tı; -t yalnız sert ünsüzden
+ * sonra, "kahvaltı"/"hizmeti" korunur), -mış, -yor, -acak/-ecek; EN -ly/-ed/-ing.
+ */
+function isVerbLike(key: string): boolean {
+  if (
+    /(?:d[iu]|[cfhkpst]t[iu])(?:k|m|n[iu]z)?$/.test(key) ||
+    /m[iu]s(?:t[iu]r)?$/.test(key) ||
+    /[iu]yor(?:[iu]m|[iu]z|du|lar)?$/.test(key) ||
+    /(?:acak|ecek)$/.test(key)
+  ) {
+    return true;
+  }
+  if (key.length >= 5 && /(?:ly|ed)$/.test(key)) return true;
+  return key.endsWith("ing") && !ING_NOUNS.has(key);
+}
+
+/**
+ * Kümedeki en sık anlamlı sözcük (katlanmış biçimle sayılır, ilk görülen yazımla döner). Durak
+ * sözcükleri ve fiil/zarf biçimleri sayılmaz; uygun sözcük kalmazsa null (genel başlık kullanılır).
+ */
 export function topKeyword(sentences: readonly Sentence[]): string | null {
   const counts = new Map<string, { n: number; first: number; display: string }>();
   let order = 0;
@@ -130,6 +247,7 @@ export function topKeyword(sentences: readonly Sentence[]): string | null {
     for (const word of splitWords(s.text)) {
       const key = foldToken(word);
       if (key.length < 3 || /^\d+$/.test(key) || seen.has(key)) continue;
+      if (TOPIC_STOP_WORDS.has(key) || isVerbLike(key)) continue;
       seen.add(key);
       const entry = counts.get(key);
       if (entry) entry.n++;

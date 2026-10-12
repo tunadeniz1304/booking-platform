@@ -32,7 +32,7 @@
     },
     "statusLabel": "Durum:",
     "verifiedAt": "Doğrulama tarihi: {date}",
-    "lastError": "Sağlayıcı kodu: {code}",
+    "lastError": "Hata kodu (destek için): {code}",
     "start": "Doğrulamayı başlat",
     "retry": "Yeniden dene",
     "starting": "Başlatılıyor…",
@@ -47,11 +47,41 @@
       "blurry": "Bulanık fotoğraf",
       "expired": "Süresi dolmuş belge",
       "fake": "Sahte belge"
-    }
+    },
+    "supportLink": "Destek ekibiyle iletişime geçin",
+    "errors": {
+      "document_unreadable": "Belge fotoğrafı okunamadı. Işıklı bir ortamda, parlama olmadan ve belgenin tamamı görünecek şekilde yeniden çekin.",
+      "document_expired": "Belgenizin süresi dolmuş. Süresi geçerli bir kimlik belgesiyle yeniden deneyin.",
+      "document_fraudulent": "Belge doğrulanamadı. Yeniden denemeden önce destek ekibiyle iletişime geçin.",
+      "document_type_not_supported": "Bu belge türü desteklenmiyor. Kimlik kartı, pasaport veya sürücü belgesi kullanın.",
+      "document_unverified_other": "Belge doğrulanamadı. Belgenin tamamının net göründüğü yeni bir fotoğrafla yeniden deneyin.",
+      "consent_declined": "Doğrulama için gereken izni vermediniz. Yeniden başlatıp izin adımını onaylayın.",
+      "abandoned": "Doğrulama yarıda bırakıldı. Belgeniz yanınızdayken yeniden başlatın.",
+      "device_not_supported": "Cihazınız doğrulama için uygun değil. Kameralı bir telefon veya bilgisayarla yeniden deneyin.",
+      "country_not_supported": "Belgenizi veren ülke desteklenmiyor. Başka bir kimlik belgesi kullanın veya destek ekibiyle iletişime geçin.",
+      "under_supported_age": "Doğrulama için yaş koşulu karşılanmadı. Sorunun hatalı olduğunu düşünüyorsanız destek ekibiyle iletişime geçin.",
+      "unknown": "Doğrulama tamamlanamadı. Yeniden deneyin; sorun sürerse destek ekibiyle iletişime geçin."
+    },
+    "resultAnnounce": "Doğrulama sonucu: {status}",
+    "returnPending": "Doğrulama sağlayıcısından döndünüz. Sonucunuz işleniyor; bu birkaç dakika sürebilir.",
+    "pendingHelp": "Belgeniz inceleniyor. Bu genellikle birkaç dakika sürer; sonuç gelince bu bölüm kendiliğinden güncellenir.",
+    "pendingRestart": "Sağlayıcı sayfasında doğrulamayı tamamlamadıysanız aşağıdan yeniden başlatabilirsiniz.",
+    "stillPending": "Doğrulama hâlâ inceleniyor. Birkaç dakika sonra yeniden bakın.",
+    "refresh": "Durumu yenile",
+    "refreshing": "Yenileniyor…",
+    "providerNotice": "Doğrulama, güvenli doğrulama sağlayıcımız Stripe'ın sayfasında yapılır; işlem bitince bu sayfaya geri dönersiniz. Süresi geçerli bir kimlik belgesi ve kameralı bir cihaz (telefon ya da web kameralı bilgisayar) gerekir.",
+    "dailyLimit": "Günde en fazla {count} kez başlatabilirsiniz.",
+    "dailyLimitGeneric": "Günlük deneme sayısı sınırlıdır; belgeniz yanınızdayken başlatın.",
+    "startProvider": "Doğrulamaya devam et (sağlayıcı sayfası)",
+    "requiredHostDone": "İlan oluşturmak için gereken kimlik doğrulaması tamamlandı.",
+    "requiredGuestDone": "Rezervasyon için gereken kimlik doğrulaması tamamlandı.",
+    "emailSent": "Doğrulama e-postası gönderildi. E-postadaki bağlantıya tıkladıktan sonra burada doğrulamayı yeniden başlatın.",
+    "emailAlreadyVerified": "E-posta adresiniz doğrulanmış; kimlik doğrulamayı yeniden başlatabilirsiniz.",
+    "lastUpdated": "Son güncelleme: {time}"
   },
   "partyRisk": {
     "title": "Parti riski uyarıları",
-    "intro": "Genç hesap, tek gece, kalabalık grup, yakın tarih ve hafta sonu sinyallerinden hesaplanan otomatik uyarılar. Rezervasyon iptal edilmez; misafirle ev kurallarını teyit edin.",
+    "intro": "Yeni hesap, tek gece, kalabalık grup, yakın tarih ve hafta sonu sinyallerinden hesaplanan otomatik uyarılar. Rezervasyon iptal edilmez; misafirle ev kurallarını teyit edin.",
     "loading": "Uyarılar yükleniyor…",
     "loadFailed": "Uyarılar yüklenemedi.",
     "empty": "Yaklaşan rezervasyonlarınızda parti riski uyarısı yok.",
@@ -61,7 +91,9 @@
       "dates": "Tarihler",
       "guests": "Misafir",
       "score": "Skor",
-      "reasons": "Gerekçeler"
+      "reasons": "Gerekçeler",
+      "booking": "Rezervasyon no",
+      "contact": "İletişim"
     },
     "reasons": {
       "YOUNG_ACCOUNT": "Yeni hesap",
@@ -69,6 +101,13 @@
       "LARGE_GROUP": "Kalabalık grup",
       "NEAR_DATE": "Yakın tarih",
       "WEEKEND": "Hafta sonu"
-    }
+    },
+    "scale": "Skor 0–100 arasındadır; yalnızca uyarı eşiğini aşan rezervasyonlar listelenir.",
+    "scaleWithThreshold": "Skor 0–100 arasındadır; {threshold} ve üzeri skorlar listelenir.",
+    "retry": "Tekrar dene",
+    "dateRange": "{from} – {to}",
+    "scoreValue": "{score}/100 · Yüksek",
+    "messageGuest": "Misafire mesaj gönder",
+    "messageAfterConfirm": "Onaydan sonra mesaj gönderilebilir"
   }
 }

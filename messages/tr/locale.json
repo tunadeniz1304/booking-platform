@@ -1,5 +1,7 @@
 {
   "label": "Dil",
   "tr": "Türkçe",
-  "en": "English"
+  "en": "English",
+  "switching": "Dil değiştiriliyor…",
+  "applyHint": "Dili uygulamak için Enter'a, vazgeçmek için Escape'e basın."
 }

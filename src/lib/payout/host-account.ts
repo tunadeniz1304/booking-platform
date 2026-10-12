@@ -28,14 +28,21 @@ export async function identityKycStatus(userId: string): Promise<HostKycStatus> 
   return last === "FAILED" ? "REJECTED" : "PENDING";
 }
 
-/** Payout açılabilir mi: sağlayıcı izni + durdurulmamış + (istenirse) kimlik doğrulaması. */
+/**
+ * Payout açılabilir mi: sağlayıcı izni + durdurulmamış + (istenirse) kimlik doğrulaması.
+ * `identityVerified` verilirse kimlik sorgusu atlanır (toplu listeler tek sorguyla hesaplar).
+ */
 export async function payoutBlockReason(
-  account: Pick<HostAccount, "userId" | "payoutsEnabled" | "payoutsPaused"> | null
+  account: Pick<HostAccount, "userId" | "payoutsEnabled" | "payoutsPaused"> | null,
+  identityVerified?: boolean
 ): Promise<"NO_ACCOUNT" | "PAUSED" | "PROVIDER_DISABLED" | "IDENTITY_UNVERIFIED" | null> {
   if (!account) return "NO_ACCOUNT";
   if (account.payoutsPaused) return "PAUSED";
   if (!account.payoutsEnabled) return "PROVIDER_DISABLED";
-  if (getConfig().PAYOUT_REQUIRE_IDENTITY_VERIFIED && !(await isIdentityVerified(account.userId)))
+  if (
+    getConfig().PAYOUT_REQUIRE_IDENTITY_VERIFIED &&
+    !(identityVerified ?? (await isIdentityVerified(account.userId)))
+  )
     return "IDENTITY_UNVERIFIED";
   return null;
 }

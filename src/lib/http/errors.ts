@@ -137,76 +137,89 @@ export const ERROR_CATALOG = {
 
 export type ErrorCode = keyof typeof ERROR_CATALOG;
 
+/**
+ * Hata yanıtı gövdesi. `error` metni sunucuda Türkçe üretilir: istemci gösterirken `code` /
+ * `details`'ı arayüz dilinde çevirir (bkz. `useErrorText`), metnin dili `Content-Language`
+ * ile bildirilir (F516; çevrilemeyen metin istemcide `lang="tr"` ile işaretlenebilir).
+ */
+export const ERROR_MESSAGE_LANG = "tr";
+
+function errorJson(
+  body: { error: string; code: string; details?: unknown },
+  status: number,
+  headers: Record<string, string> = {}
+): NextResponse {
+  return NextResponse.json(body, {
+    status,
+    headers: { "Content-Language": ERROR_MESSAGE_LANG, ...headers },
+  });
+}
+
 /** Hata → JSON yanıt. Bilinmeyen hatalar 500 ve genel mesajla döner (loglanır). */
 export function toErrorResponse(error: unknown, context = "request"): NextResponse {
   if (error instanceof HttpError) {
-    return NextResponse.json(
+    return errorJson(
       {
         error: error.message,
         code: error.code,
         ...(error.details !== undefined ? { details: error.details } : {}),
       },
-      { status: error.status }
+      error.status
     );
   }
   if (error instanceof ZodError) {
-    return NextResponse.json(
+    // İstemci `code` + `details.fieldErrors` ile alan hatalarını arayüz dilinde gösterir.
+    return errorJson(
       { error: "Doğrulama hatası", code: "VALIDATION_ERROR", details: error.flatten() },
-      { status: 400 }
+      400
     );
   }
   // Prisma "kayıt bulunamadı" (ör. var olmayan kimlikle update) → 404, 500 değil.
   if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
-    return NextResponse.json({ error: "Kayıt bulunamadı", code: "NOT_FOUND" }, { status: 404 });
+    return errorJson({ error: "Kayıt bulunamadı", code: "NOT_FOUND" }, 404);
   }
   // Yeniden denemeler tükendikten sonra kalan serileştirme çakışması geçicidir: 500 değil,
   // 409 + Retry-After. Aynı Idempotency-Key ile tekrar güvenlidir.
   if (isSerializationFailure(error)) {
     logger.warn({ context, ...errorFields(error) }, "serialization conflict after retries");
-    return NextResponse.json(
+    return errorJson(
       { error: "Eşzamanlı işlem çakışması, lütfen tekrar deneyin", code: "TRANSACTION_CONFLICT" },
-      { status: 409, headers: { "Retry-After": "1" } }
+      409,
+      { "Retry-After": "1" }
     );
   }
   // P2-3 bulgusu: ödeme sağlayıcısı (PSP) hatası sunucu hatası değil, üst akış (upstream)
   // hatasıdır → 502 + sağlayıcı kodu; ödeme yeniden denenebilir. Geçersiz token istemci hatası.
   if (error instanceof PaymentProviderError) {
     if (error.code === "invalid_token") {
-      return NextResponse.json(
-        { error: "Kart bilgisi geçersiz", code: "INVALID_CARD_TOKEN" },
-        { status: 422 }
-      );
+      return errorJson({ error: "Kart bilgisi geçersiz", code: "INVALID_CARD_TOKEN" }, 422);
     }
     logger.warn({ context, providerCode: error.code }, "payment provider error");
-    return NextResponse.json(
+    return errorJson(
       {
         error: "Ödeme sağlayıcısına şu an ulaşılamıyor, lütfen tekrar deneyin",
         code: "PAYMENT_PROVIDER_ERROR",
         details: { providerCode: error.code },
       },
-      { status: 502, headers: { "Retry-After": "5" } }
+      502,
+      { "Retry-After": "5" }
     );
   }
   // v5 P0-6: veritabanı / Redis geçici olarak erişilemez → 503 (500 değil); istemci yeniden dener.
   if (isDependencyUnavailable(error)) {
     logger.warn({ context, ...errorFields(error) }, "dependency unavailable");
-    return NextResponse.json(
+    return errorJson(
       {
         error: "Hizmet geçici olarak kullanılamıyor, lütfen biraz sonra tekrar deneyin",
         code: "SERVICE_UNAVAILABLE",
       },
-      { status: 503, headers: { "Retry-After": "5" } }
+      503,
+      { "Retry-After": "5" }
     );
   }
   if (error instanceof SyntaxError) {
-    return NextResponse.json(
-      { error: "Geçersiz JSON gövdesi", code: "INVALID_JSON" },
-      { status: 400 }
-    );
+    return errorJson({ error: "Geçersiz JSON gövdesi", code: "INVALID_JSON" }, 400);
   }
   logger.error({ context, ...errorFields(error) }, "unhandled route error");
-  return NextResponse.json(
-    { error: "Beklenmeyen bir hata oluştu", code: "INTERNAL_ERROR" },
-    { status: 500 }
-  );
+  return errorJson({ error: "Beklenmeyen bir hata oluştu", code: "INTERNAL_ERROR" }, 500);
 }

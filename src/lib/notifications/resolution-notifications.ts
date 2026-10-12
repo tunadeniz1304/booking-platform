@@ -35,14 +35,27 @@ const COPY = {
   },
 } as const;
 
-function claimUrl(claimId: string): string {
-  const base = (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000").replace(/\/+$/, "");
-  return `${base}/resolution/${claimId}`;
+function appBase(): string {
+  return (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000").replace(/\/+$/, "");
 }
 
-function render(locale: EmailLocale, subject: string, line: string, claimId: string): EmailContent {
+function claimUrl(claimId: string): string {
+  return `${appBase()}/resolution/${claimId}`;
+}
+
+/** Yönetici karar ekranı: eskale kuyruğu filtreli, talep seçili açılır. */
+function adminClaimUrl(claimId: string): string {
+  return `${appBase()}/admin/claims?status=ESCALATED&claim=${encodeURIComponent(claimId)}`;
+}
+
+function render(
+  locale: EmailLocale,
+  subject: string,
+  line: string,
+  claimId: string,
+  url = claimUrl(claimId)
+): EmailContent {
   const c = COPY[locale];
-  const url = claimUrl(claimId);
   const text = [line, "", `${c.link}: ${url}`, "", c.footer].join("\n");
   const html = `<!doctype html><html lang="${locale}"><body style="font-family:Arial,sans-serif;color:#111">
 <p>${escapeHtml(line)}</p>
@@ -93,7 +106,7 @@ export async function notifyClaimEscalated(p: ClaimEventPayload) {
       dedupeKey: `claim.escalated:${p.claimId}:${a.id}`,
       userId: a.id,
       to: a.email,
-      content: render(locale, c.escalatedSubject, c.escalated, p.claimId),
+      content: render(locale, c.escalatedSubject, c.escalated, p.claimId, adminClaimUrl(p.claimId)),
     });
   }
   return "sent" as const;

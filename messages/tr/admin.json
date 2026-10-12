@@ -1,7 +1,8 @@
 {
   "page": {
     "title": "Yönetim paneli",
-    "intro": "Kuyrukları izleyin, olay sinyallerini onaylayın ve kullanıcı rollerini yönetin."
+    "intro": "Kuyrukları izleyin, olay sinyallerini onaylayın ve kullanıcı rollerini yönetin.",
+    "sectionsNav": "Yönetim sayfaları"
   },
   "decisionSaved": "Karar kaydedildi.",
   "percent": "%{value}",
@@ -18,21 +19,35 @@
     "no": "Hayır",
     "unknown": "Bilinmiyor",
     "supported": "Var",
-    "unsupported": "Yok"
+    "unsupported": "Yok",
+    "modes": {
+      "auto": "Otomatik (anahtar varsa canlı)",
+      "live": "Canlı",
+      "demo": "Demo"
+    }
   },
   "outbox": {
-    "title": "Outbox",
-    "empty": "Outbox boş.",
-    "deadTitle": "DEAD mesajlar",
-    "deadEmpty": "DEAD mesaj yok.",
+    "title": "Olay gönderim kuyruğu (outbox)",
+    "empty": "Olay gönderim kuyruğu boş.",
+    "deadTitle": "Kalıcı olarak başarısız mesajlar",
+    "deadEmpty": "Kalıcı olarak başarısız mesaj yok.",
     "attempts": "{count} deneme",
     "requeue": "Yeniden kuyruğa al",
-    "requeued": "Mesaj yeniden kuyruğa alındı."
+    "requeued": "Mesaj yeniden kuyruğa alındı.",
+    "description": "Arka planda işlenen sistem olayları (ör. rezervasyon e-postaları). Kalıcı olarak başarısız olanları yeniden kuyruğa alarak tekrar deneyebilirsiniz.",
+    "requeuedNamed": "{name} mesajı yeniden kuyruğa alındı.",
+    "status": {
+      "PENDING": "Bekliyor",
+      "PROCESSING": "İşleniyor",
+      "DONE": "Tamamlandı",
+      "FAILED": "Hata, yeniden denenecek",
+      "DEAD": "Kalıcı olarak başarısız"
+    }
   },
   "events": {
     "title": "Olay sinyali kuyruğu",
     "textLabel": "Metinden olay öner",
-    "textHint": "Ör. haber metni: 'İzmir'de 12–15 Ekim arası uluslararası fuar düzenlenecek.' Öneri onaylanmadan fiyata yansımaz.",
+    "textHint": "{min}–{max} karakter. Ör. haber metni: 'İzmir'de 12–15 Ekim arası uluslararası fuar düzenlenecek.' Öneri onaylanmadan fiyata yansımaz.",
     "extracting": "Çıkarılıyor…",
     "create": "Öneri oluştur",
     "created": "Öneri oluşturuldu: {title}",
@@ -57,14 +72,47 @@
       "title": "“{title}” onayı geri alınsın mı?",
       "body": "Bu olayın fiyatlara etkisi kaldırılır. Geri alınan olay buradan yeniden onaylanamaz.",
       "confirm": "Onayı geri al"
-    }
+    },
+    "filter": {
+      "label": "Duruma göre filtrele",
+      "option": "{label} ({count})"
+    },
+    "cityLabel": "Şehir",
+    "allCities": "Tüm şehirler",
+    "sortedNote": "Başlangıç tarihine göre sıralı.",
+    "emptyFiltered": "Bu filtreyle eşleşen olay yok.",
+    "showMore": "Daha fazla göster ({count} kaldı)",
+    "done": {
+      "approve": "{title}: öneri onaylandı.",
+      "reject": "{title}: öneri reddedildi.",
+      "rollback": "{title}: onay geri alındı."
+    },
+    "categories": {
+      "konser": "Konser",
+      "festival": "Festival",
+      "spor": "Spor",
+      "fuar": "Fuar",
+      "kongre": "Kongre",
+      "tatil": "Tatil",
+      "diğer": "Diğer"
+    },
+    "sources": {
+      "llm": "yapay zekâ çıkarımı ({mode})"
+    },
+    "sourceLabel": "Kaynak: {source}",
+    "approveEffect": "Onay, {city} için {start}–{end} çevresindeki gecelerin fiyatlarını hemen yeniden hesaplar.",
+    "doneRepriced": {
+      "approve": "{title}: öneri onaylandı; {count, plural, =0 {fiyatı değişen gece yok} other {# gecenin fiyatı yeniden hesaplandı}}. “Onaylı” filtresinden geri alabilirsiniz.",
+      "rollback": "{title}: onay geri alındı; {count, plural, =0 {fiyatı değişen gece yok} other {# gecenin fiyatı yeniden hesaplandı}}."
+    },
+    "textCount": "{count}/{max} karakter"
   },
   "fraud": {
-    "title": "Fraud inceleme kuyruğu",
+    "title": "Dolandırıcılık inceleme kuyruğu",
     "empty": "İncelenecek kayıt yok.",
     "booking": "Rezervasyon {id}",
     "user": "kullanıcı {id}",
-    "score": "skor",
+    "score": "risk puanı",
     "reasonsLabel": "Sebep kodları",
     "noReasons": "Sebep kaydı yok",
     "legit": "Meşru olarak işaretle",
@@ -73,7 +121,33 @@
       "title": "{booking} rezervasyonu dolandırıcılık olarak işaretlensin mi?",
       "body": "Kayıt kuyruktan çıkar ve kullanıcı ({user}) dolandırıcılık kaydıyla işaretlenir. Bu karar buradan geri alınamaz.",
       "confirm": "Dolandırıcılık olarak işaretle"
-    }
+    },
+    "description": "Risk puanı yüksek rezervasyonlar. Sebep kodlarını inceleyip her kaydı meşru ya da dolandırıcılık olarak işaretleyin.",
+    "points": "+{points} puan",
+    "decisions": {
+      "review": "İnceleme gerekli",
+      "deny": "Otomatik reddedildi",
+      "block": "Engellendi (eski kayıt)"
+    },
+    "rules": {
+      "velocity": "Kısa sürede çok sayıda deneme",
+      "velocity_user": "Aynı kullanıcıdan kısa sürede çok sayıda deneme",
+      "velocity_ip": "Aynı IP adresinden çok sayıda deneme",
+      "velocity_card": "Aynı karttan çok sayıda deneme",
+      "new_account_high_amount": "Yeni hesapta yüksek tutar",
+      "country_mismatch": "Ülke uyuşmazlığı",
+      "bin_ip_country_mismatch": "Kartın ülkesi IP ülkesiyle uyuşmuyor",
+      "failed_payments": "Yakın zamanda başarısız ödemeler",
+      "new_device": "Yeni cihaz",
+      "device_shared": "Cihaz birden çok hesapta kullanılıyor"
+    },
+    "done": {
+      "legit": "{booking}: meşru olarak işaretlendi.",
+      "fraud": "{booking}: dolandırıcılık olarak işaretlendi."
+    },
+    "changeRole": "Rolü değiştir",
+    "scoreValue": "{score}/100",
+    "effectHint": "“Meşru olarak işaretle” kaydı kuyruktan çıkarır; rezervasyon olduğu gibi kalır. “Dolandırıcılık olarak işaretle” kaydı doğrulanmış dolandırıcılık olarak kapatır ve kullanıcıyı dolandırıcılık kaydıyla işaretler; bu karar buradan geri alınamaz."
   },
   "moderation": {
     "title": "Yorum moderasyon kuyruğu",
@@ -88,7 +162,23 @@
       "title": "“{property}” yorumu kaldırılsın mı?",
       "body": "Yorum yayından kalkar ve tesisin puanı yeniden hesaplanır. Bu karar buradan geri alınamaz.",
       "confirm": "Yorumu kaldır"
-    }
+    },
+    "reviewOf": "“{property}” yorumu",
+    "codes": {
+      "PROFANITY": "Küfür/hakaret",
+      "PII_PHONE": "Telefon numarası",
+      "PII_EMAIL": "E-posta adresi",
+      "PII_IBAN": "IBAN",
+      "PII_URL": "Bağlantı",
+      "PII_CARD": "Kart numarası",
+      "PII_TCKN": "T.C. kimlik numarası",
+      "REPORT_THRESHOLD": "Şikâyet eşiği aşıldı"
+    },
+    "done": {
+      "publish": "“{property}” yorumu yayınlandı.",
+      "remove": "“{property}” yorumu kaldırıldı."
+    },
+    "writtenAt": "Yazıldı: {date}"
   },
   "experiments": {
     "title": "A/B deneyleri",
@@ -96,14 +186,15 @@
     "on": "açık",
     "off": "kapalı",
     "columns": {
-      "arm": "Kol",
+      "arm": "Varyant",
       "exposures": "Maruziyet",
       "users": "Kullanıcı",
       "conversions": "Dönüşüm",
       "rate": "Oran",
-      "ci": "%95 Wilson"
+      "ci": "%95 güven aralığı (Wilson)"
     },
-    "tableLabel": "{flag} deney sonuçları"
+    "tableLabel": "{flag} deney sonuçları",
+    "description": "Her deneyin varyantlarına göre dönüşüm oranları. Varyantların güven aralıkları örtüşüyorsa aradaki fark henüz anlamlı değildir."
   },
   "roles": {
     "title": "Kullanıcı rolü değiştir",
@@ -111,7 +202,7 @@
     "userIdHint": "Kendi rolünüzü değiştiremezsiniz.",
     "newRole": "Yeni rol",
     "submit": "Rolü güncelle",
-    "updated": "Rol güncellendi: {role} (en geç 15 dk içinde yansır).",
+    "updated": "Rol güncellendi: {role}. Kullanıcının tüm oturumları kapatıldı; yeniden giriş yaptığında yeni rol geçerli olur.",
     "submitting": "Güncelleniyor…",
     "options": {
       "USER": "Misafir (USER)",
@@ -123,6 +214,41 @@
       "body": "Yeni rol: {role}. Kullanıcının tüm oturumları kapanır ve yeniden giriş yapması gerekir.",
       "adminBody": "Yeni rol: {role}. Bu kullanıcı tüm yönetim işlemlerine (ödemeler, talepler, roller) erişebilecek. Kullanıcının tüm oturumları kapanır.",
       "confirm": "Rolü değiştir"
+    },
+    "newRoleHint": "Rol değişince kullanıcının tüm cihazlardaki oturumu kapanır.",
+    "choose": "Rol seçin",
+    "updatedFor": "{user} kimlikli kullanıcının rolü güncellendi: {role}. Oturumları kapatıldı; yeni rol bir sonraki girişte geçerli olur.",
+    "updatedFromTo": "{user} kimlikli kullanıcının rolü değişti: {from} → {to}. Oturumları kapatıldı; yeni rol bir sonraki girişte geçerli olur.",
+    "errors": {
+      "notFound": "Bu kimlikle kullanıcı bulunamadı. Kimliği kontrol edin.",
+      "forbidden": "Bu rol değiştirilemez: kendi rolünüzü değiştiremezsiniz ya da yönetici yetkiniz artık yok."
     }
+  },
+  "nav": {
+    "label": "Pano bölümleri",
+    "pending": "{label} ({count, plural, =0 {boş} other {# bekliyor}})",
+    "failed": "{label} ({count, plural, =0 {sorun yok} other {# başarısız}})"
+  },
+  "rowAction": "{action}: {name}",
+  "rowError": "{name}: {error}",
+  "errors": {
+    "NOT_FOUND": "Kayıt bulunamadı; başka bir yönetici işlemiş ya da silinmiş olabilir.",
+    "INVALID_STATE": "Kaydın durumu değişmiş; başka bir yönetici işlemiş olabilir.",
+    "CONFLICT": "Kayıt aynı anda değiştirildi. Listeyi yenileyip tekrar deneyin.",
+    "LAST_ADMIN": "Son yönetici hesabının rolü düşürülemez. Önce başka bir kullanıcıyı yönetici yapın.",
+    "FORBIDDEN": "Bu işlem için yetkiniz yok. Yönetici yetkiniz değiştiyse yeniden giriş yapın.",
+    "VALIDATION_ERROR": "Gönderilen bilgiler geçersiz. Alanları kontrol edip tekrar deneyin.",
+    "RATE_LIMITED": "Kısa sürede çok fazla işlem yapıldı. Biraz bekleyip tekrar deneyin."
+  },
+  "staleRecord": "Bu kayıt başka bir yönetici tarafından işlenmiş olabilir; liste yenilendi.",
+  "refresh": {
+    "button": "Yenile",
+    "updatedAt": "Son güncelleme: {time}"
+  },
+  "limitNote": "Yalnızca {count} kayıt gösteriliyor; kuyrukta daha fazlası bekliyor olabilir. Bu kayıtları işledikçe sıradakiler listelenir.",
+  "ids": {
+    "copy": "Kopyala",
+    "copied": "Kopyalandı",
+    "copyLabel": "Tam kimliği kopyala: {name}"
   }
 }

@@ -9,6 +9,11 @@ export const TEST_CARD_3DS = "4000 0000 0000 3220";
 export const TEST_CARD_DECLINE = "4000 0000 0000 0002";
 export const MOCK_3DS_CODE = "123456";
 
+/** Ürün sayfasından checkout'a geçen düğme (`booking.widget.submit`). */
+export const PDP_CONTINUE_NAME = "Devam et: bilgileri gözden geçir";
+/** Checkout'ta odayı tutup ödeme adımına geçen düğme (`checkout.submit`). */
+export const CHECKOUT_SUBMIT_NAME = /^Odayı ayırt? ve ödemeye geç$/;
+
 /**
  * Uygulamanın kendi hata/uyarı kutuları. Next.js'in sayfa geçişlerini okuyan
  * `__next-route-announcer__` da role="alert" taşır; `getByRole("alert")` onu da yakalayıp
@@ -35,8 +40,8 @@ export async function loginViaApi(page: Page, baseURL: string, email: string) {
 export async function loginViaUi(page: Page, email: string) {
   await page.goto("/login");
   await page.getByLabel("E-posta", { exact: true }).fill(email);
-  await page.getByLabel("Parola").fill(DEMO_PASS);
-  await page.getByRole("button", { name: "Giriş Yap" }).click();
+  await page.getByLabel("Şifre", { exact: true }).fill(DEMO_PASS);
+  await page.getByRole("button", { name: "Giriş yap" }).click();
   await page.waitForURL((url) => !url.pathname.startsWith("/login"));
 }
 
@@ -89,7 +94,7 @@ export function checkoutUrl(stay: StayTarget, dates: { checkIn: string; checkOut
 
 /** Checkout'u onaylar ve HELD rezervasyon sayfasına geçer; rezervasyon id'sini döndürür. */
 export async function completeCheckout(page: Page): Promise<string> {
-  const submit = page.getByRole("button", { name: "Rezervasyonu Tamamla" });
+  const submit = page.getByRole("button", { name: CHECKOUT_SUBMIT_NAME });
   await expect(submit).toBeEnabled();
   await submit.click();
   await page.waitForURL(/\/booking\/[^/?#]+$/);

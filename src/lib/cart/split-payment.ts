@@ -515,6 +515,7 @@ export async function sendShareInvite(input: {
 interface Payer {
   id: string;
   email: string;
+  emailVerified: boolean;
 }
 
 async function loadShareByToken(token: string) {
@@ -551,9 +552,12 @@ function assertPayer(share: TokenShare, payer: Payer): void {
 }
 
 async function loadPayer(userId: string): Promise<Payer> {
-  const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { email: true, emailVerifiedAt: true },
+  });
   if (!user) throw new NotFoundError("Kullanıcı bulunamadı");
-  return { id: userId, email: user.email };
+  return { id: userId, email: user.email, emailVerified: user.emailVerifiedAt != null };
 }
 
 export interface ShareViewDTO {
@@ -570,12 +574,15 @@ export interface ShareViewDTO {
   items: Array<{ propertyTitle: string; roomTypeName: string; checkIn: string; checkOut: string }>;
   canPay: boolean;
   paidByMe: boolean;
+  /** Ödeyen hesabın e-postası doğrulanmış mı (doğrulanmamışsa ödeme 403 alır; F99). */
+  emailVerified: boolean;
 }
 
 /** Katılımcı ödeme sayfası: link + oturum + (varsa) e-posta eşleşmesi. */
 export async function getShareView(token: string, userId: string): Promise<ShareViewDTO> {
   const share = await loadShareByToken(token);
-  assertPayer(share, await loadPayer(userId));
+  const payer = await loadPayer(userId);
+  assertPayer(share, payer);
   const [organizer, items] = await Promise.all([
     prisma.user.findUnique({ where: { id: share.plan.organizerId }, select: { firstName: true } }),
     prisma.cartItem.findMany({
@@ -610,6 +617,7 @@ export async function getShareView(token: string, userId: string): Promise<Share
     })),
     canPay: open && PAYABLE.includes(share.status),
     paidByMe: FUNDED.includes(share.status) && share.payerUserId === userId,
+    emailVerified: payer.emailVerified,
   };
 }
 
@@ -631,9 +639,23 @@ async function assertAttemptsLeft(shareId: string): Promise<void> {
   }
 }
 
-async function recordFailedAttempt(shareId: string): Promise<void> {
-  const { PAYMENT_ATTEMPTS_WINDOW_SECONDS } = getConfig();
-  await redis.incrWithTtl(attemptsKey(shareId), PAYMENT_ATTEMPTS_WINDOW_SECONDS).catch(() => 0);
+/** Başarısız denemeyi sayar; kalan hakkı döner (Redis yanıt vermezse null). */
+async function recordFailedAttempt(shareId: string): Promise<number | null> {
+  const { PAYMENT_ATTEMPTS_WINDOW_SECONDS, PAYMENT_MAX_ATTEMPTS } = getConfig();
+  const count = await redis
+    .incrWithTtl(attemptsKey(shareId), PAYMENT_ATTEMPTS_WINDOW_SECONDS)
+    .catch(() => null);
+  return count === null ? null : Math.max(0, PAYMENT_MAX_ATTEMPTS - count);
+}
+
+/** Kart reddi; kalan deneme hakkı sayfada gösterilir (son denemede uyarı, 0'da kilit). */
+function shareDeclined(declineCode: string, attemptsLeft: number | null): HttpError {
+  const declined = new PaymentDeclinedError(declineCode);
+  if (attemptsLeft === null) return declined;
+  return new HttpError(declined.status, declined.code, declined.message, {
+    declineCode,
+    attemptsLeft,
+  });
 }
 
 function assertShareOpen(share: TokenShare, now = Date.now()): void {
@@ -753,8 +775,7 @@ export async function payShare(input: {
         },
       });
       splitShareTotal.inc({ outcome: "declined" });
-      await recordFailedAttempt(share.id);
-      throw new PaymentDeclinedError(result.declineCode);
+      throw shareDeclined(result.declineCode, await recordFailedAttempt(share.id));
     }
     if (result.status === "requires_action") {
       const recorded = await prisma.paymentShare.updateMany({
@@ -810,12 +831,15 @@ export async function confirmShareChallenge(input: {
         data: { status: PaymentShareStatus.FAILED, failureCode: result.declineCode },
       });
       splitShareTotal.inc({ outcome: "declined" });
-      await recordFailedAttempt(share.id);
-      throw new PaymentDeclinedError(result.declineCode);
+      throw shareDeclined(result.declineCode, await recordFailedAttempt(share.id));
     }
     if (result.status === "requires_action") {
-      await recordFailedAttempt(share.id);
-      throw new ConflictError("Doğrulama kodu hatalı", "CHALLENGE_FAILED");
+      const attemptsLeft = await recordFailedAttempt(share.id);
+      throw new ConflictError(
+        "Doğrulama kodu hatalı",
+        "CHALLENGE_FAILED",
+        attemptsLeft === null ? undefined : { attemptsLeft }
+      );
     }
     await claimAuthorizedShare(share.id, result.providerRef, input.userId, provider.name, [
       PaymentShareStatus.REQUIRES_ACTION,

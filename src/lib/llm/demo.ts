@@ -39,22 +39,32 @@ export interface ReviewSummary {
   citations: string[];
 }
 
+// Anahtarlar sözcük başında eşleşir (`(?<!\p{L})`): "kadar" içindeki "dar", "Akdeniz" içindeki
+// "deniz" gibi sözcük içi rastlantılar temaya sayılmaz; "konuyla ilgili" de personel övgüsü değil.
 const THEMES: Array<{ key: RegExp; label: string }> = [
-  { key: /temiz|hijyen|pırıl/, label: "temizlik" },
-  { key: /konum|merkez|yürüme mesafe|ulaşım/, label: "konum" },
-  { key: /personel|çalışan|resepsiyon|güler yüz|ilgili/, label: "personel ve hizmet" },
-  { key: /kahvaltı/, label: "kahvaltı" },
-  { key: /manzara|deniz|boğaz/, label: "manzara" },
-  { key: /sessiz|huzur|sakin/, label: "sessizlik" },
-  { key: /gürültü|ses geliyor/, label: "gürültü" },
-  { key: /pahalı|fiyat(ı)? yüksek/, label: "fiyat" },
-  { key: /küçük|dar/, label: "oda büyüklüğü" },
-  { key: /wifi|internet/, label: "internet" },
+  { key: /(?<!\p{L})(?:temiz|tertemiz|hijyen|pırıl)/u, label: "temizlik" },
+  { key: /(?<!\p{L})(?:konum|merkez|yürüme mesafe|ulaşım)/u, label: "konum" },
+  {
+    key: /(?<!\p{L})(?:personel|çalışan|resepsiyon|güler yüz|ilgiliydi|ilgili ve|ilgilendi)/u,
+    label: "personel ve hizmet",
+  },
+  { key: /(?<!\p{L})kahvaltı/u, label: "kahvaltı" },
+  { key: /(?<!\p{L})(?:manzara|deniz|boğaz)/u, label: "manzara" },
+  { key: /(?<!\p{L})(?:sessiz|huzur|sakin)/u, label: "sessizlik" },
+  { key: /(?<!\p{L})(?:gürültü|ses geliyor)/u, label: "gürültü" },
+  { key: /(?<!\p{L})(?:pahalı|fiyatı? yüksek)/u, label: "fiyat" },
+  { key: /(?<!\p{L})(?:küçük|dar(?!\p{L})|dardı)/u, label: "oda büyüklüğü" },
+  { key: /(?<!\p{L})(?:wifi|internet)/u, label: "internet" },
 ];
 
-function firstSentence(text: string): string {
-  const s = text.split(/(?<=[.!?])\s+/)[0] ?? text;
+function clipSentence(s: string): string {
   return s.length > 140 ? `${s.slice(0, 137)}…` : s;
+}
+
+/** Yorumun temayı içeren İLK cümlesi (alıntı iddiayla birebir örtüşsün); yoksa null. */
+function matchingSentence(text: string, key: RegExp): string | null {
+  const hit = text.split(/(?<=[.!?])\s+/).find((s) => key.test(s.toLocaleLowerCase("tr-TR")));
+  return hit ? clipSentence(hit.trim()) : null;
 }
 
 /**
@@ -69,16 +79,17 @@ export function demoReviewSummary(reviews: ReviewInput[]): ReviewSummary {
   }
   const avg = Math.round((reviews.reduce((s, r) => s + r.rating, 0) / reviews.length) * 10) / 10;
   const pick = (positive: boolean) => {
-    const out: Array<{ text: string; id: string; count: number }> = [];
+    const out: Array<{ text: string; label: string; id: string; count: number }> = [];
     for (const theme of THEMES) {
-      const hits = withText.filter(
-        (r) =>
-          theme.key.test(r.comment!.toLocaleLowerCase("tr-TR")) &&
-          (positive ? r.rating >= 4 : r.rating <= 3)
-      );
+      // Alıntı, temayı geçiren cümlenin kendisidir; eşleşen cümlesi olmayan yorum sayılmaz.
+      const hits = withText
+        .filter((r) => (positive ? r.rating >= 4 : r.rating <= 3))
+        .map((r) => ({ id: r.id, quote: matchingSentence(r.comment!, theme.key) }))
+        .filter((h): h is { id: string; quote: string } => h.quote !== null);
       if (hits.length > 0) {
         out.push({
-          text: `${theme.label}: "${firstSentence(hits[0].comment!)}" [r:${hits[0].id}]`,
+          text: `${theme.label}: "${hits[0].quote}" [r:${hits[0].id}]`,
+          label: theme.label,
           id: hits[0].id,
           count: hits.length,
         });
@@ -91,7 +102,7 @@ export function demoReviewSummary(reviews: ReviewInput[]): ReviewSummary {
   const top = pros[0];
   const summary =
     `${reviews.length} doğrulanmış yorumun ortalaması ${avg}/5.` +
-    (top ? ` Misafirler en çok ${top.text.split(":")[0]} konusunu övüyor [r:${top.id}].` : "");
+    (top ? ` Misafirler en çok ${top.label} konusunu övüyor [r:${top.id}].` : "");
   return {
     summary,
     pros: pros.map((p) => p.text),
@@ -176,10 +187,20 @@ export interface MessageDraftFacts {
   checkIn: string;
   checkOut: string;
   lastGuestMessage: string | null;
+  /** Taslak dili (misafirin mesaj dili ya da ev sahibinin arayüz dili); varsayılan tr. */
+  locale?: "tr" | "en";
 }
 
 /** Deterministik ev sahibi yanıt taslağı (P1-6); ev sahibi onaylamadan gönderilmez. */
 export function demoMessageDraft(f: MessageDraftFacts): { reply: string } {
+  if (f.locale === "en") {
+    const opener = f.lastGuestMessage
+      ? "Thank you for your message; I have noted it and will get back to you shortly."
+      : "Thank you for your booking!";
+    return {
+      reply: `Hello ${f.guestName}, ${opener} We look forward to hosting you at ${f.propertyTitle} from ${f.checkIn} to ${f.checkOut}. If you have any other questions, feel free to write here.`,
+    };
+  }
   const opener = f.lastGuestMessage
     ? "Mesajınız için teşekkürler, konuyu not aldım ve en kısa sürede dönüş yapacağım."
     : "Rezervasyonunuz için teşekkürler!";

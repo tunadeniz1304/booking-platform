@@ -1,11 +1,14 @@
 "use client";
 
-import { useState } from "react";
-import { useTranslations } from "next-intl";
+import { useEffect, useRef, useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import { apiFetch } from "@/lib/api-client";
 import { useFormat } from "@/i18n/use-format";
-import { Button, Card, Status, errorMessage, inputClass, useLoader } from "@/components/ui/ui";
+import { Button, Card, Field, Status, inputClass, useLoader } from "@/components/ui/ui";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { isStaleRecord, useAdminErrorText } from "@/components/admin/admin-error-text";
+
+type BlockReason = "PAUSED" | "PROVIDER_DISABLED" | "IDENTITY_UNVERIFIED";
 
 interface AccountRow {
   userId: string;
@@ -17,30 +20,80 @@ interface AccountRow {
   pausedReason: string | null;
   pausedAt: string | null;
   pendingPayouts: number;
+  /** Sunucu `payoutBlockReason` sonucunu dönerse o kullanılır (kimlik koşulu dahil). */
+  blockReason?: BlockReason | null;
+}
+
+type AccountFilter = "all" | "paused" | "pending";
+const FILTERS: AccountFilter[] = ["all", "paused", "pending"];
+
+const SEARCH_ID = "payout-admin-search";
+const FILTER_ID = "payout-admin-filter";
+const WARN_ICON = "⚠︎";
+const OK_ICON = "✓";
+
+/** Ödeme engeli, sunucudaki `payoutBlockReason` sırasıyla: durdurma > sağlayıcı izni. */
+function blockReasonOf(row: AccountRow): BlockReason | null {
+  if (row.blockReason !== undefined) return row.blockReason;
+  if (row.payoutsPaused) return "PAUSED";
+  if (!row.payoutsEnabled) return "PROVIDER_DISABLED";
+  return null;
+}
+
+/** Aynı ada sahip ev sahiplerini ayırmak için kısaltılmış kullanıcı kimliği. */
+function shortId(userId: string): string {
+  return userId.length > 6 ? `…${userId.slice(-6)}` : userId;
+}
+
+interface RowFeedback {
+  userId: string;
+  message: string | null;
+  error: string | null;
 }
 
 /** Yönetici payout kontrolü (P1-4): ev sahibi başına durdur / devam et (denetim kayıtlı). */
 export default function PayoutAdmin() {
   const t = useTranslations("payouts");
+  const tc = useTranslations("common");
+  const ta = useTranslations("admin");
+  const locale = useLocale();
   const f = useFormat();
+  const errorText = useAdminErrorText();
+  const [retrying, setRetrying] = useState(false);
   const { data, error, reload } = useLoader(
-    () => apiFetch<{ accounts: AccountRow[] }>("/api/admin/payouts"),
+    () =>
+      apiFetch<{ accounts: AccountRow[] }>("/api/admin/payouts").finally(() => setRetrying(false)),
     []
   );
   const [reasons, setReasons] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<RowFeedback | null>(null);
   const [reasonMissing, setReasonMissing] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<AccountFilter>("all");
+  const refocusAfterRetry = useRef(false);
   const { confirm, confirmDialog } = useConfirm();
+
+  // Başarılı yeniden denemede "Tekrar dene" düğmesi kalkar; odak <body>'ye düştüyse ilk denetime.
+  useEffect(() => {
+    if (!data || error || !refocusAfterRetry.current) return;
+    refocusAfterRetry.current = false;
+    if (document.activeElement === document.body) document.getElementById(SEARCH_ID)?.focus();
+  }, [data, error]);
+
+  const retry = () => {
+    refocusAfterRetry.current = true;
+    setRetrying(true);
+    reload();
+  };
 
   const toggle = async (row: AccountRow) => {
     if (busy) return;
+    const pausing = !row.payoutsPaused;
     const reason = reasons[row.userId]?.trim();
-    setActionError(null);
-    setMessage(null);
+    setFeedback(null);
     setReasonMissing(null);
-    if (!row.payoutsPaused) {
+    if (pausing) {
       // Durdurma denetim kaydına gerekçesiyle yazılsın: gerekçe zorunlu ve onay adımında gösterilir.
       if (!reason) {
         setReasonMissing(row.userId);
@@ -48,89 +101,217 @@ export default function PayoutAdmin() {
         return;
       }
       const ok = await confirm({
-        title: t("admin.confirmPause.title", { name: row.displayName }),
+        title: t("admin.confirmPause.title", {
+          name: `${row.displayName} (${shortId(row.userId)})`,
+        }),
         body: t("admin.confirmPause.body", { count: row.pendingPayouts, reason }),
         confirmLabel: t("admin.confirmPause.confirm"),
         tone: "danger",
       });
       if (!ok) return;
     }
+    // Sonuç bölgesi istekten önce satırda açılır; içerik değişince ekran okuyucu duyurur.
+    setFeedback({ userId: row.userId, message: null, error: null });
     setBusy(row.userId);
     try {
       await apiFetch(`/api/admin/payouts/${encodeURIComponent(row.userId)}`, {
         method: "POST",
-        body: JSON.stringify({ paused: !row.payoutsPaused, ...(reason ? { reason } : {}) }),
+        // Gerekçe yalnız durdururken gönderilir; devam ettirme kaydına eski gerekçe yazılmaz.
+        body: JSON.stringify({ paused: pausing, ...(pausing ? { reason } : {}) }),
       });
-      setMessage(row.payoutsPaused ? t("admin.resumed") : t("admin.paused"));
+      setFeedback({
+        userId: row.userId,
+        message: pausing ? t("admin.paused") : t("admin.resumed"),
+        error: null,
+      });
+      setReasons((prev) => {
+        const next = { ...prev };
+        delete next[row.userId];
+        return next;
+      });
       reload();
     } catch (e) {
-      setActionError(errorMessage(e));
+      // Kayıt başka bir yöneticice değiştirilmiş/kaldırılmışsa liste güncel hâliyle yenilenir.
+      const stale = isStaleRecord(e);
+      setFeedback({
+        userId: row.userId,
+        message: null,
+        error: stale ? ta("staleRecord") : errorText(e),
+      });
+      if (stale) reload();
     } finally {
       setBusy(null);
     }
   };
 
-  if (error) return <Status error={error} />;
-  if (!data) return <p className="text-sm text-gray-600">{t("loading")}</p>;
+  const accounts = data?.accounts ?? [];
+  // Yenilemeden sonra satırı kalmayan hesabın sonucu listenin üstünde gösterilir.
+  const orphanFeedback =
+    feedback && !accounts.some((row) => row.userId === feedback.userId) ? feedback : null;
+  const needle = query.trim().toLocaleLowerCase(locale);
+  const visible = accounts.filter((row) => {
+    // İşlem yapılan satır, sonucu okunana kadar filtreden bağımsız görünür kalır.
+    if (row.userId === feedback?.userId) return true;
+    if (filter === "paused" && !row.payoutsPaused) return false;
+    if (filter === "pending" && row.pendingPayouts === 0) return false;
+    return (
+      !needle ||
+      row.displayName.toLocaleLowerCase(locale).includes(needle) ||
+      row.userId.toLocaleLowerCase(locale).includes(needle)
+    );
+  });
+
   return (
     <Card title={t("admin.title")} id="payout-admin">
-      {data.accounts.length === 0 ? (
+      {error && (
+        <div className="mb-3 flex flex-wrap items-center gap-3">
+          <Status error={error} />
+          <Button variant="secondary" busy={retrying} onClick={retry}>
+            {tc("errorPage.retry")}
+          </Button>
+        </div>
+      )}
+      {orphanFeedback && (
+        <div className="mb-3">
+          <Status error={orphanFeedback.error} message={orphanFeedback.message} />
+        </div>
+      )}
+      {!data ? (
+        !error && (
+          <p role="status" className="text-sm text-gray-600">
+            {t("loading")}
+          </p>
+        )
+      ) : accounts.length === 0 ? (
         <p className="text-sm text-gray-700">{t("admin.empty")}</p>
       ) : (
-        <ul className="space-y-3">
-          {data.accounts.map((row) => (
-            <li key={row.userId} className="rounded-md border border-gray-200 p-3 text-sm">
-              <p className="font-medium">
-                {row.displayName} · {t(`kyc.${row.kycStatus}`)} ·{" "}
-                {row.payoutsPaused ? t("blocked.PAUSED") : t("account.active")}
-              </p>
-              <p className="text-gray-600">
-                {t("admin.pending", { count: row.pendingPayouts })}
-                {row.pausedAt ? ` · ${f.dateTime(row.pausedAt)}` : ""}
-                {row.pausedReason ? ` · ${row.pausedReason}` : ""}
-              </p>
-              <div className="mt-2 flex flex-wrap items-end gap-2">
-                {!row.payoutsPaused && (
-                  <div className="text-xs text-gray-700">
-                    <label htmlFor={`payout-reason-${row.userId}`}>{t("admin.reason")}</label>
-                    <input
-                      id={`payout-reason-${row.userId}`}
-                      className={inputClass}
-                      maxLength={500}
-                      required
-                      autoComplete="off"
-                      aria-invalid={reasonMissing === row.userId || undefined}
-                      aria-describedby={
-                        reasonMissing === row.userId
-                          ? `payout-reason-${row.userId}-error`
-                          : undefined
-                      }
-                      value={reasons[row.userId] ?? ""}
-                      onChange={(e) => {
-                        setReasons({ ...reasons, [row.userId]: e.target.value });
-                        if (reasonMissing === row.userId) setReasonMissing(null);
-                      }}
-                    />
-                    {reasonMissing === row.userId && (
-                      <p id={`payout-reason-${row.userId}-error`} className="mt-1 text-red-700">
-                        {t("admin.reasonRequired")}
-                      </p>
+        <>
+          <div className="mb-2 grid gap-3 sm:grid-cols-[1fr_auto]">
+            <Field label={t("admin.search.label")} id={SEARCH_ID} hint={t("admin.search.hint")}>
+              <input
+                id={SEARCH_ID}
+                type="search"
+                className={inputClass}
+                autoComplete="off"
+                value={query}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                  setFeedback(null);
+                }}
+              />
+            </Field>
+            <Field label={t("admin.filter.label")} id={FILTER_ID}>
+              <select
+                id={FILTER_ID}
+                className={inputClass}
+                value={filter}
+                onChange={(e) => {
+                  setFilter(e.target.value as AccountFilter);
+                  setFeedback(null);
+                }}
+              >
+                {FILTERS.map((key) => (
+                  <option key={key} value={key}>
+                    {t(`admin.filter.${key}`)}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </div>
+          <p role="status" className="mb-3 text-xs text-gray-600">
+            {visible.length === 0
+              ? t("admin.noMatch")
+              : t("admin.resultCount", { shown: visible.length, total: accounts.length })}
+          </p>
+          <ul className="space-y-3">
+            {visible.map((row) => {
+              const block = blockReasonOf(row);
+              const rowFeedback = feedback?.userId === row.userId ? feedback : null;
+              return (
+                <li key={row.userId} className="rounded-md border border-gray-200 p-3 text-sm">
+                  <p className="font-medium">
+                    {row.displayName}{" "}
+                    <span className="break-all font-normal text-gray-600">
+                      {t("admin.userId", { id: shortId(row.userId) })}
+                    </span>
+                  </p>
+                  <p>
+                    <span aria-hidden="true">{block ? WARN_ICON : OK_ICON} </span>
+                    {block ? t(`blocked.${block}`) : t("account.active")} ·{" "}
+                    {t(`kyc.${row.kycStatus}`)}
+                  </p>
+                  <p className="text-gray-600">
+                    {t("admin.pending", { count: row.pendingPayouts })}
+                  </p>
+                  {row.pausedAt && (
+                    <p className="text-gray-600">
+                      {t("admin.pausedAt", { date: f.dateTime(row.pausedAt) })}
+                    </p>
+                  )}
+                  {row.pausedReason && (
+                    <p className="break-words text-gray-600">
+                      {t("admin.pausedReason", { reason: row.pausedReason })}
+                    </p>
+                  )}
+                  <div className="mt-2 flex flex-wrap items-end gap-2">
+                    {!row.payoutsPaused && (
+                      <div className="text-xs text-gray-700">
+                        <label htmlFor={`payout-reason-${row.userId}`}>{t("admin.reason")}</label>
+                        <input
+                          id={`payout-reason-${row.userId}`}
+                          className={inputClass}
+                          maxLength={500}
+                          required
+                          autoComplete="off"
+                          aria-invalid={reasonMissing === row.userId || undefined}
+                          aria-describedby={
+                            reasonMissing === row.userId
+                              ? `payout-reason-${row.userId}-error`
+                              : undefined
+                          }
+                          value={reasons[row.userId] ?? ""}
+                          onChange={(e) => {
+                            setReasons({ ...reasons, [row.userId]: e.target.value });
+                            if (reasonMissing === row.userId) setReasonMissing(null);
+                          }}
+                        />
+                        {reasonMissing === row.userId && (
+                          <p id={`payout-reason-${row.userId}-error`} className="mt-1 text-red-700">
+                            {t("admin.reasonRequired")}
+                          </p>
+                        )}
+                      </div>
                     )}
+                    <Button
+                      variant={row.payoutsPaused ? "primary" : "danger"}
+                      busy={busy === row.userId}
+                      aria-describedby={
+                        row.payoutsPaused ? undefined : `payout-pause-hint-${row.userId}`
+                      }
+                      onClick={() => toggle(row)}
+                    >
+                      {row.payoutsPaused ? t("admin.resume") : t("admin.pause")}
+                    </Button>
                   </div>
-                )}
-                <Button
-                  variant={row.payoutsPaused ? "primary" : "danger"}
-                  busy={busy === row.userId}
-                  onClick={() => toggle(row)}
-                >
-                  {row.payoutsPaused ? t("admin.resume") : t("admin.pause")}
-                </Button>
-              </div>
-            </li>
-          ))}
-        </ul>
+                  {!row.payoutsPaused && (
+                    <p
+                      id={`payout-pause-hint-${row.userId}`}
+                      className="mt-1 text-xs text-gray-600"
+                    >
+                      {t("admin.pauseHint", { count: row.pendingPayouts })}
+                    </p>
+                  )}
+                  {rowFeedback && (
+                    <div className="mt-2">
+                      <Status error={rowFeedback.error} message={rowFeedback.message} />
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </>
       )}
-      <Status error={actionError} message={message} />
       {confirmDialog}
     </Card>
   );

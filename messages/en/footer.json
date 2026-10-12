@@ -5,7 +5,7 @@
   "columns": {
     "support": {
       "title": "Support",
-      "helpCenter": "Help Centre",
+      "helpCenter": "Help Center",
       "covid": "COVID-19 information",
       "refundPolicy": "Refund policy",
       "refunds": "Refunds",
@@ -16,13 +16,13 @@
       "allStays": "All accommodation types",
       "holidayRentals": "Holiday rentals",
       "packages": "Holiday packages",
-      "cityCentre": "City-centre hotels",
+      "cityCentre": "City-center hotels",
       "budget": "Budget hotels"
     },
     "contact": {
       "title": "Get in touch",
       "hosts": "Own a hotel?",
-      "partners": "Partner programme",
+      "partners": "Partner program",
       "careers": "Careers",
       "corporate": "Corporate contact"
     }

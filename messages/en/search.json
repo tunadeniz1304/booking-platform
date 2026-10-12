@@ -2,7 +2,10 @@
   "mapLoading": "Loading map…",
   "errors": {
     "load": "Could not load search results",
-    "smart": "The smart filter did not work"
+    "smart": "The smart filter couldn't interpret your text.",
+    "smartKept": "Your current results are still shown.",
+    "invalidParams": "Some details in this search link are invalid. Edit your search and try again.",
+    "invalidFields": "Fields to check: {fields}."
   },
   "types": {
     "hotel": "Hotel",
@@ -44,8 +47,8 @@
     "priceDesc": "Price (highest first)",
     "rating": "Rating (highest first)"
   },
-  "loading": "Loading...",
-  "resultCount": "Showing {shown} of {total} stays",
+  "loading": "Loading…",
+  "resultCount": "Showing {shown, number} of {total, plural, one {# stay} other {# stays}}",
   "cached": "From cache",
   "view": "View",
   "list": "List",
@@ -57,15 +60,15 @@
   "mapResults": "Results on the map",
   "bar": {
     "destination": "Where to?",
-    "dates": "Check-in - Check-out",
+    "dates": "Check-in – Check-out",
     "pickDate": "Select dates",
-    "checkInOnly": "{date} - check-out?",
+    "checkInOnly": "{date} – check-out?",
     "guests": "Guests",
-    "guestsSummary": "{guests, plural, one {# guest} other {# guests}} · {rooms, plural, one {# room} other {# rooms}}",
+    "guestsSummary": "{adults, plural, one {# adult} other {# adults}}{children, plural, =0 {} one { · # child} other { · # children}}",
     "adults": "Adults",
     "adultsHint": "Ages 13 and over",
     "children": "Children",
-    "childrenHint": "Ages 0-12",
+    "childrenHint": "Ages 0–12",
     "rooms": "Rooms",
     "decrease": "Decrease",
     "increase": "Increase",
@@ -79,7 +82,14 @@
     "decreaseRooms": "Decrease number of rooms",
     "increaseRooms": "Increase number of rooms",
     "countStatus": "{label}: {count}",
-    "done": "Done"
+    "done": "Done",
+    "checkOutRequired": "Choose a check-out date, or clear the dates.",
+    "clearDates": "Clear dates",
+    "searching": "Searching…",
+    "formLabel": "Search stays",
+    "maxGuests": "You can select up to {max, plural, one {# guest} other {# guests}}.",
+    "childrenHintPricing": "Ages 0–12 · age doesn't affect the price",
+    "dateRange": "{checkIn} – {checkOut} · {nights}"
   },
   "picker": {
     "prevMonth": "Previous month",
@@ -90,21 +100,32 @@
     "inRange": "within your stay",
     "hintCheckIn": "Choose a day for check-in. You can move between days with the arrow keys.",
     "hintCheckOut": "Check-in: {date}. Now choose your check-out date.",
-    "hintDone": "Selected dates: check-in {checkIn}, check-out {checkOut}."
+    "hintDone": "Selected dates: check-in {checkIn}, check-out {checkOut}, {nights}.",
+    "stepCheckIn": "Choose your check-in date",
+    "stepCheckOut": "Choose your check-out date",
+    "stepChange": "To change, choose a new check-in date",
+    "nights": "{count, plural, one {# night} other {# nights}}",
+    "minOneNight": "Choose at least 1 night: pick a day after check-in for check-out.",
+    "clearDates": "Clear dates",
+    "notBookable": "not yet open for booking"
   },
   "autocomplete": {
     "placeholder": "City, hotel or region",
     "popular": "Popular destinations",
-    "searching": "Searching...",
+    "searching": "Searching…",
     "suggestions": "Suggestions",
-    "noResults": "No results found",
-    "count": "{count, plural, one {# suggestion} other {# suggestions}}"
+    "noResults": "No matching suggestions",
+    "count": "{count, plural, one {# suggestion} other {# suggestions}}",
+    "error": "Suggestions could not be loaded. You can still search for what you typed.",
+    "searchFor": "Search for “{query}”",
+    "clear": "Clear destination",
+    "properties": "Properties"
   },
   "mapView": {
     "initFailed": "the map could not be initialised",
     "error": "map error",
     "fallback": "The map could not be loaded; using the list view.",
-    "cluster": "{count} stays; click to zoom in",
+    "cluster": "{count, plural, one {# stay} other {# stays}}, zoom in",
     "title": "Results map",
     "zoomIn": "Zoom in",
     "zoomOut": "Zoom out",
@@ -112,7 +133,13 @@
     "closePopup": "Close details",
     "toggleAttribution": "Show or hide map attribution",
     "mapFeedback": "Map feedback",
-    "marker": "Map marker"
+    "marker": "Map marker",
+    "clusterSelected": "{count} stays; click to zoom in. The selected stay is in this cluster.",
+    "ready": "Map loaded; {count, plural, one {# stay} other {# stays}} on the map.",
+    "skipToList": "Skip the map, go to the results list",
+    "cooperativeWindows": "Hold Ctrl and scroll to zoom the map",
+    "cooperativeMac": "Hold ⌘ and scroll to zoom the map",
+    "cooperativeMobile": "Use two fingers to move the map"
   },
   "smart": {
     "label": "Smart filter — describe what you're looking for",
@@ -131,14 +158,19 @@
       "maxPrice": "At most {value}",
       "checkIn": "Check-in: {value}",
       "checkOut": "Check-out: {value}",
-      "sort": "Sort: {value}"
+      "sort": "Sort: {value}",
+      "amenity": "Amenity: {value}"
     },
     "sort": {
       "recommended": "Recommended",
       "priceAsc": "Price ascending",
       "priceDesc": "Price descending",
       "rating": "Rating"
-    }
+    },
+    "region": "Smart filter",
+    "hint": "You can describe a city, dates, number of guests, budget and amenities (at least {min} characters).",
+    "tooShort": "Enter at least {min} characters.",
+    "allRemoved": "You removed all smart filters; results now match only your search criteria."
   },
   "card": {
     "reviews": "{count, plural, one {# review} other {# reviews}}",
@@ -147,14 +179,21 @@
     "fromPerNight": "per night from",
     "taxesOnDates": "taxes and fees are added once you pick dates",
     "seeDeal": "See deal",
-    "addFavorite": "Add to favourites",
-    "removeFavorite": "Remove from favourites",
+    "addFavorite": "Add to favorites",
+    "removeFavorite": "Remove from favorites",
     "favoriteAdded": "Added to favorites",
     "favoriteRemoved": "Removed from favorites",
     "favoriteAddFailed": "Couldn't add to favorites. Please try again.",
     "favoriteRemoveFailed": "Couldn't remove from favorites. Please try again.",
     "ratingLabel": "Guest rating: {value}",
-    "noRating": "No ratings yet"
+    "noRating": "No ratings yet",
+    "seeRoom": "See room",
+    "seePrices": "See prices",
+    "addFavoriteNamed": "Add to favorites: {title}",
+    "removeFavoriteNamed": "Remove from favorites: {title}",
+    "noPhoto": "No photo added",
+    "notStayTotal": "excl. taxes and fees, not the total for your dates",
+    "nightsGuestsTotal": "total for {nights, plural, one {# night} other {# nights}}, {guests, plural, one {# guest} other {# guests}}"
   },
   "visual": {
     "showSimilar": "Show similar",
@@ -166,27 +205,36 @@
       "MODEL_MISSING": "The visual search model has not been downloaded yet.",
       "LOAD_FAILED": "The visual search model could not be loaded.",
       "VECTOR_UNAVAILABLE": "No vector database is available for visual search."
-    }
+    },
+    "unavailable": "Similar-photo search isn't available right now.",
+    "showSimilarNamed": "Show similar: {title}",
+    "similarHeadingNamed": "Stays similar to the cover photo of {title}",
+    "showSimilarCover": "Show stays like the cover photo",
+    "showSimilarCoverNamed": "Show stays like the cover photo: {title}"
   },
   "flex": {
     "label": "Date flexibility",
     "exact": "Exact dates",
-    "plusMinus": "±{days} days",
+    "plusMinus": "±{days, plural, one {# day} other {# days}}",
     "suggestion": "{savings} cheaper on {dates}",
     "total": "Total {total}",
     "view": "See these dates",
     "needsDates": "Pick check-in and check-out dates to use flexible dates.",
-    "pickDates": "Choose dates"
+    "pickDates": "Choose dates",
+    "hint": "Results don't change. If a cheaper date with the same number of nights exists within the range you pick, it's shown on the stay's card.",
+    "found": "{count, plural, one {Cheaper dates found for # stay} other {Cheaper dates found for # stays}}",
+    "noneFound": "No cheaper dates found in the range you picked",
+    "viewNamed": "See these dates: {title}"
   },
   "noResultsDestination": "No stays found for “{destination}”",
   "noResultsDestinationHint": "Check the spelling or try another city.",
   "noResultsFiltersHint": "No stays match the filters you chose. Loosen or clear the filters.",
   "allStays": "See all stays",
   "skipToResults": "Skip to results",
-  "loadMore": "Show more ({remaining} stays left)",
-  "guestCountDefault": "{count} guests (default)",
+  "loadMore": "Show more ({remaining, plural, one {# stay} other {# stays}} left)",
+  "guestCountDefault": "{count, plural, one {# guest} other {# guests}} (default)",
   "mapPrice": {
-    "total": "{price} total",
+    "total": "{price} total for {nights, plural, one {# night} other {# nights}}",
     "perNight": "{price} / night"
   },
   "edit": {
@@ -199,5 +247,15 @@
     "datesBoth": "Choose both a check-in and a check-out date.",
     "datesOrder": "Check-out must be after check-in.",
     "guestsInvalid": "Number of guests must be between 1 and 30."
+  },
+  "resultsHeading": "Results",
+  "retry": "Try again",
+  "mapList": {
+    "view": "View listing",
+    "selected": "Selected",
+    "selectHint": "Select to highlight the stay on the map."
+  },
+  "emptyA11y": {
+    "hint": "All selected accessibility features must be in the same room. Try removing one to see results:"
   }
 }

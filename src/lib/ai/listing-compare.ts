@@ -56,6 +56,8 @@ export interface CompareListing {
   propertyType: string;
   rating: { avg: number; count: number };
   amenities: string[];
+  /** Olanak adı → simge kodu (F682); yalnızca arayüz içindir, LLM'e gönderilmez. */
+  amenityIcons?: Record<string, string | null>;
   cancellation: { kind: PolicyKind; freeCancellationHours: number | null };
   price: ComparePrice;
 }
@@ -92,7 +94,29 @@ export function freeCancellationHours(
   return full.length > 0 ? Math.min(...full) : null;
 }
 
-/** Yapılandırılmış fark (saf; eşitlikte istek sırasındaki ilk ilan kazanır). */
+/**
+ * Tek öndeki ilan (F681): en az 2 karşılaştırılabilir ilan (`score` null değil) gerekir ve tepe
+ * puan tek ilanda olmalıdır; eşitlikte null. Karşılaştırma sayfasının rozet kuralıyla aynıdır.
+ */
+function soleLeader(
+  listings: readonly CompareListing[],
+  score: (l: CompareListing) => number | null
+): string | null {
+  const scored = listings.flatMap((l) => {
+    const s = score(l);
+    return s === null ? [] : [{ id: l.id, s }];
+  });
+  if (scored.length < 2) return null;
+  const best = Math.max(...scored.map((x) => x.s));
+  const top = scored.filter((x) => x.s === best);
+  return top.length === 1 ? top[0].id : null;
+}
+
+/**
+ * Yapılandırılmış fark (saf). En ucuz / en iyi puan / en esnek yalnızca tek öndeki ilan varsa
+ * dolar; eşitlikte null (yorum, sayfadaki rozetlerle çelişmesin). İade edilemez ilan en esnek
+ * sayılmaz.
+ */
 export function buildCompareDiff(listings: readonly CompareListing[]): CompareDiff {
   const sets = listings.map((l) => new Set(l.amenities));
   const all = [...new Set(listings.flatMap((l) => l.amenities))].sort((a, b) => a.localeCompare(b));
@@ -106,28 +130,15 @@ export function buildCompareDiff(listings: readonly CompareListing[]): CompareDi
 
   const priced = listings.filter((l) => l.price.available && l.price.total !== null);
   const currencies = new Set(priced.map((l) => l.price.currency));
-  let cheapestId: string | null = null;
-  if (priced.length > 0 && currencies.size === 1) {
-    cheapestId = priced.reduce((best, l) => (l.price.total! < best.price.total! ? l : best)).id;
-  }
-
-  const rated = listings.filter((l) => l.rating.count > 0);
-  const bestRatedId =
-    rated.length > 0
-      ? rated.reduce((best, l) =>
-          l.rating.avg > best.rating.avg ||
-          (l.rating.avg === best.rating.avg && l.rating.count > best.rating.count)
-            ? l
-            : best
-        ).id
-      : null;
-
-  const flexRank = (l: CompareListing) =>
-    FLEX_RANK[l.cancellation.kind] * 10_000 - (l.cancellation.freeCancellationHours ?? 9_999);
-  const mostFlexibleId =
-    listings.length > 0
-      ? listings.reduce((best, l) => (flexRank(l) > flexRank(best) ? l : best)).id
-      : null;
+  const cheapestId =
+    currencies.size === 1 ? soleLeader(priced, (l) => -(l.price.total ?? 0)) : null;
+  const bestRatedId = soleLeader(listings, (l) => (l.rating.count > 0 ? l.rating.avg : null));
+  // İade edilemez en alttadır: hepsi iade edilemezse eşitlik olur, kimse öne çıkmaz.
+  const mostFlexibleId = soleLeader(listings, (l) =>
+    l.cancellation.kind === "NON_REFUNDABLE"
+      ? -Infinity
+      : FLEX_RANK[l.cancellation.kind] * 10_000 - (l.cancellation.freeCancellationHours ?? 9_999)
+  );
 
   return { commonAmenities, uniqueAmenities, cheapestId, bestRatedId, mostFlexibleId };
 }
@@ -291,10 +302,10 @@ export function validateCompareIds(ids: readonly string[]): string[] {
   return unique;
 }
 
-export async function compareListings(
-  req: CompareRequest,
-  deps: { client?: LlmClient } = {}
-): Promise<CompareResult> {
+/** Yapılandırılmış karşılaştırma (F671): olanaklar, puan, iptal, teklif toplamları; LLM yok. */
+export async function compareStructured(
+  req: CompareRequest
+): Promise<Omit<CompareResult, "commentary">> {
   const ids = validateCompareIds(req.ids);
   if ((req.checkIn && !req.checkOut) || (!req.checkIn && req.checkOut)) {
     throw new ValidationError("Giriş ve çıkış tarihi birlikte verilmeli");
@@ -308,7 +319,7 @@ export async function compareListings(
       ratingAvg: true,
       ratingCount: true,
       location: { select: { city: true, country: true } },
-      amenities: { select: { name: true } },
+      amenities: { select: { name: true, icon: true } },
       cancellationPolicy: { select: { kind: true, version: true, rules: true } },
       rooms: {
         where: { available: true },
@@ -332,6 +343,7 @@ export async function compareListings(
       propertyType: row.propertyType,
       rating: { avg: round1(row.ratingAvg), count: row.ratingCount },
       amenities: row.amenities.map((a) => a.name).sort((a, b) => a.localeCompare(b)),
+      amenityIcons: Object.fromEntries(row.amenities.map((a) => [a.name, a.icon ?? null])),
       cancellation: {
         kind: policy.kind,
         freeCancellationHours: freeCancellationHours(policy.rules.tiers),
@@ -340,25 +352,36 @@ export async function compareListings(
     });
   }
 
-  const structured = {
+  return {
     checkIn: req.checkIn ?? null,
     checkOut: req.checkOut ?? null,
     guests: req.guests,
     listings,
     diff: buildCompareDiff(listings),
   };
+}
+
+/**
+ * Yapılandırılmış veriyi anlatan kısa yorum (`ai_generated`); sayı guard'ı geçmezse şablon
+ * yoruma düşülür. Demo modda şablon yorum kullanılır.
+ */
+export async function compareCommentary(
+  structured: Omit<CompareResult, "commentary">,
+  locale: CompareLocale,
+  deps: { client?: LlmClient } = {}
+): Promise<CompareResult["commentary"]> {
   const facts = compareFacts(structured);
-  const demo = () => ({ commentary: demoCommentary(structured, req.locale) });
+  const demo = () => ({ commentary: demoCommentary(structured, locale) });
   const client = deps.client ?? getLlmClient();
-  const lang = req.locale === "tr" ? "Türkçe" : "English";
-  const payload = listings.map((l) => ({
+  const lang = locale === "tr" ? "Türkçe" : "English";
+  const payload = structured.listings.map((l) => ({
     id: l.id,
     title: l.title,
     city: l.city,
     rating: l.rating,
     amenities: l.amenities,
     cancellation: l.cancellation,
-    total: priceLabel(l.price, req.locale),
+    total: priceLabel(l.price, locale),
     nights: l.price.nights,
   }));
   const result = await client.completeJson(
@@ -390,5 +413,13 @@ export async function compareListings(
       },
     }
   );
-  return { ...structured, commentary: { text: result.data.commentary, llmMode: result.llmMode } };
+  return { text: result.data.commentary, llmMode: result.llmMode };
+}
+
+export async function compareListings(
+  req: CompareRequest,
+  deps: { client?: LlmClient } = {}
+): Promise<CompareResult> {
+  const structured = await compareStructured(req);
+  return { ...structured, commentary: await compareCommentary(structured, req.locale, deps) };
 }

@@ -10,36 +10,58 @@
   },
   "tierBadge": "{tier} tier",
   "tierAria": "Loyalty tier: {tier}",
-  "cashbackRate": "You earn {rate}% cashback on completed stays.",
+  "cashbackRate": "You earn {rate}% cashback (credit) on completed stays; it is added to your wallet balance.",
   "completedStays": "{count, plural, =0 {No completed stays yet} one {# completed stay} other {# completed stays}}",
   "nextTier": "{count, plural, one {# more stay} other {# more stays}} to reach {tier} ({rate}% cashback).",
   "topTier": "You are at the top tier.",
-  "balance": "Available credit",
-  "noBalance": "No credit yet. Cashback from completed stays will appear here.",
+  "balance": "Available wallet balance",
+  "noBalance": "No wallet balance yet. Cashback from completed stays will appear here.",
   "nextExpiry": "Next expiry: {date}",
   "lots": {
-    "title": "Credit activity",
+    "title": "Wallet activity",
     "source": {
       "CASHBACK": "Cashback",
-      "REFUND": "Refunded credit"
+      "REFUND": "Refunded balance"
     },
     "remaining": "{remaining} left of {amount}",
     "expires": "Expires: {date}",
     "expired": "Expired",
-    "used": "Used"
+    "used": "Used",
+    "credit": "+{amount}",
+    "debit": "−{amount}",
+    "earnedOn": {
+      "CASHBACK": "Earned on {date}",
+      "REFUND": "Refunded on {date}"
+    },
+    "spentOn": "Date: {date}",
+    "spend": {
+      "SPENT": "Used for a payment",
+      "RESERVED": "Reserved for a payment"
+    },
+    "expiredUnused": "Expired ({amount} unused)",
+    "expiryDate": "Expiry date: {date}"
   },
   "pending": {
     "title": "Pending cashback",
-    "item": "Becomes credit on {date} ({rate}%) after the refund/claim window."
+    "item": "Added to your wallet on {date} ({rate}%), once the cancellation/complaint period ends.",
+    "estimate": "Estimated amount: {amount}"
   },
   "checkout": {
-    "title": "Wallet credit",
-    "use": "Use my credit",
+    "title": "Wallet balance",
+    "use": "Use my wallet balance",
     "available": "Available: {amount}",
-    "amount": "Credit to apply",
+    "amount": "Balance to apply",
     "max": "Up to {amount} (part must be paid by card). Example format: 150.50",
     "cardRemainder": "Card charge: {amount}",
-    "invalid": "Credit must be between 0 and {max}.",
-    "notice": "Credit is reserved first; if the card payment fails, your credit is returned."
-  }
+    "invalid": "The balance to apply must be between 0 and {max}.",
+    "notice": "The balance is reserved first; if the card payment fails, it goes back to your wallet.",
+    "amountWithCurrency": "Credit to apply ({currency})",
+    "clamped": "You can use up to {max}; the amount was changed to {max}.",
+    "rnplUnavailable": "Wallet credit can't be combined with \"Reserve now, pay later\". Choose \"Pay now\" to use your credit."
+  },
+  "tierPrefix": "Loyalty program:",
+  "balanceHelp": "You can spend it at the payment step with “{action}”.",
+  "nextExpiryAmount": "{amount} expires on {date}.",
+  "bookingLink": "Booking: {title}",
+  "viewBooking": "View booking"
 }

@@ -10,26 +10,49 @@
     "you": "Siz",
     "assistant": "Asistan",
     "log": "Destek konuşması",
-    "handoff": "Konu insan destek ekibine devredildi (talep: {id}).",
+    "handoff": "Konu insan destek ekibine devredildi. Talep no: {id}.",
     "empty": "Henüz mesaj yok.",
     "connectHuman": "İnsana bağlan",
     "humanMessage": "Bir insan temsilciyle görüşmek istiyorum.",
     "humanHint": "AI yanıtı yetmezse konuyu doğrudan insan destek ekibine aktarabilirsiniz.",
-    "humanPending": "Talebiniz insan destek ekibine iletildi; bir temsilci size dönecek.",
+    "humanPending": "Talebiniz insan destek ekibine iletildi. Bir temsilci size hesabınızdaki e-posta adresinden dönecek; talebin durumunu bu sayfanın üstündeki listeden izleyebilirsiniz.",
     "bookingLabel": "Hangi rezervasyon hakkında?",
     "bookingNone": "Seçilmedi (en yakın rezervasyonunuz kullanılır)",
-    "context": "Rezervasyon: {booking}"
+    "context": "Rezervasyon: {booking}",
+    "tickets": "Destek talepleriniz",
+    "ticketLine": "{date} tarihli talep ({id}): {status}",
+    "failed": "Gönderilemedi.",
+    "retry": "Tekrar dene",
+    "thinking": "Asistan yanıt hazırlıyor…",
+    "standaloneHint": "Asistan her mesajı ayrı yanıtlar, önceki mesajları hatırlamaz; sorunuzu tek mesajda tam yazın.",
+    "newConversation": "Yeni konuşma başlat",
+    "suggestTitle": "Hazır bir soruyla başlayın (seçince hemen gönderilir):",
+    "suggest": {
+      "bookingStatus": "Rezervasyonumun durumu nedir?",
+      "cancellationQuote": "Şimdi iptal edersem ne kadar iade alırım?",
+      "checkInTimes": "Giriş ve çıkış saatleri nedir?"
+    },
+    "shortcutHint": "Göndermek için Ctrl+Enter (Mac’te ⌘+Enter) tuşlarına basabilirsiniz.",
+    "counter": "{count}/{max} karakter",
+    "nearLimit": "Mesajlar en fazla {max} karakter olabilir; sınıra yaklaştınız.",
+    "truncated": "Yapıştırdığınız metin sığmadı; mesajınız {max} karaktere kısaltıldı.",
+    "prefillAccessibility": "{hasProperty, select, yes {“{property}” tesisinin erişilebilirliği hakkında sorum var: } other {Bir tesisin erişilebilirliği hakkında sorum var: }}",
+    "copyRef": "Kopyala",
+    "copyRefLabel": "Talep numarasını kopyala ({id})",
+    "copied": "Kopyalandı",
+    "atLimit": "{max} karakter sınırına ulaştınız; daha fazla yazılamaz.",
+    "agentOff": "Asistan şu an kapalı; “{button}” düğmesiyle ekibimize yazabilirsiniz."
   },
   "admin": {
     "link": "Destek kuyruğu",
     "pageTitle": "Destek kuyruğu",
     "pageIntro": "AI destek asistanının insana devrettiği talepler. Kararları insan temsilci verir.",
-    "title": "Talepler",
+    "title": "Destek talepleri",
     "filter": "Duruma göre filtrele",
     "all": "Tümü",
     "empty": "Kuyrukta talep yok.",
     "loading": "Yükleniyor…",
-    "updated": "Talep güncellendi.",
+    "updated": "Destek talebi güncellendi.",
     "confidence": "Güven: {value}",
     "booking": "Rezervasyon: {id}",
     "markInProgress": "İncelemeye al",
@@ -47,6 +70,58 @@
       "USER_REQUEST": "Kullanıcı insan istedi"
     },
     "ticketId": "Talep no: {id}",
-    "user": "Kullanıcı: {id}"
+    "user": "Kullanıcı: {id}",
+    "active": "Aktif (Açık + İnceleniyor)",
+    "search": "Talep, rezervasyon veya kullanıcı no ile ara",
+    "noMatch": "Aramayla eşleşen talep yok.",
+    "selectRow": "Talebi seç: {id}",
+    "selectAll": "Tümünü seç ({count})",
+    "selectedCount": "{count} talep seçildi",
+    "bulkInProgress": "Seçilenleri incelemeye al",
+    "bulkResolve": "Seçilenleri çözüldü olarak işaretle",
+    "bulkUpdated": "{count} talep güncellendi.",
+    "bulkFailed": "{count} talep güncellenemedi: {error}",
+    "groupTitle": "Aynı rezervasyon için {count} talep",
+    "groupResolveAll": "Hepsini çözüldü olarak işaretle",
+    "assignedToYou": "Size atandı",
+    "handler": "İnceleyen: {id}",
+    "updatedTo": "Talep “{status}” durumuna alındı; “{filter}” filtresinde listelenir.",
+    "bulkUpdatedTo": "{count} talep “{status}” durumuna alındı; “{filter}” filtresinde listelenir.",
+    "language": "Dil: {locale}",
+    "intent": {
+      "booking_status": "Rezervasyon durumu sorusu",
+      "cancellation_quote": "İptal ücreti sorusu",
+      "property_policy": "Tesis kuralları sorusu",
+      "refund_request": "İade talebi",
+      "legal_or_complaint": "Hukuki konu/şikâyet",
+      "human_request": "İnsan temsilci isteği",
+      "prompt_injection": "Asistan talimatlarını değiştirme girişimi",
+      "greeting": "Selamlaşma",
+      "unknown": "Konu belirlenemedi"
+    }
+  },
+  "agent": {
+    "localTime": "tesis saatiyle"
+  },
+  "help": {
+    "title": "Sık sorulan sorular",
+    "cancellation": {
+      "question": "Rezervasyonumu nasıl iptal ederim?",
+      "answer": "Rezervasyonunuzu <link>Hesabım › Rezervasyonlarım</link> bölümünden iptal edebilirsiniz. Ne kadar iade alacağınız ilanın iptal politikasına ve ne zaman iptal ettiğinize bağlıdır; koşullar ilan sayfasında ve ödemeden önce gösterilir."
+    },
+    "refund": {
+      "question": "İadem ne zaman hesabıma geçer?",
+      "answer": "Kartınıza yapılan iadeler genellikle 5–10 iş günü içinde görünür. Konaklamanızla ilgili bir sorun için iade talebini rezervasyon sayfasından açabilir, durumunu <link>Çözüm merkezi</link> sayfasından izleyebilirsiniz."
+    },
+    "payment": {
+      "question": "Ödemem güvende mi?",
+      "answer": "Kart numaranız platformda saklanmaz; ödeme, ödeme sağlayıcısı üzerinden işlenir ve yalnızca belirteç (token) ile işlem referansı tutulur. Ayrıntılar <link>Güven merkezi</link> sayfasında."
+    },
+    "accessibility": {
+      "question": "Erişilebilirlik ihtiyacıma uygun bir konaklamayı nasıl bulurum?",
+      "answer": "<link>Arama</link> sayfasındaki erişilebilirlik filtrelerini kullanın. İlan sayfasında yalnız ekibimizin kanıtla doğruladığı özellikler gösterilir; bilgi olmaması özelliğin olmadığı anlamına gelmez. Özel bir ihtiyacınız varsa rezervasyondan önce bu sayfadaki asistana sorun ya da insan destek ekibine bağlanın (giriş gerekir)."
+    },
+    "policiesTitle": "Politikalar ve bildirimler",
+    "report": "Yasa dışı içerik veya dolandırıcılık bildir"
   }
 }

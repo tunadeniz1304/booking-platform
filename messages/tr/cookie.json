@@ -1,11 +1,14 @@
 {
   "title": "Çerez tercihleri",
-  "body": "Zorunlu çerezler oturum ve güvenlik için gereklidir. Analitik çerezler yalnızca onayınızla kullanılır. Ayrıntılar için <link>aydınlatma metni</link>.",
+  "body": "Zorunlu çerezler oturum ve güvenlik için gereklidir. Analitik çerezler yalnızca onayınızla kullanılır. Ayrıntılar için <link>Gizlilik Bildirimi (KVKK aydınlatma metni)</link> sayfasına bakın.",
   "categories": "Çerez kategorileri",
   "necessary": "Zorunlu (her zaman açık)",
   "analytics": "Analitik",
   "save": "Tercihleri kaydet",
   "customize": "Özelleştir",
   "necessaryOnly": "Yalnızca zorunlu",
-  "acceptAll": "Tümünü kabul et"
+  "acceptAll": "Tümünü kabul et",
+  "bodyShort": "Analitik çerezler yalnızca onayınızla kullanılır. Ayrıntılar: <link>Gizlilik Bildirimi</link>.",
+  "analyticsHint": "Site iyileştirme denemelerinin sonuçlarını ölçmek için rastgele bir oturum kimliği saklar (exp_sid çerezi).",
+  "manage": "Çerez tercihlerini değiştir"
 }

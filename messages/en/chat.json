@@ -1,6 +1,6 @@
 {
   "title": "Messages",
-  "loading": "Loading...",
+  "loading": "Loading messages…",
   "loadFailed": "Messages could not be loaded",
   "sendFailed": "The message could not be sent",
   "draftFailed": "The draft could not be created",
@@ -13,8 +13,43 @@
   "placeholder": "Write your message",
   "aiDraftNotice": "AI draft — check and edit it before sending.",
   "send": "Send",
-  "suggestDraft": "Suggest a reply draft",
+  "suggestDraft": "Suggest a reply draft with AI",
   "closed": "Messaging is only available for confirmed bookings.",
   "notFound": "This conversation could not be found, or you don't have permission to view it.",
-  "loginRequired": "<link>Sign in</link> to see your messages."
+  "loginRequired": "<link>Sign in</link> to see your messages.",
+  "retry": "Try again",
+  "inputLabelToHost": "Your message to the host",
+  "inputLabelToGuest": "Your message to the guest",
+  "counter": "{count}/{max} characters",
+  "counterNear": "You are close to the character limit ({max} max).",
+  "counterOver": "The message is over the {max}-character limit; shorten it before sending.",
+  "tooLong": "Messages can be at most {max} characters; remove {over} characters.",
+  "sending": "Sending…",
+  "drafting": "Preparing draft…",
+  "draftSuggestionTitle": "Reply draft ready — your text has been kept",
+  "draftReplace": "Replace my text",
+  "draftAppend": "Add to the end of my text",
+  "draftDismiss": "Dismiss",
+  "draftUndo": "Restore my previous text",
+  "fromAiDraft": "From an AI draft",
+  "live": {
+    "reconnecting": "Live connection lost — reconnecting…",
+    "stopped": "Live updates stopped; new messages may not appear automatically.",
+    "reconnect": "Reconnect"
+  },
+  "you": "You",
+  "blockedHint": "Remove the flagged part from your message and send it again; your text is still in the box.",
+  "today": "Today",
+  "yesterday": "Yesterday",
+  "newMessage": "New message from {sender}: {body}",
+  "newMessages": "{count, plural, one {# new message} other {# new messages}} arrived.",
+  "riskSentNotice": "This message was shown to the recipient with a safety warning. Reasons: {reasons}.",
+  "draftLanguage": "Draft language: {language}.",
+  "draftLanguageName": {
+    "tr": "Turkish",
+    "en": "English"
+  },
+  "loadOlder": "Load older messages",
+  "loadingOlder": "Loading older messages…",
+  "loadOlderFailed": "Couldn't load older messages. Please try again."
 }

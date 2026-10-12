@@ -5,5 +5,32 @@
   "featured": "Featured stays",
   "empty": "No listings yet.",
   "featuredError": "Featured stays couldn't be loaded right now. You can still use the search form above.",
-  "retry": "Try again"
+  "retry": "Try again",
+  "featuredLoading": "Loading featured stays…",
+  "places": {
+    "istanbul": "Istanbul",
+    "antalya": "Antalya",
+    "bodrum": "Bodrum",
+    "izmir": "Izmir",
+    "trabzon": "Trabzon",
+    "cappadocia": "Cappadocia",
+    "ankara": "Ankara",
+    "mugla": "Muğla",
+    "alanya": "Alanya",
+    "cesme": "Çeşme",
+    "kusadasi": "Kuşadası",
+    "paris": "Paris",
+    "rome": "Rome",
+    "barcelona": "Barcelona",
+    "amsterdam": "Amsterdam",
+    "vienna": "Vienna",
+    "dubai": "Dubai",
+    "london": "London",
+    "newYork": "New York",
+    "tokyo": "Tokyo"
+  },
+  "destinationLinkLabel": "{city}, {country} — see stays",
+  "featuredHint": "Sorted by highest guest rating; paid placement doesn't affect this list.",
+  "emptySearch": "Search for stays",
+  "emptyCreateListing": "Create a listing"
 }

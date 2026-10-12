@@ -49,13 +49,23 @@ export interface QuoteView {
 /** Ağ/yanıt hatasında yer tutucu; dönüşte etkin dildeki mesaja çevrilir. */
 const FETCH_FAILED = "\u0000quote-fetch-failed";
 
+/** Yanıtsız sunucuda "yükleniyor" sonsuza dek sürmez: istek iptal edilir, hata gösterilir. */
+const QUOTE_TIMEOUT_MS = 10_000;
+
 export interface QuoteState {
   quote: QuoteView | null;
   loading: boolean;
   error: string | null;
   /** Hata kodu (ör. SOLD_OUT) — UI mesajı için. */
   code: string | null;
+  /** Hata ayrıntısı (ör. RESTRICTED → { restriction, ...parametreler }); parametreli mesaj için. */
+  details: Record<string, unknown> | null;
 }
+
+const asDetails = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
 
 /**
  * Sunucudan fiyat teklifi alır. Fiyat YALNIZCA sunucuda hesaplanır (computeTotal);
@@ -97,14 +107,18 @@ export function useQuote(params: {
     loading: false,
     error: null,
     code: null,
+    details: null,
   });
 
   useEffect(() => {
     if (!key) return;
     let active = true;
     const controller = new AbortController();
+    let deadline: ReturnType<typeof setTimeout> | undefined;
     const timer = setTimeout(() => {
-      setState({ key, quote: null, loading: true, error: null, code: null });
+      setState({ key, quote: null, loading: true, error: null, code: null, details: null });
+      // Zaman aşımında `active` hâlâ true: catch FETCH_FAILED yazar, arayüz "tekrar dene" sunar.
+      deadline = setTimeout(() => controller.abort(), QUOTE_TIMEOUT_MS);
       fetch(`/api/quote?${key}`, { signal: controller.signal, cache: "no-store" })
         .then(async (res) => {
           const body = await res.json();
@@ -116,24 +130,42 @@ export function useQuote(params: {
               loading: false,
               error: body.error ?? FETCH_FAILED,
               code: body.code ?? null,
+              details: asDetails(body.details),
             });
           } else {
-            setState({ key, quote: body as QuoteView, loading: false, error: null, code: null });
+            setState({
+              key,
+              quote: body as QuoteView,
+              loading: false,
+              error: null,
+              code: null,
+              details: null,
+            });
           }
         })
         .catch(() => {
           if (active)
-            setState({ key, quote: null, loading: false, error: FETCH_FAILED, code: null });
-        });
+            setState({
+              key,
+              quote: null,
+              loading: false,
+              error: FETCH_FAILED,
+              code: null,
+              details: null,
+            });
+        })
+        .finally(() => clearTimeout(deadline));
     }, 150);
     return () => {
       active = false;
       clearTimeout(timer);
+      clearTimeout(deadline);
       controller.abort();
     };
   }, [key]);
 
-  if (!key) return { quote: null, loading: false, error: null, code: null };
-  if (state.key !== key) return { quote: null, loading: true, error: null, code: null };
+  if (!key) return { quote: null, loading: false, error: null, code: null, details: null };
+  if (state.key !== key)
+    return { quote: null, loading: true, error: null, code: null, details: null };
   return state.error === FETCH_FAILED ? { ...state, error: t("fetchFailed") } : state;
 }

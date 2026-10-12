@@ -90,13 +90,15 @@ export function passkeyErrorCode(err: unknown): "CANCELLED" | "ALREADY_REGISTERE
   return null;
 }
 
-/** WebAuthn iptal/zaman aşımı hatalarını kullanıcı diline çevirir. */
+/**
+ * WebAuthn iptal/zaman aşımı hatalarını sabit Türkçe metne çevirir.
+ * @deprecated Yerelleştirilemez (F54/F236/F46): `passkeyErrorCode` + `t()` kullanın; API
+ * hatalarında sunucu metni yerine `useErrorText()`. Son çağıran kalmayınca silinecek.
+ */
 export function passkeyErrorMessage(err: unknown, fallback: string): string {
-  if (err instanceof Error) {
-    if (err.name === "NotAllowedError")
-      return "Passkey işlemi iptal edildi veya zaman aşımına uğradı";
-    if (err.name === "InvalidStateError") return "Bu cihazdaki passkey zaten kayıtlı";
-    if ("status" in err) return err.message;
-  }
+  const code = passkeyErrorCode(err);
+  if (code === "CANCELLED") return "Passkey işlemi iptal edildi veya zaman aşımına uğradı";
+  if (code === "ALREADY_REGISTERED") return "Bu cihazdaki passkey zaten kayıtlı";
+  if (err instanceof Error && "status" in err) return err.message;
   return fallback;
 }

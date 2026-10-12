@@ -1,10 +1,10 @@
 {
   "metaTitle": "{title} | Booking Platform",
   "notFoundTitle": "İlan bulunamadı",
-  "ratingCount": "{count} değerlendirme",
+  "ratingCount": "{count} yorum",
   "description": "Açıklama",
   "registration": {
-    "trPermit": "Turizm tesisi izin belgesi no (7464)",
+    "trPermit": "Turizm tesisi izin belgesi no (7464 sayılı Kanun)",
     "euRegistration": "Kısa dönem kiralama kayıt no (AB 2024/1028)",
     "platform": "Belge/kayıt no"
   },
@@ -16,7 +16,14 @@
     "noPhotos": "Bu ilan için henüz fotoğraf yok.",
     "thumbnails": "Fotoğraflar",
     "show": "Fotoğraf {index} / {total} göster",
-    "counter": "Fotoğraf {index} / {total} gösteriliyor"
+    "counter": "Fotoğraf {index} / {total} gösteriliyor",
+    "previous": "Önceki fotoğraf",
+    "next": "Sonraki fotoğraf",
+    "position": "{index} / {total}",
+    "enlarge": "Tam ekran görüntüle",
+    "more": "+{count} fotoğraf",
+    "lightbox": "{title} fotoğrafları",
+    "close": "Kapat"
   },
   "calendar": {
     "title": "Fiyat takvimi",
@@ -29,20 +36,20 @@
     "nextMonthShort": "Sonraki",
     "caption": "{month} fiyat takvimi",
     "loading": "Fiyatlar yükleniyor…",
-    "error": "Fiyat takvimi yüklenemedi",
+    "error": "Fiyat takvimi yüklenemedi. Tekrar deneyin ya da tarihleri rezervasyon formundan seçin.",
     "unavailable": "Müsait değil",
     "noPrices": "Bu ayda müsait gece yok.",
     "cheapest": "En ucuz",
     "cheapestAria": "ayın en ucuz gecesi",
     "minStay": "en az {count} gece",
-    "minStayShort": "min {count} gece",
+    "minStayShort": "en az {count} gece",
     "closedToArrival": "girişe kapalı",
     "closedToArrivalHint": "{date} tarihinde giriş yapılamıyor; başka bir gün seçin.",
     "dayAria": "{date}: {price}, fiyat seviyesi {level}{extras}",
     "dayAriaUnavailable": "{date}: müsait değil",
     "dayAriaPast": "{date}: geçmiş tarih",
     "selectHint": "Giriş için bir gün seçin; ikinci seçim çıkış tarihini belirler. Seçim rezervasyon formunu doldurur.",
-    "selectCheckOut": "Giriş: {date}. Şimdi çıkış tarihini seçin.",
+    "selectCheckOut": "Giriş: {date}. Rezervasyon formunda çıkış geçici olarak {checkOut} ayarlandı; dilerseniz başka bir çıkış günü seçin.",
     "selected": "Seçildi: {checkIn} – {checkOut}. Rezervasyon formu güncellendi.",
     "estimateNote": "Takvim, o gece için en ucuz oda ve fiyat planını gösterir; kesin tutar rezervasyon formundaki tekliftir.",
     "legend": {
@@ -57,7 +64,30 @@
     "rangeBlocked": "{date} gecesi dolu. Daha erken bir çıkış tarihi ya da başka bir giriş tarihi seçin.",
     "dayAriaCheckoutOnly": "{date}: yalnızca çıkış tarihi olarak seçilebilir",
     "checkoutOnly": "Çıkış",
-    "goToBooking": "Rezervasyon formuna git"
+    "goToBooking": "Rezervasyon formuna git",
+    "retry": "Tekrar dene",
+    "keyboardHint": "Günler arasında ok tuşlarıyla gezinin; Home/End haftanın başına/sonuna, Page Up/Page Down önceki/sonraki aya gider. Seçmek için Enter'a basın.",
+    "uniformPrice": "Bu ay müsait tüm gecelerin fiyatı aynı.",
+    "dayAriaUniform": "{date}: {price}{extras}",
+    "rangeStart": "Giriş",
+    "rangeEnd": "Çıkış",
+    "rangeAria": {
+      "start": "giriş tarihi",
+      "end": "çıkış tarihi",
+      "between": "seçili konaklamada"
+    },
+    "currentSelection": "Seçili tarihler: {checkIn} – {checkOut}.",
+    "clearSelection": "Seçimi temizle",
+    "selectionCleared": "Seçim temizlendi. Yeni bir giriş günü seçin.",
+    "booked": "Dolu",
+    "closedToArrivalMark": "Giriş yok",
+    "minStayTiny": "min {count}",
+    "legendMinStay": "min N: en az N gece konaklama",
+    "legendClosedToArrival": "Girişe kapalı",
+    "currencyNote": "Fiyatlar {currency} cinsindendir.",
+    "monthSelect": "Ay seç",
+    "horizonNote": "Fiyat takvimi {date} tarihine kadar fiyat gösterir.",
+    "dayAriaBeyondHorizon": "{date}: fiyat bilgisi yok"
   },
   "ratingOutOf": "{rating}/5",
   "noRatingYet": "Henüz puan yok",
@@ -80,7 +110,7 @@
     "title": "Giriş, çıkış ve iptal koşulları",
     "checkIn": "Giriş: {time} ve sonrası",
     "checkOut": "Çıkış: en geç {time}",
-    "localTime": "Saatler tesisin yerel saatine göredir ({timeZone}).",
+    "localTime": "Saatler konaklama yerinin yerel saatine göredir ({timeZone}).",
     "cancellationTitle": "İptal politikası: {kind}",
     "kinds": {
       "FLEXIBLE": "Esnek",
@@ -94,5 +124,26 @@
     "tierAny": "İptal ederseniz: {percent, plural, =0 {iade yapılmaz} other {ödediğinizin %{percent} kadarı iade edilir}}",
     "grace": "Rezervasyondan sonraki ilk {hours} saat içinde, giriş tarihine yeterli süre varsa ücretsiz iptal edebilirsiniz.",
     "note": "Süreler giriş gününün giriş saatinden geriye doğru sayılır. İade edilemez bir fiyat seçerseniz iade yapılmaz; kesin koşullar ödemeden önce de gösterilir."
-  }
+  },
+  "loading": "İlan yükleniyor…",
+  "notFoundDescription": "Bu ilan kaldırılmış ya da artık yayında değil. Benzer konaklamaları arayabilir ya da ana sayfadan devam edebilirsiniz.",
+  "breadcrumb": {
+    "label": "Sayfa konumu",
+    "home": "Ana sayfa",
+    "cityStays": "{city} konaklamaları",
+    "backToResults": "Arama sonuçlarına dön"
+  },
+  "actions": {
+    "share": "Paylaş",
+    "shareCopied": "Bağlantı panoya kopyalandı.",
+    "shareFailed": "Bağlantı kopyalanamadı. Adres çubuğundaki bağlantıyı kopyalayabilirsiniz."
+  },
+  "sectionNav": {
+    "label": "Sayfa bölümleri",
+    "booking": "Rezervasyon",
+    "policies": "Koşullar",
+    "prices": "Fiyatlar",
+    "reviews": "Yorumlar"
+  },
+  "ratingAria": "Misafir puanı: 5 üzerinden {rating}"
 }

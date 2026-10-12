@@ -169,6 +169,8 @@ export interface SupportTicketRow {
   summary: string;
   locale: string;
   createdAt: Date;
+  /** F667: IN_PROGRESS'te talebi üstlenen, RESOLVED'da çözen yönetici; OPEN'da `null`. */
+  resolvedById: string | null;
   resolvedAt: Date | null;
 }
 
@@ -192,6 +194,7 @@ export async function listSupportTickets(
       summary: true,
       locale: true,
       createdAt: true,
+      resolvedById: true,
       resolvedAt: true,
     },
   });
@@ -212,7 +215,8 @@ export async function updateSupportTicketStatus(
         where: { id },
         data: {
           status,
-          resolvedById: resolved ? adminId : null,
+          // F667: sütun, talebi üstlenen (IN_PROGRESS) ya da çözen (RESOLVED) yöneticiyi tutar.
+          resolvedById: status === "OPEN" ? null : adminId,
           resolvedAt: resolved ? new Date() : null,
         },
         select: { id: true, status: true },

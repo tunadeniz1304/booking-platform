@@ -367,6 +367,12 @@ export async function onStayCompleted(p: BookingCompletedPayload): Promise<void>
   });
 }
 
+/** Cashback tabanı yalnız bu ödeme durumlarında oluşur (verme + cüzdan tahmini). */
+const CASHBACK_BASE_STATUSES: PaymentStatus[] = [
+  PaymentStatus.PAID,
+  PaymentStatus.PARTIALLY_REFUNDED,
+];
+
 /**
  * Vadesi gelen cashback'leri krediye çevirir. Taban = kartla ödenen net tutar (ödeme −
  * iadeler; krediyle ödenen kısım cashback kazandırmaz). Devredilmiş rezervasyon (ödeme
@@ -415,8 +421,7 @@ export async function issueDueCashbacks(now = new Date(), limit = 200): Promise<
         await skip("TRANSFERRED");
         return false;
       }
-      const paidStatuses: PaymentStatus[] = [PaymentStatus.PAID, PaymentStatus.PARTIALLY_REFUNDED];
-      const base = paidStatuses.includes(pay.status)
+      const base = CASHBACK_BASE_STATUSES.includes(pay.status)
         ? minorFromDb(pay.amountMinor - pay.refundedAmountMinor)
         : 0;
       const amount = cashbackMinor(base, cb.bps, pay.currency);
@@ -620,23 +625,51 @@ export interface WalletView {
   cashbackBps: number;
   staysToNextTier: number | null;
   nextTierBps: number | null;
-  balances: Array<{ currency: string; availableMinor: number; nextExpiryAt: string | null }>;
+  balances: Array<{
+    currency: string;
+    availableMinor: number;
+    nextExpiryAt: string | null;
+    /** En yakın son kullanma tarihinde düşecek tutar. */
+    nextExpiryMinor: number;
+  }>;
   lots: Array<{
     id: string;
     source: "CASHBACK" | "REFUND";
     currency: string;
     amountMinor: number;
     remainingMinor: number;
+    /** Süre dolumuyla düşülen tutar (süpürme kalanı 0'a çeker). */
+    expiredMinor: number;
     expiresAt: string;
     expired: boolean;
     createdAt: string;
+    bookingId: string | null;
+    propertyTitle: string | null;
   }>;
-  pendingCashback: Array<{ bookingId: string; currency: string; bps: number; dueAt: string }>;
+  pendingCashback: Array<{
+    bookingId: string;
+    currency: string;
+    bps: number;
+    dueAt: string;
+    /** Bugünkü net kart tabanıyla tahmini tutar; taban bilinmiyorsa null. */
+    estimatedMinor: number | null;
+    propertyTitle: string | null;
+  }>;
+  /** Ödemede kullanılan kredi (RESERVED | SPENT), yeniden eskiye. */
+  spends: Array<{
+    id: string;
+    bookingId: string;
+    currency: string;
+    amountMinor: number;
+    status: "RESERVED" | "SPENT" | "RELEASED";
+    createdAt: string;
+    propertyTitle: string | null;
+  }>;
 }
 
 export async function getWallet(userId: string, now = new Date()): Promise<WalletView> {
   const cfg = getConfig();
-  const [account, lots, pending] = await Promise.all([
+  const [account, lots, pending, spends] = await Promise.all([
     prisma.loyaltyAccount.findUnique({ where: { userId } }),
     prisma.walletCredit.findMany({
       where: { userId },
@@ -647,18 +680,90 @@ export async function getWallet(userId: string, now = new Date()): Promise<Walle
       where: { userId, status: "PENDING" },
       orderBy: { dueAt: "asc" },
       take: 20,
-      select: { bookingId: true, currency: true, bps: true, dueAt: true },
+      select: { bookingId: true, currency: true, bps: true, dueAt: true, amountMinor: true },
+    }),
+    prisma.creditSpend.findMany({
+      where: { userId, status: { in: ["RESERVED", "SPENT"] } },
+      orderBy: { createdAt: "desc" },
+      take: 50,
+      select: {
+        id: true,
+        bookingId: true,
+        currency: true,
+        amountMinor: true,
+        status: true,
+        createdAt: true,
+      },
     }),
   ]);
+  // İlan başlıkları + bekleyen cashback tahmini için tek rezervasyon sorgusu.
+  const bookingIds = [
+    ...new Set([
+      ...lots.flatMap((l) => (l.bookingId ? [l.bookingId] : [])),
+      ...pending.map((p) => p.bookingId),
+      ...spends.map((s) => s.bookingId),
+    ]),
+  ];
+  const bookings = bookingIds.length
+    ? await prisma.booking.findMany({
+        where: { id: { in: bookingIds } },
+        select: {
+          id: true,
+          userId: true,
+          status: true,
+          property: { select: { title: true } },
+          payment: {
+            select: {
+              userId: true,
+              status: true,
+              amountMinor: true,
+              refundedAmountMinor: true,
+              currency: true,
+            },
+          },
+        },
+      })
+    : [];
+  const bookingById = new Map(bookings.map((b) => [b.id, b]));
+  const titleOf = (bookingId: string | null) =>
+    (bookingId && bookingById.get(bookingId)?.property.title) || null;
+  // issueDueCashbacks ile aynı taban: devredilmiş/ödenmemiş rezervasyonda tahmin yok.
+  const estimateOf = (p: (typeof pending)[number]): number | null => {
+    if (p.amountMinor !== null) return minorFromDb(p.amountMinor);
+    const booking = bookingById.get(p.bookingId);
+    const pay = booking?.payment;
+    if (!booking || booking.status !== BookingStatus.COMPLETED || !pay) return null;
+    if (pay.userId !== userId || booking.userId !== userId) return null;
+    if (!CASHBACK_BASE_STATUSES.includes(pay.status)) return null;
+    const amount = cashbackMinor(
+      minorFromDb(pay.amountMinor - pay.refundedAmountMinor),
+      p.bps,
+      pay.currency
+    );
+    return amount > 0 ? amount : null;
+  };
   const completedStays = account?.completedStays ?? 0;
   const tier = tierFor(completedStays, cfg.LOYALTY_TIER_THRESHOLDS);
-  const balances = new Map<string, { availableMinor: number; nextExpiryAt: Date | null }>();
+  const balances = new Map<
+    string,
+    { availableMinor: number; nextExpiryAt: Date | null; nextExpiryMinor: number }
+  >();
   for (const l of lots) {
     const live = l.expiresAt.getTime() > now.getTime() && l.remainingMinor > 0n;
     if (!live) continue;
-    const b = balances.get(l.currency) ?? { availableMinor: 0, nextExpiryAt: null };
-    b.availableMinor += minorFromDb(l.remainingMinor);
-    if (!b.nextExpiryAt || l.expiresAt < b.nextExpiryAt) b.nextExpiryAt = l.expiresAt;
+    const b = balances.get(l.currency) ?? {
+      availableMinor: 0,
+      nextExpiryAt: null,
+      nextExpiryMinor: 0,
+    };
+    const remaining = minorFromDb(l.remainingMinor);
+    b.availableMinor += remaining;
+    if (!b.nextExpiryAt || l.expiresAt < b.nextExpiryAt) {
+      b.nextExpiryAt = l.expiresAt;
+      b.nextExpiryMinor = remaining;
+    } else if (l.expiresAt.getTime() === b.nextExpiryAt.getTime()) {
+      b.nextExpiryMinor += remaining;
+    }
     balances.set(l.currency, b);
   }
   return {
@@ -671,6 +776,7 @@ export async function getWallet(userId: string, now = new Date()): Promise<Walle
       currency,
       availableMinor: b.availableMinor,
       nextExpiryAt: b.nextExpiryAt?.toISOString() ?? null,
+      nextExpiryMinor: b.nextExpiryMinor,
     })),
     lots: lots.map((l) => ({
       id: l.id,
@@ -678,15 +784,29 @@ export async function getWallet(userId: string, now = new Date()): Promise<Walle
       currency: l.currency,
       amountMinor: minorFromDb(l.amountMinor),
       remainingMinor: minorFromDb(l.remainingMinor),
+      expiredMinor: minorFromDb(l.expiredMinor),
       expiresAt: l.expiresAt.toISOString(),
       expired: l.expiresAt.getTime() <= now.getTime(),
       createdAt: l.createdAt.toISOString(),
+      bookingId: l.bookingId,
+      propertyTitle: titleOf(l.bookingId),
     })),
     pendingCashback: pending.map((p) => ({
       bookingId: p.bookingId,
       currency: p.currency,
       bps: p.bps,
       dueAt: p.dueAt.toISOString(),
+      estimatedMinor: estimateOf(p),
+      propertyTitle: titleOf(p.bookingId),
+    })),
+    spends: spends.map((s) => ({
+      id: s.id,
+      bookingId: s.bookingId,
+      currency: s.currency,
+      amountMinor: minorFromDb(s.amountMinor),
+      status: s.status,
+      createdAt: s.createdAt.toISOString(),
+      propertyTitle: titleOf(s.bookingId),
     })),
   };
 }

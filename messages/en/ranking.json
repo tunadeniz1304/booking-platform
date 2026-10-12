@@ -1,7 +1,7 @@
 {
-  "metaTitle": "How ranking works — booking-platform",
+  "metaTitle": "How ranking works",
   "title": "How ranking works",
-  "intro": "In the \"Recommended\" order, each stay's score is the weighted sum of the components below. The \"Why this ranking?\" link on each result card shows how much every component contributes. Paid placement and commission rates do not affect the ranking.",
+  "intro": "In the \"Recommended\" order, each stay's score is found by adding up the components below according to their weights. Open the \"Why this ranking?\" section on a result card to see how much each component contributes. Paid placement and commission rates do not affect the ranking.",
   "table": {
     "component": "Component",
     "weight": "Weight",
@@ -14,28 +14,42 @@
   "factors": {
     "priceFit": {
       "label": "Price fit",
-      "description": "How favourable the tax-inclusive total for your selected dates is compared with the other results."
+      "description": "The lower the tax-inclusive total for your dates is compared with the other stays in the same search, the higher this component."
     },
     "rating": {
       "label": "Guest rating",
-      "description": "Bayesian-adjusted average rating, so listings with few reviews are not over-promoted."
+      "description": "The average score guests gave. For listings with only a few reviews, it is pulled towards the overall average so that a single high rating cannot inflate it."
     },
     "popularity": {
       "label": "Review count",
-      "description": "Logarithmic scale of the number of reviews tied to verified stays."
+      "description": "The number of reviews written by guests who actually stayed. More reviews help, but each new review adds a little less than the one before."
     },
     "personal": {
-      "label": "Personalisation",
-      "description": "If you are signed in, city/type similarity to your past bookings and favourites."
+      "label": "Personalization",
+      "description": "If you are signed in, how closely the listing's city and property type match your past bookings and favorites."
     },
     "semantic": {
-      "label": "Search text similarity",
-      "description": "Similarity between your search text and the listing text."
+      "label": "Relevance to your search",
+      "description": "How closely the listing's text, such as its title and description, matches what you searched for."
     }
   },
-  "footnote": "When you sort by price, rating or most liked, only that criterion is used.",
+  "footnote": "If you choose \"Price (lowest first)\", \"Price (highest first)\" or \"Rating (highest first)\", this score is not used; results are ordered by that criterion only.",
   "why": "Why this ranking?",
-  "totalScore": "Total score: {score}",
-  "withQueryNote": "When you enter a destination or search text, search text similarity counts for more so that results match what you are looking for; in that case the weights in the third column are used.",
-  "experimentNote": "To improve the ranking, some visitors may see an experimental, self-learning ranking model. It uses only the components above, and paid placement or commission does not affect it either."
+  "totalScore": "Total: {score} out of 100",
+  "withQueryNote": "When you enter a destination or search text, \"Relevance to your search\" counts for more so that results match what you are looking for; in that case the weights in the third column are used.",
+  "experimentNote": "To improve the ranking, some visitors may see an experimental, self-learning ranking model. It uses only the components above, and paid placement or commission does not affect it either.",
+  "nav": {
+    "label": "Related pages",
+    "backToResults": "Back to search results",
+    "search": "Search stays",
+    "trust": "Trust center"
+  },
+  "factorOutOf": "{points} of {max} points",
+  "factorPoints": "{points} points",
+  "weightsSet": {
+    "default": "Standard weights were used because there is no search text.",
+    "withQuery": "Because you entered search text or a destination, weights that favor text similarity were used.",
+    "ltr": "This result was ordered by an experimental ranking model; the contributions below are approximate."
+  },
+  "whyFor": "(for {title})"
 }

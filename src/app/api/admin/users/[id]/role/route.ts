@@ -21,7 +21,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const admin = await requireRole(req, ["ADMIN"]);
     const { role } = z.object({ role: z.enum(["USER", "HOST", "ADMIN"]) }).parse(await req.json());
     if (id === admin.userId) throw new ForbiddenError("Kendi rolünüzü değiştiremezsiniz");
-    const { user, version } = await withSerializableRetry(async (tx) => {
+    const { user, previousRole, version } = await withSerializableRetry(async (tx) => {
       const current = await tx.user.findUnique({ where: { id }, select: { role: true } });
       if (!current) throw new NotFoundError("Kullanıcı bulunamadı");
       if (current.role === "ADMIN" && role !== "ADMIN") {
@@ -36,11 +36,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         data: { role },
         select: { id: true, role: true },
       });
-      return { user, version: await bumpTokenVersion(id, tx) };
+      return { user, previousRole: current.role, version: await bumpTokenVersion(id, tx) };
     });
     await publishTokenVersion(id, version);
     await audit(admin.userId, "user.role", "User", id, { role });
-    return NextResponse.json(user);
+    // F466: önceki rol de döner (arayüz "eski → yeni" geri bildirimi gösterir; ek alan).
+    return NextResponse.json({ ...user, previousRole });
   } catch (error) {
     return toErrorResponse(error, "admin.users.role");
   }

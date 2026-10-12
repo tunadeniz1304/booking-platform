@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "KVKK Aydınlatma Metni (demo) — booking-platform",
+    "title": "KVKK Aydınlatma Metni (demo)",
     "description": "Kişisel verilerin işlenmesine ilişkin demo aydınlatma metni."
   },
   "notice": {
@@ -8,7 +8,8 @@
     "disclaimer": "Bu metin bir portföy/demo projesi içindir ve <strong>hukuki görüş değildir</strong>. Gerçek bir hizmette bir hukuk uzmanı tarafından hazırlanmalıdır.",
     "controller": {
       "title": "1. Veri sorumlusu",
-      "body": "6698 sayılı Kişisel Verilerin Korunması Kanunu (\"KVKK\") uyarınca veri sorumlusu, bu demo platformun işletmecisidir. Demo ortamında gerçek ödeme alınmaz ve gerçek kişisel veri girilmemelidir."
+      "body": "6698 sayılı Kişisel Verilerin Korunması Kanunu (\"KVKK\") uyarınca veri sorumlusu, bu demo platformun işletmecisidir. Demo ortamında gerçek ödeme alınmaz ve gerçek kişisel veri girilmemelidir.",
+      "contact": "Başvuru kanalı: Bilgi talebi, düzeltme veya itiraz gibi başvurularınızı giriş yaptıktan sonra <link>Destek</link> sayfasında \"İnsana bağlan\" seçeneğiyle doğrudan insan destek ekibine iletebilirsiniz."
     },
     "data": {
       "title": "2. İşlenen kişisel veriler",
@@ -19,15 +20,15 @@
     },
     "purpose": {
       "title": "3. İşleme amaçları ve hukuki sebepler",
-      "body": "Veriler; rezervasyon sözleşmesinin kurulması ve ifası (KVKK md. 5/2-c), hukuki yükümlülüklerin yerine getirilmesi (md. 5/2-ç), hizmet güvenliğinin sağlanması ve dolandırıcılığın önlenmesi için meşru menfaat (md. 5/2-f) ile analitik çerezler bakımından açık rızanız (md. 5/1) hukuki sebeplerine dayanılarak işlenir."
+      "body": "Verilerinizi rezervasyonunuzu oluşturup yerine getirmek (sözleşmenin ifası, KVKK md. 5/2-c), yasal yükümlülüklerimizi yerine getirmek (md. 5/2-ç) ve hizmeti güvende tutup dolandırıcılığı önlemek (meşru menfaat, md. 5/2-f) için işleriz. Analitik çerezleri yalnızca onay verirseniz kullanırız (açık rıza, md. 5/1)."
     },
     "transfer": {
       "title": "4. Aktarım",
-      "body": "Veriler yalnızca hizmetin gerektirdiği ölçüde konaklama tesisine (rezervasyon bilgileri), ödeme hizmet sağlayıcısına ve yasal olarak yetkili kurumlara aktarılabilir. Yapay zekâ özellikleri canlı modda çalışıyorsa, istem içeriği kişisel veri içermeyecek şekilde model sağlayıcısına gönderilir."
+      "body": "Veriler yalnızca hizmetin gerektirdiği ölçüde konakladığınız yerin ev sahibine (rezervasyon bilgileri), ödeme hizmet sağlayıcısına ve yasal olarak yetkili kurumlara aktarılabilir. Yapay zekâ özellikleri canlı modda çalışıyorsa, istem içeriği kişisel veri içermeyecek şekilde model sağlayıcısına gönderilir."
     },
     "retention": {
       "title": "5. Saklama süresi",
-      "body": "Hesabınızı sildiğinizde kişisel alanlar silinir veya takma adla değiştirilir. Rezervasyon ve ödeme kayıtları, yasal saklama yükümlülükleri nedeniyle anonimleştirilmiş olarak tutulur."
+      "body": "Hesabınızı sildiğinizde kişisel alanlar silinir veya sizi tanımlamayan rastgele bir değerle (takma ad) değiştirilir. Rezervasyon ve ödeme kayıtları, yasal saklama yükümlülükleri nedeniyle anonimleştirilmiş olarak tutulur."
     },
     "cookies": {
       "title": "6. Çerezler",
@@ -36,25 +37,35 @@
     },
     "rights": {
       "title": "7. Haklarınız (KVKK md. 11)",
-      "body": "Verilerinizin işlenip işlenmediğini öğrenme, bilgi talep etme, düzeltme, silme ve itiraz haklarına sahipsiniz. Verilerinizi indirmek veya hesabınızı silmek için <link>Gizlilik ve verilerim</link> sayfasını kullanabilirsiniz."
+      "body": "Verilerinizin işlenip işlenmediğini öğrenme, bilgi talep etme, düzeltme, silme ve itiraz haklarına sahipsiniz. Verilerinizi indirmek veya hesabınızı silmek için <link>Gizlilik ve verilerim</link> sayfasını kullanabilirsiniz.",
+      "requests": "Bilgi talebi, düzeltme (ör. adınızın veya e-posta adresinizin düzeltilmesi) ve itiraz haklarınızı kullanmak için <link>Destek</link> sayfasından insan destek ekibine yazabilirsiniz."
+    },
+    "lastUpdated": "Son güncelleme: <time>{date}</time>",
+    "summary": {
+      "title": "Kısaca",
+      "data": "Rezervasyon yapabilmeniz için adınızı, e-posta adresinizi ve rezervasyon bilgilerinizi işleriz. Kart numaranızı saklamayız.",
+      "purpose": "Bu verileri yalnızca rezervasyonunuzu yürütmek, yasal yükümlülüklerimizi yerine getirmek ve hizmeti güvende tutmak için kullanırız.",
+      "sharing": "Verilerinizi yalnızca konakladığınız yerin ev sahibi, ödeme sağlayıcısı ve yasal olarak yetkili kurumlarla paylaşırız.",
+      "cookies": "Analitik çerezleri yalnızca onay verirseniz kullanırız; tercihinizi bu sayfadan istediğiniz zaman değiştirebilirsiniz.",
+      "rights": "Verilerinizin bir kopyasını indirebilir veya hesabınızı istediğiniz zaman silebilirsiniz."
     }
   },
   "accountPage": {
     "title": "Gizlilik ve verilerim",
-    "intro": "KVKK md. 11 kapsamındaki haklarınızı buradan kullanabilirsiniz."
+    "intro": "Buradan verilerinizin bir kopyasını indirebilir veya hesabınızı silebilirsiniz (KVKK md. 11 kapsamındaki haklarınız)."
   },
   "center": {
     "exportFileName": "verilerim.json",
-    "exported": "Verileriniz indirildi ({file}).",
-    "deleted": "Hesabınız silindi. Ana sayfaya yönlendiriliyorsunuz…",
+    "exported": "Dosyanız hazırlandı ({file}).",
+    "deleted": "Hesabınız silindi",
     "exportTitle": "Verilerimi indir",
-    "exportBody": "Hesabınıza ait kişisel verilerin (profil, rezervasyonlar, yorumlar, favoriler) bir kopyasını JSON olarak indirin. Parola özeti dışa aktarılmaz.",
+    "exportBody": "Hesabınıza ait kişisel verilerin (profil, rezervasyonlar, yorumlar, favoriler) bir kopyasını JSON dosyası olarak indirin. JSON, bilgisayarların okuyabildiği bir metin dosyasıdır; herhangi bir metin düzenleyiciyle açabilirsiniz. Şifreniz (şifrelenmiş hâli dahil) dosyaya eklenmez.",
     "exportButton": "Verilerimi indir",
     "deleteTitle": "Hesabımı sil",
-    "deleteBody": "Kişisel alanlarınız silinir veya takma adla değiştirilir. Rezervasyon ve ödeme kayıtları yasal saklama yükümlülüğü nedeniyle anonimleştirilerek tutulur. Bu işlem geri alınamaz.",
+    "deleteBody": "Kişisel alanlarınız silinir ya da sizi tanımlamayan rastgele bir değerle değiştirilir. Rezervasyon ve ödeme kayıtları yasal saklama yükümlülüğü nedeniyle anonimleştirilerek tutulur. Bu işlem geri alınamaz.",
     "deleteButton": "Hesabımı sil",
     "confirmTitle": "Hesabınızı kalıcı olarak silmek istediğinize emin misiniz?",
-    "acknowledge": "Yaklaşan rezervasyonlarımın iptal koşullarına göre iptal edileceğini, cüzdan kredimin silineceğini ve bu işlemin geri alınamayacağını anladım.",
+    "acknowledge": "Yaklaşan rezervasyonlarımın iptal koşullarına göre iptal edileceğini, cüzdan bakiyemin silineceğini ve bu işlemin geri alınamayacağını anladım.",
     "deleting": "Siliniyor…",
     "confirmDelete": "Evet, hesabımı sil",
     "cancel": "Vazgeç",
@@ -62,7 +73,7 @@
     "deleteEffects": {
       "title": "Hesabınızı sildiğinizde:",
       "bookings": "Yaklaşan rezervasyonlarınız, rezervasyonu yaptığınız andaki iptal koşullarına göre iptal edilir. İade almayabilir ya da yalnız kısmi iade alabilirsiniz.",
-      "wallet": "Cüzdanınızdaki kredi ve ödüller silinir; sonradan kullanılamaz.",
+      "wallet": "Cüzdan bakiyeniz ve ödülleriniz silinir; sonradan kullanılamaz.",
       "transfers": "Satışa koyduğunuz rezervasyon devir ilanları geri çekilir.",
       "listings": "Ev sahibiyseniz ilanlarınız yayından kaldırılır.",
       "obligations": "Ev sahibi olarak yaklaşan onaylı rezervasyonunuz, bekleyen bir ödemeniz ya da açık bir talebiniz varsa önce bunları tamamlamanız gerekir."
@@ -77,6 +88,15 @@
       "pendingPayoutsLink": "Ödemelerime git",
       "openClaims": "{count, plural, other {# açık talebiniz var.}}",
       "openClaimsLink": "Taleplerime git"
-    }
+    },
+    "exporting": "Hazırlanıyor…",
+    "exportFallback": "İndirme başlamadıysa dosyayı buradan indirin",
+    "deletedBody": "Oturumunuz kapatıldı. Kişisel alanlarınız silindi veya takma adla değiştirildi; rezervasyon ve ödeme kayıtları anonimleştirilerek saklanır.",
+    "deletedBookings": "{count, plural, other {# yaklaşan rezervasyonunuz iptal koşullarına göre iptal edildi.}}",
+    "deletedTransfers": "{count, plural, other {# rezervasyon devir ilanınız geri çekildi.}}",
+    "deletedHome": "Ana sayfaya git",
+    "cookiesTitle": "Çerez tercihleri",
+    "cookiesBody": "Analitik çerezler yalnızca onay vermeniz hâlinde kullanılır. Tercihinizi istediğiniz zaman değiştirebilir, onayınızı geri çekebilirsiniz.",
+    "requestsTitle": "Diğer talepler (bilgi, düzeltme, itiraz)"
   }
 }

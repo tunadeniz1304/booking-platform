@@ -9,18 +9,26 @@
     "loading": "Yükleniyor…",
     "empty": "Şu an ilan yok.",
     "guests": "{count} misafir",
-    "terms": "İstenen: <b>{ask}</b> (orijinal {original}) · satıcı {seller} · son {expires}"
+    "terms": "İstenen: <b>{ask}</b> (orijinal {original}) · satıcı {seller} · son geçerlilik: {expires}",
+    "itemNote": "Bu ilanı yalnızca satıcının size gönderdiği bağlantıyla devralabilirsiniz.",
+    "how": {
+      "title": "Devir nasıl çalışır?",
+      "step1": "Satıcı onaylı rezervasyonunu seçer, satış fiyatını belirler ve tek kullanımlık bir devir bağlantısı oluşturur.",
+      "step2": "Satıcı bağlantıyı alıcıya kendisi iletir; bu listeden satıcıya ulaşılamaz.",
+      "step3": "Alıcı bağlantıyı açıp ödeme yapar. Ödeme onaylanınca rezervasyon alıcıya geçer.",
+      "step4": "Satış fiyatı satıcıya ödenir. Ödeme yapılmazsa ya da bağlantının süresi dolarsa rezervasyon satıcıda kalır."
+    }
   },
   "loginToSell": "Kendi rezervasyonunuzu devretmek için <link>giriş yapın</link>.",
   "sell": {
     "title": "Rezervasyonumu devret",
-    "created": "Devir ilanı açıldı ({amount}).",
+    "created": "Devir bağlantısı oluşturuldu ({amount}). Bağlantı {expires} tarihine kadar geçerli; alıcı ödeme yapınca rezervasyon ona geçer ve tutar size ödenir.",
     "copyFailed": "Kopyalanamadı; bağlantıyı elle seçip kopyalayın.",
-    "none": "Devredilebilir (onaylı) rezervasyonunuz yok.",
+    "none": "Devredilebilir rezervasyonunuz yok. Yalnızca girişine {hours} saatten fazla kalan onaylı rezervasyonlar devredilebilir.",
     "booking": "Rezervasyon",
-    "askPrice": "İstek fiyatı ({currency})",
-    "askHint": "Örnek: 1.250 veya 1.250,50. Ödediğiniz tutarı aşamaz.",
-    "submit": "Devret",
+    "askPrice": "Satış fiyatı ({currency})",
+    "askHint": "En fazla {max}. Örnek: 1.250 veya 1.250,50.",
+    "submit": "Devir bağlantısı oluştur",
     "linkOnce": "Devir bağlantısı yalnızca şimdi gösterilir — kopyalayıp alıcıyla paylaşın.",
     "linkLabel": "Devir bağlantısı",
     "copy": "Kopyala",
@@ -36,7 +44,14 @@
     "linkLost": "Bağlantıyı kaybederseniz yeni bir bağlantı oluşturabilirsiniz; eskisi geçersiz olur.",
     "closeTitle": "Bağlantıyı kopyalamadan kapatılsın mı?",
     "closeBody": "Bu bağlantı bir daha gösterilmeyecek. Kopyalamadıysanız alıcıya iletemezsiniz.",
-    "closeConfirm": "Yine de kapat"
+    "closeConfirm": "Yine de kapat",
+    "tooLateSuffix": "(girişe {hours} saatten az; devredilemez)",
+    "askTooHigh": "Satış fiyatı en fazla {max} olabilir.",
+    "keepNote": "Bu adım rezervasyonu hemen devretmez: rezervasyon, alıcı bağlantıyla ödeme yapana kadar sizde kalır. Ödeme onaylanınca satış fiyatı size ödenir.",
+    "share": "Paylaş",
+    "shareTitle": "Rezervasyon devri",
+    "shareText": "{property} rezervasyonumu {amount} karşılığında devralmak için bu bağlantıyla ödeme yap.",
+    "shared": "Paylaşıldı."
   },
   "claim": {
     "title": "Rezervasyonu devral",
@@ -47,7 +62,7 @@
     "paymentTitle": "Ödeme bilgileri",
     "owned": "Rezervasyon artık sizin: <link>rezervasyonu görüntüle</link>",
     "cardNumber": "Kart numarası",
-    "cardHint": "Demo kartları: onay {success}, ret {decline}. Kart bilgisi sunucuya gönderilmez; yalnızca token gider.",
+    "cardHint": "Demo kartları: onay {success}, ret {decline}. Kart numaranız sunucumuza ulaşmaz; ödeme sağlayıcısı tek kullanımlık bir kod üretir. Ek doğrulama (3D Secure) isteyen kartlar devirde desteklenmez.",
     "month": "Ay",
     "year": "Yıl",
     "cvc": "CVC",
@@ -58,7 +73,12 @@
     "confirmTitle": "Ödeme yapılsın mı?",
     "confirmBody": "Kartınızdan satıcının belirlediği devir tutarı çekilecek ve rezervasyon size geçecek. Bu işlem geri alınamaz.",
     "confirmAction": "Öde ve devral",
-    "maybeCharged": "Önceki denemenizde ödeme alınmış ve devir tamamlanmış olabilir. Tekrar ödemeden önce <link>seyahatlerinizi</link> kontrol edin."
+    "maybeCharged": "Önceki denemenizde ödeme alınmış ve devir tamamlanmış olabilir. Tekrar ödemeden önce <link>seyahatlerinizi</link> kontrol edin.",
+    "threeDsUnsupported": "Bu kart ek doğrulama (3D Secure) istiyor; devirde bu tür kartlar desteklenmez. Başka bir kart kullanın.",
+    "linkExpired": "Bu devir bağlantısının süresi {date} itibarıyla doldu. Satıcıdan yeni bir bağlantı isteyin.",
+    "linkGone": "Bu devir artık mevcut değil: rezervasyon başka bir alıcıya devredilmiş ya da satıcı ilanı geri çekmiş.",
+    "selfClaim": "Bu bağlantı sizin devir ilanınıza ait; kendi rezervasyonunuzu devralamazsınız. Bağlantıyı alıcıyla paylaşın.",
+    "invalidLinkHelp": "Devri zaten tamamladıysanız rezervasyon Seyahatlerim sayfasında görünür."
   },
   "mine": {
     "title": "Devir ilanlarım",
@@ -91,5 +111,9 @@
     "sent": "Doğrulama e-postası gönderildi. Gelen kutunuzu kontrol edin.",
     "alreadyVerified": "E-posta adresiniz zaten doğrulanmış. Tekrar deneyin.",
     "failed": "E-posta gönderilemedi. Biraz sonra yeniden deneyin."
+  },
+  "jump": {
+    "label": "Bu sayfada",
+    "discover": "İlanlara göz at"
   }
 }

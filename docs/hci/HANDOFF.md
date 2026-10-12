@@ -1,6 +1,6 @@
 # HCI düzeltme işi — Handoff
 
-> Son güncelleme: 2026-10-11 · Durum: Critical/High turu birleştirildi (PR #9) · **onaylı 12 renk düzeltmesi + 2 gerileme UYGULANDI** (§1.1, §7) · sırada: crossOwner istekleri (§4.3), çalışma zamanı taraması, Medium/Low turu
+> Son güncelleme: 2026-10-12 · Durum: Critical/High (PR #9), renk + gerilemeler (PR #10) birleştirildi · **Medium/Low turu ve paketler arası istekler (2 tur) UYGULANDI** (§8; rapor §8) · açık iş: ertelenen 47 istek + 15 atlanan bulgu (arka uç/şema/ürün kararı), kapsam dışı 8 renk bulgusu
 > Bu dosya, haftalık kullanım limiti dolarsa ya da oturum kesilirse işi kaldığı yerden sürdürmek içindir.
 
 ## 1. Hedef ve kullanıcı kararları
@@ -115,3 +115,24 @@ Düzeltme sonrası ortaya çıkan 2 gerileme — **İKİSİ DE DÜZELTİLDİ** (
 2. **Ev sahibi promosyon tablosu, mobil:** sayfa 181 px yatay taşıyor (önce 142 px). Tablo kaydırılabilir bir kapsayıcıya alınmamış: `tabIndex=0` + `role="region"` + `aria-label` + `overflow-x-auto`. Sahip: `src/components/host/PromotionsPanel.tsx` (hostB).
 
 Konsol hataları 251'den 333'e çıktı; artışın 319'u `401 Unauthorized`. Bu, uzun tarama sırasında süresi dolan demo oturumlarından kaynaklanan tarama artefaktı, uygulama gerilemesi değil.
+
+## 8. Medium/Low turu ve paketler arası istekler (2026-10-12, bulut oturumu) — BİTTİ
+
+Ortam bulut konteyneri (Linux). Scratchpad: `/tmp/claude-0/-home-user-booking-platform/6c8e30e3-b8b0-5400-b6f9-3d38ab33293b/scratchpad` (aşağıda `$S`; oturum bitince silinir, kalıcı kayıt `docs/hci/` altında). Dal: `hci/regressions-and-color-vs4f2l`.
+
+| Adım                                                            | Sonuç                                                                                                                                              |
+| --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| crossOwner sınıflandırma (131 istek)                            | 76 uygulanabilir (Medium/Low paketlerine katıldı), 31 zaten yapılmış, 24 ertelendi                                                                 |
+| Medium/Low turu: 130 paket                                      | 637 fixed, 244 partially_fixed, 126 already_ok, 8 skipped (Medium/Low, renk hariç 1.015 bulgu)                                                     |
+| crossOwner 2. tur: Medium/Low ajanlarının 543 isteği → 81 paket | 377 uygulandı, 19 kısmen, 124 zaten yapılmış, 23 ertelendi; kalan 11 küçük istek merkezde                                                          |
+| Mesaj yamaları                                                  | 155 yama, 2.910 yeni anahtar, 666 güncelleme                                                                                                       |
+| Kapılar                                                         | lint, typecheck, format, i18n, unit (1.328), mcp:smoke, llm:eval, build geçti; integration + e2e CI'da                                             |
+| Kayıtlar                                                        | `hci-findings.json` (`fixOutcome`), `fix-status.json` (`ml-pNNN` + `crossOwner[].status`), rapor §4.2 / §6 / §8, `docs/hci/areas/*.md`             |
+| Çalışma zamanı önce/sonra                                       | 178 ziyaret: axe S+C 0→0, `<h1>`suz sayfa 2→0; taramanın bulduğu `/trust` TDZ hatası, 1 px taşma ve yeni küçük bağlantılar düzeltildi (rapor §8.5) |
+
+Açık kalanlar (rapor §6): ertelenen 47 istek ve 15 atlanan bulgu yeni arka uç ucu, şema/migration ya da ürün kararı istiyor; kısmen düzeltilen 393 bulgunun kalan kısmı her bulgunun "Yapılan düzeltme" notunda; 8 renk/tema bulgusu palet kararı bekliyor.
+
+Notlar:
+
+- `next dev` her açılışta `next-env.d.ts` dosyasını değiştirir; commit edilmez (yerelde `git update-index --assume-unchanged next-env.d.ts`).
+- Unit testler `runtime/env.sh` yüklenmeden koşulmalı (env ile 12 test yanlış düşer).

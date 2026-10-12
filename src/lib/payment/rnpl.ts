@@ -108,6 +108,10 @@ export interface RnplOffer {
   currency: string;
   dueAt?: string;
   freeCancellationUntil?: string;
+  /** Tesisin IANA saat dilimi; istemci son tarihleri bu dilimde gösterir. */
+  timeZone?: string;
+  /** Başarısız tahsilattan sonra kartı güncelleme süresi (saat; `RNPL_GRACE_HOURS`). */
+  graceHours: number;
 }
 
 /** Checkout için teklif (misafirin kendi HELD rezervasyonu). RNPL kapalıyken `DISABLED`. */
@@ -126,6 +130,8 @@ export async function getRnplOffer(
     dueTodayMinor: 0 as const,
     amountMinor: minorFromDb(booking.totalPriceMinor),
     currency: booking.currency,
+    timeZone: booking.property.timeZone,
+    graceHours: getConfig().RNPL_GRACE_HOURS,
   };
   if (!terms.available) return { ...base, available: false, reason: terms.reason };
   return {
@@ -148,6 +154,10 @@ export interface RnplPlanView {
   /** Başarısız tahsilattan sonra planlanan yeniden deneme (RETRYING). */
   nextAttemptAt: string | null;
   capturedAt: string | null;
+  /** Kart güncelleme süresi (saat; `RNPL_GRACE_HOURS`). */
+  graceHours: number;
+  /** RETRYING: ilk başarısızlık + `RNPL_GRACE_HOURS`; sonrasında plan iptal edilir. */
+  graceUntil: string | null;
 }
 
 export function presentRnplPlan(
@@ -160,8 +170,14 @@ export function presentRnplPlan(
     | "freeCancellationUntil"
     | "nextAttemptAt"
     | "capturedAt"
+    | "firstFailedAt"
   >
 ): RnplPlanView {
+  const graceHours = getConfig().RNPL_GRACE_HOURS;
+  const graceUntil =
+    schedule.status === "RETRYING" && schedule.firstFailedAt
+      ? new Date(schedule.firstFailedAt.getTime() + graceHours * HOUR_MS).toISOString()
+      : null;
   return {
     status: schedule.status,
     paidTodayMinor: 0,
@@ -171,6 +187,8 @@ export function presentRnplPlan(
     freeCancellationUntil: schedule.freeCancellationUntil.toISOString(),
     nextAttemptAt: schedule.nextAttemptAt?.toISOString() ?? null,
     capturedAt: schedule.capturedAt?.toISOString() ?? null,
+    graceHours,
+    graceUntil,
   };
 }
 

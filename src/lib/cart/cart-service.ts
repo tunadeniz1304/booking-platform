@@ -802,18 +802,40 @@ export async function expireCarts(now: Date = new Date(), limit = 100): Promise<
 }
 
 /**
- * Süresi dolmuş / iptal edilmiş son sepetin kalemleriyle yeni OPEN sepet açar (fiyatlar tutmada
- * yeniden hesaplanır). Aktif sepet varsa onu döner.
+ * Geri yüklenebilir sepet: kullanıcının en son kapanan sepeti yalnız süresi dolmuşsa (EXPIRED) ve
+ * kalemi varsa. Sonradan elle temizlenen (CANCELLED) ya da ödenen (CHECKED_OUT) sepet, daha eski
+ * ilgisiz bir sepeti geri getirmez.
+ */
+async function lastRestorableCart(userId: string) {
+  const last = await prisma.cart.findFirst({
+    where: { userId, status: { notIn: ACTIVE } },
+    include: { items: true },
+    orderBy: { updatedAt: "desc" },
+  });
+  return last?.status === CartStatus.EXPIRED && last.items.length > 0 ? last : null;
+}
+
+/**
+ * Sepet sayfasının "önceki sepeti geri yükle" önerisi için özet (`reopenCart` ile aynı koşul;
+ * aktif sepet varsa null).
+ */
+export async function findRestorableCart(
+  userId: string
+): Promise<{ expiredAt: string; itemCount: number } | null> {
+  if ((await prisma.cart.count({ where: { userId, status: { in: ACTIVE } } })) > 0) return null;
+  const last = await lastRestorableCart(userId);
+  return last ? { expiredAt: last.updatedAt.toISOString(), itemCount: last.items.length } : null;
+}
+
+/**
+ * Süresi dolmuş son sepetin kalemleriyle yeni OPEN sepet açar (fiyatlar tutmada yeniden
+ * hesaplanır). Aktif sepet varsa onu döner.
  */
 export async function reopenCart(userId: string): Promise<CartDTO | null> {
   const active = await findActiveCart(userId);
   if (active) return presentCart(active);
-  const last = await prisma.cart.findFirst({
-    where: { userId, status: { in: [CartStatus.EXPIRED] } },
-    include: { items: true },
-    orderBy: { updatedAt: "desc" },
-  });
-  if (!last || last.items.length === 0) return null;
+  const last = await lastRestorableCart(userId);
+  if (!last) return null;
   try {
     await prisma.cart.create({
       data: {

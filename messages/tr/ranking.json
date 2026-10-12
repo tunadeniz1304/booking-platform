@@ -1,7 +1,7 @@
 {
-  "metaTitle": "Sıralama nasıl çalışır? — booking-platform",
+  "metaTitle": "Sıralama nasıl çalışır?",
   "title": "Sıralama nasıl çalışır?",
-  "intro": "\"Önerilen\" sıralamada her konaklamanın skoru aşağıdaki bileşenlerin ağırlıklı toplamıdır. Sonuç kartındaki \"Bu sıralama neden?\" bağlantısı her bileşenin katkısını gösterir. Ücretli yerleşim veya komisyon oranı sıralamayı etkilemez.",
+  "intro": "\"Önerilen\" sıralamada her konaklamanın skoru, aşağıdaki bileşenlerin ağırlıklarına göre toplanmasıyla bulunur. Sonuç kartındaki \"Bu sıralama neden?\" açılır bölümü her bileşenin katkısını gösterir. Ücretli yerleşim veya komisyon oranı sıralamayı etkilemez.",
   "table": {
     "component": "Bileşen",
     "weight": "Ağırlık",
@@ -14,28 +14,42 @@
   "factors": {
     "priceFit": {
       "label": "Fiyat uyumu",
-      "description": "Seçtiğiniz tarihlerdeki vergi dahil toplamın, sonuçlar arasındaki göreli uygunluğu."
+      "description": "Seçtiğiniz tarihler için vergiler dahil toplam fiyat, aynı aramadaki diğer konaklamalara göre ne kadar düşükse bu bileşen o kadar yüksek olur."
     },
     "rating": {
       "label": "Misafir puanı",
-      "description": "Az yorumlu ilanların aşırı öne çıkmaması için Bayes düzeltmeli ortalama puan."
+      "description": "Misafirlerin verdiği ortalama puan. Az yorumu olan bir ilanın puanı, tek bir yüksek puanla şişmesin diye tüm ilanların ortalamasına doğru dengelenir."
     },
     "popularity": {
       "label": "Yorum sayısı",
-      "description": "Doğrulanmış konaklamalara bağlı yorum sayısının logaritmik ölçeği."
+      "description": "Gerçekten konaklamış misafirlerin yazdığı yorumların sayısı. Yorum sayısı arttıkça katkısı da artar, ama her yeni yorumun etkisi bir öncekinden biraz azdır."
     },
     "personal": {
       "label": "Kişiselleştirme",
-      "description": "Giriş yaptıysanız geçmiş rezervasyon ve favorilerinizdeki şehir/tip benzerliği."
+      "description": "Giriş yaptıysanız, ilanın şehrinin ve konaklama tipinin geçmiş rezervasyonlarınıza ve favorilerinize ne kadar benzediği."
     },
     "semantic": {
-      "label": "Arama metni benzerliği",
-      "description": "Arama metninizle ilan metni arasındaki benzerlik."
+      "label": "Aramanızla ilgisi",
+      "description": "İlanın başlık ve açıklama gibi metinlerinin aradığınız şeyle ne kadar örtüştüğü."
     }
   },
-  "footnote": "Fiyat, puan veya en çok beğenilen sıralamalarını seçtiğinizde yalnızca o ölçüt kullanılır.",
+  "footnote": "\"Fiyat (önce en düşük)\", \"Fiyat (önce en yüksek)\" veya \"Puan (önce en yüksek)\" sıralamasını seçtiğinizde bu skor kullanılmaz; sonuçlar yalnızca o ölçüte göre sıralanır.",
   "why": "Bu sıralama neden?",
-  "totalScore": "Toplam skor: {score}",
-  "withQueryNote": "Bir varış yeri ya da arama metni girdiğinizde, sonuçların aradığınızla ilgili olması için arama metni benzerliği daha ağır basar; bu durumda üçüncü sütundaki ağırlıklar kullanılır.",
-  "experimentNote": "Sıralamayı iyileştirmek için bazı ziyaretçilerde deneysel, kendi kendine öğrenen bir sıralama modeli kullanılabilir. Bu model de yalnızca yukarıdaki bileşenleri kullanır; ücretli yerleşim ya da komisyon onu da etkilemez."
+  "totalScore": "Toplam: 100 üzerinden {score}",
+  "withQueryNote": "Bir varış yeri ya da arama metni girdiğinizde, sonuçların aradığınızla ilgili olması için \"Aramanızla ilgisi\" bileşeni daha ağır basar; bu durumda üçüncü sütundaki ağırlıklar kullanılır.",
+  "experimentNote": "Sıralamayı iyileştirmek için bazı ziyaretçilerde deneysel, kendi kendine öğrenen bir sıralama modeli kullanılabilir. Bu model de yalnızca yukarıdaki bileşenleri kullanır; ücretli yerleşim ya da komisyon onu da etkilemez.",
+  "nav": {
+    "label": "İlgili sayfalar",
+    "backToResults": "Arama sonuçlarına dön",
+    "search": "Konaklama ara",
+    "trust": "Güven merkezi"
+  },
+  "factorOutOf": "{max} puandan {points}",
+  "factorPoints": "{points} puan",
+  "weightsSet": {
+    "default": "Arama metni olmadığı için standart ağırlıklar kullanıldı.",
+    "withQuery": "Arama metni ya da varış yeri girildiği için metin benzerliğinin daha ağır bastığı ağırlıklar kullanıldı.",
+    "ltr": "Bu sonuç deneysel bir sıralama modeliyle sıralandı; aşağıdaki katkılar yaklaşıktır."
+  },
+  "whyFor": "({title} için)"
 }

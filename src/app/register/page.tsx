@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useRef, useState } from "react";
+import { FormEvent, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -8,14 +8,20 @@ import AuthCard, {
   AuthField,
   Notice,
   ResendVerificationButton,
-  authInputClass,
   safeRedirect,
   submitButtonProps,
   useAuthErrorText,
   useSearchParam,
   withRedirect,
 } from "@/components/auth/AuthCard";
-import { postJsonWithPow } from "@/lib/auth/pow-fetch";
+import NewPasswordField, { newPasswordOk } from "@/components/auth/NewPasswordField";
+import PasswordRevealInput from "@/components/auth/PasswordRevealInput";
+import { setSessionUserCache, useSessionUserCache } from "@/components/layout/useSessionUserCache";
+import { invalidateFavoriteIds } from "@/components/property/useFavoriteIds";
+import { Button, ButtonLink, buttonClass, focusRing, inputClass } from "@/components/ui/ui";
+import { logout } from "@/lib/api-client";
+import { postJsonWithPowCancellable } from "@/lib/auth/pow-fetch-cancellable";
+import { isAbortError } from "@/lib/auth/pow-solve-cancellable";
 
 interface RegisterResponse {
   user: {
@@ -37,13 +43,32 @@ interface RegisterError {
 type FieldName = "firstName" | "lastName" | "email" | "password";
 const FIELD_ORDER: FieldName[] = ["firstName", "lastName", "email", "password"];
 
-const passwordOk = (v: string) => v.length >= 8 && /[0-9]/.test(v);
+/** E-posta doğrulandıktan sonra dönülecek adres; verify-email sayfası okuyup siler. */
+const POST_VERIFY_REDIRECT_KEY = "postVerifyRedirect";
+
+/** Rezervasyon akışından gelen dönüş adresleri (kayıt nedeni formun üstünde açıklanır). */
+const BOOKING_FLOW_PATTERN = /^\/(checkout|cart|pay)(?=[/?#]|$)/;
+
+const cancelButtonClass = buttonClass({ variant: "secondary", fullWidth: true });
+
+const noopSubscribe = () => () => {};
+const clientSnapshot = () => true;
+const serverSnapshot = () => false;
+
+const inlineLinkClass = `font-semibold text-[#003580] underline ${focusRing}`;
+const recoveryClass = `inline-flex min-h-[44px] items-center sm:min-h-[24px] ${inlineLinkClass}`;
 
 export default function RegisterPage() {
   const t = useTranslations("auth");
   const router = useRouter();
   const authErrorText = useAuthErrorText();
   const redirect = safeRedirect(useSearchParam("redirect"));
+  const reason = useSearchParam("reason");
+  const bookingContext = reason === "checkout" || BOOKING_FLOW_PATTERN.test(redirect);
+  // Hidrasyondan önce gönder düğmesi devre dışı: Enter yerel GET gönderimiyle sayfayı yenilemez.
+  const hydrated = useSyncExternalStore(noopSubscribe, clientSnapshot, serverSnapshot);
+  // undefined: oturum bilinmiyor (form gösterilir); oturum açıksa form yerine devam seçenekleri.
+  const sessionUser = useSessionUserCache();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
@@ -51,8 +76,22 @@ export default function RegisterPage() {
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<FieldName, string>>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [status, setStatus] = useState<string | null>(null);
+  const [signingOut, setSigningOut] = useState(false);
+  /** Zaten kayıtlı çıkan adres: giriş ve şifre sıfırlama bağlantıları bu adresle açılır. */
+  const [takenEmail, setTakenEmail] = useState<string | null>(null);
   const [registeredEmail, setRegisteredEmail] = useState<string | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  const submitRef = useRef<HTMLButtonElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+
+  // Sayfadan çıkılınca süren doğrulama arka planda çalışmaya devam etmez.
+  useEffect(() => {
+    const pending = abortRef;
+    return () => pending.current?.abort();
+  }, []);
 
   const fieldMessage = (name: FieldName) => t(`register.errors.${name}`);
 
@@ -71,27 +110,46 @@ export default function RegisterPage() {
   const clearFieldError = (name: FieldName) =>
     setFieldErrors((prev) => (prev[name] ? { ...prev, [name]: undefined } : prev));
 
+  /** Kayıtlı e-posta için kurtarma bağlantısı: dönüş adresi ve e-posta (ön doldurma) taşınır. */
+  const recoveryHref = (base: "/login" | "/forgot-password", address: string) => {
+    const href = withRedirect(base, redirect);
+    return `${href}${href.includes("?") ? "&" : "?"}email=${encodeURIComponent(address)}`;
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (submitting) return;
     setError(null);
+    setStatus(null);
     // Sunucuyla aynı kurallar (ad/soyad en az 2 karakter, parola 8+ karakter ve bir rakam).
     const clientInvalid: FieldName[] = [];
     if (firstName.trim().length < 2) clientInvalid.push("firstName");
     if (lastName.trim().length < 2) clientInvalid.push("lastName");
-    if (!passwordOk(password)) clientInvalid.push("password");
+    if (!newPasswordOk(password)) clientInvalid.push("password");
     if (clientInvalid.length > 0) {
       showFieldErrors(clientInvalid);
       return;
     }
     setFieldErrors({});
+    const controller = new AbortController();
+    abortRef.current = controller;
     setSubmitting(true);
     try {
-      const res = await postJsonWithPow("/api/auth/register", {
-        firstName,
-        lastName,
-        email,
-        password,
+      const res = await postJsonWithPowCancellable(
+        "/api/auth/register",
+        { firstName, lastName, email, password },
+        {
+          signal: controller.signal,
+          onChallenge: () => {
+            setVerifying(true);
+            setStatus(t("login.verifyingInfo"));
+          },
+        }
+      ).finally(() => {
+        // İptal düğmesi kalkarken odak kaybolmasın.
+        if (document.activeElement === cancelRef.current) submitRef.current?.focus();
+        setVerifying(false);
+        setStatus(null);
       });
       const data = (await res.json().catch(() => ({}))) as RegisterResponse & RegisterError;
       if (!res.ok) {
@@ -105,29 +163,56 @@ export default function RegisterPage() {
         }
         if (data.code === "EMAIL_TAKEN") {
           setFieldErrors({ email: authErrorText("EMAIL_TAKEN", t("register.failed")) });
+          setTakenEmail(email.trim());
           focusField("email");
           setSubmitting(false);
           return;
         }
-        throw new Error(authErrorText(data.code, t("register.failed")));
+        // Gövdesiz/bilinmeyen yanıt: 5xx için "hizmet kullanılamıyor", diğerleri genel metin.
+        setError(
+          authErrorText(
+            data.code,
+            res.status >= 500 ? t("errors.unavailable") : t("register.failed")
+          )
+        );
+        setSubmitting(false);
+        return;
       }
       // Oturum açıldı: başlık güncellensin; doğrulama e-postası ayrıca bildirilsin.
       router.refresh();
       if (data.user?.emailVerified === false) {
+        // Doğrulama bağlantısı açılınca kaldığı yere dönebilsin (verify-email okur).
+        try {
+          if (redirect === "/") localStorage.removeItem(POST_VERIFY_REDIRECT_KEY);
+          else localStorage.setItem(POST_VERIFY_REDIRECT_KEY, redirect);
+        } catch {
+          // Depolama kapalıysa yalnız doğrulama sonrası dönüş bağlantısı gösterilmez.
+        }
         setRegisteredEmail(data.user.email);
         return;
       }
       router.push(redirect);
     } catch (err) {
-      setError(
-        err instanceof TypeError
-          ? authErrorText("NETWORK", t("register.failed"))
-          : err instanceof Error
-            ? err.message
-            : t("register.failed")
-      );
+      // Ham istisna metni (ör. "Failed to fetch", çözücü hatası) gösterilmez.
+      if (isAbortError(err)) setStatus(t("register.verifyCancelled"));
+      else setError(err instanceof TypeError ? t("errors.network") : t("register.failed"));
       setSubmitting(false);
+    } finally {
+      if (abortRef.current === controller) abortRef.current = null;
     }
+  };
+
+  const switchAccount = async () => {
+    if (signingOut) return;
+    setSigningOut(true);
+    try {
+      await logout();
+    } finally {
+      setSigningOut(false);
+    }
+    setSessionUserCache(null);
+    invalidateFavoriteIds();
+    router.push(withRedirect("/login", redirect));
   };
 
   if (registeredEmail) {
@@ -146,10 +231,44 @@ export default function RegisterPage() {
     );
   }
 
+  // Gönderim sürerken (başarılı kayıtta yönlendirme dahil) oturum görünümüne geçilmez.
+  if (sessionUser && !submitting) {
+    return (
+      <AuthCard title={t("login.signedInTitle")} focusTitle>
+        <p className="mt-4 text-sm text-gray-700">
+          {t("login.signedInAs", {
+            name: `${sessionUser.firstName} ${sessionUser.lastName}`,
+            email: sessionUser.email,
+          })}
+        </p>
+        <div className="mt-6 space-y-3">
+          <ButtonLink href={redirect} size="lg" fullWidth>
+            {t("login.continue")}
+          </ButtonLink>
+          <Button
+            variant="secondary"
+            size="lg"
+            fullWidth
+            busy={signingOut}
+            onClick={() => void switchAccount()}
+          >
+            {signingOut ? t("login.signingOut") : t("login.switchAccount")}
+          </Button>
+        </div>
+      </AuthCard>
+    );
+  }
+
   return (
     <AuthCard title={t("register.title")} subtitle={t("register.subtitle")}>
+      {bookingContext && (
+        <p role="note" className="mt-4 rounded-lg bg-blue-50 px-4 py-3 text-sm text-[#003580]">
+          {t("register.continueBooking")}
+        </p>
+      )}
+
       <form ref={formRef} onSubmit={handleSubmit} className="mt-6 space-y-4">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-3">
           <AuthField
             id="firstName"
             label={t("register.firstName")}
@@ -162,12 +281,14 @@ export default function RegisterPage() {
               required
               minLength={2}
               autoComplete="given-name"
+              autoCapitalize="words"
+              spellCheck={false}
               value={firstName}
               onChange={(e) => {
                 setFirstName(e.target.value);
                 clearFieldError("firstName");
               }}
-              className={authInputClass}
+              className={inputClass}
             />
           </AuthField>
           <AuthField
@@ -182,40 +303,56 @@ export default function RegisterPage() {
               required
               minLength={2}
               autoComplete="family-name"
+              autoCapitalize="words"
+              spellCheck={false}
               value={lastName}
               onChange={(e) => {
                 setLastName(e.target.value);
                 clearFieldError("lastName");
               }}
-              className={authInputClass}
+              className={inputClass}
             />
           </AuthField>
         </div>
 
-        <AuthField id="email" label={t("email")} error={fieldErrors.email}>
-          <input
-            id="email"
-            type="email"
-            required
-            autoComplete="email"
-            value={email}
-            onChange={(e) => {
-              setEmail(e.target.value);
-              clearFieldError("email");
-            }}
-            className={authInputClass}
-          />
-        </AuthField>
+        <div>
+          <AuthField id="email" label={t("email")} error={fieldErrors.email}>
+            <input
+              id="email"
+              type="email"
+              required
+              autoComplete="email"
+              autoCapitalize="none"
+              spellCheck={false}
+              value={email}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                setTakenEmail(null);
+                clearFieldError("email");
+              }}
+              className={inputClass}
+            />
+          </AuthField>
+          {takenEmail && (
+            <p className="mt-1 flex flex-wrap gap-x-4 text-sm">
+              <Link href={recoveryHref("/login", takenEmail)} className={recoveryClass}>
+                {t("register.loginInstead")}
+              </Link>
+              <Link href={recoveryHref("/forgot-password", takenEmail)} className={recoveryClass}>
+                {t("login.forgotPassword")}
+              </Link>
+            </p>
+          )}
+        </div>
 
-        <AuthField
+        <NewPasswordField
           id="password"
           label={t("password")}
-          hint={t("register.passwordHint")}
+          value={password}
           error={fieldErrors.password}
         >
-          <input
+          <PasswordRevealInput
             id="password"
-            type="password"
             required
             autoComplete="new-password"
             minLength={8}
@@ -226,13 +363,13 @@ export default function RegisterPage() {
             }}
             onBlur={() => {
               // Hata yazarken değil, alandan çıkınca gösterilir.
-              if (password.length > 0 && !passwordOk(password)) {
+              if (password.length > 0 && !newPasswordOk(password)) {
                 setFieldErrors((prev) => ({ ...prev, password: fieldMessage("password") }));
               }
             }}
-            className={authInputClass}
+            className={inputClass}
           />
-        </AuthField>
+        </NewPasswordField>
 
         {error && (
           <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
@@ -240,9 +377,44 @@ export default function RegisterPage() {
           </div>
         )}
 
-        <button {...submitButtonProps(submitting)}>
-          {submitting ? t("saving") : t("register.submit")}
-        </button>
+        <p className="text-xs text-gray-600">
+          {t.rich("register.privacy", {
+            link: (chunks) => (
+              <Link
+                href="/privacy"
+                target="_blank"
+                rel="noopener noreferrer"
+                className={inlineLinkClass}
+              >
+                {chunks}
+                <span className="sr-only"> {t("register.newTab")}</span>
+              </Link>
+            ),
+          })}
+        </p>
+
+        <div>
+          <button ref={submitRef} {...submitButtonProps(submitting)} disabled={!hydrated}>
+            {verifying
+              ? t("login.verifying")
+              : submitting
+                ? t("register.submitting")
+                : t("register.submit")}
+          </button>
+          <div role="status" className={status ? "mt-2 text-sm text-gray-700" : undefined}>
+            {status}
+          </div>
+          {verifying && (
+            <button
+              ref={cancelRef}
+              type="button"
+              onClick={() => abortRef.current?.abort()}
+              className={`mt-2 min-h-[44px] ${cancelButtonClass}`}
+            >
+              {t("login.cancelVerify")}
+            </button>
+          )}
+        </div>
       </form>
 
       <p className="mt-6 text-center text-sm text-gray-600">

@@ -703,13 +703,15 @@
 | Renk/tema           | Hayır                                                                                              |
 | Efor                | S                                                                                                  |
 | Kaynak denetçiler   | runtime:cart                                                                                       |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                       |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p013)                                                                   |
 
 **Kanıt:** Sweep landmarks: 068/069 guest /cart ve 070/071 /checkout/cart için header=0, nav=0, footer=0. /trips, /plan ve /compare gibi oturumlu sayfalar PageShell kullandığından (ui.tsx:157-178) header=1, nav=1 ve footer=1. p8 (/pay/share/invalid-token, oturumlu görünüm): header=0, nav=0. Tab sırası (068) doğrudan kalem bağlantısıyla başlıyor. Çıkış yolları yalnızca kalem bağlantısı, 'Ödemeye geç' ve 'Sepeti boşalt'. /checkout/cart'ta tutmadan sonra 'Sepete dön' de kayboluyor (satır 279 yalnızca !held koşulunda). Ekran görüntüleri: full/shots/068-guest-tr-desktop-_cart.png ve 071-guest-tr-mobile-_checkout_cart.png
 
 **Etki:** Misafir sepetten aramaya, seyahatlerine ya da hesabına dönemiyor; tarayıcı geri tuşuna mahkûm kalıyor. Header'daki sepet bağlantısı sepet sayfasının kendisinde yok. Davetle gelen katılımcı nerede olduğunu ve hangi hesapla giriş yaptığını göremiyor.
 
 **Önerilen aksiyon:** cart/page.tsx ve pay/share sayfasını PageShell (Header+Footer) ile sar. checkout/cart için en az logo ve 'Sepete dön' içeren sadeleştirilmiş bir checkout başlığı kullan (dikkat dağıtmadan çıkış yolu). Paylaşım sayfasında başlıkta oturumdaki hesabı göster.
+
+**Yapılan düzeltme:** /cart already renders in PageShell (Header with the nav including 'Sepetim', LocaleSwitcher and account, plus Footer), in the loading branch too, so nothing was needed in cart/page.tsx. The checkout/cart shell and the 'Sepete dön' link that disappears after hold are handed off through crossOwner. The share page already uses PageShell.
 
 ## F486 — Kabuksuz rotalar: oturumlu /cart, /checkout ve /checkout/cart sayfalarında başlık ve footer yok; geri dönüş yolu yok
 
@@ -725,13 +727,15 @@
 | Renk/tema           | Hayır                                                                 |
 | Efor                | M                                                                     |
 | Kaynak denetçiler   | runtime:shell                                                         |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                          |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p013)                                      |
 
 **Kanıt:** report.json landmark verisi: guest /cart, anon ve guest /checkout, guest /checkout/cart için header=0, footer=0. Anon /cart ise kabuklu, yani aynı rota oturum durumuna göre farklı kabukla geliyor. P12: guest /cart'ta etkileşimler yalnız mülk bağlantısı, 'Ödemeye geç' ve 'Sepeti boşalt'. /checkout'ta yalnız 'Uygula' ve 'Rezervasyonu Tamamla': mülke ya da aramaya geri dönüş, logo, hesap ve çıkış yok. Başlık nav'ındaki 'Sepetim'e tıklanınca başlık kayboluyor (RT/probes/shell/dbg2.png).
 
 **Etki:** Kullanıcı sepetten ya da ödeme adımından alışverişe veya mülk sayfasına ancak tarayıcının geri tuşuyla dönebiliyor. Başlığın birden kaybolması yön duygusunu bozuyor.
 
 **Önerilen aksiyon:** /cart sayfasını PageShell içine alın. Checkout'ta odaklı ama minimal bir kabuk kullanın: logo (/), '← Konaklamaya dön' (propertyId ile), adım göstergesi ve footer'da en azından yasal bağlantılar.
+
+**Yapılan düzeltme:** The /cart part was already fixed: PageShell wraps every branch. checkout/page.tsx already uses CheckoutFrame (Header+Footer) with backToProperty links. Only checkout/cart/page.tsx is still shell-less (main at ~L421/429/474/505), and it is handed off through crossOwner.
 
 ## F487 — Boş sepet ekranındaki 'Süresi dolan sepeti geri yükle' düğmesi elle boşaltılan sepette ve hiç sepeti olmayan kullanıcıda da çıkıyor; tıklayınca hiçbir şey olmuyor
 
@@ -747,13 +751,15 @@
 | Renk/tema           | Hayır                                                                 |
 | Efor                | S                                                                     |
 | Kaynak denetçiler   | runtime:cart                                                          |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                          |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p013)                                |
 
 **Kanıt:** p2-empty (desktop TR): 'Sepeti boşalt' onaylandı (DELETE /api/cart/c1). Boş ekranda 'Konaklama ara' ile birlikte 'Süresi dolan sepeti geri yükle' (220x38) görünüyor. Tıklandı, POST /api/cart/reopen gitti, sunucu {cart:null} döndü. Ekran değişmedi, mesaj yok, odak body'de (C satırı). Sunucuda reopenCart yalnızca EXPIRED sepetleri geri yüklüyor (cart-service.ts:811-816), CANCELLED olanları değil. p11-nocart (mobil TR): GET {cart:null} dönen, hiç sepeti olmamış kullanıcıda da aynı düğme çıkıyor. Ekran görüntüsü: crops/cart/p2-desktop-tr-empty-after-clear.png ve crops/cart/p11-mobile-tr.png
 
 **Etki:** Düğme var olmayan bir sepeti vaat ediyor. İşe yaramayınca kullanıcı sistemin bozuk olduğunu düşünüyor; elle boşalttığı sepeti 'geri yükleyebileceğini' sanıyor ama bu mümkün değil.
 
 **Önerilen aksiyon:** Düğmeyi yalnızca geri yüklenebilir bir EXPIRED sepet varken göster: GET /api/cart yanıtına 'restorable: true/false' ekle. reopen null dönerse 'Geri yüklenecek sepet bulunamadı' durum mesajı göster. Elle boşaltma için ayrı bir 'Geri al' (undo) düşün.
+
+**Yapılan düzeltme:** The restore button is now hidden when the cart failed to load, after a manual clear, after an item removal, and once reopen returns null. A null reopen also shows a visible and announced 'Geri yüklenebilecek, süresi dolmuş bir sepet bulunamadı…' message, and focus moves to the empty-state heading. Item removal gets an undo. Showing the button only when an EXPIRED cart exists needs a `restorable` field from the API, which is handed off through crossOwner (cart-service, api/cart route, useCart).
 
 ## F488 — Sepet kalemi kaldırma: onay yok, geri alma yok, görünür geri bildirim yok
 
@@ -768,13 +774,15 @@
 | Renk/tema           | Hayır                                                |
 | Efor                | M                                                    |
 | Kaynak denetçiler   | runtime:cart                                         |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                         |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p013)                      |
 
 **Kanıt:** p1-remove (desktop TR, API stub, 400 ms gecikme): 'Kaldır' tetiklenince dialogs=[] ve DELETE /api/cart/items/it2 hemen gidiyor. İstek sürerken 3 düğme ve 6 alan disabled oluyor, ama 'kaldırılıyor…' gibi bir metin görünmüyor. Kaldırmadan sonra 'Geri al' düğmesi sayısı 0, kalem sessizce kayboluyor. Ekran görüntüleri: crops/cart/p1-desktop-tr-before.png ve p1-desktop-tr-after-remove.png. Kaldırma yolu remove() satır 39-40'ta, düğme 183-191'de.
 
 **Etki:** Yanlış dokunuşla silinen kalemi geri getirmek için ilan sayfasına dönüp tarih, oda ve kişi seçimini baştan yapmak gerekiyor. Mobilde 'Kaldır' fiyat ve alanların hemen yanında durduğu için bu risk artıyor.
 
 **Önerilen aksiyon:** Kaldırmadan sonra satırın yerinde birkaç saniye kalan bir 'X kaldırıldı — Geri al' satırı ya da toast göster. Geri al, aynı kalemi POST /api/cart/items ile yeniden eklesin (propertyId, roomTypeId, tarihler ve kişi sayıları istemcide zaten var). İşlem sürerken satır içinde 'Kaldırılıyor…' durumunu göster.
+
+**Yapılan düzeltme:** While a removal is in progress, the row shows a visible 'Kaldırılıyor…' and aria-busy. After it finishes, an undo row ('{name} sepetten kaldırıldı.' plus a 'Geri al' button) appears where the item was. Focus moves to that button, which re-adds the same item with POST /api/cart/items (property, room, rate plan, dates, guests, quantity, currency). It then announces the new total and focuses the restored item's link. If the re-add fails, the error is shown inside the undo row.
 
 ## F489 — Tutma başarısız olunca ('odalardan biri müsait değil') hangi odanın sorunlu olduğu gösterilmiyor ve doğrudan bir çözüm eylemi yok
 
@@ -789,13 +797,15 @@
 | Renk/tema           | Hayır                                             |
 | Efor                | S                                                 |
 | Kaynak denetçiler   | runtime:cart                                      |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                      |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p015)                   |
 
 **Kanıt:** p12-holdfail (desktop TR): hold 409 ve details.itemId='it2' döndü. Alert: 'Sepetteki odalardan biri artık müsait değil; hiçbir oda tutulmadı.' Satırlarda işaret yok (aria-invalid=null, sınıf aynı), odak body'de. Mevcut eylemler yalnızca ['Odaları tut','Sepete dön']. holdError details.itemId'yi yalnızca mesaj seçmek için kullanıyor (satır 48-49), kalemi işaretlemiyor. Ekran görüntüsü: crops/cart/p12-desktop-tr.png
 
 **Etki:** Çok kalemli sepette kullanıcı hangi odayı kaldırması ya da değiştirmesi gerektiğini tahmin etmek zorunda kalıyor. Aynı düğmeye tekrar basmak aynı hatayı veriyor.
 
 **Önerilen aksiyon:** details.itemId ile ilgili satırı vurgula ve satıra 'Bu oda artık müsait değil' notu ekle. Mesajı 'Kapadokya Mağara Otel · Deluxe Oda artık müsait değil' biçiminde adla yaz. Satıra 'Sepetten kaldır' veya 'Başka tarih/oda seç (ilana git)' eylemi koy.
+
+**Yapılan düzeltme:** When a hold returns 409 with details.itemId, the matching summary row now shows a 'Bu oda artık müsait değil' note with a warning icon. The row also gets two actions: Kaldır (DELETE /api/cart/items/:id, which also issues a fresh hold Idempotency-Key and announces the new total) and 'Tarihleri veya odayı değiştir' (a link to /property/:id). The alert now names the room as 'Tesis · Oda' with its dates, and focus moves to the row note instead of falling to body.
 
 ## F490 — Bölünmüş ödeme seçeneği ancak 'Odaları tut' adımından sonra, ödeme formunun altında ve ekran dışında beliriyor; 'Ödemeye geç' bir tutma adımına götürüyor
 
@@ -811,13 +821,15 @@
 | Renk/tema           | Hayır                                                                |
 | Efor                | M                                                                    |
 | Kaynak denetçiler   | runtime:cart                                                         |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                         |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p015)                               |
 
 **Kanıt:** /cart sayfasında CTA 'Ödemeye geç' (cart/page.tsx:216-221). Ama /checkout/cart'ta kart formu yok, yalnızca 'Odaları tut' var (sweep 070/071 bodyTextSample). Bölüşme paneli ancak held=true olunca render ediliyor (satır 359-367). p5: panel üst kenarı y=821, desktop viewport 800 (doc 1342). Mobilde y=929, viewport 844 (doc 1510). Panel 'Öde ve onayla' ve 'Tutmayı bırak' düğmelerinin altında. İki alternatifi ayıran 'ya da' ayracı yok; cart.split.or anahtarı ('ya da', cart.json:101) tanımlı ama kullanılmıyor (Grep sonucu yok). Ekran görüntüsü: crops/cart/p4d-0.png
 
 **Etki:** Grupla ödemek isteyen kullanıcı bu seçeneği sepette veya tutma öncesinde göremiyor. Tek ödeme formunu tek yol sanıp tüm tutarı kendi kartıyla ödeyebilir. 'Ödemeye geç' sonrasında beklenmeyen bir ara adım çıkıyor.
 
 **Önerilen aksiyon:** /cart toplam kutusunda 'Tek kartla öde' ve 'Grupla bölüş' seçeneklerini önden göster (ör. iki radyo veya iki CTA). Checkout'ta tuttuktan sonra iki yolu sekme ya da 'ya da' ayracıyla eş düzeyde sun; bölüşme seçeneğini kart formunun üstüne kısa bir özetle taşı. 'Ödemeye geç' metnini 'Odaları tut ve öde' olarak netleştir veya tutma adımını açıklayan bir adım göstergesi (1 Tut → 2 Öde) ekle.
+
+**Yapılan düzeltme:** On /checkout/cart: added a two-step indicator (ol with aria-current='step': 1 Odaları tut, 2 Ödeme). Added a pre-hold hint that after holding you can pay with one card or split. On the pay step, a short summary with an in-page link to the split panel now sits above the card form, and a 'ya da' separator (cart.split.or) sits between the form and the panel. 'Tutmayı bırak' moved below both payment options. The /cart CTA side is left to its owner (see crossOwner).
 
 ## F491 — Geçersiz veya başkasına ait paylaşım linki ekranı neden ve sonraki adım vermiyor; tek bağlantı ilgisiz 'Seyahatlerim'
 
@@ -832,13 +844,15 @@
 | Renk/tema           | Hayır                                    |
 | Efor                | S                                        |
 | Kaynak denetçiler   | runtime:cart                             |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**             |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p028)          |
 
 **Kanıt:** p8-share-invalid (oturumlu görünüm, API 404 SHARE_LINK_INVALID stub): desktop TR, mobil 390 ve EN çalıştırıldı. İçerik yalnızca H1 'Grup rezervasyonu payı', alert 'Bu ödeme linki geçersiz.' / 'This payment link is invalid.' ve 'Seyahatlerim' (/trips, 91x24) bağlantısı. Header, nav ve footer sayısı 0; odak body'de. SHARE_EMAIL_MISMATCH için metin 'Bu ödeme linki başka bir kişiye gönderildi.' (cart.json:107); hangi hesapla giriş yapıldığı ya da hesap değiştirme yolu gösterilmiyor. Ekran görüntüleri: crops/cart/p8-mobile-tr-SHARE_LINK_INVALID.png ve p8-desktop-en-SHARE_LINK_INVALID.png
 
 **Etki:** Davet edilen kişi linkin neden çalışmadığını (yanlış kopyalama, süre dolması, yanlış hesap) ve ne yapması gerektiğini bilemiyor. 'Seyahatlerim' ona hiçbir şey ifade etmiyor; organizatöre ulaşma yolu yok.
 
 **Önerilen aksiyon:** Hata koduna göre eylemli metin göster. INVALID için 'Linki eksiksiz kopyaladığınızdan emin olun ya da organizatörden yeni link isteyin'. MISMATCH için '<oturumdaki e-posta> ile giriş yaptınız; davet <maskeli e-posta> için. Çıkış yapıp doğru hesapla girin' ve [Hesap değiştir] düğmesi. Sayfayı PageShell ile sar ve 'Ana sayfa' bağlantısı ekle.
+
+**Yapılan düzeltme:** The error screen (already inside PageShell) now explains each code with a next step. INVALID shows cart.split.share.invalidHelp (copy the full link or ask the organizer for a new one), EXPIRED shows expiredHelp, and MISMATCH shows notYoursHelp next to the existing signed-in-as line and switch-account button. Network or unknown errors get a 'Sayfayı yenile' button, and the irrelevant 'Seyahatlerim' link was replaced by 'Ana sayfa' only. The masked invited email was not shown: the server does not expose it, and showing it would leak the invitee's address to another account.
 
 ## F492 — Eşit bölmede organizatör örtük olarak sayıya dahil; varsayılan 2 satır 3 kişilik bölme yapıyor ve bu açıkça söylenmiyor
 
@@ -853,13 +867,15 @@
 | Renk/tema           | Hayır                                                    |
 | Efor                | S                                                        |
 | Kaynak denetçiler   | runtime:cart                                             |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                             |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p068)                          |
 
 **Kanıt:** p5 (desktop TR, toplam ₺7.458,18): form iki katılımcı satırıyla açılıyor (satır 59-62). Her satırda '₺2.486,06', 'Sizin payınız ₺2.486,06'; yani toplam 3'e bölünüyor (satır 94: rows.length + 1). Giriş metni 'Her katılımcı kendi payını kendi kartıyla öder…' (cart.json:57) kişi sayısını ya da organizatörün dahil olduğunu söylemiyor. 9 satıra ulaşılınca '+ Katılımcı ekle' kayboluyor ve 'en fazla' ipucu yok (any max hint? null; satır 243).
 
 **Etki:** İki kişi (kendisi ve bir arkadaşı) bölüşmek isteyen kullanıcı varsayılan formu gönderince toplamı üçe bölmüş oluyor; boş e-postalı fazladan bir pay oluşuyor ve süre sonunda bu pay ona düşüyor.
 
 **Önerilen aksiyon:** Formu 'Kaç kişi ödeyecek? (siz dahil) [2]' sayacıyla başlat ve varsayılanı 1 katılımcı yap. Özet satırı 'Toplam ₺7.458,18 ÷ 3 kişi = kişi başı ₺2.486,06 (siz dahil)' olsun. Sınıra yaklaşınca 'En fazla 9 katılımcı (siz dahil 10 kişi)' ipucunu göster.
+
+**Yapılan düzeltme:** The form now opens with 1 participant row, so the default is 2 people instead of 3. A 'Kaç kişi ödeyecek? (siz dahil)' stepper (−/+ buttons with aria-disabled, an <output aria-live> such as '2 kişi') sets the people count and adds or removes rows, and it replaces the old '+ Katılımcı ekle' button. A max hint ('En fazla 9 katılımcı… (siz dahil 10 kişi)') always shows and is linked with aria-describedby, and equal mode shows a summary line 'Toplam X ÷ N kişi = kişi başı Y (siz dahil)'.
 
 ## F493 — 'Linki kopyala' geri bildirimi düğmeden uzakta, hangi satıra ait olduğu belirsiz, kalıcı ve ikinci kopyalamada duyurulmuyor; izin yoksa ham window.prompt açılıyor
 
@@ -874,13 +890,15 @@
 | Renk/tema           | Hayır                                           |
 | Efor                | S                                               |
 | Kaynak denetçiler   | runtime:cart                                    |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                    |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p068)                 |
 
 **Kanıt:** p6-split-status (desktop TR, panoya izin verildi): Katılımcı 1'in 'Linki kopyala' düğmesi y=651'de, 'Kopyalandı' metni ise panelin en altında y=788'de (137 px aşağıda) çıktı. Düğme etiketi değişmedi. 4 sn sonra metin hâlâ duruyordu, hiç temizlenmiyor. Katılımcı 2'nin linki kopyalanınca metin yine 'Kopyalandı' kaldı; aria-live içeriği değişmediği için yeniden duyurulmuyor. Pano içeriği doğru (tok-1, sonra tok-2). İzin yokken (noclip) dialog 'prompt: Linki kopyala [default=http://localhost:3000/pay/share/tok-1]' açıldı ve uygulama içi bir mesaj yok. İlgili kod: notice satır 136/170, prompt fallback satır 138.
 
 **Etki:** Organizatör hangi katılımcının linkini kopyaladığından emin olamıyor; yanlış kişiye yanlış link gönderebilir. Ekran okuyucu ikinci kopyalamada hiçbir şey duymuyor.
 
 **Önerilen aksiyon:** Geri bildirimi satır içinde ver: düğme etiketi 2 sn için 'Kopyalandı ✓' olsun ve aria-live ile 'Katılımcı 1 linki kopyalandı' duyurulsun. Bildirim zaman aşımıyla temizlensin. Fallback için prompt yerine satır içinde seçili, salt-okunur bir link alanı göster.
+
+**Yapılan düzeltme:** Copy feedback now appears inside the row: for 2 s the button reads 'Kopyalandı ✓' and its aria-label becomes '{name} için link kopyalandı'. A persistent sr-only role=status region announces the same text, is cleared before each new message so repeat copies are announced again, and auto-clears after 5 s. The window.prompt fallback is replaced by an inline read-only 'Davet linki' field that is focused and selected, with a Ctrl+C hint. The 'Davet gönderildi' notice now also re-announces and clears after a timeout.
 
 ## F590 — Bölme yöntemi radyo grubunda legend yok
 
@@ -897,13 +915,15 @@
 | Renk/tema           | Hayır                                       |
 | Efor                | S                                           |
 | Kaynak denetçiler   | area:cart, lens:a11y                        |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p068)            |
 
 **Kanıt:** 186-198 `<fieldset className="flex flex-wrap gap-4 ...">` içinde `<legend>` yok; radyolar `name="split-mode"` ('Eşit böl' / 'Özel tutarlar').
 
 **Etki:** Ekran okuyucu grubu adsız okur ('Eşit böl, radyo düğmesi, 1/2'); seçimin neyi belirlediği (bölme yöntemi) duyurulmaz.
 
 **Önerilen aksiyon:** `<legend className="text-sm font-medium text-gray-700">{t("modeLegend")}</legend>` ('Tutar nasıl bölünsün?') ekle; cart.json'a modeLegend anahtarını TR/EN ekle.
+
+**Yapılan düzeltme:** Already fixed. The split-mode fieldset already has <legend className="mb-2 w-full text-sm font-medium text-gray-700">{t("modeLegend")}</legend>, and cart.split.modeLegend already exists in both locales ('Tutar nasıl bölünsün?' / 'How should the amount be split?').
 
 ## F716 — Sepet güncellemesinde ilerleme ve sonuç (yeni fiyat/toplam) bildirilmiyor; hata metni sayfa başında kalıyor
 
@@ -920,13 +940,15 @@
 | Renk/tema           | Hayır                                                                                                                            |
 | Efor                | S                                                                                                                                |
 | Kaynak denetçiler   | area:cart                                                                                                                        |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                     |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p013)                                                                                                  |
 
 **Kanıt:** mutate() (22-33) yalnız setBusy(true); görünür 'Güncelleniyor…' yok. Yeni kalem fiyatı `f.money(item.totalMinor, cart.currency)` (133-135) ve toplam `data-testid="cart-total"` (210-212) canlı bölgede değil. Hata kutusu sayfa başında (65-69), düzenlenen kalemden uzak. 'Ödemeye geç' Link'i (216-221) busy iken de etkin.
 
 **Etki:** Oda adedini değiştiren misafir toplamın değiştiğini kaçırabilir (ekran okuyucu hiç duymaz); mobilde aşağıdaki kalemi düzenlerken üstteki hatayı görmez; PATCH bitmeden 'Ödemeye geç'e basınca checkout eski toplamla açılabilir.
 
 **Önerilen aksiyon:** Sayfaya kalıcı `<p role="status" aria-live="polite" className="sr-only">` ekle; başarıda "{property}: {n} oda — yeni toplam {total}" yaz. Kalem kartına aria-busy={pending} ve görünür 'Güncelleniyor…' metni. Hataları ilgili kalemin içinde de göster. Busy iken 'Ödemeye geç'i aria-disabled yap ve tıklamayı engelle.
+
+**Yapılan düzeltme:** Confirmed: there was no visible progress text, errors appeared only at the top, and 'Ödemeye geç' stayed active while busy. Fixes: the item row shows a visible 'Güncelleniyor…' with aria-busy; the live region announces '{name} güncellendi. Yeni toplam: {total}'; item-scoped errors render inside the row with role=alert instead of at the top; the 'Ödemeye geç' link gets aria-disabled while busy. A click during a save (including blur-triggered saves, tracked with busyRef) is deferred and continues to /checkout/cart once the save succeeds.
 
 ## F717 — Sepet, checkout ve pay sayfalarında genel gezinme ve dil değiştirici yok
 
@@ -942,13 +964,15 @@
 | Renk/tema           | Hayır                                                                                                                                                                                                    |
 | Efor                | M                                                                                                                                                                                                        |
 | Kaynak denetçiler   | area:cart                                                                                                                                                                                                |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                                                                                             |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p013)                                                                                                                                                                         |
 
 **Kanıt:** Sayfalar doğrudan `<main id="main">` döndürüyor (cart 63, checkout/cart 232, share 178). LocaleSwitcher içeren Header (Header.tsx:8, 101) ve PageShell (ui.tsx:157-179) kullanılmıyor. Share sayfasında tek çıkış 'Seyahatlerim' (162-164); organizatör kendi payını ödeyince checkout'taki durum ekranına dönüş bağlantısı yok.
 
 **Etki:** E-posta linkiyle gelen EN konuşan katılımcı dili değiştiremez; misafir sepetten ana sayfaya/hesabına dönmek için tarayıcı geri tuşuna mecbur; organizatör pay durumuna geri dönemez.
 
 **Önerilen aksiyon:** /cart'ı PageShell ile sar (Header + Footer). Checkout ve share için sade üst bar: logo → '/', LocaleSwitcher, 'Sepete dön'. Share sayfasında `share.isOrganizer` ise 'Bölünmüş ödeme durumuna dön' (/checkout/cart) bağlantısı.
+
+**Yapılan düzeltme:** /cart already uses PageShell, whose Header includes LocaleSwitcher and the main nav, plus a Footer. The share page also already uses PageShell. Two parts remain and are handed off through crossOwner: a slim shell with 'Sepete dön' for checkout/cart, and an organizer link back to /checkout/cart on the share page.
 
 ## F718 — Sepet, ödeme ve paylaşımlı ödeme sayfalarında site başlığı/navigasyon yok
 
@@ -965,13 +989,15 @@
 | Renk/tema           | Hayır                                                                                                           |
 | Efor                | S                                                                                                               |
 | Kaynak denetçiler   | lens:a11y                                                                                                       |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                    |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p013)                                                                                |
 
 **Kanıt:** cart/page.tsx:62-63 `return (<main id="main" className="mx-auto max-w-3xl px-4 py-8">` — Header/Footer yok, oysa 'Sepetim' Header.tsx:24'te ana menü öğesi; checkout/page.tsx:165-166, checkout/cart/page.tsx:231-232 ve pay/share/[token]/page.tsx:177-178 aynı. Diğer sayfalar PageShell veya Header+Footer kullanıyor.
 
 **Etki:** Misafir menüden 'Sepetim'e geçince banner landmark'ı, ana menü, dil ve tema seçimi kayboluyor; ekran okuyucu landmark gezinmesiyle siteye dönemiyor; EN kullanıcı ödeme ortasında dili değiştiremiyor.
 
 **Önerilen aksiyon:** Bu sayfaları PageShell ile sarın ya da tutarlı bir 'checkout header' (logo, 'Sepete dön', dil seçici, aynı skip link hedefi) kullanın.
+
+**Yapılan düzeltme:** cart/page.tsx no longer returns a bare <main>: every branch uses PageShell (banner, nav, language switcher, footer, the same #main skip target). checkout/page.tsx has CheckoutFrame. checkout/cart is handed off through crossOwner.
 
 ## F719 — Sepet yüklenemediğinde 'Sepetiniz boş' gösteriliyor, yeniden deneme yok
 
@@ -987,13 +1013,15 @@
 | Renk/tema           | Hayır                                                                                                           |
 | Efor                | S                                                                                                               |
 | Kaynak denetçiler   | area:cart                                                                                                       |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                    |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p013)                                                                                 |
 
 **Kanıt:** useCart hata durumunda cart null kalır (useCart.ts reload catch → setError). Sayfa hem 65-69 `{message ?? t("loadFailed")}` uyarısını hem 71 `!cart` boş durumunu ("Sepetiniz boş" + 'Süresi dolan sepeti geri yükle') birlikte gösterir; 'Tekrar dene' yok. checkout/cart/page.tsx:31 `const { cart, setCart, loading, reload } = useCart();` error'ı almaz → ağ hatasında 215-224 "Ödenecek sepet yok." gösterir.
 
 **Etki:** Ağ kesintisinde misafir sepetinin silindiğini düşünür; yeniden sepet kurmaya ya da yanlış 'geri yükle' eylemine yönelir.
 
 **Önerilen aksiyon:** `error && !cart` için ayrı hata durumu: h1 + "Sepet yüklenemedi. Bağlantınızı kontrol edin." + `<button onClick={reload}>Tekrar dene</button>`; boş durumu yalnız !error iken göster. Checkout sayfasında da error'u al ve aynı hata durumunu kullan.
+
+**Yapılan düzeltme:** Confirmed. In cart/page.tsx, `error && !cart` now renders its own error state (h1 from PageShell, an h2 'Sepet yüklenemedi', a hint to check the connection, and a 'Tekrar dene' Button wired to reload with busy). It no longer shows the empty state or the restore button. A repeated failure remounts the alert so it is announced again; on success, focus moves to the first item or the empty heading. The same change for checkout/cart, which does not read useCart's error, is handed off through crossOwner.
 
 ## F720 — Yükleme, hata ve boş durumları birbirine karışıyor (hata + 'boş', hata sonrası sonsuz 'Yükleniyor', yüklenirken 'kayıt yok')
 
@@ -1009,13 +1037,15 @@
 | Renk/tema           | Hayır                                                                                                                                                                                                 |
 | Efor                | S                                                                                                                                                                                                     |
 | Kaynak denetçiler   | lens:status                                                                                                                                                                                           |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                                                                                          |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p013)                                                                                                                                                                       |
 
 **Kanıt:** cart/page.tsx:65-74 yükleme hatasında 'Sepet yüklenemedi' ile aynı anda 'Sepetiniz boş' + 'Süresi dolan sepeti geri yükle' butonu. PasskeyManager.tsx:63 hata yazılıyor ama 117 `passkeys === null ?` → 'Yükleniyor...' kalıcı; SessionManager.tsx:63 ve 105 aynı. ComplianceDashboard.tsx:103 `const pending = notices.data ?? []` → 151 yükleme ve hata sırasında 'Bekleyen bildirim yok'. SplitPayPanel.tsx:82-83 plan okunamazsa `apply(null)` → mevcut plan varken 'Payları oluştur' formu.
 
 **Etki:** Misafir sepetinin silindiğini sanıp 'geri yükle'ye basıyor; yönetici yasal süreli bildirim kuyruğunu boş sanıyor; organizatör var olan bölünmüş ödeme planının üzerine yenisini kurmaya çalışıyor.
 
 **Önerilen aksiyon:** Her ekranda tek durum makinesi `loading | error | empty | ready`; hata varken boş durum ve 'Yükleniyor' render edilmesin. ComplianceDashboard'da `notices.data === null` için 'Yükleniyor…', hata için LoadError+retry. SplitPayPanel'de load hatasında create formu yerine 'Ödeme planı okunamadı — Tekrar dene'.
+
+**Yapılan düzeltme:** The cart page now has separate loading, error, empty and ready states, so the error no longer appears together with 'Sepetiniz boş' and the restore button. The remaining confirmed parts are handed off through crossOwner: PasskeyManager and SessionManager stay on 'Yükleniyor' forever after a load error, SplitPayPanel calls apply(null) when the load fails, and ComplianceDashboard's `notices.data ?? []` needs verifying.
 
 ## F721 — 'Süresi dolan sepeti geri yükle' herkese gösteriliyor ve sonuç olmadığında sessiz kalıyor
 
@@ -1031,13 +1061,15 @@
 | Renk/tema           | Hayır                                  |
 | Efor                | M                                      |
 | Kaynak denetçiler   | area:cart                              |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**           |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p013) |
 
 **Kanıt:** 82-91 `{!cart && (<button ... onClick={reopen}>{t("reopen")}</button>)}`: hiç sepeti olmamış, yeni ödeme yapmış (CHECKED_OUT) veya sepetini elle iptal etmiş kullanıcıya da görünür. reopenCart yalnız EXPIRED sepet arar (cart-service.ts:811-816), yoksa null döner → setCart(null) → ekran değişmez, mesaj yok. Elle iptal sonrası daha eski, ilgisiz bir EXPIRED sepeti geri getirebilir.
 
 **Etki:** Düğmeye basan misafir hiçbir şey olmadığını görür (sistemi bozuk sanır) ya da beklemediği eski bir sepet geri gelir.
 
 **Önerilen aksiyon:** GET /api/cart yanıtına `restorable: { expiredAt, itemCount } | null` ekle; düğmeyi yalnız bu varken "{date} tarihinde süresi dolan {n} odalı sepeti geri yükle" metniyle göster. Null dönerse role="status" ile "Geri yüklenecek sepet bulunamadı".
+
+**Yapılan düzeltme:** Client side: the button is no longer offered after a load error, a manual clear or an item removal. A null reopen result hides it, shows and announces 'Geri yüklenebilecek, süresi dolmuş bir sepet bulunamadı. Elle boşaltılan sepetler geri yüklenemez.', and moves focus to the empty heading. A successful reopen focuses the first item. The server-side parts are handed off through crossOwner: a `restorable {expiredAt,itemCount}` field, and a guard so reopen does not bring back an older EXPIRED cart after a manual clear or checkout.
 
 ## F722 — Başlık hiyerarşisi eksik: kalemler, toplam, boş/yükleme/hata durumları
 
@@ -1054,13 +1086,15 @@
 | Renk/tema           | Hayır                                                                                                                                                                                                                                   |
 | Efor                | S                                                                                                                                                                                                                                       |
 | Kaynak denetçiler   | area:cart                                                                                                                                                                                                                               |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                                                                                                                            |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p013)                                                                                                                                                                                                         |
 
 **Kanıt:** Kalem adı `<Link className="font-semibold text-gray-900">` (118-123) başlık değil; 'Sepet toplamı' `<span className="text-lg font-semibold">` (209); boş durum `<p className="text-lg font-semibold">{t("empty")}</p>` (73). Yükleme dallarında h1 yok (cart 52-58, checkout/cart 168-174, share 168-174); checkout noCart dalında (215-224) h1 yok; share özet bölümü başlıksız (184-208).
 
 **Etki:** Ekran okuyucu kullanıcısı başlıkla gezinerek kalemler arasında atlayamaz ve karşılaştıramaz; yükleme/boş ekranlarında sayfanın ne olduğunu başlıktan öğrenemez.
 
 **Önerilen aksiyon:** Kalem adını `<h2>` içine al (bağlantı h2 içinde); 'Sepet toplamı' ve boş durum metnini `<h2>` yap; tüm yükleme/boş/hata dallarında aynı `<h1>`'i render et; share özetine `<h2>{t("share.summary")}</h2>`.
+
+**Yapılan düzeltme:** The item name is now an h2 that wraps the link, 'Sepet toplamı' is an h2, the empty state was already an h2, and the new error state has an h2. Every branch, including loading, gets an h1 from PageShell. The heading changes needed in checkout/cart (the loading and noCart branches have no h1) and in the share page's summary are handed off through crossOwner.
 
 ## F723 — Tekrarlanan kontrollerin erişilebilir adlarında satır bağlamı yok
 
@@ -1077,13 +1111,15 @@
 | Renk/tema           | Hayır                                                                                                                                                                                                                    |
 | Efor                | S                                                                                                                                                                                                                        |
 | Kaynak denetçiler   | area:cart                                                                                                                                                                                                                |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                                                                                                             |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p013)                                                                                                                                                                                          |
 
 **Kanıt:** Her kalemde `<label>{t("item.adults")}<input .../></label>` (138-152), 'Çocuk' (153-167), 'Oda adedi' (168-182): kalem adı yok. SplitPayPanel.tsx:235 `aria-label={t("removeParticipant")}` (numarasız 'Katılımcıyı kaldır'), 336 'Linki kopyala', 341 `aria-label={t("emailLabel")}`, 354 'E-postayla gönder' her satırda aynı. Başarı ekranında her satırda 'Rezervasyonu görüntüle' (checkout/cart/page.tsx:199).
 
 **Etki:** Ekran okuyucu kontrol listesinde 3 kez 'Yetişkin, 2', 2 kez 'Linki kopyala' duyulur; yanlış kalem düzenlenir veya link yanlış kişiye gönderilir.
 
 **Önerilen aksiyon:** Kalem kartını `<fieldset aria-labelledby={titleId}>` ile grupla (başlık bağlantısına id). Split satırlarında `aria-label={t("removeParticipantN", { n: i + 1 })}`, kopyala/gönder/e-posta için `aria-describedby={rowNameId}`. Başarı listesinde bağlantıya satır metnini aria-describedby ile bağla.
+
+**Yapılan düzeltme:** Each item's Yetişkin/Çocuk/Oda adedi/Kaldır controls now sit in a role=group container labelled by the item's title, room and dates ids, so repeated fields are distinguishable. 'Kaldır' already had a contextual aria-label. SplitPayPanel already uses removeParticipantN, copyLinkFor and sendEmailFor. The success-list 'Rezervasyonu görüntüle' link in checkout/cart is handed off through crossOwner.
 
 ## F724 — Sepet: başarısız güncellemeden sonra kişi alanı sunucu değerini değil reddedilen değeri gösteriyor; toplam değişimi duyurulmuyor
 
@@ -1100,13 +1136,15 @@
 | Renk/tema           | Hayır                                                   |
 | Efor                | S                                                       |
 | Kaynak denetçiler   | lens:status                                             |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                            |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p014)                         |
 
 **Kanıt:** cart/page.tsx:145 `defaultValue={item.adults}` (kontrolsüz input), 147-150 onBlur ile PATCH; hata olursa 26-30 `setMessage(...)` + `await reload()` ama `key={item.id}` değişmediği için DOM'daki reddedilen değer kalıyor (çocuk alanı 160-165 aynı). 210-212 sepet toplamı ve 133-135 kalem tutarı canlı bölge değil; başarılı güncellemede geri bildirim yok.
 
 **Etki:** Misafir 8 yetişkin yazıp hata aldığında alan 8 göstermeye devam ediyor, fiyat eski kişi sayısında kalıyor → yanlış kişi sayısıyla ödeme riski; ekran okuyucu yeni toplamı öğrenemiyor.
 
 **Önerilen aksiyon:** Inputları kontrollü yap (yerel taslak + value) veya reload sonrası `key={`${item.id}-${item.adults}-${item.children}`}` ile yeniden mount et; hata mesajını ilgili kalemin altında aria-describedby ile bağla; toplam alanına `aria-live="polite"` ve 'Toplam güncellendi: 4.200 ₺' duyurusu.
+
+**Yapılan düzeltme:** Confirmed partly. p013 had already made the guest inputs controlled, so the rejected value no longer stays on screen, and the new total is announced in the live region. I made two more changes. After a failed save the row now re-syncs from the server value through a key built from the item's values. A row-level server error now has an id and is linked through aria-describedby to that row's guest inputs and the room-count select.
 
 ## F725 — Sepette kişi sayısı blur'da kaydediliyor ve gösterge yok; akış boyunca 4 farklı misafir kontrolü var
 
@@ -1122,13 +1160,15 @@
 | Renk/tema           | Hayır                                                                                                                                                             |
 | Efor                | M                                                                                                                                                                 |
 | Kaynak denetçiler   | lens:mobile                                                                                                                                                       |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                                                      |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p014)                                                                                                                            |
 
 **Kanıt:** cart/page.tsx:140-166'daki `type="number"` alanlar (w-20, `px-2 py-1`) değeri `onBlur`'da PATCH ediyor. Alan bazında 'kaydediliyor' ya da 'kaydedildi' göstergesi yok. :217'deki 'Ödemeye geç' bağlantısı `busy` iken de etkin; mobilde alanı düzenleyip doğrudan bağlantıya dokunmak blur'daki PATCH ile sayfa geçişini yarıştırıyor. Misafir sayısı akış boyunca dört farklı kontrolle giriliyor: SearchBar.tsx:151-213 −/+ adımlayıcı, BookingWidget.tsx:166 select (1–6, çocuk yok), sepette number input ve TripPlanner.tsx:129 number input.
 
 **Etki:** Misafir sepet toplamının güncellenip güncellenmediğini bilemiyor ve ödeme sayfası eski toplamla açılabiliyor. Her ekranda farklı bir kontrol öğrenme yükü getiriyor.
 
 **Önerilen aksiyon:** Ortak bir `<GuestStepper>` bileşeni yaz: 44px'lik −/+ düğmeleri, anında PATCH ve satırda `aria-live` ile 'Güncellendi · yeni toplam ₺…'. busy iken 'Ödemeye geç'i `aria-disabled` yap. Aynı bileşeni BookingWidget'ta ve TripPlanner'da kullan.
+
+**Yapılan düzeltme:** New shared GuestCountStepper: 44px −/+ buttons around a numeric text field, up/down arrow keys, aria-disabled at the limits or while busy, and a polite announcement of the new count. The cart uses it for adults and children. Stepper and room-count changes are saved together after 600ms in one PATCH and retried if another save is running. While a save runs the row shows 'Güncelleniyor…', then 'Kaydedildi' for 4s, and the new total is announced. 'Ödemeye geç' first saves any pending changes and waits for them to finish. Switching BookingWidget and TripPlanner to the stepper is described in crossOwner.
 
 ## F726 — Kalem veya katılımcı satırı kaldırılınca odak kayboluyor, duyuru ve geri alma yok
 
@@ -1145,13 +1185,15 @@
 | Renk/tema           | Hayır                                                                                        |
 | Efor                | M                                                                                            |
 | Kaynak denetçiler   | area:cart                                                                                    |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                 |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p014)                                                             |
 
 **Kanıt:** 183-191 'Kaldır' → remove() → mutate → setCart; `<li key={item.id}>` ve odaktaki düğme DOM'dan çıkar; onay, role="status" veya 'Geri al' yok. SplitPayPanel.tsx:230-238 `onClick={() => setRows(rows.filter((_, j) => j !== i))}` aynı şekilde odağı düşürür; satırlar 201 `key={i}` indeks anahtarlı.
 
 **Etki:** Klavye/ekran okuyucu kullanıcısı sayfadaki konumunu kaybeder. Yanlışlıkla kaldırılan oda (tarih + oda seçimi) ilan sayfasına dönüp yeniden seçilmeden geri gelmez.
 
 **Önerilen aksiyon:** Kaldırma sonrası odağı bir sonraki kalemin başlık bağlantısına (yoksa 'Sepet toplamı' başlığına) taşı. role="status" ile "{name} sepetten kaldırıldı" + 8 sn 'Geri al' (aynı verilerle POST /api/cart/items). Katılımcı satırlarında kararlı id anahtarı; kaldırınca önceki satırın e-posta alanına odak.
+
+**Yapılan düzeltme:** The cart part was already fixed by p013. remove() keeps a 'Geri al' row where the item was, moves focus to its undo button and announces '{name} sepetten kaldırıldı. Yeni toplam…' through role=status. Undo re-POSTs to /api/cart/items and puts focus back on the restored item. The SplitPayPanel participant rows belong to another owner and have since been rebuilt with a people-count stepper (p068).
 
 ## F727 — Son kullanma tarihi alanı '12/30' ile önceden dolu geliyor
 
@@ -1167,13 +1209,15 @@
 | Renk/tema           | Hayır                                                                                                                           |
 | Efor                | S                                                                                                                               |
 | Kaynak denetçiler   | area:cart                                                                                                                       |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                    |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p015)                                                                                                 |
 
 **Kanıt:** 36 `useState({ number: "", exp: "12/30", cvc: "" })`; share page:33 aynı. Alan (311-317) `autoComplete="cc-exp"` ama dolu değer tarayıcı otomatik doldurmasını bazı tarayıcılarda engeller. docs/img/v4-checkout-cart.png'de '12/30' görünüyor.
 
 **Etki:** Kendi kartıyla ödeyen misafir dolu alanı kendi verisi sanıp kontrol etmez; reddedilen ödeme ve yeniden deneme.
 
 **Önerilen aksiyon:** Varsayılanı boş bırak; placeholder="AA/YY", inputMode="numeric", maxLength={5} ekle ve '1230' girişini '12/30'a otomatik biçimle. Demo kolaylığı için test kartı metnine "Son kullanma: gelecekte herhangi bir tarih, ör. 12/30" yaz.
+
+**Yapılan düzeltme:** Confirmed: the expiry field was prefilled with '12/30'. The default is now empty, and the card inputs use the shared CardFields: the expiry field has the AA/YY label plus an expiryHint example, auto-formats '1230' to '12/30', uses inputMode numeric and maxLength 5. The e2e helper must now fill the expiry field (see testUpdates). The test-card text was not changed, because the expiry hint already gives an example.
 
 ## F728 — Tutma hatası hangi odanın müsait olmadığını ve fiyatın ne kadar değiştiğini söylemiyor
 
@@ -1190,13 +1234,15 @@
 | Renk/tema           | Hayır                                                                   |
 | Efor                | M                                                                       |
 | Kaynak denetçiler   | area:cart                                                               |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                            |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p015)                                         |
 
 **Kanıt:** 48-49 `const details = err.details as { itemId?: string } | undefined; if (err.status === 409 && details?.itemId) return t("checkout.itemUnavailable");`: itemId elde var ama metin "Sepetteki odalardan biri artık müsait değil; hiçbir oda tutulmadı." (tr cart.json:43). PRICE_CHANGED için "Fiyat değişti. Yeni toplamı kontrol edip tekrar deneyin." (tr:42); eski/yeni tutar veya değişen kalem gösterilmiyor, özet listesi (237-249) değişeni vurgulamıyor.
 
 **Etki:** Birden çok odalı misafir hangi kalemi kaldıracağını tahmin etmek zorunda; fiyat farkını kendisi hesaplamalı (para toleransı çok düşük).
 
 **Önerilen aksiyon:** itemId ile `cart.items.find(...)` → "{propertyTitle} – {roomTypeName} ({tarihler}) artık müsait değil. Bu odayı kaldırıp diğerlerini tutabilirsiniz." + `/cart#item-{id}` bağlantısı. PRICE_CHANGED'de önceki toplamı state'te tut, "Toplam {eski} → {yeni}" göster ve değişen satıra görünür 'Fiyat güncellendi' etiketi ekle.
+
+**Yapılan düzeltme:** Unavailable room: the message now names the room and dates and says it can be removed (removal works in place, see F489). PRICE_CHANGED: the details.items {itemId, previousTotal, currentTotal} are kept in state. The alert reads 'toplam {eski} → {yeni}', and each changed row gets a visible 'Fiyat güncellendi: {eski} → {yeni}' label until the next hold attempt.
 
 ## F729 — Sepet ödemesinde olumlu bilgi mesajı ('Ödemeniz alındı…') kırmızı hata kutusunda ve role=alert ile gösteriliyor
 
@@ -1213,13 +1259,15 @@
 | Renk/tema           | Hayır                                                                                                                             |
 | Efor                | S                                                                                                                                 |
 | Kaynak denetçiler   | lens:consistency                                                                                                                  |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                      |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p015)                                                                                                  |
 
 **Kanıt:** checkout/cart/page.tsx:79 `setMessage(t("checkout.confirmPending"))` (cart.json:47 "Ödemeniz alındı; rezervasyon onayı birkaç saniye içinde tamamlanacak…") ile hata mesajları aynı `message` durumunu paylaşıyor ve :261'de `<div role="alert" className="… bg-red-50 … text-red-700">` olarak gösteriliyor. Başka yerlerde başarı ve bilgi ayrı tutuluyor: BookingActions.tsx:363-368 `role={message.kind === "error" ? "alert" : "status"}`, AuthCard Notice `kind`, ui.tsx:144-155 Status error/message.
 
 **Etki:** Ödemesi başarıyla alınan misafir kırmızı bir uyarı görür ve ekran okuyucu bunu acil hata olarak okur. Kullanıcı ödemenin başarısız olduğunu sanıp tekrar ödemeye çalışabilir. Bu, para hatası riski taşır.
 
 **Önerilen aksiyon:** `message` durumunu `{ kind: "error" | "info", text }` yapısına çevirin ve gösterimde ui.tsx Status (error/message) ya da Notice kullanın. confirmPending `role="status"` ile ve 'yenile' düğmesiyle (reload) birlikte gösterilsin.
+
+**Yapılan düzeltme:** Already handled: confirmPending is shown through the separate `notice` state in role=status gray text (finish(): setNotice(t('checkout.confirmPending'))), not in the red alert. As a small refinement, statusRegion no longer nests role=alert inside an aria-live wrapper. Errors use a conditional role=alert, and notices use a role=status region that is always mounted.
 
 ## F730 — Başarılı ödemeden sonraki sepet okuması hata verirse kullanıcıya 'Ödeme başarısız' deniyor
 
@@ -1235,13 +1283,15 @@
 | Renk/tema           | Hayır                                                                            |
 | Efor                | S                                                                                |
 | Kaynak denetçiler   | area:cart                                                                        |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                     |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p015)                                                  |
 
 **Kanıt:** finish() confirmed dalı: 83-84 `const res = await apiFetch<{ cart: CartDTO }>(`/api/cart/${outcome.cartId}`); setDone(...)`. finish pay() içindeki try'da çağrılıyor (119-127); bu GET ağ hatası verirse catch → payFailed(err) → `setMessage(err instanceof ApiError ? err.message : tp("failed"))` ("Ödeme başarısız") ve 96 `setPayKey(newKey())`.
 
 **Etki:** Tahsilatı yapılmış misafire 'Ödeme başarısız' gösterilir; yeni idempotency anahtarıyla tekrar dener ve ham sunucu hatası alır. Güven kaybı ve destek talebi.
 
 **Önerilen aksiyon:** Confirmed dalındaki GET'i ayrı try/catch'e al; başarısızsa done ekranını outcome verisiyle (amount, currency, bookingIds) göster, rezervasyon bağlantılarını bookingIds'ten `/booking/${id}` olarak üret. payFailed'i yalnız pay/confirm POST hatalarında çağır.
+
+**Yapılan düzeltme:** The confirmed branch already had the cart GET in its own try/catch, so payFailed is not reached when that GET fails. To finish the fix, when the fallback cart has no bookingIds, the success screen now builds 'Rezervasyonu görüntüle' links from outcome.bookingIds as /booking/:id. Each per-item link also gets aria-describedby pointing to its item text.
 
 ## F731 — Kart alanı hataları alana bağlanmıyor; biçim hatası 'süresi geçmiş' diye raporlanıyor
 
@@ -1258,13 +1308,15 @@
 | Renk/tema           | Hayır                                                                                                                                                                                                                 |
 | Efor                | M                                                                                                                                                                                                                     |
 | Kaynak denetçiler   | area:cart                                                                                                                                                                                                             |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                                                                                                          |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p015)                                                                                                                                                                                       |
 
 **Kanıt:** 106 `const [mm, yy] = card.exp.split("/").map((v) => Number(v.trim()));`: '1230' girilirse mm=1230 → tokenizeCard "Kartın son kullanma tarihi geçmiş" fırlatır (card-token.ts:61-63); '12/2030' → expYear 4030 kabul edilir. Hata sayfa üstündeki genel kutuda (259-265); input'larda aria-invalid/aria-describedby yok, odak alana taşınmaz. Kart numarasında maxLength/gruplama yok; CVC açıklanmıyor; 3DS kod alanında (389-396) maxLength/pattern yok. Share page:111-120 ve 240-273 aynı. ui.tsx'teki Field bileşeni (aria-describedby + aria-invalid) kullanılmıyor.
 
 **Etki:** Biçimi yanlış giren misafir kartının süresi dolmuş sanır; ekran okuyucu kullanıcısı hatalı alanı bulmak için formu baştan gezmek zorunda kalır.
 
 **Önerilen aksiyon:** ui.tsx Field bileşenini kullan. Doğrulamayı alan bazına böl: INVALID_EXPIRY_FORMAT → "AA/YY biçiminde girin, ör. 08/27"; ilk hatalı alana focus(). Kart numarasına maxLength={23} ve 4'lü gruplama; CVC'ye maxLength={4} + ipucu "Kartın arkasındaki 3 haneli kod"; 3DS alanına maxLength={6} pattern="\d{6}".
+
+**Yapılan düzeltme:** The card inputs now use CardFields (ui Field, so aria-invalid and aria-describedby are set, plus maxLength 23/5/4). tokenizeCardFields replaces split('/'), so a wrongly formatted expiry gives payment.errors.EXPIRY_FORMAT on the expiry field instead of 'expired'. Number, CVC and expiry errors appear under their own field, and focusFirstInvalid moves focus there. The 3DS code field now uses Field and inputClass, with maxLength 6 and digits only.
 
 ## F732 — Başarı ekranı kalıcı değil; split tamamlanınca organizatöre onay/rezervasyon bağlantısı gösterilmiyor
 
@@ -1280,13 +1332,15 @@
 | Renk/tema           | Hayır                                                                                                                |
 | Efor                | M                                                                                                                    |
 | Kaynak denetçiler   | area:cart                                                                                                            |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                         |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p015)                                                                               |
 
 **Kanıt:** Başarı yalnız istemci state'inde: 40-43 `const [done, setDone] = useState<...>(null)`; 176 `if (done)`. Yenileme/geri gelişte sepet CHECKED_OUT → 215-224 "Ödenecek sepet yok."; /cart'ta "Sepetiniz boş" + 'Süresi dolan sepeti geri yükle' (cart/page.tsx:71-91). Split'te tüm paylar gelince panel yalnız `t(`planStatus.${plan.status}`)` metnini gösterir (SplitPayPanel.tsx:280), yönlendirme/bağlantı yok. Başarı listesinde (185-204) rezervasyon numarası ve 'onay e-postası gönderildi' bilgisi yok.
 
 **Etki:** Sekmeyi yenileyen veya sonra dönen misafir rezervasyonunun yapıldığını bu sayfalardan doğrulayamaz; split organizatörü işlemin tamamlandığını ve rezervasyon bağlantılarını görmez.
 
 **Önerilen aksiyon:** Onaydan sonra kalıcı URL'ye yönlendir (ör. /checkout/cart/done?cart=<id>, GET /api/cart/:id ile render). noCart dalında son CHECKED_OUT sepet varsa "Bu sepet {date} tarihinde ödendi — Rezervasyonlarımı gör" göster. SETTLED planda panelde rezervasyon bağlantıları ve 'Seyahatlerim' düğmesi. Başarı satırlarına rezervasyon kodu ve 'Onay e-postası {email} adresine gönderildi' satırı.
+
+**Yapılan düzeltme:** The success screen now survives refresh: on confirm it writes ?paid=<cartId> with history.replaceState, and on load it restores the done screen from GET /api/cart/:id when the cart is CHECKED_OUT. When the split plan becomes SETTLED (via onPlan), the organizer gets the same done screen with booking links and a split-specific message. The no-cart state now points to Seyahatlerim. Not done: a booking code and a 'confirmation email sent to {email}' line, because there is no booking-code field and no cart confirmation email to back that claim.
 
 ## F733 — Ödeme öncesi özette misafir sayısı ve gece sayısı yok; tek oda checkout'uyla tutarsız düzen
 
@@ -1302,13 +1356,15 @@
 | Renk/tema           | Hayır                                                                             |
 | Efor                | S                                                                                 |
 | Kaynak denetçiler   | area:cart                                                                         |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                      |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p015)                                                   |
 
 **Kanıt:** 241-242 `{item.propertyTitle} · {item.roomTypeName} × {item.quantity} · {f.date(item.checkIn, "medium")} → {f.date(item.checkOut, "medium")}`: adults/children/nights yok, tek satır birleştirilmiş metin. Tek oda checkout'u aynı bilgiyi `<dl>` ile ve 'Misafir' satırıyla veriyor (src/app/checkout/page.tsx:172-202). Share page:186-191 da misafir/gece içermiyor.
 
 **Etki:** Misafir ödeme anında yetişkin/çocuk sayısını doğrulayamaz; sepette yanlış kalan değer (bkz. kontrolsüz alan bulgusu) fark edilmeden ödenir.
 
 **Önerilen aksiyon:** Her kalemi `<dl>` ile yapılandır: Tesis, Oda × adet ('2 oda'), Tarihler (n gece), Misafirler ('2 yetişkin, 1 çocuk'), Tutar; tek oda checkout'uyla aynı düzen ve sınıflar.
+
+**Yapılan düzeltme:** Each summary row is now a <dl> in the same layout and classes as the single-room checkout: Konaklama, Oda (name · 'n oda'), Giriş–Çıkış (with 'n gece'), Misafir ('2 yetişkin, 1 çocuk'), and Tutar. It reuses the checkout namespace labels and adds new cart.checkout.roomCount, guestsValue and itemTotal keys.
 
 ## F734 — İki aşamalı süreç (odaları tut → öde) önceden anlatılmıyor; adım göstergesi yok
 
@@ -1324,13 +1380,15 @@
 | Renk/tema           | Hayır                                                                                   |
 | Efor                | M                                                                                       |
 | Kaynak denetçiler   | area:cart                                                                               |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                            |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p016)                                                         |
 
 **Kanıt:** Sepetteki 'Ödemeye geç' (cart/page.tsx:216-221, tr:11) ödeme yerine 'Odaları tut' adımına götürüyor (267-283). holdHint "Ödemeden önce tüm odalar birlikte tutulur (tümü ya da hiçbiri)." (tr:40) tutmanın 15 dk sürdüğünü, bu adımda ücret alınmadığını ve ardından kart isteneceğini söylemiyor. Sayfada adım göstergesi yok.
 
 **Etki:** Düşük okuryazarlıklı misafir 'Odaları tut'un ödeme olup olmadığını, para çekilip çekilmediğini bilmez; süreli olduğunu öğrenmeden başlatır.
 
 **Önerilen aksiyon:** h1 altına `<ol aria-label="Adımlar">` göstergesi (1 Odaları ayırt · 2 Ödeme · 3 Onay; geçerli adımda aria-current="step"). holdHint → "Odaları 15 dakika sizin için ayırırız; bu adımda ücret alınmaz. Ardından kart bilgilerinizi girersiniz.". Sepetteki düğme → 'Rezervasyona devam et'.
+
+**Yapılan düzeltme:** Confirmed. p015 had already added a 2-step list. It now has 3 steps (Odaları tut · Ödeme · Onay), with aria-current="step" on the current one: 3 while confirmation is pending, and the done screen also shows the list with step 3 current. holdHint now says the rooms are held for a limited time, nothing is charged at this step, and the end time appears in the next step. I didn't write "15 dakika" because the duration comes from the configurable CART_HOLD_TTL_MINUTES setting. The cart button text (cart.proceed) changes to "Rezervasyona devam et"; its only usage is src/app/cart/page.tsx.
 
 ## F735 — Doğrulanmış e-posta şartı (tutma ve bölme) eylemden önce belirtilmiyor
 
@@ -1346,13 +1404,15 @@
 | Renk/tema           | Hayır                                                                                                                                |
 | Efor                | M                                                                                                                                    |
 | Kaynak denetçiler   | area:cart                                                                                                                            |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                         |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p016)                                                                                                      |
 
 **Kanıt:** 'Odaları tut' (270-278) koşulsuz etkin; sunucu `requireVerifiedEmail(req)` (src/app/api/cart/[id]/hold/route.ts:15) ile reddediyor ve holdError (45-51) bu kodu ele almadığından `err.message` ham gösteriliyor. Split oluşturma da `requireVerifiedEmail` (src/app/api/cart/[id]/split/route.ts:24) istiyor; form (SplitPayPanel.tsx:174-268) bunu söylemiyor.
 
 **Etki:** E-postasını doğrulamamış misafir sepeti hazırlayıp formu doldurduktan sonra engellenir ve sonraki adımı bilmez.
 
 **Önerilen aksiyon:** Sayfa yüklenirken oturumdaki emailVerified bilgisini al; doğrulanmamışsa 'Odaları tut' ve 'Payları oluştur' üstünde "Devam etmek için e-postanızı doğrulayın" kutusu + 'Doğrulama e-postası gönder' düğmesi; düğmeleri aria-disabled yap. EMAIL_NOT_VERIFIED kodunu çevrilmiş metne eşle.
+
+**Yapılan düzeltme:** Confirmed. On load the page calls fetchCurrentUser(). If emailVerified is false, an amber box (checkout.verifyEmailFirst) appears above 'Odaları tut' with a resend-verification button (POST /api/auth/verify-email/resend, reusing the split.share.* keys) and a refresh button. The hold button gets aria-disabled plus aria-describedby pointing at the box, and clicking it moves focus to the box. A server EMAIL_NOT_VERIFIED response turns on the same box instead of showing raw text. The split panel only appears after a successful hold, and holding already requires a verified email, so 'Payları oluştur' can't be reached unverified.
 
 ## F736 — Tek ödeme ve grupla bölme formları seçim yapısı olmadan alt alta sunuluyor
 
@@ -1368,13 +1428,15 @@
 | Renk/tema           | Hayır                                                                 |
 | Efor                | M                                                                     |
 | Kaynak denetçiler   | area:cart                                                             |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                          |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p016)                                       |
 
 **Kanıt:** 285-357 ödeme formu ('Öde ve onayla · ₺9.794,92') ve hemen ardından 359-367 SplitPayPanel oluşturma formu ('Payları oluştur') aynı anda; araya 'Tutmayı bırak' (348-355) giriyor. messages/tr/cart.json:101 `"or": "ya da"` tanımlı ama hiçbir bileşende kullanılmıyor. docs/img/v4-checkout-cart.png'de split formu ekranın altında kalıyor.
 
 **Etki:** Misafir iki formun birbirini dışladığını anlamaz; bölmek isterken kartını ilk forma girer ya da kıvrım altındaki split seçeneğini hiç görmez.
 
 **Önerilen aksiyon:** Ödeme yöntemi seçimini başa al: `<fieldset><legend>Nasıl ödemek istersiniz?</legend>` + iki radyo ('Tamamını ben ödeyeceğim' / 'Grupla bölüşeceğiz') ve seçime göre ilgili formu göster. En azından iki form arasına `t("split.or")` ayırıcısı ve ödeme formunun başına split bölümüne atlayan bağlantı ekle.
+
+**Yapılan düzeltme:** p015 had only done the minimum: the 'ya da' separator and a link to the split section. These are replaced by a fieldset (legend 'Nasıl ödemek istersiniz?') with two radios, 'Tamamını ben ödeyeceğim' (the default) and 'Grupla bölüşeceğiz', and only the chosen form is shown. SplitPayPanel stays mounted but `hidden` while the card option is selected, so an existing split plan still loads. An active plan switches the choice to split, so the panel stays visible if that plan is later aborted.
 
 ## F737 — 3D Secure adımında vazgeçme / farklı kartla deneme yolu yok
 
@@ -1390,13 +1452,15 @@
 | Renk/tema           | Hayır                                        |
 | Efor                | S                                            |
 | Kaynak denetçiler   | area:cart                                    |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                 |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p016)              |
 
 **Kanıt:** 379-406 3DS formunda yalnız 'Doğrula' gönder düğmesi var; setChallenge(null) yalnız başarı/hata sonrası çağrılıyor. Kart formu ve 'Tutmayı bırak' bu adımda gizli (285 ve 359 `!challenge`). Share page:294-321 aynı.
 
 **Etki:** Kod gelmeyen veya yanlış kart girdiğini fark eden misafirin çıkış yolu yok; yalnız sayfayı yenilemek (sonucu belirsiz) kalıyor.
 
 **Önerilen aksiyon:** 3DS formuna ikincil 'Farklı kartla dene' düğmesi (`setChallenge(null); setCode(""); setPayKey(newKey())`) ve 'Kod gelmedi mi?' yardım metni ekle; checkout'ta bu adımda da 'Tutmayı bırak' bağlantısını (onaylı) göster.
+
+**Yapılan düzeltme:** Confirmed. The 3DS form now has a 'Kod gelmedi mi?' help text (checkout.threeDsNoCode) and a secondary 'Geri dön, başka kart kullan' button (payment.threeDsBack). The button clears the challenge and code, makes a new payKey, and returns to the card form; the server accepts a new payment attempt while one is waiting for 3DS. 'Tutmayı bırak' (still behind the confirm dialog) and 'Sepete dön' now also show during the challenge. A successful release clears the challenge state so it can't come back stale.
 
 ## F738 — Ödeme deneme sınırı önceden bildirilmiyor, kilitlenme mesajı çevrilmiyor
 
@@ -1412,13 +1476,15 @@
 | Renk/tema           | Hayır                                                                           |
 | Efor                | M                                                                               |
 | Kaynak denetçiler   | area:cart                                                                       |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                    |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p028)                                          |
 
 **Kanıt:** errorText switch'i (44-63) PAYMENT_ATTEMPTS_EXCEEDED'i ele almaz → `default: return err.message;` ham TR metin "Çok fazla başarısız ödeme denemesi. Bu pay için ödeme kapatıldı." (split-payment.ts:622-633). Kalan hak sayısı hiçbir yerde gösterilmiyor. Checkout payFailed (87-98) aynı.
 
 **Etki:** Kartı reddedilen katılımcı birkaç denemeden sonra uyarısız kilitlenir ve ne yapacağını bilmez.
 
 **Önerilen aksiyon:** Ret mesajına "Kalan deneme: {n}" ekle (sunucu details.attemptsLeft döndürsün); son hakta uyarı. PAYMENT_ATTEMPTS_EXCEEDED için çevrilmiş metin + "{minutes} dk sonra tekrar deneyin veya organizatörden yeni link isteyin".
+
+**Yapılan düzeltme:** Confirmed: PAYMENT_ATTEMPTS_EXCEEDED fell through to raw TR err.message. It now maps to the translated share.attemptsExceeded message, and the card form closes (locked state) with a home link. When the server sends details.attemptsLeft, the decline message appends share.attemptsLeft, which has a last-attempt warning at =1; attemptsLeft 0 also locks. The server does not send attemptsLeft yet, so split-payment.ts needs a change (see crossOwner). No '{minutes}' value is shown because the window is 24h and is not in the error details.
 
 ## F739 — Pay linki hata durumlarında kurtarma eylemi sunulmuyor
 
@@ -1435,13 +1501,15 @@
 | Renk/tema           | Hayır                                    |
 | Efor                | M                                        |
 | Kaynak denetçiler   | area:cart                                |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**             |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p028)          |
 
 **Kanıt:** 155-167 loadError dalı yalnız hata metni + 'Seyahatlerim' bağlantısı. "Bu ödeme linki başka bir kişiye gönderildi." (tr cart.json:107) hesap değiştirme yolu sunmaz; "Ödeme yapmak için e-posta adresinizi doğrulayın." (tr:108) için doğrulama e-postasını yeniden gönderme düğmesi yok; expired/invalid (tr:105-106) organizatörden yeni link istemeyi önermez.
 
 **Etki:** Yanlış hesapla girmiş veya e-postası doğrulanmamış katılımcı ödemeyi tamamlayamaz ve ne yapacağını bilemez.
 
 **Önerilen aksiyon:** Koda göre eylem: SHARE_EMAIL_MISMATCH → "Davetin gönderildiği e-postayla giriş yapın" + 'Çıkış yap ve farklı hesapla gir' (logout → /login?redirect=…); EMAIL_NOT_VERIFIED → 'Doğrulama e-postasını yeniden gönder'; EXPIRED/INVALID → "{organizer} kişisinden yeni link isteyin". 'Seyahatlerim' yerine 'Ana sayfa'.
+
+**Yapılan düzeltme:** Confirmed partly: resend verification and switch account already existed. Added recovery text for INVALID and EXPIRED (ask the organizer for a new link; the organizer name is unknown on a load error), a notYoursHelp line for MISMATCH, and a refresh button for network errors. The error and closed states now offer 'Ana sayfa' instead of 'Seyahatlerim'.
 
 ## F740 — Katılımcıya ödeme öncesi provizyon mantığı ve başarısızlık sonucu anlatılmıyor; son ödeme bilgisi en düşük vurguda
 
@@ -1457,13 +1525,15 @@
 | Renk/tema           | Hayır                                                                     |
 | Efor                | S                                                                         |
 | Kaynak denetçiler   | area:cart                                                                 |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                              |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p028)                                           |
 
 **Kanıt:** 205-207 `<p className="mt-2 text-xs text-gray-500">{t(`status.${share.status}`)} · {t("deadline", ...)}</p>`: son ödeme en küçük ve gri metinde. "Payınız alındı. Tüm paylar ödenince ... kartınızdan tahsil edilecek." açıklaması (tr cart.json:113) yalnız ödeme sonrası (216-225) gösteriliyor; diğerleri ödemezse provizyonun iptal edileceği hiç söylenmiyor.
 
 **Etki:** Katılımcı kartından hemen para çekileceğini sanabilir ya da bloke tutarın ne zaman serbest kalacağını bilmez; son ödeme saatini kaçırır.
 
 **Önerilen aksiyon:** Ödeme formunun üstüne aria-describedby ile bağlı bilgi: "Kartınızdan şimdi {amount} için provizyon alınır; tüm paylar {deadline} saatine kadar ödenirse tahsil edilir, ödenmezse provizyon iptal edilir." Son ödeme satırını text-sm, saat ikonu ve göreli süreyle ayrı satıra taşı (renk değiştirmeden).
+
+**Yapılan düzeltme:** Confirmed. Added a share.payInfo paragraph at the top of the pay form explaining the pre-authorization: the amount is only reserved now, charged when all shares are in, and released otherwise. The submit button references it via aria-describedby. The deadline moved out of the text-xs gray status line into its own text-sm font-semibold row with an aria-hidden clock icon and a relative 'N dakika kaldı' (deadlineLeft), refreshed every 30s while payable. Only existing color classes are used.
 
 ## F741 — Bölünmüş ödeme paneli yüklenirken ve yükleme hatasında plan yokmuş gibi davranıyor
 
@@ -1479,13 +1549,15 @@
 | Renk/tema           | Hayır                                                                                                                                                       |
 | Efor                | S                                                                                                                                                           |
 | Kaynak denetçiler   | area:cart                                                                                                                                                   |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                                                |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p068)                                                                                                                      |
 
 **Kanıt:** 82-84 `} catch { apply(null); }` ve 160 `if (!loaded) return null;`. Checkout'ta `splitActive` (page.tsx:229) panel yüklenene kadar false → aktif plan varken tek ödeme formu (285) görünür; hata durumunda kalıcı olarak hem tek ödeme formu hem 'Ödemeyi grupla bölüş' oluşturma formu çıkar. Sunucu tam ödemeyi "Bu sepet için bölünmüş ödeme başlatıldı" (cart-payment.ts:197) ile reddeder; ham mesaj gösterilir. /cart'ta panel sessizce kaybolur.
 
 **Etki:** Organizatör, katılımcılar öderken tüm tutarı kendi kartıyla ödemeye ya da ikinci plan kurmaya çalışır; bilgi neden kaybolduğunu anlamaz.
 
 **Önerilen aksiyon:** loaded=false iken paneli aria-busy="true" iskeletle göster ve checkout'ta onPlan sonucu gelene kadar ödeme formunu render etme. Hata durumunda panelde role="alert" "Bölünmüş ödeme durumu alınamadı" + 'Tekrar dene'; bu durumda create formunu ve tek ödeme formunu gösterme.
+
+**Yapılan düzeltme:** Panel side is done. A new loadState ('loading'\|'ready'\|'error') controls the panel: with allowCreate it shows an aria-busy skeleton while loading. If the first read fails, it shows a role=alert 'Bölünmüş ödeme durumu alınamadı' with a 'Tekrar dene' button (also on /cart) and no create form. Failed background refreshes keep the last plan and show a 'may be out of date' note. I added an optional onLoadState prop and exported the SplitLoadState type. Still needed: the checkout page has to hide the single-payment form until the state is 'ready' (see crossOwner).
 
 ## F742 — Organizatörün pay durum listesi kendiliğinden güncellenmiyor
 
@@ -1501,13 +1573,15 @@
 | Renk/tema           | Hayır                                           |
 | Efor                | S                                               |
 | Kaynak denetçiler   | area:cart                                       |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                    |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p068)                 |
 
 **Kanıt:** 89-92 `useEffect(() => { const timer = setTimeout(() => void load(), 0); ... }, [load]);` yalnız ilk yüklemede çalışır. Yoklama, visibilitychange yenilemesi veya 'Yenile' düğmesi yok; "{funded} / {total} ödendi" (292-297) ve durum çipleri (313-317) bayat kalır.
 
 **Etki:** 60 dk son ödeme süresi içinde organizatör kimin ödediğini görmek için sayfayı elle yenilemek zorundadır; FALLBACK geçişini (kalanı kendisinin ödemesi gerektiğini) kaçırabilir.
 
 **Önerilen aksiyon:** Plan COLLECTING/FALLBACK iken document.visibilityState === "visible" ise 15 sn'de bir load(); visibilitychange'te yenile. Başlık yanına 'Son güncelleme {time}' ve 'Yenile' düğmesi. Durum değişince role="status" ile "{email} payını ödedi" duyurusu.
+
+**Yapılan düzeltme:** While the plan is COLLECTING or FALLBACK, the panel re-reads the plan every 15 s when the tab is visible and right away on visibilitychange. The heading row shows 'Son güncelleme: HH:MM' and a 'Yenile' button; a manual refresh is announced through the sr-only status region. Changes are shown in a persistent aria-live region ('{name} payını ödedi (2/3 pay ödendi).', 'Durum değişti: …'). onPlan/onLoadState are kept in a ref so the load callback stays stable even when a parent passes inline callbacks.
 
 ## F743 — İptal edilmiş plandan sonra yeniden grupla bölme imkânı yok
 
@@ -1523,13 +1597,15 @@
 | Renk/tema           | Hayır                                                                         |
 | Efor                | S                                                                             |
 | Kaynak denetçiler   | area:cart                                                                     |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                  |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p068)                                               |
 
 **Kanıt:** Oluşturma formu yalnız 174 `if (!plan)` iken. GET split `currentPlanFor` aktif plan yoksa en son ABORTED planı döndürür (split-payment.ts:231-239 `plans.find((p) => p.status !== SplitPlanStatus.ABORTED) ?? plans[0]`). Ret veya 'Tutmayı bırak' sonrası sepet yeniden tutulduğunda panel "İptal edildi — ödemeler iade edildi" listesini gösterir; yeni plan düğmesi yok. splitActive false olduğundan (page.tsx:229) tek ödeme formu yanında görünür.
 
 **Etki:** Organizatör grupla bölme seçeneğini o sepet için kalıcı olarak kaybeder; iade edilmiş pay listesini güncel durum sanabilir.
 
 **Önerilen aksiyon:** plan.status === "ABORTED" ise listeyi daraltılabilir 'Önceki bölme iptal edildi ({date})' özetine çevir ve altında oluşturma formunu (allowCreate true ise) göster; ya da 'Yeniden böl' düğmesiyle setPlan(null).
+
+**Yapılan düzeltme:** When the latest plan is ABORTED, the panel shows a compact summary ('Önceki bölme iptal edildi; yapılan ödemeler iade edildi.') with the old shares inside a collapsed <details> ('Önceki payları göster'). With allowCreate, the create form appears below it. I confirmed the server allows a new plan after ABORTED: the unique index covers only active plans and FAILED payments count as open. On /cart only the collapsed summary is shown.
 
 ## F744 — Arka planda değişen durumlar (bölünmüş ödeme payları, KYC 'beklemede', talep yazışmaları) otomatik güncellenmiyor
 
@@ -1546,13 +1622,15 @@
 | Renk/tema           | Hayır                                                                                                |
 | Efor                | M                                                                                                    |
 | Kaynak denetçiler   | lens:status                                                                                          |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                         |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p068)                                                               |
 
 **Kanıt:** SplitPayPanel.tsx:76-92 plan yalnız mount'ta okunuyor; 292-297 '{funded} / {total} ödendi' ve pay rozetleri (313-317) katılımcı ödedikçe değişmiyor. IdentityVerification.tsx:88 PENDING'de tek okuma. ClaimDetail.tsx:33-36 karşı tarafın yanıtını ancak sayfa yenilenince gösteriyor.
 
 **Etki:** Grup organizatörü son ödeme saati baskısı altında katılımcıların ödeyip ödemediğini görmek için sürekli sayfayı yeniliyor; ev sahibi KYC sonucunu kaçırıyor.
 
 **Önerilen aksiyon:** Görünür sekmede (document.visibilityState) 15–30 sn aralıklı yoklama veya SSE; değişiklikte role=status kısa duyuru ('Katılımcı 2 payını ödedi — 2/3'); 'Güncellendi 14:05' damgası ve elle 'Yenile' butonu.
+
+**Yapılan düzeltme:** SplitPayPanel part is done: the same polling, refresh button, 'Son güncelleme' stamp and live change announcements as F742. IdentityVerification.tsx and ClaimDetail.tsx belong to other owners and are listed in crossOwner.
 
 ## F745 — Pay satırındaki e-posta alanının görünür etiketi yalnız placeholder; 'isteğe bağlı' ifadesi çelişkili
 
@@ -1569,13 +1647,15 @@
 | Renk/tema           | Hayır                                       |
 | Efor                | S                                           |
 | Kaynak denetçiler   | area:cart                                   |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p068)             |
 
 **Kanıt:** 339-346 `<input type="email" aria-label={t("emailLabel")} placeholder={t("emailLabel")} className="w-48 ..." />`: yazmaya başlayınca görünür etiket kaybolur. Etiket "E-posta (isteğe bağlı)" (tr cart.json:61) ama yandaki 'E-postayla gönder' alan boşken disabled (350). Alan+düğme form içinde değil, Enter ile gönderilmez.
 
 **Etki:** Kullanıcı yazarken alanın amacını unutabilir; 'isteğe bağlı' denip gönderim için zorunlu olması kafa karıştırır.
 
 **Önerilen aksiyon:** Görünür `<label>` ekle; bu bağlam için yeni anahtar `inviteEmailLabel` ('Davet e-postası'); placeholder 'ornek@eposta.com'. Alan + düğmeyi küçük bir `<form onSubmit>` içine al (Enter ile gönderim).
+
+**Yapılan düzeltme:** The visible 'Davet e-postası' label already existed, and is now tied to the input with htmlFor. Changes: added the placeholder 'ornek@eposta.com' / 'name@example.com'; wrapped the field and 'E-postayla gönder' in a small <form onSubmit> so Enter sends; and stopped disabling the button when the field is empty. Submitting with no email now shows an inline error (existing errors.SHARE_EMAIL_REQUIRED) with aria-invalid and aria-describedby, and moves focus to the field.
 
 ## F1099 — Mobilde sepet kontrolleri 44px önerisinin altında (alanlar 30px, 'Kaldır' 28px, 'Sepete dön' 20px)
 
@@ -1591,13 +1671,15 @@
 | Renk/tema           | Hayır                                                                     |
 | Efor                | S                                                                         |
 | Kaynak denetçiler   | runtime:cart                                                              |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                              |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p014)                                    |
 
 **Kanıt:** p11 (mobil 390, TR) boyutları: Yetişkin ve Çocuk input 80x30, Oda adedi select 80x31, 'Kaldır' 61x28, kalem başlık bağlantısı 223x21. Sweep 069 için targetsLt44Count=5. 071 /checkout/cart'ta 'Sepete dön' 70x20. p5: bölüşme '×' düğmesi 24x28, '+ Katılımcı ekle' 98x24. p6: 'Linki kopyala' 109x30, durum listesi e-posta alanı 192x30. WCAG 2.5.8 için 24px ya da boşluk koşulu sağlanıyor, yani AA ihlali değil.
 
 **Etki:** Mobil ağırlıklı misafirlerde yanlış dokunma riski var; özellikle 'Kaldır' ve onaysız silme birleşince bu risk büyüyor.
 
 **Önerilen aksiyon:** Mobilde input sınıfını py-2.5 ve min-h-11 yap (cart/page.tsx:11-12). 'Kaldır', '×', 'Sepete dön' ve '+ Katılımcı ekle' için min-h-11 ve yeterli yatay dolgu ver. Kişi sayıları için 44px −/+ stepper kullan.
+
+**Yapılan düzeltme:** On /cart, guest fields and the room-count select are now h-11 (44px) at every width, with text-base on mobile so iOS does not zoom. The −/+ buttons are 44x44. I removed sm:min-h-0 so 'Kaldır' and the release button stay 44px on every screen size, and 'Kaldır' moved to mt-6 to line up with the fields. The 'Sepete dön' links on /checkout/cart are another owner's file (see crossOwner). The SplitPayPanel controls have been reworked by their owner.
 
 ## F1100 — Oda adedi seçimi 5 ile sınırlı ama API 10'a izin veriyor; sınır açıklanmıyor
 
@@ -1613,13 +1695,15 @@
 | Renk/tema           | Hayır                                  |
 | Efor                | S                                      |
 | Kaynak denetçiler   | runtime:cart                           |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**           |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p014)        |
 
 **Kanıt:** p3: oda adedi seçenekleri ['1','2','3','4','5'] ([1,2,3,4,5].map, satır 176). Sunucu cartItemPatchSchema quantity için max(10) tanımlıyor (schemas.ts:31). Arayüzde sınır hakkında ipucu yok.
 
 **Etki:** 6-10 oda isteyen grup organizatörü (sepetin temel kullanım senaryosu) bunun mümkün olmadığını sanıyor ve aynı odayı birden çok kez eklemeye çalışıyor.
 
 **Önerilen aksiyon:** Seçenekleri sunucu sınırıyla (1-10) eşle ya da sınırı paylaşılan bir sabitten üret. Müsaitlik sınırı varsa 'En fazla N oda' ipucu göster.
+
+**Yapılan düzeltme:** Confirmed. The room-count options now run 1 to 10 from a ROOM_OPTIONS constant, which matches cartItemPatchSchema.quantity max(10). A comment notes the server limits.
 
 ## F1101 — Kart son kullanma tarihi '12/30' olarak önceden doldurulmuş (paylaşım ve sepet ödeme formları)
 
@@ -1635,13 +1719,15 @@
 | Renk/tema           | Hayır                                   |
 | Efor                | S                                       |
 | Kaynak denetçiler   | runtime:cart                            |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**            |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p028)         |
 
 **Kanıt:** p9-share-pay (desktop TR): inputs=['Kart numarası value=""', 'Son kullanma (AA/YY) value="12/30"', 'CVC value=""']. p4 sepet ödeme formunda da '12/30' önceden dolu (crops/cart/p4d-0.png). Kaynak: useState({ number: '', exp: '12/30', cvc: '' }) (share satır 33, checkout/cart satır 36).
 
 **Etki:** Gerçek akışta kullanıcı dolu alanı kontrol etmeden geçer ve kart reddedilir ya da yanlış veri gönderilir. Demo kolaylığı üretim davranışı gibi görünüyor.
 
 **Önerilen aksiyon:** Alanı boş başlat ve placeholder 'AA/YY' kullan. Demo kolaylığı gerekiyorsa test kartı ipucuna tıklanınca tüm alanları dolduran bir 'Test kartını kullan' düğmesi ekle.
+
+**Yapılan düzeltme:** Card state now starts as { number: "", exp: "", cvc: "" }. The shared CardFields supplies the AA/YY hint (payment.expiryHint), the automatic '/' and maxLength. No e2e test fills the share page form, so no test depends on the old 12/30 default.
 
 ## F1215 — Sepet sayfasında devre dışı kontroller görsel olarak farklılaşmıyor; ortak Button bileşeni kullanılmıyor
 
@@ -1657,13 +1743,15 @@
 | Renk/tema           | Hayır                                                                                                                                                     |
 | Efor                | S                                                                                                                                                         |
 | Kaynak denetçiler   | area:cart                                                                                                                                                 |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                                              |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p014)                                                                                                                           |
 
 **Kanıt:** 11-12 `input` sınıfında disabled: varyantı yok; 'Süresi dolan sepeti geri yükle' (87), 'Tutmayı bırak' (103), 'Sepeti boşalt' (226) ve checkout 'Tutmayı bırak' (352) düğmelerinde disabled: stili yok. Tailwind preflight renkleri inherit ettiğinden kilitli/busy durumda alanlar etkin görünüyor. Ortak `Button` `disabled:cursor-not-allowed disabled:opacity-60` sağlıyor (ui.tsx:38) ama kullanılmıyor.
 
 **Etki:** Kilitli sepette misafir alanları düzenlemeye çalışır, tepki alamayınca sistemi bozuk sanar.
 
 **Önerilen aksiyon:** Palete dokunmadan `disabled:cursor-not-allowed disabled:opacity-60` ekle veya ui.tsx Button'ı kullan; kilitli alanlara aria-describedby ile lockedNotice id'sini bağla.
+
+**Yapılan düzeltme:** Confirmed. I added disabled:cursor-not-allowed and disabled:opacity-60 to the guest fields, select and stepper buttons, and aria-disabled:cursor-wait and aria-disabled:opacity-60 to release, reopen and 'Sepeti boşalt'. 'Kaldır' gets disabled:cursor-not-allowed plus the aria-disabled styles. No color classes changed; I did not switch to the shared Button because its variants would change colors. In a locked cart, the guest fields, the select and 'Kaldır' get aria-describedby pointing to the lock notice's id. The release button on checkout/cart is in crossOwner.
 
 ## F1216 — Yükleme durumları duyurulmuyor; bölme paneli yüklenirken hiçbir şey göstermiyor
 
@@ -1680,13 +1768,15 @@
 | Renk/tema           | Hayır                                                                                                                       |
 | Efor                | S                                                                                                                           |
 | Kaynak denetçiler   | area:cart                                                                                                                   |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p014)                                                                                            |
 
 **Kanıt:** 55 `<p className="text-gray-500">{t("loading")}</p>` role/aria-live yok; checkout/cart:171 ve share:171 aynı. SplitPayPanel.tsx:160 `if (!loaded) return null;` → gösterge yok, panel sonradan belirince düzen kayar.
 
 **Etki:** Yavaş ağda ekran okuyucu kullanıcısı sayfanın boş mu yoksa yükleniyor mu olduğunu bilemez; geç beliren panel, tıklanmak üzere olan öğeyi aşağı iter.
 
 **Önerilen aksiyon:** Yükleme metnine role="status" ekle; SplitPayPanel yüklenirken sabit yükseklikli iskelet ve aria-busy="true" göster.
+
+**Yapılan düzeltme:** The /cart loading text already has role="status" (the loading branch in PageShell). SplitPayPanel now shows an aria-busy loading block with 'Bölünmüş ödeme durumu yükleniyor…' instead of returning null. The missing role=status on the checkout/cart loading text is in crossOwner.
 
 ## F1217 — İlan adı bağlantısı dinlenme durumunda bağlantı gibi görünmüyor
 
@@ -1701,13 +1791,15 @@
 | Renk/tema           | Hayır                                      |
 | Efor                | S                                          |
 | Kaynak denetçiler   | area:cart                                  |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**               |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p014)            |
 
 **Kanıt:** 118-123 `<Link href={`/property/${item.propertyId}`} className="font-semibold text-gray-900 hover:underline">`: alt çizgi veya ikon yok, çevre metinle aynı renk; dokunmatik cihazda hover yok.
 
 **Etki:** Mobil misafir otel sayfasına dönüp detayı kontrol edebileceğini fark etmez.
 
 **Önerilen aksiyon:** Renk değiştirmeden `underline decoration-1 underline-offset-2` ekle veya ayrı 'İlanı görüntüle' ikincil bağlantısı koy.
+
+**Yapılan düzeltme:** The item title link is now underlined at rest (underline decoration-1 underline-offset-2, thicker on hover), with no color change.
 
 ## F1218 — Anlam taşıyan semboller ekran okuyucuda ham okunuyor (→, ·, ×, +)
 
@@ -1724,13 +1816,15 @@
 | Renk/tema           | Hayır                                                                                                                                                                                                                  |
 | Efor                | S                                                                                                                                                                                                                      |
 | Kaynak denetçiler   | area:cart                                                                                                                                                                                                              |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                                                                                                           |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p014)                                                                                                                                                                                        |
 
 **Kanıt:** cart/page.tsx:129-130 `{f.date(item.checkIn, "medium")} →{" "}`; checkout/cart/page.tsx:192 ve 241-242 (`·`, `×`, `→`); share page:188-189 (`→`); SplitPayPanel.tsx:203 (`·`), 237 (`×` tek içerik), 249 (`+ {t("addParticipant")}`).
 
 **Etki:** Ekran okuyucu 'sağ ok', 'orta nokta', 'çarpı' okur; tarih aralığı ve oda adedi anlaşılmaz.
 
 **Önerilen aksiyon:** Ayraçları `<span aria-hidden="true">→</span><span className="sr-only">{t("to")}</span>` biçiminde ver (yeni 'to' anahtarı: 'ile'/'to'); '× 2' yerine `t("item.roomsCount", { count })` ('2 oda'); '+' işaretini aria-hidden yap.
+
+**Yapılan düzeltme:** On /cart, the date arrow is now aria-hidden with a screen-reader-only word (new key cart.item.to: 'ile'/'to'). The '·' before the city is aria-hidden with a screen-reader-only comma. The same symbols on checkout/cart are in crossOwner. The share page and SplitPayPanel no longer contain them.
 
 ## F1219 — 'Artık açık değil' mesajı payın gerçek durumuyla çelişebiliyor
 
@@ -1745,13 +1839,15 @@
 | Renk/tema           | Hayır                                    |
 | Efor                | S                                        |
 | Kaynak denetçiler   | area:cart                                |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**             |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p028)          |
 
 **Kanıt:** 226-230 `{!paid && !share.canPay && (<p ...>{t("share.closed")}</p>)}`: pay başka hesapça ödenmişse (AUTHORIZED, paidByMe false) veya süre geçmiş ama plan hâlâ aktifse de "Bu bölünmüş ödeme artık açık değil." yazar; üstte durum 'Ödendi (onay bekliyor)' görünebilir.
 
 **Etki:** Katılımcı payının ödenip ödenmediğinden emin olamaz; organizatöre gereksiz soru sorar veya tekrar ödemeye çalışır.
 
 **Önerilen aksiyon:** Nedene göre metin: FUNDED && !paidByMe → "Bu pay başka bir hesapla ödendi"; deadline geçti → t("share.deadlinePassed"); SETTLED → t("share.confirmed"); ABORTED → "Plan iptal edildi, ödeme alınmadı".
+
+**Yapılan düzeltme:** Confirmed. The closed message now depends on the reason: AUTHORIZED/CAPTURED but not paid by me gives share.paidByOther, plan ABORTED gives share.aborted, SETTLED gives share.confirmed, EXPIRED or deadline passed gives share.deadlinePassed, and anything else gives share.closed. A client-side deadline check also hides the form once the deadline passes.
 
 ## F1220 — Ödeme ve devir bağlantıları yalnız panoya kopyalanıyor, mobil paylaşım menüsü yok
 
@@ -1767,13 +1863,15 @@
 | Renk/tema           | Hayır                                                                                          |
 | Efor                | S                                                                                              |
 | Kaynak denetçiler   | lens:mobile                                                                                    |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                   |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p069)                                                                |
 
 **Kanıt:** SplitPayPanel.tsx:133-140 `navigator.clipboard.writeText(share.inviteUrl)` başarısız olursa `window.prompt(...)` gösteriyor. TransferMarket.tsx:136-144 de yalnız kopyalıyor. Kod tabanında `navigator.share` hiç kullanılmıyor.
 
 **Etki:** Bölünmüş ödeme davetini WhatsApp ya da SMS ile göndermek isteyen mobil organizatör kopyala, uygulama değiştir, yapıştır yapmak zorunda. iOS'ta `window.prompt` geri dönüşünde uzun URL'yi seçmek zor.
 
 **Önerilen aksiyon:** `navigator.share` varsa 'Paylaş' düğmesi göster: `navigator.share({ title, text: 'Payını öde', url })`. Kopyalamayı ikincil seçenek olarak bırak. prompt yerine salt okunur bir input ve 'Kopyalandı' durumu kullan (TransferMarket.tsx:198-215'teki desen).
+
+**Yapılan düzeltme:** Confirmed: the copy-only flow was real. The panel now detects Web Share on the client (canShare), so on supporting devices each non-organizer row gets a 'Paylaş' button that calls navigator.share({title, text, url}). If the user dismisses the sheet (AbortError) nothing happens; any other error falls back to copy. Copy stays as the secondary action. When clipboard permission is missing, a selected read-only link input with a hint appears in place of window.prompt. The missing strings (shareLink, shareLinkFor, shareText) are now in msg-ml/p069.json. TransferMarket.tsx still only copies and is listed under crossOwner.
 
 ## F1221 — Kopyalama/gönderim bildirimi kalıcı, satırdan uzak ve tekrarda yeniden duyurulmuyor
 
@@ -1790,13 +1888,15 @@
 | Renk/tema           | Hayır                                                                                                                                 |
 | Efor                | S                                                                                                                                     |
 | Kaynak denetçiler   | area:cart                                                                                                                             |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                          |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p069)                                                                                                       |
 
 **Kanıt:** 136 `setNotice(t("copied"))` ve 152 `setNotice(t("sent"))` hiç temizlenmiyor; ikinci kopyalamada aynı metin set edildiği için DOM değişmiyor ve canlı bölge yeniden duyurmuyor. Bildirim panelin en altında (170), satırdan uzak; hangi katılımcı olduğu yazmıyor. sendInvite (143) yalnız message'ı sıfırlıyor, eski başarı bildirimi yeni hatayla yan yana kalabiliyor.
 
 **Etki:** Kullanıcı ikinci linkin de kopyalandığından emin olamaz; mobilde bildirimi görmez; çelişkili başarı+hata aynı anda görünür.
 
 **Önerilen aksiyon:** notice'u `{ text, key: Date.now() }` olarak tut, 4 sn sonra temizle; metin "Katılımcı 2 linki kopyalandı"; copy/sendInvite başında setNotice(null); düğme etiketini 2 sn 'Kopyalandı' yap (satır içi geri bildirim).
+
+**Yapılan düzeltme:** Feedback now shows on the row itself. The copy and send buttons change their label to 'Kopyalandı ✓' / 'Davet gönderildi ✓' for 2–3 s, and their aria-label names the participant. A sr-only role=status region gets the text through flash(): it clears first, so a repeated message is announced again, and it clears itself after 5 s. sendInvite already reset message, inviteError and sentId; I added setMessage(null) at the start of copy() so an old error no longer sits next to a new success. The missing sentTo key is in p069.json (copiedFor comes from p068).
 
 ## F1222 — Eşit bölmede satır tutarı etiketsiz gösteriliyor
 
@@ -1812,13 +1912,15 @@
 | Renk/tema           | Hayır                                       |
 | Efor                | S                                           |
 | Kaynak denetçiler   | area:cart                                   |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p069)            |
 
 **Kanıt:** 228 `<span className="pb-2 text-sm text-gray-700">{f.money(equalShare, currency)}</span>`: 'Pay' etiketi yok; ekran okuyucu yalnız tutarı okur.
 
 **Etki:** Ekran okuyucu kullanıcısı tutarın katılımcı payı olduğunu bağlamdan çıkarmak zorunda kalır.
 
 **Önerilen aksiyon:** Görünür veya sr-only etiket: `{t("shareOf", { n: i + 1 })}: {amount}` ("Katılımcı 1 payı: ₺3.264,97").
+
+**Yapılan düzeltme:** The equal-share amount already has a label: a sr-only 'Katılımcı {n} · ' prefix plus the visible t("equalShare") = 'Payı: {amount}' (SplitPayPanel.tsx ~L810-813). A screen reader hears 'Katılımcı 1 · Payı: ₺…'.
 
 ## F1223 — '×' katılımcı kaldırma düğmesi küçük hedef ve yalnız glif
 
@@ -1834,13 +1936,15 @@
 | Renk/tema           | Hayır                                       |
 | Efor                | S                                           |
 | Kaynak denetçiler   | area:cart                                   |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p069)            |
 
 **Kanıt:** 231-238 `<button ... className="pb-2 text-sm font-semibold text-red-700 hover:underline" aria-label={t("removeParticipant")}>×</button>`: genişlik ~8-10px; mobilde e-posta/tutar alanının hemen yanında.
 
 **Etki:** Mobil ağırlıklı misafir yanlış dokunuşla katılımcıyı siler ya da düğmeye isabet ettiremez.
 
 **Önerilen aksiyon:** `inline-flex h-11 w-11 items-center justify-center` (en az 24×24) ve görünür 'Kaldır' metni veya çöp kutusu ikonu + sr-only metin.
+
+**Yapılan düzeltme:** The remove button is already at least 44×44 px (min-h-[44px] min-w-[44px]) and its aria-label names the row: removeParticipantN 'Katılımcı {n} satırını kaldır'. After removal, focus moves to the email field of the row that takes its place. That meets WCAG 2.5.8. The '×' glyph is visual only, because the aria-label overrides it.
 
 ## F1224 — Katılımcı ekleme sınırı sessizce uygulanıyor; eklenen satıra odak verilmiyor
 
@@ -1856,13 +1960,15 @@
 | Renk/tema           | Hayır                                       |
 | Efor                | S                                           |
 | Kaynak denetçiler   | area:cart                                   |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p069)      |
 
 **Kanıt:** 243-251 `{rows.length < 9 && (<button ...>+ {t("addParticipant")}</button>)}`: 9'da düğme kaybolur (odaktaysa odak da kaybolur), sınır yazılmaz. Sunucu sınırı config'ten (SPLIT_PAY_MAX_SHARES=10, app-config.ts:68), istemcide sabit 9. Ekleme sonrası yeni e-posta alanına odak yok.
 
 **Etki:** 10'dan kalabalık grup neden ekleyemediğini anlamaz; klavye kullanıcısı yeni satırı arar.
 
 **Önerilen aksiyon:** Düğmeyi gizlemek yerine aria-disabled + "En fazla 9 katılımcı (siz dahil 10 kişi)" yardım metni; sınırı GET split yanıtından al; eklemeden sonra yeni satırın e-posta input'una focus().
+
+**Yapılan düzeltme:** On the client: the old 'add participant' button that disappeared is now a +/− people stepper. At the limit the button gets aria-disabled instead of being hidden, so focus is never lost. A hint linked by aria-describedby says 'En fazla {max} katılımcı… (siz dahil {people} kişi)', and the count is announced through a live <output>. The client reads maxShares from the GET response when present (default 9). Focus deliberately stays on the stepper so it can be pressed again. Still open: the GET route does not send maxShares yet (see crossOwner).
 
 ## F1225 — Bölüm ve form adları görünür başlıkla uyumsuz (aria-label yerine aria-labelledby)
 
@@ -1879,13 +1985,15 @@
 | Renk/tema           | Hayır                                                                                                                                                          |
 | Efor                | S                                                                                                                                                              |
 | Kaynak denetçiler   | area:cart                                                                                                                                                      |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                                                   |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p069)                                                                                                                                |
 
 **Kanıt:** 275 `aria-label={t("sharesTitle")}` ('Paylar') ama görünür h2 'Ödemeyi grupla bölüş' (279). Formlarda h2 metni aria-label ile kopyalanmış: checkout/cart 289 ve 382, share 237 ve 297.
 
 **Etki:** Ekran okuyucu bölge listesinde görünenden farklı ad duyar; çeviri güncellenince iki metin birbirinden kopabilir.
 
 **Önerilen aksiyon:** h2'lere id verip section/form'larda aria-labelledby kullan; aria-label'ları kaldır.
+
+**Yapılan düzeltme:** Every section/form in the panel uses aria-labelledby={headingId}, and no aria-label copies the heading. Two of those references pointed at nothing: the h2 in the allowCreate=false aborted-summary section and the h2 in the plan status section had no id. Both now carry id={headingId}. I also fixed a mis-indented h2 and collapsed short h2s onto one line, as prettier would. The forms in the cart and share pages are listed under crossOwner.
 
 ## F1226 — Uzun e-posta adresleri 320px genişlikte yatay taşma yaratabiliyor
 
@@ -1901,10 +2009,12 @@
 | Renk/tema           | Hayır                                       |
 | Efor                | S                                           |
 | Kaynak denetçiler   | area:cart                                   |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p069)            |
 
 **Kanıt:** 302-308 `<span className="text-gray-800">{... s.participantEmail ...}</span>`: break-all/min-w-0 yok; flex öğesinin min-width:auto değeri ~44 karakterlik adreste (~330px) 360px ekrandaki ~288px içerik genişliğini aşar.
 
 **Etki:** Mobil misafir yatay kaydırma yapmak zorunda kalır; tutar ve durum çipi ekran dışına itilir.
 
 **Önerilen aksiyon:** span'a `min-w-0 break-all` (veya `[overflow-wrap:anywhere]`) ekle.
+
+**Yapılan düzeltme:** The participant name/email span in each share row already has 'min-w-0 [overflow-wrap:anywhere]' inside a flex-wrap row (SplitPayPanel.tsx ~L524), so long addresses wrap and do not overflow at 320 px.

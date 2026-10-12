@@ -1,8 +1,8 @@
 import { z } from "zod";
 
-/** Kayıt ve şifre sıfırlamada ortak parola kuralı. */
+/** Kayıt ve şifre sıfırlamada ortak şifre kuralı. */
 export const passwordSchema = z
   .string()
-  .min(8, "Parola en az 8 karakter olmalıdır")
+  .min(8, "Şifre en az 8 karakter olmalıdır")
   .max(200)
-  .regex(/[0-9]/, "Parola en az bir rakam içermelidir");
+  .regex(/[0-9]/, "Şifre en az bir rakam içermelidir");

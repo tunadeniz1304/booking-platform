@@ -4,6 +4,7 @@ import {
   cloneElement,
   isValidElement,
   useEffect,
+  useRef,
   useState,
   useSyncExternalStore,
   type ReactElement,
@@ -13,18 +14,35 @@ import { useTranslations } from "next-intl";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import { Button, Status } from "@/components/ui/ui";
+import { focusRing } from "@/components/ui/focusRing";
 import { ApiError, apiFetch } from "@/lib/api-client";
 
-/** Kimlik sayfaları (giriş, kayıt, sıfırlama, doğrulama) için ortak kart düzeni. */
+/**
+ * Kimlik sayfaları (giriş, kayıt, sıfırlama, doğrulama) için ortak kart düzeni.
+ * `status`: ilk render'dan beri DOM'da duran `role="status"` bölgesinin içeriği (yükleniyor ve
+ * başarı metinleri; içerikle birlikte eklenen bölgeler güvenilir duyurulmaz). Görünür başarı
+ * kutusu için `<Notice kind="success" live={false}>`, yalnız duyuru için `sr-only` metin verin;
+ * hatalar (`role="alert"`) bu bölgenin dışında kalmalı (iç içe canlı bölge yok).
+ * `focusTitle`: true olduğunda (ör. işlem tamamlandı görünümü) odak başlığa taşınır.
+ */
 export default function AuthCard({
   title,
   subtitle,
   children,
+  status,
+  focusTitle = false,
 }: {
   title: string;
   subtitle?: string;
   children: ReactNode;
+  status?: ReactNode;
+  focusTitle?: boolean;
 }) {
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    if (focusTitle) titleRef.current?.focus();
+  }, [focusTitle, title]);
+
   return (
     <div className="flex min-h-screen flex-col bg-gray-50">
       <Header />
@@ -32,10 +50,19 @@ export default function AuthCard({
         id="main"
         className="mx-auto flex w-full max-w-md flex-1 items-center justify-center px-4 py-16"
       >
-        <div className="w-full rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
-          <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
+        <div className="w-full rounded-2xl border border-gray-200 bg-white p-6 shadow-sm sm:p-8">
+          <h1
+            ref={titleRef}
+            tabIndex={focusTitle ? -1 : undefined}
+            className="text-2xl font-bold text-gray-900 focus:outline-none"
+          >
+            {title}
+          </h1>
           {subtitle && <p className="mt-1 text-sm text-gray-600">{subtitle}</p>}
           {children}
+          <div role="status" aria-live="polite" aria-atomic="true">
+            {status}
+          </div>
         </div>
       </main>
       <Footer />
@@ -43,11 +70,22 @@ export default function AuthCard({
   );
 }
 
-/** Sonuç / hata mesajı kutusu (ekran okuyucu için canlı bölge). */
-export function Notice({ kind, children }: { kind: "error" | "success"; children: ReactNode }) {
+/**
+ * Sonuç / hata mesajı kutusu (ekran okuyucu için canlı bölge). `live={false}`: rolsüz, yalnız
+ * görsel kutu; duyuruyu kalıcı bir bölge (ör. `AuthCard` `status`) yapıyorsa kullanın.
+ */
+export function Notice({
+  kind,
+  children,
+  live = true,
+}: {
+  kind: "error" | "success";
+  children: ReactNode;
+  live?: boolean;
+}) {
   return (
     <div
-      role={kind === "error" ? "alert" : "status"}
+      role={live ? (kind === "error" ? "alert" : "status") : undefined}
       className={`mt-4 rounded-lg px-4 py-3 text-sm ${
         kind === "error" ? "bg-red-50 text-red-700" : "bg-green-50 text-green-800"
       }`}
@@ -57,13 +95,14 @@ export function Notice({ kind, children }: { kind: "error" | "success"; children
   );
 }
 
-/** Kimlik formlarındaki alanların ortak (değişmeyen) görünümü. */
-export const authInputClass =
-  "mt-1 w-full rounded-lg border border-gray-500 px-3 py-2 text-sm focus:border-[#003580] focus:outline-none focus:ring-1 focus:ring-[#003580]";
+/**
+ * Kimlik formlarındaki alanların ortak (değişmeyen) görünümü: küçük ekranda 16px (iOS odakta
+ * büyütmez), en az 44px yükseklik ve sitenin ortak odak halkası.
+ */
+export const authInputClass = `mt-1 min-h-[44px] w-full rounded-lg border border-gray-500 px-3 py-2 text-base focus:border-[#003580] sm:text-sm ${focusRing}`;
 
 /** Birincil gönder düğmesi; `aria-disabled` iken odak düğmede kalır (bkz. `submitButtonProps`). */
-export const authSubmitClass =
-  "w-full rounded-lg bg-[#003580] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#002b66] disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-700 aria-disabled:cursor-not-allowed aria-disabled:bg-gray-300 aria-disabled:text-gray-700";
+export const authSubmitClass = `w-full rounded-lg bg-[#003580] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#002b66] disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-700 aria-disabled:cursor-not-allowed aria-disabled:bg-gray-300 aria-disabled:text-gray-700 ${focusRing}`;
 
 /**
  * Gönderim sürerken `disabled` yerine `aria-disabled` + `aria-busy`: `disabled` klavye

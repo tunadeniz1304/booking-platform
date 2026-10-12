@@ -20,7 +20,7 @@
     "goodFaith": "Bu bildirimdeki bilgilerin ve iddiaların doğru ve eksiksiz olduğuna iyi niyetle inanıyorum.",
     "submit": "Bildirimi gönder",
     "sending": "Gönderiliyor…",
-    "sent": "Bildiriminiz alındı. Başvuru numaranız: {reference}. Onay e-postası gönderildi.",
+    "sent": "Bildiriminiz alındı. Başvuru numaranız: {reference}. Onay e-postası birkaç dakika içinde gönderilecek; gelmezse istenmeyen posta klasörünüzü kontrol edin.",
     "invalid": "Lütfen tüm zorunlu alanları doğru doldurun.",
     "rateLimited": "Çok fazla bildirim gönderildi; lütfen daha sonra tekrar deneyin.",
     "error": "Bildirim gönderilemedi; lütfen tekrar deneyin.",
@@ -30,12 +30,38 @@
       "category": "Bir bildirim türü seçin.",
       "explanation": "Açıklama boşluklar hariç en az 20 karakter olmalı.",
       "reporterName": "Ad en fazla 120 karakter olabilir.",
-      "reporterEmail": "Geçerli bir e-posta adresi girin, örneğin ad@ornek.com."
-    }
+      "reporterEmail": "Geçerli bir e-posta adresi girin, örneğin ad@ornek.com.",
+      "goodFaith": "Göndermek için iyi niyet beyanını onaylayın.",
+      "propertyNotFound": "Bu ilan artık bulunamadı. İçerik adresini kontrol edip yeniden gönderin."
+    },
+    "contentUrlHint": "Tam adres, ör. https://ornek.com/property/123. İlan sayfasındaki “Bu ilanı bildir” bağlantısı bu alanı sizin için doldurur.",
+    "categoryPlaceholder": "Bir tür seçin…",
+    "linkedTitle": "Bildirilen ilan",
+    "reportAnother": "Başka bir içerik bildir",
+    "errorSummary": "Formda {count} hata var; lütfen düzeltin:",
+    "sentEmail": "Onay e-postası birkaç dakika içinde {email} adresine gönderilecek; gelmezse istenmeyen posta klasörünüzü kontrol edin.",
+    "referenceLabel": "Başvuru numaranız",
+    "referenceHint": "Destekle iletişime geçerseniz bu numarayı paylaşın.",
+    "copyReference": "Numarayı kopyala",
+    "copied": "Kopyalandı.",
+    "copyFailed": "Kopyalanamadı; numarayı elle seçip kopyalayın.",
+    "nextTitle": "Bundan sonra ne olacak?",
+    "next": {
+      "review": "Bildiriminizi bir ekip üyesi inceler.",
+      "decision": "Karar ve gerekçesi e-posta adresinize gönderilir.",
+      "appeal": "Karara katılmazsanız karar e-postasındaki bağlantıyla itiraz edebilirsiniz (DSA md. 20)."
+    },
+    "backToListing": "İlana dön",
+    "home": "Ana sayfaya dön",
+    "reporterEmailHint": "Onay ve karar e-postaları bu adrese gönderilir. Adresiniz yalnız bu bildirimle ilgili iletişim için kullanılır.",
+    "privacyNote": "Adınız ve e-posta adresiniz ilan sahibiyle paylaşılmaz; yalnız bildirimi inceleyen ekibimiz görür. Ayrıntılar için <link>aydınlatma metnini</link> okuyun.",
+    "timeout": "Bağlantı zaman aşımına uğradı. Yazdıklarınız korunuyor; bildirimi yeniden gönderebilirsiniz.",
+    "rateLimitedRetry": "Çok fazla bildirim gönderildi. Yaklaşık {minutes} dakika sonra tekrar deneyin.",
+    "rateLimitedAlt": "Bekleyemeyecek bir durumsa <link>destek ekibimize ulaşın</link>."
   },
   "admin": {
     "title": "Uyum",
-    "intro": "7565 kaldırma talepleri (24 saat SLA), DSA bildirimleri ve şeffaflık raporu.",
+    "intro": "7565 kaldırma talepleri (24 saat SLA), DSA bildirimleri, md. 20 itirazları, erişilebilirlik doğrulama kuyruğu ve şeffaflık raporu.",
     "open": "Uyum paneli",
     "takedowns": "7565 kaldırma talepleri",
     "source": "Kaynak",
@@ -48,23 +74,23 @@
     "referenceNo": "Evrak no",
     "reason": "Gerekçe",
     "createTakedown": "Talebi kaydet ve ilanı kaldır",
-    "takedownCreated": "Talep kaydedildi; ilan yayından kaldırıldı.",
-    "takedownClosed": "Talep kapatıldı.",
+    "takedownCreated": "Talep kaydedildi; “{listing}” ilanı yayından kaldırıldı.",
+    "takedownClosed": "“{item}” talebi kapatıldı.",
     "defaultResolution": "Yönetici tarafından kapatıldı",
     "status": {
       "RECEIVED": "Alındı",
       "ACTIONED": "İlan kaldırıldı",
       "CLOSED": "Kapalı"
     },
-    "slaDue": "SLA bitişi {at} UTC",
+    "slaDue": "SLA bitişi",
     "breached": "SLA aşıldı",
-    "close": "Kapat",
+    "close": "Talebi kapat…",
     "notices": "Bekleyen DSA bildirimleri",
     "noNotices": "Bekleyen bildirim yok.",
     "decision": "Karar",
     "decisions": {
-      "REMOVED": "Kaldır",
-      "NO_ACTION": "İşlem yapma"
+      "REMOVED": "Kaldır (ilan yayından kalkar)",
+      "NO_ACTION": "İşlem yapılmasın"
     },
     "ground": "Dayanak",
     "grounds": {
@@ -74,10 +100,10 @@
     "facts": "Olgular ve gerekçe",
     "legalReference": "Hukuki referans",
     "decide": "Kararı kaydet",
-    "noticeDecided": "Karar kaydedildi; gerekçeli karar bildirimi gönderilecek.",
+    "noticeDecided": "“{url}” için karar kaydedildi; gerekçeli karar bildirimi gönderilecek.",
     "transparency": "Şeffaflık raporu",
-    "exportCsv": "CSV indir (bu yıl)",
-    "exportJson": "JSON görüntüle (bu yıl)",
+    "exportCsv": "CSV indir",
+    "exportJson": "JSON görüntüle (yeni sekmede açılır)",
     "propertyIdHint": "İlanın kimliğini yapıştırın; alandan çıkınca ilan adı aşağıda gösterilir.",
     "preview": {
       "loading": "İlan aranıyor…",
@@ -105,7 +131,88 @@
       "noActionEffect": "İçerik yayında kalır; bildiren kişiye ve ev sahibine gerekçeli karar e-postası gider.",
       "final": "Kaydedilen karar değiştirilemez; yalnızca taraflardan biri itiraz ederse yeniden incelenir.",
       "confirm": "Kararı onayla ve gönder"
-    }
+    },
+    "sectionsNav": "Uyum bölümleri",
+    "receivedAt": "Yazının alındığı tarih ve saat (TSİ)",
+    "receivedAtHint": "Türkiye saatiyle girin; 24 saatlik süre bu andan başlar. Varsayılan: şimdi.",
+    "reasonHint": "En az 3 karakter.",
+    "factsHint": "En az 10 karakter. Bu metin gerekçeli karar bildiriminde taraflara gönderilir.",
+    "takedownList": {
+      "title": "Kayıtlı talepler",
+      "filter": "Talep durumu",
+      "filters": {
+        "open": "Açık",
+        "closed": "Kapalı",
+        "all": "Tümü"
+      },
+      "empty": {
+        "open": "Açık talep yok.",
+        "closed": "Kapalı talep yok."
+      },
+      "item": "{source} · {ref}",
+      "listing": "İlan",
+      "statusLabel": "Durum",
+      "received": "Yazının alındığı an",
+      "at": "{at} (TSİ)",
+      "none": "Yok",
+      "remaining": "{hours} sa {minutes} dk kaldı",
+      "overdue": "Süre doldu"
+    },
+    "report": {
+      "period": "Rapor dönemi",
+      "presets": "Hazır dönemler",
+      "thisYear": "Bu yıl",
+      "lastYear": "Geçen yıl",
+      "last6Months": "Son 6 ay",
+      "from": "Başlangıç tarihi",
+      "to": "Bitiş tarihi (dahil)",
+      "dateRequired": "Bir tarih seçin.",
+      "invalidRange": "Bitiş tarihi başlangıç tarihinden önce olamaz."
+    },
+    "errors": {
+      "validation": "Bazı alanlar eksik ya da hatalı. İşaretli alanları düzeltip yeniden deneyin.",
+      "propertyNotFound": "Bu kimlikle bir ilan bulunamadı. İlan kimliğini kontrol edin.",
+      "takedownDuplicate": "Bu ilan ve evrak no için açık bir talep zaten var.",
+      "takedownNotFound": "“{item}” talebi artık bulunamıyor; liste yenilendi.",
+      "takedownClosed": "“{item}” talebi zaten kapatılmış; liste yenilendi.",
+      "noticeNotFound": "“{url}” bildirimi artık bulunamıyor; liste yenilendi.",
+      "noticeDecided": "“{url}” bildirimi için zaten karar verilmiş; liste yenilendi.",
+      "fields": {
+        "source": "Bir kaynak seçin.",
+        "propertyId": "İlan kimliğini girin (en fazla 64 karakter).",
+        "referenceNo": "Evrak no en fazla 120 karakter olabilir.",
+        "reason": "Gerekçe 3 ile 2000 karakter arasında olmalı.",
+        "receivedAt": "Geçerli bir tarih ve saat girin.",
+        "decision": "Bir karar seçin.",
+        "ground": "Kaldırma kararı için bir dayanak seçin.",
+        "facts": "Olgular ve gerekçe 10 ile 5000 karakter arasında olmalı.",
+        "legalReference": "Hukuki referans en fazla 300 karakter olabilir.",
+        "resolution": "Kapatma gerekçesi 3 ile 2000 karakter arasında olmalı.",
+        "other": "Bu alanı kontrol edin."
+      }
+    },
+    "noticeQueue": {
+      "title": "Bekleyen DSA bildirimleri ({count})",
+      "order": "En uzun süredir bekleyen bildirim en üstte.",
+      "received": "Alındı",
+      "waitedDays": "{days} gün {hours} sa bekliyor",
+      "waitedHours": "{hours} sa {minutes} dk bekliyor",
+      "reporter": "Bildiren",
+      "reporterUnknown": "Adı belirtilmedi",
+      "noListing": "Bir ilana bağlı değil",
+      "removeUnavailable": "Bu bildirim bir ilana bağlı değil; kaldırma uygulanamaz, yalnızca işlem yapılmaması seçilebilir.",
+      "newTab": "(yeni sekmede açılır)"
+    },
+    "fieldLimits": {
+      "count": "{count}/{max} karakter",
+      "near": "Karakter sınırına yaklaştınız.",
+      "reached": "Karakter sınırına ulaştınız; fazlası eklenmez."
+    },
+    "slaWarning": {
+      "dueSoon": "SLA bitişi yaklaşıyor"
+    },
+    "referenceNoOptional": "Evrak no (isteğe bağlı)",
+    "legalReferenceOptional": "Hukuki referans (isteğe bağlı)"
   },
   "accessibility": {
     "title": "Erişilebilirlik",
@@ -133,7 +240,7 @@
     },
     "host": {
       "title": "Erişilebilirlik özellikleri",
-      "intro": "Tesisinizin erişilebilirlik özelliklerini beyan edin ve her biri için ilan fotoğraflarınızdan bir kanıt bağlayın. Yalnızca platform ekibinin kanıtla doğruladığı özellikler ilanda ve aramada görünür.",
+      "intro": "İlanınızın erişilebilirlik özelliklerini beyan edin ve her biri için ilan fotoğraflarınızdan bir kanıt bağlayın. Yalnızca platform ekibinin kanıtla doğruladığı özellikler ilanda ve aramada görünür.",
       "property": "İlan",
       "loading": "Özellikler yükleniyor…",
       "empty": "Henüz beyan edilmiş özellik yok.",
@@ -154,8 +261,8 @@
       "note": "Not (isteğe bağlı)",
       "add": "Özelliği ekle",
       "added": "Özellik eklendi.",
-      "evidenceSaved": "Kanıt güncellendi; özellik yeniden incelenecek.",
-      "deleted": "Özellik silindi.",
+      "evidenceSaved": "{name}: kanıt güncellendi; özellik yeniden incelenecek.",
+      "deleted": "{name} özelliği silindi.",
       "saveEvidence": "Kanıtı kaydet",
       "saveEvidenceLabel": "{name} için kanıtı kaydet",
       "evidenceVerifiedWarning": "Bu özellik doğrulandı. Kanıtı değiştirip kaydederseniz doğrulama kaldırılır ve platform ekibi yeniden inceler.",
@@ -164,29 +271,79 @@
       "deleteConfirmTitle": "{name} ({scope}) silinsin mi?",
       "deleteConfirmBody": "Özellik listeden kalıcı olarak kaldırılır.",
       "deleteConfirmVerified": "Doğrulanmış rozet kalkar ve özellik ilanda ile aramada görünmez. Yeniden eklerseniz platform ekibinin tekrar incelemesi gerekir.",
-      "deleteConfirm": "Kalıcı olarak sil"
+      "deleteConfirm": "Kalıcı olarak sil",
+      "wholeListing": "İlanın tamamı",
+      "alreadyAdded": "Bu özellik seçili kapsam için zaten eklendi. Başka bir özellik ya da kapsam seçin.",
+      "alreadyAddedOption": "{name} (zaten eklendi)",
+      "noPhotosHint": "Kanıt bu ilanın fotoğraflarından seçilir; henüz fotoğraf yüklenmemiş.",
+      "uploadPhotos": "İlana fotoğraf yükle",
+      "noteShown": "Not: {note}",
+      "edit": "Düzenle",
+      "editLabel": "{name} özelliğini düzenle",
+      "editWidthHint": "{min}–{max} cm arasında bir tam sayı girin. Genişlik değişirse doğrulama kalkar ve platform ekibi yeniden inceler.",
+      "editNoteHint": "Not değişikliği doğrulamayı etkilemez.",
+      "saveEdit": "Değişiklikleri kaydet",
+      "cancelEdit": "Vazgeç",
+      "editSaved": "Özellik güncellendi.",
+      "editConfirmTitle": "{name} için genişlik değiştirilsin mi?",
+      "widthVerifiedWarning": "Bu özellik doğrulandı. Genişliği değiştirirseniz doğrulama kaldırılır ve platform ekibi yeniden inceler.",
+      "photoOptionDated": "Fotoğraf {index} (yükleme: {date})",
+      "featureScoped": "{name} ({scope})",
+      "verifiedStatusHint": "İlanda ve aramada gösteriliyor.",
+      "pendingReviewHint": "Platform ekibi kanıtı inceleyip doğruladığında ilanda ve aramada görünür.",
+      "needsEvidenceHint": "İlan fotoğraflarınızdan bir kanıt seçip kaydedin; platform ekibi doğruladıktan sonra ilanda görünür.",
+      "newTab": "(yeni sekmede açılır)",
+      "noteHint": "En fazla {max} karakter; {remaining} karakter kaldı.",
+      "adding": "Ekleniyor…"
     },
     "admin": {
       "title": "Erişilebilirlik doğrulama kuyruğu",
       "intro": "Ev sahiplerinin kanıt fotoğraflı beyanları. Fotoğraf özelliği açıkça gösteriyorsa doğrulayın.",
-      "filter": "Kuyruk filtresi",
+      "filter": "Göster",
       "tabs": {
-        "pending": "Bekleyen",
-        "verified": "Doğrulanmış"
+        "pending": "İnceleme bekleyenler",
+        "verified": "Doğrulananlar"
       },
       "empty": "Kuyrukta kayıt yok.",
       "evidenceAlt": "{name} için kanıt fotoğrafı",
       "verify": "Doğrula",
       "unverify": "Doğrulamayı kaldır",
       "verifiedOk": "Özellik doğrulandı.",
-      "unverifiedOk": "Doğrulama kaldırıldı."
+      "unverifiedOk": "Doğrulama kaldırıldı.",
+      "verifiedDone": "{name} ({property}) doğrulandı.",
+      "unverifiedDone": "{name} ({property}) için doğrulama kaldırıldı.",
+      "undo": "Geri al",
+      "undoLabel": "Geri al: {name} ({property})",
+      "enlargeEvidence": "Kanıtı büyüt: {name}",
+      "closePreview": "Kapat",
+      "submittedAt": "Gönderildi: {date}",
+      "verifiedAt": "Doğrulandı: {date}",
+      "confirm": {
+        "verifyTitle": "Bu özellik doğrulansın mı?",
+        "unverifyTitle": "Doğrulama kaldırılsın mı?",
+        "body": "Özellik: {name} · İlan: {property} · {scope}",
+        "verifyEffect": "Özellik ilanda ve aramada doğrulanmış olarak gösterilir.",
+        "unverifyEffect": "Özellik ilanda ve aramada gizlenir ve inceleme bekleyenler listesine döner.",
+        "verify": "Doğrula",
+        "unverify": "Doğrulamayı kaldır"
+      },
+      "verifyLabel": "Doğrula: {name} ({property})",
+      "unverifyLabel": "Doğrulamayı kaldır: {name} ({property})",
+      "errors": {
+        "evidenceRequired": "Kanıt fotoğrafı olmayan bir özellik doğrulanamaz. Ev sahibinin kanıt eklemesini bekleyin.",
+        "notFound": "Bu beyan artık bulunamıyor; ev sahibi silmiş olabilir."
+      }
     },
-    "askSupport": "Destek'e soru sor"
+    "askSupport": "Destek'e soru sor",
+    "noneVerified": "Bu ilan için henüz doğrulanmış erişilebilirlik bilgisi yok; bu, özelliklerin bulunmadığı anlamına gelmez. Özel bir ihtiyacınız varsa rezervasyondan önce Destek'e yazın ve ilanın adını belirtin.",
+    "evidenceLabel": "{feature} için kanıt fotoğrafı (yeni sekmede açılır)",
+    "verifiedExplainer": "“Doğrulanmış” rozeti, platform ekibinin özelliği ev sahibinin gönderdiği fotoğraf kanıtıyla kontrol ettiğini gösterir.",
+    "filterSummary": "{count, plural, =0 {Özellik seç} other {# özellik seçili}}"
   },
   "appeal": {
     "title": "Karara itiraz",
-    "intro": "DSA md. 20 kapsamında içerik moderasyonu kararına itiraz edebilirsiniz. İtirazınızı yetkili bir çalışan inceler; sonuç e-postayla bildirilir.",
-    "invalidLink": "İtiraz bağlantısı geçersiz ya da süresi dolmuş. Lütfen karar e-postanızdaki bağlantıyı kullanın.",
+    "intro": "AB Dijital Hizmetler Yasası (DSA) md. 20 kapsamında içerik moderasyonu kararına itiraz edebilirsiniz. İtirazınızı yetkili bir çalışan inceler; sonuç e-postayla bildirilir.",
+    "invalidLink": "İtiraz bağlantısı eksik ya da hatalı. Karar e-postanızdaki bağlantının tamamını kullanın; sorun sürerse karar numarası ve e-posta adresinizle destek ekibimize ulaşın.",
     "decisionTitle": "İtiraz edilen karar",
     "decision": "Karar",
     "decisions": {
@@ -199,7 +356,7 @@
     "existing": {
       "PENDING": "İtirazınız alındı ve inceleniyor (itiraz no: {reference}).",
       "UPHELD": "İtirazınız kabul edildi; karar geri alındı (itiraz no: {reference}).",
-      "REJECTED": "İtirazınız reddedildi (itiraz no: {reference}). DSA md. 21 kapsamında mahkeme dışı uyuşmazlık çözümüne başvurabilirsiniz."
+      "REJECTED": "İtirazınız reddedildi (itiraz no: {reference}). DSA md. 21 kapsamında sertifikalı bir mahkeme dışı uyuşmazlık çözüm kuruluşuna başvurabilirsiniz."
     },
     "windowClosed": "Bu karar için itiraz süresi doldu.",
     "formTitle": "İtirazınız",
@@ -229,7 +386,7 @@
       "groundHint": "İlan kaldırılacağı için dayanak zorunludur.",
       "response": "Gerekçe (itiraz edene gönderilir)",
       "submit": "İtiraz kararını kaydet",
-      "decided": "İtiraz kararı kaydedildi; sonuç e-postalanacak.",
+      "decided": "“{item}” için yapılan itirazın kararı kaydedildi; sonuç e-postalanacak.",
       "chooseOutcome": "Bir sonuç seçin.",
       "confirm": {
         "title": "İtiraz kararı kaydedilsin mi?",
@@ -238,8 +395,32 @@
         "rejected": "Önceki karar geçerli kalır.",
         "final": "Kaydedilen itiraz kararı değiştirilemez ve itiraz edene e-postayla bildirilir.",
         "confirm": "İtiraz kararını onayla"
+      },
+      "rowTitle": "İtiraz eden: {role} · Karar: {decision}",
+      "noDecision": "kayıtlı değil",
+      "appealedAt": "İtiraz tarihi: {date}",
+      "responseHint": "En az 10 karakter.",
+      "errors": {
+        "response": "Gerekçe 10 ile 5000 karakter arasında olmalı.",
+        "decided": "“{item}” için yapılan itiraza zaten karar verilmiş; liste yenilendi.",
+        "notFound": "“{item}” için yapılan itiraz artık bulunamıyor; liste yenilendi."
       }
     },
-    "sentTitle": "İtirazınız alındı"
+    "sentTitle": "İtirazınız alındı",
+    "notDecided": "Bu bağlantı için itiraz edilebilir bir karar bulunamadı. Bildirim henüz sonuçlanmamış olabilir; karar verildiğinde size e-postayla bildirilir.",
+    "loadFailed": "Karar bilgileri şu anda yüklenemedi. Lütfen biraz sonra sayfayı yenileyin.",
+    "contactSupport": "Destekle iletişime geç",
+    "newReport": "Yeni bildirim yap",
+    "statementRaw": "Resmî karar metni (TR/EN)",
+    "windowEndsAt": "{date}, {time} (TSİ)",
+    "daysLeft": "{days, plural, =0 {Bugün sona eriyor} other {# gün kaldı}}",
+    "appealDecidedAt": "İtiraz karar tarihi",
+    "disputeHelp": "Mahkeme dışı uyuşmazlık çözümü (DSA md. 21) için destek ekibimize danışın",
+    "timeout": "Bağlantı zaman aşımına uğradı. Yazdıklarınız korunuyor; itirazı yeniden gönderebilirsiniz.",
+    "copyReference": "İtiraz numarasını kopyala",
+    "copied": "Kopyalandı.",
+    "copyFailed": "Kopyalanamadı; numarayı elle seçip kopyalayın.",
+    "nextSteps": "Yetkili bir çalışan itirazınızı inceler. İtiraz kabul edilirse önceki karar geri alınır; reddedilirse DSA md. 21 kapsamında mahkeme dışı uyuşmazlık çözümüne başvurabilirsiniz.",
+    "home": "Ana sayfaya dön"
   }
 }

@@ -710,7 +710,7 @@
 | Renk/tema           | Hayır                                                                |
 | Efor                | S                                                                    |
 | Kaynak denetçiler   | runtime:results, lens:copy                                           |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                         |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p034)                                     |
 
 **Kanıt:** RUNTIME p6-smart.mjs: akıllı filtre aktifken #sort-by "rating" seçiliyor. Giden istek değişmiyor: GET /api/search?destination=Antalya&guests=4&maxPrice=9000&propertyType=VILLA&amenities=Havuz&page=1&pageSize=24, yani sort parametresi yok. Select ise "Puan (önce en yüksek)" göstermeye devam ediyor. KOD: page.tsx:179-182, smartToParams sortBy değerini kullanmıyor.
 
@@ -718,26 +718,30 @@
 
 **Önerilen aksiyon:** smartToParams sonrasında sortBy != "recommended" ise params.set("sort", sortBy) çağırın; ya da sıralamayı akıllı filtre çipiyle eşleyin. İkisi de yapılmayacaksa select'i bir açıklamayla devre dışı bırakın.
 
+**Yapılan düzeltme:** Already fixed in the current code. effSort = smartFilters?.sort ?? sortParam (page.tsx ~L210), and requestKey sets the sort param whenever effSort is not "recommended". setSort writes the URL and also syncs smartFilters.sort, so the sidebar select and the request agree when the smart filter is on.
+
 ## F549 — Harita ve harita listesi gecelik taban fiyatı birim etiketi olmadan gösteriyor, kartlar ise toplam fiyat gösteriyor
 
-| Alan                | Değer                         |
-| ------------------- | ----------------------------- |
-| Severity            | Medium                        |
-| Durum               | Gözlemlendi                   |
-| Konum               | `src/app/search/page.tsx:266` |
-| Kullanıcılar        | misafir                       |
-| Prensip             | learnability · Tutarlılık     |
-| Sezgisel madde      | H4 — Tutarlılık/standartlar   |
-| Renk/tema           | Hayır                         |
-| Efor                | S                             |
-| Kaynak denetçiler   | runtime:results               |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**  |
+| Alan                | Değer                           |
+| ------------------- | ------------------------------- |
+| Severity            | Medium                          |
+| Durum               | Gözlemlendi                     |
+| Konum               | `src/app/search/page.tsx:266`   |
+| Kullanıcılar        | misafir                         |
+| Prensip             | learnability · Tutarlılık       |
+| Sezgisel madde      | H4 — Tutarlılık/standartlar     |
+| Renk/tema           | Hayır                           |
+| Efor                | S                               |
+| Kaynak denetçiler   | runtime:results                 |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p034) |
 
 **Kanıt:** RUNTIME p3-map.mjs (desktop TR, 27-29.01.2027): harita listesinde "Grand Deluxe Hotel İstanbul · ₺2.450,00" ve işaretçide "₺2.450,00" var. Liste görünümündeki kart aynı ilan için "2 gece toplam ₺4.647,33" diyor. Ekran görüntüsü: crops/search/map-desktop.png.
 
 **Etki:** Görünüm değişince aynı ilanın fiyatı değişmiş gibi algılanıyor ve kullanıcı haritada yanlış fiyata göre karar veriyor.
 
 **Önerilen aksiyon:** priceLabel, quote varsa f.money(quote.total) ve "2 gece toplam" ile, yoksa "gecelik ₺…" ile gösterilsin. İşaretçinin aria-label'ı da aynı birimi içersin.
+
+**Yapılan düzeltme:** The map priceLabel now matches the card's unit. With a quote it shows the night count plus the total, using mapPrice.total with a nights param (e.g. "2 gece toplam ₺4.647,33"). Without a quote it shows the per-night price. ResultsMap builds the marker aria-label from priceLabel, so the marker gets the same unit.
 
 ## F550 — Fiyat alanları temizlenemiyor ("0", "05000"), her tuş vuruşunda süzme yapılıyor ve canlı bölge ara sonuçları duyuruyor
 
@@ -753,13 +757,15 @@
 | Renk/tema           | Hayır                                   |
 | Efor                | S                                       |
 | Kaynak denetçiler   | runtime:results                         |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**            |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p034)        |
 
 **Kanıt:** RUNTIME p2-links.mjs: #price-max alanına fill('') yapınca değer "0" oluyor. Ardından 5000 yazınca değer "05000" oluyor. p1-filters.mjs: "3000" tuş tuş yazılırken canlı bölge önce "0 sonuç gösteriliyor (4 bulundu)", sonra "3 sonuç gösteriliyor" diyor; arada "Sonuç bulunamadı" kutusu yanıp sönüyor. Max alanı silindiğinde tüm sonuçlar kayboluyor. Min değerin max'tan büyük olması doğrulanmıyor. placeholder ("Min"/"Max") hiçbir zaman görünmüyor, çünkü alanın değeri her zaman dolu.
 
 **Etki:** Kullanıcı sınırı kaldıramıyor ve 0'a düşen max değeri tüm sonuçları gizliyor. Ekran okuyucu kullanıcısı her tuşta yanıltıcı bir "0 sonuç" duyuyor.
 
 **Önerilen aksiyon:** Durumu string olarak tutun; boş alan sınır yok anlamına gelsin. Uygulamayı 400 ms debounce ile ya da blur/Enter anında yapın. Min değer max'tan büyükse aria-describedby ile satır içi hata gösterin. inputMode="numeric" ekleyin. Varsayılan değer 0/20000 yerine boş olsun ki placeholder görünsün.
+
+**Yapılan düzeltme:** Already fixed. The price fields keep string drafts (minDraft/maxDraft) and an empty field means no limit. Values are applied after a 500 ms debounce, and invalid or min>max input shows an inline error linked by aria-describedby/aria-invalid. The inputs use inputMode="decimal" and start empty.
 
 ## F551 — Sonuç bölümünün başlığı yok: kart H3'leri "Filtreler" H2'sinin altında görünüyor; sonuçlara atlama yolu yok (24 Tab)
 
@@ -776,13 +782,15 @@
 | Renk/tema           | Hayır                                                                |
 | Efor                | S                                                                    |
 | Kaynak denetçiler   | runtime:results                                                      |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                         |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p034)                                      |
 
 **Kanıt:** RUNTIME p8-tab.mjs başlık dökümü: H1 "İstanbul için konaklama" → H2 "Filtreler" → H3 Grand Deluxe Hotel … H3 Luxury Bosphorus Suite → H2 Destek. p7-misc.mjs: #smart-filter'dan ilk sonuç denetimine ulaşmak 24 Tab basışı gerektiriyor. Sonuç ızgarası bir div; liste semantiği yok, dolayısıyla "liste, 4 öğe" duyurulmuyor.
 
 **Etki:** Ekran okuyucu kullanıcısı başlık gezintisinde sonuçları filtrelerin alt bölümü sanıyor. Klavye kullanıcısı her aramada 24 Tab basıyor.
 
 **Önerilen aksiyon:** Sonuç sütununu <section aria-labelledby="results-h"> ile sarıp içine <h2 id="results-h">Sonuçlar</h2> koyun (görsel ya da sr-only). Izgarayı <ul role="list"> ve <li> ile kurun. Akıllı filtreden sonra "Sonuçlara geç" bağlantısı ekleyin.
+
+**Yapılan düzeltme:** The results column is now <section id="results" aria-labelledby="results-heading"> with an sr-only <h2> ("Sonuçlar"). The card grid is now <ul role="list"> with <li> items, which keep the result-{id} ids and tabIndex=-1, and it renders only when there are results. A second focusable "Sonuçlara geç" skip link sits right after SmartFilter, so the filter panel can be skipped.
 
 ## F552 — Harita için liste alternatifi zayıf: öğeler yalnızca seçim düğmesi, ilana doğrudan bağlantı, puan ya da toplam fiyat yok; harita görünümünde kartlar tümüyle gizleniyor
 
@@ -798,13 +806,15 @@
 | Renk/tema           | Hayır                                             |
 | Efor                | M                                                 |
 | Kaynak denetçiler   | runtime:results                                   |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                      |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p034)                   |
 
 **Kanıt:** RUNTIME p3-map.mjs: harita görünümünde cardsVisible=0. Yan listede aria-pressed düğmeleri var: "Grand Deluxe Hotel İstanbul · ₺2.450,00". Enter'a basınca odak harita içindeki popup bağlantısına sıçrıyor; Tab sırası "Close popup" ve ardından listeye dönüyor. İlana gitmenin tek yolu popup içindeki parametresiz bağlantı. Mobilde liste 480px yüksekliğindeki haritanın altında kalıyor (crops/search/mapm-2.png).
 
 **Etki:** Haritayı kullanamayan (ekran okuyucu, düşük görme) ya da harita görünümündeki kullanıcı puanı ve toplam fiyatı göremiyor ve ilana gitmek için fazladan adım atıyor.
 
 **Önerilen aksiyon:** Liste öğesine puan ve toplam fiyatı ekleyin. Öğe içinde ayrı bir "İlanı gör" bağlantısı (tam arama parametreleriyle) bulunsun ve seçim düğmesi ayrı kalsın. Seçimde odak listede kalsın; popup odağı için focusAfterOpen={false} kullanın.
+
+**Yapılan düzeltme:** Each map list item now shows rating, review count and the unit-labelled price, plus a separate "İlanı gör" link. The link carries the full stay context (dates, guests, roomId/ratePlanId) and gets the title through aria-describedby; the aria-pressed select button is unchanged. The same href goes to MapPoint.href, so the popup link has the context too. ResultsMap already uses focusAfterOpen={false} and only moves focus to the popup after a marker click. The mobile layout (list below the map) is unchanged.
 
 ## F553 — Dokunma hedefleri: 29 adet <24px hedefin dökümü (16 onay kutusu, 4 "Bu sıralama neden?", 4 "Sıralama nasıl çalışır?", 1 atlama bağlantısı, 4 footer bağlantısı)
 
@@ -821,13 +831,15 @@
 | Renk/tema           | Hayır                                                                                                                     |
 | Efor                | S                                                                                                                         |
 | Kaynak denetçiler   | runtime:results                                                                                                           |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                              |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p112)                                                                                           |
 
 **Kanıt:** RUNTIME taraması (002 desktop) targetsLt24Count=29 ve p2-links.mjs ölçümleri. (a) "İçeriğe geç" 1x1: sr-only olduğu için yanlış pozitif. (b) 16 input.h-4.w-4 16x16 (5 "Konaklama Türü" ve 11 "Erişilebilirlik (doğrulanmış)"); saran label satırı 248x20 (mobilde 326x20), satırlar arası 8px boşluk ve merkezler arası 28px olduğu için 2.5.8 boşluk istisnası sağlanıyor. (c) 4 adet summary "Bu sıralama neden?" 259x16 (mobilde 332x16): details py-2 dolgusu tıklanabilir alana dahil değil. (d) 4 adet "Sıralama nasıl çalışır?" 110x16: details kapalıyken checkVisibility()=false, yani yalnızca açıldığında gerçek bir hedef. (e) 4 footer bağlantısı (Gizlilik Bildirimi, Güven merkezi, Verilerim, Çerez Bildirimi; bilinen genel bulgu). Ek olarak mobilde kart başlık bağlantıları 143-190x21px ve "Karşılaştırmaya ekle" tam 125x24px.
 
 **Etki:** Mobil ağırlıklı misafirler, özellikle de erişilebilirlik filtresini kullanacak motor engelli kullanıcılar, 20px'lik satırlarda yanlış seçeneğe dokunuyor.
 
 **Önerilen aksiyon:** Filtre label'larına min-h-11 py-2 (44px satır) ve checkbox'a h-5 w-5 verin. RankingWhy'da dolguyu details'tan summary'ye taşıyın (summary block py-2). "Sıralama nasıl çalışır?" bağlantısına inline-block py-1 ekleyin. CompareToggle'a py-2 ekleyin.
+
+**Yapılan düzeltme:** Each checkbox label row is now at least 44px tall (`flex min-h-[44px] items-center gap-2 py-2`) and the checkbox is h-5 w-5 shrink-0. This uses the codebase's min-h-[44px] convention, which matches min-h-11. The 44px rows replace the old space-y-2 gaps. The rest of the finding (page.tsx type radios, RankingWhy summary padding, PropertyCard/CompareToggle) belongs to other owners, as listed in otherFiles.
 
 ## F600 — Arama filtreleri (fiyat, tür, sıralama, esneklik) URL'de tutulmuyor; geri dönüşte kayboluyor
 
@@ -843,13 +855,15 @@
 | Renk/tema           | Hayır                            |
 | Efor                | S                                |
 | Kaynak denetçiler   | lens:forms, lens:nav             |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**     |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p034) |
 
 **Kanıt:** src/app/search/page.tsx:159-164 `priceRange`, `selectedTypes`, `sortBy`, `flexDays` yerel state; `flexDays` URL'den okunuyor (:143) ama yazılmıyor. Aynı sayfada erişilebilirlik filtresi URL'ye yazılıyor (:137-142 `router.replace(…accessibility…)`) — tutarsız. Akıllı filtre çipleri de (:166) URL'de değil.
 
 **Etki:** İlan detayına gidip geri dönen misafir tüm filtrelerini yeniden kurmak zorunda; mobil/masaüstü arasında aramayı paylaşamıyor.
 
 **Önerilen aksiyon:** Tüm filtreleri setAccessibility kalıbıyla URLSearchParams'a yaz (`minPrice`, `maxPrice`, `types`, `sort`, `flexDays`) ve ilk değerleri URL'den oku.
+
+**Yapılan düzeltme:** Already fixed (F66). Type, minPrice/maxPrice, sort, view and flexDays are read from searchParams and written back through updateParams (router.replace), the same way the accessibility filter is. Removing a smart chip also clears the matching URL param.
 
 ## F958 — Arama filtreleri tutarsız biçimde saklanıyor: erişilebilirlik filtresi URL'de, fiyat/tür/sıralama yerel durumda; akıllı filtre kenar çubuğu sıralamasını sessizce geçersiz kılıyor
 
@@ -865,7 +879,7 @@
 | Renk/tema           | Hayır                                                                                                   |
 | Efor                | M                                                                                                       |
 | Kaynak denetçiler   | lens:consistency                                                                                        |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                            |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p034)                                                                        |
 
 **Kanıt:** search/page.tsx:133-142 erişilebilirlik filtresi `router.replace(`/search?${next}`)` ile URL'ye yazılıyor. :159-169 `priceRange`, `selectedTypes`, `sortBy`, `flexDays` ve `view` yalnızca useState'te tutuluyor; flexDays URL'den okunuyor ama geri yazılmıyor. :179-182 `if (smartFilters) { params = smartToParams(smartFilters); }` dalında kenar çubuğundaki sortBy hiç kullanılmıyor, sıralama select'i (:383-393) yine etkileşimli kalıyor.
 
@@ -873,26 +887,30 @@
 
 **Önerilen aksiyon:** Tüm kenar çubuğu filtrelerini (minPrice, maxPrice, types, sort, flexDays, view) erişilebilirlik filtresi gibi URL'ye yazın ve oradan okuyun. Akıllı filtre etkinken kenar çubuğu sıralamasını akıllı filtrenin sort çipine bağlayın ya da select'i `disabled` yapıp `aria-describedby` ile "Akıllı filtre etkin; sıralamayı çipten değiştirin" ipucu gösterin.
 
+**Yapılan düzeltme:** Already fixed. All sidebar filters, including view, live in the URL via updateParams. The smart filter and the sidebar share one state (effType/effSort/effMin/effMax), and setSort/setType/applyPrice write to the URL and to smartFilters, so a sort change is never silently ignored.
+
 ## F959 — Filtreler art arda değiştirildiğinde geç dönen eski yanıt yeni sonuçların üzerine yazabiliyor
 
-| Alan                | Değer                          |
-| ------------------- | ------------------------------ |
-| Severity            | Medium                         |
-| Durum               | Aday                           |
-| Konum               | `src/app/search/page.tsx:202`  |
-| Kullanıcılar        | misafir                        |
-| Prensip             | robustness · responsiveness    |
-| Sezgisel madde      | H1 — Sistem durumu görünürlüğü |
-| Renk/tema           | Hayır                          |
-| Efor                | S                              |
-| Kaynak denetçiler   | area:results                   |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**   |
+| Alan                | Değer                            |
+| ------------------- | -------------------------------- |
+| Severity            | Medium                           |
+| Durum               | Aday                             |
+| Konum               | `src/app/search/page.tsx:202`    |
+| Kullanıcılar        | misafir                          |
+| Prensip             | robustness · responsiveness      |
+| Sezgisel madde      | H1 — Sistem durumu görünürlüğü   |
+| Renk/tema           | Hayır                            |
+| Efor                | S                                |
+| Kaynak denetçiler   | area:results                     |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p034) |
 
 **Kanıt:** page.tsx:227-230'daki effect yalnızca zamanlayıcıyı iptal ediyor: `return () => clearTimeout(timer);`. Devam eden fetch (202) iptal edilmiyor ve yanıtların sırası denetlenmiyor; 205-208 `setResults(data.results)` yanıtın hangi isteğe ait olduğuna bakmadan yazıyor. Sıralama 'Fiyat (önce en düşük)' → 'Puan' diye hızlı değiştirildiğinde ya da çipler art arda kaldırıldığında geç dönen eski yanıt son durumu eziyor.
 
 **Etki:** Misafir seçtiği sıralama ya da filtreyle uyuşmayan bir liste görüyor (ör. select 'Puan' derken fiyata göre sıralı liste). Yavaş mobil ağda bu olasılık artıyor.
 
 **Önerilen aksiyon:** load'a AbortController ekleyin: effect cleanup'ında `controller.abort()` çağırın ve apiFetch'e signal geçirin. Ya da artan bir istek kimliği tutup yalnızca son isteğin yanıtını uygulayın.
+
+**Yapılan düzeltme:** Already handled with the suggested alternative of an increasing request id. load() and loadMore() check requestSeq and drop stale responses before any setResults/setError/setLoading, so an older response cannot overwrite a newer one.
 
 ## F960 — Arama hatası ham sunucu/tarayıcı metniyle ve arayüz dilinden bağımsız gösteriliyor; 'Tekrar dene' yok
 
@@ -908,13 +926,15 @@
 | Renk/tema           | Hayır                                                    |
 | Efor                | S                                                        |
 | Kaynak denetçiler   | area:results                                             |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                             |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p034)                          |
 
 **Kanıt:** page.tsx:209-211 `setError(err instanceof Error ? err.message : t('errors.load'))`: fetch her zaman Error fırlattığı için çevrilmiş t('errors.load') pratikte hiç kullanılmıyor. Gösterilen metinler şunlar: geçersiz URL'de (ör. checkOut <= checkIn ya da guests=40) sunucunun 'Doğrulama hatası' metni (src/lib/http/errors.ts:154); JSON olmayan yanıtta 'İstek başarısız (500)' (src/lib/api-client.ts:40); ağ kesintisinde tarayıcının İngilizce 'Failed to fetch' metni. Sonuç olarak EN arayüzde Türkçe, TR arayüzde İngilizce metin çıkıyor. 470-476'daki hata kutusunda yeniden deneme düğmesi ya da düzeltme bağlantısı yok.
 
 **Etki:** Yavaş ya da kesintili mobil ağdaki misafir 'Failed to fetch' görüyor ve ne yapacağını bilmiyor. Bozuk bir paylaşım bağlantısıyla gelen kullanıcı hangi parametrenin hatalı olduğunu öğrenemiyor.
 
 **Önerilen aksiyon:** ApiError.status ve code değerlerini çevrilmiş mesajlarla eşleyin: VALIDATION_ERROR → t('errors.invalidParams') ve details içindeki alanın adı; ağ hatası → t('errors.offline'). Hata kutusuna `<Button onClick={load}>{t('retry')}</Button>`, VALIDATION_ERROR için de 'Aramayı düzenle' bağlantısı ekleyin.
+
+**Yapılan düzeltme:** Search errors now go through useErrorText with the localized fallback errors.load. For VALIDATION_ERROR the box shows errors.invalidParams plus the invalid fields, taken from details.fieldErrors and mapped to translated labels. The error box has a "Tekrar dene" button that moves focus to #results and re-runs load(). For validation errors it also has "Aramayı düzenle", which opens EditSearch focused on the first invalid field. A failed "Daha fazla göster" now shows its own role=alert message and no longer hides the loaded results.
 
 ## F961 — Akıllı filtre: başarısız LLM çağrısı mevcut sonuçları gizliyor; etkin filtreler başlık ve sıralama kutusuyla çelişiyor
 
@@ -930,13 +950,15 @@
 | Renk/tema           | Hayır                                                                                       |
 | Efor                | S                                                                                           |
 | Kaynak denetçiler   | lens:status                                                                                 |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p034)                                                             |
 
 **Kanıt:** search/page.tsx:243 akıllı filtre hatası arama hatasıyla aynı `error` state'ine yazılıyor → 470-476 hata kutusu, 503 `{!error && !showMap && (` sonuç ızgarası gizleniyor. 179-181 smartFilters varken URL destination/sort yok sayılıyor ama 284-290 başlık hâlâ URL'deki destination/tarihleri gösteriyor; 383-393 'Sıralama' select'i smart modda etkisiz.
 
 **Etki:** Misafir geçerli sonuç listesini, yalnız isteğe bağlı AI yorumlaması başarısız olduğu için kaybediyor; başlık 'İstanbul için konaklama' derken sonuçlar başka şehir olabiliyor; sıralama değişikliği sessizce yok sayılıyor.
 
 **Önerilen aksiyon:** Ayrı `smartError` state'i; SmartFilter altında role=alert 'Metin yorumlanamadı, mevcut sonuçlar korunuyor' + 'Tekrar dene'. smartFilters aktifken başlığı çiplerden üret ('Antalya · 2 misafir') ve sidebar sıralama değişikliğini smartFilters.sort'a yaz ya da select'i disable edip 'Akıllı filtre sıralaması etkin' ipucu göster.
+
+**Yapılan düzeltme:** Smart filter failures now go to a separate smartError state and no longer hide the results. Under SmartFilter they show as a role=alert message ("... Mevcut sonuçlar korunuyor.") with a Retry button, which moves focus to #smart-filter and re-runs the last text. clearSmart() clears it on clear, edit-search and clear-all. The heading and sort mismatch were already fixed: the heading comes from the effective request destination, and the sort is synced.
 
 ## F962 — Arama fiyat filtresi: birim/para birimi yok, sınır yok, boşaltılınca tüm sonuçlar gizleniyor
 
@@ -952,13 +974,15 @@
 | Renk/tema           | Hayır                                        |
 | Efor                | S                                            |
 | Kaynak denetçiler   | lens:forms                                   |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                 |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p034)             |
 
 **Kanıt:** src/app/search/page.tsx:159 `useState<[number, number]>([0, 20000])`; :334-353 `type="number"` alanlarda min/max/step ve para birimi yok, etiketler `sr-only` (görsel olarak yalnız '0 - 20000'), placeholder değer dolu olduğu için hiç görünmüyor. :338,350 `Number(e.target.value)` — maks alanı silinince 0 olur ve :252 `price > priceRange[1]` tüm sonuçları eler; min>max kontrolü yok. Filtre farklı para birimli ilanları aynı sayıyla karşılaştırıyor (:251 `toMajorNumber(p.basePriceMinor, p.currency)`).
 
 **Etki:** Misafir maks fiyatı yeniden yazmak için silince 'Sonuç bulunamadı' görür ve nedenini anlayamaz; '20000'in TL mi EUR mu olduğu belli değil.
 
 **Önerilen aksiyon:** Görünür etiketler ('En düşük (TRY)', 'En yüksek (TRY)'), `min={0} step={100} inputMode="numeric"`; boş alanı 'sınırsız' (undefined) olarak yorumla; min>max ise Field `error`. Sonuç yoksa 'Fiyat filtresi tüm sonuçları gizliyor — sıfırla' eylemi göster.
+
+**Yapılan düzeltme:** Already fixed. The fields have visible labels (En az/En çok), and the legend shows the unit (total vs nightly) plus the currency when results share one. Empty means no limit, and min>max or invalid input shows an inline error. Price filtering now happens on the server, and the no-results state has a clear-all-filters action. min/step do not apply because the input is text with locale-aware parsing.
 
 ## F963 — Fiyat alanları hatayı önlemiyor: 20000 tavanı ilanları sessizce gizliyor, alan silinince değer 0 olup tüm sonuçlar kayboluyor, en düşük > en yüksek denetlenmiyor
 
@@ -973,7 +997,7 @@
 | Renk/tema           | Hayır                                     |
 | Efor                | S                                         |
 | Kaynak denetçiler   | area:results                              |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**              |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p035)          |
 
 **Kanıt:** page.tsx:159 `useState<[number, number]>([0, 20000])`: gecelik tabanı 20000'i aşan ilanlar, kullanıcı hiçbir şey seçmeden gizleniyor; tek ipucu 'X sonuç gösteriliyor (Y bulundu)' farkı. 338/350 `onChange={(e) => setPriceRange([Number(e.target.value), ...])}`: üst alan temizlenince Number('') = 0 oluyor, tüm sonuçlar kayboluyor ve alanda '0' beliriyor. En düşük > en yüksek için doğrulama ya da aria-invalid yok. min özniteliği olmadığından negatif değer engellenmiyor; inputMode ve step de yok. Değer hep dolu olduğu için 'Min'/'Max' placeholder'ları (340, 352) hiç görünmüyor.
 
@@ -981,26 +1005,30 @@
 
 **Önerilen aksiyon:** State'i `[number | null, number | null]` yapın; boş değer sınırsız anlamına gelsin. Başlangıç değerlerini boş bırakın ki placeholder görünsün. Inputlara `min='0' inputMode='numeric' step='1'` ekleyin. En düşük > en yüksek olduğunda iki alana da aria-invalid verin, aria-describedby ile bağlı 'En düşük fiyat en yüksek fiyattan büyük olamaz' metnini gösterin ve filtreyi uygulamayın. Değişiklikleri 300 ms gecikmeyle uygulayın.
 
+**Yapılan düzeltme:** I checked the current code and the problem is already fixed. There is no [0, 20000] default any more. The price fields keep text drafts, and an empty field means no limit. If min > max, both fields get aria-invalid and aria-describedby pointing to 'price-hint price-error', and filters.priceOrder is shown. Valid values are applied after 500 ms. parseAmountToMinor rejects negative input such as '-5' through its /^[\d.,]+$/ check, and the fields use inputMode="decimal" for TR amounts.
+
 ## F964 — Tarih esnekliği seçeneği ne yapacağını önceden söylemiyor; öneri bulunamadığında da geri bildirim vermiyor
 
-| Alan                | Değer                         |
-| ------------------- | ----------------------------- |
-| Severity            | Medium                        |
-| Durum               | Aday                          |
-| Konum               | `src/app/search/page.tsx:397` |
-| Kullanıcılar        | misafir                       |
-| Prensip             | learnability · predictability |
-| Sezgisel madde      | H13 — Feedforward             |
-| Renk/tema           | Hayır                         |
-| Efor                | S                             |
-| Kaynak denetçiler   | area:results                  |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**  |
+| Alan                | Değer                           |
+| ------------------- | ------------------------------- |
+| Severity            | Medium                          |
+| Durum               | Aday                            |
+| Konum               | `src/app/search/page.tsx:397`   |
+| Kullanıcılar        | misafir                         |
+| Prensip             | learnability · predictability   |
+| Sezgisel madde      | H13 — Feedforward               |
+| Renk/tema           | Hayır                           |
+| Efor                | S                               |
+| Kaynak denetçiler   | area:results                    |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p035) |
 
 **Kanıt:** page.tsx:397-413'te etiket 'Tarih esnekliği', seçenekler 'Tam tarihler / ±1 gün...'. Sonuç listesinin değişmeyeceği, yalnızca karta 'daha ucuz tarih' notunun (534-540) ekleneceği açıklanmıyor. Hiçbir ilan için öneri yoksa ekranda hiçbir şey değişmiyor ve mesaj da çıkmıyor. 404'teki disabled select odak sırasından çıkıyor; ipucu (414-418) yalnızca tarih seçilmemişken görünüyor.
 
 **Etki:** Misafir '±3 gün' seçince aramanın ±3 günlük aralıkta yapılacağını bekliyor; bir değişiklik görmeyince özelliğin çalışmadığını düşünüyor.
 
 **Önerilen aksiyon:** Select'e her zaman görünen bir ipucu bağlayın: 'Aynı gece sayısıyla ±N gün içinde daha ucuz tarih varsa ilan kartında gösterilir'. Yükleme bitince öneri sayısını sayım satırındaki aria-live alanında duyurun ('3 ilanda daha ucuz tarih bulundu' ya da 'Daha ucuz tarih bulunamadı'). disabled yerine aria-disabled='true' kullanarak select'i odaklanabilir bırakın.
+
+**Yapılan düzeltme:** The flex select now has a hint that is always visible (#flex-days-desc, flex.hint). It explains that the result list does not change and that a cheaper date is shown on the card. I replaced `disabled` with aria-disabled, so the select stays focusable; onChange does nothing when there are no dates, and the aria-disabled:bg-gray-100 variant keeps the old grey look. Once flexDays has loaded, the aria-live count line now adds '· N ilanda daha ucuz tarih bulundu' or 'daha ucuz tarih bulunamadı'.
 
 ## F965 — Sonuçlar bölümünün başlığı yok; kart başlıkları (h3) 'Filtreler' h2'sinin altına düşüyor; akıllı filtre formu landmark değil
 
@@ -1017,7 +1045,7 @@
 | Renk/tema           | Hayır                                                                                       |
 | Efor                | S                                                                                           |
 | Kaynak denetçiler   | area:results                                                                                |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p035)                                                             |
 
 **Kanıt:** page.tsx:326 `<h2>{t('filters.title')}</h2>` sayfadaki tek h2. Sonuç sütununun (423 `<div className='lg:col-span-3'>`) başlığı yok ve bir bölge olarak işaretlenmemiş. PropertyCard.tsx:133'teki `<h3>` başlıkları belgenin ana hattında 'Filtreler'in altında görünüyor. Akıllı filtre formu (SmartFilter.tsx:108) role='search' taşımıyor ve başlığı yok. `<aside>` (324) etiketsiz; içeriği tamamlayıcı değil, birincil filtre kontrolleri.
 
@@ -1025,26 +1053,30 @@
 
 **Önerilen aksiyon:** Sonuç sütununu `<section id='results' aria-labelledby='results-heading'>` yapın ve içine `<h2 id='results-heading'>{t('resultsTitle')}</h2>` ekleyin (görünür ya da sr-only). aside'ı `<section aria-labelledby='filters-heading'>` yapın. SmartFilter formuna `role='search' aria-label={t('smart.label')}` ekleyin.
 
+**Yapılan düzeltme:** The results section and its heading were already in place. I changed the unlabeled <aside> to <section aria-labelledby="filters-heading"> and gave the Filtreler h2 that id. I wrapped the SmartFilter block, including its error and skip link, in <div role="search" aria-label={t('smart.region')}>, so SmartFilter.tsx needs no change.
+
 ## F966 — Yükleniyor durumu zayıf: ilk yüklemede sonuç alanı boş kalıyor, yeniden yüklemede eski kartlar işaretsiz ve tıklanabilir
 
-| Alan                | Değer                         |
-| ------------------- | ----------------------------- |
-| Severity            | Medium                        |
-| Durum               | Aday                          |
-| Konum               | `src/app/search/page.tsx:426` |
-| Kullanıcılar        | misafir                       |
-| Prensip             | robustness · observability    |
-| Sezgisel madde      | H15 — Performans              |
-| Renk/tema           | Hayır                         |
-| Efor                | S                             |
-| Kaynak denetçiler   | area:results                  |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**  |
+| Alan                | Değer                           |
+| ------------------- | ------------------------------- |
+| Severity            | Medium                          |
+| Durum               | Aday                            |
+| Konum               | `src/app/search/page.tsx:426`   |
+| Kullanıcılar        | misafir                         |
+| Prensip             | robustness · observability      |
+| Sezgisel madde      | H15 — Performans                |
+| Renk/tema           | Hayır                           |
+| Efor                | S                               |
+| Kaynak denetçiler   | area:results                    |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p035) |
 
 **Kanıt:** Tek gösterge 426'daki `{loading ? t('loading') : t('resultCount', ...)}` küçük gri metni. İlk yüklemede results=[] ve 478'deki boş durum `!loading` koşuluyla gizli, dolayısıyla ızgara alanı tamamen boş. Yeniden yüklemede (sıralama, erişilebilirlik ya da akıllı filtre değişince) 503-553'teki eski kartlar soluklaştırılmadan kalıyor; sonuç kapsayıcısında aria-busy yok. Suspense fallback'i (619) Header'sız boş gri bir div.
 
 **Etki:** Mobilde sayım satırı filtre panelinin altında, ekran dışında kaldığı için misafir yüklemenin sürdüğünü görmüyor. Yeniden yükleme sırasında eski bir karta tıklayıp yanlış sıralama ya da fiyat varsayımıyla ilerleyebiliyor.
 
 **Önerilen aksiyon:** İlk yüklemede 6 iskelet kart gösterin. Yeniden yüklemede ızgaraya `aria-busy={loading}` ve `opacity-60 pointer-events-none` uygulayın. Suspense fallback'ine Header ile iskelet kartları koyun.
+
+**Yapılan düzeltme:** On first load the results area shows 6 skeleton cards (ResultSkeletons: aria-hidden, motion-safe:animate-pulse, existing gray classes only). When results reload, the list gets aria-busy and 'pointer-events-none opacity-60'. The Suspense fallback is now Header plus a main with aria-busy, a role=status 'Yükleniyor...' line and the skeleton cards. The skeletons have no /property links and no card-price test ids.
 
 ## F967 — Geliştiriciye yönelik teknik metinler misafire gösteriliyor (önbellek, vektör DB, VAPID, deterministik LLM, ham skorlar)
 
@@ -1060,7 +1092,7 @@
 | Renk/tema           | Hayır                                                                                                                                                                                                                                                                                                              |
 | Efor                | M                                                                                                                                                                                                                                                                                                                  |
 | Kaynak denetçiler   | lens:copy                                                                                                                                                                                                                                                                                                          |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                                                                                                                                                                                                       |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p035)                                                                                                                                                                                                                                                                             |
 
 **Kanıt:** search/page.tsx:429-433 yeşil 'Önbellekten' rozeti (search.json:37); 297 visual.reasons → search.json:121 'Görsel model çalışma zamanı kurulu değil.', 124 'Görsel arama için vektör veritabanı yok.'; pwa.json:34 '(VAPID anahtarları yok)'; ui.tsx:123-141 LlmBadge her AI çıktısında 'Demo (deterministik)', 'Canlı LLM', 'Yedek (LLM başarısız)' (common.json:19-21); RankingWhy.tsx:27 'Toplam skor: 0.734', 33-34 bilinmeyen faktör anahtarı ham ve 3 ondalıklı değerler; compare.json:3 'teklif motorundan'; booking.json:27 '(%90 güven)'.
 
@@ -1068,26 +1100,30 @@
 
 **Önerilen aksiyon:** 'Önbellekten' rozetini ve teknik görsel arama nedenlerini yalnız yöneticiye gösterin, misafire 'Benzer fotoğraf araması şu an kullanılamıyor' deyin; LlmBadge'de misafir için yalnız 'Yapay zekâ ile oluşturuldu' gösterip mod ayrıntısını title/yönetici paneline bırakın; RankingWhy'da sayıları yüzde katkı çubuklarına çevirin ('Puan: %40'); 'güven aralığı' yerine 'Bu tarihlerde benzer odalar genellikle ₺X–₺Y' yazın.
 
+**Yapılan düzeltme:** The search-page parts are done. The 'Önbellekten' badge now shows only to ADMIN users (via useSessionUserCache). Guests now see one plain message, visual.unavailable, when visual search fails; admins still see the technical visual.reasons.*. LlmBadge, RankingWhy and the pwa, compare and booking texts live in files I don't own, so I listed them under crossOwner.
+
 ## F968 — Boş durum nedeni ayırt etmiyor ve tek tıkla kurtulma yolu sunmuyor; panelde 'Tüm filtreleri temizle' yok
 
-| Alan                | Değer                         |
-| ------------------- | ----------------------------- |
-| Severity            | Medium                        |
-| Durum               | Aday                          |
-| Konum               | `src/app/search/page.tsx:478` |
-| Kullanıcılar        | misafir                       |
-| Prensip             | robustness · recoverability   |
-| Sezgisel madde      | H9 — Hata mesajları           |
-| Renk/tema           | Hayır                         |
-| Efor                | M                             |
-| Kaynak denetçiler   | area:results                  |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**  |
+| Alan                | Değer                           |
+| ------------------- | ------------------------------- |
+| Severity            | Medium                          |
+| Durum               | Aday                            |
+| Konum               | `src/app/search/page.tsx:478`   |
+| Kullanıcılar        | misafir                         |
+| Prensip             | robustness · recoverability     |
+| Sezgisel madde      | H9 — Hata mesajları             |
+| Renk/tema           | Hayır                           |
+| Efor                | M                               |
+| Kaynak denetçiler   | area:results                    |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p035) |
 
 **Kanıt:** page.tsx:478-483'te yalnızca 'Sonuç bulunamadı' ve 'Filtreleri değiştirmeyi deneyin.' (tr/search.json:44) metni var, düğme yok. Sunucunun 0 sonuç döndürmesi ile istemci filtrelerinin (fiyat/tür, 249-255) total>0 olan sonuçları tamamen gizlemesi aynı mesajı veriyor. Erişilebilirlik filtresi (AND kuralı, aynı oda) sonucu sıfırladığında hangi özelliğin elediği söylenmiyor. Yan panelde (325-420) toplu sıfırlama kontrolü yok.
 
 **Etki:** Erişilebilirlik ihtiyacı olan misafir 4-5 özellik seçip sıfır sonuç aldığında hangi seçimi gevşeteceğini bilmiyor ve onay kutularını tek tek kaldırmak zorunda kalıyor.
 
 **Önerilen aksiyon:** total>0 ve visibleResults.length===0 ise '{total} sonuç fiyat/tür filtrelerinizle gizlendi' mesajını ve 'Fiyat ve tür filtrelerini temizle' düğmesini gösterin. Erişilebilirlik özellikleri seçiliyse bunları kaldırılabilir çipler olarak listeleyin. Panel başlığının yanına fiyat, tür, sıralama, esneklik ve erişilebilirlik seçimlerini birlikte sıfırlayan 'Tümünü temizle' düğmesi ekleyin.
+
+**Yapılan düzeltme:** The empty-state cause the finding described no longer exists: price and type filtering now happen on the server, so total already reflects the filters. 'Tüm filtreleri temizle' already existed in the panel and the empty state. I added a list of the selected accessibility features as removable chips to the empty state. It comes with a hint explaining that all features must be in the same room; the chip names reuse smart.remove and compliance.accessibility.codes.*. Removing a chip or clearing all filters first moves focus to #results, so focus is not lost while the list reloads.
 
 ## F969 — Boş sonuç ve hata durumlarında kurtarma eylemi yok
 
@@ -1103,13 +1139,15 @@
 | Renk/tema           | Hayır                                                                                                                                                                                                              |
 | Efor                | M                                                                                                                                                                                                                  |
 | Kaynak denetçiler   | lens:copy                                                                                                                                                                                                          |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                                                                                                       |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p035)                                                                                                                                                                             |
 
 **Kanıt:** search/page.tsx:478-483 'Sonuç bulunamadı' + 'Filtreleri değiştirmeyi deneyin.' — 'Filtreleri temizle' düğmesi yok (fiyat/tür süzgeci istemcide sessizce kalır). booking/[id]/page.tsx:104-113 başlık 'Hata' + sunucu metni + yalnız 'Ana sayfaya dön' (yeniden dene yok); checkout/page.tsx:148-163 loadError'da 'Rezervasyon bilgileri eksik' başlığı yanlış teşhis; compare/page.tsx:83-89 yalnız hata metni; account/page.tsx:191-205 tek bir favori hatası tüm sayfayı başlıksız hata ekranıyla değiştirir; compliance.json:24 'Lütfen tüm zorunlu alanları doğru doldurun.' hangi alan olduğunu söylemez (NoticeForm).
 
 **Etki:** Misafir çıkmaz sokakta kalır; favori eklerken oluşan geçici hata bütün hesap sayfasını kaybettirir.
 
 **Önerilen aksiyon:** Boş sonuçta 'Filtreleri temizle' ve 'Tarihleri esnet (±2 gün)' düğmeleri ekleyin; hata kartlarına 'Tekrar dene' (reload) eylemi ve anlamlı başlık ('Rezervasyon yüklenemedi') koyun; account'ta favori/iptal hatalarını sayfayı değiştirmeden satır içi Status ile gösterin; NoticeForm'da details.fieldErrors'u ilgili Field'lara bağlayın.
+
+**Yapılan düzeltme:** On the search page, the empty state now always offers 'Aramayı düzenle'. It focuses check-in when dates are set, otherwise the destination. Clear-all and the removable accessibility chips are also there, and the error card already had Tekrar dene. I did not add a '±2 gün esnet' button, because flexDays only adds notes to results that are already found and cannot fill an empty list. The booking, checkout, compare, account and NoticeForm parts are in files I don't own; they are listed under crossOwner.
 
 ## F970 — Arama boş sonuç durumunda filtreleri sıfırlama veya tarihleri esnetme eylemi yok
 
@@ -1124,13 +1162,15 @@
 | Renk/tema           | Hayır                             |
 | Efor                | S                                 |
 | Kaynak denetçiler   | lens:nav                          |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**      |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p035)   |
 
 **Kanıt:** 478-483 yalnız metin: "Sonuç bulunamadı" / "Filtreleri değiştirmeyi deneyin." priceRange ve selectedTypes için sıfırlama yok. smartFilters'ın onClear'ı (316-319) burada sunulmuyor. Sonuçları hangi filtrenin gizlediği gösterilmiyor; resultCount yalnız "{shown} sonuç ({total} bulundu)".
 
 **Etki:** Fiyat aralığını daraltıp sıfır sonuç alan misafir hangi filtrenin sebep olduğunu bilmiyor ve tek tek geri almak zorunda kalıyor.
 
 **Önerilen aksiyon:** Boş durumda "Tüm filtreleri temizle" (priceRange [0, 20000], selectedTypes [], accessibility parametresi, smartFilters null) ve tarih varsa "Tarihleri ±3 gün esnet" (flexDays=3) düğmeleri ekleyin. `total > shown` ise "Filtreler {n} sonucu gizledi" metnini gösterin.
+
+**Yapılan düzeltme:** The empty state has 'Tüm filtreleri temizle' when filters are active; it resets type, price, accessibility, similar-photo, flexDays and the smart filter. It also now always has 'Aramayı düzenle' to change dates or destination. I did not add a 'Tarihleri ±3 gün esnet' button, because flexDays does not change which results are found. The 'filters hid N results' message is no longer needed: filtering now happens on the server, so total already counts only matching results.
 
 ## F971 — Akıllı filtre hatası tüm sonuç listesini gizliyor ve mesaj giriş alanından uzakta gösteriliyor
 
@@ -1146,13 +1186,15 @@
 | Renk/tema           | Hayır                                       |
 | Efor                | S                                           |
 | Kaynak denetçiler   | area:results                                |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p035)      |
 
 **Kanıt:** runSmart ile load aynı error state'ini kullanıyor (243 `setError(... t('errors.smart'))`). Izgara 503'teki `{!error && !showMap && (...)}` koşuluna bağlı; bu yüzden ekranda geçerli sonuçlar varken bile akıllı filtre başarısız olursa liste kayboluyor. Mesaj sonuç sütununda (470-476) çıkıyor; SmartFilter girişi (SmartFilter.tsx:113-121) aria-invalid ya da aria-describedby almıyor ve odak taşınmıyor.
 
 **Etki:** LLM ya da ağ hatasında misafir az önce gördüğü sonuçları kaybediyor. Mobilde hata mesajı filtre panelinin altında, ekran dışında kalıyor; kullanıcı listenin neden boşaldığını anlamıyor.
 
 **Önerilen aksiyon:** Akıllı filtre için ayrı bir smartError state'i tutun. SmartFilter'a error prop'u geçirin ve mesajı girişin altında `<p id='smart-filter-error' role='alert'>` olarak gösterin. Girişe `aria-invalid` ve `aria-describedby='smart-filter-error'` ekleyin. Sonuç ızgarasını yalnızca load hatasında gizleyin.
+
+**Yapılan düzeltme:** A separate smartError state already existed: the error appears right under SmartFilter with role=alert and a retry button, and the results list stays visible. I gave the error paragraph id="smart-filter-error". The input still lacks aria-invalid and aria-describedby, because SmartFilter.tsx needs an optional prop before the page can wire it (see crossOwner).
 
 ## F972 — Kart altındaki kontroller ilan adını taşımıyor ve sonuçlar liste semantiğinde değil
 
@@ -1169,13 +1211,15 @@
 | Renk/tema           | Hayır                                                                                                                                    |
 | Efor                | M                                                                                                                                        |
 | Kaynak denetçiler   | area:results                                                                                                                             |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                             |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p035)                                                                                                   |
 
 **Kanıt:** page.tsx:504-506 `<div className='grid ...'>{visibleResults.map((property) => (<div key={property.id}>`: ul/li ya da article yok. Her öğede aynı adla tekrarlanan kontroller var: RankingWhy.tsx:23-25'teki summary 'Bu sıralama neden?', CompareToggle.tsx:25 'Karşılaştırmaya ekle', page.tsx:548 'Benzerlerini göster', page.tsx:657 'Bu tarihleri gör', PropertyCard.tsx:190-195 'Fırsatı Gör'. Bu kontrollerin çoğu PropertyCard'ın dışında, kardeş öğe olarak duruyor; h3 başlığıyla programatik ilişkileri zayıf.
 
 **Etki:** Ekran okuyucunun bağlantı ve düğme listesinde 24 adet 'Karşılaştırmaya ekle' ve 'Fırsatı Gör' çıkıyor; misafir hangisinin hangi ilana ait olduğunu anlamak için geri dolaşmak zorunda. Sonuç sayısı ve konum ('24 öğeden 3.') duyurulmuyor.
 
 **Önerilen aksiyon:** Izgarayı `<ul role='list'>` yapın; her sonucu `<li><article aria-labelledby={'title-' + id}>` içine alın ve PropertyCard'daki h3'e bu id'yi verin. Tekrarlanan kontrollere görünmez bağlam ekleyin: `<span className='sr-only'>: {title}</span>` (ör. 'Karşılaştırmaya ekle: Grand Deluxe Hotel'). summary'ye `aria-describedby={'title-' + id}` verin.
+
+**Yapılan düzeltme:** Results were already a ul/li list, and PropertyCard already renders an <article aria-labelledby> around its h3. The 'Benzerlerini göster' link is now named visual.showSimilarNamed ('Benzerlerini göster: {title}'). FlexSuggestionNote takes a new optional title prop, and its 'Bu tarihleri gör' link is now named flex.viewNamed. Both names start with the visible text, so label-in-name holds. CompareToggle and RankingWhy need an optional title prop in their own files first (see crossOwner).
 
 ## F973 — Fotoğrafı olmayan ilanda stok bir otel fotoğrafı, alt metni ilan adı olacak şekilde ilanın kendi fotoğrafıymış gibi gösteriliyor
 
@@ -1192,13 +1236,15 @@
 | Renk/tema           | Hayır                                               |
 | Efor                | S                                                   |
 | Kaynak denetçiler   | area:results                                        |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                        |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p035)              |
 
 **Kanıt:** page.tsx:511-514 `imageUrl={property.images?.[0] ?? 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=600&h=400&fit=crop'}`; PropertyCard.tsx:95-98 `<Image src={imageUrl} alt={title} .../>`. Böylece aynı stok fotoğraf ilan adıyla etiketleniyor. Ayrıca gerçek fotoğraflarda da alt=title, hemen altındaki h3 bağlantısının (133-136) metnini tekrarlıyor.
 
 **Etki:** Misafir gerçek olmayan bir görsele bakarak ilan seçebiliyor ve bu güveni zedeliyor. Ekran okuyucu ilan adını iki kez okuyor.
 
 **Önerilen aksiyon:** Fotoğraf yoksa nötr bir yer tutucu (ikon ve görünür 'Fotoğraf yok' metni) gösterin ve alt={t('card.noPhoto')} kullanın. Gerçek fotoğrafta alt metni ya '' yapın (başlık zaten bağlantıda) ya da fotoğrafın içeriğini tarif eden bir metin kullanın.
+
+**Yapılan düzeltme:** I removed the Unsplash stock fallback. The card now gets imageUrl={property.images?.[0]}, so PropertyCard shows its 'Fotoğraf eklenmemiş' placeholder when there is no photo. Real photos still use alt={title}, which repeats the h3 link text; that is in PropertyCard.tsx (see crossOwner).
 
 ## F974 — Harita yan listesinde ilana bağlantı yok; ilana gitmenin tek yolu harita içindeki açılır pencere
 
@@ -1214,13 +1260,15 @@
 | Renk/tema           | Hayır                                      |
 | Efor                | S                                          |
 | Kaynak denetçiler   | area:results                               |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**               |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p036)            |
 
 **Kanıt:** page.tsx:595-609'da her liste öğesi yalnızca bir seçim düğmesi: `<button aria-pressed={active} onClick={() => onSelect(active ? null : p.id)}>`. İlana gitmek için ResultsMap.tsx:229-248'deki Popup içinde bulunan Link'e ulaşmak gerekiyor; bu bağlantı harita tuvalinin içinde ve odak sırasında işaretçilerden sonra geliyor.
 
 **Etki:** Klavye ya da ekran okuyucu kullanıcısı harita görünümünde listeden ilana doğrudan geçemiyor; mobilde küçük açılır pencereye dokunmak gerekiyor.
 
 **Önerilen aksiyon:** Her li'ye, seçim düğmesinin yanına `<Link href={stayHref}>İlanı gör<span className='sr-only'>: {p.title}</span></Link>` ekleyin. Seçim düğmesinin erişilebilir adını 'Haritada göster: {title}' yapın.
+
+**Yapılan düzeltme:** Each map list item already had an "İlanı gör" link to the listing (added earlier by p034/F552, current page.tsx MapResultList). I added a screen-reader hint, wired to every select button with aria-describedby, that says what the button does ("Seçince ilan haritada vurgulanır."). I kept the name built from the button content because the e2e test reads the first span as the title.
 
 ## F975 — Harita görünümünün liste alternatifi ilana gitmeyi sağlamıyor; seçili öğe yalnız renkle belli
 
@@ -1237,13 +1285,15 @@
 | Renk/tema           | Hayır                                      |
 | Efor                | S                                          |
 | Kaynak denetçiler   | lens:a11y                                  |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**               |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p036)            |
 
 **Kanıt:** MapResultList 595-609 her öğe yalnız seçim yapan `<button aria-pressed={active} onClick={() => onSelect(active ? null : p.id)}>`; ilana bağlantı yalnız harita Popup'ında (ResultsMap.tsx:229-248) ve liste DOM'da haritadan SONRA. Harita görünümünde (485-501) PropertyCard ızgarası gizli. Aktif öğe 599-602 `border-[#003580] bg-amber-100` ile, yalnız renkle ayrışıyor.
 
 **Etki:** Klavye/ekran okuyucu misafir harita görünümünde listeden ilana gidemiyor; Shift+Tab ile harita içindeki açılır pencereye geri dönmek zorunda; renk körü kullanıcı seçili öğeyi ayırt edemiyor.
 
 **Önerilen aksiyon:** Her liste öğesine `<Link href={`/property/${p.id}`}>` ekleyin (seçim düğmesi ayrı kalsın); seçili öğeye ✓ ikonu veya 'Seçili' metni ekleyin.
+
+**Yapılan düzeltme:** The link to the listing was already in each list item. The selected item now shows a visible "✓ Seçili" line, marked aria-hidden because aria-pressed already announces the state. Its border is now border-2 with padding adjusted so nothing shifts. No colors were changed.
 
 ## F976 — Algılanan performans: iskelet yok, loading.tsx yok, Header'sız yedekler düzeni kaydırıyor
 
@@ -1259,13 +1309,15 @@
 | Renk/tema           | Hayır                                                                                               |
 | Efor                | M                                                                                                   |
 | Kaynak denetçiler   | lens:mobile                                                                                         |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                        |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p036)                                                                     |
 
 **Kanıt:** `find src/app -name loading.tsx` hiçbir sonuç döndürmüyor. property/[id]/page.tsx:116 dinamik Prisma sorgusu yapıyor; karta dokununca sunucu yanıtına kadar hiçbir geri bildirim yok. search/page.tsx:619 `<Suspense fallback={<div className="min-h-screen bg-gray-50" />}>` Header'sız boş bir zemin gösteriyor, ardından Header ve :426 'Yükleniyor...' metni, en son kartlar geliyor: üç aşamalı sıçrama. account/page.tsx:183-188 yüklenirken Header'sız tam ekran spinner gösteriyor (metin ya da `role=status` yok), sonra Header ekleniyor. messages/tr altında 30 'Yükleniyor' metni var; kod tabanında hiç iskelet (`animate-pulse`) kullanılmıyor. 'Yükleniyor...' ve 'Yükleniyor…' yazımları da karışık.
 
 **Etki:** Mobil ağda misafir karta dokunduğunda ekran donmuş gibi görünüyor ve tekrar dokunuyor. Arama sayfası açılırken başlık ve içerik zıplıyor (CLS). Ekran okuyucu kullanıcısı hesap sayfası yüklenirken hiçbir şey duymuyor.
 
 **Önerilen aksiyon:** `src/app/property/[id]/loading.tsx` ekle: galeri için `aspect-[16/9]` gri kutu, başlık çubukları ve sağda widget iskeleti. `src/app/search/loading.tsx` ekle. Arama sayfasındaki Suspense yedeğini ve `loading` dalını 6 kart iskeletiyle değiştir (h-48 görsel ve 3 metin çubuğu, `animate-pulse`; reduced-motion zaten globals.css:6-15'te ele alınıyor) ve Header'ı Suspense dışına al. Hesap sayfasında spinner yerine Header'lı iskelet ve `<p role="status" className="sr-only">Yükleniyor…</p>` kullan. Yazımı tek biçime indir.
+
+**Yapılan düzeltme:** Added src/app/search/loading.tsx and a new shared src/components/search/SearchPageSkeleton.tsx. The skeleton includes the Header and copies the page layout (title box, smart filter, filter panel, card grid), with motion-safe pulse and an sr-only role=status message. The page's Suspense fallback and its loading branch both use it now, and main no longer has aria-busy (same as F400). property/[id]/loading.tsx and the account page skeleton were already done by their owners. The p001 patch already changes search.loading to "Yükleniyor…".
 
 ## F977 — Erişilebilirlik onay kutuları URL güncellemesi tamamlanana kadar tepki vermiyor
 
@@ -1281,13 +1333,15 @@
 | Renk/tema           | Hayır                                              |
 | Efor                | S                                                  |
 | Kaynak denetçiler   | area:results                                       |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                       |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p112)                    |
 
 **Kanıt:** AccessibilityFilter.tsx:35-36 `checked={selected.includes(code)} onChange={() => toggle(code)}`: selected tamamen URL'den türetiliyor (page.tsx:134-136 ve 375 `parseAccessibilityParam(accessibilityParam).codes`). Değişiklik page.tsx:141'de `router.replace(...)` ile yapılıyor; bu bir navigasyon geçişi. Kök layout headers() çağırdığı için sayfa dinamik; yeni URL işlenene kadar onay kutusu eski durumunda görünüyor. Yerel ya da iyimser durum yok.
 
 **Etki:** Yavaş mobil ağda misafir kutuyu işaretliyor ama görünüm değişmiyor; tekrar tıklıyor ve seçimi geri almış oluyor. Ekran okuyucu bu sırada 'işaretli değil' okumaya devam ediyor.
 
 **Önerilen aksiyon:** Seçimi useOptimistic ya da yerel state ile anında yansıtın. URL'yi `window.history.replaceState(null, '', '?' + next)` ile güncelleyin; Next 16'da bu yöntem useSearchParams ile senkron çalışır ve sunucuya istek atmaz.
+
+**Yapılan düzeltme:** Confirmed: `selected` comes only from useSearchParams, and page.tsx changes it with router.replace, a server round-trip transition. The controlled checkbox therefore snapped back until the new URL committed. The component now keeps the selection in useOptimistic(selected). Each toggle builds the next list from the optimistic value and calls setCurrent(next) and onChange(next) inside React startTransition, so the checkbox, its screen-reader state and the summary count update straight away and rapid clicks add up. The optimistic value clears when the router transition commits the new URL.
 
 ## F978 — 'Bu sıralama neden?' ham ondalık skorlar gösteriyor; yerel biçim, ölçek ve deneysel sıralama bilgisi yok
 
@@ -1303,13 +1357,15 @@
 | Renk/tema           | Hayır                                     |
 | Efor                | M                                         |
 | Kaynak denetçiler   | area:results                              |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**              |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p114)           |
 
 **Kanıt:** RankingWhy.tsx:27 `t('totalScore', { score: score.toFixed(3) })` 'Toplam skor: 0.734' üretiyor; TR'de ondalık ayırıcı virgül olmalı, useFormat kullanılmıyor. 34 `{v.toFixed(3)}`: bileşen katkıları birimsiz ve en fazla kaç olabilecekleri belirtilmiyor. 33 bilinmeyen anahtarları ham haliyle gösteriyor (`: k`). LTR deneyinde (src/lib/search/ltr.ts:137-141) score model çıktısı, explain ise ağırlıklı bileşenler; gösterilen toplam bileşenlerin toplamına eşit olmuyor. Oysa ranking.json intro'su skorun 'ağırlıklı toplam' olduğunu söylüyor.
 
 **Etki:** Misafir '0.350' gibi bir sayıdan neyin iyi neyin kötü olduğunu çıkaramıyor ve şeffaflık amacı gerçekleşmiyor. Deney grubundaki kullanıcı toplamın tutmadığını görüyor.
 
 **Önerilen aksiyon:** Her bileşeni ağırlığına oranla gösterin (ör. 'Misafir puanı: 35 puandan 35', yanında küçük bir çubuk) ve sayıları f.number ile biçimlendirin. Toplamı '100 üzerinden 73' biçiminde verin. ranking=ltr ise 'Bu sonuç deneysel bir sıralama modeliyle sıralandı; aşağıdaki katkılar yaklaşıktır' notunu ekleyin. Bilinmeyen anahtarları göstermeyin.
+
+**Yapılan düzeltme:** All numbers are formatted with useFormat().number on a 0–100 scale. Each component reads 'max puandan X' (e.g. '35 puandan 24,5') with a small aria-hidden bar when the weight set is known, and 'X puan' when it is not. The total reads 'Toplam: 100 üzerinden 73' and is the sum of the contributions. Unknown keys are hidden. In LTR mode (weightsSet="ltr", or when the score does not equal the sum of the contributions) the total is hidden and a note says the contributions are approximate.
 
 ## F979 — Çip etiketleri ham değer gösteriyor: ISO tarih, para birimsiz tutar, öneksiz ve çevrilmemiş olanak adı
 
@@ -1325,13 +1381,15 @@
 | Renk/tema           | Hayır                                                      |
 | Efor                | S                                                          |
 | Kaynak denetçiler   | area:results                                               |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                               |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p120)                            |
 
 **Kanıt:** SmartFilter.tsx:59-62 `t('smart.chips.checkIn', { value: f.checkIn })` 'Giriş: 2026-10-29' üretiyor; f.date kullanılmıyor, oysa başlık (page.tsx:289) f.date kullanıyor. 52-54 `t('smart.chips.maxPrice', { value: f.maxPrice })` 'En çok 5000' üretiyor, para birimi yok (docs/img/search-smart-filter.png'de görülüyor). 68 `chips.push({ key: 'amenities', value: a, label: a })`: 'Olanak:' öneki yok ve değer DB'deki Türkçe metin ('Ücretsiz WiFi', 'Deniz Manzarası'); EN arayüzde de Türkçe görünüyor.
 
 **Etki:** Misafir 5000'in TL mi olduğunu, gecelik mi toplam mı olduğunu bilemiyor. ISO tarih biçimi okuryazarlığı düşük kullanıcıyı şaşırtıyor. EN kullanıcı Türkçe olanak adları görüyor.
 
 **Önerilen aksiyon:** filtersToChips'e useFormat çıktısını geçirin: tarih için `f.date(value)`, tutar için para birimi ve 'gecelik/toplam' ibaresiyle biçimlenmiş metin kullanın. Olanak çipi için `t('smart.chips.amenity', { value })` ('Olanak: {value}') anahtarını kullanın ve olanak sözlüğünü çevirin.
+
+**Yapılan düzeltme:** Confirmed. filtersToChips now takes an optional third param `fmt: ChipFormatters` ({date, price, amenity}), and the component passes all three. Dates use fmt.date(iso, "medium"), so a chip reads "Giriş: 29 Eki 2026". Prices use fmt.decimal(value, priceCurrency) when the currency is known, otherwise fmt.number, and get the existing mapPrice.perNight/total unit when the page says which one applies. Amenity chips use the new smart.chips.amenity key ("Olanak: {value}") with the name translated from property.amenityNames via a new name→key helper, src/lib/i18n/amenity-display-names.ts. Currency and per-night/total only show once page.tsx passes the two new optional props (see crossOwner).
 
 ## F980 — Akıllı filtre durum mesajları yanıltıcı ya da eksik: çipler kullanıcı tarafından kaldırılınca 'Metinden filtre çıkarılamadı' çıkıyor, yorumlama süreci duyurulmuyor
 
@@ -1346,13 +1404,15 @@
 | Renk/tema           | Hayır                                       |
 | Efor                | S                                           |
 | Kaynak denetçiler   | area:results                                |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p120)             |
 
 **Kanıt:** SmartFilter.tsx:131-133 `chips.length === 0 && <span>{t('smart.noFilters')}</span>`: kullanıcı çipleri kendisi kaldırdığında da 'Metinden filtre çıkarılamadı.' (tr/search.json:84) görünüyor; bu durumda page.tsx:179-181 boş filtreyle tüm konaklamaları getiriyor. Yorumlama sırasında yalnızca düğme metni değişiyor (124 `busy ? t('smart.interpreting')`). Odak girişte kaldığından ekran okuyucu bunu duyurmuyor ve aria-live bölgesi (127) busy sırasında boş.
 
 **Etki:** Misafir çipleri kaldırdıktan sonra sistemin metni anlamadığını sanıyor. Ekran okuyucu kullanıcısı Enter'a bastıktan sonra birkaç saniye hiçbir geri bildirim almıyor.
 
 **Önerilen aksiyon:** Çipleri kullanıcı sıfırladıysa noFilters yerine 'Tüm akıllı filtreler kaldırıldı · aramanız: {destination}' gösterin; ya da son çip kaldırılınca onClear çağırın. busy iken aria-live bölgesine t('smart.interpreting') yazın ve forma aria-busy ekleyin.
+
+**Yapılan düzeltme:** Confirmed. The component keeps the last filters the user made by removing chips (userFilters state). When that leaves no chips, it shows the new key smart.allRemoved instead of smart.noFilters. A persistent role="status" region now announces t("smart.interpreting") as sr-only text while busy. The chips live region gets aria-busy while busy; I kept it off the form so it does not silence the status region inside it. The submit Button now uses busy={busy} instead of disabled, so focus is kept and double submits are blocked, and submit() also returns early when busy.
 
 ## F1138 — Sıralama sayfası çıkmaz ve ortak sayfa iskeletinden farklı
 
@@ -1368,13 +1428,15 @@
 | Renk/tema           | Hayır                                                              |
 | Efor                | S                                                                  |
 | Kaynak denetçiler   | runtime:compliance                                                 |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                       |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p031)                                    |
 
 **Kanıt:** p6: main içindeki bağlantılar = []. Giriş metni 'Sonuç kartındaki "Bu sıralama neden?" bağlantısı'ndan söz ediyor ama bu öğe RankingWhy.tsx'te bir <details> açılır bölümü ve sayfadan arama sonuçlarına dönüş yolu yok. Sayfa PageShell kullanmıyor: arka plan bg-white (diğerlerinde gray-50), genişlik max-w-3xl (H1 x=272; trust ve report'ta max-w-5xl, H1 x=144), H1 text-3xl (diğerlerinde 2xl). 026 ile 024 ekran görüntüleri karşılaştırılabilir. Koyu temada da arka plan diğer sayfalardan farklı (p7-ranking-dark.png).
 
 **Etki:** Sonuç kartından gelen misafir aramasına dönmek için tarayıcının geri tuşuna muhtaç kalıyor. Görsel tutarsızlık sayfanın aynı ürüne ait olmadığı izlenimini veriyor.
 
 **Önerilen aksiyon:** PageShell kullanın. 'Arama sonuçlarına dön' bağlantısı (history.back ya da /search) ve 'Güven merkezi' bağlantısı ekleyin. Metni 'Bu sıralama neden? açılır bölümü' olarak düzeltin.
+
+**Yapılan düzeltme:** The ranking page now uses PageShell, so it has the gray-50 background, max-w-5xl width and a text-2xl h1 like the other pages. Its content sits in a Card. I added a nav with two links. The first goes back to the search results when ?from=<search query> is present ('Arama sonuçlarına dön', sanitised through URLSearchParams the same way the property page does it), and otherwise to /search ('Konaklama ara'). The second is 'Güven merkezi' (/trust). The fix to the intro wording ('açılır bölümü') is already in p005's ranking.intro patch.
 
 ## F1139 — Sıralama tablosunda hücrelerin yatay boşluğu yok; mobilde 'Ağırlık' ve 'Açıklama' başlıkları bitişik
 
@@ -1389,13 +1451,15 @@
 | Renk/tema           | Hayır                                       |
 | Efor                | S                                           |
 | Kaynak denetçiler   | runtime:compliance                          |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p031)             |
 
 **Kanıt:** p6: th ve td için padding-left/right 1px. Masaüstünde 'Ağırlık' sütunu x=432-480 (48px), 'Açıklama' 480'de başlıyor. Mobil 390'da 'Ağırlık' metni 168'de bitiyor, 'Açıklama' 170'te başlıyor (2px aralık); görselde 'AğırlıkAçıklama' gibi okunuyor (RT/crops/compliance/p6-ranking-table-mobile.png).
 
 **Etki:** Şeffaflık tablosu dar ekranda tek kelime gibi okunuyor ve sütunlar ayırt edilemiyor.
 
 **Önerilen aksiyon:** th ve td'ye px-3 verin (ilk sütunda pl-0). Ağırlık sütununu sağa hizalayıp tabular-nums kullanın. Mobilde tabloyu tanım listesi ya da kart düzenine çevirin.
+
+**Yapılan düzeltme:** Table cells now have horizontal padding: the first column is pr-3, the weight columns px-3, and the last column pl-3. The weight columns are right-aligned with tabular-nums. Below sm the table is hidden. In its place is a list of cards: each factor shows its label and description, then a dl with the two weights.
 
 ## F1140 — Misafir puanı filtresi yok, yalnızca puana göre sıralama var
 
@@ -1410,13 +1474,15 @@
 | Renk/tema           | Hayır                                        |
 | Efor                | M                                            |
 | Kaynak denetçiler   | runtime:results                              |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                 |
+| **Düzeltme durumu** | **Atlandı** (paket: ml-p036)                 |
 
 **Kanıt:** RUNTIME 002 ve 118 gövde metni: filtre panelinde yalnızca Fiyat Aralığı, Konaklama Türü, Erişilebilirlik, Sıralama ve Tarih esnekliği var. Puan için tek seçenek "Puan (önce en yüksek)" sıralaması.
 
 **Etki:** "8+ puanlı yerler" gibi yaygın bir OTA görevi ancak listeyi tek tek tarayarak yapılabiliyor.
 
 **Önerilen aksiyon:** "Misafir puanı" adında bir radyo grubu ekleyin (9+, 8+, 7+, Tümü); değer minRating sunucu parametresiyle gitsin ve URL'de tutulsun.
+
+**Yapılan düzeltme:** The server has no minRating parameter: params.ts maps query keys one by one and lib/search.ts has no rating filter. A filter in the UI alone would silently do nothing, so I did not add it. The server work is described in crossOwner. Note that ratingAvg is on a 0–5 scale, so the options should be e.g. 4.5+/4+/3.5+/Tümü, not 9+/8+/7+.
 
 ## F1141 — Boş akıllı filtre gönderimi hiçbir geri bildirim vermiyor
 
@@ -1431,13 +1497,15 @@
 | Renk/tema           | Hayır                                       |
 | Efor                | S                                           |
 | Kaynak denetçiler   | runtime:results                             |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p120)             |
 
 **Kanıt:** RUNTIME p6-smart.mjs: boş #smart-filter alanında Enter'a basınca hiç POST isteği gitmiyor, validationMessage boş kalıyor ve canlı bölgede değişiklik olmuyor. 2 karakterde yalnızca tarayıcının yerel balonu çıkıyor. KOD: submit() içindeki text.trim().length >= 3 koşulu sağlanmazsa fonksiyon sessizce çıkıyor.
 
 **Etki:** Kullanıcı düğmenin çalışmadığını sanıyor.
 
 **Önerilen aksiyon:** required ve minLength ekleyin, ayrıca aria-describedby ile kalıcı bir "En az 3 karakter yazın" ipucu gösterin. Koşul sağlanmazsa role="status" içinde mesaj verin.
+
+**Yapılan düzeltme:** Submitting empty or under-3-character text (after trimming) no longer fails silently. The form has noValidate, so the browser's own bubble is replaced by a message in the page language. submit() sets tooShort, focuses the input and shows the new key smart.tooShort ("En az {min} karakter yazın.") inside the role="status" region, styled like Field's error (icon plus sr-only common.errorPrefix). The input gets aria-invalid and an aria-describedby pointing to the error. The error clears once the text is long enough. The input also has required and minLength={SMART_MIN_LENGTH}.
 
 ## F1358 — Bilgi ve politika sayfaları üç farklı kabukla kurulmuş (gizlilik, sıralama, güven merkezi)
 
@@ -1454,13 +1522,15 @@
 | Renk/tema           | Hayır                                                                                           |
 | Efor                | S                                                                                               |
 | Kaynak denetçiler   | lens:consistency                                                                                |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                    |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p031)                                                                 |
 
 **Kanıt:** ranking/page.tsx:16-19 Header ve ham `<main className="mx-auto max-w-3xl px-4 py-10">` kullanıyor, beyaz zemin, h1 `text-3xl`, tablo başlıklarında `scope` yok (:23-27). privacy/page.tsx:22-29 Header, gri zemin ve `<article>` kart, h1 `text-2xl`, yerel `link` sabiti (:14-15). trust/page.tsx:64 PageShell ve Card, h1 `text-2xl`. Üçü aynı türde (kamuya açık politika) içerik.
 
 **Etki:** Kullanıcı politika sayfaları arasında geçerken farklı genişlik, zemin ve başlık ölçeği görür. Sıralama tablosu ekran okuyucuda başlık-hücre ilişkisini zayıf aktarır.
 
 **Önerilen aksiyon:** ranking ve privacy sayfalarını PageShell'e taşıyın, bölümleri Card'a çevirin. Sıralama tablosunda `th scope="col"` ve satır başlığında `scope="row"` kullanın. Yerel `link` sabitini ortak linkClass ile değiştirin.
+
+**Yapılan düzeltme:** Both pages now use PageShell. On the ranking page, the table and notes sit inside a Card, and the th scope attributes were already there. On the privacy page, the notice stays a single max-w-3xl article card so legal text keeps a readable line length. I did not turn each section into a Card, because Card adds a named region, which would conflict with F1175. The privacy page's local link constant is now built from the shared focusRing, and its colour class is unchanged.
 
 ## F1359 — Sıralama sayfasındaki tabloda caption ve sütun kapsamı yok; aramaya dönüş bağlantısı da yok
 
@@ -1475,13 +1545,15 @@
 | Renk/tema           | Hayır                                                          |
 | Efor                | S                                                              |
 | Kaynak denetçiler   | area:results                                                   |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                   |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p031)                                |
 
 **Kanıt:** ranking/page.tsx:21-27 `<table ...><thead><tr><th className='py-2'>...`: `<caption>` ve scope='col' yok; bileşen adı hücresi td (32). Sayfa RankingWhy.tsx:39'daki bağlantıyla aynı sekmede açılıyor. Sayfada aramaya dönüş bağlantısı yok (yalnızca Header ve Footer var). Filtreler URL'de tutulmadığı için tarayıcının geri tuşu da seçimleri geri getirmiyor.
 
 **Etki:** Ekran okuyucu kullanıcısı tablonun neyi listelediğini önceden duyamıyor. Açıklamayı okuyan misafir sonuçlara dönmek için tarayıcının geri tuşuna mecbur kalıyor ve filtre seçimlerini kaybediyor.
 
 **Önerilen aksiyon:** `<caption className='sr-only'>{t('table.caption')}</caption>` ekleyin; th'lere scope='col' verin; bileşen hücresini `<th scope='row'>` yapın. h1'in üstüne router.back() çağıran bir 'Arama sonuçlarına dön' düğmesi koyun.
+
+**Yapılan düzeltme:** The caption and the scope=col/row headers were already in the code. I added the return link, but as a link rather than router.back(), because /ranking is also opened from /trust. It goes to /search?<from> when the from parameter is present, which restores the URL-based filters, and to /search otherwise. RankingWhy has to pass ?from=; I sent that as a crossOwner request.
 
 ## F1360 — Bazı tablolarda th scope ve caption eksik
 
@@ -1498,13 +1570,15 @@
 | Renk/tema           | Hayır                                                                         |
 | Efor                | S                                                                             |
 | Kaynak denetçiler   | lens:a11y                                                                     |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                  |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p031)                                              |
 
 **Kanıt:** ranking/page.tsx:21-28 `<table>` caption yok, `<th className="py-2">` scope yok; AdminDashboard.tsx:454-463 deney tablosu caption/scope yok (birden çok tablo arka arkaya, yalnız üstteki `<p>` ile ayrılıyor); compare/page.tsx:107 karşılaştırma tablosunun caption'ı yok.
 
 **Etki:** Ekran okuyucu tablolar arasında gezinirken hangi deneye/konuya ait olduğunu duymuyor.
 
 **Önerilen aksiyon:** `<caption className="sr-only">` (deneyde flagKey) ve `<th scope="col">` ekleyin.
+
+**Yapılan düzeltme:** Everything was already in place. ranking/page.tsx has <caption className="sr-only">, th scope="col" and a row header with th scope="row". AdminDashboard.tsx:906-935 has an sr-only caption and scope col/row. compare/page.tsx:249-279 has an sr-only caption and scope col/row. I kept everything in the ranking table.
 
 ## F1361 — Akıllı filtre sonuçları iki kez hesaplanıyor: POST yanıtındaki sonuçlar atılıyor ve ikinci bir GET bekleniyor
 
@@ -1520,7 +1594,7 @@
 | Renk/tema           | Hayır                                  |
 | Efor                | S                                      |
 | Kaynak denetçiler   | area:results                           |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**           |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p036) |
 
 **Kanıt:** src/app/api/search/smart/route.ts:21-44 yanıtına `...results` koyuyor. page.tsx:240-241 yalnızca setLlmMode ve setSmartFilters çağırıyor, sonuçları kullanmıyor. smartFilters değişimi load()'u tetikliyor (174, 227-230) ve ikinci bir /api/search isteği atılıyor.
 
@@ -1528,20 +1602,22 @@
 
 **Önerilen aksiyon:** runSmart'ta `setResults(data.results); setTotal(data.total)` uygulayın ve bu filtre nesnesi için bir sonraki load'u atlayın (ör. skipNextLoadRef ile). Ya da POST yanıtından sonuçları kaldırıp yalnızca filtreyi döndürün.
 
+**Yapılan düzeltme:** The smart POST runs its search on the smart filters only. The page merges those filters onto the URL's base search, so the POST results do not match and cannot be reused. The page now sends {text, filtersOnly: true}; the current zod schema strips the extra field, so this is harmless. SmartResponse is narrowed to {filters, llmMode}. The route still has to honour filtersOnly and skip searchProperties (see crossOwner).
+
 ## F1362 — Görsel benzerlik aramasında referans fotoğraf gösterilmiyor
 
-| Alan                | Değer                         |
-| ------------------- | ----------------------------- |
-| Severity            | Low                           |
-| Durum               | Aday                          |
-| Konum               | `src/app/search/page.tsx:292` |
-| Kullanıcılar        | misafir                       |
-| Prensip             | robustness · observability    |
-| Sezgisel madde      | H6 — Tanıma > hatırlama       |
-| Renk/tema           | Hayır                         |
-| Efor                | S                             |
-| Kaynak denetçiler   | area:results                  |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**  |
+| Alan                | Değer                           |
+| ------------------- | ------------------------------- |
+| Severity            | Low                             |
+| Durum               | Aday                            |
+| Konum               | `src/app/search/page.tsx:292`   |
+| Kullanıcılar        | misafir                         |
+| Prensip             | robustness · observability      |
+| Sezgisel madde      | H6 — Tanıma > hatırlama         |
+| Renk/tema           | Hayır                           |
+| Efor                | S                               |
+| Kaynak denetçiler   | area:results                    |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p036) |
 
 **Kanıt:** page.tsx:292-306'da yalnızca 'Bu fotoğrafa benzeyen ilanlar' metni (visual.similarHeading) var; similarToPhotoId'nin hangi ilanın hangi fotoğrafı olduğu (küçük resim ya da ilan adı) gösterilmiyor. 543-549'daki 'Benzerlerini göster' bağlantısı da hangi fotoğrafı (kapak fotoğrafı) kullanacağını belirtmiyor.
 
@@ -1549,21 +1625,23 @@
 
 **Önerilen aksiyon:** Başlığın yanında referans fotoğrafın küçük resmini (alt='Referans: {ilan adı} kapak fotoğrafı') ve ilan adını gösterin. Bağlantı metnini 'Bu kapak fotoğrafına benzeyenleri göster' yapın.
 
+**Yapılan düzeltme:** The reference listing is the result whose coverPhotoId equals similarToPhotoId. When it is in the results, the status line shows its 64x48 thumbnail (next/image, alt empty because the name is in the text) and the text "Şu ilanın kapak fotoğrafına benzeyen ilanlar: {title}". Otherwise it falls back to the generic heading. The link now reads "Kapak fotoğrafına benzeyenleri göster", with an aria-label that adds the title.
+
 ## F1363 — 'Önbellekten' rozeti ve görsel arama hata gerekçeleri misafire geliştirici jargonu gösteriyor
 
-| Alan                | Değer                         |
-| ------------------- | ----------------------------- |
-| Severity            | Low                           |
-| Durum               | Aday                          |
-| Konum               | `src/app/search/page.tsx:429` |
-| Diğer konumlar      | `messages/tr/search.json:120` |
-| Kullanıcılar        | misafir                       |
-| Prensip             | learnability · familiarity    |
-| Sezgisel madde      | H2 — Gerçek dünya eşleşmesi   |
-| Renk/tema           | Hayır                         |
-| Efor                | S                             |
-| Kaynak denetçiler   | area:results                  |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**  |
+| Alan                | Değer                            |
+| ------------------- | -------------------------------- |
+| Severity            | Low                              |
+| Durum               | Aday                             |
+| Konum               | `src/app/search/page.tsx:429`    |
+| Diğer konumlar      | `messages/tr/search.json:120`    |
+| Kullanıcılar        | misafir                          |
+| Prensip             | learnability · familiarity       |
+| Sezgisel madde      | H2 — Gerçek dünya eşleşmesi      |
+| Renk/tema           | Hayır                            |
+| Efor                | S                                |
+| Kaynak denetçiler   | area:results                     |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p036) |
 
 **Kanıt:** page.tsx:429-433 `{cached && <span>{t('cached')}</span>}` 'Önbellekten' rozetini gösteriyor (tr/search.json:37); misafir için eylem gerektirmeyen teknik bir bilgi. 297 `t('visual.reasons.' + (visual.reason ?? 'LOAD_FAILED'))` 'Görsel model çalışma zamanı kurulu değil.' ve 'Görsel arama için vektör veritabanı yok.' gibi metinler üretiyor (tr/search.json:120-124).
 
@@ -1571,26 +1649,30 @@
 
 **Önerilen aksiyon:** Önbellek rozetini kaldırın ya da yalnızca geliştirici modunda gösterin. Görsel arama gerekçelerini tek bir kullanıcı metninde birleştirin: 'Benzer fotoğraf araması şu anda kullanılamıyor; normal sonuçlar gösteriliyor.' Neden kodunu yalnızca loglara yazın.
 
+**Yapılan düzeltme:** Already fixed under F967. The "Önbellekten" badge renders only when cached && isAdmin. Guests see the plain visual.unavailable text ("Benzer fotoğraf araması şu an kullanılamıyor."), and only admins see the technical visual.reasons text.
+
 ## F1364 — Harita yüklenemediğinde ya da konum bilgisi yokken 'Harita' düğmesi basılı kalıyor, oysa gösterilen içerik liste
 
-| Alan                | Değer                          |
-| ------------------- | ------------------------------ |
-| Severity            | Low                            |
-| Durum               | Aday                           |
-| Konum               | `src/app/search/page.tsx:443`  |
-| Kullanıcılar        | misafir                        |
-| Prensip             | robustness · observability     |
-| Sezgisel madde      | H1 — Sistem durumu görünürlüğü |
-| Renk/tema           | Hayır                          |
-| Efor                | S                              |
-| Kaynak denetçiler   | area:results                   |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**   |
+| Alan                | Değer                           |
+| ------------------- | ------------------------------- |
+| Severity            | Low                             |
+| Durum               | Aday                            |
+| Konum               | `src/app/search/page.tsx:443`   |
+| Kullanıcılar        | misafir                         |
+| Prensip             | robustness · observability      |
+| Sezgisel madde      | H1 — Sistem durumu görünürlüğü  |
+| Renk/tema           | Hayır                           |
+| Efor                | S                               |
+| Kaynak denetçiler   | area:results                    |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p036) |
 
 **Kanıt:** page.tsx:271 `showMap = view === 'map' && !mapError && mapPoints.length > 0`; ama 443 `aria-pressed={view === v}` ve 448-450'deki stil view state'ine bakıyor. mapFailed ('...liste görünümü gösteriliyor', tr/search.json) ve noLocation durumlarında liste görünüyor ama 'Harita' düğmesi seçili görünüyor ve öyle duyuruluyor.
 
 **Etki:** Misafir görünümün hangisi olduğunu anlamıyor; ekran okuyucu 'Harita, basılı' derken içerik liste.
 
 **Önerilen aksiyon:** aria-pressed ve stil için `const effectiveView = showMap ? 'map' : 'list'` kullanın. Ya da onFail'de setView('list') çağırın; 'Harita' düğmesini aria-disabled yapıp nedenini aria-describedby ile bağlayın.
+
+**Yapılan düzeltme:** Added mapUnavailable (view is map and the map failed or there is no location data after loading) and shownView. aria-pressed, the pressed style and the ✓ now follow shownView, so "Liste" shows as pressed when the list is what's on screen. While the map is unavailable, the Map button points via aria-describedby to the notice (id map-unavailable-note). Clicking Map still retries the map.
 
 ## F1365 — Arama boş durumunda filtre temizleme eylemi yok; varsayılan istemci fiyat üst sınırı sonuçları sessizce gizleyebiliyor
 
@@ -1606,13 +1688,15 @@
 | Renk/tema           | Hayır                                                        |
 | Efor                | S                                                            |
 | Kaynak denetçiler   | lens:status                                                  |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                 |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p036)                             |
 
 **Kanıt:** search/page.tsx:478-483 boş durum yalnız 'Filtreleri değiştirmeyi deneyin.' metni; 159 `useState<[number, number]>([0, 20000])` istemci tarafı varsayılan üst sınır, 249-255 sonuçları gizliyor; tek ipucu 426 '{shown} sonuç gösteriliyor ({total} bulundu)'.
 
 **Etki:** Misafir hangi filtrenin sonuçları sakladığını bulmak için tek tek denemek zorunda; yüksek fiyatlı ilanlar habersiz gizleniyor.
 
 **Önerilen aksiyon:** Boş durumda 'Filtreleri temizle' butonu (fiyat, tür, erişilebilirlik, akıllı filtre sıfırla) ve shown<total iken 'X sonuç filtreleriniz nedeniyle gizlendi — Göster' bağlantısı; varsayılan üst sınırı boş bırak.
+
+**Yapılan düzeltme:** There is no client-side default price cap any more: effMin and effMax are undefined by default and price is filtered on the server. The empty state already has a "Tüm filtreleri temizle" button (when filters are active), per-feature accessibility chips, "Aramayı düzenle" and "Tüm konaklamalar". The count is only lower than the total because of paging, which has a "Daha fazla göster" button.
 
 ## F1366 — Arama sonuçları bölümünde başlık/liste semantiği ve aria-busy yok
 
@@ -1629,13 +1713,15 @@
 | Renk/tema           | Hayır                                          |
 | Efor                | S                                              |
 | Kaynak denetçiler   | lens:a11y                                      |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                   |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p036)               |
 
 **Kanıt:** 326 `<h2 ...>{t("filters.title")}</h2>` aside'da; sonuç ızgarası 503-554 `<div className="grid ...">` ve kart başlıkları PropertyCard.tsx:133 `<h3>` — sonuçlar için h2 yok, başlık gezinmesinde kartlar 'Filtreler'in altında görünüyor; liste değil (sayı bilgisi yok); yükleme sırasında (174-212) eski sonuçlar `aria-busy` olmadan kalıyor.
 
 **Etki:** Ekran okuyucu başlık/liste gezinmesiyle sonuçlara atlayamıyor ve kaç sonuç olduğunu listeden öğrenemiyor; yükleme sırasında eski sonuçları güncel sanabiliyor.
 
 **Önerilen aksiyon:** Sonuç sütununa `<h2 className="sr-only">{t("resultsHeading")}</h2>`, ızgarayı `<ul role="list">/<li>` yapın; kapsayıcıya `aria-busy={loading}` verin.
+
+**Yapılan düzeltme:** The results section already has aria-labelledby pointing to an sr-only <h2 id="results-heading">. The result grid is a <ul role="list"> of <li> items with aria-busy={loading}.
 
 ## F1367 — Harita yan listesinde seçili öğe yalnızca renk farkıyla belirtiliyor
 
@@ -1651,13 +1737,15 @@
 | Renk/tema           | Hayır                                       |
 | Efor                | S                                           |
 | Kaynak denetçiler   | area:results                                |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p036)             |
 
 **Kanıt:** page.tsx:599-603: seçili öğe `border-[#003580] bg-amber-100`, seçili olmayan `border-gray-200 bg-white`. Fark yalnızca kenarlık ve arka plan renginde; metin ya da simge değişmiyor. aria-pressed yalnızca yardımcı teknolojilere ulaşıyor.
 
 **Etki:** Renk algısı zayıf misafir, haritada seçtiği ilanın listede hangisi olduğunu ayırt etmekte zorlanıyor.
 
 **Önerilen aksiyon:** Seçili öğeye görünür bir '✓ Seçili' metni ya da check simgesi ekleyin ve kenarlığı border-2 ile kalınlaştırın. Bu, renge ek bir ipucudur ve renk değişikliği gerektirmez.
+
+**Yapılan düzeltme:** The selected map list item now has a thicker border-2 (padding adjusted) and a visible "✓ Seçili" text, in addition to the color change. No color classes or hex values were changed.
 
 ## F1368 — Akıllı filtre girişi kısıtlarını ve anlayabildiği ifadeleri önceden bildirmiyor
 
@@ -1672,10 +1760,12 @@
 | Renk/tema           | Hayır                                       |
 | Efor                | S                                           |
 | Kaynak denetçiler   | area:results                                |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p120)             |
 
 **Kanıt:** SmartFilter.tsx:113-121 `<input id='smart-filter' ... minLength={3} maxLength={300} .../>`: type='search', enterKeyHint='search' ve autoComplete='off' yok. 3 karakterlik alt sınır yalnızca tarayıcının kendi dilindeki yerel doğrulama balonuyla bildiriliyor. 103 `if (text.trim().length >= 3)` boşluklarla uzatılmış kısa metinde sessizce hiçbir şey yapmıyor. Hangi ifadelerin anlaşıldığı (şehir, tarih, kişi sayısı, bütçe, olanak) için yardım metni yok; tek örnek yazmaya başlayınca kaybolan placeholder.
 
 **Etki:** Misafir sistemin neleri anlayabildiğini bilmeden deneme yanılmayla yazıyor; kısa bir metin gönderdiğinde neden bir şey olmadığını anlamıyor.
 
 **Önerilen aksiyon:** Girişe `type='search' enterKeyHint='search' autoComplete='off'` ekleyin. Altına aria-describedby ile bağlı kalıcı bir ipucu koyun: 'Şehir, tarih, kişi sayısı, bütçe ve olanakları yazabilirsiniz (en az 3 karakter)'. 3 karakterden kısa gönderimde görünür bir hata metni gösterin.
+
+**Yapılan düzeltme:** Confirmed. The input now has type="search", enterKeyHint="search" and autoComplete="off". A persistent hint, the new key smart.hint ("Şehir, tarih, kişi sayısı, bütçe ve olanakları yazabilirsiniz (en az {min} karakter)."), sits between the label and the input and is linked with aria-describedby="smart-filter-hint". Putting it there keeps the sm:items-end button alignment. A short submission shows the visible error described under F1141. The magic number 3 is now the SMART_MIN_LENGTH constant.

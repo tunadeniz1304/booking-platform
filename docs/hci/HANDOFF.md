@@ -1,6 +1,6 @@
 # HCI düzeltme işi — Handoff
 
-> Son güncelleme: 2026-10-12 · Durum: Critical/High (PR #9) ve renk + gerilemeler (PR #10) birleştirildi · **Medium/Low turu uygulandı** (130 paket, commit `433af79`) · **crossOwner 2. tur sürüyor** (§8) · sonra: kapılar, çalışma zamanı önce/sonra, rapor, PR
+> Son güncelleme: 2026-10-12 · Durum: Critical/High (PR #9), renk + gerilemeler (PR #10) birleştirildi · **Medium/Low turu ve paketler arası istekler (2 tur) UYGULANDI** (§8; rapor §8) · açık iş: ertelenen 47 istek + 15 atlanan bulgu (arka uç/şema/ürün kararı), kapsam dışı 8 renk bulgusu
 > Bu dosya, haftalık kullanım limiti dolarsa ya da oturum kesilirse işi kaldığı yerden sürdürmek içindir.
 
 ## 1. Hedef ve kullanıcı kararları
@@ -116,17 +116,23 @@ Düzeltme sonrası ortaya çıkan 2 gerileme — **İKİSİ DE DÜZELTİLDİ** (
 
 Konsol hataları 251'den 333'e çıktı; artışın 319'u `401 Unauthorized`. Bu, uzun tarama sırasında süresi dolan demo oturumlarından kaynaklanan tarama artefaktı, uygulama gerilemesi değil.
 
-## 8. Medium/Low turu ve paketler arası istekler (2026-10-12, bulut oturumu)
+## 8. Medium/Low turu ve paketler arası istekler (2026-10-12, bulut oturumu) — BİTTİ
 
-Ortam bulut konteyneri (Linux). Scratchpad: `/tmp/claude-0/-home-user-booking-platform/6c8e30e3-b8b0-5400-b6f9-3d38ab33293b/scratchpad` (aşağıda `$S`). Dal: `hci/regressions-and-color-vs4f2l`.
+Ortam bulut konteyneri (Linux). Scratchpad: `/tmp/claude-0/-home-user-booking-platform/6c8e30e3-b8b0-5400-b6f9-3d38ab33293b/scratchpad` (aşağıda `$S`; oturum bitince silinir, kalıcı kayıt `docs/hci/` altında). Dal: `hci/regressions-and-color-vs4f2l`.
 
-| Adım                                                                                                                        | Durum                                                                                                                      |
-| --------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| crossOwner sınıflandırma (131 istek)                                                                                        | bitti: 76 uygulanabilir (Medium/Low paketlerine katıldı), 31 zaten yapılmış, 24 ertelendi (gerekçeler `$S/xo/triage.json`) |
-| Medium/Low turu: 130 paket (`$S/ml/pkgs/`, betik `$S/ml/ml-fix.js`)                                                         | bitti: 754 fixed, 247 partially_fixed, 153 already_ok, 8 skipped; sonuçlar `$S/ml/results.json`                            |
-| Mesaj yamaları (`$S/msg-ml/p*.json`)                                                                                        | birleştirildi (125 yama, 2.726 yeni, 583 güncelleme; 24 çakışmada sonraki paket kazandı)                                   |
-| Kapılar (tur 1 sonrası)                                                                                                     | lint, typecheck, i18n, format, unit (1.328) geçti; testUpdates uygulandı                                                   |
-| crossOwner 2. tur: ajanların yeni 546 isteği → 81 paket (`$S/ml/pkgs2/`, betik `$S/ml/ml-fix2.js`, plan `$S/ml/plan2.json`) | sürüyor; ilk koşuda 16 paket oturum limitine takıldı, resume edildi. Run id'leri `$S/ml/runs2.txt`                         |
-| Çalışma zamanı taraması                                                                                                     | önce (792a57a, 178 ziyaret) bitti: `$S/sweep/base-out/`; sonra: 2. tur bitince (`$S/sweep/README.md`)                      |
+| Adım                                                            | Sonuç                                                                                                                                  |
+| --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| crossOwner sınıflandırma (131 istek)                            | 76 uygulanabilir (Medium/Low paketlerine katıldı), 31 zaten yapılmış, 24 ertelendi                                                     |
+| Medium/Low turu: 130 paket                                      | 637 fixed, 244 partially_fixed, 126 already_ok, 8 skipped (Medium/Low, renk hariç 1.015 bulgu)                                         |
+| crossOwner 2. tur: Medium/Low ajanlarının 543 isteği → 81 paket | 377 uygulandı, 19 kısmen, 124 zaten yapılmış, 23 ertelendi; kalan 11 küçük istek merkezde                                              |
+| Mesaj yamaları                                                  | 155 yama, 2.910 yeni anahtar, 666 güncelleme                                                                                           |
+| Kapılar                                                         | lint, typecheck, format, i18n, unit (1.328), mcp:smoke, llm:eval, build geçti; integration + e2e CI'da                                 |
+| Kayıtlar                                                        | `hci-findings.json` (`fixOutcome`), `fix-status.json` (`ml-pNNN` + `crossOwner[].status`), rapor §4.2 / §6 / §8, `docs/hci/areas/*.md` |
+| Çalışma zamanı önce/sonra                                       | rapor §8.5                                                                                                                             |
 
-Devam (aynı oturumda): `Workflow({scriptPath: "$S/ml/ml-fix2.js", resumeFromRunId: <run id>, args: <plan2.json'daki wf>})`. Sonuç toplama: `node $S/ml/collect.mjs <out.json> <run id>...`. Kayıt: `node $S/ml/records-ml.mjs $S/ml/results.json $S/xo/triage.json <round2.json>`. Mesajlar: `node $S/merge-messages.mjs . $S/msg-ml` (r2 yamaları tur 1 yamalarından sonra birleşir).
+Açık kalanlar (rapor §6): ertelenen 47 istek ve 15 atlanan bulgu yeni arka uç ucu, şema/migration ya da ürün kararı istiyor; kısmen düzeltilen 393 bulgunun kalan kısmı her bulgunun "Yapılan düzeltme" notunda; 8 renk/tema bulgusu palet kararı bekliyor.
+
+Notlar:
+
+- `next dev` her açılışta `next-env.d.ts` dosyasını değiştirir; commit edilmez (yerelde `git update-index --assume-unchanged next-env.d.ts`).
+- Unit testler `runtime/env.sh` yüklenmeden koşulmalı (env ile 12 test yanlış düşer).

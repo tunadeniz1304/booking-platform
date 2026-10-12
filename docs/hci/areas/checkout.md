@@ -823,13 +823,15 @@
 | Renk/tema           | Hayır                                                                     |
 | Efor                | S                                                                         |
 | Kaynak denetçiler   | runtime:checkout, area:checkout                                           |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                              |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p054)                                          |
 
 **Kanıt:** RUNTIME p4-booking-page.mjs ve p2 ekran görüntüsü (crops/checkout/p2-desktop-booking-s-0.png): kart numarası ve CVC boşken 'Son kullanma (AA/YY)' alanının değeri '12/30'. Tab sırasında 'input "12/30"' olarak görünüyor. Boş gönderimde yalnız numara ve CVC için 'Please fill out this field.' çıkıyor, son kullanma doğrulanmadan geçiyor. KOD: useState({ number: "", exp: "12/30", cvc: "" }).
 
 **Etki:** Kart bilgilerini girerken dolu alanı atlayan misafir yanlış son kullanma tarihiyle ödeme yapar, kart reddedilir ve deneme hakkı (PAYMENT_MAX_ATTEMPTS=5) boşa harcanır.
 
 **Önerilen aksiyon:** exp başlangıç değeri boş olsun, placeholder 'AA/YY' ve inputMode='numeric' kullanılsın, maxLength=5 verilsin, iki rakamdan sonra '/' otomatik eklensin. Demo kolaylığı gerekiyorsa test kartı ipucuna 'herhangi bir gelecek tarih' notu eklensin.
+
+**Yapılan düzeltme:** The current code already starts expiry empty (useState exp: ""), uses inputMode=numeric and maxLength=5, inserts "/" automatically via formatExpiry, and shows the visible hint expiryHint "AA/YY biçiminde, ör. 08/28". I also moved the card inputs to the shared CardFields component (same labels, ids and behaviour), so this code is no longer duplicated.
 
 ## F494 — Girişe yönlendirme bağlamı kaybediyor: neden açıklanmıyor, Kayıt Ol ve rezervasyon sayfasındaki giriş bağlantısı geri dönüş adresini taşımıyor
 
@@ -845,13 +847,15 @@
 | Renk/tema           | Hayır                                                                                                        |
 | Efor                | S                                                                                                            |
 | Kaynak denetçiler   | runtime:checkout                                                                                             |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                 |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p017)                                                                       |
 
 **Kanıt:** RUNTIME p1-anon.mjs: anon checkout'ta girişin gerekli olduğuna dair bir ipucu yok; 'giriş/oturum' metni sayısı 0. Tıklandığında POST 401 dönüyor ve /login?redirect=%2Fcheckout… adresine gidiliyor. Login alt başlığı 'Rezervasyonlarınıza ve favorilerinize erişin.'; rezervasyondan söz edilmiyor; odak body'de. p1c: 'Kayıt Ol' href='/register' (redirect yok). router.replace checkout'u geçmişten siliyor: Geri'ye basınca about:blank açıldı (p1c, checkout ilk sayfa iken). p14-anon-booking.mjs: /booking/{id} anon olarak 'Giriş gerekli' gösteriyor, 'Giriş Yap' href='/login' (redirect yok). Olumlu: p1d'de girişten sonra checkout'a parametreleriyle dönülüyor. KOD: checkout/page.tsx:121-125; login/page.tsx:81 (subtitle), 149 (/register); booking/[id]/page.tsx:80-81.
 
 **Etki:** Yeni misafir hesap açtığında rezervasyon bağlamını kaybediyor. E-postadaki rezervasyon bağlantısından gelen kullanıcı girişten sonra ana sayfaya düşüyor. Neden giriş istendiği anlaşılmıyor.
 
 **Önerilen aksiyon:** Yönlendirmeye ?redirect=…&reason=checkout eklensin; login'de reason=checkout ise 'Rezervasyonu tamamlamak için giriş yapın veya hesap oluşturun' gösterilsin. /register bağlantısı redirect parametresini taşısın. Rezervasyon sayfasındaki giriş bağlantısı '/login?redirect=/booking/{id}' olsun. replace yerine push kullanılsın. Checkout'ta anon kullanıcıya düğme üstünde 'Devam etmek için giriş yapmanız gerekecek' notu gösterilsin.
+
+**Yapılan düzeltme:** In checkout, a 401 now uses router.push (not replace), so checkout stays in history. Login and register links now go through a new authHref() helper, which builds loginHref(returnTo(), base) and appends &reason=checkout. The return address carries the coupon. Anonymous users now see a 'Hesap oluştur' link to /register?redirect=…&reason=checkout next to 'Giriş yap', above the submit button. The booking page already uses loginHref(). Showing a context message on the login page is left to its owner (see crossOwner).
 
 ## F495 — Ağ hatasında checkout İngilizce ham tarayıcı mesajı 'Failed to fetch' gösteriyor
 
@@ -866,13 +870,15 @@
 | Renk/tema           | Hayır                                                                       |
 | Efor                | S                                                                           |
 | Kaynak denetçiler   | runtime:checkout                                                            |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p017)                                             |
 
 **Kanıt:** RUNTIME p12-checkout-coupon.mjs: POST /api/bookings route.abort('internetdisconnected') ile kesildi. Türkçe arayüzde role=alert 'Failed to fetch' çıktı ve odak body'ye düştü (crops/checkout/p12-network-error.png). KOD: catch(err) içinde setError(err.message) (page.tsx:142-144); TypeError ayırt edilmiyor.
 
 **Etki:** Mobil ağdaki misafir anlamadığı bir İngilizce mesajla karşılaşıyor; rezervasyonun oluşup oluşmadığını ve yeniden denemenin güvenli olup olmadığını bilmiyor.
 
 **Önerilen aksiyon:** TypeError ya da ağ hatası için t('networkError') kullanılsın: 'Bağlantı kurulamadı. İnternetinizi kontrol edip yeniden deneyin; aynı rezervasyon iki kez oluşturulmaz.' Hata kutusuna 'Yeniden dene' düğmesi eklensin.
+
+**Yapılan düzeltme:** A network error (TypeError) now shows the localized common.errors.network text plus a new checkout.retrySafeHint ('aynı rezervasyon iki kez oluşturulmaz'), with a 'Tekrar dene' button. The button moves focus to the main submit button and calls form.requestSubmit() with the same Idempotency-Key. While a submit is in progress, the main button uses aria-disabled/aria-busy plus an inFlight ref guard instead of `disabled`, so focus no longer drops to <body>.
 
 ## F496 — Checkout özetinde site başlığı/geri bağlantısı yok, tarihler ham ISO, seçilen fiyat planı gösterilmiyor
 
@@ -887,13 +893,15 @@
 | Renk/tema           | Hayır                                           |
 | Efor                | S                                               |
 | Kaynak denetçiler   | runtime:pdp                                     |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                    |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p017)                |
 
 **Kanıt:** RUNTIME p5-anon-flow.mjs + runtime/probes/property/p5-coupon-invalid.png: sayfada Header yok (yalnız DEMO şeridi), ilana dönüş/düzenle bağlantısı yok; 'Giriş – Çıkış 2026-10-12 → 2026-10-13', 'Misafir 2'; 'Oda Loft (Çift Kişilik Yatak)' — Standart/İade edilemez planı ve iade koşulu yok. Kod: checkout/page.tsx:162 main (Header import yok), 188-193 ham {checkIn} → {checkOut}, 179-186 yalnız room.name.
 
 **Etki:** Kullanıcı tarih/oda düzeltmek için tarayıcı geri tuşuna mecbur; ISO tarih geniş kullanıcı kitlesi için zor okunur; ödeme öncesi iade koşulunu doğrulayamaz.
 
 **Önerilen aksiyon:** Header (veya sade checkout başlığı + 'İlana dön/Değiştir' bağlantısı) ekleyin; tarihleri f.date(…,'medium') + gece sayısıyla gösterin; seçili plan adı ve iade/iptal metnini özet listesine ekleyin.
+
+**Yapılan düzeltme:** This was already fixed in the current code. CheckoutFrame renders Header and Footer, and there is a '← İlana dön' link. Dates are shown with f.date(…,'long') plus the night count. A 'Fiyat seçeneği' row shows the plan name, refundable/non-refundable and breakfast. I also added a change link on the stay card (see F497).
 
 ## F497 — Checkout bir çıkmaz sokak: üst çubuk ya da geri bağlantısı yok, tarih ve misafir düzenlenemiyor, fiyat hatası kurtarma eylemi sunmuyor
 
@@ -908,13 +916,15 @@
 | Renk/tema           | Hayır                                                                                                |
 | Efor                | S                                                                                                    |
 | Kaynak denetçiler   | runtime:checkout                                                                                     |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                         |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p017)                                                                      |
 
 **Kanıt:** RUNTIME tarama 010/011/088/089/122/123: landmarks header:0, nav:0, footer:0; masaüstü TR'de Tab sırası yalnız 'İçeriğe geç', kupon, 'Uygula', 'Rezervasyonu Tamamla'. p1-anon'da sayfadaki görünür bağlantı sayısı 1. p13-checkout-errors.mjs (mobil): geçmiş tarihlerde 'Giriş tarihi geçmişte olamaz', 12 misafirde 'Bu oda en fazla 2 kişiliktir' kırmızı metin çıkıyor, düğme disabled ve main içinde bağlantı yok (links: []). Ekran görüntüsü: crops/checkout/p13-too-many-guests.png. Karşılaştırma: rezervasyon sayfası Header ve Footer içeriyor (booking/[id]/page.tsx:99,206). KOD: page.tsx:165-237 Header içermiyor; quoteError yalnız metin olarak gösteriliyor (212-214).
 
 **Etki:** Tarih ya da misafir sayısını değiştirmek veya konaklamaya geri dönmek isteyen misafir yalnız tarayıcının Geri düğmesine güvenebiliyor; PWA ya da derin bağlantıyla gelince Geri de yok. Hata ekranında ne yapacağı söylenmiyor.
 
 **Önerilen aksiyon:** Logo ve '← Konaklamaya dön' (/property/{id}?checkIn&checkOut&guests) içeren minimal bir checkout başlığı eklensin. Konaklama Bilgileri kartına 'Tarihleri/misafirleri değiştir' bağlantısı konsun. quoteError metninin yanına aynı bağlantı bir eylem olarak eklensin ve metin role=alert ile duyurulsun.
+
+**Yapılan düzeltme:** Header, Footer and the back link were already there. I added a 'Tarihleri, misafirleri veya odayı değiştir' link to /property/{id}?checkIn&checkOut&guests&roomId in the Konaklama Bilgileri card header, reusing the changeDates key with updated text. The quote error text now has role=alert and keeps its recalculate and change-dates actions.
 
 ## F498 — 'Rezervasyonu Tamamla' rezervasyonu tamamlamıyor: adım göstergesi, tutma ve iptal koşulları önceden söylenmiyor
 
@@ -930,13 +940,15 @@
 | Renk/tema           | Hayır                                                                               |
 | Efor                | M                                                                                   |
 | Kaynak denetçiler   | runtime:checkout                                                                    |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                        |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p017)                                              |
 
 **Kanıt:** RUNTIME: checkout'ta h1 ve düğme aynı metne sahip ('Rezervasyonu Tamamla'). Tıklama yalnızca 15 dk'lık bir HELD kaydı oluşturuyor ve ödeme adımına götürüyor (p2: h1 'Oda sizin için tutuluyor — ödemeyi tamamlayın'). Checkout gövde metninde (tarama bodyTextSample 010/088) ve ödeme sayfası MAIN metninde (p4) adım göstergesi, 'sonraki adımda ödeme' ifadesi ya da iptal politikası yok. Mülkün ücretsiz iptal politikası var (RNPL zaman çizelgesinde 'X tarihine kadar ücretsiz iptal' görünüyor, p10) ama 'Şimdi öde' seçen kullanıcıya hiçbir yerde gösterilmiyor.
 
 **Etki:** Misafir rezervasyonun bittiğini sanıp sayfadan ayrılabilir ve tutma süresi dolar. Karar için kritik olan iptal koşulu ödeme yapılmadan görülemiyor.
 
 **Önerilen aksiyon:** Düğme metni 'Devam et: Ödeme' ya da 'Odayı ayırt ve ödemeye geç' olsun, altına 'Oda 15 dakika sizin için tutulur; ödeme sonraki adımda' notu eklensin. Her iki sayfaya '1 Bilgiler · 2 Ödeme' adım göstergesi konsun. Toplamın yanında iptal koşulu gösterilsin ('{tarih} tarihine kadar ücretsiz iptal' ya da 'İade edilemez').
+
+**Yapılan düzeltme:** The submit button now says 'Odayı ayırt ve ödemeye geç' (new key checkout.submit); the h1 is unchanged. I added a step indicator with '1. Bilgiler' (aria-current=step) and '2. Ödeme'. The existing nextStepNotice already says the room is held for a short time and payment comes next. The exact free-cancellation deadline can't be shown because /api/properties/[id] does not return cancellationPolicy; only the plan's refundable/non-refundable text is shown. The booking page step indicator and the API field are left to their owners (see crossOwner).
 
 ## F499 — Biçimi hatalı son kullanma tarihi 'Kartın son kullanma tarihi geçmiş' olarak raporlanıyor
 
@@ -952,13 +964,15 @@
 | Renk/tema           | Hayır                                                              |
 | Efor                | S                                                                  |
 | Kaynak denetçiler   | runtime:checkout                                                   |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                       |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p054)                                   |
 
 **Kanıt:** RUNTIME p5-form-validation.mjs: son kullanma alanına '1230' (eğik çizgisiz) girildi, gelen alert 'Kartın son kullanma tarihi geçmiş' oldu. Gerçek neden biçim hatası, 2030 geçmiş bir tarih değil. KOD: card.exp.split('/') '1230' için mm=1230, yy=NaN üretiyor (BookingActions.tsx:153). card-token.ts:60-61 ay ya da yıl geçersiz olduğunda da 'geçmiş' mesajını veriyor.
 
 **Etki:** Kullanıcı kartının süresi dolmuş sanıp başka kart arıyor ya da ödemeden vazgeçiyor; asıl yapması gereken '/' eklemek.
 
 **Önerilen aksiyon:** Biçim ve süre ayrı doğrulansın: /^(0[1-9]|1[0-2])\/?(\d{2})$/ ile eşleşmezse 'Son kullanma tarihini AA/YY biçiminde girin (ör. 08/29)' gösterilsin, yalnız geçmiş tarih için 'süresi geçmiş' kullanılsın. Eğik çizgisiz '1230' girdisi de kabul edilsin.
+
+**Yapılan düzeltme:** Format and expiry were already checked separately. parseExpiry accepts "1230" or "12/30" and returns null for a bad month or format, which shows errors.EXPIRY_FORMAT under the expiry field. Only a real past date reaches tokenizeCard's CARD_EXPIRED. This now runs through the shared tokenizeCardFields, which behaves the same. card-token.ts never receives an invalid month from this form, so it needs no change.
 
 ## F500 — İptal: onay penceresi iade tutarını söylemiyor; ödenmemiş rezervasyon için 'Politika gereği iade yok' deniyor
 
@@ -974,13 +988,15 @@
 | Renk/tema           | Hayır                                                                       |
 | Efor                | M                                                                           |
 | Kaynak denetçiler   | runtime:checkout                                                            |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p054)                                      |
 
 **Kanıt:** RUNTIME p15-pay-dblclick.mjs: CONFIRMED rezervasyonda iptal native window.confirm ile 'Rezervasyonu iptal etmek istediğinize emin misiniz?' soruyor (dismiss edildi); iade tutarı ya da politika yok. p17: kendi oluşturduğum ve hiç ödenmemiş HELD rezervasyon iptal edildiğinde role=status 'İptal edildi. Politika gereği iade yok.' çıktı. KOD: BookingActions.tsx:208 confirm, 216-222 refundMinor>0 değilse noRefund; payment.json:23.
 
 **Etki:** Ödeme yapmamış misafir 'iade yok' sözüyle para kaybettiğini sanıyor. Onaylı rezervasyonu iptal eden misafir ne kadar geri alacağını ancak geri dönüşsüz eylemden sonra öğreniyor. Native Türkçe confirm düğmeleri 'Tamam/İptal' olduğundan 'İptal' sözcüğü belirsizleşiyor.
 
 **Önerilen aksiyon:** HELD için 'Rezervasyon iptal edildi; kartınızdan ödeme alınmadı.' gösterilsin. window.confirm yerine önce iade önizlemesini (GET refund quote) çeken bir diyalog kullanılsın: '₺X iade edilecek (%Y)'. Düğmeler açık etiketli olsun: 'Rezervasyonu iptal et' / 'Vazgeç'.
+
+**Yapılan düzeltme:** Cancelling a HELD (unpaid) booking now shows the new key cancel.cancelledNoCharge ("İptal edildi. Kartınızdan ödeme alınmadı.") instead of noRefund. The confirm step already used useConfirm with clear labels ('Evet, iptal et' / 'Rezervasyonu koru') and a HELD/CONFIRMED-specific body. The refund preview in the dialog ('₺X iade edilecek (%Y)') is not done: no refund-quote API exists, so it is listed in crossOwner.
 
 ## F501 — İptal sonrası odak body'ye düşüyor; sonuç yalnızca geçici küçük metinle veriliyor
 
@@ -996,13 +1012,15 @@
 | Renk/tema           | Hayır                                           |
 | Efor                | S                                               |
 | Kaynak denetçiler   | runtime:trips                                   |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                    |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p054)          |
 
 **Kanıt:** p-cancel-accept.mts (390x844, sahte id): onay kabul -> iptal düğmesi DOM'dan kalkıyor, document.activeElement=body; sonuç role=status 'İptal edildi. Politika gereği iade yok.' text-sm; 'Toplam Tutar ₺7.350,00' değişmeden duruyor, iade satırı yok. Ekran after-cancel-mobile.png.
 
 **Etki:** SR kullanıcısı status'u duysa da bağlamı kaybediyor; tüm kullanıcılar ödenen/iade edilen tutarı tek bakışta göremiyor.
 
 **Önerilen aksiyon:** İptal sonrası odağı tabIndex=-1 olan h1'e veya sonuç kutusuna taşıyın; sunucu verisinden kalıcı 'İade: ₺X (%Y) · durum' satırı gösterin.
+
+**Yapılan düzeltme:** Focus is already handled by the page: booking/[id]/page.tsx:63-96 moves focus to the h1 (tabIndex=-1) when the status changes to CANCELLED. The cancel result, with the refund amount and percent or the new no-charge text, stays in the status region while the component is mounted. A refund row that comes from server data and survives a reload needs the booking API and page changes listed in crossOwner.
 
 ## F502 — Kart hataları alanlarla ilişkilendirilmiyor ve iptal düğmesinin altında, alandan uzakta gösteriliyor
 
@@ -1018,13 +1036,15 @@
 | Renk/tema           | Hayır                                                                               |
 | Efor                | S                                                                                   |
 | Kaynak denetçiler   | runtime:checkout                                                                    |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                        |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p054)                                                     |
 
 **Kanıt:** RUNTIME p5-form-validation.mjs (masaüstü, TR): '1234 5678 9012 3456' girildiğinde role=alert 'Kart numarası geçersiz' çıktı. Hata y=540'ta, 'Rezervasyonu iptal et' düğmesinin altında; kart alanı y=250'de, 'Öde ve onayla' y=418'de. Tüm inputlarda aria-invalid=null, aria-describedby=null. Odak düğmede kaldı. Aynı durum CVC ve süre hatalarında ve red ile HOLD_EXPIRED mesajlarında da görüldü (p6, p11). Ekran görüntüleri: crops/checkout/p5-invalid.png, p11-pay-after-expiry.png. KOD: tek mesaj alanı bileşenin en sonunda, iptal düğmesinden sonra render ediliyor (BookingActions.tsx:344-370).
 
 **Etki:** Hata görsel olarak iptal düğmesine ait görünüyor. Kullanıcı hangi alanı düzeltmesi gerektiğini aramak zorunda kalıyor. Yardımcı teknolojide alan hatalı olarak bildirilmiyor.
 
 **Önerilen aksiyon:** CardValidationError'a alan bilgisi (number|exp|cvc) eklensin. İlgili input'a aria-invalid='true' ve aria-describedby ile bağlı bir hata metni verilsin, metin alanın hemen altında gösterilsin ve odak o alana taşınsın. Sunucu ve genel ödeme hataları ise 'Öde ve onayla' düğmesinin hemen üstünde bir hata özeti olarak gösterilsin.
+
+**Yapılan düzeltme:** Field errors were already linked to their inputs (Field error → aria-invalid + aria-describedby, and failField focuses the field). Now the single role=alert error appears next to the action that caused it: just above 'Öde ve onayla' in the card form, above 'Doğrula' in the 3DS form, under the Stripe form, and next to the cancel button for cancel errors (Message.at="cancel"). It falls back to its old place only when no form is visible (e.g. hold expired).
 
 ## F591 — Fiyat bölümünün tamamı aria-live; her kupon değişikliğinde döküm baştan okunuyor
 
@@ -1041,13 +1061,15 @@
 | Renk/tema           | Hayır                                                                                                                                                                                                                                                                                                                             |
 | Efor                | S                                                                                                                                                                                                                                                                                                                                 |
 | Kaynak denetçiler   | area:checkout, lens:a11y                                                                                                                                                                                                                                                                                                          |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                                                                                                                                                                                                                      |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p017)                                                                                                                                                                                                                                                                                                   |
 
 **Kanıt:** checkout/page.tsx:206-209 `<section ... aria-live="polite">` h2'yi, QuoteBreakdown'ı, CouponField girdisini ve düğmelerini ve totalNotice metnini sarıyor. useQuote.ts:226 her yeni istekte `quote: null` atıyor; döküm DOM'dan kalkıp yeniden ekleniyor. Bu yüzden her kupon uygulama ya da kaldırma işleminde gece, vergi ve toplam satırlarının tamamı ile "Kaldır" düğmesi yeniden duyuruluyor.
 
 **Etki:** Ekran okuyucu kullanan misafir kuponun sonucunu (uygulandı / geçersiz) ve yeni toplamı uzun bir okuma içinde kaçırıyor. Bilişsel yük artıyor.
 
 **Önerilen aksiyon:** section'dan aria-live'ı kaldırın. Yalnızca değişen bilgiyi taşıyan tek bir `<p role="status" className="sr-only">` ekleyin: "Kupon uygulandı. Yeni toplam: {total}" ya da kupon durum metni. Bu metin quote değişiminde güncellensin.
+
+**Yapılan düzeltme:** Confirmed: the whole price section had aria-live='polite'. I removed it and added one sr-only <p role=status> that only says the coupon result (quote.couponStatus.*) and 'Güncel toplam: {total}' (new key checkout.totalStatus). It updates when the quote changes. The quote error <p> got role=alert so errors are still announced.
 
 ## F592 — Rezervasyon ödemesinde 3DS kod alanı görünür etiketsiz ve one-time-code'suz; ödeme düğmesi tutarı göstermiyor
 
@@ -1064,13 +1086,15 @@
 | Renk/tema           | Hayır                                                                                                                                                                                                                                |
 | Efor                | S                                                                                                                                                                                                                                    |
 | Kaynak denetçiler   | lens:forms, lens:a11y                                                                                                                                                                                                                |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                                                                                                                         |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p054)                                                                                                                                                                                                      |
 
 **Kanıt:** src/components/booking/BookingActions.tsx:327-334 `<input inputMode="numeric" aria-label={t("verificationCode")} …/>` — görünür label yok, `autoComplete="one-time-code"` ve maxLength yok; :339 doğrula düğmesi meşgulken metin değiştirmiyor. :318 `t("payAndConfirm")` tutar içermiyor. Aynı akışın sepet/paylaşım sürümleri doğru: src/app/checkout/cart/page.tsx:387-404 (görünür label + one-time-code + processing), :344-346 ve src/app/pay/share/[token]/page.tsx:287-289 (`Öde ve onayla · {tutar}`).
 
 **Etki:** SMS kodunu otomatik dolduramayan mobil misafir kodu elle taşır; tek oda ödemesinde tutar teyidi düğme anında görünmez; ekranlar arası tutarsızlık öğrenmeyi zorlaştırır.
 
 **Önerilen aksiyon:** BookingActions 3DS alanını cart'taki <label> sarmalı + `autoComplete="one-time-code" maxLength={8}` ile değiştir; doğrula düğmesine `busy ? t("processing") : t("verify")`; ödeme düğmesini `${t("payAndConfirm")} · ${f.money(amountMinor - creditMinor, currency)}` yap.
+
+**Yapılan düzeltme:** Partly real, confirmed in code. The visible label, autoComplete=one-time-code and the busy 'İşleniyor...' text were already there. What was missing: the 3DS input now has maxLength={8}, and the mock pay button reads `${t("payAndConfirm")} · ${f.money(amountMinor - creditMinor, currency)}`, matching the cart page. The Stripe form's button is in another file (see crossOwner).
 
 ## F746 — Geçersiz URL parametreleri sessiz çıkmaza ve ekranda 'NaN' görünmesine yol açıyor
 
@@ -1086,13 +1110,15 @@
 | Renk/tema           | Hayır                                                                     |
 | Efor                | S                                                                         |
 | Kaynak denetçiler   | area:checkout                                                             |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                              |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p017)                                           |
 
 **Kanıt:** checkout/page.tsx:51 `const guestCount = Number(searchParams.get("guestCount") ?? "1");`: "abc" ya da boş değer gelirse NaN üretiyor ve :201'de "NaN" olarak basılıyor. useQuote.ts:200 `checkIn < checkOut ? ... : null` koşulu sağlanmazsa (çıkış ≤ giriş ya da eski yer imi) quote=null, loading=false, error=null dönüyor. Fiyat bölümü boş kalıyor ve düğme kalıcı olarak devre dışı. :148'deki koruma yalnızca parametrenin var olup olmadığına bakıyor.
 
 **Etki:** Eski bir yer imi ya da paylaşılan bağlantıyla gelen misafir boş bir fiyat kutusu ve basılamayan bir düğme görüyor; açıklama yok.
 
 **Önerilen aksiyon:** :148 korumasına şu doğrulamaları ekleyin: ISO tarih regex'i, `checkIn < checkOut`, `checkIn >= bugün`, `Number.isInteger(guestCount) && guestCount >= 1`. Geçersizse eksik-bilgi görünümünde nedeni yazın ("Seçtiğiniz tarihler geçersiz ya da geçmişte kaldı") ve konaklama sayfasına bağlantı verin.
+
+**Yapılan düzeltme:** Confirmed: guestCount could be NaN and invalid dates gave an empty price box with a dead button. The page now checks that both dates are real YYYY-MM-DD days, that checkIn < checkOut, that checkIn is not before an earliest allowed day (UTC today minus one day, set with useState(earliestCheckIn) so it doesn't break the purity lint rule), and that guestCount is an integer ≥ 1. If any check fails, no quote is requested and an error view shows the reason (new keys invalidTitle, invalidDatesHint, pastDatesHint, invalidGuestsHint) with links back to the property and home. The property link only carries valid dates and guests.
 
 ## F747 — Anonim misafir checkout'ta giriş gerektiğini ancak 'Rezervasyonu Tamamla'ya basınca öğreniyor; giriş sayfası nedenini söylemiyor
 
@@ -1108,13 +1134,15 @@
 | Renk/tema           | Hayır                                                       |
 | Efor                | S                                                           |
 | Kaynak denetçiler   | lens:nav                                                    |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p017)                      |
 
 **Kanıt:** Checkout mount'ta oturum kontrolü yapmıyor; 121-125'te 401 gelince yönlendiriyor. couponCode (59) URL'de değil, girişten dönünce kayboluyor. login/page.tsx:80-81 başlık ve alt başlık sabit ("Rezervasyonlarınıza ve favorilerinize erişin."); redirect parametresi varken bağlam gösterilmiyor. Oturum açıkken giriş formu yine gösteriliyor.
 
 **Etki:** Kupon girip ödemeye hazırlanan misafir beklenmedik biçimde giriş sayfasına atılıyor ve neden orada olduğunu bilmiyor. Döndüğünde kupon kaybolmuş oluyor.
 
 **Önerilen aksiyon:** Checkout'ta useSession kullanın. Anonimse düğmenin üstünde "Rezervasyonu tamamlamak için giriş yapın veya hesap oluşturun" kutusunu, redirect'i ve kuponu taşıyan loginHref/registerHref ile gösterin. Login sayfasında redirect varsa "Giriş yaptıktan sonra işleminize döneceksiniz" alt başlığını gösterin; oturum açıksa doğrudan redirect'e gidin.
+
+**Yapılan düzeltme:** Partly confirmed. Checkout already used useSession, already showed a sign-in notice above the button, and already kept the coupon in the return URL. Still missing were a register path and context for the login page. I added a register link that keeps redirect and coupon, plus reason=checkout on both links and on the 401 redirect. The login page subtitle and sending already-signed-in users straight to the redirect are left to the login page owner (see crossOwner).
 
 ## F748 — JSON olmayan yanıt ya da ağ kopması teknik JS hata metni olarak gösteriliyor
 
@@ -1130,13 +1158,15 @@
 | Renk/tema           | Hayır                               |
 | Efor                | S                                   |
 | Kaynak denetçiler   | area:checkout                       |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**        |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p017)     |
 
 **Kanıt:** checkout/page.tsx:127 `const data = await res.json();` res.ok kontrolünden önce çalışıyor. Proxy 502 HTML döndürürse SyntaxError atılıyor; çevrimdışıyken fetch TypeError atıyor. :142-143 `setError(err instanceof Error ? err.message : t("createFailed"))` bunları "Unexpected token '<' ..." ya da "Failed to fetch" gibi İngilizce ve teknik metinler olarak kullanıcıya basıyor.
 
 **Etki:** Mobil ve zayıf ağdaki misafir anlamsız bir teknik mesaj görüyor. Yeniden denemenin güvenli olduğunu (idempotency anahtarı aynı kaldığı için) bilmiyor.
 
 **Önerilen aksiyon:** Kendi attığınız hataları ayrı bir sınıfla (ör. `class CheckoutError`) işaretleyin. Diğer tüm hatalarda `t("createFailed")` gösterin. Ağ hatasında "Bağlantı sorunu. Tekrar deneyin; aynı rezervasyon iki kez oluşturulmaz." metni ve "Tekrar dene" düğmesi verin. `res.json()` çağrısını try/catch ile sarın.
+
+**Yapılan düzeltme:** Confirmed: the last catch branch showed err.message, e.g. a SyntaxError text. apiFetch already turns non-JSON error responses into an ApiError. Now every ApiError message goes through errorText(err, t('createFailed')), so 5xx or code-less errors show createFailed and other-language server text isn't shown. Any non-ApiError shows either the localized network text or createFailed, never a raw message. A missing booking id no longer throws; it shows createFailed with a retry. Retryable errors show the 'safe to retry' hint and a 'Tekrar dene' button.
 
 ## F749 — Fiyat değişince ya da kupon uygulanınca eski ve yeni tutar karşılaştırılamıyor
 
@@ -1152,13 +1182,15 @@
 | Renk/tema           | Hayır                                                                          |
 | Efor                | M                                                                              |
 | Kaynak denetçiler   | area:checkout                                                                  |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                   |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p018)                                                |
 
 **Kanıt:** checkout/page.tsx:133-135 PRICE_CHANGED durumunda yalnızca `t("priceChanged")` gösteriliyor: "Fiyat değişti. Güncel fiyatı kontrol edip tekrar onaylayın." Oysa sunucu booking-service.ts:527-531'de `details: { previousTotal, currentTotal, currency }` gönderiyor. Ayrıca useQuote.ts:226 yeni istekte eski teklifi sildiği için önceki toplam ekrandan kalkıyor; kupon öncesi ve sonrası tutarları kullanıcı aklında tutmak zorunda kalıyor.
 
 **Etki:** Para hatasına toleransı düşük misafir fiyatın ne kadar arttığını hatırlamak zorunda kalıyor; tanıma yerine hatırlamaya dayanıyor. Fark büyükse fark etmeden onaylayabiliyor.
 
 **Önerilen aksiyon:** PRICE_CHANGED hatasında details'ı okuyup şunu gösterin: "Toplam {f.money(previousTotal)} → {f.money(currentTotal)} olarak güncellendi". useQuote'ta yeni istek sırasında önceki teklifi `stale` olarak tutup "güncelleniyor…" etiketiyle gösterin. Kupon uygulanınca "İndirim: −{amount}" satırını vurgulayın.
+
+**Yapılan düzeltme:** Confirmed that PRICE_CHANGED only showed the generic message. The page now reads err.details (previousTotal/currentTotal/currency) and shows 'Fiyat değişti: toplam X yerine artık Y…'. A render-time derived PriceTrail state keeps the last quote, so while a recalculation runs it shows 'Fiyat güncelleniyor… Önceki toplam: X'. After a coupon or price change it shows a visible 'Toplam güncellendi: önceki X, şimdi Y.' line, which is also announced through the existing role=status region. useQuote did not need to change.
 
 ## F750 — Konaklama yükleme hatası 'bilgiler eksik' başlığıyla gösteriliyor; yeniden deneme yok
 
@@ -1174,13 +1206,15 @@
 | Renk/tema           | Hayır                           |
 | Efor                | S                               |
 | Kaynak denetçiler   | area:checkout                   |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**    |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p018) |
 
 **Kanıt:** checkout/page.tsx:87-89 `.catch(() => { if (active) setLoadError(t("loadFailed")); })` → :148 `if (!propertyId || ... || loadError)`. Ağ hatası olduğunda ekranda h1 :155 `t("missingTitle")` "Rezervasyon bilgileri eksik", altında "Konaklama bilgileri alınamadı." ve tek bağlantı "Ana sayfaya dön" (:157-159) çıkıyor. Hata kutusu role="alert" taşımıyor ve yeniden deneme düğmesi yok.
 
 **Etki:** Yavaş ya da kopuk mobil ağda geçici bir hata misafirin bütün seçimini (oda, tarih, kupon) silip ana sayfaya göndermesine yol açıyor. Başlık sorunun nedenini yanlış anlatıyor.
 
 **Önerilen aksiyon:** loadError için ayrı bir dal kurun: h1 "Konaklama bilgileri yüklenemedi", kapsayıcıda `role="alert"`, "Tekrar dene" düğmesi (bir `retry` sayacını artırıp useEffect bağımlılığına ekleyerek) ve "Konaklama sayfasına dön" bağlantısı (/property/{propertyId}). Eksik parametre durumunda "Ana sayfaya dön" yerine "Yeniden ara" (/search) gösterin.
+
+**Yapılan düzeltme:** The separate load-error title, retry button and 'İlana dön' link were already there (F747). Added role="alert" on the title+hint wrapper for the load-error case only. When parameters are missing, the home link is replaced by a 'Yeniden ara' link to /search.
 
 ## F751 — Rezervasyon akışında adım göstergesi yok (Bilgiler → Ödeme → Onay)
 
@@ -1196,13 +1230,15 @@
 | Renk/tema           | Hayır                               |
 | Efor                | M                                   |
 | Kaynak denetçiler   | area:checkout                       |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**        |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p018)     |
 
 **Kanıt:** checkout/page.tsx:166-167 yalnızca `<main ...><h1>{t("title")}</h1>` çiziyor. Ödeme adımı ayrı bir sayfada (booking/[id]/page.tsx:165 BookingActions). İki sayfada da kullanıcının toplam kaç adımın kaçıncısında olduğunu gösteren bir öğe yok.
 
 **Etki:** Misafir, özellikle düşük bilgisayar okuryazarlığında, sürecin ne kadar süreceğini ve ödemeyi henüz yapmadığını kavrayamıyor. Bu durum bir önceki bulgudaki yanlış anlamayı pekiştiriyor.
 
 **Önerilen aksiyon:** Her iki sayfaya `<ol aria-label="Rezervasyon adımları">` ekleyin: 1. Bilgileri kontrol et, 2. Ödeme, 3. Onay. Geçerli adıma `aria-current="step"` ve görünür "Adım 1/3" metni verin. Adım durumu yalnızca renkle gösterilmesin.
+
+**Yapılan düzeltme:** The existing 2-step <ol> (Bilgiler, Ödeme with aria-current) now has a third step, '3. Onay'. A visible 'Adım 1/3' line sits above it, so the current step is not shown by color alone. The booking/[id] payment page still needs the matching indicator; that is listed in crossOwner.
 
 ## F752 — Checkout'ta geri dönme, tarih veya misafiri düzenleme yolu yok; tek çıkış tarayıcının geri tuşu
 
@@ -1218,13 +1254,15 @@
 | Renk/tema           | Hayır                                                |
 | Efor                | S                                                    |
 | Kaynak denetçiler   | area:checkout                                        |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                         |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p018)                     |
 
 **Kanıt:** checkout/page.tsx:165-167 `<main id="main" ...><h1>...` ile başlıyor; Header, logo ya da "Konaklamaya dön" bağlantısı yok (docs/img/checkout-breakdown.png'de de üst gezinme görünmüyor). Ödeme sayfası ise booking/[id]/page.tsx:99'da `<Header />` çiziyor. Tarih (:193-198), misafir (:199-202) ve oda (:185-192) satırlarının yanında "Değiştir" bağlantısı yok. Hata ekranı (:157) yalnızca ana sayfaya dönüyor ve seçimi kaybettiriyor.
 
 **Etki:** Misafir son kontrolde yanlış tarih ya da kişi sayısı fark ederse geri dönmenin yolunu bilmiyor. Mobil PWA kipinde ya da geri tuşu olmayan görünümde akışta sıkışıyor.
 
 **Önerilen aksiyon:** h1'in üstüne `<Link href={`/property/${propertyId}?checkIn=${checkIn}&checkOut=${checkOut}&guests=${guestCount}`}>← Konaklamaya dön</Link>` ekleyin. Tarih, misafir ve oda satırlarına aynı hedefe giden "Değiştir" bağlantısı koyun; bağlantı metni sr-only olarak "tarihleri" gibi bağlam taşısın. İsteğe bağlı olarak logolu yalın bir başlık kullanın.
+
+**Yapılan düzeltme:** Already fixed in the current code. CheckoutFrame renders Header and Footer. There is a '← İlana dön' link above the h1, and the 'Konaklama Bilgileri' section header has a change link (checkout.changeDates). Both point to /property/{id} with checkIn, checkOut, guests, roomId and ratePlanId. The error screen also links back to the property.
 
 ## F753 — Sepet, ödeme ve pay ödeme sayfalarında site başlığı/gezinme yok; tek oda checkout'ta 'değiştir/geri' yolu yok
 
@@ -1240,13 +1278,15 @@
 | Renk/tema           | Hayır                                                                                                                                       |
 | Efor                | S                                                                                                                                           |
 | Kaynak denetçiler   | lens:status                                                                                                                                 |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                                |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p018)                                                                                                            |
 
 **Kanıt:** Header/PageShell içermeyen sayfalar: cart/page.tsx:63, checkout/page.tsx:166, checkout/cart/page.tsx:232, pay/share/[token]/page.tsx:178 (yalnız `<main id="main">`). checkout/page.tsx:170-204 özetinde tarih/oda/misafir için 'Değiştir' bağlantısı yok; 196 tarihler ham ISO `{checkIn} → {checkOut}`.
 
 **Etki:** Misafir seçimini düzeltmek için tarayıcı geri tuşuna mecbur; dil değiştiremiyor, hesabına/sepetine gidemiyor; diğer sayfalarla tutarsız.
 
 **Önerilen aksiyon:** Bu sayfaları PageShell ya da sadeleştirilmiş checkout başlığıyla (logo + dil seçici + 'Güvenli ödeme') sar; checkout özetine 'Tarihleri/odayı değiştir' bağlantısı (/property/{id}?checkIn&checkOut&guests&roomId) ve tarihleri `f.date(..., 'long')` ile biçimlendir.
+
+**Yapılan düzeltme:** Checkout is wrapped in CheckoutFrame (Header with LocaleSwitcher, plus Footer) and has the back and change links. Dates were already formatted rather than shown as ISO, and now use separate rows with the weekday (F756). cart/page.tsx and pay/share already render Header. checkout/cart Header is handled by p016 crossOwner checkoutB#6.
 
 ## F754 — Sepet, ödeme ve pay ödeme sayfalarında genel başlık/dil seçici/geri dönüş yok
 
@@ -1262,13 +1302,15 @@
 | Renk/tema           | Hayır                                                                                                      |
 | Efor                | S                                                                                                          |
 | Kaynak denetçiler   | lens:copy                                                                                                  |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                               |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p018)                                                                           |
 
 **Kanıt:** checkout/page.tsx:166, cart/page.tsx:63, checkout/cart/page.tsx:232, pay/share/[token]/page.tsx:178 yalnız `<main>` döndürür; Header/Footer/PageShell yok (src/app altında ek layout da yok). Oysa 'Sepetim' Header.tsx:24 menüsünde; booking/[id] ve account Header içerir. Checkout'ta ilan sayfasına geri dönüş bağlantısı da yok.
 
 **Etki:** Menüden 'Sepetim'e giden kullanıcı menüyü kaybeder; ödeme sırasında dil değiştiremez, tarayıcı geri tuşu dışında çıkış yolu yoktur.
 
 **Önerilen aksiyon:** Bu sayfaları PageShell ile sarın veya en azından logo + dil seçici + 'İlana dön' bağlantısı içeren sade bir ödeme başlığı ekleyin.
+
+**Yapılan düzeltme:** Same as F753. The checkout page already renders Header (logo, LocaleSwitcher, menu) and Footer through CheckoutFrame, and has an '← İlana dön' link. The other listed pages either already have Header or are covered by p016 checkoutB#6.
 
 ## F755 — Konaklama tarihleri ekranlara göre beş farklı biçimde yazılıyor (ham ISO dahil) ve tarih aralığı ayırıcısı değişiyor
 
@@ -1284,13 +1326,15 @@
 | Renk/tema           | Hayır                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | Efor                | S                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | Kaynak denetçiler   | lens:consistency                                                                                                                                                                                                                                                                                                                                                                                                          |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                                                                                                                                                                                                                                                                                                              |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p018)                                                                                                                                                                                                                                                                                                                                                                                    |
 
 **Kanıt:** checkout/page.tsx:196 `{checkIn} → {checkOut}` ham ISO ("2026-10-12 → 2026-10-15"). Aynı akışın diğer adımlarında farklı biçimler var: BookingWidget.tsx:130 `f.date(s, "medium")` ve " - ", cart/page.tsx:129-130 medium ve "→", booking/[id]/page.tsx:93 ile account/page.tsx:156 ve TripsView.tsx:145 "long", search/page.tsx:289 ve compare/page.tsx:99 ile TripPlanner.tsx:187 varsayılan "short" ("12.10.2026") ve "-" ya da "–". Ham ISO gösterilen başka yerler: PartyRiskPanel.tsx:63, ComplianceDashboard.tsx:137 `td.slaDueAt.slice(0, 16).replace("T", " ")` (UTC), SmartFilter.tsx:60 çip etiketi `value: f.checkIn`. docs/img/v4-compare.png "24.06.2027 – 26.06.2027" gösterirken v4-cart.png "24 Haz 2027 → 26 Haz 2027" gösteriyor.
 
 **Etki:** Misafir aynı konaklamanın tarihini dört adımda dört farklı görünümde okur. Ödemeden hemen önceki özet ekranında ISO biçimi en zor okunanıdır ve tarih hatasına toleransın en düşük olduğu yer burasıdır. Admin SLA saatini UTC olarak yerel saat sanabilir.
 
 **Önerilen aksiyon:** Formatter'a `stay(checkIn, checkOut)` metodu ekleyin. "medium" stil ve tek ayırıcı (" – ") kullansın, gece sayısını da isteğe bağlı eklesin. Tüm konaklama aralığı gösterimlerinde bunu kullanın. checkout/page.tsx:196, PartyRiskPanel.tsx:63 ve SmartFilter çiplerinde `f.date` çağırın, ComplianceDashboard'da `f.dateTime(td.slaDueAt)` kullanın. Ayırıcı için booking.widget.dates ile checkout.dates'teki tire ve uzun çizgi farkını da giderin.
+
+**Yapılan düzeltme:** Checkout no longer shows ISO dates or the arrow. Check-in and check-out are separate rows with a long, weekday-qualified, UTC-safe date, and nights are on their own row. The shared formatter stay() method from the recommendation (src/lib/i18n/format.ts) and its use on other screens are outside this file. The ISO cases in PartyRiskPanel, ComplianceDashboard and SmartFilter are already queued to their owners as checkoutB#7.
 
 ## F756 — Özet ekranlarında ham ISO tarih ve '→' oku; SLA saati yerelleştirilmemiş UTC
 
@@ -1306,13 +1350,15 @@
 | Renk/tema           | Hayır                                                                                                |
 | Efor                | S                                                                                                    |
 | Kaynak denetçiler   | lens:a11y                                                                                            |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                         |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p018)                                                                      |
 
 **Kanıt:** checkout/page.tsx:193-198 `<dd ...>{checkIn} → {checkOut}</dd>` ('2026-11-12 → 2026-11-15'); PartyRiskPanel.tsx:62-64 `{i.checkIn} → {i.checkOut}`; ComplianceDashboard.tsx:137 `t("slaDue", { at: td.slaDueAt.slice(0, 16).replace("T", " ") })` — UTC saat dilimi belirtilmeden yerel saat gibi gösteriliyor. Diğer ekranlar `f.date(..., "long")` kullanıyor (booking/[id]/page.tsx:93).
 
 **Etki:** Misafir ödeme özetinde (en düşük tarih hatası toleransı) tarihleri makine biçiminde görüyor, ekran okuyucu '2026 tire 11 tire 12 sağ ok …' okuyor; yönetici yasal SLA son saatini 3 saat sapmalı yorumlayabilir.
 
 **Önerilen aksiyon:** `f.date(checkIn, "long")` ile haftanın günü dahil biçimlendirin ve 'Giriş: … / Çıkış: …' olarak ayrı dt/dd satırları kullanın; '→' yerine metin ('ile') veya `aria-hidden` ok + sr-only metin; SLA için `f.dateTime(td.slaDueAt)` + saat dilimi.
+
+**Yapılan düzeltme:** Split the single 'Giriş – Çıkış' dd into separate dt/dd rows: Giriş, Çıkış and Süre (nights). Dates now include the weekday, using Intl with the active locale and UTC, and no arrow or dash separator is read aloud. The SLA/UTC part in ComplianceDashboard belongs to that file's owner (checkoutB#7).
 
 ## F757 — Ödeme öncesi son kontrol ekranında ve ev sahibi listesinde ham ISO tarih
 
@@ -1328,13 +1374,15 @@
 | Renk/tema           | Hayır                                                                                   |
 | Efor                | S                                                                                       |
 | Kaynak denetçiler   | lens:mobile                                                                             |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                            |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p018)                                                         |
 
 **Kanıt:** checkout/page.tsx:196 `{checkIn} → {checkOut}` ekranda '2026-10-12 → 2026-10-15' olarak görünüyor; gün adı ve gece sayısı yok. PartyRiskPanel.tsx:63 `{i.checkIn} → {i.checkOut}` aynı biçimi kullanıyor. SmartFilter.tsx:60/62 çip etiketleri `value: f.checkIn` ile ham değeri gösteriyor. Diğer ekranlar f.date kullanıyor (cart/page.tsx:129, booking/[id]/page.tsx:93).
 
 **Etki:** Misafir rezervasyonu onaylamadan önceki son ekranda tarihi YYYY-AA-GG biçiminde görüyor. Gün ile ayı karıştırabilir, hafta gününü kontrol edemez. Bu, tarih hatasına toleransın en düşük olduğu adım.
 
 **Önerilen aksiyon:** Tarihi `f.date(checkIn, "long")` ve hafta günüyle göster (örn. 'Pzt 12 Eki 2026 → Per 15 Eki 2026 · 3 gece'). PartyRiskPanel ve SmartFilter çiplerinde `f.date(…, "medium")` kullan.
+
+**Yapılan düzeltme:** The final review screen now shows check-in and check-out with weekday and long month, for example '12 Ekim 2026 Pazartesi', plus a separate nights row. The PartyRiskPanel and SmartFilter chips belong to their owners (checkoutB#7).
 
 ## F758 — Fiyat alınamadığında ya da oda dolduğunda çıkmaz; düğme nedeni açıklanmadan devre dışı
 
@@ -1350,13 +1398,15 @@
 | Renk/tema           | Hayır                                                                         |
 | Efor                | S                                                                             |
 | Kaynak denetçiler   | area:checkout                                                                 |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                  |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p019)                                               |
 
 **Kanıt:** checkout/page.tsx:213 `{quoteError && <p className="text-sm text-red-600">{quoteError}</p>}` yanında yeniden deneme ya da alternatif yok. :232 `disabled={submitting || !quote || !idempotencyKey}` için görünür veya aria-describedby ile bağlı bir neden metni yok. useQuote.ts:236-237 hata `code` değerini (ör. SOLD_OUT) döndürüyor ama checkout :64-77 `code` alanını hiç almıyor.
 
 **Etki:** Misafir gri düğmeye neden basamadığını anlamıyor. Oda dolduysa başka tarih seçmek için yol gösterilmiyor ve misafir akışı terk ediyor.
 
 **Önerilen aksiyon:** quoteError olduğunda "Tekrar dene" düğmesi ekleyin (`setRefreshKey(k => k + 1)`). `code === "SOLD_OUT"` için "Bu oda seçtiğiniz tarihlerde dolu" metni ile "Başka tarih seç" bağlantısı (/property/{id}) gösterin. Gönder düğmesine `aria-describedby` ile bağlı kısa bir neden metni ekleyin ("Fiyat hesaplanıyor…" / "Fiyat alınamadı").
+
+**Yapılan düzeltme:** Most of the fix was already there: a 'Fiyatı yeniden hesapla' retry, SOLD_OUT text with a 'Tarihleri veya odayı değiştir' link, and a reason text for the failed-price case. What was still missing was a reason linked to the disabled button. Its aria-describedby now points to the visible 'Fiyat hesaplanıyor…' line (#checkout-quote-loading) while the price loads, and to the sold-out alert (#checkout-quote-error) when the room is sold out. In other failures it still points to the submitDisabledReason text, which is no longer shown for SOLD_OUT because its 'recalculate' advice does not apply there.
 
 ## F759 — Ödeme yapılandırması gelmeden mock form çiziliyor; hata olursa yanlış forma düşülüyor ve seçenekler sonradan form üstüne ekleniyor
 
@@ -1372,13 +1422,15 @@
 | Renk/tema           | Hayır                                                                                                  |
 | Efor                | M                                                                                                      |
 | Kaynak denetçiler   | area:checkout                                                                                          |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                           |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p054)                                                                 |
 
 **Kanıt:** BookingActions.tsx:47-50 `useState<PaymentConfig>({ provider: "mock", publishableKey: null })` ile başlıyor; yapılandırma :68-73'te sonradan geliyor ve `.catch(() => undefined); // Yapılandırma okunamazsa mock form kalır.` Stripe ortamında ilk karede mock kart formu çiziliyor, ardından Stripe formuyla değiştiriliyor. Okuma hata verirse mock token Stripe'a gidiyor ve errors.ts:173-177 "Kart bilgisi geçersiz" dönüyor. RnplOption.tsx:32-40 ve WalletCreditOption.tsx:139-151 de asenkron yüklenip kart formunun üstüne yer tutucusuz ekleniyor.
 
 **Etki:** Hızlı yazan misafirin mock forma girdiği kart bilgisi form değişince kayboluyor. Yazarken form aşağı kayıyor. Yapılandırma hatasında kart geçerli olduğu hâlde "geçersiz" mesajı alınıyor.
 
 **Önerilen aksiyon:** payConfig başlangıcını `null` yapın ve çözülene kadar `<p role="status">Ödeme seçenekleri yükleniyor…</p>` ile sabit yükseklikte bir iskelet gösterin. Okuma hatasında demo modu değilse mock'a düşmeyin; "Ödeme formu yüklenemedi" ve "Tekrar dene" gösterin. RNPL ve kredi blokları için min-height ayırın ya da hepsi yüklenene kadar formu göstermeyin.
+
+**Yapılan düzeltme:** Confirmed. payConfig now starts as null, and until it loads a fixed-height block (min-h-[18rem], aria-busy) shows 'Ödeme seçenekleri yükleniyor…'. If loading fails, the form no longer falls back to mock: it shows a role=alert 'Ödeme formu yüklenemedi…' and a 'Tekrar dene' button that refetches, with an unmount guard. RNPL and wallet blocks render only after the config is known. Reserving min-height inside RnplOption and WalletCreditOption is in other files (see crossOwner).
 
 ## F760 — Step-up açıklaması 'ödeme otomatik yeniden denenir' diyor; Stripe akışında kullanıcı yeniden göndermek zorunda
 
@@ -1394,13 +1446,15 @@
 | Renk/tema           | Hayır                                                                                                         |
 | Efor                | S                                                                                                             |
 | Kaynak denetçiler   | area:checkout                                                                                                 |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                  |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p054)                                                                               |
 
 **Kanıt:** payment.json:30 stepUp.description: "Onaydan sonra ödeme otomatik olarak yeniden denenir." Stripe akışında BookingActions.tsx:128 `if (isStepUp(err)) setStepUp({ cardToken: "" });` → :101-104 `if (!pending?.cardToken) { setStepUpToken(token); setMessage({ kind: "info", text: t("verifiedRetry") }); return; }`. Ödeme otomatik tekrarlanmıyor; kullanıcının "Öde ve onayla" düğmesine yeniden basması gerekiyor ("Doğrulandı. Ödemeyi yeniden gönderebilirsiniz.").
 
 **Etki:** Misafir ödemenin kendiliğinden tamamlanacağını bekleyip sayfada bekliyor ya da sayfadan ayrılıyor. 15 dakikalık tutma süresi dolabiliyor.
 
 **Önerilen aksiyon:** StepUpDialog'a `autoRetry: boolean` prop'u ekleyin. Stripe yolunda `description` yerine yeni `stepUp.descriptionManual` gösterilsin: "Onayladıktan sonra 'Öde ve onayla' düğmesine yeniden basın." Daha iyisi, doğrulamadan sonra StripePaymentForm'daki form ref'ine `requestSubmit()` çağrılarak gerçekten otomatik yeniden gönderim yapılsın.
+
+**Yapılan düzeltme:** Confirmed: the Stripe path needed a manual resubmit. After step-up verification, the Stripe form is now resubmitted automatically: afterStepUp stores the token and sets a flag, and an effect on stepUpToken calls requestSubmit() on the Stripe form, so a fresh pm_ is created and sent with the stepUpToken. The existing stepUp.description ('ödeme otomatik olarak yeniden denenir') is therefore true on both paths. Only browsers without requestSubmit still get the 'verifiedRetry' message.
 
 ## F761 — Ödeme deneme sınırı (5) görünmüyor; sınır aşılınca form etkin kalıyor
 
@@ -1416,13 +1470,15 @@
 | Renk/tema           | Hayır                                           |
 | Efor                | M                                               |
 | Kaynak denetçiler   | area:checkout                                   |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                    |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p054)          |
 
 **Kanıt:** pay.ts:45-53 `PaymentAttemptsExceededError` → "Çok fazla başarısız ödeme denemesi. Bu rezervasyon için ödeme kapatıldı." (app-config.ts:532 PAYMENT_MAX_ATTEMPTS=5, 24 saatlik pencere). BookingActions.tsx:178-181 yalnızca ham mesajı basıyor. Durum hâlâ HELD olduğu için :265'teki kart formu gösterilmeye devam ediyor. Ret sonrasında kalan deneme hakkı yazılmıyor.
 
 **Etki:** Misafir kalan hakkını bilmeden kart denemeye devam ediyor. Kilitlendikten sonra form hâlâ etkin görünüyor ve ne yapacağı (iptal, destek) belirsiz kalıyor.
 
 **Önerilen aksiyon:** Sunucu PAYMENT_DECLINED yanıtının details alanına `attemptsLeft` eklesin ve UI "Kalan deneme hakkı: {n}" göstersin. PAYMENT_ATTEMPTS_EXCEEDED geldiğinde kart formunu gizleyip açıklama, "Destekle iletişime geç" (/support?bookingId=…) ve "Rezervasyonu iptal et" seçeneklerini gösterin.
+
+**Yapılan düzeltme:** Confirmed. On PAYMENT_ATTEMPTS_EXCEEDED the card, 3DS, Stripe, RNPL and wallet forms are hidden. A block appears with a focusable h2 (focus moves to it) 'Bu rezervasyon için kartla ödeme kapatıldı', an explanation (no charge taken), a 'Destekle iletişime geç' link to /support?bookingId=…, and the existing cancel button. Decline errors add 'Kalan deneme hakkı: {count}.' when the server sends details.attemptsLeft, which it does not do yet (see crossOwner).
 
 ## F762 — Ödenmemiş (HELD) rezervasyon iptalinde yanıltıcı 'Politika gereği iade yok' mesajı
 
@@ -1438,13 +1494,15 @@
 | Renk/tema           | Hayır                                                        |
 | Efor                | S                                                            |
 | Kaynak denetçiler   | area:checkout                                                |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                 |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p055)                              |
 
 **Kanıt:** BookingActions.tsx:217-222 `res.refund.refundMinor > 0 ? t("cancel.refunded", ...) : t("cancel.noRefund")`. İptal düğmesi HELD durumunda da görünüyor (:344 `status === "HELD" || status === "CONFIRMED"`). HELD rezervasyonda hiç tahsilat yapılmadığı için refundMinor=0 dönüyor ve payment.json:23 "İptal edildi. Politika gereği iade yok." gösteriliyor. RNPL planında tahsilattan önce yapılan iptal de bu dala düşüyor.
 
 **Etki:** Ödeme yapmamış misafir parasının yandığını sanıyor ve gereksiz destek talebi açıyor ya da kaygılanıyor. Sistem durumu gerçek dünyayla örtüşmüyor.
 
 **Önerilen aksiyon:** Durum HELD ise (ya da RNPL planında tahsilat yapılmamışsa) yeni `cancel.holdReleased` anahtarını kullanın: "Rezervasyon iptal edildi. Sizden herhangi bir ödeme alınmadı." `noRefund` yalnızca ödenmiş ve iadesiz durumda kalsın.
+
+**Yapılan düzeltme:** p054 had already fixed the HELD case by showing cancel.cancelledNoCharge instead of noRefund. I added the RNPL case: the DELETE response's refund.reason === "not_paid" now also shows "no payment was taken". A new optional prop, chargePending, lets the booking page turn this off for bookings that were paid and then fully refunded before cancelling. noRefund now appears only for paid bookings with no refund.
 
 ## F763 — Kart alanlarında biçim kısıtı ve maskesi yok; '1230' girilince 'süresi geçmiş' hatası çıkıyor
 
@@ -1461,13 +1519,15 @@
 | Renk/tema           | Hayır                                                                                                                                                                                              |
 | Efor                | S                                                                                                                                                                                                  |
 | Kaynak denetçiler   | area:checkout                                                                                                                                                                                      |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                                                                                       |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p055)                                                                                                                                                             |
 
 **Kanıt:** Son kullanma girdisinde (:287-292) inputMode="numeric", maxLength ve placeholder yok. :153 `card.exp.split("/").map(...)` "1230" için yy=undefined → NaN üretiyor ve card-token.ts:158-159 `throw new CardValidationError("Kartın son kullanma tarihi geçmiş")` yanlış nedeni bildiriyor. Kart numarasında (:275-282) maxLength ve 4'lü gruplama yok. CVC'de (:298-304) maxLength=4 yok ve kodun nerede olduğuna dair ipucu yok.
 
 **Etki:** Mobil misafir son kullanma alanında harf klavyesiyle karşılaşıyor. Eğik çizgisiz giriş yanlış "süresi geçmiş" mesajı üretiyor ve kullanıcı kartının geçerliliğinden şüpheleniyor.
 
 **Önerilen aksiyon:** Son kullanma: `inputMode="numeric" placeholder="AA/YY" maxLength={5}`; iki rakamdan sonra "/" otomatik eklensin ve "1230" ile "12/30" aynı kabul edilsin. Biçim hatası için ayrı bir metin ekleyin: "Son kullanma tarihini AA/YY biçiminde girin". Kart numarası: `maxLength={23}`, yazarken 4'lü gruplama. CVC: `maxLength={4}` ve "Kartın arkasındaki 3 haneli kod" ipucu (aria-describedby ile bağlı).
+
+**Yapılan düzeltme:** Most of this was already done when p054 moved the form to the shared CardFields. Expiry has numeric keyboard, maxLength 5, auto "/", accepts "1230" and shows its own format error (errors.EXPIRY_FORMAT). Card number has maxLength 23 and CVC has maxLength 4. Grouping the card number in fours and the CVC hint wired with aria-describedby live in CardFields.tsx, which I don't own, so I requested them as crossOwner.
 
 ## F764 — Ödeme düğmeleri tahsil edilecek tutarı göstermiyor
 
@@ -1483,13 +1543,15 @@
 | Renk/tema           | Hayır                                                                            |
 | Efor                | S                                                                                |
 | Kaynak denetçiler   | area:checkout                                                                    |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                     |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p055)                                           |
 
 **Kanıt:** BookingActions.tsx:318 `t("payAndConfirm")` → "Öde ve onayla". StripePaymentForm.tsx:84 aynı metni kullanıyor. Kartla ödenecek tutar cüzdan kredisi kullanılınca toplamdan farklılaşıyor (:255 `amountMinor! - creditMinor`). Toplam ise booking/[id]/page.tsx:156-161'de, seçeneklerin ve formun çok üstünde kalıyor.
 
 **Etki:** Misafir düğmeye basarken kartından tam olarak ne kadar çekileceğini görmüyor; özellikle kredi ya da RNPL seçildiğinde emin olamıyor.
 
 **Önerilen aksiyon:** Yeni anahtar `payment.payAmount: "{amount} öde ve onayla"` ekleyin ve `f.money(amountMinor - creditMinor, currency)` ile doldurun. Stripe düğmesinde de aynısını kullanın. RNPL için mevcut `rnpl.reserve` metni kalsın.
+
+**Yapılan düzeltme:** The mock card form button now reads "Öde ve onayla · <amount>", where the amount is amountMinor minus creditMinor; RNPL keeps rnpl.reserve. BookingActions already passes the credit-adjusted amount to StripePaymentForm. The Stripe button text itself is in StripePaymentForm.tsx, so I requested that change as crossOwner.
 
 ## F765 — Tek oda ödeme düğmesi tutarı göstermiyor (sepet ve pay ödemesi gösteriyor)
 
@@ -1505,13 +1567,15 @@
 | Renk/tema           | Hayır                                                                                                                             |
 | Efor                | S                                                                                                                                 |
 | Kaynak denetçiler   | lens:copy                                                                                                                         |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                      |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p055)                                                                                            |
 
 **Kanıt:** BookingActions.tsx:318 `rnpl ? t("rnpl.reserve") : t("payAndConfirm")` → 'Öde ve onayla'; StripePaymentForm.tsx:84 aynı. Buna karşın checkout/cart/page.tsx:346 `${tp("payAndConfirm")} · ${f.money(cart.totalMinor, ...)}` ve pay/share/[token]/page.tsx:289 tutarı düğmeye yazıyor. Cüzdan kredisi seçildiğinde kartla ödenecek kalan yalnız WalletCreditOption içinde (281-285).
 
 **Etki:** Misafir kredi düşüldükten sonra karttan çekilecek tutarı düğmede görmeden onaylar; üç ödeme ekranı arasında tutarsızlık.
 
 **Önerilen aksiyon:** Düğmeyi `${t("payAndConfirm")} · ${f.money(amountMinor - creditMinor, currency)}` yapın (RNPL'de 'Bugün ödeme yok — {tarih}'te ₺X'); aynısını StripePaymentForm'a amountMinor prop'u ile uygulayın.
+
+**Yapılan düzeltme:** Same change as F764: the single-room card button shows the card amount after credit, matching the cart and share-pay screens. The Stripe button still needs the matching change (crossOwner on StripePaymentForm.tsx).
 
 ## F766 — 3DS adımında geri dönme ya da başka kart kullanma yolu yok; doğrula düğmesi meşgul durumunu göstermiyor
 
@@ -1527,13 +1591,15 @@
 | Renk/tema           | Hayır                                               |
 | Efor                | S                                                   |
 | Kaynak denetçiler   | area:checkout                                       |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                        |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p055)                     |
 
 **Kanıt:** BookingActions.tsx:323 `{challenge && (`: challenge yalnızca başarıda temizleniyor (:195 `setChallenge(null)`). Formda "Vazgeç" ya da "Başka kart kullan" düğmesi yok. :339 `{t("verify")}` metni busy iken de değişmiyor (yalnızca :336 `disabled={busy}`). Yanlış koddan sonra girdi temizlenmiyor ve odaklanmıyor.
 
 **Etki:** Bankasından kod gelmeyen ya da başka kartla ödemek isteyen misafir 3DS ekranında sıkışıyor; tek çıkış sayfayı yenilemek ya da rezervasyonu iptal etmek.
 
 **Önerilen aksiyon:** Forma ikincil bir `<button type="button">` ekleyin: "Geri dön / başka kart kullan" → `setChallenge(null); setCode("");` ve ardından odağı kart numarası alanına taşıyın. Düğme metnini `{busy ? t("processing") : t("verify")}` yapın. Hatada `setCode("")` ile girdiyi temizleyip odaklayın.
+
+**Yapılan düzeltme:** Already present: the "back, use another card" button (clears the code, makes a new idempotency key, focuses the card number) and the "processing" text while busy. I added that when a 3DS error leaves the challenge open, focus returns to the code field with the entered code selected, so the user can type over it. Closed challenges still go back to the card form.
 
 ## F767 — 3D Secure doğrulama formlarında 'Vazgeç / başka kart dene' yolu yok
 
@@ -1549,13 +1615,15 @@
 | Renk/tema           | Hayır                                                                          |
 | Efor                | S                                                                              |
 | Kaynak denetçiler   | lens:status                                                                    |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                   |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p055)                                                |
 
 **Kanıt:** BookingActions.tsx:323-342 challenge formunda yalnız kod alanı + 'Doğrula'; challenge state'ini temizleyen kontrol yok. checkout/cart/page.tsx:379-405 ve pay/share/[token]/page.tsx:294-321 aynı.
 
 **Etki:** SMS kodu gelmeyen misafir başka kartla deneyemiyor; tutma süresi işlerken sayfayı yenilemek zorunda kalıyor.
 
 **Önerilen aksiyon:** Her challenge formuna ikincil 'Vazgeç, başka kartla öde' butonu: setChallenge(null), setCode(''), sepette setPayKey(newKey()); 'Kod gelmedi mi?' yardım metni; odak kart numarası alanına.
+
+**Yapılan düzeltme:** The back/other-card button was already there. I added the help text payment.threeDsNoCode ("Didn't get a code? … pay with another card below. Your card has not been charged.") above that button and linked it to the button with aria-describedby. The cart and share-pay pages are covered by their owners' existing crossOwner item (checkoutA#2).
 
 ## F768 — Dört ayrı kart formu tutarsız: OTP otomatik doldurma eksik, son kullanma tarihi önceden dolu
 
@@ -1571,13 +1639,15 @@
 | Renk/tema           | Hayır                                                                                                                                                                                                                                                      |
 | Efor                | M                                                                                                                                                                                                                                                          |
 | Kaynak denetçiler   | lens:mobile                                                                                                                                                                                                                                                |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                                                                                                                                               |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p055)                                                                                                                                                                                                                     |
 
 **Kanıt:** 3DS kodu: BookingActions.tsx:327-333 `inputMode="numeric" aria-label={t("verificationCode")}` içinde `autoComplete="one-time-code"` yok; checkout/cart/page.tsx:392 ve pay/share/[token]/page.tsx:307'de var. Son kullanma tarihi BookingActions.tsx:51, checkout/cart/page.tsx:36 ve pay/share/[token]/page.tsx:33'te `exp: "12/30"` ile önceden dolu. Bu alanlarda (BookingActions.tsx:287-292 vb.) `inputMode`, `placeholder="AA/YY"` ve `maxLength` yok, metin klavyesi açılıyor. ClaimForm.tsx:123-146 ise ayrı `type="number"` ay ve yıl alanları kullanıyor. Kart numarasında hiçbir formda gruplama ya da `maxLength` yok (BookingActions.tsx:275-282).
 
 **Etki:** Tek oda ödemesinde SMS doğrulama kodu klavye önerisinden otomatik dolmuyor (sepet ödemesinde doluyor), mobilde uygulamalar arası geçiş ve hata gerekiyor. Önceden dolu '12/30' kontrol edilmeden gönderilebiliyor (gerçek sağlayıcıda red). Devir pazarında farklı tarih alanı düzeni öğrenmeyi bozuyor.
 
 **Önerilen aksiyon:** Ortak `<CardFields>` ve `<OtpField>` bileşenlerini çıkar ve dört formda kullan. Numara: `inputMode=numeric autoComplete=cc-number maxLength=23`, dörtlü gruplara otomatik boşluk. Son kullanma: tek alan, `inputMode=numeric placeholder="AA/YY" maxLength=5`, '/' otomatik eklensin, varsayılan boş. CVC: `maxLength=4`. OTP: `autoComplete="one-time-code" inputMode="numeric" maxLength=6` ve görünür etiket.
+
+**Yapılan düzeltme:** In this file: the 3DS code field has a visible label, autoComplete=one-time-code, inputMode=numeric and maxLength 8 (the server accepts 4–8 digits), and now drops anything that isn't a digit. The expiry field starts empty, and the shared CardFields component is used. Grouping the card number in fours belongs in CardFields.tsx (crossOwner). The other forms are owned by other packages.
 
 ## F769 — Ödeme hata ve bilgi mesajı en altta, iptal düğmesinin altında; gönder düğmesinden uzak
 
@@ -1593,13 +1663,15 @@
 | Renk/tema           | Hayır                                               |
 | Efor                | S                                                   |
 | Kaynak denetçiler   | area:checkout                                       |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                        |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p055)                     |
 
 **Kanıt:** BookingActions.tsx:363-370 `{message && (<p role={...}>...)}` kapsayıcının en sonunda, kırmızı "Rezervasyonu iptal et" düğmesinin (:344-353) ve StepUpDialog'un altında çiziliyor. Ödeme düğmesi :314-319'da. Hata çıktığında kaydırma ya da odak taşıma yok.
 
 **Etki:** 360 px mobilde kart reddi mesajı ekranın dışında kalıyor. Misafir düğmeye bastığında hiçbir şey olmadığını sanıp tekrar basıyor ve deneme hakkı tükeniyor.
 
 **Önerilen aksiyon:** Mesajı her dalda (mock, Stripe, 3DS) gönder düğmesinin hemen üstünde çizin. Hata ayarlandığında `messageRef.current?.scrollIntoView({ block: "nearest" })` çağırın. İptal sonucu mesajı iptal düğmesinin yanında kalsın.
+
+**Yapılan düzeltme:** p054 had already moved the error next to the button of the action that caused it (card, 3DS, Stripe or cancel). I added a ref on the role=alert error and an effect that scrolls it into view with scrollIntoView({block:"nearest"}) whenever an error is set, so it stays visible on narrow screens.
 
 ## F770 — RNPL tahsilatı başarısız olduğunda 'Kartınızı kontrol edin' deniyor ama yapılacak bir eylem sunulmuyor
 
@@ -1615,13 +1687,15 @@
 | Renk/tema           | Hayır                                    |
 | Efor                | M                                        |
 | Kaynak denetçiler   | area:checkout                            |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**             |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p065)   |
 
 **Kanıt:** RnplPlan.tsx:56-60 `{plan.status === "RETRYING" && plan.nextAttemptAt && (<p>{t("plan.retry", ...)}</p>)}` → payment.json:49 "Tahsilat başarısız oldu; sonraki deneme: {date}. Kartınızı kontrol edin." Kartı güncelleme düğmesi ya da destek bağlantısı yok. src/app/api/bookings/[id]/rnpl/route.ts yalnızca GET sunuyor; kart güncelleme ucu yok. Ek sürenin son günü de yazılmıyor.
 
 **Etki:** Misafir kartı nasıl değiştireceğini bilmiyor. Ek süre dolunca rezervasyon otomatik iptal ediliyor (stepFailure); konaklama kaybı yaşanıyor.
 
 **Önerilen aksiyon:** RETRYING durumunda "Kartı güncelle" düğmesi ekleyin (yeni setup akışı). Bu akış yoksa en azından `<Link href={`/support?bookingId=${id}`}>Destekle iletişime geç</Link>` verin. Ek sürenin bitişini yazın: "Son ödeme tarihi: {graceUntil}; bu tarihe kadar ödenmezse rezervasyon iptal edilir".
+
+**Yapılan düzeltme:** In the RETRYING state there is now a "Destek ekibine yazın" link to /support?bookingId=… via a new optional bookingId prop (plain /support without it). The retry text now gives concrete card checks and points to support, and the next attempt shows date and time with f.dateTime. A deadline line (plan.graceUntil) appears when the plan includes a new optional graceUntil field. A card-update flow is not possible because there is no API endpoint for it. Server fields and page wiring are in crossOwner.
 
 ## F771 — Stripe Elements'e dil verilmiyor; kart formu uygulama dilinden farklı görünebiliyor
 
@@ -1637,13 +1711,15 @@
 | Renk/tema           | Hayır                                             |
 | Efor                | S                                                 |
 | Kaynak denetçiler   | area:checkout                                     |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                      |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p066)                   |
 
 **Kanıt:** StripePaymentForm.tsx:36-42 `options={{ mode: "payment", amount, currency, captureMethod: "manual", paymentMethodCreation: "manual" }}` içinde `locale` yok. Stripe varsayılan olarak tarayıcı dilini (auto) kullanıyor. Stripe'tan dönen hata metinleri (:61, :63, :69 `submitError.message`, `error?.message`, `next.error.message`) de o dilde onError'a aktarılıyor.
 
 **Etki:** TR arayüzü seçmiş ama tarayıcısı EN olan misafir (ya da tersi) ödeme alanlarını ve hata mesajlarını sayfanın geri kalanından farklı dilde görüyor.
 
 **Önerilen aksiyon:** `const locale = useLocale();` ile etkin dili alın ve Elements options'a `locale: locale === "en" ? "en" : "tr"` ekleyin.
+
+**Yapılan düzeltme:** The <Elements> options now include locale = useLocale() === "en" ? "en" : "tr". The Stripe card fields and the Stripe error messages passed to onError now follow the app language instead of the browser language.
 
 ## F1077 — Checkout'ta tarihler ISO biçiminde ve oklu ('2027-01-27 → 2027-01-29'); gece sayısı yok
 
@@ -1659,13 +1735,15 @@
 | Renk/tema           | Hayır                                                                                         |
 | Efor                | S                                                                                             |
 | Kaynak denetçiler   | runtime:checkout, area:checkout                                                               |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                  |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p019)                                                              |
 
 **Kanıt:** RUNTIME tarama 010/011 (TR) ve 122/123 (EN): 'Giriş – Çıkış 2027-01-27 → 2027-01-29'. Rezervasyon sayfasında aynı tarihler '1 Mart 2027' ve 'April 5, 2027' biçiminde (p2, p9). Ekran görüntüsü: crops/checkout/010-anon-tr-desktop-0.png.
 
 **Etki:** Okuryazarlık düzeyi geniş bir kitle için ISO tarih yavaş okunuyor; ekran okuyucu '→' karakterini 'sağa ok' diye okuyor.
 
 **Önerilen aksiyon:** f.date(checkIn,'long') – f.date(checkOut,'long') ve '(2 gece)' kullanılsın; ok yerine metin ayırıcı konsun.
+
+**Yapılan düzeltme:** Already fixed in the current code. Check-in and check-out are separate dl rows (checkInLabel/checkOutLabel). Each is formatted by stayDay() with Intl long weekday/day/month/year, and there is a 'Süre' row with t('nights', {count}). There is no ISO date and no arrow.
 
 ## F1078 — 3DS kod alanında görünür etiket, one-time-code otomatik doldurma ve ipucu bağlantısı yok
 
@@ -1682,13 +1760,15 @@
 | Renk/tema           | Hayır                                                                                          |
 | Efor                | S                                                                                              |
 | Kaynak denetçiler   | runtime:checkout, area:checkout                                                                |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                   |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p055)                                                                |
 
 **Kanıt:** RUNTIME p7-3ds.mjs: <input inputmode="numeric" aria-label="Doğrulama kodu" required>; autocomplete='', maxLength=-1, aria-describedby=null. Görünür etiket yok, yalnız h2 ve ipucu metni var (crops/checkout/p7-3ds-mobile-tr-challenge.png).
 
 **Etki:** Mobil kullanıcı SMS kodunu klavye önerisinden alamıyor ve alanın amacını görsel etiketten okuyamıyor.
 
 **Önerilen aksiyon:** Görünür bir <label> 'Doğrulama kodu (6 hane)' eklensin; autoComplete='one-time-code', maxLength=6, pattern='\d{6}' verilsin; ipucu metni aria-describedby ile alana bağlansın.
+
+**Yapılan düzeltme:** Already present: a visible Field label ("Doğrulama kodu"), autoComplete=one-time-code, maxLength, and the challenge hint linked with aria-describedby. I added filtering to digits only on input. I left out pattern on purpose: this form uses native validation, so it would show a browser-language message instead of an app message, and the server accepts 4–8 digits, not exactly 6.
 
 ## F1102 — HELD ekranında iki birincil eylem ve 'Rezervasyonu iptal et' ödeme düğmesinin hemen altında
 
@@ -1704,7 +1784,7 @@
 | Renk/tema           | Hayır                                                                                 |
 | Efor                | S                                                                                     |
 | Kaynak denetçiler   | runtime:checkout                                                                      |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                          |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p056)                                                |
 
 **Kanıt:** RUNTIME p4 (masaüstü): 'Öde ve onayla' 672x44 y=879, 'Rezervasyonu iptal et' 186x46 y=939 (araları 16px), 'Konaklamayı Görüntüle' y=1034 ve birincil lacivert stilde (crops/checkout/p2-desktop-booking-s-0.png ve s-1). Onaydan sonra görünüm iptal düğmesinin bulunduğu yerde kalıyor (p5-retry-s-0.png).
 
@@ -1712,26 +1792,30 @@
 
 **Önerilen aksiyon:** HELD durumunda 'Konaklamayı Görüntüle' ikincil stile alınsın; iptal eylemi ödeme formundan ayrılıp 'Diğer seçenekler' altında bir metin bağlantısı olarak sunulsun.
 
+**Yapılan düzeltme:** In the HELD state, 'Rezervasyonu iptal et' now sits in its own group below the payment section, under a 'Diğer seçenekler' label, separated by a top border. It is styled as an underlined red text link instead of a bordered button. The CONFIRMED state keeps its existing button. Making 'Konaklamayı Görüntüle' secondary belongs to src/app/booking/[id]/page.tsx and is requested in crossOwner.
+
 ## F1227 — Özet satırlarında dt ile dd arasında boşluk ve sağa hizalama yok; 360 px'te uzun değerler dağınık kırılıyor
 
-| Alan                | Değer                           |
-| ------------------- | ------------------------------- |
-| Severity            | Low                             |
-| Durum               | Aday                            |
-| Konum               | `src/app/checkout/page.tsx:173` |
-| Kullanıcılar        | misafir                         |
-| Prensip             | learnability · synthesizability |
-| Sezgisel madde      | H8 — Estetik/minimal tasarım    |
-| Renk/tema           | Hayır                           |
-| Efor                | S                               |
-| Kaynak denetçiler   | area:checkout                   |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**    |
+| Alan                | Değer                            |
+| ------------------- | -------------------------------- |
+| Severity            | Low                              |
+| Durum               | Aday                             |
+| Konum               | `src/app/checkout/page.tsx:173`  |
+| Kullanıcılar        | misafir                          |
+| Prensip             | learnability · synthesizability  |
+| Sezgisel madde      | H8 — Estetik/minimal tasarım     |
+| Renk/tema           | Hayır                            |
+| Efor                | S                                |
+| Kaynak denetçiler   | area:checkout                    |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p019) |
 
 **Kanıt:** checkout/page.tsx:173, 178, 186, 193, 199 `<div className="flex justify-between">`: gap yok ve dd öğelerinde text-right yok. Uzun bir konaklama adı ya da "Loft (Çift Kişilik Yatak)" gibi oda adları 360 px genişlikte (kart içi yaklaşık 280 px) birkaç satıra kırılıyor, sola hizalanıyor ve etiketle bitişik duruyor.
 
 **Etki:** Mobildeki misafir hangi değerin hangi etikete ait olduğunu ayırt etmekte zorlanıyor.
 
 **Önerilen aksiyon:** Satırlara `gap-4`, dd'lere `text-right` ekleyin. 360 px altında `flex-col sm:flex-row` ile alt alta dizilime geçin.
+
+**Yapılan düzeltme:** Already fixed in the current code. Every summary row is `flex justify-between gap-4` and every dd has `text-right`, so labels and values have spacing and the values are right-aligned. I did not add the optional flex-col stacking, since it would change the mobile layout without being needed.
 
 ## F1228 — Yükleniyor yer tutucuları ekran okuyucuya anlamlı gelmiyor
 
@@ -1748,13 +1832,15 @@
 | Renk/tema           | Hayır                           |
 | Efor                | S                               |
 | Kaynak denetçiler   | area:checkout                   |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**    |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p019) |
 
 **Kanıt:** checkout/page.tsx:175 `{property?.title ?? "…"}`: ekran okuyucu bunu "yatay üç nokta" diye okuyor. :251 Suspense yedeğindeki `<p className="text-gray-500">{t("loading")}</p>` role="status" taşımıyor. Oda satırı (:185) yükleme bitince sonradan ekleniyor ve sayfa kayıyor.
 
 **Etki:** Ekran okuyucu kullanıcısı sayfanın yüklendiğini ya da başlığın beklendiğini anlamıyor.
 
 **Önerilen aksiyon:** Yer tutucuyu `<span aria-hidden="true">…</span><span className="sr-only">{t("loading")}</span>` yapın. Suspense yedeğindeki p'ye `role="status"` ekleyin. Oda satırı için yükleme sırasında da aynı yükseklikte bir iskelet satırı gösterin.
+
+**Yapılan düzeltme:** The '…' placeholder is now an aria-hidden '…' plus an sr-only t('loading'). It is used for the stay title and also for the location and room rows, which now render during loading so the page no longer shifts. The room row still disappears if the loaded property has no matching room. The Suspense fallback <p> now has role="status".
 
 ## F1229 — Ödeme zamanı ve kredi seçenekleri 'Ödeme' başlığının üstünde ve formun dışında
 
@@ -1771,13 +1857,15 @@
 | Renk/tema           | Hayır                                                                                            |
 | Efor                | S                                                                                                |
 | Kaynak denetçiler   | area:checkout                                                                                    |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                     |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p056)                                                                  |
 
 **Kanıt:** BookingActions.tsx:238-249 RnplOption ve WalletCreditOption fieldset'leri, h2 `{t("title")}` başlığından (:252, :267) önce ve `<form onSubmit={pay}>` (:266) dışında çiziliyor. docs/img/v5-rnpl-checkout.png'de "Ödeme zamanı" seçimi "Ödeme" başlığının üstünde görünüyor.
 
 **Etki:** Başlıklarla gezinen ekran okuyucu kullanıcısı "Ödeme" başlığına atladığında ödeme zamanı ve kredi seçimini atlıyor. Görsel gruplama da seçeneklerin ödeme bölümüne ait olduğunu göstermiyor.
 
 **Önerilen aksiyon:** HELD bloğunun en üstüne tek bir h2 "Ödeme" koyun. Altına sırayla ödeme zamanı, kredi ve kart formunu yerleştirin. İki daldaki tekrarlı h2'leri (:252, :267) kaldırın.
+
+**Yapılan düzeltme:** Confirmed: RnplOption and WalletCreditOption were drawn before the h2. The HELD payment UI is now one <section> with a single h2 'Ödeme' at the top, followed by the hold timer, the config loading or error block, the payment timing (RnplOption), the wallet credit and the Stripe or card form. The duplicate h2s in the config, Stripe and card branches are gone, and the 3DS title is now an h3 under 'Ödeme'. The card form keeps aria-label 'Ödeme' for the e2e getByRole('form').
 
 ## F1230 — Ödeme butonlarında tahsil edilecek tutar ekranlar arasında tutarsız
 
@@ -1793,13 +1881,15 @@
 | Renk/tema           | Hayır                                                                                                                             |
 | Efor                | S                                                                                                                                 |
 | Kaynak denetçiler   | lens:status                                                                                                                       |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                      |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p056)                                                                                                  |
 
 **Kanıt:** BookingActions.tsx:318 `{busy ? t("processing") : rnpl ? t("rnpl.reserve") : t("payAndConfirm")}` tutarsız (tutar yok); cüzdan kredisi seçilince WalletCreditOption 'Kart ile ödenecek: …' gösteriyor ama buton güncellenmiyor. Oysa checkout/cart/page.tsx:346 ve pay/share/[token]/page.tsx:289 butonda tutarı gösteriyor.
 
 **Etki:** Misafir tek oda ödemesinde karttan ne kadar çekileceğini son tıklamada görmüyor; sepet akışıyla farklı davranış öğrenmeyi zorlaştırıyor.
 
 **Önerilen aksiyon:** Butonu 'Öde ve onayla · {f.money(amountMinor - creditMinor)}' olarak biçimlendir; StripePaymentForm butonunda da aynı.
+
+**Yapılan düzeltme:** BookingActions already builds payLabel as `${t("payAndConfirm")} · ${f.money(amountMinor - creditMinor, currency)}` and uses it on the card-form button, so the amount updates when credit is applied. The StripePaymentForm button still shows only 'Öde ve onayla' and is reported in crossOwner.
 
 ## F1231 — Meşgul durumda devre dışı iptal düğmeleri etkin görünüyor; iptal sırasında 'işleniyor' metni yok
 
@@ -1815,13 +1905,15 @@
 | Renk/tema           | Hayır                                           |
 | Efor                | S                                               |
 | Kaynak denetçiler   | area:checkout                                   |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                    |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p056)                 |
 
 **Kanıt:** BookingActions.tsx:345-352 `disabled={busy}` verilmiş ama className'de disabled: varyantı yok; metin sabit `{t("cancel.button")}`. DELETE isteği (:209-213) sürerken düğme görünüşte değişmiyor. StepUpDialog.tsx:82-86 "Vazgeç" düğmesi de `disabled={busy}` ile aynı durumda. Paylaşılan Button (ui.tsx:38) ise `disabled:cursor-not-allowed disabled:opacity-60` kullanıyor.
 
 **Etki:** Misafir düğmeye tekrar tekrar basıyor ve tepki alamıyor; işlemin sürdüğünü anlamıyor.
 
 **Önerilen aksiyon:** İki düğmeye de `disabled:cursor-not-allowed disabled:opacity-60` ekleyin ya da ui.tsx'teki Button'ı kullanın. İptal düğmesinin metnini `{busy ? t("cancel.processing") : t("cancel.button")}` yapın ("İptal ediliyor…").
+
+**Yapılan düzeltme:** Confirmed. Both cancel buttons (the HELD link style and the CONFIRMED button) now use aria-disabled with aria-disabled:cursor-not-allowed aria-disabled:opacity-60 instead of disabled, so focus is not lost after the confirm dialog. cancel() has a busy guard. A separate `cancelling` state switches the label to t('cancel.processing') ('İptal ediliyor...') and sets aria-busy, so a pay request in flight does not show the cancel text. The StepUpDialog 'Vazgeç' button already has aria-disabled:opacity-50.
 
 ## F1232 — Step-up 'Vazgeç' sonrası geri bildirim yok; bekleyen ödeme sessizce düşüyor
 
@@ -1837,13 +1929,15 @@
 | Renk/tema           | Hayır                                           |
 | Efor                | S                                               |
 | Kaynak denetçiler   | area:checkout                                   |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                    |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p056)                 |
 
 **Kanıt:** BookingActions.tsx:359 `onCancel={() => setStepUp(null)}`: mesaj ayarlanmıyor ve mock akışta :175 `setStepUp({ cardToken })` ile saklanan token atılıyor. İletişim kutusu kapanıyor; kullanıcı dolu kart formuna geri dönüyor ama ödemenin yapılmadığına dair bir metin görmüyor.
 
 **Etki:** Misafir vazgeçtiği hâlde ödemenin bir şekilde yapıldığını sanabiliyor ya da neden tekrar sorulduğunu anlamıyor.
 
 **Önerilen aksiyon:** onCancel içinde `setMessage({ kind: "info", text: t("stepUp.cancelled") })` çağırın; metin "Ödeme yapılmadı. Oda {time} saatine kadar tutuluyor; dilediğinizde yeniden deneyebilirsiniz." olsun. Ardından odağı ödeme düğmesine taşıyın.
+
+**Yapılan düzeltme:** Confirmed: onCancel only cleared stepUp. The new cancelStepUp() sets a neutral 'note' message: stepUpCancelled, then holdUntil with the time when holdExpiresAt is set, then stepUpRetry. The note is announced through the existing role=status region and shown in gray text-gray-700 next to the pay button (card or Stripe form). It clears on the next submit. Focus then moves to the pay button.
 
 ## F1233 — Ek doğrulama (step-up) iptal edilince ödeme durumu açıklanmıyor ve odak tetikleyiciye dönmüyor
 
@@ -1860,13 +1954,15 @@
 | Renk/tema           | Hayır                                           |
 | Efor                | S                                               |
 | Kaynak denetçiler   | lens:status                                     |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                    |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p056)                 |
 
 **Kanıt:** BookingActions.tsx:355-361 `onCancel={() => setStepUp(null)}` — mesaj yok; StepUpDialog.tsx açılışta odağı primary butona taşıyor (iyi) ama kapanışta tetikleyiciye geri vermiyor.
 
 **Etki:** Misafir ödemenin yapılıp yapılmadığından emin olamıyor; klavye kullanıcısı odağı kaybediyor.
 
 **Önerilen aksiyon:** İptalde role=status 'Ödeme tamamlanmadı; dilediğinizde yeniden deneyebilirsiniz' ve odağı 'Öde ve onayla' butonuna geri ver.
+
+**Yapılan düzeltme:** Same handler as F1232. The status message is announced through role=status, and focusNext 'pay' focuses the card form's pay button, or the Stripe form's submit button, after the dialog unmounts. This runs after StepUpDialog's own return-focus cleanup, so the pay button always ends up focused.
 
 ## F1234 — Doğrulama sürerken Escape iletişim kutusunu kapatıyor ama işlem arkada sürüyor
 
@@ -1882,13 +1978,15 @@
 | Renk/tema           | Hayır                                              |
 | Efor                | S                                                  |
 | Kaynak denetçiler   | area:checkout                                      |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                       |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p066)                    |
 
 **Kanıt:** StepUpDialog.tsx:31 `if (e.key === "Escape") onCancel();` busy durumunu kontrol etmiyor, oysa "Vazgeç" düğmesi :85'te `disabled={busy}`. performStepUp (:41) kapanıştan sonra da tamamlanıp `onVerified` çağırıyor. BookingActions.tsx:99-104'te `pending` null olduğu için kullanıcı vazgeçmiş olsa da beklenmedik biçimde "Doğrulandı. Ödemeyi yeniden gönderebilirsiniz." görüyor.
 
 **Etki:** Klavye kullanıcısı için düğme ile Escape tutarsız davranıyor. İptal edildiğini sandığı işlem sonradan "doğrulandı" diye geri dönüyor.
 
 **Önerilen aksiyon:** Escape işleyicisine busy kontrolü ekleyin (`busyRef.current` ile). Alternatif olarak WebAuthn törenini AbortController ile iptal edin ve iptalden sonra onVerified çağrılmasın.
+
+**Yapılan düzeltme:** Escape was already ignored while busy, through the cancel event's preventDefault and the busyRef guard. One real gap remained: when the browser force-closes the dialog (for example a repeated Escape), onClose called onCancel while performStepUp kept running, and onVerified still fired afterwards. A new closedRef is now set on forced close and on unmount. On forced close the running WebAuthn ceremony is also aborted with WebAuthnAbortService.cancelCeremony(), and a late result is dropped: onVerified is not called and no error is set.
 
 ## F1235 — Ek doğrulama (step-up) penceresi iptal edilince ödeme yapılmadığı söylenmiyor; meşgulken Escape iptal ediyor
 
@@ -1905,13 +2003,15 @@
 | Renk/tema           | Hayır                                                                                                |
 | Efor                | S                                                                                                    |
 | Kaynak denetçiler   | lens:forms                                                                                           |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                         |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p066)                                                               |
 
 **Kanıt:** src/components/booking/StepUpDialog.tsx:28-35 Escape her durumda `onCancel()` (passkey töreni sürerken de); src/components/booking/BookingActions.tsx:355-361 `onCancel={() => setStepUp(null)}` sonrasında mesaj yok. Diyalog odak tuzağı içermiyor ve kapanınca odak tetikleyiciye dönmüyor.
 
 **Etki:** Misafir pencereyi kapatınca ödemenin yapılıp yapılmadığından emin olamaz; çift ödeme korkusuyla destek arar.
 
 **Önerilen aksiyon:** İptalde `setMessage({ kind: "info", text: t("stepUp.cancelledNoCharge") })` ('Ödeme yapılmadı; tekrar deneyebilirsiniz'); busy iken Escape'i yok say; odak tuzağı ve kapanışta odağı ödeme düğmesine döndür.
+
+**Yapılan düzeltme:** The StepUpDialog part is done. Escape while busy is ignored, and on forced close the ceremony is aborted with no late 'verified'. The native showModal() dialog already traps focus and restores it on close. A new key, payment.stepUp.cancelledNoCharge, was added to the patch. Still open: BookingActions.tsx needs to show the 'no payment was taken' info message on cancel (see crossOwner).
 
 ## F1236 — 'Passkey'lerimi yönet' bağlantısı aynı sekmede ödeme bağlamını terk ettiriyor
 
@@ -1926,13 +2026,15 @@
 | Renk/tema           | Hayır                                        |
 | Efor                | S                                            |
 | Kaynak denetçiler   | area:checkout                                |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                 |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p066)             |
 
 **Kanıt:** StepUpDialog.tsx:67 `<Link href="/account" className="font-semibold underline">`: hata metninin içinde, uyarı vermeden ve dönüş adresi olmadan /account sayfasına gidiyor. Bu sırada HELD rezervasyonun 15 dakikalık süresi işlemeye devam ediyor (app-config.ts:53).
 
 **Etki:** Misafir passkey ekleyip ödeme sayfasına nasıl döneceğini bilemiyor ve tutma süresini kaçırabiliyor.
 
 **Önerilen aksiyon:** Bağlantıya `href={`/account?returnTo=/booking/${bookingId}`}` verin ve hesap sayfasında "Ödemeye dön" bağlantısı gösterin. Alternatif olarak `target="_blank" rel="noopener"` ile yeni sekmede açın ve görünür "(yeni sekmede açılır)" ibaresi ekleyin.
+
+**Yapılan düzeltme:** The /account link already has target="_blank" and rel="noopener noreferrer". Its visible text says it opens in a new tab: payment.stepUp.managePasskeys = 'Passkey oluştur veya yönet (yeni sekmede açılır)' / 'Create or manage passkeys (opens in a new tab)'. The noPasskey text also tells the user to come back to this window, so the payment context is not lost.
 
 ## F1237 — Step-up bekleme metni 'Bekleniyor...' neyin beklendiğini söylemiyor
 
@@ -1948,13 +2050,15 @@
 | Renk/tema           | Hayır                                                        |
 | Efor                | S                                                            |
 | Kaynak denetçiler   | area:checkout                                                |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                 |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p066)                              |
 
 **Kanıt:** StepUpDialog.tsx:80 `{busy ? t("waiting") : t("verify")}`, payment.json:32 "Bekleniyor...". Passkey istemi işletim sistemi penceresinde ya da telefonda açılıyor; düğme metni kullanıcının nereye bakması gerektiğini söylemiyor ve role=status ile duyurulmuyor.
 
 **Etki:** Passkey'e yeni alışan misafir sistem istemini görmezse ekranın donduğunu sanıyor.
 
 **Önerilen aksiyon:** Metni "Cihazınızdaki passkey onayı bekleniyor…" yapın ve düğmenin altına `<p role="status">` ile aynı metni ekleyin. Telefon üzerinden doğrulama için "Telefonunuzda gelen isteği onaylayın" ipucu verin.
+
+**Yapılan düzeltme:** The button's busy text payment.stepUp.waiting changes to 'Passkey onayı bekleniyor…' / 'Waiting for your passkey…'; it is only used in this file. A permanent <p role="status"> live region, sr-only when idle, now shows a new key while busy: payment.stepUp.waitingHint (approve the prompt on your device, or the request on your phone). aria-busy was removed from the dialog because it could stop that live region from being announced.
 
 ## F1238 — Stripe doğrulama hataları iki kez gösteriliyor ve duyuruluyor
 
@@ -1971,10 +2075,12 @@
 | Renk/tema           | Hayır                                               |
 | Efor                | S                                                   |
 | Kaynak denetçiler   | area:checkout                                       |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                        |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p066)                     |
 
 **Kanıt:** StripePaymentForm.tsx:60-61 `const { error: submitError } = await elements.submit(); if (submitError) return onError(submitError.message ...)`. PaymentElement bu doğrulama hatasını kendi alanının altında zaten gösteriyor. onError bunu ayrıca BookingActions.tsx:363-369'da `role="alert"` olarak tekrar basıyor.
 
 **Etki:** Ekran okuyucu aynı hatayı iki kez duyuruyor. Görsel olarak aynı mesaj formun içinde ve en altta tekrar ediyor.
 
 **Önerilen aksiyon:** `elements.submit()` doğrulama hatalarında onError çağırmayın; yalnızca odağı PaymentElement'e verin (`elements.getElement('payment')?.focus()`). onError createPaymentMethod, sunucu ve 3DS hataları için kalsın.
+
+**Yapılan düzeltme:** When elements.submit() returns an error with type === 'validation_error', onError is no longer called; focus moves to the PaymentElement with elements.getElement('payment')?.focus(), whose inline error is already shown and announced. Other submit errors, createPaymentMethod errors, server errors and 3DS errors still go to onError.

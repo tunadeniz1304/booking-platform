@@ -472,13 +472,15 @@
 | Renk/tema           | Hayır                                                                                                                                         |
 | Efor                | S                                                                                                                                             |
 | Kaynak denetçiler   | runtime:checkout, area:checkout                                                                                                               |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                                  |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p065)                                                                                                               |
 
 **Kanıt:** RUNTIME p10-rnpl.mjs (masaüstü; o anki çerez nedeniyle EN göründü, TR metinleri payment.json:41-43): seçildiğinde 'Today: TRY 0.00 is charged; your card is only saved.', 'March 17, 2027: TRY 4,276.36 is charged…', 'Free cancellation until March 19, 2027; cancel before the charge and you pay nothing.' gösterildi. Tahsilat 17 Mart, ücretsiz iptal 19 Mart; 17-19 arası iptalde ne olacağı (iade) söylenmiyor. 'Bugün ₺0,00 tahsil edilir' ifadesi doğal değil. Seçenek listesi <ol> ama list-disc (madde imli, RnplOption.tsx:84-85), plan kartında list-decimal (RnplPlan.tsx:66-67). Metinler 12px. Ekran görüntüsü: crops/checkout/p10-rnpl-zoom.png. Olumlu: seçimde düğme 'Reserve now (no payment today)' olarak değişiyor.
 
 **Etki:** Misafir iptal ederse para kaybedip kaybetmeyeceğini net anlayamıyor. RNPL'nin güven vermesi beklenirken belirsizlik yaratıyor.
 
 **Önerilen aksiyon:** Metin şöyle olsun: 'Bugün ödeme yok; kartınız yalnızca kaydedilir.' / '17 Mart: ₺4.276,36 kartınızdan çekilir.' / '19 Mart'a kadar iptal ederseniz: 17 Mart'tan önceyse hiç ödeme alınmaz, sonra ise tamamı iade edilir.' Her iki listede list-decimal kullanılsın ya da zaman çizelgesi tek bileşene alınsın.
+
+**Yapılan düzeltme:** The RnplOption timeline <ol> now uses list-decimal, the same as RnplPlan, and text-sm instead of 12px text. stepToday was reworded so it no longer says "₺0,00 tahsil edilir". stepFreeCancel now says what happens if you cancel after the charge but before the deadline: a full refund. This matches freeCancellationDeadline, which is the last 100%-refund tier. RnplPlan uses the same keys, so both timelines change.
 
 ## F577 — EN arayüzde Türkçe içerik lang etiketsiz ve çevrilmemiş (açıklama, olanaklar, oda/yatak, plan adları, vergi satırı); 'guest(s)'
 
@@ -495,13 +497,15 @@
 | Renk/tema           | Hayır                                                                                                      |
 | Efor                | M                                                                                                          |
 | Kaynak denetçiler   | runtime:pdp                                                                                                |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                               |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p060)                                                                     |
 
 **Kanıt:** RUNTIME p7-keyboard-misc.mjs (en, desktop): html lang='en'; açıklama 'Galata Kulesi'nin gölgesinde…' en yakın lang='en'; olanak 'Ücretsiz WiFi'; oda 'Loft - 2 people - Çift Kişilik Yatak'; planlar 'İade edilemez','Standart','Esnek — şimdi rezerve et, sonra öde'; kırılım 'Konaklama vergisi (1%)'; alt başlık 'Lowest price for 1 night, 1 guest(s)' (messages/en/property.json:19). Ekran crops/property/120-0.png, 120-1.png.
 
 **Etki:** Ekran okuyucu Türkçe metni İngilizce telaffuzla okur; yabancı misafir plan ve vergi satırlarını anlayamaz.
 
 **Önerilen aksiyon:** DB kaynaklı metinleri çeviri alanlarıyla (title_en, description_en, ratePlan.name_en) sunun; çeviri yoksa ilgili öğeye lang='tr' verin. Vergi etiketini sunucu kodundan (code) istemcide çevirin; ICU plural kullanın: '{guests, plural, one {# guest} other {# guests}}'.
+
+**Yapılan düzeltme:** Rate plan names (from the DB, always Turkish) now sit in <span lang="tr"> when the UI locale is not tr, in both the multi-plan fieldset and the single-plan line. Room names and bed types inside <option> stay unmarked because an option can't hold an inline lang span and its text mixes translated words with DB text. The tax label (QuoteBreakdown taxKind) and the 'guest(s)' plural (property.json subtitle ICU) were already fixed by other packages. The property description still has no lang attribute; that is page.tsx, see crossOwner.
 
 ## F578 — 'Rezervasyonu Onayla' onaylamıyor: oturumsuz kullanıcı ödeme özetine gidiyor, giriş gerektiği ancak son düğmede ortaya çıkıyor
 
@@ -517,13 +521,15 @@
 | Renk/tema           | Hayır                                                   |
 | Efor                | S                                                       |
 | Kaynak denetçiler   | runtime:pdp                                             |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                            |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p060)                         |
 
 **Kanıt:** RUNTIME p5-anon-flow.mjs: anon 'Rezervasyonu Onayla' → /checkout?propertyId…&quoteId=… (oturum kontrolü yok); sayfa başlığı ve düğmesi 'Rezervasyonu Tamamla'. Burada düğmeye basınca POST /api/bookings 401 → /login?redirect=%2Fcheckout%3F…quoteId… . Giriş sayfası bağlam vermiyor. (Olumlu: redirect checkout URL'ini koruyor.) Metin: messages/tr/booking.json:16 'Rezervasyonu Onayla'.
 
 **Etki:** 'Onayla' etiketi kesin işlem beklentisi yaratıyor (bazı kullanıcılar tıklamaktan çekinir); oturumsuz kullanıcı iki ekran sonra beklenmedik şekilde girişe atılıyor, teklif süresi dolabiliyor.
 
 **Önerilen aksiyon:** Widget düğmesini 'Devam et — rezervasyonu gözden geçir' gibi adlandırın; oturumsuzken düğme altında 'Bir sonraki adımda giriş yapmanız istenecek' yazın ya da girişi checkout'a girerken (redirect korunarak) isteyin; giriş sayfasında 'Rezervasyonunuzu tamamlamak için giriş yapın' başlığı gösterin.
+
+**Yapılan düzeltme:** The CTA already reads 'Rezervasyona devam et' and has a 'no payment yet' hint. The widget now calls useSession(), and for a signed-out user the hint adds widget.loginNext ('Sonraki adımda giriş yapmanız ya da hesap oluşturmanız istenecek.'), so the login step is announced before checkout. A login-page context heading for redirects to /checkout belongs to another owner (crossOwner).
 
 ## F579 — Yazılmış ama 'Uygula'ya basılmamış kupon, rezervasyonda sessizce yok sayılıyor
 
@@ -539,13 +545,15 @@
 | Renk/tema           | Hayır                                                                     |
 | Efor                | S                                                                         |
 | Kaynak denetçiler   | runtime:checkout                                                          |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                              |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p063)                                           |
 
 **Kanıt:** RUNTIME p12-checkout-coupon.mjs (masaüstü, TR; POST yakalandı ve abort edildi, rezervasyon oluşmadı): kupon alanına seed kuponu 'HOSGELDIN' (150 TL) yazıldı, Uygula'ya basılmadan 'Rezervasyonu Tamamla' tıklandı. Giden gövde {propertyId, roomId, checkIn, checkOut, guestCount:2, quoteId}; couponCode yok. Ekranda uyarı yok. Aynı kupon Uygula ile girildiğinde '−₺150,00' satırı çıkıyor (p12-valid-coupon.png). KOD: yazılan değer CouponField içindeki yerel state'te kalıyor (CouponField.tsx:31) ve checkout yalnız uygulanmış kuponu gönderiyor (checkout/page.tsx:117).
 
 **Etki:** İndirim kodunu yazıp doğrudan 'Rezervasyonu Tamamla'ya basan misafir indirimini kaybediyor; burada 150 TL.
 
 **Önerilen aksiyon:** CouponField'ın girdi değeri checkout'a taşınsın (onChange prop). Gönderimde alan dolu ve uygulanandan farklıysa önce kupon uygulansın, ya da gönderim durdurulup alanın altında 'Kuponu uygulamak için Uygula'ya basın veya alanı temizleyin' gösterilsin ve odak kupon alanına taşınsın.
+
+**Yapılan düzeltme:** Confirmed: a typed code stayed in local state and checkout sent only the applied coupon. CouponField now treats the field as dirty when the trimmed, uppercased value is non-empty and differs from the applied code. While it is dirty, a native submit listener on the enclosing form (input.form) calls preventDefault and stopPropagation, so the checkout's React onSubmit never sends the booking. The listener also moves focus to the coupon field and shows the polite hint "Bu kupon kodunu uygulamadınız. Uygula'ya basın ya da alanı temizleyin." Clicking Apply or clearing the field removes the block. This also covers retrySubmit's requestSubmit. No checkout change is needed.
 
 ## F580 — Fiyat içgörüsündeki 'gecelik' fiyat teklifle çelişiyor ve aralık anlamsız derecede geniş
 
@@ -561,13 +569,15 @@
 | Renk/tema           | Hayır                                                   |
 | Efor                | M                                                       |
 | Kaynak denetçiler   | runtime:pdp                                             |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                            |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p064)                         |
 
 **Kanıt:** RUNTIME: Grand Deluxe varsayılan oda — teklif '₺4.850,00 × 1 gece', içgörü 'gecelik ₺3.650,00' (crops/property/p4-2.png, p4-3.png). Galata 'Terash Loft' — teklif ₺3.500 × 2 gece, içgörü 'gecelik ₺2.800,00' (p2-widget.mjs). Aralık: '(%90 güven): ₺457,82 – ₺3.952,18' (8,6 kat; her yüklemede değişiyor: ₺436,02–₺3.763,98). Sayfa üstü 'Gösterilen fiyatlar vergi … dahil toplamdır' derken içgörü vergisiz taban fiyat (insight.ts:109-110,158 'taban fiyat'); ratePlanId/misafir parametresi gönderilmiyor (PriceInsight.tsx:36).
 
 **Etki:** Karar anında yan yana iki farklı gecelik fiyat; '%90 güven' istatistik jargonu geniş okuryazarlık yelpazesindeki misafir için anlamsız, güveni azaltır.
 
 **Önerilen aksiyon:** İçgörüyü teklifin gecelik tutarıyla (aynı oda+plan+misafir, vergi dahil) hesaplayın veya 'oda taban fiyatı' olduğunu açıkça yazın; aralığı yalnız dar ve kalibre ise gösterin, metni 'Bu tarihler için fiyat olağan seviyede' gibi sade tutun.
+
+**Yapılan düzeltme:** The main line now says only 'Bu tarihlerde fiyat <b>{label}</b> seviyede.' with no nightly amount, so it no longer conflicts with the quote. The base rate appears only inside a <details> section that says it excludes taxes and rate-plan differences and may differ from the quote. The range is shown only when calibrated (label is not null) and narrow (high ≤ 2×low, MAX_INTERVAL_RATIO), so the observed 8.6× ranges are hidden.
 
 ## F581 — İngilizce fiyat dökümünde vergi etiketleri Türkçe ('Konaklama vergisi', 'KDV')
 
@@ -584,13 +594,15 @@
 | Renk/tema           | Hayır                                               |
 | Efor                | S                                                   |
 | Kaynak denetçiler   | runtime:checkout                                    |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                        |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p065)                    |
 
 **Kanıt:** RUNTIME tarama 122/123 (anon EN masaüstü ve mobil) bodyTextSample: 'TRY 2,415.00 × 2 nights', 'Konaklama vergisi (2%) TRY 87.82', 'KDV (10%) included: TRY 439.10'; crops/checkout/123-anon-en-mobile-0.png. KOD: etiketler data/tax-rules.json:8,16'dan geliyor ve doğrudan render ediliyor (QuoteBreakdown.tsx:60,69,106). messages/en/quote.json içindeki 'tax': 'Accommodation tax' anahtarı kullanılmıyor.
 
 **Etki:** Yabancı misafir toplama eklenen kalemi anlayamıyor ve fiyat şeffaflığı zayıflıyor.
 
 **Önerilen aksiyon:** Vergi ve ücret kodu (VAT, ACCOMMODATION_TAX) üzerinden t('tax'), t('vat') gibi çevrilmiş etiketler kullanılsın; bilinmeyen kodlarda data etiketine geri düşülsün.
+
+**Yapılan düzeltme:** Already fixed in current code. QuoteBreakdown.tsx has KNOWN_CHARGE_CODES (VAT, ACCOMMODATION_TAX, SERVICE_FEE), and chargeLabel() renders t(`taxKind.${code}`), which messages/en/quote.json translates as VAT, Accommodation tax and Service fee. Fee rows, add-on tax rows and the included-tax note all use it. Unknown codes fall back to the label from the data.
 
 ## F582 — Meşgulken kendini devre dışı bırakan düğmeler odağı body'ye düşürüyor (Sepete ekle, Fiyat alarmı kur)
 
@@ -607,13 +619,15 @@
 | Renk/tema           | Hayır                                             |
 | Efor                | S                                                 |
 | Kaynak denetçiler   | runtime:pdp                                       |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                      |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p070)                   |
 
 **Kanıt:** RUNTIME p2-widget.mjs: 'Fiyat alarmı kur' tıklandıktan sonra 'focus after alert: body' (PriceInsight.tsx:121 disabled={busy}). p6-guest-cart.mjs: odaklı 'Sepete ekle'ye Enter → 100 ms sonra 'focus: body' (AddToCartButton.tsx:77 disabled={disabled||busy}).
 
 **Etki:** Klavye/ekran okuyucu kullanıcısı işlemden sonra sayfa başına atılır; sonuç mesajını ve 'Sepete git' bağlantısını bulmak için baştan gezinmek zorunda.
 
 **Önerilen aksiyon:** busy sırasında disabled yerine aria-disabled='true' + tıklamayı yok sayma kullanın (odak düğmede kalsın); sonuç geldiğinde gerekirse odağı durum mesajına/‘Sepete git’ bağlantısına taşıyın.
+
+**Yapılan düzeltme:** AddToCartButton no longer sets `disabled` while busy. It uses aria-disabled/aria-busy, and add() returns early when busy, so focus stays on the button. On success, if the button had focus, focus moves to the 'Sepete git' link that replaces it. The PriceInsight.tsx part ('Fiyat alarmı kur') is filed as crossOwner.
 
 ## F1003 — Tarih seçilmeden 'yarın–ertesi gün' varsayılanı atanıyor; fiyat ve CTA kullanıcının seçmediği tarihlerle etkin
 
@@ -628,13 +642,15 @@
 | Renk/tema           | Hayır                                         |
 | Efor                | S                                             |
 | Kaynak denetçiler   | area:widget                                   |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                  |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p060)               |
 
 **Kanıt:** BookingWidget.tsx:69-70 `useState(validStay ? initial!.checkIn! : addDaysISO(1))` ve `addDaysISO(2)`. :131'deki `t("widget.selectDates")` boş durumu ilk yüklemede hiç görünmüyor. useQuote.ts:136 anahtar yoksa zaten boşta (`loading:false`) dönebiliyor.
 
 **Etki:** Ana sayfadan veya doğrudan bağlantıyla gelen misafir, hiç seçmediği yarınki 1 gece için hazır bir toplam ve etkin "Rezervasyonu Onayla" görüyor. Okuryazarlığı düşük kullanıcı tarihleri fark etmeden ilerleyebiliyor.
 
 **Önerilen aksiyon:** `validStay` false ise checkIn ve checkOut'u "" ile başlat. Fiyat alanında "Fiyatı görmek için tarih seçin" yönergesini ve tarih düğmesini öne çıkar. Varsayılan korunacaksa özet yanında görünür bir "Örnek tarihler, değiştirin" etiketi göster.
+
+**Yapılan düzeltme:** Confirmed: tomorrow and the day after were pre-filled without any label. I used the finding's alternative fix: the default dates stay, because e2e tests booking-flow, a11y and cart open /property/{id} without dates and expect the CTA to be enabled. New datesChosen state (true when the URL had a valid stay, or once the user picks dates). Until then a visible 'Örnek tarihler gösteriliyor; kendi tarihlerinizi seçin.' line shows under the date button and is added to its aria-describedby. Sample dates are never written to the URL.
 
 ## F1004 — Aramada seçilen oda müsait değilse başka oda sessizce seçiliyor
 
@@ -649,13 +665,15 @@
 | Renk/tema           | Hayır                                         |
 | Efor                | S                                             |
 | Kaynak denetçiler   | area:widget                                   |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                  |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p060)               |
 
 **Kanıt:** BookingWidget.tsx:74-76 `rooms.find((r) => r.id === initial?.roomId)?.id ?? rooms[0]?.id` ve :80-81 `availableRooms.find((room) => room.id === selectedRoomId) ?? availableRooms[0]`. Arama kartındaki oda (initial.roomId) `available=false` ise ilk müsait oda kullanılıyor; bunu bildiren bir mesaj yok. BookingWidget.tsx:40 yorumu: "kartta gösterilen toplamla aynı teklif için".
 
 **Etki:** Arama kartında belirli bir oda ve toplam gören misafir, ilan sayfasında farklı bir odanın farklı toplamını görüyor ve nedenini bilmiyor. Kart ile PDP toplamı arasındaki tutarlılık bozuluyor ve güven azalıyor.
 
 **Önerilen aksiyon:** `initial.roomId` varsa ama `availableRooms` içinde yoksa oda select'inin altına `<p role="status">{t("widget.roomReplaced", { name })}</p>` göster: "Seçtiğiniz oda artık müsait değil; {name} gösteriliyor".
+
+**Yapılan düzeltme:** Confirmed: there was a silent fallback. When initial.roomId is set, the user hasn't picked a room (new roomPicked state) and the shown room differs, a <p role="status"> under the room select says 'Aramada seçtiğiniz oda artık satışta değil; yerine {name} gösteriliyor.' The select's aria-describedby points to it.
 
 ## F1005 — İlan formundaki seçimler URL'ye yazılmıyor; checkout'ta 'değiştir' yolu yok, tarihler ham ISO biçiminde
 
@@ -671,13 +689,15 @@
 | Renk/tema           | Hayır                                                           |
 | Efor                | S                                                               |
 | Kaynak denetçiler   | lens:nav                                                        |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                    |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p060)                          |
 
 **Kanıt:** handleDateChange (106-110) ve kişi seçimi (169) yalnız setState çağırıyor. checkout/page.tsx:165-237'de ilana dönüş bağlantısı yok. 196 `{checkIn} → {checkOut}` ham ISO gösteriyor (ekran görüntüsünde "2026-10-29 → 2026-11-01"); sepet ise biçimli tarih kullanıyor (cart/page.tsx:129 `f.date(…, "medium")`). Parametre adları da tutarsız: ilanda `guests`, checkout'ta `guestCount` (51).
 
 **Etki:** Misafir ilanda tarihleri değiştirip checkout'a geçiyor, bir hata fark edip Geri'ye basınca form eski URL parametreleriyle yeniden kuruluyor ve önceki tarihler görünüyor. Tüm seçimler yeniden yapılıyor. Ham ISO tarihi doğrulamak düşük okuryazarlıktaki kullanıcı için zor.
 
 **Önerilen aksiyon:** BookingWidget seçim değiştikçe `router.replace` ile checkIn/checkOut/guests/roomId/ratePlanId değerlerini URL'ye yazsın (`scroll: false`). Checkout'a "Tarihleri / odayı değiştir" bağlantısı ekleyin: `/property/${propertyId}?checkIn=…&checkOut=…&guests=${guestCount}&roomId=…&ratePlanId=…`. Tarihleri `f.date(…, "medium")` ile biçimleyip gece sayısını yanına yazın. Parametre adını tek bir değerde (`guests`) birleştirin.
+
+**Yapılan düzeltme:** Once the user changes anything (edited state), a useEffect writes checkIn/checkOut (only for chosen, valid dates), guests, roomId and ratePlanId to the URL with window.history.replaceState(null, ...). That works with Next's router and causes no RSC refetch, scroll or reload, and other params and the hash are kept. Back from checkout now rebuilds the form from page.tsx's existing guests/roomId/ratePlanId/checkIn/checkOut parsing. Not done here: the checkout 'change' link, formatted dates and the guestCount-to-guests rename. The widget still sends guestCount because checkout reads it (crossOwner).
 
 ## F1006 — Yalnız giriş tarihi seçiliyken özet 'Tarih seçin'e dönüyor; çıkış için yönlendirme yok; fiyat alanı sessizce boşalıyor
 
@@ -693,13 +713,15 @@
 | Renk/tema           | Hayır                                          |
 | Efor                | S                                              |
 | Kaynak denetçiler   | area:widget                                    |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                   |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p060)                |
 
 **Kanıt:** BookingWidget.tsx:129-132 `return checkIn && checkOut ? ... : t("widget.selectDates");`. DateRangePicker.tsx:114 ilk tıklamada `checkOut: ""` gönderiyor. SearchBar.tsx:63 aynı durumda `t("bar.checkInOnly", { date })` → "{date} - çıkış?" gösteriyor. Widget'ta bu yok. Takvim içinde "çıkış tarihini seçin" yönergesi de yok.
 
 **Etki:** Giriş gününü seçen misafir özetin "Tarih seçin"e döndüğünü görüyor ve seçiminin kaybolduğunu sanıyor. Pencereyi kapatırsa fiyat, PriceInsight ve CTA açıklamasız kayboluyor. Arama çubuğuyla davranış tutarsız.
 
 **Önerilen aksiyon:** booking.json'a `widget.checkInOnly` ("{date} - çıkış tarihini seçin") ekle ve checkOut boşken özet bunu göstersin. Takvim penceresinin üstüne `<p role="status">` koy: giriş seçilmemişse "Giriş tarihini seçin", seçilmişse "Çıkış tarihini seçin". Pencere eksik seçimle kapanırsa fiyat alanında aynı yönerge görünsün.
+
+**Yapılan düzeltme:** With only check-in picked, the date summary now reads widget.checkInOnly ('{date} - çıkış tarihini seçin'). A visible step line ('Giriş tarihini seçin' / 'Şimdi çıkış tarihini seçin') sits above the open calendar. It is aria-hidden because DateRangePicker already announces the same step in its own sr-only live hint. If the calendar is closed with only check-in picked, the price area shows 'Fiyatı görmek için çıkış tarihini seçin.' as the submit reason.
 
 ## F1007 — Fiyat planları karşılaştırılamıyor: fiyat farkı yok, 'İptal politikasına göre iade' belirsiz, yarım/tam pansiyon gösterilmiyor, ad ile alt metin tekrar ediyor
 
@@ -715,13 +737,15 @@
 | Renk/tema           | Hayır                                                        |
 | Efor                | M                                                            |
 | Kaynak denetçiler   | area:widget                                                  |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                 |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p060)                       |
 
 **Kanıt:** BookingWidget.tsx:219-224 `{plan.name}<span ...>{plan.refundable ? t("widget.refundable") : t("widget.nonRefundable")}{plan.mealPlan === "BREAKFAST" ? ... : ""}`. `priceModifierBps` (:19) gösterilmiyor. schema.prisma:257-262 `ROOM_ONLY | BREAKFAST | HALF_BOARD | FULL_BOARD` var ama yalnız BREAKFAST işleniyor. tr/booking.json:12 "İptal politikasına göre iade". docs/img/property.png'de "İade edilemez / İade edilemez" tekrar ediyor; "Standart" ile "Esnek" aynı alt metni taşıyor.
 
 **Etki:** Misafir planlar arasındaki fiyat ve koşul farkını görmek için her planı tek tek seçip toplamı hatırlamak zorunda kalıyor. Yarım veya tam pansiyon dahil olduğu halde bunu bilmiyor. "Standart" ile "Esnek"in farkını anlayamıyor.
 
 **Önerilen aksiyon:** Her plana göreli fiyat farkını ekle: `priceModifierBps` ≠ 0 ise "+%10" veya "−%15" (ya da sunucudan plan başına toplam). mealPlan'in dört değerini de i18n anahtarlarına eşle (widget.meal.ROOM_ONLY "Yalnız oda", HALF_BOARD "Yarım pansiyon", FULL_BOARD "Tam pansiyon"). "İptal politikasına göre iade" yerine "{date} tarihine kadar ücretsiz iptal" yaz. Plan adı alt metinle aynıysa alt metni gizle.
+
+**Yapılan düzeltme:** Price difference between plans, the less ambiguous refund wording and hiding a name that repeats the subtext were done in an earlier round. Added: all four meal plans map to i18n (mealRoomOnly, breakfastIncluded, mealHalfBoard, mealFullBoard). 'Yalnız oda' only shows when plans differ in meals. Not done: a 'free cancellation until {date}' line, which needs the policy tiers plus check-in time that the widget doesn't get. The 'İptal koşullarını gör' link to #policies stays.
 
 ## F1008 — Fiyat alanının aria-live bölgesi tüm dökümü sarıyor; her değişiklikte uzun duyuru yapılıyor
 
@@ -737,13 +761,15 @@
 | Renk/tema           | Hayır                                                               |
 | Efor                | S                                                                   |
 | Kaynak denetçiler   | area:widget                                                         |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                        |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p060)                                     |
 
 **Kanıt:** BookingWidget.tsx:232-236 `<div ... aria-live="polite">` içinde yükleniyor metni, hata ve tüm `<QuoteBreakdown>` (dl satırları, vergi notları, FX notu) var. checkout/page.tsx:206-209'da `<section ... aria-live="polite">` başlık, döküm ve CouponField'ın tamamını sarıyor.
 
 **Etki:** Ekran okuyucu kullanıcısı misafir sayısını, odayı veya planı her değiştirdiğinde önce "Fiyat hesaplanıyor…", ardından 5-8 satırlık dökümün tamamını dinliyor. Asıl bilgi olan yeni toplam kayboluyor ve odak gezinmesi kesiliyor.
 
 **Önerilen aksiyon:** Kapsayıcıdaki `aria-live`'ı kaldır. Ayrı bir `<p className="sr-only" role="status">` ekle; yalnız kısa metin duyursun: yükleniyorsa `t("widget.calculating")`, hata varsa hata, teklif gelince `t("widget.totalAnnounce", { total })` ("Yeni toplam: ₺6.357,27"). Checkout'taki section için de aynısını uygula; kupon durumu kendi `role="status"`'una sahip olsun.
+
+**Yapılan düzeltme:** Removed aria-live and aria-busy from the price container. A separate <p className="sr-only" role="status"> now announces only a short line: the room-switch notice or 'Fiyat hesaplanıyor…' while loading, the error text, the block reason, or widget.totalAnnounce ('Güncel toplam: {total}', formatted with f.money). It stays silent until the user's first change, so nothing is announced on page load. The checkout section is another owner's (crossOwner).
 
 ## F1009 — Fiyat alınamadığında 'Tekrar dene' yok; dolu veya kısıt hatasında alternatif eylem önerilmiyor
 
@@ -759,13 +785,15 @@
 | Renk/tema           | Hayır                                          |
 | Efor                | S                                              |
 | Kaynak denetçiler   | area:widget                                    |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                   |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p060)         |
 
 **Kanıt:** BookingWidget.tsx:234 yalnız `<p className="text-sm text-red-600">{error}</p>`. useQuote.ts:72-73 `refreshKey` destekliyor ama widget useQuote'u :87-94'te `refreshKey` olmadan çağırıyor. useQuote.ts:108 fetch'te zaman aşımı yok; yavaş ağda "Fiyat hesaplanıyor…" süresiz kalıyor.
 
 **Etki:** Anlık bir ağ kesintisinde misafir "Fiyat alınamadı" ve pasif CTA ile kalıyor. Yeniden denemek için misafir sayısını değiştirip geri almak gibi bir hile bulmak zorunda. Dolu tarihte başka tarih veya oda önerisi yok.
 
 **Önerilen aksiyon:** `const [refreshKey, setRefreshKey] = useState(0)` ekle, useQuote'a geçir ve hata metninin yanına `<button type="button" onClick={() => setRefreshKey(k => k + 1)}>{t("widget.retry")}</button>` koy. `code === "SOLD_OUT"` veya `"RESTRICTED"` ise "Başka tarih seç" düğmesi takvimi açsın. fetch'e `AbortSignal.timeout(10000)` ekle ve zaman aşımı hata metnine düşsün.
+
+**Yapılan düzeltme:** Added refreshKey state, passed to useQuote. For network or unknown errors a 'Tekrar dene' Button refetches and moves focus to the submit button, because the retry button disappears while loading. For SOLD_OUT and RESTRICTED a 'Başka tarih seç' Button opens the calendar and focuses the date trigger. NOT_FOUND gets no action, since the user picks another room. The fetch timeout belongs in useQuote.ts (crossOwner).
 
 ## F1010 — Pasif CTA'ların nedeni açıklanmıyor; pasif düğmeler odaklanamıyor; 'Uygun oda yok' boş durumu yönlendirmesiz
 
@@ -781,13 +809,15 @@
 | Renk/tema           | Hayır                                                                                        |
 | Efor                | S                                                                                            |
 | Kaynak denetçiler   | area:widget                                                                                  |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                 |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p060)                                                       |
 
 **Kanıt:** BookingWidget.tsx:249 `disabled={!selectedRoom || !quote}` ve :261 `disabled={!quote}`. AddToCartButton.tsx:77 `disabled={disabled || busy || !roomTypeId}`. Nedeni anlatan bir metin veya `aria-describedby` yok. :190 `{availableRooms.length === 0 && <option value="">{t("widget.noRooms")}</option>}` dışında boş durum mesajı yok.
 
 **Etki:** Tarih eksikken, teklif başarısızken veya oda yokken misafir iki gri düğme görüyor ve nedenini bilmiyor. Ekran okuyucu kullanıcısı `disabled` düğmeleri Tab ile hiç bulamıyor; ana CTA'nın varlığından habersiz kalıyor.
 
 **Önerilen aksiyon:** `disabled` yerine `aria-disabled={!canSubmit}` kullan ve handleSubmit'te koruma ekle. Düğmenin altına `id="submit-reason"` olan bir neden metni koy ("Fiyatı görmek için tarih seçin" / "Bu tarihlerde müsait oda yok") ve `aria-describedby="submit-reason"` ile bağla. Oda yoksa select yerine "Bu tesiste müsait oda yok" mesajı ve aramaya dönüş bağlantısı göster.
+
+**Yapılan düzeltme:** The submit button now uses aria-disabled instead of disabled, so it stays focusable. Its styles moved from disabled: to aria-disabled: variants with the same colour classes. handleSubmit guards against submitting, and opens the calendar when dates are incomplete. A visible reason line (id submit-reason: calculating / error / choose dates / choose check-out / room too small) is linked via aria-describedby. With no available rooms, the select is replaced by a message (widget.noRooms text changed; it was only used here) and a 'Başka konaklama ara' link to /search, and the button's aria-describedby points to it. AddToCartButton's native disabled is another owner's (crossOwner).
 
 ## F1011 — 'Rezervasyonu Onayla' düğmesi rezervasyonu onaylamıyor, yalnız checkout'a geçiyor; 'henüz ücret alınmaz' bilgisi yok
 
@@ -803,13 +833,15 @@
 | Renk/tema           | Hayır                                                        |
 | Efor                | S                                                            |
 | Kaynak denetçiler   | area:widget                                                  |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                 |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p061)                             |
 
 **Kanıt:** BookingWidget.tsx:252 `{t("widget.submit")}` = tr "Rezervasyonu Onayla" / en "Confirm booking". :126 `router.push(`/checkout?${params}`)`. Sonraki adımların etiketleri: checkout.json "title": "Rezervasyonu Tamamla", ardından payment.json "payAndConfirm": "Öde ve onayla". Aynı akışta üç adım üç ayrı "onay/tamamla" etiketi kullanıyor.
 
 **Etki:** Okuryazarlığı düşük misafir ilk düğmeye bastığında rezervasyonun onaylandığını veya ücretin çekildiğini sanıyor. Kaygı, geri dönme ya da akışı terk etme sonucu doğuyor. Sonraki "Tamamla" ve "Öde ve onayla" düğmeleri de beklentiyi karıştırıyor.
 
 **Önerilen aksiyon:** widget.submit'i "Rezervasyona devam et" / "Continue to book" olarak değiştir. Düğmenin altına `t("widget.noChargeYet")` ekle: "Sonraki adımda bilgilerinizi kontrol edeceksiniz; henüz ücret alınmaz." Checkout'ta "1/2 Bilgileri kontrol et" türü bir adım göstergesi kullan.
+
+**Yapılan düzeltme:** Already fixed in the current messages, so nothing changed. booking.widget.submit already reads "Rezervasyona devam et" / "Continue to booking", and p129's patch renames it to "Devam et: bilgileri gözden geçir", which tests/e2e/helpers.ts PDP_CONTINUE_NAME already uses. The widget already renders widget.submitHint ("Henüz ödeme alınmaz. Sonraki adımda bilgilerinizi gözden geçirir...") under the button and links it with aria-describedby. The checkout step indicator is in checkout files I don't own.
 
 ## F1012 — Yazılıp uygulanmamış kupon kodu, rezervasyon gönderilince sessizce yok sayılıyor
 
@@ -825,13 +857,15 @@
 | Renk/tema           | Hayır                                       |
 | Efor                | S                                           |
 | Kaynak denetçiler   | area:widget                                 |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p063)             |
 
 **Kanıt:** CouponField.tsx:31-32 `const [value, setValue] = useState(applied); const apply = () => onApply(value.trim());`: girilen metin yalnız bileşen içinde kalıyor. checkout/page.tsx:117 yalnız teklifte uygulanmış kuponu gönderiyor. :230-236 gönder düğmesi, uygulanmamış bir kod alanda dururken bunu kontrol etmiyor.
 
 **Etki:** Misafir kodu yazıp doğrudan "Rezervasyonu Tamamla"ya basıyor; rezervasyon indirimsiz tam fiyatla oluşuyor ve uyarı gelmiyor. Bu doğrudan para kaybı.
 
 **Önerilen aksiyon:** CouponField'a `onDirtyChange?: (dirty: boolean) => void` ekle (`value.trim().toUpperCase() !== applied.toUpperCase()`). Checkout handleSubmit, alan kirliyse gönderimi durdursun, alan altında "Kupon kodunu uygulamadınız: Uygula'ya basın ya da alanı temizleyin" göstersin ve alana odaklansın. Ya da kod `onBlur`'da otomatik uygulansın.
+
+**Yapılan düzeltme:** Confirmed: the problem was real (CouponField.tsx:31-32 and checkout:251). Fixed by the same submit guard as F579, which needs no checkout change and so no onDirtyChange prop: the dirty field blocks submit, shows the hint and gets focus.
 
 ## F1013 — Kupon uygulanırken meşgul geri bildirimi yok; alan metni ile uygulanan kod ayrışabiliyor; hatada aria-invalid yok
 
@@ -846,13 +880,15 @@
 | Renk/tema           | Hayır                                       |
 | Efor                | S                                           |
 | Kaynak denetçiler   | area:widget                                 |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p063)      |
 
 **Kanıt:** CouponField.tsx:56-62 "Uygula" düğmesinin meşgul veya pasif durumu yok. :76-84 durum yalnız `applied && status` iken çiziliyor; teklif yeniden alınırken (quote=null) kayboluyor. Kullanıcı uygulanan kodu düzenlerse alan "KIS20" gösterirken durum "Kupon uygulandı." diyor. :40-55 input'ta `aria-invalid` yok; durum `<p>`'si (:77) kendi `role="status"`'una sahip değil ve ebeveynin aria-live'ına bağımlı.
 
 **Etki:** Misafir "Uygula"ya basınca bir şey olup olmadığını anlamıyor ve tekrar basıyor. Hangi kodun geçerli olduğu belirsizleşiyor. Ekran okuyucu geçersiz kodu alanda hata olarak duymuyor.
 
 **Önerilen aksiyon:** CouponField'a `loading` prop'u geçir: düğme metni "Uygulanıyor…", `aria-busy` ve pasif. Durum metnini kodla birlikte yaz ("„{code}" kuponu uygulandı"). `aria-invalid={!!applied && !!status && status !== "APPLIED"}` ekle. Durum `<p>`'sine `role="status"` ver ve sürekli DOM'da tut.
+
+**Yapılan düzeltme:** Added an optional `loading` prop. When the shown code is the applied one and the quote is loading, the Apply button reads "Uygulanıyor…", gets aria-busy and aria-disabled with cursor-wait, and ignores clicks and Enter. The status now names the code ("{code} kuponu uygulandı."). The input gets aria-invalid on a non-APPLIED status or a local hint. Local hints sit in an always-present role="status" container. The server result <p> stays non-live on purpose, because checkout's sr-only priceStatus already announces it (F591) and a second live region would read it twice. The busy state only appears once checkout passes loading={quoteLoading} (crossOwner).
 
 ## F1014 — Fiyat içgörüsü asenkron yüklenip toplam ile CTA arasına giriyor; her tarih değişiminde kaybolup yeniden çıkıyor (yerleşim kayması)
 
@@ -868,13 +904,15 @@
 | Renk/tema           | Hayır                                          |
 | Efor                | S                                              |
 | Kaynak denetçiler   | area:widget                                    |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                   |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p064)         |
 
 **Kanıt:** PriceInsight.tsx:54-55 `const data = insight?.key === key ? insight.data : null; if (!data) return null;`: anahtar değişince eski veri hemen atılıyor, yükleme sırasında yer ayrılmıyor. BookingWidget.tsx:238-245 bileşeni QuoteBreakdown ile ana CTA arasına koyuyor; docs/img/price-insight.png'de ~140px'lik kutu bu konumda görünüyor.
 
 **Etki:** Mobilde "Rezervasyonu Onayla"ya basmak üzere olan misafirin altında içerik ~140px aşağı kayıyor; dokunuş "Fiyat alarmı kur"a ya da boşluğa gidiyor. Fiyattan CTA'ya giden tarama yolu ikincil bilgiyle bölünüyor.
 
 **Önerilen aksiyon:** PriceInsight'ı AddToCartButton'ın altına taşı. Yüklenirken `min-h-[7rem]` bir yer tutucu çiz. Anahtar değiştiğinde yeni veri gelene kadar önceki veriyi `aria-busy="true"` ile göstermeye devam et.
+
+**Yapılan düzeltme:** Confirmed: the old code returned null as soon as the key changed. Now an aria-hidden min-h-[7rem] placeholder shows on first load. When the dates or room change, the previous data stays visible with aria-busy and is dimmed (aria-busy:opacity-60) until the new data arrives. The section also has min-h-[7rem]. Moving the component below AddToCartButton happens in BookingWidget and is listed under crossOwner.
 
 ## F1015 — Oturum yokken 'Fiyat alarmı kur' yalnız metin gösteriyor, giriş bağlantısı yok; yandaki 'Sepete ekle' ise girişe yönlendiriyor (tutarsızlık)
 
@@ -890,13 +928,15 @@
 | Renk/tema           | Hayır                                        |
 | Efor                | S                                            |
 | Kaynak denetçiler   | area:widget                                  |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                 |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p064)              |
 
 **Kanıt:** PriceInsight.tsx:77-78 `err instanceof ApiError && err.status === 401 ? t("alertLoginRequired")` ile yalnız "Fiyat alarmı kurmak için giriş yapın." metni çıkıyor. AddToCartButton.tsx:57-61 aynı 401'de `router.push(`/login?redirect=...`)` yapıyor. Aynı form içinde aynı duruma iki farklı tepki veriliyor.
 
 **Etki:** Oturumsuz misafir mesajı görüyor ama girişe nasıl gideceğini bilmiyor; giriş yaptıktan sonra da sayfaya dönüp tekrar denemesi gerekiyor. Diğer düğme ise uyarı vermeden sayfadan çıkarıyor; hangi düğmenin ne yapacağı öngörülemiyor.
 
 **Önerilen aksiyon:** alertLoginRequired'ı `t.rich` ile `<Link href={`/login?redirect=${encodeURIComponent(location.pathname + location.search)}`}>` içeren bir metne çevir (ui.tsx:219 desenindeki gibi). Sepete ekle için de önce aynı satır içi mesaj ve bağlantı gösterilsin (aşağıdaki bulguya bakın).
+
+**Yapılan düzeltme:** Confirmed. On a 401, or when the user prop says there is no session (in that case no API call is made), the status now shows t.rich('alertLoginRequired') with a <Link> to loginHref(...). The link returns to the current URL with the user's selections plus priceAlert=1. The AddToCartButton half belongs to another file and finding.
 
 ## F1016 — Fiyat alarmının ne yapacağı önceden söylenmiyor; kurulan alarm arayüzden görülemiyor veya iptal edilemiyor
 
@@ -911,13 +951,15 @@
 | Renk/tema           | Hayır                                         |
 | Efor                | M                                             |
 | Kaynak denetçiler   | area:widget                                   |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                  |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p064)        |
 
 **Kanıt:** PriceInsight.tsx:118-125 düğme yalnız `{t("setAlert")}` ("Fiyat alarmı kur") diyor; kanal (e-posta, price-alerts.ts:207 `to: alert.user.email`) ve eşik belirtilmiyor. :121 `disabled={busy}`; meşgul durumunda metin değişmiyor, yalnız opaklık düşüyor. :70 başarı metni "Fiyat alarmı kuruldu." ama yönetim bağlantısı yok. API'de GET ve DELETE var (price-alerts/route.ts:16, :37), fakat src/app altında bunları kullanan bir sayfa yok (grep).
 
 **Etki:** Misafir alarmın nereye ve ne zaman bildirim göndereceğini bilmeden kuruyor; geri almak veya listelemek için bir yol yok. Kullanıcı kontrolü ve geri alma eksik.
 
 **Önerilen aksiyon:** Düğmeye `aria-describedby` ile bağlı bir ipucu ekle: "Fiyat düşerse {email} adresine e-posta göndeririz." Meşgulken metni "Kuruluyor…" yap. Başarı mesajına "Geri al" (DELETE ?id=) düğmesi ve hesap altındaki alarm listesine bağlantı ekle; liste sayfası yoksa oluştur.
+
+**Yapılan düzeltme:** Confirmed. Added a hint linked with aria-describedby ('...toplam fiyatı düşerse {email} adresine e-posta göndeririz.' / an anonymous variant). The button now uses aria-disabled instead of disabled, so focus is kept, and reads 'Fiyat alarmı kuruluyor…' while busy. Success shows 'Alarmı geri al', which calls DELETE /api/price-alerts?id=, then shows 'Fiyat alarmı kaldırıldı.' and moves focus back to the alert button. If the undo fails, the error shows and the undo button stays. I did not build an account alarm list page: PriceAlertView has no property or room name, so a list would be useless. That work is under crossOwner.
 
 ## F1017 — Yüzde ve ondalık sayılar yerel biçim yardımcısını atlıyor; TR'de '%12.5' ile '%12,5' bir arada
 
@@ -933,13 +975,15 @@
 | Renk/tema           | Hayır                                                                                                                                                                                                                                                                                                                                                                        |
 | Efor                | S                                                                                                                                                                                                                                                                                                                                                                            |
 | Kaynak denetçiler   | lens:consistency                                                                                                                                                                                                                                                                                                                                                             |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                                                                                                                                                                                                                                                                 |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p065)                                                                                                                                                                                                                                                                                                                                       |
 
 **Kanıt:** QuoteBreakdown.tsx:19-20 `t("rate", { rate: String(bps / 100) })`, misafirin checkout vergi satırı. PromotionsPanel.tsx:75 `String(p.discountBps / 100)`. AdminDashboard.tsx:443 `(v * 100).toFixed(1)`. RevenueDashboard.tsx:195 `×{c.multiplier.toFixed(2)}` ve :264 `(k.occupancy * 100).toFixed(1)`. SupportAdmin.tsx:93 `row.confidence.toFixed(2)`. RankingWhy.tsx:27 ve :34 `toFixed(3)`. Doğru kullanım örnekleri: WalletPanel.tsx:69 ve PayoutPanel.tsx:73 `f.number(bps / 100, { maximumFractionDigits: 2 })`, PriceInsight `f.number(level, { style: "percent" })`.
 
 **Etki:** Aynı arayüzde cashback oranı "%1,5", vergi oranı "%1.5" görünür. Para ekranlarında ayırıcı karmaşası, kullanıcının tutar okumasına duyduğu güveni azaltır. Doluluk ve deney oranları da ev sahibi ile admin panelinde farklı biçimde yazılır.
 
 **Önerilen aksiyon:** Formatter'a `percent(bps)` ve `decimal(value, digits)` metotları ekleyin (Intl.NumberFormat ile). Bu yedi çağrı yerinde toFixed ve String yerine bunları kullanın. ICU iletisine sayı yerine önceden biçimlenmiş metin geçirme kuralını kod incelemesi kontrol listesine ekleyin.
+
+**Yapılan düzeltme:** Confirmed and fixed the QuoteBreakdown call site. The rate is now formatted with f.number(bps / 10_000, { style: "percent", maximumFractionDigits: 2 }), giving "%8,5" in TR and "8.5%" in EN, and the message no longer adds its own % sign. The other listed call sites are in files I don't own, so they are listed in crossOwner.
 
 ## F1018 — Değişken gece fiyatlarında gecelik döküm görülemiyor
 
@@ -954,13 +998,15 @@
 | Renk/tema           | Hayır                                          |
 | Efor                | S                                              |
 | Kaynak denetçiler   | area:widget                                    |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                   |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p065)                |
 
 **Kanıt:** QuoteBreakdown.tsx:37-41 `uniform ? t("nightsUniform", ...) : t("nightsVariable", { count: n })` → "3 gece (gecelik fiyatlar değişken)". `quote.nights` (useQuote.ts:15 `Array<{ date; amount }>`) eldeyken gecelere göre tutarlar gösterilmiyor.
 
 **Etki:** Hafta sonu veya sezon fiyatı farklı olan konaklamada misafir ara toplamın nasıl oluştuğunu doğrulayamıyor. Para hatasına toleransı düşük kullanıcıda güveni azaltıyor ve tarih kaydırarak karşılaştırmayı zorlaştırıyor.
 
 **Önerilen aksiyon:** Değişken durumda `<details><summary>{t("nightsShow")}</summary><ul>{quote.nights.map(n => <li key={n.date}>{f.date(n.date, "medium")}: {fmt(n.amount, quote.currency)}</li>)}</ul></details>` ekle; dl dışında, döküm notlarının yanında dursun.
+
+**Yapılan düzeltme:** Confirmed: the variable-price case only showed "N gece (gecelik fiyatlar değişken)". Added a <details> after the <dl> with the summary t("nightsShow") and a <ul> listing each night as f.date(date, "medium") and its amount (data-testid="quote-nights"). It appears only when nightly prices differ, and the summary has focusRing.
 
 ## F1019 — RNPL zaman çizelgesi tahsilat ile ücretsiz iptal son tarihi arasındaki pencereyi açıklamıyor; '₺0,00 tahsil edilir' ifadesi doğal değil
 
@@ -976,13 +1022,15 @@
 | Renk/tema           | Hayır                                                        |
 | Efor                | S                                                            |
 | Kaynak denetçiler   | area:widget                                                  |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                 |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p065)                              |
 
 **Kanıt:** RnplOption.tsx:89-92 adımlar `stepToday`, `stepCharge`, `stepFreeCancel`, `stepFailure`. tr/payment.json:41 "Bugün: {today} tahsil edilir; kartınız yalnızca kaydedilir." (today = ₺0,00, :56). :43 "{date} tarihine kadar ücretsiz iptal; tahsilattan önce iptal ederseniz hiç ödeme alınmaz." docs/img/v5-rnpl-checkout.png: tahsilat 21 Nisan, ücretsiz iptal 23 Nisan. :84-85 `<ol className="... list-disc">` sıralı listeyi madde imiyle gösteriyor.
 
 **Etki:** Misafir 22 Nisan'da (tahsilattan sonra, son tarihten önce) iptal ederse ne olacağını bilemiyor; paranın iade edilip edilmeyeceği yazmıyor. "₺0,00 tahsil edilir" ifadesi kafa karıştırıyor.
 
 **Önerilen aksiyon:** stepFreeCancel'i şöyle yaz: "{date} {time}'e kadar ücretsiz iptal: tahsilattan önce iptal ederseniz ödeme alınmaz, tahsilattan sonra iptal ederseniz tutarın tamamı iade edilir." stepToday'i "Bugün ödeme alınmaz; kartınız yalnızca kaydedilir." yap. Listeyi `list-decimal` ile numaralandır.
+
+**Yapılan düzeltme:** Confirmed. stepFreeCancel now reads "Ücretsiz iptal son tarihi: {date}. Tahsilattan önce iptal ederseniz hiç ödeme alınmaz; tahsilattan sonra iptal ederseniz tutarın tamamı iade edilir." In RnplOption, {date} already includes date, time and time zone. stepToday reads "Bugün kartınızdan ödeme alınmaz; kartınız yalnızca kaydedilir." and the list is now list-decimal.
 
 ## F1020 — 'Şimdi rezerve et, sonra öde' metinleri çelişkili ve eksik; kredi seçeneği sessizce kayboluyor
 
@@ -998,13 +1046,15 @@
 | Renk/tema           | Hayır                                                                                                                                                    |
 | Efor                | S                                                                                                                                                        |
 | Kaynak denetçiler   | lens:copy                                                                                                                                                |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                                             |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p065)                                                                                                                   |
 
 **Kanıt:** RnplOption.tsx:56 `const today = f.money(0, ...)`; 89 `t("stepToday", { today })` → payment.json:41 'Bugün: ₺0,00 tahsil edilir; kartınız yalnızca kaydedilir.'; payment.json:44 '...ek süre içinde ödenmezse rezervasyon otomatik iptal edilir' — ek süre uzunluğu yok. BookingActions.tsx:241 `status === "HELD" && !challenge && !rnpl &&` WalletCreditOption'ı RNPL seçilince açıklamasız gizler.
 
 **Etki:** Misafir '₺0 tahsil edilir' ile ne olacağını anlamaz; tahsilat başarısızlığında ne kadar süresi olduğunu bilmeden rezervasyonunu kaybedebilir; kredi seçimi neden kaybolduğunu anlamaz.
 
 **Önerilen aksiyon:** stepToday'i 'Bugün kartınızdan ödeme alınmaz; kart yalnızca kaydedilir.' yapın; stepFailure'a süreyi parametre olarak verin ('{days} gün içinde'); RNPL seçilince kredi kutusunun yerine 'Cüzdan kredisi bu seçenekle birlikte kullanılamaz' notu gösterin.
+
+**Yapılan düzeltme:** stepToday is fixed. Added stepFailureGrace with {hours}; it is used when the offer or plan includes a new optional graceHours field, and the generic stepFailure remains otherwise. Added an optional creditNote prop to RnplOption and RnplChoice: while RNPL is selected, it shows payment.rnpl.creditUnavailable. The server's graceHours and the BookingActions wiring are in crossOwner.
 
 ## F1021 — Kredi ve 'sonra öde' seçenekleri ödeme formunun üstüne gecikmeli ekleniyor; RNPL seçilince kredi açıklamasız kayboluyor
 
@@ -1020,13 +1070,15 @@
 | Renk/tema           | Hayır                                                                                       |
 | Efor                | M                                                                                           |
 | Kaynak denetçiler   | area:widget                                                                                 |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p067)                                                      |
 
 **Kanıt:** WalletCreditOption.tsx:56 `if (!opts || opts.maxUsableMinor <= 0) return null;` ve RnplOption.tsx:30-41 `offer` null iken hiçbir şey çizilmiyor; yükleme sırasında yer ayrılmıyor. BookingActions.tsx:238-249 ikisi de kart formunun üstünde. :241 `!rnpl &&` RNPL seçilince kredi kutusunu kaldırıyor; sebebi yalnız kod yorumunda yazıyor (:62 "kredi ile birlikte kullanılamaz").
 
 **Etki:** Kart numarasını yazmaya başlamış misafirin altındaki form iki ayrı istek dönünce aşağı kayıyor; dokunuşlar yanlış alana gidiyor. "Sonra öde"yi seçince kredi seçeneği kayboluyor ve kullanıcı kredisinin nereye gittiğini bilmiyor.
 
 **Önerilen aksiyon:** Her iki bileşen yüklenirken `min-h` iskelet çizsin ya da kart formunun altına taşınsın. RNPL seçiliyken WalletCreditOption'ı kaldırmak yerine `disabled` fieldset olarak göster ve altına "'Sonra öde' seçeneğinde cüzdan kredisi kullanılamaz" notunu ekle.
+
+**Yapılan düzeltme:** Added two optional props to WalletCreditOption. With rnplSelected, the box stays visible as a disabled fieldset with an unchecked checkbox and an explanatory note (wallet.checkout.rnplUnavailable) linked by aria-describedby. Its credit/amount state is kept for when the guest switches back. onLoaded(shown) fires once when the credit fetch resolves or fails, so the parent can reserve space or wait before showing the card form. The layout shift and hide-on-RNPL behaviour live in BookingActions and RnplOption; the needed changes are listed in crossOwner.
 
 ## F1022 — Geçersiz kredi tutarında ödeme engellenmiyor; kredi sessizce 0'a düşüyor ve tüm tutar karttan çekiliyor
 
@@ -1042,13 +1094,15 @@
 | Renk/tema           | Hayır                                              |
 | Efor                | S                                                  |
 | Kaynak denetçiler   | area:widget                                        |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                       |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p067)             |
 
 **Kanıt:** WalletCreditOption.tsx:63-64 `const ok = ...; onChange(nextUse && ok ? nextAmount : 0);`: geçersiz tutarda ebeveyne 0 gidiyor. :101-105 hata gösteriliyor, ama BookingActions.tsx:314-319 "Öde ve onayla" yalnız `disabled={busy}` ile korunuyor ve tutar göstermiyor.
 
 **Etki:** Krediyi kullanmak isteyen misafir sınırı aşan bir tutar yazıyor (ör. ₺600, en fazla ₺500) ve hata satırını kaçırıp öde'ye basıyor. Kredisiz, tam tutar karttan çekiliyor; ekranda ise kredi kutusu işaretli duruyor.
 
 **Önerilen aksiyon:** WalletCreditOption'a `onValidityChange(valid)` ekle. Geçersizken BookingActions gönderimi engellesin ve tutar alanına odaklansın. Ya da `onBlur`'da tutarı `maxUsableMinor`'a kırp ve "En fazla {max} kullanılabilir, tutar düzeltildi" diye bildir. Öde düğmesinde karttan çekilecek tutarı göster: "₺X öde ve onayla".
+
+**Yapılan düzeltme:** On blur, an amount over the limit is now clamped to maxUsableMinor and a polite note (wallet.checkout.clamped) is shown and linked to the input. Blur runs before the pay click, so the over-limit case no longer silently charges the full amount to the card. Added optional onValidityChange(valid) and inputRef props so the parent can block payment and move focus when the text can't be parsed. The pay button already shows the amount to be charged (BookingActions:448). Blocking the submit is a BookingActions change (crossOwner).
 
 ## F1023 — Para girişlerinde iki farklı desen: type=number ve virgül kabul eden metin alanı
 
@@ -1064,13 +1118,15 @@
 | Renk/tema           | Hayır                                                                                                                                                                                                                                                                                                                                                                                                            |
 | Efor                | M                                                                                                                                                                                                                                                                                                                                                                                                                |
 | Kaynak denetçiler   | lens:mobile                                                                                                                                                                                                                                                                                                                                                                                                      |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                                                                                                                                                                                                                                                                                                     |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p067)                                                                                                                                                                                                                                                                                                                                                                                 |
 
 **Kanıt:** Desen A (type=number): WalletCreditOption.tsx:87-93 `type="number" inputMode="decimal" … onChange={(e) => update(true, Math.round(Number(e.target.value) * 100))}`; HostDashboard.tsx:252 taban fiyat, :401 fiyat farkı, :501 takvim fiyatı; search/page.tsx:334/346 fiyat filtresi. Desen B (virgül kabul eden metin): DepositSettings.tsx:140 `inputMode="decimal" pattern="\d+([.,]\d{1,3})?"`, OpenClaimForm.tsx:71, ClaimAdmin.tsx:210, TransferMarket.tsx:174 (ve :122 `ask.replace(",", ".")`), SplitPayPanel.tsx:218. Kod tabanı TR kullanıcısının virgül yazdığını bildiği hâlde (TransferMarket), Desen A'da tarayıcı virgüllü değeri geçersiz sayarsa `value` boş dönüyor ve `Number("")=0` oluyor.
 
 **Etki:** TR klavyesinde ondalık tuşu ',' olan mobil kullanıcı cüzdan kredisine '12,50' yazdığında tutar sessizce 0'a düşebilir. Ev sahibinin fiyat alanları ekrana göre farklı davranıyor. Para hatasına toleransı düşük kullanıcı için öngörülemez.
 
 **Önerilen aksiyon:** Tek bir `<MoneyInput>` bileşeni yaz: `type="text" inputMode="decimal"`, virgül ve noktayı kabul eden `parseMoney` ile ayrıştırma, geçersiz girişte değeri sıfıra çevirmeden alanın altında hata. Desen A'daki tüm para alanlarını buna geçir. Para birimini ve örnek biçimi ('Örn. 1.250,50') ipucu olarak göster.
+
+**Yapılan düzeltme:** Already fixed in the current code. The credit field is type="text" inputMode="decimal" and is parsed with parseAmountToMinor; unparseable text becomes -1 and shows an error instead of 0, and the hint already shows an example format (150,50). The other money fields listed (HostDashboard, search page) also use parseAmountToMinor now; the remaining type="number" inputs there are capacity and guest counts, not money. Currency was added to the credit label (see F1394).
 
 ## F1024 — Cüzdan kredisi tutar alanında ipucu ve hata girdiye bağlı değil; uyarı her tuş vuruşunda tekrarlanıyor
 
@@ -1086,13 +1142,15 @@
 | Renk/tema           | Hayır                                               |
 | Efor                | S                                                   |
 | Kaynak denetçiler   | area:checkout                                       |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                        |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p067)                     |
 
 **Kanıt:** WalletCreditOption.tsx:183-193 `<input type="number" ... aria-invalid={!valid} />`: aria-describedby yok. :195-197 "En fazla {amount}" ipucu ve :198-202 `<p role="alert">` hata metni girdiye bağlanmamış. Hata öğesi koşullu mount edildiği için kullanıcı yazarken her geçersiz değerde yeniden duyuruluyor.
 
 **Etki:** Ekran okuyucu kullanıcısı alana odaklandığında üst sınırı duymuyor. Yazarken kesintili uyarılar alıyor.
 
 **Önerilen aksiyon:** İpucu ve hataya id verin ve girdiye `aria-describedby="credit-max credit-error"` ekleyin. role="alert" yerine sabit bir `aria-live="polite"` kapsayıcı kullanın ve doğrulamayı onBlur'da yapın.
+
+**Yapılan düzeltme:** aria-describedby was already present. The error is now validated on blur instead of on every keystroke and clears as soon as the user edits again. It renders inside an always-mounted aria-live="polite" container together with the clamp note. aria-invalid only appears while the error is shown, and describedby lists the hint plus whichever error or clamp note is visible.
 
 ## F1025 — Yetişkin/çocuk ayrımı rezervasyon kutusunda kayboluyor; sepete herkes yetişkin olarak ekleniyor
 
@@ -1108,13 +1166,15 @@
 | Renk/tema           | Hayır                                                                                    |
 | Efor                | L                                                                                        |
 | Kaynak denetçiler   | area:widget                                                                              |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                             |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p070)                                                   |
 
 **Kanıt:** AddToCartButton.tsx:50-51 `adults, children: 0`. BookingWidget.tsx:162-177 tek bir "Misafir Sayısı" select'i var ve :260 `adults={guestCount}` geçiriyor. SearchBar.tsx:24-25 ise `adults` ve `children` ayrı tutuyor, :46'da toplamı `guests` olarak aktarıyor. Sepet kalemi cart.json:21-22'de "Yetişkin" ve "Çocuk" sütunlarıyla gösteriliyor.
 
 **Etki:** 2 yetişkin + 2 çocukla arama yapan aile kutuda "4 misafir" görüyor. Sepette "4 Yetişkin, 0 Çocuk" yazıyor. Kişi başı vergi veya çocuk politikası olan tesislerde fiyat ve koşullar yanlış yansıyabiliyor, kullanıcı da girdiği bilginin kaybolduğunu görüyor.
 
 **Önerilen aksiyon:** Misafir select'ini SearchBar'daki gibi yetişkin ve çocuk sayaçlarıyla değiştir. property/[id]/page.tsx:109-115 `adults` ve `children` parametrelerini okusun. Teklif, checkout ve AddToCartButton çağrısına ikisi ayrı ayrı geçirilsin.
+
+**Yapılan düzeltme:** AddToCartButton has a new optional `childCount` prop. It sends `children: childCount ?? 0` to /api/cart/items, sets guests to adults+children in the login return URL, and writes adults/children only when the caller provides childCount. The widget's adults/children inputs and the property page URL reading belong to their owners (crossOwner widget#3 in p061/p030); the prop name is given in crossOwner.
 
 ## F1026 — 'Sepete ekle' başarıdan sonra tekrar etkin kalıyor ve aynı kalem yeniden eklenebiliyor; başarı mesajı seçim değişince bayat kalıyor
 
@@ -1130,13 +1190,15 @@
 | Renk/tema           | Hayır                                        |
 | Efor                | M                                            |
 | Kaynak denetçiler   | area:widget                                  |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                 |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p070)              |
 
 **Kanıt:** AddToCartButton.tsx:55 `setStatus({ kind: "ok", text: t("add.added") })` sonrasında :77'deki koşullar düğmeyi yeniden etkinleştiriyor. cart-service.ts:312-322 `tx.cartItem.create(...)` aynı oda, tarih ve misafir için her seferinde yeni satır açıyor; birleştirme yok. `status`, prop'lar (oda, tarih, misafir) değişince sıfırlanmıyor.
 
 **Etki:** Eklenip eklenmediğinden emin olamayan misafir ikinci kez basıyor ve sepette iki aynı oda oluşuyor; fark edilmezse grup ödemesinde iki oda ücreti çıkıyor. Tarihi değiştirdikten sonra "Sepete eklendi." yazısı yeni seçimin de eklendiği izlenimini veriyor.
 
 **Önerilen aksiyon:** Başarıdan sonra aynı (oda, plan, tarih, misafir) anahtarı için düğmeyi "Sepette, sepete git" bağlantısına çevir. `useEffect(() => setStatus(null), [roomTypeId, ratePlanId, checkIn, checkOut, adults])` ekle. Sunucuda aynı kalem için 409 DUPLICATE_ITEM dön ya da adedi artır, UI'da bunu bildir.
+
+**Yapılan düzeltme:** Each result is stored with a key (room, plan, dates, adults, children) and shown only while the selection matches it, so a stale 'Sepete eklendi.' disappears when the selection changes. After success for the same key, the button becomes a 'Sepete git' link, so the same item can't be added twice by accident. A server-side duplicate check is not included.
 
 ## F1027 — 'Sepete ekle' oturum yokken uyarısız girişe gidiyor; widget seçimleri URL'de olmadığından dönüşte kayboluyor ve ekleme yapılmıyor
 
@@ -1152,13 +1214,15 @@
 | Renk/tema           | Hayır                                                                               |
 | Efor                | M                                                                                   |
 | Kaynak denetçiler   | area:widget                                                                         |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                        |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p070)                                                    |
 
 **Kanıt:** AddToCartButton.tsx:57-61 `router.push(`/login?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`)`. BookingWidget.tsx:69-83 tarih, misafir, oda ve plan yalnız React durumunda; URL güncellenmiyor. property/[id]/page.tsx:109-115 bu değerleri URL'den okuyabiliyor ama widget yazmıyor.
 
 **Etki:** Tarih ve oda seçip "Sepete ekle"ye basan oturumsuz misafir aniden giriş sayfasına gidiyor. Dönüşte varsayılan veya arama tarihleriyle karşılaşıyor, kalem eklenmemiş oluyor ve tüm seçimi yeniden yapıyor.
 
 **Önerilen aksiyon:** Yönlendirme adresini güncel seçimden üret: `/property/${propertyId}?checkIn=..&checkOut=..&guests=..&roomId=..&ratePlanId=..&addToCart=1`. Dönüşte `addToCart=1` varsa eklemeyi otomatik tamamla ve bildir. Yönlendirmeden önce düğme altında "Sepete eklemek için giriş yapın" ve giriş bağlantısı göster (feedforward).
+
+**Yapılan düzeltme:** Already in place: returnUrl() keeps checkIn/checkOut/guests/roomId/ratePlanId plus intent=add-to-cart, an effect finishes the add on return and clears the intent, and the signed-out hint (cart.add.loginHint, linked via aria-describedby) warns before the redirect. As part of F1025, guests in that URL is now the adults+children total.
 
 ## F1081 — 'Giriş - Çıkış' etiketi tarih düğmesine bağlı değil
 
@@ -1174,13 +1238,15 @@
 | Renk/tema           | Hayır                                          |
 | Efor                | S                                              |
 | Kaynak denetçiler   | runtime:pdp, area:widget                       |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                   |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p061)                |
 
 **Kanıt:** RUNTIME p2-widget.mjs: label htmlFor=null, düğmenin adı yalnız '12 Eki 2026 - 13 Eki 2026' (aria-labelledby yok); boşken yalnız 'Tarih seçin'.
 
 **Etki:** Ekran okuyucu alanın giriş-çıkış tarihi olduğunu duymuyor.
 
 **Önerilen aksiyon:** Düğmeye id verip label htmlFor ile bağlayın veya aria-labelledby='dates-label dates-value' kullanın.
+
+**Yapılan düzeltme:** The date trigger button now has aria-labelledby="<datesLabelId> <datesValueId>", and the summary text is wrapped in <span id={datesValueId}>. Screen readers now announce "Giriş - Çıkış, 12 Eki 2026 - 13 Eki 2026" or "Giriş - Çıkış, Tarih seçin" instead of only the value.
 
 ## F1158 — Kupon alanı CSS uppercase yüzünden TR'de 'HOSGELDİN' gösteriyor, uygulanan kod 'HOSGELDIN'
 
@@ -1195,13 +1261,15 @@
 | Renk/tema           | Hayır                                                                 |
 | Efor                | S                                                                     |
 | Kaynak denetçiler   | runtime:checkout                                                      |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                          |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p063)                                       |
 
 **Kanıt:** RUNTIME p12-checkout-coupon.mjs: 'hosgeldin' yazıldı; input görsel olarak 'HOSGELDİN' (noktalı İ) gösterirken döküm 'Kupon HOSGELDIN' diyor (crops/checkout/p12-valid-coupon.png). Neden: sayfa lang=tr ve input'ta 'uppercase' sınıfı.
 
 **Etki:** Kullanıcı kodu yanlış yazdığını düşünebilir; kodu kopyalayıp paylaşırken farklı karakter görülür.
 
 **Önerilen aksiyon:** Input'a lang='en' verilsin ya da CSS uppercase kaldırılıp onChange'de value.toLocaleUpperCase('en-US') uygulansın.
+
+**Yapılan düzeltme:** Removed the CSS `uppercase` class. The value is now uppercased with String.prototype.toUpperCase, which does not depend on locale and matches the server's normalisation, both on change and for the initial value from the URL, so Turkish "i" becomes "I" and never "İ". The caret position is kept when the case changes.
 
 ## F1159 — Mobilde kupon 'Uygula' düğmesinin metni kenarlığından taşıyor
 
@@ -1216,13 +1284,15 @@
 | Renk/tema           | Hayır                                                         |
 | Efor                | S                                                             |
 | Kaynak denetçiler   | runtime:checkout                                              |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                  |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p063)                               |
 
 **Kanıt:** RUNTIME p13-checkout-errors.mjs (390x844): kupon satırında rowW=308, scrollWidth=313; 'Uygula' 54x38 boyutuna sıkışmış, kupon uygulandığında 'Kaldır' 38x38. Ekran görüntüleri: crops/checkout/p13-mobile-coupon-applied.png, p13-too-many-guests.png (uygulamadan önce de 'Uygula' kenara değiyor).
 
 **Etki:** Kırık görünüm güveni azaltıyor ve dokunma hedefi daralıyor.
 
 **Önerilen aksiyon:** Düğmelere shrink-0 whitespace-nowrap verilsin, input'a min-w-0 eklensin; 390px'te 'Kaldır' alt satıra alınsın.
+
+**Yapılan düzeltme:** The input now has min-w-0 flex-1 (in place of w-full) and Apply has shrink-0 whitespace-nowrap, so the row can't overflow, even while Apply shows "Uygulanıyor…". On every width, "Kaldır" moved to a separate result row under the field (status text + Kaldır, flex-wrap) and also got shrink-0 whitespace-nowrap.
 
 ## F1160 — Geçersiz kupon mesajı yönlendirmiyor; alan aria-invalid almıyor, boş 'Uygula' geri bildirimsiz
 
@@ -1239,13 +1309,15 @@
 | Renk/tema           | Hayır                                       |
 | Efor                | S                                           |
 | Kaynak denetçiler   | runtime:pdp                                 |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p063)             |
 
 **Kanıt:** RUNTIME p5-anon-flow.mjs /checkout: 'yanlis123' → 'Kupon bulunamadı.' (12px kırmızı), input aria-invalid=null (describedby bağlı), odak 'Uygula'da; alan CSS uppercase ile 'YANLİS123' gösteriyor (Türkçe İ dönüşümü, gönderilen değer küçük harf); boş kodla 'Uygula' → hiçbir durum yok. Ekran runtime/probes/property/p5-coupon-invalid.png.
 
 **Etki:** Kullanıcı yazım mı, süre mi, ilan uyumu mu sorun anlamıyor; ekran okuyucu alanın hatalı olduğunu duymuyor.
 
 **Önerilen aksiyon:** Hatada aria-invalid='true' verin; metni eyleme dönüştürün: 'Kupon bulunamadı. Kodu kontrol edin (büyük/küçük harf fark etmez) veya kaldırın.'; boş gönderimde 'Kupon kodu girin' gösterin; text-transform yerine değeri toLocaleUpperCase('en') ile normalize edin.
+
+**Yapılan düzeltme:** aria-invalid is set on an error. couponStatus.NOT_FOUND now tells the user what to do ("Kupon bulunamadı. Kodu kontrol edip yeniden uygulayın ya da kaldırın."); checkout's priceStatus uses the same key, and the text still reads correctly there. Clicking Apply with an empty field and no applied coupon now shows "Kupon kodu girin." in the live hint. The value is normalised with toUpperCase in place of the CSS text-transform.
 
 ## F1161 — Oturumsuz fiyat alarmı: 'giriş yapın' deniyor ama giriş bağlantısı yok
 
@@ -1261,13 +1333,15 @@
 | Renk/tema           | Hayır                                        |
 | Efor                | S                                            |
 | Kaynak denetçiler   | runtime:pdp                                  |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                 |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p064)       |
 
 **Kanıt:** RUNTIME p2-widget.mjs anon: 'Fiyat alarmı kur' → durum 'Fiyat alarmı kurmak için giriş yapın.' (düz metin), bağlantı yok; odak body'de.
 
 **Etki:** Kullanıcı yönlendirmeyi kendisi bulmak zorunda; alarm niyeti kaybolur.
 
 **Önerilen aksiyon:** Mesajı 'Giriş yap' bağlantısıyla verin (redirect=geçerli URL + seçimler + intent=price-alert); oturumsuzken düğme etiketinde '(giriş gerekir)' feedforward'u.
+
+**Yapılan düzeltme:** The login link with intent is in place: the redirect is the current path, its query (selections) and priceAlert=1. On return with a signed-in user, the alert is created once and the parameter is removed from the URL. The button reads 'Fiyat alarmı kur (giriş gerekir)' when user===null. The feedforward label and the auto-create only work once BookingWidget passes the new optional `user` prop (see crossOwner). The link works now without it.
 
 ## F1162 — 'Konaklama vergisi (%1) ₺19,09' satırı ₺2.100'ün %1'i değil; hesap tabanı açıklanmıyor
 
@@ -1282,13 +1356,15 @@
 | Renk/tema           | Hayır                                                     |
 | Efor                | S                                                         |
 | Kaynak denetçiler   | runtime:pdp                                               |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                              |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p065)                           |
 
 **Kanıt:** RUNTIME 006-0.png ve p2: '₺2.100,00 × 1 gece', 'Konaklama vergisi (%1) ₺19,09' (₺2.100 × %1 = ₺21); Grand Deluxe ₺4.850 → ₺44,09. KDV dahil satırı ayrı ('KDV (%10) dahil: ₺190,91').
 
 **Etki:** Kendi hesabını yapan kullanıcı hata olduğunu düşünür.
 
 **Önerilen aksiyon:** Etiketi 'Konaklama vergisi (%1, KDV hariç tutar üzerinden)' yapın veya bilgi ipucuyla taban tutarı gösterin.
+
+**Yapılan düzeltme:** Checked src/lib/pricing/tax.ts: add-on percentage taxes are calculated on the amount net of included taxes. When the quote has included taxes, add-on tax rows now use the new key quote.rateNet, e.g. "Konaklama vergisi (%1, KDV hariç tutar üzerinden)" / "Accommodation tax (1% of the price excluding VAT)". The included-tax names are joined with Intl.ListFormat.
 
 ## F1385 — Ana CTA'ya basıldıktan sonra yönlendirme sırasında meşgul durumu yok
 
@@ -1303,13 +1379,15 @@
 | Renk/tema           | Hayır                                          |
 | Efor                | S                                              |
 | Kaynak denetçiler   | area:widget                                    |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                   |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p061)                |
 
 **Kanıt:** BookingWidget.tsx:112-127 handleSubmit yalnız `router.push(...)` çağırıyor. :247-253 düğmenin meşgul metni veya `aria-busy`'si yok (checkout/page.tsx:235'te `submitting ? t("processing")` deseni var).
 
 **Etki:** Yavaş mobil ağda misafir düğmeye bastıktan sonra 1-3 sn boyunca geri bildirim almıyor ve tekrar basıyor ya da sayfadan çıkıyor.
 
 **Önerilen aksiyon:** `const [pending, startTransition] = useTransition()` ekle, `startTransition(() => router.push(...))` yap. Düğmede `pending ? t("widget.continuing") : ...` ve `aria-busy={pending}` kullan.
+
+**Yapılan düzeltme:** Added useTransition. handleSubmit now calls startNavigation(() => router.push(...)) and ignores a second submit while navigating. While pending, the submit button shows t("widget.continuing") (new key) and gets aria-busy.
 
 ## F1386 — Odak göstergeleri tutarsız: tarih düğmesi ve ana CTA'da özel stil yok, select'lerde 1px halka, diğerlerinde 2px halka; ortak focusRing kullanılmıyor
 
@@ -1325,13 +1403,15 @@
 | Renk/tema           | Hayır                                                                                                                         |
 | Efor                | S                                                                                                                             |
 | Kaynak denetçiler   | area:widget                                                                                                                   |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                  |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p061)                                                                                               |
 
 **Kanıt:** BookingWidget.tsx:147 tarih düğmesinde `focus` sınıfı yok, yalnız `hover:border-[#003580]`. :170 ve :188 select'lerde `focus:outline-none focus:ring-1`. :250 submit'te focus sınıfı yok. AddToCartButton.tsx:79 `focus-visible:ring-2 ... ring-offset-2`. ui.tsx:18-19'da ortak `focusRing` tanımlı ve PriceInsight.tsx:122'de kullanılıyor, ama widget'ta kullanılmıyor.
 
 **Etki:** Klavye kullanıcısı aynı kutuda odak konumunu kontrolden kontrole farklı kalınlık ve biçimde görüyor; 1px halka ince sınırla karışabiliyor.
 
 **Önerilen aksiyon:** Tarih düğmesi, iki select, radyolar ve submit için ui.tsx'teki mevcut `focusRing` sınıfını kullan. Bu yeni renk tanımlamıyor, mevcut halka rengini kullanıyor.
+
+**Yapılan düzeltme:** The adults, children and room selects now use the shared focusRing instead of focus:ring-1; the existing focus:border-[#003580] class is kept and no colors were changed. The rate-plan radios and the submit button also get focusRing. The date trigger already used it.
 
 ## F1387 — Teklif hatası (dolu veya kısıt) varken fiyat içgörüsü gecelik fiyat göstermeye devam ediyor
 
@@ -1346,13 +1426,15 @@
 | Renk/tema           | Hayır                                          |
 | Efor                | S                                              |
 | Kaynak denetçiler   | area:widget                                    |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                   |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p061)                |
 
 **Kanıt:** BookingWidget.tsx:238-245 PriceInsight yalnız `selectedRoom && checkIn && checkOut && checkIn < checkOut` koşuluna bağlı; `error`'a bakmıyor. Hata satırı (:234) "Oda seçilen tarihler için müsait değil" derken içgörü "Bu tarihler için fiyat olağan (gecelik ₺2.100,00)" diyor.
 
 **Etki:** Misafir aynı kutuda hem "müsait değil" hem bir gecelik fiyat görüyor ve rezervasyonun mümkün olup olmadığını anlamıyor.
 
 **Önerilen aksiyon:** PriceInsight'ı `quote &&` koşuluyla göster ya da `code === "SOLD_OUT" || code === "RESTRICTED"` iken gizle (useQuote'un `code` alanını widget'ta oku).
+
+**Yapılan düzeltme:** PriceInsight now renders only when the selected room and dates are complete, there is no quote error (errorText) and the room is not over capacity. The box no longer shows "müsait değil" next to a nightly price.
 
 ## F1388 — Kupon alanında mobil klavye otomatik düzeltme ve büyük harf ayarı yok; 'Kaldır' düğmesi bağlamsız
 
@@ -1367,13 +1449,15 @@
 | Renk/tema           | Hayır                                       |
 | Efor                | S                                           |
 | Kaynak denetçiler   | area:widget                                 |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p063)             |
 
 **Kanıt:** CouponField.tsx:40-55 input'ta `autoComplete="off"` var ama `autoCapitalize`, `autoCorrect` ve `spellCheck` yok; büyük harf yalnız CSS `uppercase` ile gösteriliyor (:53). :63-74 düğme yalnız `{t("couponRemove")}` ("Kaldır") diyor, aria-label'ı yok.
 
 **Etki:** Mobilde klavye "yaz10" kodunu otomatik düzeltip "Yaz 10" yapabiliyor ve kupon bulunamıyor. Ekran okuyucunun düğme listesinde "Kaldır"ın neyi kaldırdığı belli değil.
 
 **Önerilen aksiyon:** Input'a `autoCapitalize="characters" autoCorrect="off" spellCheck={false}` ekle. Kaldır düğmesine `aria-label={t("couponRemoveLabel", { code: applied })}` ("{code} kuponunu kaldır") ver.
+
+**Yapılan düzeltme:** Confirmed: the problem was real. The input now has autoCapitalize="characters", autoCorrect="off" and spellCheck={false}. The Remove button got aria-label "{code} kuponunu kaldır", which keeps the visible word "Kaldır". After removal, focus moves to the input so it no longer falls to body when the button unmounts.
 
 ## F1389 — Mobil klavye öznitelikleri (enterKeyHint, autoCapitalize, spellCheck) hiç kullanılmıyor
 
@@ -1389,13 +1473,15 @@
 | Renk/tema           | Hayır                                                                                                                                                                                                                                   |
 | Efor                | S                                                                                                                                                                                                                                       |
 | Kaynak denetçiler   | lens:forms                                                                                                                                                                                                                              |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                                                                                                                            |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p063)                                                                                                                                                                                                  |
 
 **Kanıt:** `grep enterKeyHint` → 0, `grep autoCapitalize|spellCheck` → 0. src/components/booking/CouponField.tsx:40-55 kupon kodu yalnız CSS `uppercase` (değer küçük harf kalır), spellCheck açık; src/components/search/DestinationAutocomplete.tsx:127-143 `type="text"` (search değil), Enter tuşu etiketi 'Git'; src/components/support/SupportChat.tsx:122-130 ve src/components/booking/BookingMessages.tsx:182-189 'Gönder' ipucu yok.
 
 **Etki:** Mobil ağırlıklı misafir kuponda otomatik düzeltme/büyük harf sorunları yaşar; klavyedeki eylem tuşu beklenen eylemi göstermez.
 
 **Önerilen aksiyon:** Kupon: `autoCapitalize="characters" autoCorrect="off" spellCheck={false} enterKeyHint="done"`; varış: `type="search" enterKeyHint="search"`; e-posta alanları: `autoCapitalize="none" spellCheck={false}`; ad alanları `autoCapitalize="words"`; sohbet/mesaj `enterKeyHint="send"`.
+
+**Yapılan düzeltme:** In the coupon field, autoCapitalize="characters", autoCorrect="off", spellCheck={false} and enterKeyHint="done" were added. DestinationAutocomplete already has autoCapitalize, spellCheck and enterKeyHint="search". The SupportChat and BookingMessages textareas have no Enter-to-send, so enterKeyHint="send" would be wrong there and they are not changed. The register and login email and name fields still need these attributes from their owners (crossOwner).
 
 ## F1390 — Fiyat içgörüsünde istatistik jargonu: 'içgörü', '(%90 güven)'
 
@@ -1411,13 +1497,15 @@
 | Renk/tema           | Hayır                                                        |
 | Efor                | S                                                            |
 | Kaynak denetçiler   | area:widget                                                  |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                 |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p064)                              |
 
 **Kanıt:** PriceInsight.tsx:109-116 `t("interval", { level: f.number(data.level, { style: "percent" }), ... })` → tr/booking.json:27 "Beklenen gecelik fiyat aralığı (%90 güven): ₺483,98 – ₺4.178,02" (docs/img/price-insight.png). Başlık :19 "Fiyat içgörüsü".
 
 **Etki:** Bilgisayar okuryazarlığı düşük misafir "güven" yüzdesini ve bu kadar geniş aralığın ne anlama geldiğini çözemiyor; bilgi karar vermesine yardım etmiyor.
 
 **Önerilen aksiyon:** Başlığı "Bu tarihler için fiyat değerlendirmesi" yap. Aralık metnini "Bu odada gecelik fiyat genelde {low} ile {high} arasında" olarak sadeleştir; güven düzeyini `<details>` içine al.
+
+**Yapılan düzeltme:** Confirmed. The title is now 'Bu tarihler için fiyat değerlendirmesi'. The range text is plain: 'Bu odanın gecelik taban fiyatı genelde {low} ile {high} arasındadır.' The confidence level has moved into the <details> 'Bu değerlendirme nasıl yapılıyor?' as '...fiyatların yaklaşık {level} kadarı bu aralıkta kalır.'
 
 ## F1391 — Vergi oranı metninde ondalık ayırıcı Türkçede nokta çıkıyor ('%8.5')
 
@@ -1433,13 +1521,15 @@
 | Renk/tema           | Hayır                                          |
 | Efor                | S                                              |
 | Kaynak denetçiler   | area:widget                                    |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                   |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p065)                |
 
 **Kanıt:** QuoteBreakdown.tsx:19-20 `t("rate", { rate: String(bps / 100) })`. tr/quote.json:11 " (%{rate})". 850 bps için TR arayüzde "(%8.5)" yazılıyor; tutarlar ise `f.money` ile "₺572,73" virgülüyle biçimleniyor.
 
 **Etki:** Aynı satırda iki farklı ondalık ayırıcı görünüyor; TR kullanıcısı "8.5"i sekiz bin beş yüz gibi okuyabiliyor.
 
 **Önerilen aksiyon:** `f.number(bps / 10000, { style: "percent", maximumFractionDigits: 2 })` ile biçimlendir. Mesajı `" ({rate})"` yap; yüzde işaretini Intl koysun.
+
+**Yapılan düzeltme:** Confirmed: String(bps/100) printed "%8.5" in TR. The rate now goes through Intl percent formatting, and quote.rate becomes " ({rate})" in both locales. Its only usage is QuoteBreakdown (add-on tax rows and the includedTax note).
 
 ## F1392 — Fiyat dökümünün başlığı yok; rezervasyon formu adlandırılmış bir landmark değil
 
@@ -1455,13 +1545,15 @@
 | Renk/tema           | Hayır                                          |
 | Efor                | S                                              |
 | Kaynak denetçiler   | area:widget                                    |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                   |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p065)         |
 
 **Kanıt:** QuoteBreakdown.tsx:34-35 `<div className="space-y-2 text-sm"><dl ...>` başlıksız. BookingWidget.tsx:135 `<form onSubmit=...>` `aria-labelledby` taşımıyor; :139 h2'nin id'si yok. Yalnız checkout bir "Fiyat Özeti" h2'si sağlıyor (checkout/page.tsx:210).
 
 **Etki:** Ekran okuyucu kullanıcısı başlık (H) veya landmark ile gezinirken fiyat dökümüne ve rezervasyon formuna doğrudan atlayamıyor; sayfayı satır satır taramak zorunda.
 
 **Önerilen aksiyon:** BookingWidget h2'sine `id="booking-widget-title"` ver ve forma `aria-labelledby="booking-widget-title"` ekle. Widget içinde dökümden önce `<h3 className="sr-only">{t("widget.priceDetails")}</h3>` koy.
+
+**Yapılan düzeltme:** Confirmed: the breakdown had no heading and the BookingWidget form has no aria-labelledby. Added an optional prop heading?: "h2" \| "h3" \| "h4" that renders a visually hidden heading with the new key quote.priceDetails. It is off by default, so checkout keeps its single "Fiyat Özeti" h2. The BookingWidget wiring is in crossOwner.
 
 ## F1393 — Teklifin geçerlilik süresi (15 dk) gösterilmiyor
 
@@ -1476,13 +1568,15 @@
 | Renk/tema           | Hayır                                          |
 | Efor                | S                                              |
 | Kaynak denetçiler   | area:widget                                    |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                   |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p065)         |
 
 **Kanıt:** useQuote.ts:32 `expiresAt: string` yanıtta var; quote/route.ts:10 "Teklif 15 dk saklanır". QuoteBreakdown.tsx:75-91 toplam satırında veya altında `expiresAt` kullanılmıyor. Checkout'ta süre dolunca "Fiyat teklifinin süresi doldu; güncel fiyat yüklendi." (checkout.json) hatası ancak gönderimde geliyor.
 
 **Etki:** Sayfada uzun süre kalan misafir fiyatın garanti olduğunu sanıyor; gönderimde fiyat değişti veya süre doldu hatası sürpriz oluyor.
 
 **Önerilen aksiyon:** Toplamın altına `t("quote.validUntil", { time: f.time(quote.expiresAt) })` ("Bu fiyat {time}'e kadar geçerli") ekle. Süre dolunca useQuote'un `refreshKey`'ini artırarak teklifi otomatik yenile ve değişen fiyatı vurgula.
+
+**Yapılan düzeltme:** Confirmed that expiresAt was never shown. Added a note at the bottom of the breakdown with t("validUntil", { time: f.time(expiresAt) }) (data-testid="quote-valid-until"). A timer switches it to t("expired") when the quote expires and calls a new optional onExpire prop. The expired state is tied to expiresAt, so a fresh quote clears it. Auto-refresh needs callers to pass onExpire; see crossOwner.
 
 ## F1394 — Kredi tutarı alanı temizlenince 0'a sıçrıyor; para birimi göstergesi yok; sınır ve hata metni alana bağlı değil
 
@@ -1497,13 +1591,15 @@
 | Renk/tema           | Hayır                                                                       |
 | Efor                | S                                                                           |
 | Kaynak denetçiler   | area:widget                                                                 |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p067)                                             |
 
 **Kanıt:** WalletCreditOption.tsx:92-93 `value={amount / 100}` ve `onChange={(e) => update(true, Math.round(Number(e.target.value) * 100))}`: boş değer `Number("")=0` olunca alan anında "0" gösteriyor. :84-85 etiket "Kullanılacak kredi" para birimi içermiyor. :98-100 "En fazla …" ipucu ve :101-105 hata `aria-describedby` ile bağlı değil (yalnız `aria-invalid`, :94).
 
 **Etki:** Misafir tutarı silip yeniden yazamıyor, alan sürekli "0"a dönüyor. Ekran okuyucu alana odaklanınca sınırı duymuyor; hata yalnız bir kez `role=alert` ile okunuyor.
 
 **Önerilen aksiyon:** Taslak string durumu tut ve sayıya yalnız `onBlur`'da veya geçerli girişte çevir. Etikete para birimi ekle ("Kullanılacak kredi (₺)") ya da alanın yanına `aria-hidden` sembol koy. İpucu ve hata `<p>`'lerine id ver ve `aria-describedby={`${id}-max ${id}-err`}` bağla.
+
+**Yapılan düzeltme:** The field no longer jumps to 0, because the typed text is kept as a draft. A remaining bug is fixed: clearing the field or typing invalid text and then leaving it used to display "-0,01"; invalid text now stays as typed and shows the error. The label now includes the currency symbol from Intl (new key amountWithCurrency, e.g. "Kullanılacak kredi (₺)"). It is a separate label using htmlFor, and the hint and error are linked by id.
 
 ## F1395 — Cüzdan kredisi alanı: aria-invalid var ama hata metni alana bağlı değil; alan temizlenemiyor
 
@@ -1519,13 +1615,15 @@
 | Renk/tema           | Hayır                                              |
 | Efor                | S                                                  |
 | Kaynak denetçiler   | lens:forms                                         |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                       |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p067)                    |
 
 **Kanıt:** src/components/booking/WalletCreditOption.tsx:86-96 `aria-invalid={!valid}` ama `aria-describedby` yok; hata :101-105 ve azami :98-100 ayrı <p>'ler. :92-93 `value={amount / 100}` + `Math.round(Number(e.target.value) * 100)` — alan silinince 0'a döner, kullanıcı boşaltıp yeniden yazamaz; varsayılan olarak azami kredi dolu (:48).
 
 **Etki:** Ekran okuyucu misafir 'geçersiz' duyar ama nedenini duymaz; görsel kullanıcı tutarı düzeltirken 0'a sıçrayan alanla uğraşır.
 
 **Önerilen aksiyon:** Field bileşenini kullan (hint=max, error=invalid); state'i string tut ve yalnız blur/submit'te minor'a çevir; ondalık için C3 ayrıştırıcısını kullan.
+
+**Yapılan düzeltme:** The hint and error are linked with aria-describedby, the value is kept as a string and parsed with the shared parser, and the blur bug that displayed "-0,01" after clearing is fixed (same change as F1394). I did not switch to the shared Field component: it would change this file's hint and error color classes, and colors are out of scope. The wiring is equivalent: label htmlFor, describedby, and aria-invalid only after blur.
 
 ## F1396 — 'Sepete ekle' durum alanında aria-live içinde role=alert var (çift duyuru); ipucu metni düğmeye bağlı değil
 
@@ -1540,10 +1638,12 @@
 | Renk/tema           | Hayır                                        |
 | Efor                | S                                            |
 | Kaynak denetçiler   | area:widget                                  |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                 |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p070)              |
 
 **Kanıt:** AddToCartButton.tsx:84 `<div aria-live="polite">` içinde :94 `<p role="alert" ...>`. :83 `<p className="mt-1 text-xs text-gray-500">{t("add.hint")}</p>` düğmeyle `aria-describedby` üzerinden ilişkilendirilmemiş.
 
 **Etki:** Bazı ekran okuyucularda hata iki kez okunuyor. Düğmenin "birden çok oda veya tesisi tek ödemede ayırtma" amacı odakta duyurulmuyor; iki CTA arasındaki fark ekran okuyucu kullanıcısına anlatılmıyor.
 
 **Önerilen aksiyon:** İpucuna `id={hintId}` ver ve düğmeye `aria-describedby={hintId}` ekle. Dış div'deki `aria-live`'ı kaldırıp başarı için `role="status"`, hata için `role="alert"` olan ve sürekli DOM'da duran ayrı öğeler kullan.
+
+**Yapılan düzeltme:** The single aria-live wrapper is gone. Success now goes in an always-present `role="status"` div and errors in an always-present `role="alert"` div. The hint id comes from useId() (it was a hard-coded duplicate-prone id) and is linked to the button with aria-describedby.

@@ -433,13 +433,15 @@
 | Renk/tema           | Hayır                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | Efor                | S                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | Kaynak denetçiler   | area:auth, lens:forms, lens:a11y, lens:copy                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p032)                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 
 **Kanıt:** register/page.tsx:119 kural placeholder'da ('En az 8 karakter ve bir rakam'); :122-123 `{password.length > 0 && (!/[0-9]/.test(password) || password.length < 8) && <p className="mt-1 text-xs text-red-600">...}` ilk karakterde kırmızı hata olarak çıkıyor. Bu paragrafın id'si yok, input'ta aria-describedby ya da aria-invalid yok, canlı bölge değil. Hangi koşulun eksik olduğu ayrıştırılmıyor; koşul sağlanınca metin yalnızca kayboluyor. reset-password/page.tsx:51'de kural yalnız subtitle içinde, alandan uzakta duruyor; :61 yalnız `minLength={8}` kullanıyor, rakam kontrolü ve canlı ipucu yok.
 
 **Etki:** Misafir henüz yazmayı bitirmeden 'hata yaptın' sinyali alır ve eksik koşulu tahmin etmek zorunda kalır. Sıfırlamada kural farklı bir yerde ve biçimde sunulur; 'abcdefgh' girildiğinde uyarı ancak sunucu hatasıyla gelir. Ekran okuyucu kullanıcısı kuralı alanla birlikte duymaz.
 
 **Önerilen aksiyon:** src/components/auth/PasswordField.tsx oluşturun ve `Field` ile sarın. Etiketin altında kalıcı bir hint olsun: id='password-hint' ile iki maddelik kontrol listesi ('En az 8 karakter', 'En az 1 rakam'). Her maddede ✓/○ ikonu ve `sr-only` 'karşılandı/karşılanmadı' metni bulunsun (bilgi yalnız renge bağlı kalmasın). Listeyi input'a aria-describedby ile bağlayın. Hata stilini ve aria-invalid'i yalnız blur ya da gönderimde uygulayın. Placeholder'ı kaldırın. register ve reset aynı bileşeni ve aynı gönderim kontrolünü kullansın.
+
+**Yapılan düzeltme:** I added a new NewPasswordField component and used it on the register page. Under the field it shows a permanent checklist ('En az 8 karakter', 'En az 1 rakam'). Each rule has a ✓/○ icon and sr-only '(karşılandı)/(henüz karşılanmadı)' text, so the state is not shown by colour alone. The list is linked to the input with aria-describedby and each rule is announced politely when its state flips. The error text and aria-invalid still appear only on blur or submit, and there is no placeholder. Register's check now uses the shared newPasswordOk(); moving reset-password to the same component and check is left to its owner (crossOwner).
 
 ## F379 — Kayıt formunda gizlilik/KVKK aydınlatma bağlantısı yok
 
@@ -455,13 +457,15 @@
 | Renk/tema           | Hayır                                                               |
 | Efor                | S                                                                   |
 | Kaynak denetçiler   | area:auth, runtime:auth                                             |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                        |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p032)                                     |
 
 **Kanıt:** register/page.tsx:127-147 gönder düğmesi ile 'Zaten hesabınız var mı?' arasında veri işleme ya da aydınlatma metni bulunmuyor. /privacy sayfası mevcut (src/app/privacy/page.tsx) ama yalnız Footer.tsx:52'de bağlantı olarak duruyor.
 
 **Etki:** Misafir ad ve e-posta verirken verisinin nasıl işleneceğini görmeden karar verir. Bu güveni zedeler ve KVKK'nın veri toplama anında aydınlatma beklentisiyle uyuşmaz.
 
 **Önerilen aksiyon:** Gönder düğmesinin (:133) hemen üstüne `<p className="text-xs text-gray-600">` ekleyin. İçeriği `t.rich('register.privacy', { link: (c) => <Link href="/privacy" target="_blank" rel="noopener">{c}<span className="sr-only"> (yeni sekmede açılır)</span></Link> })` olsun: 'Hesap oluşturarak Gizlilik ve KVKK Aydınlatma Metni'ni okuduğunuzu kabul edersiniz.' (TR/EN). Mevcut renk sınıflarını kullanın.
+
+**Yapılan düzeltme:** Above the submit button I added a text-xs text-gray-600 note built with t.rich('register.privacy'). It links to /privacy in a new tab (rel noopener noreferrer, underlined, focusRing) and has an sr-only '(yeni sekmede açılır)' suffix. The wording informs the user and does not imply consent. No colours changed.
 
 ## F380 — Şifre sıfırlamada ağ hatası formu kalıcı olarak 'Kaydediliyor...' durumunda bırakıyor
 
@@ -476,13 +480,15 @@
 | Renk/tema           | Hayır                                        |
 | Efor                | S                                            |
 | Kaynak denetçiler   | area:auth, runtime:auth                      |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                 |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p033)              |
 
 **Kanıt:** reset-password/page.tsx:18 `setState("saving")` sonrasında :20-24 `await fetch(...)` try/catch dışında kalıyor. fetch reddedilirse işlenmemiş bir promise hatası oluşur ve durum 'saving'de kalır. :70 `disabled={state === "saving"}` düğmeyi kalıcı devre dışı bırakır, :73 etiketi 'Kaydediliyor...' olarak kalır.
 
 **Etki:** Bağlantısı kopan kullanıcı sonu gelmeyen bir 'Kaydediliyor...' görür ve parolanın değişip değişmediğini bilemez. İstek sunucuya ulaştıysa token tüketilmiştir; sayfayı yenileyip tekrar denediğinde 'Bağlantı geçersiz' alır.
 
 **Önerilen aksiyon:** Submit gövdesini try/catch ile sarın. catch'te `setState("idle")` yapın ve `setError(t('reset.networkError'))` ile şu metni gösterin: 'Bağlantı kurulamadı. Parolanız değişmiş olabilir: önce yeni parolanızla giriş yapmayı deneyin, olmazsa yeni bağlantı isteyin.' Notice içinde /login ve /forgot-password bağlantılarını verin.
+
+**Yapılan düzeltme:** The permanent 'Kaydediliyor...' hang was already gone (fetch(...).catch(() => null) resets state to idle), but the page showed only the generic network error. It now shows reset.networkError ('Şifreniz değişmiş olabilir: önce yeni şifrenizle giriş yapmayı deneyin, olmazsa yeni bağlantı isteyin') and a /forgot-password 'Yeni bağlantı iste' link under the Notice. The /login link below the form was already there.
 
 ## F381 — Başarı ve yükleniyor durumları ekran okuyucuya güvenilir biçimde iletilmiyor (canlı bölge içerikle birlikte ekleniyor)
 
@@ -499,13 +505,15 @@
 | Renk/tema           | Hayır                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | Efor                | S                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | Kaynak denetçiler   | area:auth, lens:a11y                                                                                                                                                                                                                                                                                                                                                                                                                |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                                                                                                                                                                                                                                                                                                                        |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p062)                                                                                                                                                                                                                                                                                                                                                                                              |
 
 **Kanıt:** AuthCard.tsx:37 `role={kind === "error" ? "alert" : "status"}`, ancak Notice yalnız koşullu render ediliyor: forgot-password:47 `{state === "sent" && <Notice ...>}`, verify-email:34 (pending durumundaki role=status <p> öğesi :29'da kaldırılıp yerine yeni bir Notice ekleniyor), reset-password:40. İçerikle aynı anda DOM'a eklenen role=status bölgeleri ekran okuyucularca tutarlı biçimde duyurulmuyor. Yükleniyor bilgisi yalnız düğme etiketinde (login :131-135, forgot :44, reset :73); aria-live ya da aria-busy yok.
 
 **Etki:** Ekran okuyucu kullanıcısı 'Bağlantı gönderildi' ya da 'E-posta adresiniz doğrulandı' mesajını kaçırabilir. Saniyeler süren 'Tarayıcı doğrulanıyor' aşamasında sistemin çalıştığını bilmez ve tekrar dener ya da vazgeçer.
 
 **Önerilen aksiyon:** AuthCard'a ilk render'dan itibaren DOM'da duran bir canlı bölge ekleyin (ui.tsx:144 `Status` bileşenini kullanın ya da `<div role="status" aria-live="polite" aria-atomic="true">`). Başarı ve yükleniyor metinlerini bu bölgenin içeriğine yazın. verify-email'de pending, ok ve error metinlerini aynı kalıcı öğe içinde değiştirin. Gönderim sırasında `<form aria-busy={submitting}>` ekleyin.
+
+**Yapılan düzeltme:** AuthCard now renders a role="status" aria-live="polite" aria-atomic="true" region from the first render, filled by a new optional `status?: ReactNode` prop. Notice has a new optional `live?: boolean` (default true); with live={false} it is a purely visual box for use inside that region, which avoids nested live regions. The pages (forgot-password, verify-email, reset-password, login) still need to pass their success and loading text through `status` and add form aria-busy (see crossOwner).
 
 ## F388 — Şifremi unuttum 'gönderildi' durumu: form etkin kalıyor, tekrar gönderim önceki bağlantıyı geçersiz kılıyor ve bu söylenmiyor
 
@@ -521,13 +529,15 @@
 | Renk/tema           | Hayır                                                                                    |
 | Efor                | S                                                                                        |
 | Kaynak denetçiler   | area:auth                                                                                |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                             |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p022)                                                          |
 
 **Kanıt:** forgot-password/page.tsx:24-47 'sent' durumunda form ve 'Bağlantı gönder' düğmesi etkin kalıyor; Notice formun altında beliriyor. auth.json:35 metni spam ipucu içermiyor ve yalnız son bağlantının geçerli olduğunu söylemiyor. Her yeni istek öncekileri geçersiz kılıyor (account.ts issueEmailToken `tx.authToken.updateMany({... usedAt: null }, data: { usedAt: now })`). E-posta başına saatte 3'ü aşan istekler sessizce gönderilmiyor (account.ts allowResetEmail, AUTH_RESET_PER_EMAIL_MAX=3).
 
 **Etki:** E-postayı bekleyemeyen kullanıcı düğmeye tekrar basar. İlk gelen e-postadaki bağlantı artık geçersiz olduğu için reset sayfasında 'Bağlantı geçersiz' döngüsüne girer. 4. denemeden sonra 'gönderildi' mesajı çıksa da e-posta hiç gelmez.
 
 **Önerilen aksiyon:** 'sent' durumunda formu gizleyin; Notice metnini şöyle güncelleyin: 'Hesap varsa sıfırlama bağlantısı gönderildi. Spam klasörünü de kontrol edin. Yalnızca en son gönderilen bağlantı geçerlidir.' (TR/EN). Altına 60 sn geri sayımlı 'Yeniden gönder' ve 'Farklı e-posta dene' (formu geri açan) `Button`'ları ekleyin. Sınır aşımını açıklamak hesap varlığını sızdırmaz, çünkü sayaç e-posta bazlı.
+
+**Yapılan düzeltme:** In the sent state the form is replaced by a 'Check your email' card and focus moves to its heading (AuthCard focusTitle). The card shows the address, the existing sent notice, a spam-folder hint, and a note that only the latest link works and that too many requests stop new emails for a while. It has a 'Resend link' Button with a 60 s countdown (aria-disabled plus aria-describedby to the wait text, reusing verify.resendWait), a Status region for the resend result, and a 'Try a different email' Button that reopens the form and focuses the field.
 
 ## F389 — İş kanıtı (PoW) doğrulaması belirsiz: neden ve süre bilgisi, iptal yok; kayıt ve şifremi unuttumda ayrı bir etiket bile yok
 
@@ -543,13 +553,15 @@
 | Renk/tema           | Hayır                                                                                                                                   |
 | Efor                | M                                                                                                                                       |
 | Kaynak denetçiler   | area:auth                                                                                                                               |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                            |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p023)                                                                                                  |
 
 **Kanıt:** login/page.tsx:49-52 POW_REQUIRED geldiğinde kullanıcı yalnız düğmede :132 'Tarayıcı doğrulanıyor...' görüyor. pow-solver.ts:65-73 `maxIterations = 2 ** 26`; ilerleme bildirimi ya da AbortSignal yok. Zorluk AUTH_POW_DIFFICULTY_BITS varsayılan 16, en çok 28 (app-config). register ve forgot'ta pow-fetch.ts:21 bulmacayı sessizce çözüyor; etiket 'Kaydediliyor...' / 'Gönderiliyor...' olarak kalıyor.
 
 **Etki:** Düşük donanımlı telefondaki kullanıcı saniyelerce, zorluk artarsa çok daha uzun süre, değişmeyen bir düğmeye bakar. Sayfanın donduğunu sanıp yeniler ya da terk eder; işlemi iptal edemez.
 
 **Önerilen aksiyon:** `postJsonWithPow`'a `onChallenge?: () => void` geri çağrısı, `solvePow`'a `signal?: AbortSignal` ve `onProgress?` parametreleri ekleyin. Login, register ve forgot'ta doğrulama başlarken kalıcı Status bölgesine şu metni yazın: 'Güvenliğiniz için kısa bir tarayıcı doğrulaması yapılıyor; birkaç saniye sürebilir.' Yanına bir 'İptal' `Button`'ı koyun (abort edip formu idle'a döndürsün). İsteğe bağlı olarak hesaplamayı bir Web Worker'a taşıyın.
+
+**Yapılan düzeltme:** Login: the PoW solve now runs through the new src/lib/auth/pow-solve-cancellable.ts (solvePowCancellable with signal/onProgress, plus isAbortError). It shares one AbortController with both fetches. While it solves, a persistent role=status region shows t('login.verifyingInfo') and a 'Doğrulamayı iptal et' button appears. Cancelling aborts, returns the form to idle, announces t('login.verifyCancelled') and moves focus back to submit. Register and forgot still go through pow-fetch.ts, which is not my file; the changes they need are in crossOwner.
 
 ## F390 — Gecikmeli giriş (LOGIN_DELAYED): geri sayım yok, düğme hemen yeniden etkin; EN metninde çoğul hatası
 
@@ -565,13 +577,15 @@
 | Renk/tema           | Hayır                                                  |
 | Efor                | S                                                      |
 | Kaynak denetçiler   | area:auth                                              |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                           |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p023)                        |
 
 **Kanıt:** login/page.tsx:57-58 `throw new Error(t("login.delayed", { seconds: data.details?.retryAfterSeconds ?? 1 }))`, ardından :68 `setSubmitting(false)` düğmeyi anında yeniden etkinleştiriyor; saniye değeri sabit metin, geri sayım yok. messages/en/auth.json:14 'Try again in {seconds} seconds.' ICU çoğul kuralı içermiyor; AUTH_LOGIN_DELAY_BASE_MS=1000 olduğu için '1 seconds' çıktısı gerçekten oluşuyor.
 
 **Etki:** Kullanıcı süre dolmadan tekrar dener ve her seferinde aynı hatayı alır; ne kadar beklediğini takip edemez. EN kullanıcısı dilbilgisi hatası görür.
 
 **Önerilen aksiyon:** LOGIN_DELAYED geldiğinde `retryAfterSeconds` değerini state'e alıp setInterval ile geri sayın. Bu süre boyunca gönder düğmesini `aria-disabled` tutun ve etiketi `t('login.retryIn', {seconds})` ('Tekrar deneyin (12)') olarak gösterin. Süre dolunca Status bölgesine 'Şimdi tekrar deneyebilirsiniz' yazın. EN metni: `Try again in {seconds, plural, one {# second} other {# seconds}}.`
+
+**Yapılan düzeltme:** LOGIN_DELAYED now puts retryAfterSeconds into a retryIn state and counts it down once a second. Meanwhile the submit button is aria-disabled (no aria-busy), labelled t('login.retryIn',{seconds}), and handleSubmit ignores it. When the countdown ends the error clears and the status region says t('login.retryReady'). The patch adds an ICU plural to the EN 'login.delayed'.
 
 ## F391 — Ev sahibi ve yönetici girişten sonra kendi paneline değil misafir ana sayfasına düşüyor
 
@@ -587,13 +601,15 @@
 | Renk/tema           | Hayır                                                                         |
 | Efor                | S                                                                             |
 | Kaynak denetçiler   | area:auth                                                                     |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                  |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p023)                                        |
 
 **Kanıt:** login/page.tsx:13 `LoginResponse.user.role` alınıyor ama :63 `.get("redirect") ?? "/"` rolden bağımsız olarak ana sayfaya gidiyor. Passkey yolunda :140-142 `onSuccess` rolü almıyor; oysa passkey-client.ts loginWithPasskey `{ user: { id, role } }` döndürüyor ve PasskeyLoginButton.tsx:31 bu değeri atıyor.
 
 **Etki:** Ev sahibi ve yönetici her girişte önce misafir arama sayfasına düşer ve kendi kuyruğuna/takvimine geçmek için ek gezinme yapar. Günde birkaç kez giriş yapan kullanıcı için tekrarlayan bir sürtünmedir.
 
 **Önerilen aksiyon:** redirect yoksa hedefi role göre seçin: `role === 'ADMIN' ? '/admin' : role === 'HOST' ? '/host' : '/'`. PasskeyLoginButton'da `const { user } = await loginWithPasskey(); onSuccess(user.role)` yapın ve `onSuccess` imzasını `(role: string) => void` olarak değiştirin.
+
+**Yapılan düzeltme:** goBack(role?) now sends users to /admin for ADMIN and /host for HOST when there is no redirect param (safeRedirect gives '/'); an explicit redirect still wins. The password path passes data.user?.role. goBack is assignable to PasskeyLoginButton's current onSuccess type, but that button still calls onSuccess() without a role (crossOwner).
 
 ## F392 — Ağ/sunucu hatalarında ham teknik istisna metni gösteriliyor ('Failed to fetch', JSON ayrıştırma hatası, 'PoW çözülemedi')
 
@@ -609,13 +625,15 @@
 | Renk/tema           | Hayır                                                                                                                        |
 | Efor                | S                                                                                                                            |
 | Kaynak denetçiler   | area:auth                                                                                                                    |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                 |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p023)                                                                                       |
 
 **Kanıt:** login/page.tsx:38 `data: (await res.json())`, JSON olmayan bir yanıtta (502/504 HTML sayfası) SyntaxError fırlatıyor; ağ kesildiğinde fetch `TypeError: Failed to fetch` fırlatıyor. :67 `setError(err instanceof Error ? err.message : ...)` bu metni olduğu gibi gösteriyor. pow-solver.ts:73 `throw new Error("PoW çözülemedi")` de aynı yoldan kullanıcıya ulaşıyor. register/page.tsx:37 ve :44'te aynı desen var.
 
 **Etki:** Zayıf mobil bağlantıdaki kullanıcı 'Failed to fetch' ya da `Unexpected token '<'` gibi İngilizce ve teknik bir metin görür. Sorunun bağlantıda olduğunu ve yeniden denemesi gerektiğini anlamaz; 'PoW' jargonu da güveni zedeler.
 
 **Önerilen aksiyon:** Login ve register'da `res.json()` çağrısını `.catch(() => ({}))` ile sarın. catch bloğunda `err.message`'ı göstermek yerine: `TypeError` için t('errors.network') ('Bağlantı kurulamadı. İnternetinizi kontrol edip tekrar deneyin.'), 5xx ya da gövdesiz yanıt için t('errors.server') ('Şu an işlem yapılamıyor, birazdan tekrar deneyin.'), kodlu yanıtlar için useAuthErrorText eşlemesini kullanın.
+
+**Yapılan düzeltme:** Login never shows err.message now. TypeError gives errors.network, AbortError gives the cancelled status, and any other thrown error gives login.failed (so 'PoW çözülemedi' never shows). Responses without a body or with an unknown code use errors.unavailable for 5xx and login.failed otherwise, and coded responses map through useAuthErrorText. register/page.tsx:126 still renders err.message (crossOwner).
 
 ## F393 — Checkout/sepetten girişe yönlendirilen misafire neden giriş istendiği ve sonra ne olacağı söylenmiyor
 
@@ -631,13 +649,15 @@
 | Renk/tema           | Hayır                                                                |
 | Efor                | S                                                                    |
 | Kaynak denetçiler   | area:auth                                                            |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                         |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p023)                                      |
 
 **Kanıt:** login/page.tsx:80-81 başlık ve alt başlık sabit: 'Giriş Yap' / 'Rezervasyonlarınıza ve favorilerinize erişin.' `redirect` parametresi yalnız :63'te yönlendirme için okunuyor. checkout/page.tsx:121-124 ve useCart.ts:24 kullanıcıyı açıklama göstermeden `router.replace` ile login'e gönderiyor.
 
 **Etki:** 'Rezervasyon yap'a basan misafir kendini aniden giriş formunda bulur. Seçiminin korunup korunmadığını ve giriş sonrası nereye döneceğini bilmediği için bir kısmı akışı terk eder.
 
 **Önerilen aksiyon:** login/page.tsx'te `safeRedirect` sonucu '/checkout', '/cart' ya da '/pay' ile başlıyorsa formun üstünde bir Status/Notice bilgi kutusu gösterin: t('login.continueBooking') 'Rezervasyonunuzu tamamlamak için giriş yapın veya hesap oluşturun. Seçimleriniz korunur; giriş sonrası kaldığınız yere döneceksiniz.' (TR/EN).
+
+**Yapılan düzeltme:** If the safe redirect starts with /checkout, /cart or /pay, an info box above the form shows t('login.continueBooking'), telling the user to sign in or create an account and that they will come back to where they left off. It uses only existing color classes (bg-blue-50, text-[#003580]).
 
 ## F394 — Parola alanlarında göster/gizle denetimi yok
 
@@ -653,13 +673,15 @@
 | Renk/tema           | Hayır                                                                 |
 | Efor                | S                                                                     |
 | Kaynak denetçiler   | area:auth                                                             |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                          |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p023)                                |
 
 **Kanıt:** login/page.tsx:105, register/page.tsx:113 ve reset-password/page.tsx:59'da `type="password"` sabit. Göster/gizle düğmesi yok; kayıt ve sıfırlamada parola tekrar alanı da yok.
 
 **Etki:** Mobil klavyede otomatik düzeltme ya da ı/i, ş/s karışıklığıyla yanlış yazılan parola kayıt veya sıfırlama sırasında fark edilmez. Kullanıcı sonraki girişte 'parola hatalı' alır ve şifre sıfırlama akışına zorlanır.
 
 **Önerilen aksiyon:** PasswordField bileşenine input'un sağında `type="button"` bir 'Göster'/'Gizle' düğmesi ekleyin: `aria-pressed`, `aria-controls` input id'si, en az 44×44 px dokunma alanı, `focusRing`. Tıklamada input type'ını password/text arasında değiştirin, form gönderilirken password'e döndürün. login, register ve reset bu bileşeni kullansın.
+
+**Yapılan düzeltme:** New shared src/components/auth/PasswordRevealInput.tsx: a password input with a type=button eye toggle (aria-pressed, aria-controls, constant aria-label t('auth.passwordReveal.show'), 44x44 target, focusRing). It hides the password again on form submit and forwards aria-describedby/aria-invalid, so it works as AuthField's only child. Login uses it. Register and reset are in crossOwner.
 
 ## F395 — Durum geçişlerinde odak yönetimi yok; gönder düğmesi devre dışı kalınca odak kayboluyor
 
@@ -676,13 +698,15 @@
 | Renk/tema           | Hayır                                                                                                                                                                                                                                      |
 | Efor                | S                                                                                                                                                                                                                                          |
 | Kaynak denetçiler   | area:auth                                                                                                                                                                                                                                  |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                                                                                                                               |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p023)                                                                                                                                                                                                     |
 
 **Kanıt:** login/page.tsx:128 `disabled={submitting}`: klavyeyle etkinleştirilen düğme devre dışı kalınca tarayıcı odağı body'ye düşürüyor. :66-68 catch bloğu odağı geri taşımıyor (hata role=alert ile duyuruluyor ama odak konumu kayboluyor). register :135, forgot :41, reset :70 ve PasskeyLoginButton :49'da aynı durum var. reset-password/page.tsx:37-48 `state === "done"` olduğunda formu tümüyle kaldırıp yeni bir kart çiziyor; odak kayboluyor.
 
 **Etki:** Klavye ve ekran okuyucu kullanıcısı başarısız bir girişten sonra sayfadaki konumunu kaybeder ve düzeltme yapacağı alana yeniden gezinmek zorunda kalır. Şifre sıfırlama sonrasında yeni içeriği ve 'Giriş yap' bağlantısını ayrıca araması gerekir.
 
 **Önerilen aksiyon:** Gönderim sırasında `disabled` yerine `aria-disabled={submitting}` kullanın ve handler başına `if (submitting) return;` koruması ekleyin. Hata kutusuna `tabIndex={-1}` ve ref verip hata oluşunca `ref.current?.focus()` çağırın (alan hatasında ilk hatalı input'a odaklanın). AuthCard'daki h1'e `tabIndex={-1}` ve isteğe bağlı `autoFocusTitle` prop'u ekleyin; reset done, forgot sent ve verify sonuç ekranlarında başlığa odaklanın.
+
+**Yapılan düzeltme:** Login submit already used aria-disabled. I added a focusRequest effect that runs after the aria-invalid render. Client validation errors focus the first invalid field. A credential error focuses and selects the password field, which is linked to the error. If the cancel button had focus when verification ended, focus moves back to submit. Other errors leave focus in place. Focusing the title on result screens (reset done, forgot sent, verify) needs AuthCard (crossOwner).
 
 ## F396 — 'E-posta zaten kayıtlı' hatası kurtarma eylemi sunmuyor
 
@@ -699,13 +723,15 @@
 | Renk/tema           | Hayır                                                                    |
 | Efor                | S                                                                        |
 | Kaynak denetçiler   | area:auth                                                                |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                             |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p032)                                          |
 
 **Kanıt:** register/page.tsx:38-39 `throw new Error(data.error ?? ...)`: sunucu register/route.ts:46 `ConflictError("Bu e-posta adresi zaten kayıtlı", "EMAIL_TAKEN")` ile kod döndürse de istemci `data.code`'a bakmıyor. :127-131 hata kutusu düz metin; giriş ya da şifre sıfırlama bağlantısı içermiyor.
 
 **Etki:** Daha önce hesap açtığını unutan misafir ne yapacağını bilemez. Kartın altındaki küçük 'Giriş Yap' bağlantısını fark etmezse başka bir e-postayla ikinci hesap açar ve rezervasyon geçmişi bölünür.
 
 **Önerilen aksiyon:** `data.code === "EMAIL_TAKEN"` durumunda hata kutusunda çevrilmiş mesajla birlikte iki bağlantı gösterin: `<Link href="/login">{t('register.loginInstead')}</Link>` ve `<Link href="/forgot-password">{t('login.forgotPassword')}</Link>`. Varsa redirect parametresini de taşıyın. E-posta değerini URL'ye koymadan sessionStorage ile hedef formun email alanına önceden doldurun.
+
+**Yapılan düzeltme:** On EMAIL_TAKEN the page now saves the submitted address in takenEmail. Right under the email field's error it shows two links: 'Bu e-postayla giriş yap' (new key register.loginInstead) and 'Şifremi unuttum' (existing login.forgotPassword). Both keep the redirect parameter and add ?email= for prefilling; forgot-password already reads ?email=, and login needs a small crossOwner change. The links disappear once the email is edited. Focus still moves to the email field, so the next Tab lands on the recovery links.
 
 ## F397 — Şifre sıfırlamada geçersiz, süresi dolmuş veya eksik token için yeni bağlantı isteme yolu yok
 
@@ -721,13 +747,15 @@
 | Renk/tema           | Hayır                                                                                                     |
 | Efor                | S                                                                                                         |
 | Kaynak denetçiler   | lens:nav                                                                                                  |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                              |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p033)                                                                          |
 
 **Kanıt:** Dosya 80 satır; adayın verdiği 120/134/142/177 numaraları yanlış. Token yalnız gönderimde okunuyor: 19 `const token = new URLSearchParams(window.location.search).get("token") ?? "";`. Token yoksa da form (52-75) gösteriliyor. Hata yalnız 76'da `{error && <Notice kind="error">{error}</Notice>}` ile çıkıyor ve yanında /forgot-password bağlantısı yok. Giriş bağlantısı yalnız başarı durumunda var (41-45). Sunucu tarafı: boş token zod'da (route.ts:9 `token: z.string().min(20)`) düşüyor ve genel "Doğrulama hatası" dönüyor. Sayfa yalnız `fieldErrors.password`'ü okuyor (33), bu yüzden kullanıcı nedeni bilmeden genel mesajı görüyor. Geçersiz veya süresi dolmuş token için account.ts:266/271 "Bağlantı geçersiz veya süresi dolmuş" dönüyor; bu metin sabit Türkçe, en dilinde de çevrilmeden çıkıyor.
 
 **Etki:** Süresi dolmuş, kullanılmış ya da bozuk bağlantıyla gelen kullanıcı yeni şifreyi yazıp gönderiyor, sonra hata alıyor ve sayfada çıkış yolu yok. Adresi bilmiyorsa sıfırlama akışını yeniden başlatamıyor, ya da girişe gidip 'Şifremi unuttum'u kendisi bulması gerekiyor. Token hiç yoksa mesaj yalnızca 'Doğrulama hatası' oluyor ve nedeni anlaşılmıyor.
 
 **Önerilen aksiyon:** src/app/reset-password/page.tsx: (1) `const [token, setToken] = useState<string | null>(null)` ekleyin ve `useEffect` içinde `window.location.search`'ten okuyun. Token boşsa ya da 20 karakterden kısaysa formu göstermeyin: `<AuthCard title={t("reset.invalidTitle")}>` içinde `<Notice kind="error">{t("reset.invalidLink")}</Notice>` ile `<Link href="/forgot-password">{t("reset.requestNew")}</Link>` gösterin; bağlantı, başarı ekranındaki giriş bağlantısıyla (42) aynı sınıfları kullansın. (2) submit içinde `res.status === 400` iken `fieldErrors.password` yoksa (yani token hatasıysa) `setError` yanında `tokenInvalid` bayrağını true yapın ve 76'daki Notice'in altına aynı /forgot-password bağlantısını koyun. Mesajı sunucu metni yerine `t("reset.invalidLink")` ile gösterin, böylece en dilinde de çevrilmiş olur. (3) messages/tr/auth.json ve messages/en/auth.json içindeki `reset` nesnesine `invalidTitle`, `invalidLink` ve `requestNew` anahtarlarını ekleyin. Renk değişikliği gerekmiyor.
+
+**Yapılan düzeltme:** Already fixed in the current code: missing or short tokens (<20 chars) and server VALIDATION_ERROR both render an AuthCard with reset.invalidTitle, a translated reset.invalidLink Notice, a 'Yeni bağlantı iste' /forgot-password link and 'Girişe dön'; these keys already exist in both locales. In addition, the new preview check now shows that screen on page load for used or expired tokens, before the user types a password.
 
 ## F398 — E-posta doğrulama sayfası her başarısızlığı (ağ, 5xx, 429, zaten kullanılmış token) 'bağlantı geçersiz' olarak gösteriyor; tekrar dene yok
 
@@ -743,13 +771,15 @@
 | Renk/tema           | Hayır                                                     |
 | Efor                | S                                                         |
 | Kaynak denetçiler   | area:auth                                                 |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                              |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p042)                    |
 
 **Kanıt:** verify-email/page.tsx:23-24 `.then((res) => setState(res.ok ? "ok" : "error")).catch(() => setState("error"))`: ağ hatası, 503, 429 ve daha önce kullanılmış token (account.ts consumeToken, aynı ValidationError) tek bir 'error' durumuna düşüyor ve auth.json:52 'Bağlantı geçersiz veya süresi dolmuş.' metni gösteriliyor. Tekrar dene düğmesi yok.
 
 **Etki:** Bağlantıya ikinci kez tıklayan ve aslında zaten doğrulanmış misafir 'geçersiz' mesajını görüp doğrulamanın başarısız olduğunu sanır. Geçici bir sunucu sorununda geçerli bağlantısını çöpe atar; yeniden gönderme UI'ı da olmadığından çıkmaza girer.
 
 **Önerilen aksiyon:** Durumları ayırın. Fetch hatası, 5xx ya da 429 için 'retryable' durumu: 'Şu an doğrulanamadı' metni ve aynı token'la POST'u tekrarlayan bir 'Tekrar dene' `Button`'ı. 400 için 'invalid' durumu: ResendVerificationButton. Sunucuda verifyEmail, kullanılmış token'ın sahibi zaten doğrulanmışsa 200 `{ alreadyVerified: true }` dönsün; istemci bu durumda t('verify.alreadyVerified') gösterip 'Giriş yap' / 'Ana sayfa' bağlantısı versin.
+
+**Yapılan düzeltme:** verify-email/page.tsx no longer lumps every failure into one 'error' state. It now has separate states: retry (fetch throws or 5xx), rateLimited (429) and invalid (other 4xx or no token). retry and rateLimited show their own text and a 'Tekrar dene' Button (busy guard) that re-POSTs the same token. invalid keeps the resend button or the login link. A 200 body with alreadyVerified:true now shows 'already verified', and so does an invalid result when the signed-in user's /api/user/me has emailVerified=true. Still open: a signed-out user on another device who re-uses a link still sees 'invalid' until the server-side alreadyVerified change (crossOwner) lands.
 
 ## F471 — HTML ve sunucu e-posta kuralları uyumsuz: 'a@b' istemcide geçiyor, sunucu reddediyor; şifremi unuttum bunu ağ hatası gibi raporluyor
 
@@ -766,13 +796,15 @@
 | Renk/tema           | Hayır                                                                                          |
 | Efor                | S                                                                                              |
 | Kaynak denetçiler   | runtime:auth                                                                                   |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                   |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p022)                                                                |
 
 **Kanıt:** RUNTIME /forgot-password mobile TR (forgot.mjs): 'a@b' -> yanıt 400 fieldErrors.email ['Geçerli bir e-posta girin'] ama ekranda 'İstek gönderilemedi, tekrar deneyin.' (alanla ilişkisiz, aria-invalid=null). Ekran: C:/Users/tuna9/AppData/Local/Temp/claude/C--Users-tuna9-projects-booking/62fc84fa-09c9-431e-a0a0-680b0434666c/scratchpad/runtime/probes/auth/forgot-ab-mobile-tr.png. /login 'a@b' -> 'Doğrulama hatası' (login1.mjs). KOD: forgot-password/page.tsx:19 202 dışındaki her yanıtı 'error' sayıyor.
 
 **Etki:** Kullanıcı yazım hatasını fark etmek yerine aynı adresle tekrar tekrar dener; mesaj sorunun kendisinde değil ağda olduğunu ima ediyor.
 
 **Önerilen aksiyon:** 400 VALIDATION_ERROR'da alan altında 'Geçerli bir e-posta adresi girin (ör. ad@alanadi.com)' gösterin; ağ/5xx için mevcut mesajı koruyun. İstemci kuralını sunucuyla hizalayın (ör. pattern='[^@\\s]+@[^@\\s]+\\.[^@\\s]+').
+
+**Yapılan düzeltme:** The 400 response was already shown under the field (forgot.invalidEmail with aria-invalid). The client rule now matches the login page (`/^[^\s@]+@[^\s@]+\.[^\s@]+$/` with noValidate), so 'a@b' and empty input get the in-app field error and focus before any request. 429 and network errors keep their own messages via useAuthErrorText.
 
 ## F472 — Ağ/proxy hatasında ham teknik İngilizce mesaj gösteriliyor: 'Failed to fetch', 'Unexpected token '<'...'
 
@@ -788,13 +820,15 @@
 | Renk/tema           | Hayır                                                                    |
 | Efor                | S                                                                        |
 | Kaynak denetçiler   | runtime:auth                                                             |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                             |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p023)                                   |
 
 **Kanıt:** RUNTIME desktop TR, API isteği page.route ile yerelde kesildi (neterr.mjs): offline -> /login ve /register role=alert 'Failed to fetch'; HTML gövdeli 502 -> /login ve /register 'Unexpected token '<', "<html><bod"... is not valid JSON'. Aynı koşulda /forgot-password düzgün 'İstek gönderilemedi, tekrar deneyin.' gösteriyor (tutarsız). KOD: login/page.tsx:38 koşulsuz res.json(), :67 err.message doğrudan setError; register/page.tsx:37 ve :44 aynı desen.
 
 **Etki:** Mobil ağda bağlantı kopan misafir anlamsız İngilizce teknik metin görür, ne olduğunu ve ne yapacağını bilemez.
 
 **Önerilen aksiyon:** catch bloğunda yalnız bilinen/çevrilmiş mesajları gösterin: TypeError (fetch) -> t('common.networkError') 'Bağlantı kurulamadı, internetinizi kontrol edip tekrar deneyin'; res.json() başarısızsa -> t('login.failed'). navigator.onLine=false iken ayrıca belirtin.
+
+**Yapılan düzeltme:** Same change as F392 for /login: offline gives errors.network, and an HTML 502 or a body that isn't JSON gives errors.unavailable (res.json is already caught), never raw English text. The /register part is described in crossOwner.
 
 ## F473 — Hatalarda alanlar işaretlenmiyor: aria-invalid / aria-describedby yok, kenarlık değişmiyor
 
@@ -811,13 +845,15 @@
 | Renk/tema           | Hayır                                                                                                                                  |
 | Efor                | S                                                                                                                                      |
 | Kaynak denetçiler   | runtime:auth                                                                                                                           |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                           |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p023)                                                                                                 |
 
 **Kanıt:** RUNTIME /login desktop TR yanlış parola (guest@booking.test, 1 deneme): email/password aria-invalid=null, aria-describedby=null, e-posta kenarlığı rgb(209,213,219) (değişmedi) (login2.mjs). Boş gönderim ve 'abc' e-postası yalnız tarayıcı yerel balonuna dayanıyor, aria-invalid yok (login1.mjs). /register zayıf parola, /forgot 'a@b' ve /reset hatalarında da tüm input'lar aria-invalid=null (register.mjs, forgot.mjs). Hata kutusu formun altında ayrı bir div; hiçbir alana bağlı değil.
 
 **Etki:** Ekran okuyucu kullanıcısı alana geri döndüğünde alanın hatalı olduğunu duymaz; görsel kullanıcı hangi alanın sorunlu olduğunu yalnız metinden çıkarmak zorunda.
 
 **Önerilen aksiyon:** Her alan için hata state'i tutun: <input aria-invalid={!!err} aria-describedby={err ? 'email-error' : undefined}> + <p id='email-error'>; kenarlığa ek olarak hata ikonu/metin kullanın (renge tek başına dayanmayın). Kimlik hatasında (yanlış parola) her iki alanı da genel hata metnine describedby ile bağlayın.
+
+**Yapılan düzeltme:** The login form now uses noValidate with its own validation. Bad or empty email shows the reused key auth.forgot.invalidEmail, and an empty password shows the new key login.passwordRequired; both appear as AuthField errors with aria-invalid and aria-describedby. A server UNAUTHORIZED sets aria-invalid on both inputs and aria-describedby='login-error' (the alert box). I skipped the red border because color/theme is out of scope; the error text works without color. Register, forgot and reset belong to their owners.
 
 ## F474 — Mobilde form alanları 14px yazı ve 38px yükseklikte: iOS Safari odakta sayfayı yakınlaştırır, dokunma hedefi 44px altı
 
@@ -834,13 +870,15 @@
 | Renk/tema           | Hayır                                                                                              |
 | Efor                | S                                                                                                  |
 | Kaynak denetçiler   | runtime:auth                                                                                       |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                       |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p023)                                                             |
 
 **Kanıt:** RUNTIME mobile 390x844 TR (mobilemisc.mjs): /login, /register, /forgot-password, /reset-password tüm input'lar font-size 14px, yükseklik 38px; viewport meta 'width=device-width, initial-scale=1'. Kart içi metin bağlantıları 'Şifremi unuttum' 100x19, 'Kayıt Ol' 50x19, 'Girişe dön' 65x19 (Şifremi unuttum cümle içi değil, kendi satırında). KOD: input className 'px-3 py-2 text-sm'.
 
 **Etki:** iPhone kullanıcısı her alana dokunduğunda sayfa yakınlaşır ve yatay kaydırma gerekir (başlıktaki bilinen taşmayla birleşince daha kötü); küçük bağlantılara isabet zorlaşır.
 
 **Önerilen aksiyon:** Input'larda mobilde 'text-base sm:text-sm' (16px) ve 'py-2.5/min-h-[44px]' kullanın; 'Şifremi unuttum' ve 'Girişe dön' bağlantılarına 'inline-block py-3' ile ≥44px dokunma alanı verin.
+
+**Yapılan düzeltme:** The login forgot and register links were already min-h-[44px] on mobile, and the new password toggle is 44x44. Input font size and height come from authInputClass in AuthCard.tsx, which is not my file. Changing it there fixes login, register, forgot and reset at once (crossOwner), so I did not override it locally with conflicting text-sm/text-base classes.
 
 ## F475 — Parola göster/gizle yok (giriş, kayıt, sıfırlama) ve kayıt/sıfırlamada onay alanı da yok
 
@@ -856,13 +894,15 @@
 | Renk/tema           | Hayır                                                                     |
 | Efor                | S                                                                         |
 | Kaynak denetçiler   | runtime:auth                                                              |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                              |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p023)                                    |
 
 **Kanıt:** RUNTIME /login desktop TR: form içindeki buton/anahtar listesi yalnız ['Giriş Yap'] (login1.mjs); /register ve /reset-password formlarında da tek düğme submit; reset sayfası input listesi yalnız #password (mobilemisc.mjs). Yeni parola belirlenen iki ekranda girilen değeri doğrulamanın hiçbir yolu yok.
 
 **Etki:** Mobil ağırlıklı misafirler küçük klavyede parola yazım hatası yapar; kayıt/sıfırlamada hatalı yazılan parola hesabı kullanılamaz hale getirir ve yeni bir sıfırlama döngüsüne yol açar.
 
 **Önerilen aksiyon:** Her parola alanına type='button' aria-pressed'li 'Göster/Gizle' düğmesi ekleyin (aria-controls ile alana bağlı, ≥44px dokunma alanı); yeni parola alanlarında göster/gizle onay alanı yerine yeterli olur.
+
+**Yapılan düzeltme:** The login password field now has a show/hide toggle (PasswordRevealInput, aria-pressed, ≥44px). Register and reset-password still need to adopt it (crossOwner). As the finding allows, the toggle stands in for a confirmation field.
 
 ## F476 — Giriş/kayıt arasında görev bağlamı kayboluyor: redirect parametresi kayıt bağlantısına taşınmıyor, kayıt redirect'i yok sayıyor, girişte 'neden' bilgisi yok
 
@@ -878,13 +918,15 @@
 | Renk/tema           | Hayır                                                                             |
 | Efor                | S                                                                                 |
 | Kaynak denetçiler   | runtime:auth                                                                      |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                      |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p024)                                                   |
 
 **Kanıt:** RUNTIME /login?redirect=%2Fcart desktop TR (misc.mjs): kart bağlantıları 'Şifremi unuttum -> /forgot-password', 'Kayıt Ol -> /register' (redirect düşüyor); sayfada sepete dönüleceğini belirten bağlam metni yok (yalnız genel alt başlık). /register?redirect=%2Fcart (API mock 201, hesap oluşmadı) gönderimden sonra navigasyon '/' (regredirect.mjs). /login?redirect=%2Fcart doğrudan giriş yolunda /cart'a dönüş çalışıyor (redirect.mjs). KOD: login/page.tsx:149 href='/register'; register/page.tsx:41 router.push('/').
 
 **Etki:** Sepetten veya ödeme adımından gelen yeni kullanıcı kayıt olunca ana sayfaya atılır, sepetini/ilanını yeniden aramak zorunda kalır (rezervasyon dönüşümü düşer).
 
 **Önerilen aksiyon:** Login sayfasında redirect'i Kayıt Ol ve Şifremi unuttum bağlantılarına (güvenli doğrulanmış haliyle) ekleyin; register sayfası redirect'i okuyup başarıda oraya gitsin. redirect varsa başlık altında 'Sepetinize devam etmek için giriş yapın' gibi bağlam metni gösterin.
+
+**Yapılan düzeltme:** The 'Kayıt Ol' and 'Şifremi unuttum' links (including the reset link inside the error box) now carry the safe redirect through withRedirect(...). When the redirect points into the booking flow (/checkout, /cart, /pay), a role="note" box above the form shows auth.login.continueBooking. The register page already reads ?redirect= and goes back to it after signup (owned by p032, cartA#1), and forgot-password links back to /login with the redirect.
 
 ## F477 — Kayıtta 'Bu e-posta adresi zaten kayıtlı' hatası çıkış yolu sunmuyor (Giriş yap / Şifremi unuttum bağlantısı yok)
 
@@ -901,13 +943,15 @@
 | Renk/tema           | Hayır                                        |
 | Efor                | S                                            |
 | Kaynak denetçiler   | runtime:auth                                 |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                 |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p032)              |
 
 **Kanıt:** RUNTIME /register desktop TR ve mobile EN, e-posta guest@booking.test (409, hesap oluşmadı): alert 'Bu e-posta adresi zaten kayıtlı', alert içinde bağlantı sayısı 0, odak body (register.mjs, register-en.mjs). Ekran: C:/Users/tuna9/AppData/Local/Temp/claude/C--Users-tuna9-projects-booking/62fc84fa-09c9-431e-a0a0-680b0434666c/scratchpad/runtime/probes/auth/register-exists-desktop-tr.png. Ayrıca login ve forgot uçları hesap keşfine karşı genel mesaj verirken kayıt ucu (register/route.ts:46) hesabın varlığını açıkça doğruluyor — politika tutarsızlığı.
 
 **Etki:** Hesabı olduğunu unutan misafir ne yapacağını bilemez; formun altındaki küçük 'Giriş Yap' bağlantısını kendisi keşfetmeli ve e-postayı yeniden yazmalı.
 
 **Önerilen aksiyon:** EMAIL_TAKEN kodunda hata kutusuna 'Bu e-postayla bir hesabınız var. [Giriş yapın] veya [şifrenizi sıfırlayın]' bağlantılarını e-posta ön-dolu (/login?email=…&redirect=…) olarak ekleyin; hesap keşfi politikası gereği istenirse kayıt yanıtını da genel 'Doğrulama e-postası gönderildi' akışına çevirin.
+
+**Yapılan düzeltme:** Same change as F396: the EMAIL_TAKEN error now offers Sign in and Reset password links that carry the redirect and email (/login?redirect=…&email=…, /forgot-password?…&email=…). I left the account-discovery policy point alone: changing what the register API responds would break its contract and the route is not mine.
 
 ## F478 — E-posta doğrulama sayfası ağ/sunucu hatasını da 'Bağlantı geçersiz veya süresi dolmuş' diye gösteriyor; yeniden dene yok
 
@@ -922,13 +966,15 @@
 | Renk/tema           | Hayır                                                        |
 | Efor                | S                                                            |
 | Kaynak denetçiler   | runtime:auth                                                 |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                 |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p042)                              |
 
 **Kanıt:** RUNTIME /verify-email?token=<25+ karakter> desktop TR, /api/auth/verify-email yerelde abort ve 503 olarak yanıtlandı (verifyoffline.mjs): her iki durumda alert 'Bağlantı geçersiz veya süresi dolmuş. Hesabınızdan yeni bir doğrulama e-postası isteyebilirsiniz.', main içinde button sayısı 0. KOD: satır 23 'setState(res.ok ? "ok" : "error")' ve 24 '.catch(() => setState("error"))' tüm hataları aynı kategoriye koyuyor.
 
 **Etki:** Geçerli bir bağlantıyla gelen kullanıcı geçici bir kesintide bağlantısının bozuk olduğuna inanır ve (zaten mevcut olmayan) yeni e-posta arayışına girer.
 
 **Önerilen aksiyon:** 400/410 'geçersiz bağlantı' ile 5xx/ağ hatasını ayırın; ikincisinde 'Şu an doğrulanamadı, bağlantınız hâlâ geçerli' + 'Tekrar dene' düğmesi gösterin (token tüketilmediği için güvenli).
+
+**Yapılan düzeltme:** Network errors and 5xx now show the new verify.retryError text ('Bağlantınız hâlâ geçerli; birazdan tekrar deneyin') plus a 'Tekrar dene' Button. 429 shows errors.rateLimited with the same button. Only 4xx shows the invalid-link text. The error Notice is keyed by attempt, so a failed retry is announced again. The status region announces 'Doğrulanıyor...' during a retry, and on a final result focus moves to the title.
 
 ## F1028 — Sıfırlama formunda parola yöneticisi için kullanıcı adı alanı yok
 
@@ -943,13 +989,15 @@
 | Renk/tema           | Hayır                                |
 | Efor                | M                                    |
 | Kaynak denetçiler   | area:auth, runtime:auth              |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**         |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p033)      |
 
 **Kanıt:** reset-password/page.tsx:52-67 form yalnız `autoComplete="new-password"` alanı içeriyor; hesabı belirten `autoComplete="username"` alanı yok.
 
 **Etki:** Parola yöneticisi yeni şifreyi hangi hesaba ait olduğunu bilmeden kaydeder; sonraki girişte otomatik doldurma çalışmayabilir.
 
 **Önerilen aksiyon:** Token ön-kontrol uç noktası (ya da reset sayfası açılışında hafif bir GET) hesabın e-postasını döndürsün; forma görünür salt okunur 'Hesap: ad@ornek.com' satırı ve `<input type="email" autoComplete="username" value={email} readOnly hidden>` ekleyin.
+
+**Yapılan düzeltme:** Added a non-consuming token pre-check: src/lib/auth/password-reset-preview.ts (same sha256 lookup as consumeToken; valid only if PASSWORD_RESET, unused and unexpired) and POST /api/auth/password/reset/preview (returns {email} or 400 VALIDATION_ERROR; no-store; covered by the existing /api/auth rate-limit and login-CSRF checks). On mount the reset page calls it and shows a visible 'Hesap: {email}' line plus a hidden readOnly username field (type=email, autoComplete=username). A VALIDATION_ERROR switches to the invalid-link screen.
 
 ## F1034 — Oturumu açık kullanıcı /login ve /register'da yine form görüyor
 
@@ -965,13 +1013,15 @@
 | Renk/tema           | Hayır                                                          |
 | Efor                | S                                                              |
 | Kaynak denetçiler   | area:auth                                                      |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                   |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p024)                         |
 
 **Kanıt:** login/page.tsx:23-30 ve register/page.tsx:16-24 oturum kontrolü yapmıyor; ui.tsx:183 `useSession()` hazır ve Header aynı sayfada oturumu biliyor.
 
 **Etki:** Yer imiyle /login'e gelen oturumu açık kullanıcı gereksiz yere tekrar giriş yapar ya da farkında olmadan başka hesaba geçer.
 
 **Önerilen aksiyon:** İki sayfada `useSession()` ile `status === "ready" && user` ise formun yerine '{ad} olarak giriş yaptınız' metni, 'Devam et' (safeRedirect hedefi) birincil Button'ı ve 'Farklı hesapla giriş yap' (önce çıkış) ikincil Button'ı gösterin.
+
+**Yapılan düzeltme:** Login reads useSessionUserCache(), the session cache the Header uses. When a user is signed in, the form is replaced by an AuthCard (focusTitle) showing 'Zaten giriş yaptınız' and '{name} ({email}) olarak giriş yaptınız', a primary 'Devam et' ButtonLink to the safe redirect (or the role's home), and a secondary 'Farklı hesapla giriş yap' busy Button that logs out, clears the cache and focuses the email field. The register page part is filed as a crossOwner request.
 
 ## F1035 — Auth sayfaları ortak primitifleri kullanmıyor: kopya kart düzeni, farklı odak ve disabled stilleri
 
@@ -987,13 +1037,15 @@
 | Renk/tema           | Hayır                                                                                                                                       |
 | Efor                | M                                                                                                                                           |
 | Kaynak denetçiler   | area:auth                                                                                                                                   |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                                |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p024)                                                                                                      |
 
 **Kanıt:** login/page.tsx:73-79 ve register/page.tsx:50-56 AuthCard.tsx:16-26 düzenini kopyalıyor. Input odak stili `focus:ring-1 focus:ring-[#003580]` (login:95), ortak ui.tsx:18-19 `focus-visible:ring-2 … ring-offset-2`. Disabled: gönder düğmesi `disabled:bg-gray-300 disabled:text-gray-700` (login:129), PasskeyLoginButton.tsx:50 `disabled:opacity-60`. Denetçinin 'düğmelerde odak stili yok, tarayıcı varsayılanı' iddiası yanlış: styles/globals.css:61 ring sınıfı olmayan button/a öğelerine 2px outline veriyor.
 
 **Etki:** Aynı kartta iki düğme bekleme durumunda farklı görünür; input odak halkası sitenin geri kalanından ince olduğu için odak takibi tutarsızdır; kopya düzenler zamanla ayrışır.
 
 **Önerilen aksiyon:** login ve register'ı AuthCard'a taşıyın (yalnız yapı). Input'larda `focus:ring-1 focus:ring-[#003580] focus:border-[#003580]` yerine ui.tsx `focusRing` kullanın (aynı renk, yalnız kalınlık ve offset değişir). Düğmeleri `Button` primitifine taşımak ve disabled stillerini birleştirmek renk sınıfı değişikliği gerektirdiğinden kapsam dışında bırakın; yalnız yapısal birleştirme yapın.
+
+**Yapılan düzeltme:** Login is already built on AuthCard, AuthField and Notice, so the copied card layout and hand-made error div are gone (register also uses AuthCard). The thinner input focus ring and the submit button's missing focusRing live in authInputClass and authSubmitClass in AuthCard.tsx, which I don't own, so that change is filed as a crossOwner request. Merging the disabled styles was left out because it means changing color/opacity classes (color/theme out of scope).
 
 ## F1036 — Hidrasyon öncesi gönderim sayfayı yeniden yükleyip girilen veriyi siliyor
 
@@ -1009,13 +1061,15 @@
 | Renk/tema           | Hayır                                                                                                       |
 | Efor                | S                                                                                                           |
 | Kaynak denetçiler   | area:auth                                                                                                   |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p024)                                                                      |
 
 **Kanıt:** login/page.tsx:83 `<form onSubmit={handleSubmit}>` `action`/`method` içermiyor, input'larda `name` yok; sayfa 'use client' ve JS hidrasyonundan önce Enter yerel GET gönderimi yapar, sayfa yeniden yüklenir ve yazılanlar kaybolur (name olmadığı için parola URL'ye sızmaz). Aynı yapı register:60, forgot:24, reset:52.
 
 **Etki:** Yavaş bağlantıda otomatik doldurup hemen Enter'a basan misafirin formu sıfırlanır ve nedenini anlamaz.
 
 **Önerilen aksiyon:** `useSyncExternalStore(noopSubscribe, () => true, () => false)` ile `hydrated` bayrağı türetin (PasskeyLoginButton.tsx:13'teki kalıp); hidrasyondan önce gönder düğmesini `disabled` render edin. Alternatif olarak form'a `onSubmit` dışında `action="javascript:void 0"` yerine Next sunucu eylemi bağlayın.
+
+**Yapılan düzeltme:** A hydrated flag from useSyncExternalStore(noopSubscribe, () => true, () => false) renders the submit button disabled before hydration. A disabled default button blocks implicit Enter submission, so the native GET reload no longer wipes the form. The same guard for register, forgot-password and reset-password is filed as crossOwner requests.
 
 ## F1037 — Giriş e-posta alanı 'webauthn' belirtecini taşımıyor; passkey otomatik doldurma önerisi yok
 
@@ -1031,13 +1085,15 @@
 | Renk/tema           | Hayır                               |
 | Efor                | M                                   |
 | Kaynak denetçiler   | area:auth                           |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**        |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p024)     |
 
 **Kanıt:** login/page.tsx:92 `autoComplete="email"`; passkey-client.ts:25 yalnız modal `startAuthentication({ optionsJSON: options })`. Kurulu @simplewebauthn/browser 13.3.0 `useBrowserAutofill` seçeneğini destekliyor.
 
 **Etki:** Passkey'i olan kullanıcı e-posta alanına dokunduğunda klavye önerisinde anahtarını görmez, ayrı düğmeyi bulmak zorunda kalır.
 
 **Önerilen aksiyon:** login:92'yi `autoComplete="username webauthn"` yapın; passkey-client.ts'e `loginWithPasskeyAutofill()` ekleyin (`startAuthentication({ optionsJSON, useBrowserAutofill: true })`); login sayfası mount'ta `PublicKeyCredential.isConditionalMediationAvailable?.()` doğruysa bunu başlatsın, modal düğme ise öncesinde `WebAuthnAbortService` ile iptal edip devam etsin.
+
+**Yapılan düzeltme:** The email input uses autoComplete="username webauthn". A new file, src/lib/auth/passkey-autofill-login.ts, adds loginWithPasskeyAutofill(signal), which uses startAuthentication with useBrowserAutofill:true, checks browserSupportsWebAuthnAutofill, and cancels through WebAuthnAbortService when the signal aborts. Login starts it on mount when there is no session, aborts it in PasskeyLoginButton's onStart before the modal ceremony, and restarts it through onBusyChange(false). I added a new module instead of changing passkey-client.ts, which I don't own.
 
 ## F1038 — Ortak Field/inputClass/focusRing ve AuthCard/Notice auth formlarında tutarlı kullanılmıyor; odak göstergesi projenin geri kalanından zayıf
 
@@ -1053,7 +1109,7 @@
 | Renk/tema           | Hayır                                                                                                                                                                                                                                                                                                |
 | Efor                | M                                                                                                                                                                                                                                                                                                    |
 | Kaynak denetçiler   | area:shell                                                                                                                                                                                                                                                                                           |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                                                                                                                                                                                         |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p024)                                                                                                                                                                                                                                                               |
 
 **Kanıt:** ui.tsx:18-21 focusRing `focus-visible:ring-2 ... ring-offset-2`; auth input'ları ise yerel sınıf kullanıyor: `rounded-lg border border-gray-300 ... focus:ring-1 focus:ring-[#003580]` (login :95/:110, register :73/:87/:103/:120, forgot :36, reset :65). Bu 1px'lik, offsetsiz bir halka. Auth düğmelerinde focusRing yok, varsayılan outline'a kalıyorlar (login :129, PasskeyLoginButton :50). login ve register AuthCard'ı kullanmayıp aynı düzeni kopyalıyor (login :73-79, register :50-56), hata kutusunu da Notice yerine elle yazılmış div ile gösteriyor (login :121, register :128).
 
@@ -1061,27 +1117,31 @@
 
 **Önerilen aksiyon:** Auth input'larında `focus:ring-1 focus:ring-[#003580] focus:border-[#003580] focus:outline-none` yerine `focusRing` sabitini kullanın (renk aynı #003580 kalır, yalnız halka kalınlığı ve offset değişir). Submit düğmelerine `focusRing` ekleyin ya da `Button` primitifini kullanın. login ve register'ı `AuthCard` ile sarın, hata kutularını `Notice kind="error"` ile değiştirin. Kenarlık rengi bu düzeltmenin kapsamı dışında (bkz. kontrast bulgusu).
 
+**Yapılan düzeltme:** Login uses AuthCard, AuthField (aria-describedby/aria-invalid wiring) and Notice kind="error" for the error box. The input and submit focus styles come from the shared authInputClass and authSubmitClass in AuthCard.tsx; switching them to focusRing is filed as a crossOwner request so every auth page changes together and login does not drift from register, forgot and reset.
+
 ## F1039 — Girişte yazılan e-posta 'Şifremi unuttum' formuna taşınmıyor
 
-| Alan                | Değer                                 |
-| ------------------- | ------------------------------------- |
-| Severity            | Low                                   |
-| Durum               | Doğrulandı                            |
-| Konum               | `src/app/login/page.tsx:115`          |
-| Diğer konumlar      | `src/app/forgot-password/page.tsx:12` |
-| Kullanıcılar        | tümü                                  |
-| Prensip             | flexibility · task migratability      |
-| Sezgisel madde      | H7 — Esneklik/verim                   |
-| Renk/tema           | Hayır                                 |
-| Efor                | S                                     |
-| Kaynak denetçiler   | area:auth                             |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**          |
+| Alan                | Değer                                  |
+| ------------------- | -------------------------------------- |
+| Severity            | Low                                    |
+| Durum               | Doğrulandı                             |
+| Konum               | `src/app/login/page.tsx:115`           |
+| Diğer konumlar      | `src/app/forgot-password/page.tsx:12`  |
+| Kullanıcılar        | tümü                                   |
+| Prensip             | flexibility · task migratability       |
+| Sezgisel madde      | H7 — Esneklik/verim                    |
+| Renk/tema           | Hayır                                  |
+| Efor                | S                                      |
+| Kaynak denetçiler   | area:auth                              |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p024) |
 
 **Kanıt:** login/page.tsx:115 `<Link href="/forgot-password">` girilen `email`'i iletmiyor; forgot-password/page.tsx:12 `useState("")` boş başlıyor.
 
 **Etki:** Şifresini hatırlayamayan mobil misafir e-postasını ikinci kez yazmak zorunda kalır; yazım hatası riski artar.
 
 **Önerilen aksiyon:** Bağlantının onClick'inde e-postayı try/catch içinde `sessionStorage.setItem("auth.email", email)` ile saklayın; forgot sayfasında `useState(() => readStoredEmail())` ile başlangıç değeri yapın. Kişisel veriyi URL sorgusuna koymayın.
+
+**Yapılan düzeltme:** Both forgot-password links call rememberAuthEmail(email) on click. This is a new helper in src/lib/auth/auth-email-handoff.ts that saves to sessionStorage key "auth.email" inside try/catch, so the email never goes into the URL. The forgot-password page (owned by p022) only pre-fills from ?email= right now, so the handoff does not work end to end until the crossOwner change that reads readRememberedAuthEmail() lands.
 
 ## F1040 — 360 px'te ad/soyad iki sütunda ~125 px'e sıkışıyor; kart dolgusu mobilde sabit p-8
 
@@ -1097,7 +1157,7 @@
 | Renk/tema           | Hayır                                                              |
 | Efor                | S                                                                  |
 | Kaynak denetçiler   | area:auth                                                          |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                       |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p032)                             |
 
 **Kanıt:** register/page.tsx:61 `grid grid-cols-2 gap-3` her genişlikte iki sütun; :56 kart `p-8`. 360 px'te 360 − 32 (main px-4) − 64 (p-8) − 2 (border) − 12 (gap) ≈ 250 → her alan ≈125 px. AuthCard.tsx:22 ve login/page.tsx:79 aynı p-8.
 
@@ -1105,27 +1165,31 @@
 
 **Önerilen aksiyon:** register/page.tsx:61'i `grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-3` yapın; kartlarda (register:56, login:79, AuthCard:22) `p-6 sm:p-8` kullanın.
 
+**Yapılan düzeltme:** The name grid was already single-column on mobile. I changed it to 'grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-3' so the mobile spacing matches the form's space-y-4. The card padding (p-8 → p-6 sm:p-8) lives in AuthCard.tsx, so I filed it as crossOwner.
+
 ## F1041 — Ad/soyad alanlarında mobil klavye ipuçları eksik (autoCapitalize, spellCheck)
 
-| Alan                | Değer                          |
-| ------------------- | ------------------------------ |
-| Severity            | Low                            |
-| Durum               | Doğrulandı                     |
-| Konum               | `src/app/register/page.tsx:66` |
-| Diğer konumlar      | `src/app/register/page.tsx:80` |
-| Kullanıcılar        | misafir                        |
-| Prensip             | robustness · error prevention  |
-| Sezgisel madde      | H5 — Hata önleme               |
-| Renk/tema           | Hayır                          |
-| Efor                | S                              |
-| Kaynak denetçiler   | area:auth                      |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**   |
+| Alan                | Değer                           |
+| ------------------- | ------------------------------- |
+| Severity            | Low                             |
+| Durum               | Doğrulandı                      |
+| Konum               | `src/app/register/page.tsx:66`  |
+| Diğer konumlar      | `src/app/register/page.tsx:80`  |
+| Kullanıcılar        | misafir                         |
+| Prensip             | robustness · error prevention   |
+| Sezgisel madde      | H5 — Hata önleme                |
+| Renk/tema           | Hayır                           |
+| Efor                | S                               |
+| Kaynak denetçiler   | area:auth                       |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p032) |
 
 **Kanıt:** register/page.tsx:66-74 ve :80-88 input'larında yalnız `autoComplete="given-name"/"family-name"` var; `autoCapitalize="words"` ve `spellCheck={false}` yok.
 
 **Etki:** Mobil klavye ikinci adın baş harfini küçük bırakabilir; masaüstü tarayıcı Türkçe adların altını yazım hatası gibi çizip kullanıcıyı tedirgin edebilir.
 
 **Önerilen aksiyon:** İki input'a `autoCapitalize="words"` ve `spellCheck={false}` ekleyin.
+
+**Yapılan düzeltme:** Added autoCapitalize="words" and spellCheck={false} to the first-name and last-name inputs.
 
 ## F1042 — Kayıt ve sıfırlamada yükleniyor etiketi genel 'Kaydediliyor...'
 
@@ -1141,13 +1205,15 @@
 | Renk/tema           | Hayır                                                           |
 | Efor                | S                                                               |
 | Kaynak denetçiler   | area:auth                                                       |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                    |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p032)                          |
 
 **Kanıt:** register/page.tsx:138 `{submitting ? t("saving") : t("register.submit")}` ve reset-password/page.tsx:73 `t("saving")` → auth.json:5 'Kaydediliyor...'. Kayıtta postJsonWithPow (pow-fetch.ts) 429'da bulmaca çözerken de aynı etiket kalıyor; login ise :131-135 ayrı 'Tarayıcı doğrulanıyor...' gösteriyor.
 
 **Etki:** Kullanıcı neyin kaydedildiğini anlamaz; PoW çözümü sürerken bekleme açıklanmaz ve tekrar tıklama ya da terk riski doğar.
 
 **Önerilen aksiyon:** auth.json'a `register.submitting` ('Hesap oluşturuluyor…') ve `reset.submitting` ('Şifre değiştiriliyor…') ekleyip iki sayfada kullanın. Kayıtta PoW aşamasını göstermek için postJsonWithPow'a `onPow` callback'i ekleyip login'deki `login.verifying` metnini kullanın.
+
+**Yapılan düzeltme:** The register button now reads 'Hesap oluşturuluyor...' (new register.submitting) instead of the generic 'Kaydediliyor...'. While the PoW puzzle is being solved it shows the existing login.verifying ('Tarayıcı doğrulanıyor...'). For this I added src/lib/auth/pow-fetch-challenge.ts (postJsonWithPowChallenge), which works like postJsonWithPow but takes an onChallenge callback; I did this because pow-fetch.ts has no owner. I added the reset.submitting key; switching reset-password to it is a crossOwner change.
 
 ## F1043 — Şifre sıfırlama formunda 'Girişe dön' bağlantısı yok
 
@@ -1163,13 +1229,15 @@
 | Renk/tema           | Hayır                                 |
 | Efor                | S                                     |
 | Kaynak denetçiler   | area:auth                             |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**          |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p033)      |
 
 **Kanıt:** reset-password/page.tsx:50-78 form görünümünde gezinme bağlantısı yok (yalnız :41-45 'done' görünümünde var); aynı AuthCard'ı kullanan forgot-password/page.tsx:49-53 `<Link href="/login">{t("backToLogin")}</Link>` sunuyor.
 
 **Etki:** Eski şifresini hatırlayan ya da vazgeçen kullanıcı kart içinden çıkamaz, Header'a gitmek zorunda kalır; kardeş sayfalarla tutarsız.
 
 **Önerilen aksiyon:** reset-password/page.tsx:76'dan sonra forgot sayfasındaki `<p className="mt-6 text-center text-sm text-gray-600"><Link href="/login" …>{t("backToLogin")}</Link></p>` bloğunu aynen ekleyin.
+
+**Yapılan düzeltme:** Already fixed: the form view ends with <p className="mt-6 text-center text-sm"><Link href="/login">{t("backToLogin")}</Link></p>, matching forgot-password.
 
 ## F1044 — Doğrulama sonuç ekranında başlık sonucu yansıtmıyor ve tek eylem ana sayfa
 
@@ -1185,13 +1253,15 @@
 | Renk/tema           | Hayır                                       |
 | Efor                | S                                           |
 | Kaynak denetçiler   | area:auth                                   |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p042)             |
 
 **Kanıt:** verify-email/page.tsx:28 `<AuthCard title={t("verify.title")}>` her durumda 'E-posta doğrulama'; :36-40 tek eylem `<Link href="/">{t("verify.home")}</Link>`; başarıda 'Giriş yap' ya da 'Aramaya devam et' gibi duruma özel sonraki adım yok.
 
 **Etki:** E-postayı başka cihazda açan misafir doğrulamadan sonra oturumsuz ana sayfaya düşer; rezervasyona nasıl devam edeceği açık değildir.
 
 **Önerilen aksiyon:** ok durumunda başlığı 'E-postanız doğrulandı' yapın; useSession() ile oturum varsa birincil eylem 'Aramaya devam et' (/search), yoksa 'Giriş yap' (/login) olsun. Hata durumundaki yeniden gönder eylemi Critical bulguda ele alınıyor.
+
+**Yapılan düzeltme:** The title now follows the result: titleOk on success or already verified, titleInvalid for a bad link, titleRetry for a temporary failure, and the generic title while pending. After success there is a primary next step. With a session it is 'Aramaya devam et' (/search), or 'Devam et' when a stored return path exists. Without a session it is 'Giriş yap' (/login, carrying the stored redirect if there is one). The home link stays as the secondary action. The success box is now a visual Notice live={false}, and AuthCard's persistent status region announces the result.
 
 ## F1045 — Passkey bloğu hidrasyondan sonra ekleniyor; dikey ortalanmış kart yerinden kayıyor (CLS)
 
@@ -1207,13 +1277,15 @@
 | Renk/tema           | Hayır                                              |
 | Efor                | S                                                  |
 | Kaynak denetçiler   | area:auth                                          |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                       |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p062)                    |
 
 **Kanıt:** PasskeyLoginButton.tsx:13 `useSyncExternalStore(noopSubscribe, passkeySupported, () => false)` ve :17 `if (!supported) return null;`. SSR'da render edilmeyen 'veya' ayıracı ile düğme (~90 px) hidrasyondan sonra ekleniyor. login/page.tsx:77 `items-center` dikey ortalama yaptığı için tüm kart yukarı kayıyor.
 
 **Etki:** Yavaş mobil ağda e-posta alanına dokunmak üzere olan kullanıcı kart kaydığı için yanlış öğeye dokunabilir.
 
 **Önerilen aksiyon:** PasskeyLoginButton'da `!supported` iken null yerine aynı yükseklikte bir yer tutucu render edin: `<div className="mt-4 min-h-[5.5rem]" aria-hidden="true" />`. Destek yoksa hidrasyondan sonra yer tutucu kalabilir ya da kaldırılabilir. Alternatif olarak login/page.tsx:77'de `items-center` yerine `items-start` ve sabit bir üst boşluk kullanın.
+
+**Yapılan düzeltme:** useSyncExternalStore now returns null on the server and during hydration (support unknown). In that state the full passkey block is rendered with the `invisible` class, so it keeps exactly the same height and cannot be focused, and the card doesn't jump once support is confirmed. Only browsers that are actually unsupported (false) return null.
 
 ## F1046 — Passkey iptali ya da cihazda anahtar olmaması kırmızı role=alert hata olarak gösteriliyor
 
@@ -1229,13 +1301,15 @@
 | Renk/tema           | Hayır                                                                       |
 | Efor                | S                                                                           |
 | Kaynak denetçiler   | area:auth                                                                   |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p062)                                             |
 
 **Kanıt:** PasskeyLoginButton.tsx:21 `if (err.name === "NotAllowedError") return t("passkey.cancelled")` ve :54-57 `<p role="alert" className="mt-2 text-sm text-red-700">`. Kullanıcının bilinçli iptali ve 'bu cihazda anahtar yok' durumu (WebAuthn her ikisinde de NotAllowedError verir) 'iptal edildi veya zaman aşımına uğradı' diye alarm olarak gösteriliyor.
 
 **Etki:** İşletim sistemi penceresini kapatıp parolayla devam etmek isteyen kullanıcı hata yapmış gibi uyarılır. Passkey'i olmayan kullanıcı neden çalışmadığını anlamaz.
 
 **Önerilen aksiyon:** NotAllowedError için ayrı bir `notice` state'i tutun ve `role="status"` ile nötr metin (`text-gray-600`, mevcut sınıf) gösterin: 'Geçiş anahtarı kullanılmadı. Bu cihazda kayıtlı anahtarınız yoksa e-posta ve parolanızla giriş yapın.' role="alert" ve kırmızı stili gerçek sunucu/doğrulama hatalarına ayırın.
+
+**Yapılan düzeltme:** NotAllowedError (passkeyErrorCode CANCELLED) now sets a separate `notice` state. It appears in neutral text-gray-600 inside a role="status" wrapper that exists from the first render. role="alert" with red styling is now used only for real server, network or verification errors.
 
 ## F1047 — Parola ve passkey girişi eşzamanlı başlatılabiliyor; iki hata alanı birbirini temizlemiyor
 
@@ -1251,13 +1325,15 @@
 | Renk/tema           | Hayır                                                      |
 | Efor                | S                                                          |
 | Kaynak denetçiler   | area:auth                                                  |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                               |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p062)                     |
 
 **Kanıt:** PasskeyLoginButton.tsx:49 `disabled={busy}` yalnız kendi durumuna bakıyor; login/page.tsx:128 `disabled={submitting}` passkey durumunu bilmiyor. Hatalar ayrı tutuluyor: login :120-124 ve PasskeyLoginButton :54-58; biri başlarken diğeri temizlenmiyor.
 
 **Etki:** Parola hatası ekranda dururken passkey denenirse iki hata aynı anda görünür; hangi yöntemin başarısız olduğu karışır. Ender ama kafa karıştırıcı.
 
 **Önerilen aksiyon:** PasskeyLoginButton'a `disabled?: boolean` ve `onStart?: () => void` prop'ları ekleyin; login sayfası `disabled={submitting}` ve `onStart={() => setError(null)}` geçsin. Passkey busy iken login gönder düğmesini de devre dışı bırakmak için `onBusyChange` callback'i ekleyin.
+
+**Yapılan düzeltme:** Added optional props `disabled` (makes the button aria-disabled, blocks clicks, and clears any passkey error or notice when it becomes true), `onStart` (called when a passkey attempt starts) and `onBusyChange(busy)`. login/page.tsx still has to wire them up (see crossOwner).
 
 ## F1048 — 'Passkey' terimi açıklamasız ve Türkçe karşılığı olmadan kullanılıyor
 
@@ -1273,13 +1349,15 @@
 | Renk/tema           | Hayır                                                  |
 | Efor                | S                                                      |
 | Kaynak denetçiler   | area:auth                                              |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                           |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p062)                        |
 
 **Kanıt:** PasskeyLoginButton.tsx:52 `{busy ? t("passkey.waiting") : t("passkey.login")}` → messages/tr/auth.json:57-58 'Passkey ile giriş', 'Passkey bekleniyor...'. Yanında açıklama, ikon ya da yardım metni yok. Türkçe iOS/Android arayüzleri 'geçiş anahtarı' terimini kullanıyor.
 
 **Etki:** Terimi bilmeyen misafir düğmenin ne yaptığını anlamaz; ya hiç kullanmaz ya da açılan işletim sistemi penceresine hazırlıksız yakalanır. Parola yolu ayrıca mevcut olduğu için etki sınırlı.
 
 **Önerilen aksiyon:** TR metinlerini 'Geçiş anahtarı (passkey) ile giriş' ve 'Geçiş anahtarı bekleniyor...' yapın. Düğmenin altına id='passkey-hint' olan `text-xs text-gray-600` bir açıklama ekleyip düğmeye aria-describedby ile bağlayın: 'Parola yerine parmak izi, yüz tanıma veya ekran kilidinizi kullanın.' EN: 'Use your fingerprint, face or screen lock instead of a password.'
+
+**Yapılan düzeltme:** The TR texts now read 'Geçiş anahtarı (passkey) ile giriş' and 'Geçiş anahtarı bekleniyor...', and passkey.failed was aligned. Below the button there is a text-xs text-gray-600 hint (useId) linked with aria-describedby: 'Parola yerine parmak izi, yüz tanıma veya ekran kilidinizi kullanın.' / 'Use your fingerprint, face or screen lock instead of a password.' These strings are in the p062 patch.
 
 ## F1093 — Şifremi unuttum başarı durumu: form aktif kalıyor, sonraki adım yönlendirmesi yok, login'de yazılan e-posta taşınmıyor
 
@@ -1295,13 +1373,15 @@
 | Renk/tema           | Hayır                                                                         |
 | Efor                | S                                                                             |
 | Kaynak denetçiler   | runtime:auth                                                                  |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                  |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p022)                                        |
 
 **Kanıt:** RUNTIME /forgot-password mobile TR (forgot.mjs), var olmayan e-posta: 802 ms sonra role=status 'Hesap varsa şifre sıfırlama bağlantısı e-postayla gönderildi. Bağlantı 30 dakika geçerlidir.'; form görünür ve 'Bağlantı gönder' düğmesi aktif kalıyor, odak body, sayfada yalnız 'Girişe dön' bağlantısı (spam klasörü/yeniden gönderme süresi/demo 'Posta kutusu' yönlendirmesi yok). Status bölgesi gönderimden önce DOM'da yok (canlı bölge sayısı 0) — içerikle birlikte ekleniyor. Ekran: C:/Users/tuna9/AppData/Local/Temp/claude/C--Users-tuna9-projects-booking/62fc84fa-09c9-431e-a0a0-680b0434666c/scratchpad/runtime/probes/auth/forgot-sent-mobile-tr.png. login/page.tsx:115 'Şifremi unuttum' bağlantısı yazılmış e-postayı taşımıyor.
 
 **Etki:** Kullanıcı tekrar tekrar gönderir (her gönderim önceki bağlantıyı geçersiz kılar — issueEmailToken), e-postayı bulamazsa ne yapacağını bilmez; e-postasını iki kez yazmak zorunda kalır.
 
 **Önerilen aksiyon:** Başarıda formu 'E-postanızı kontrol edin' durum kartıyla değiştirin (adres, 30 dk, spam klasörü, demo'da Posta kutusu bağlantısı, 60 sn sonra etkinleşen 'Yeniden gönder'); başlığa odaklanın; status bölgesini baştan DOM'da boş tutun. Login'deki e-postayı /forgot-password?email= ile ön-doldurun.
+
+**Yapılan düzeltme:** The success card (heading focus, next steps, resend cooldown, Mailbox link in demo mode only, read from <html data-demo>, reusing nav.mailbox) is done. The AuthCard role=status region exists from the first render, and the sent notice is a non-live visual box. The page now prefills the email from `?email=` until the user edits it. Making the login page's 'Forgot password' link pass the typed email is a crossOwner item for login/page.tsx.
 
 ## F1094 — Hatalı giriş mesajı çözüm önermiyor; gecikme mesajı 'X saniye sonra' derken düğme hemen aktif, geri sayım yok
 
@@ -1316,13 +1396,15 @@
 | Renk/tema           | Hayır                                                                      |
 | Efor                | S                                                                          |
 | Kaynak denetçiler   | runtime:auth                                                               |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                               |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p024)                                            |
 
 **Kanıt:** RUNTIME /login desktop TR, rastgele var olmayan e-postayla 6 hızlı deneme (login3.mjs): 1-4. deneme 'E-posta veya parola hatalı' (çözüm/ 'Şifremi unuttum' önerisi yok, kalan deneme bilgisi yok); 5. deneme 429 LOGIN_DELAYED -> 'Çok fazla başarısız deneme. 1 saniye sonra tekrar deneyin.' ve düğme anında yeniden aktif (btnDisabledAfter=false), geri sayım yok. Ekran: C:/Users/tuna9/AppData/Local/Temp/claude/C--Users-tuna9-projects-booking/62fc84fa-09c9-431e-a0a0-680b0434666c/scratchpad/runtime/probes/auth/login-delayed.png. Gecikme üstel artıyor (30 sn'ye kadar; account.ts:83-90).
 
 **Etki:** Parolasını hatırlamayan kullanıcı sıfırlama yerine denemeye devam eder ve artan gecikmelere takılır; ne kadar beklemesi gerektiğini düğme durumundan anlayamaz.
 
 **Önerilen aksiyon:** Kimlik hatası metnine 'Parolanızı mı unuttunuz? [Sıfırlayın]' bağlantısı (e-posta ön-dolu) ekleyin. LOGIN_DELAYED'de retryAfterSeconds boyunca düğmeyi aria-disabled tutup '{n} sn sonra tekrar deneyin' geri sayımını gösterin.
+
+**Yapılan düzeltme:** After UNAUTHORIZED or LOGIN_DELAYED, the error Notice adds 'Şifrenizi mi unuttunuz? [Sıfırlama bağlantısı alın]', linking to forgot-password with the redirect and the remembered email. Wrong credentials also mark the fields aria-invalid and move focus to the password field. On LOGIN_DELAYED, retryAfterSeconds starts a countdown: the submit button stays aria-disabled (focus stays on it) with the label 'Tekrar deneyin (n)'. When it reaches 0, 'Şimdi tekrar deneyebilirsiniz.' is announced in the persistent status region.
 
 ## F1095 — Passkey hata metni kök nedeni açıklamıyor; passkey'in ne olduğu/nasıl ekleneceği konusunda yardım yok
 
@@ -1337,10 +1419,12 @@
 | Renk/tema           | Hayır                                                        |
 | Efor                | S                                                            |
 | Kaynak denetçiler   | runtime:auth                                                 |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                 |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p062)                              |
 
 **Kanıt:** RUNTIME /login desktop TR, CDP sanal kimlik doğrulayıcı (kayıtlı kimlik yok) (passkey.mjs): düğme 'Passkey bekleniyor...' (disabled, odak body), 4.3 sn sonra role=alert 'Passkey işlemi iptal edildi veya zaman aşımına uğradı' — kullanıcı iptal etmediği halde. Sayfada passkey açıklaması/yardım bağlantısı yok. WebAuthn desteklenmeyen ortamda (PublicKeyCredential=undefined, mobile) düğme ve 'veya' ayırıcı tamamen gizleniyor (passkey-unsupported-mobile.png) — bu doğru. Ekran: C:/Users/tuna9/AppData/Local/Temp/claude/C--Users-tuna9-projects-booking/62fc84fa-09c9-431e-a0a0-680b0434666c/scratchpad/runtime/probes/auth/passkey-fail-desktop.png
 
 **Etki:** Passkey kavramına yabancı misafir düğmeyi dener, yanıltıcı mesaj alır ve bir sonraki adımı bilemez.
 
 **Önerilen aksiyon:** NotAllowedError metnini 'Bu cihazda kullanılabilir passkey bulunamadı veya işlem iptal edildi. E-posta ve parolanızla giriş yapıp Hesabım > Güvenlik'ten passkey ekleyebilirsiniz.' olarak genişletin; düğme altına kısa 'Passkey nedir?' açıklaması (details/summary) ekleyin.
+
+**Yapılan düzeltme:** passkey.cancelled now explains both possible causes and the next step: 'Geçiş anahtarı kullanılmadı. İşlemi iptal ettiyseniz ya da bu cihazda kayıtlı geçiş anahtarınız yoksa e-posta ve parolanızla giriş yapın.' It is only used by this component. A details/summary 'Geçiş anahtarı nedir?' explains what a passkey is and that you add one from the My Account page after signing in with your password.

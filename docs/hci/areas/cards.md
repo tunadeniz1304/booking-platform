@@ -453,13 +453,15 @@
 | Renk/tema           | Hayır                                                                                             |
 | Efor                | S                                                                                                 |
 | Kaynak denetçiler   | runtime:results                                                                                   |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                      |
+| **Düzeltme durumu** | **Atlandı** (paket: ml-p020)                                                                      |
 
 **Kanıt:** RUNTIME p4e.mjs: /compare tablosunda "Puan 8,9/5 (1240 yorum)" ve "8,6/5 (540 yorum)" yazıyor. AI yorumu "(8.9/5, 1240 yorum)" diyor. prisma/seed.ts:311'de ratingAvg 8.9 (10'luk ölçek). Arama kartı ise ölçeksiz olarak "8.9" gösteriyor.
 
 **Etki:** 5 üzerinden 8,9 anlamsız bir değer ve puan ölçeği hakkında kafa karışıklığı ile güvensizlik yaratıyor.
 
 **Önerilen aksiyon:** ratingValue değerini "{avg}/10 ({count} değerlendirme)" yapın ve listing-compare.ts:209-210'daki "/5" ifadesini "/10" ile değiştirin. Kartta da aynı ölçeği ve terimi kullanın.
+
+**Yapılan düzeltme:** I did not switch to /10. The codebase scale is 1–5: the review API validates z.number().int().min(1).max(5), ranking.ts divides by 5, the shared RatingBadge and property.ratingOutOf show '/5', and listing-compare.ts:209 already says '/5'. The '8,9/5' comes from seed data on a 10-point scale (prisma/seed.ts:311+). Package p006 (crossOwner cards#6) is halving those seed values, after which the compare page shows e.g. '4,5/5'. Changing ratingValue to /10 here would make it disagree with the API and every other badge.
 
 ## F480 — Kart görseli tıklanamıyor: kartın en büyük dokunma alanı işlevsiz
 
@@ -474,13 +476,15 @@
 | Renk/tema           | Hayır                                         |
 | Efor                | S                                             |
 | Kaynak denetçiler   | runtime:results                               |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                  |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p100)               |
 
 **Kanıt:** RUNTIME p8-tab.mjs: main içindeki img.closest('a') sonucu false. Mobilde görsel 358x192px. İlana yalnızca başlık bağlantısıyla (mobilde 143-190x21px) ve "Fırsatı Gör" düğmesiyle gidilebiliyor. hover:scale-105 efekti görselin tıklanabilir olduğu izlenimini veriyor ama tıklamada bir şey olmuyor.
 
 **Etki:** OTA alışkanlığıyla fotoğrafa dokunan mobil misafir hiçbir tepki alamıyor.
 
 **Önerilen aksiyon:** Görseli tabIndex={-1} ve aria-hidden olan bir Link ile sarın, ya da başlık bağlantısına after:absolute after:inset-0 ekleyerek (stretched link) kartın tamamını tıklanabilir yapın. Kalp düğmesine relative z-10 verin.
+
+**Yapılan düzeltme:** The title link is now a stretched link (after:absolute after:inset-0 after:z-[1]) on a relative <article>, so a tap anywhere on the card, the photo included, opens the listing. It is still one tab stop. The favourite button sits above the overlay (absolute z-[2]) and the type badge has pointer-events-none.
 
 ## F481 — Favori düğmelerinin hepsi 'Favorilere ekle' adını taşıyor, mülk adını içermiyor ve okuma/Tab sırasında başlıktan önce geliyor
 
@@ -496,13 +500,15 @@
 | Renk/tema           | Hayır                                                        |
 | Efor                | S                                                            |
 | Kaynak denetçiler   | runtime:home                                                 |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                 |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p100)                              |
 
 **Kanıt:** RUNTIME tarama 000 tabOrder: '…a "BodrumTürkiye" → button "Favorilere ekle" → a "Kapadokya Sultan Cave Hotel" → a "Fırsatı Gör" → button "Favorilere ekle" → a "Cave Suite Cappadocia"…'. links.mjs ariaSnapshot: her kartta 'img … / button "Favorilere ekle" / text: BED_AND_BREAKFAST / heading …'. Kartlar liste değil (ul/li yok). Kod: 102-108 düğme görsel kapsayıcısında ve h3'ten önce. aria-label={t('card.addFavorite')}.
 
 **Etki:** Ekran okuyucu kullanıcısı hangi mülkü favorilediğini bilmeden 'Favorilere ekle' duyuyor. Bağlam, düğmeden sonra geliyor.
 
 **Önerilen aksiyon:** aria-label'ı '{title} favorilere ekle' / '{title} favorilerden çıkar' yap. DOM'da h3'ü önce koyup düğmeyi CSS ile görselin üstüne konumla (order veya absolute). Kartları <ul role=list><li><article aria-labelledby> yapısına al.
+
+**Yapılan düzeltme:** The favourite button is named after the listing: card.addFavoriteNamed / card.removeFavoriteNamed, e.g. 'Favorilere ekle: {title}'. In the DOM the h3 now comes first, then type, location, rating, price, photo and the favourite button. The photo is moved to the top visually with order-first and the badge and heart are absolutely positioned over it. The card root is <article aria-labelledby=titleId>. The ul/li list wrapper belongs to the callers (see crossOwner).
 
 ## F482 — Konaklama tür rozetlerinde ham enum görünüyor: BED_AND_BREAKFAST, HOTEL, VILLA (TR ve EN)
 
@@ -518,13 +524,15 @@
 | Renk/tema           | Hayır                                                |
 | Efor                | S                                                    |
 | Kaynak denetçiler   | runtime:home                                         |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                         |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p100)                      |
 
 **Kanıt:** RUNTIME tarama 000/001/116/117 bodyTextSample: 'BED_AND_BREAKFAST', 'HOTEL', 'VILLA' (EN sürümde de aynı). Ekran görüntüleri C:/Users/tuna9/AppData/Local/Temp/claude/C--Users-tuna9-projects-booking/62fc84fa-09c9-431e-a0a0-680b0434666c/scratchpad/runtime/crops/home/000-anon-tr-desktop-_-0.png ve -1.png (kart sol üst rozetleri). Kod: PropertyCard.tsx:126 {propertyType} ham basılıyor. Çeviriler hazır: messages/tr/search.json 'types' (Otel/Apart/Villa/Hostel/Pansiyon). Eşleme search/page.tsx:109-117'de var ama kartta kullanılmıyor.
 
 **Etki:** Teknik sabitler (alt çizgili İngilizce büyük harf) TR kullanıcıya yabancı geliyor ve güveni zedeliyor. Düşük okuryazarlıktaki misafir 'Pansiyon' bilgisini çıkaramıyor.
 
 **Önerilen aksiyon:** Enum→anahtar eşlemesini (HOTEL→hotel, BED_AND_BREAKFAST→bedAndBreakfast …) ortak bir yardımcıya taşı ve PropertyCard'da t(`types.${key}`) ile göster. Bilinmeyen değerde rozeti gizle.
+
+**Yapılan düzeltme:** The card translates a raw enum through the shared propertyTypeKey() to t(`types.${key}`). An unknown raw enum (all caps and underscores) hides the badge, and a label the caller already translated is shown unchanged. Callers that already call typeLabel() still work, and they can now pass property.propertyType raw if they want.
 
 ## F483 — 'Fırsatı Gör' yanıltıcı feedforward: ortada fırsat veya indirim yok, düğme başlıkla aynı sayfaya gidiyor; 6 kez aynı link metni
 
@@ -540,13 +548,15 @@
 | Renk/tema           | Hayır                                          |
 | Efor                | S                                              |
 | Kaynak denetçiler   | runtime:home                                   |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                   |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p100)                |
 
 **Kanıt:** RUNTIME probes/home/links.mjs: her kartta 'Kapadokya Sultan Cave Hotel -> /property/cmv2uydt…' ve 'Fırsatı Gör -> /property/cmv2uydt…' aynı href'e gidiyor. Hedef sayfada fırsat/indirim/% ifadesi yok (dealWords: []), tarihler varsayılan '12 Eki 2026 - 13 Eki 2026'. Ekran görüntüsü C:/Users/tuna9/AppData/Local/Temp/claude/C--Users-tuna9-projects-booking/62fc84fa-09c9-431e-a0a0-680b0434666c/scratchpad/runtime/probes/home/after-deal.png. Tarama tabOrder: 'Fırsatı Gör' 6 kez aynı adla. Kod: 190-195 Link, messages/tr/search.json:111 'Fırsatı Gör'.
 
 **Etki:** 'Fırsat' beklentisi boşa çıkıyor ve güven sarsılıyor (dark-pattern algısı). Ekran okuyucu link listesinde altı özdeş 'Fırsatı Gör' var. Her kart klavye kullanıcısına 3 Tab durağı ekliyor.
 
 **Önerilen aksiyon:** Metni gerçek eyleme çevir: 'Müsaitliği gör' veya 'Odaları gör'. aria-describedby ile kart başlığına bağla ya da görünmez ek metin kullan ('… – Kapadokya Sultan Cave Hotel'). Tek tıklanabilir kart bağlantısı deseniyle başlık ve CTA'yı birleştir, favori düğmesi ayrı kalsın.
+
+**Yapılan düzeltme:** 'Fırsatı Gör' is replaced by a label for the real action: card.seeRoom 'Odayı gör' when there is a stay quote, otherwise card.seePrices 'Fiyatları gör', matching p101 F706. The second link to the same page is gone: the CTA is now an aria-hidden visual span that darkens on group-hover, and clicks on it reach the card-wide title link. Each card now has 2 tab stops (title, favourite) and no duplicate link names. Needs the price-ftc test change listed in testUpdates.
 
 ## F484 — Mobilde harita tek parmakla kaydırmayı yutuyor (kaydırma tuzağı)
 
@@ -561,13 +571,15 @@
 | Renk/tema           | Hayır                                                          |
 | Efor                | S                                                              |
 | Kaynak denetçiler   | runtime:results                                                |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                   |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p117)                                |
 
 **Kanıt:** RUNTIME p9-maptouch.mjs (mobile 390x844, Harita görünümü): harita 358x480px (x 16-374). Harita üzerinde CDP ile yukarı kaydırma hareketi yapınca scrollY 1201'de kalıyor. Kontrol olarak p9b.mjs'te liste görünümünde aynı hareket scrollY'yi 800'den 1037'ye taşıyor. Sayfayı kaydırmak için yalnızca 16px'lik yan boşluklar kalıyor.
 
 **Etki:** Mobil kullanıcı haritanın altındaki liste alternatifine ya da footer'a geçemiyor, harita içinde sıkışıp kalıyor.
 
 **Önerilen aksiyon:** Map bileşenine cooperativeGestures verin (iki parmakla kaydırma ve yerelleştirilmiş ipucu). Mobilde harita yüksekliğini yaklaşık 50vh ile sınırlayın ve haritanın üstüne yapışkan bir "Listeye dön" düğmesi koyun.
+
+**Yapılan düzeltme:** Map now uses `cooperativeGestures`, so one finger scrolls the page and two fingers pan the map. The help texts are localized through `locale`. The container is `h-[50svh] min-h-[280px] max-h-[480px] lg:h-[480px]`, so it is about half the screen on mobile. An optional visible 'skip to list' link above the map on mobile replaces the sticky 'Listeye dön' button; it is sr-only on lg and appears once page.tsx passes `resultsListId` (see crossOwner).
 
 ## F587 — Mobilde karşılaştırma tablosu yatay kayınca satır başlıkları kayboluyor; kaydırma kabı etiketsiz
 
@@ -584,13 +596,15 @@
 | Renk/tema           | Hayır                                                         |
 | Efor                | S                                                             |
 | Kaynak denetçiler   | area:cards, lens:mobile                                       |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                  |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p020)                               |
 
 **Kanıt:** compare/page.tsx:106: `<div className='overflow-x-auto ...'>` etiketsiz ve `tabIndex` vermiyor. 107: `min-w-full`. 124/150/163/179/189'daki satır `<th scope='row'>` hücreleri yapışkan değil. 4 sütun ve olanak listeleriyle 360px genişlikte yatay kaydırma oluşuyor.
 
 **Etki:** Mobil misafir 3. ve 4. ilan sütununa kaydırınca 'Toplam fiyat', 'İptal politikası' gibi satır adlarını görmüyor ve değerleri ezberlemek zorunda kalıyor. Bağlantısız sütunlarda klavyeyle kaydırma güvenilir değil.
 
 **Önerilen aksiyon:** Satır `th` öğelerine ve köşe hücresine `sticky left-0 z-10 bg-white` verin. Kaba `role='region' aria-label={t('title')} tabIndex={0}` ekleyin. Sütunlara `min-w-[11rem]` verin.
+
+**Yapılan düzeltme:** The scroll container already had role=region, an aria-label and tabIndex=0. Row headers and the corner cell are now sticky with left-0, z-10 and an opaque bg-white. The table uses border-separate border-spacing-0 so sticky cells keep their borders. Listing columns get min-w-[11rem]. The corner th used to be class sr-only (position:absolute), which takes it out of the table grid and shifts the column headers left. It is now a normal sticky cell with sr-only text inside.
 
 ## F588 — initialFavorite hiçbir çağıranda verilmiyor, favoriye alınmış ilanlar boş kalp ve aria-pressed=false ile görünüyor
 
@@ -607,13 +621,15 @@
 | Renk/tema           | Hayır                                                                                                                                                                                                                               |
 | Efor                | M                                                                                                                                                                                                                                   |
 | Kaynak denetçiler   | area:cards, lens:consistency                                                                                                                                                                                                        |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                                                                                                                        |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p100)                                                                                                                                                                                                     |
 
 **Kanıt:** PropertyCard.tsx:62: `useState(initialFavorite)`, 47: varsayılan `false`. search/page.tsx:507-533 ve app/page.tsx:86-99 `initialFavorite` geçmiyor. Arama ve popüler ilan yanıtlarında da favori bilgisi yok.
 
 **Etki:** Daha önce favoriye eklediği ilanı aramada gören misafir dolu kalp yerine boş kalp görüyor. Ekran okuyucu 'basılı değil' diyor. Kaldırmak için iki kez tıklamak gerekiyor (önce yeniden ekleniyor). Durum algısı yanlış oluşuyor.
 
 **Önerilen aksiyon:** Oturum varsa sayfa yüklenirken `GET /api/favorites` ile id kümesini bir kez çekin (ya da arama yanıtına `isFavorite` ekleyin). `initialFavorite={favIds.has(property.id)}` geçin. Oturum yoksa durum bilinmediği için `aria-pressed` kullanmayın.
+
+**Yapılan düzeltme:** Confirmed: no caller passed initialFavorite. The card now uses the shared useFavoriteIds() (one GET /api/favorites per page) with isFavorite = favoriteIds?.has(id) ?? initialFavorite. After a successful POST or DELETE it calls setFavoriteId(id, !wasFavorite), so every card stays in sync. aria-pressed is removed (see F697), so an unknown anonymous state is no longer announced as 'not pressed'. The cache still has to be invalidated after login and logout (see crossOwner).
 
 ## F589 — MapLibre arayüz metinleri ve erişilebilir adları Türkçe arayüzde İngilizce kalıyor
 
@@ -630,13 +646,15 @@
 | Renk/tema           | Hayır                                                                         |
 | Efor                | S                                                                             |
 | Kaynak denetçiler   | area:cards, lens:a11y                                                         |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                  |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p117)                                              |
 
 **Kanıt:** ResultsMap.tsx:159-172: `<Map ref mapStyle ... ><NavigationControl position='top-right' />` ve `locale` prop'u yok. MapLibre varsayılanları (maplibre-gl-dev.mjs:24305-24310): 'Map' (tuval aria-label, role=region), 'Zoom in', 'Zoom out', 'Drag to rotate map, click to reset north', 'Close popup'.
 
 **Etki:** TR ekran okuyucu kullanıcısı yakınlaştırma düğmelerini ve popup kapatma düğmesini Türkçe sesle bozuk telaffuzla İngilizce duyuyor. Fare kullanıcısının title ipuçları da İngilizce. Arayüz dil tutarlılığı bozuluyor.
 
 **Önerilen aksiyon:** `<Map locale={{ 'Map.Title': t('mapView.title'), 'NavigationControl.ZoomIn': t('mapView.zoomIn'), 'NavigationControl.ZoomOut': t('mapView.zoomOut'), 'NavigationControl.ResetBearing': t('mapView.resetNorth'), 'Popup.Close': t('mapView.closePopup') }}>` ekleyin ve anahtarları messages/{tr,en}/search.json mapView altına yazın. Döndürme gereksizse `<NavigationControl showCompass={false} />` kullanın.
+
+**Yapılan düzeltme:** Already fixed by F92. ResultsMap.tsx:122-138 passes `locale={mapLocale}` with Map.Title, NavigationControl.ZoomIn/ZoomOut/ResetBearing, Popup.Close, AttributionControl.* and Marker.Title, all taken from search.mapView.* keys (TR text exists in messages/tr/search.json). The new cooperative-gesture strings are localized the same way. The compass is kept so a rotated map can be reset to north.
 
 ## F671 — Deterministik karşılaştırma tablosu yapay zekâ yorumunu bekliyor
 
@@ -652,13 +670,15 @@
 | Renk/tema           | Hayır                               |
 | Efor                | M                                   |
 | Kaynak denetçiler   | area:cards                          |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**        |
+| **Düzeltme durumu** | **Atlandı** (paket: ml-p020)        |
 
 **Kanıt:** compare/page.tsx:65-71 tek bir `apiFetch('/api/compare')` çağrısı yapıyor ve 91'de `if (!data) return <p>{t('loading')}</p>`. listing-compare.ts:361 `const result = await client.completeJson('listing_compare', ...)` tablo verisi hazır olduğu halde LLM yanıtı bitene kadar dönmüyor.
 
 **Etki:** Canlı LLM modunda ya da yavaş ağda misafir fiyat ve puan tablosunu birkaç saniye geç görüyor. Algılanan hız düşüyor, oysa tablo için LLM gerekmiyor.
 
 **Önerilen aksiyon:** API'yi ikiye bölün: `/api/compare` yalnızca structured+diff döndürsün, `/api/compare/commentary` yorumu ayrı üretsin. UI tabloyu hemen göstersin, yorum bölümünde `aria-busy='true'` ile bir iskelet kullansın.
+
+**Yapılan düzeltme:** Splitting the table from the AI commentary needs changes in src/lib/ai/listing-compare.ts and src/app/api/compare/route.ts, which I don't own. The plan is in crossOwner. Once those endpoints exist, the page will load the table first and show the commentary section with aria-busy and a skeleton while it loads.
 
 ## F672 — Karşılaştırma API hata metinleri yalnızca Türkçe; EN arayüzde Türkçe hata görünüyor
 
@@ -675,7 +695,7 @@
 | Renk/tema           | Hayır                                                                                                  |
 | Efor                | S                                                                                                      |
 | Kaynak denetçiler   | area:cards                                                                                             |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                           |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p020)                                                                        |
 
 **Kanıt:** compare/page.tsx:86 `{res.error}` ile sunucu mesajını doğrudan basıyor. listing-compare.ts:288 `Karşılaştırma için 2–4 farklı ilan seçin`, 300 `Giriş ve çıkış tarihi birlikte verilmeli`, 320 `İlan bulunamadı`; errors.ts:154 `Doğrulama hatası`. Yanıtta `code` alanı var ama kullanılmıyor.
 
@@ -683,28 +703,32 @@
 
 **Önerilen aksiyon:** `useLoader` yerine hata nesnesini koruyan bir sarmalayıcı kullanın. `ApiError.code` değerini compare.json'da `errors.{VALIDATION_ERROR|NOT_FOUND|...}` anahtarlarına eşleyin ve yalnızca bilinmeyen kodda genel `common.unexpectedError` gösterin.
 
+**Yapılan düzeltme:** useLoader, which converted errors to strings, is replaced by a local useCompareData hook that keeps the error object. ApiError.code is mapped to new compare.errors.{VALIDATION_ERROR,NOT_FOUND} keys in both locales; other codes go through the shared useErrorText (common.errors.* or common.unexpectedError). The generic errorHelp paragraph only shows for unmapped errors. Retry now uses Button busy while it reloads.
+
 ## F673 — Karşılaştırma yükleme durumu duyurulmuyor; dil değişiminde eski veri göstergesiz kalıyor
 
-| Alan                | Değer                          |
-| ------------------- | ------------------------------ |
-| Severity            | Medium                         |
-| Durum               | Aday                           |
-| Konum               | `src/app/compare/page.tsx:91`  |
-| Diğer konumlar      | `src/components/ui/ui.tsx:246` |
-| Kullanıcılar        | misafir                        |
-| Prensip             | robustness · observability     |
-| Sezgisel madde      | H1 — Sistem durumu görünürlüğü |
-| WCAG                | 4.1.3                          |
-| Renk/tema           | Hayır                          |
-| Efor                | S                              |
-| Kaynak denetçiler   | area:cards                     |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**   |
+| Alan                | Değer                           |
+| ------------------- | ------------------------------- |
+| Severity            | Medium                          |
+| Durum               | Aday                            |
+| Konum               | `src/app/compare/page.tsx:91`   |
+| Diğer konumlar      | `src/components/ui/ui.tsx:246`  |
+| Kullanıcılar        | misafir                         |
+| Prensip             | robustness · observability      |
+| Sezgisel madde      | H1 — Sistem durumu görünürlüğü  |
+| WCAG                | 4.1.3                           |
+| Renk/tema           | Hayır                           |
+| Efor                | S                               |
+| Kaynak denetçiler   | area:cards                      |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p020) |
 
 **Kanıt:** compare/page.tsx:91: `<p className='text-sm text-gray-700'>{t('loading')}</p>` ve 237 Suspense fallback'ında `role='status'` yok. ui.tsx:246-256'da `useLoader` deps değiştiğinde `data`'yı sıfırlamıyor; 70'teki `query.toString()` locale içerdiği için dil değişince eski tablo yükleniyor göstergesi olmadan duruyor.
 
 **Etki:** Ekran okuyucu kullanıcısı tablonun ne zaman geldiğini duymuyor. Dili değiştiren misafir bir süre eski dildeki yorum ve metinleri görüyor ve güncellenip güncellenmediğini bilmiyor.
 
 **Önerilen aksiyon:** Yükleme paragraflarına `role='status'` ekleyin. useLoader'a `loading` bayrağı ekleyin (deps değişince true). Veri yenilenirken tablo kabına `aria-busy` ve görünür 'Güncelleniyor…' metni koyun.
+
+**Yapılan düzeltme:** The initial-loading paragraph and the Suspense fallback now have role=status. useCompareData exposes a loading flag that is true whenever the request URL (ids, dates or locale) or the retry version changes. While loading, the old table stays visible and is marked aria-busy, and an always-present role=status paragraph shows 'Karşılaştırma güncelleniyor…' / 'Updating comparison…'.
 
 ## F674 — Kısa sayısal tarih biçimi EN (en-US) arayüzde gün/ay karışıklığı yaratıyor
 
@@ -720,13 +744,15 @@
 | Renk/tema           | Hayır                                                      |
 | Efor                | S                                                          |
 | Kaynak denetçiler   | area:cards                                                 |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                               |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p020)                            |
 
 **Kanıt:** compare/page.tsx:99-100: `f.date(data.checkIn)` varsayılan olarak `short` (`{day:'2-digit', month:'2-digit', year}`, format.ts:17) kullanıyor ve en, `en-US` olarak eşleniyor (format.ts:8). Sonuç '06/24/2027' ya da '10/12/2026' oluyor. search/page.tsx:289'da da aynı durum var. FlexSuggestionNote (search/page.tsx:644) ise `medium` kullanıyor.
 
 **Etki:** EN arayüzü kullanan Türk ya da Avrupalı misafir '10/12/2026' tarihini 10 Aralık olarak okuyabiliyor. Tarih hatasına tolerans çok düşük olduğu için yanlış tarihli rezervasyon riski var.
 
 **Önerilen aksiyon:** Karşılaştırma ve arama başlığında `f.date(x, 'medium')` ('12 Eki 2026' / 'Oct 12, 2026') kullanın; mümkünse hafta günü ekleyin (`weekday: 'short'`).
+
+**Yapılan düzeltme:** Compare dates now use f.date(x, "medium"), giving '12 Eki 2026' / 'Oct 12, 2026'. I did not add a weekday because format.ts is not my file. The same change for the search header is in crossOwner.
 
 ## F675 — 'Aramaya dön' ve tarih yok durumu bağlamı kaybettiriyor; karşılaştırma sayfasında tarih seçimi yok
 
@@ -742,13 +768,15 @@
 | Renk/tema           | Hayır                                                                     |
 | Efor                | M                                                                         |
 | Kaynak denetçiler   | area:cards                                                                |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                              |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p020)                                    |
 
 **Kanıt:** compare/page.tsx:77: `<Link href='/search'>` hedef, tarih ve misafir parametresi taşımıyor. 103: `t('noDates')` ('Toplam fiyat için arama sayfasında tarih seçin.') düz metin, bağlantı yok. Sayfada tarih seçici de yok. CompareBar.tsx:21-26 destination parametresini compare URL'ine eklemiyor.
 
 **Etki:** Tarihsiz karşılaştırma yapan misafirin toplam fiyatı görmesi için aramaya dönmesi, hedefi ve tarihleri baştan girmesi, ilanları yeniden bulması ve karşılaştırmayı yeniden açması gerekiyor.
 
 **Önerilen aksiyon:** CompareBar'ın compare URL'ine `from=` (mevcut arama sorgu dizgesi) ekleyin ve 'Aramaya dön' bu adrese gitsin. noDates mesajını bir bağlantıya çevirin ya da sayfaya giriş/çıkış seçici (SearchBar'daki takvim) koyup URL'yi `router.replace` ile güncelleyin.
+
+**Yapılan düzeltme:** A new searchHref() helper builds the 'Back to search' target from a `from` query string when present, otherwise from destination, checkIn, checkOut and guests. It always points to the fixed /search path, so it cannot redirect off-site. All back links (needMore, error view, reset) use it. With no dates, the page now shows a link ('aramada tarih seçin' / 'pick dates in search', new key noDatesLink) instead of plain text. `from` is not forwarded to the compare API. CompareBar and the search page still need to pass `from` (crossOwner). I did not add a date picker on the compare page.
 
 ## F676 — Karşılaştırma sayfasında bir ilanı çıkarma ya da değiştirme olanağı yok
 
@@ -763,13 +791,15 @@
 | Renk/tema           | Hayır                             |
 | Efor                | S                                 |
 | Kaynak denetçiler   | area:cards                        |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**      |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p020)   |
 
 **Kanıt:** compare/page.tsx:113-119'daki sütun başlıklarında yalnızca ilan bağlantısı var; 'Kaldır' düğmesi yok. Sayfa `useCompareSelection` kullanmıyor; id'ler yalnızca URL'den (61) okunuyor.
 
 **Etki:** 4 ilanı karşılaştıran ve birini elemek isteyen misafir aramaya dönüp toggle'ı bulmak ve karşılaştırmayı yeniden açmak zorunda kalıyor.
 
 **Önerilen aksiyon:** Her sütun başlığına `<button aria-label={t('removeNamed', {title})}>` ekleyin. Bu düğme `useCompareSelection().toggle(id)` çağırsın ve `router.replace` ile `ids` parametresini güncellesin. 2'nin altına düşerse needMore durumu gösterilsin.
+
+**Yapılan düzeltme:** Each column header now has a 'Çıkar'/'Remove' button with aria-label removeNamed ('{title} ilanını karşılaştırmadan çıkar' / 'Remove {title} from comparison'). It calls useCompareSelection().toggle(id) only if that id is in the saved selection, then router.replace updates ids (scroll:false). The removed column disappears straight away while the new data loads. Focus moves to the table region, or, when fewer than 2 listings remain, to the needMore message (tabIndex=-1), so focus is never lost.
 
 ## F677 — Karşılaştırmadan ilana ve aramaya dönüşte tarih/misafir bağlamı düşüyor; arama kartı ise bu bağlamı taşıyor
 
@@ -785,13 +815,15 @@
 | Renk/tema           | Hayır                                                                                                                 |
 | Efor                | S                                                                                                                     |
 | Kaynak denetçiler   | lens:consistency                                                                                                      |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                          |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p020)                                                                                       |
 
 **Kanıt:** compare/page.tsx:113 `<Link href={`/property/${l.id}`}>` tarih ve misafir parametresi taşımıyor, oysa sayfa o tarihlerin toplam fiyatını gösteriyor (:128-131). :72-75 `<Link href="/search">{t("backToSearch")}</Link>` önceki aramayı tamamen sıfırlıyor. Buna karşılık PropertyCard.tsx:50-58 ve search/page.tsx:637-643 (FlexSuggestionNote) `checkIn`, `checkOut`, `guests`, `roomId` ve `ratePlanId` taşıyor. CompareBar.tsx:22-27 bu parametreleri compare'a geçiriyor.
 
 **Etki:** Karşılaştırmada "en uygun" toplamı gördükten sonra ilana geçen misafir, widget'ta yarın-öbür gün varsayılan tarihlerini ve farklı bir fiyatı görür. Karşılaştırma ile rezervasyon arasında fiyat tutarsızlığı oluşur.
 
 **Önerilen aksiyon:** compare/page.tsx'teki ilan bağlantısını PropertyCard'daki gibi `new URLSearchParams({ checkIn, checkOut, guests })` ile kurun (`data.checkIn` varsa). 'Aramaya dön' bağlantısı `sp` içindeki checkIn, checkOut ve guests değerlerini (ve varsa destination'ı) korusun. Bunu `propertyHref(id, stay)` adlı ortak bir yardımcıya taşıyın.
+
+**Yapılan düzeltme:** Listing links already used propertyHref(l.id, {checkIn, checkOut, guests}). Now every 'Back to search' link, including the needMore one that was plain /search, also keeps destination, dates and guests, or the full `from` query when present. URL ids are trimmed so they match the API's trimmed ids.
 
 ## F678 — İlan sayfasına giden bağlantılar seçili tarih/misafir bağlamını taşımıyor
 
@@ -807,7 +839,7 @@
 | Renk/tema           | Hayır                                                                                                                     |
 | Efor                | S                                                                                                                         |
 | Kaynak denetçiler   | lens:copy                                                                                                                 |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                              |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p021)                                                                                           |
 
 **Kanıt:** compare/page.tsx:115 `href={`/property/${l.id}`}` (karşılaştırma tarih/misafir ile yapılmış olsa da); ResultsMap.tsx:239 harita açılır penceresi `/property/${selected.id}`; TransferMarket.tsx:64; cart/page.tsx:119; booking/[id]/page.tsx:183-188. Oysa PropertyCard.tsx:50-58 ve FlexSuggestionNote (search/page.tsx:637-643) checkIn/checkOut/guests'i taşır.
 
@@ -815,26 +847,30 @@
 
 **Önerilen aksiyon:** Ortak `propertyHref(id, {checkIn, checkOut, guests, roomId, ratePlanId})` yardımcı fonksiyonu yazıp compare, harita, devir ve sepet bağlantılarında kullanın.
 
+**Yapılan düzeltme:** The column-header link to the listing now uses propertyHref(l.id, {checkIn, checkOut, guests, roomId: l.price.roomId, ratePlanId: l.price.ratePlanId}). The API already returns price.roomId and price.ratePlanId (listing-compare.ts ComparePrice). ResultsMap already uses propertyHref. The cart link still needs its owner to change it (see crossOwner).
+
 ## F679 — Karşılaştırma toplam fiyatında 'vergi ve ücretler dahil' ile misafir/gece bağlamı eksik
 
-| Alan                | Değer                          |
-| ------------------- | ------------------------------ |
-| Severity            | Medium                         |
-| Durum               | Aday                           |
-| Konum               | `src/app/compare/page.tsx:131` |
-| Kullanıcılar        | misafir                        |
-| Prensip             | learnability · consistency     |
-| Sezgisel madde      | H4 — Tutarlılık/standartlar    |
-| Renk/tema           | Hayır                          |
-| Efor                | S                              |
-| Kaynak denetçiler   | area:cards                     |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**   |
+| Alan                | Değer                           |
+| ------------------- | ------------------------------- |
+| Severity            | Medium                          |
+| Durum               | Aday                            |
+| Konum               | `src/app/compare/page.tsx:131`  |
+| Kullanıcılar        | misafir                         |
+| Prensip             | learnability · consistency      |
+| Sezgisel madde      | H4 — Tutarlılık/standartlar     |
+| Renk/tema           | Hayır                           |
+| Efor                | S                               |
+| Kaynak denetçiler   | area:cards                      |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p021) |
 
 **Kanıt:** compare/page.tsx:129-138 yalnızca `f.money(total)` + `t('nights')` gösteriyor. PropertyCard.tsx:181 aynı teklif motoru toplamı için `t('card.taxesIncluded')` gösteriyor. compare.json'da vergi niteleyicisi yok.
 
 **Etki:** Para hatasına toleransı düşük misafir karşılaştırma tablosundaki tutarın vergi dahil olup olmadığını bilemiyor ve kartta gördüğü tutarla karşılaştırırken tereddüt ediyor.
 
 **Önerilen aksiyon:** Fiyat hücresine `<span className='block text-xs text-gray-700'>{t('taxesIncluded')}</span>` ekleyin. compare.json TR 'vergi ve ücretler dahil', EN 'taxes and fees included'.
+
+**Yapılan düzeltme:** The total-price cell now shows a 'vergi ve ücretler dahil' / 'taxes and fees included' line by reusing the existing search.card.taxesIncluded key, the same one PropertyCard uses. The nights line is still shown above it.
 
 ## F680 — İptal politikası satırında açıklanmayan jargon ve göreli saat kullanılıyor
 
@@ -850,13 +886,15 @@
 | Renk/tema           | Hayır                                                        |
 | Efor                | M                                                            |
 | Kaynak denetçiler   | area:cards                                                   |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                 |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p021)                              |
 
 **Kanıt:** compare/page.tsx:168: `t(`policy.${kind}`)` 'Orta' ya da 'Katı' gösteriyor (compare.json:27-28); açıklama yok. 171: `t('freeCancel', {hours})` 'Girişten 120 saat öncesine kadar' (docs/img/v4-compare.png). Tarihler bilinirken mutlak son tarih gösterilmiyor.
 
 **Etki:** Misafir 'Orta' politikanın ne demek olduğunu ve 120 saatin hangi güne denk geldiğini hesaplamak zorunda kalıyor. Para iadesi kararında hata riski yükseliyor.
 
 **Önerilen aksiyon:** `hours >= 48` ise gün cinsinden yazın ('5 gün'). `data.checkIn` varsa mutlak tarih gösterin: '{date} tarihine kadar ücretsiz iptal' (`f.date(checkIn - hours, 'medium')`). Politika adının yanına `<details>` ile kısa açıklama ekleyin ('Orta: girişe 5 gün kalana kadar tam iade').
+
+**Yapılan düzeltme:** When the dates are known, freeCancelText() shows the last free-cancellation day as an absolute date ('{date} günü giriş saatine kadar ücretsiz iptal'), or 'deadline has passed'. Otherwise it shows days ('Girişe 5 gün kalana kadar'), uses an 'anytime' text for 0 hours, and keeps hours only when the value is not whole days. A policy with no free cancellation now says so. The suggested generic <details> text per policy was left out on purpose: each listing's own concrete line is more accurate than a fixed description per policy type, because the rules differ by listing.
 
 ## F681 — Rozet mantığı yanıltıcı: iade edilemez ilana 'En esnek iptal', eşitlikte tek ilana 'en iyi'
 
@@ -872,13 +910,15 @@
 | Renk/tema           | Hayır                                                                                               |
 | Efor                | S                                                                                                   |
 | Kaynak denetçiler   | area:cards                                                                                          |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                        |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p021)                                                                     |
 
 **Kanıt:** compare/page.tsx:174: `{data.diff.mostFlexibleId === l.id && <Badge>{t('badges.mostFlexible')}</Badge>}`. listing-compare.ts:127-130 `listings.length > 0 ? listings.reduce(...)` her zaman bir kazanan seçiyor; tümü NON_REFUNDABLE olsa da ilk ilan kazanıyor. 96 yorumu 'eşitlikte istek sırasındaki ilk ilan kazanır' diyor; bestRated (115-123) ve cheapest (111) için de aynı. Yalnızca bir ilan fiyatlıysa 'En uygun fiyat' ona veriliyor.
 
 **Etki:** Misafir 'En esnek iptal' rozetini görüp iade edilemez bir ilanı seçebiliyor. Bu, para kaybı riski taşıyan bir yanlış yönlendirme. Eşit ilanlardan yalnızca birinin rozet alması da sıralama sırasına bağlı rastgele bir öne çıkarma yaratıyor.
 
 **Önerilen aksiyon:** Diff'te: tümü NON_REFUNDABLE ise ya da en yüksek flexRank birden çok ilanda eşitse `mostFlexibleId = null` yapın (ya da eşitleri dizi olarak döndürüp hepsine rozet verin). cheapest için en az 2 fiyatlı ilan şartı koyun. bestRated eşitliğinde de aynı kuralı uygulayın.
+
+**Yapılan düzeltme:** Badges are now worked out on the client from the visible columns with leaders(). It needs at least 2 listings that can be compared. Every listing tied for first gets the badge, and nobody gets it when all are equal. 'Cheapest' needs 2 or more priced listings in one currency. A non-refundable listing scores -Infinity, so it can never be 'most flexible', and when all listings are non-refundable none gets the badge. The server diff and the AI commentary should follow the same rule (see crossOwner).
 
 ## F682 — Olanak adları veritabanından yalnızca Türkçe geliyor; EN arayüzde karışık dil
 
@@ -895,13 +935,15 @@
 | Renk/tema           | Hayır                                                    |
 | Efor                | M                                                        |
 | Kaynak denetçiler   | area:cards                                               |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                             |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p021)                   |
 
 **Kanıt:** compare/page.tsx:197-199: `{l.amenities.map((a) => <li key={a}>{a}...)}`. listing-compare.ts:334'te `row.amenities.map((a) => a.name)` ham DB adını kullanıyor. seed.ts:67-68'de `{ name: 'Ücretsiz WiFi', icon: 'wifi' }`, `{ name: 'Havuz', icon: 'pool' }`.
 
 **Etki:** EN kullanan misafir tablonun en uzun satırını Türkçe görüyor. Ekran okuyucu Türkçe kelimeleri İngilizce sesle okuyor.
 
 **Önerilen aksiyon:** Olanağın `icon` kodunu anahtar olarak döndürün (`amenities: [{code, name}]`). UI'da `t(`amenities.${code}`)` kullanın ve bilinmeyen kodda `name`'e düşün; bu durumda `<span lang='tr'>` ile sarın.
+
+**Yapılan düzeltme:** The page reads an optional listing.amenityIcons (name to icon code) and shows property.amenityNames.<code> in the interface language. If a code has no translation, it shows the raw name, wrapped in <span lang="tr"> on non-TR locales. Sorting and the 'shared amenities' row use the same label. It only takes effect once listing-compare.ts returns amenityIcons (see crossOwner). Until then the raw name is still shown, but marked lang=tr.
 
 ## F683 — AI bölüm başlığı 'Yorum' misafir yorumlarıyla karışıyor; AI rozeti jargon içeriyor
 
@@ -917,13 +959,15 @@
 | Renk/tema           | Hayır                                                                                       |
 | Efor                | S                                                                                           |
 | Kaynak denetçiler   | area:cards                                                                                  |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p021)                                                            |
 
 **Kanıt:** compare/page.tsx:222-224: `<h2>{t('commentary')}</h2>` TR 'Yorum' (compare.json:43). Aynı sayfada puan satırı '(260 yorum)' diyor (compare.json:22). 225'teki `<LlmBadge>` 'Canlı LLM', 'Demo (deterministik)', 'Yedek (LLM başarısız)' gösteriyor (common.json:19-21). Açıklama yalnızca `title` özniteliğinde (ui.tsx:135).
 
 **Etki:** Misafir AI üretimi metni bir misafir yorumu sanabiliyor. 'LLM' ve 'deterministik' terimleri okuryazarlığı sınırlı kullanıcı için anlamsız. Dokunmatik ve klavye kullanıcısı 'doğruluğunu kontrol edin' uyarısını hiç görmüyor.
 
 **Önerilen aksiyon:** Başlığı 'Yapay zekâ özeti' / 'AI summary' yapın. Mod etiketlerini 'Otomatik özet' / 'Hazır şablon' / 'Yedek özet' gibi sade metinlere çevirin. `ai.hint` metnini bölüm içinde görünür `<p className='text-xs'>` olarak gösterin.
+
+**Yapılan düzeltme:** Already handled by other owners. p003.json changes compare.commentary to 'Yapay zekâ karşılaştırma özeti' / 'AI comparison summary'; this page is the only place that key is used. p122.json changes common.ai.modes to plain wording ('Canlı yapay zekâ', 'Örnek yanıt (demo)', 'Basit yanıt (yapay zekâ yanıt vermedi)'). LlmBadge in ui.tsx now shows the ai.hint text visibly in the badge, and hides the live/demo mode labels for the guest audience.
 
 ## F684 — Çerez bandı (z-50) karşılaştırma çubuğunu (z-40) tamamen örtüyor
 
@@ -939,13 +983,15 @@
 | Renk/tema           | Hayır                                         |
 | Efor                | S                                             |
 | Kaynak denetçiler   | area:cards                                    |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                  |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p070)        |
 
 **Kanıt:** CompareBar.tsx:31: `fixed inset-x-0 bottom-0 z-40`. CookieConsent.tsx:47: `fixed inset-x-0 bottom-0 z-50 ... p-4`. İkisi de aynı konumda ve çerez bandı üstte.
 
 **Etki:** İlk ziyaretinde çerez tercihini henüz yapmamış misafir 'Karşılaştırmaya ekle'ye basıyor ama çubuk bandın altında kalıyor. Hiçbir geri bildirim görmüyor ve 'Karşılaştır' bağlantısına ulaşamıyor.
 
 **Önerilen aksiyon:** CookieConsent görünürken yüksekliğini `--cookie-banner-h` değişkeniyle yayınlayın. CompareBar'a `style={{ bottom: 'var(--cookie-banner-h, 0px)' }}` verin ya da çubuğu bandın üstüne istifleyin.
+
+**Yapılan düzeltme:** CompareBar now sits at `bottom: var(--cookie-banner-h, 0px)`, and its body/scroll padding is `calc(<bar>px + var(--cookie-banner-h, 0px))`. A MutationObserver restores the padding when CookieConsent overwrites or clears the shared style fields, and the banner's last value is put back on unmount. The fix only takes effect once CookieConsent publishes --cookie-banner-h (crossOwner).
 
 ## F685 — Karşılaştırma seçim sayısındaki değişim ekran okuyucuya duyurulmuyor
 
@@ -961,13 +1007,15 @@
 | Renk/tema           | Hayır                                      |
 | Efor                | S                                          |
 | Kaynak denetçiler   | area:cards                                 |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**               |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p070)           |
 
 **Kanıt:** CompareBar.tsx:20: `if (ids.length === 0) return null;`, 34: `<span className='font-medium ...'>{t('bar', {count})}</span>`. Canlı bölge yok. Çubuk DOM'da main'den sonra (search/page.tsx:558) mount/unmount oluyor.
 
 **Etki:** Ekran okuyucu kullanıcısı ekleme yaptıktan sonra yalnızca düğme etiketinin değiştiğini duyuyor; kaç ilan seçtiğini ve 'Karşılaştır' bağlantısının sayfa sonunda belirdiğini bilmiyor.
 
 **Önerilen aksiyon:** Her zaman mount edilen bir `<div role='status' aria-live='polite' className='sr-only'>{ids.length > 0 ? t('bar', {count}) : ''}</div>` ekleyin; bu, `return null` dışında kalmalı. 2. seçimden sonra 'Karşılaştırmaya hazır' duyurusu yapın.
+
+**Yapılan düzeltme:** Already fixed (F90): CompareBar always renders `<p role="status" className="sr-only">` outside the `visible` condition. It announces the count, plus 'Karşılaştırmaya hazır.' from 2 items and the full hint at 4, and search/page.tsx always mounts CompareBar. It now also announces 'Karşılaştırma seçimi temizlendi.' after clearing.
 
 ## F686 — Çubuk hangi ilanların seçili olduğunu göstermiyor; seçim aramalar arasında gizlice kalıyor
 
@@ -983,13 +1031,15 @@
 | Renk/tema           | Hayır                                                     |
 | Efor                | M                                                         |
 | Kaynak denetçiler   | area:cards                                                |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                              |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p070)                           |
 
 **Kanıt:** CompareBar.tsx:34 yalnızca sayıyı (`t('bar', {count})`) gösteriyor. useCompareSelection.ts:7 ve 43 seçimi `localStorage` ('compare:ids') içinde süresiz tutuyor ve yalnızca id saklıyor. Tek tek kaldırma ancak ilgili kart görünürken mümkün.
 
 **Etki:** Dün İstanbul araması yapmış misafir bugün Antalya'da '2 ilan seçildi' görüyor ama hangileri olduğunu bilmiyor. Karşılaştırmayı açınca beklemediği ilanlarla karşılaşıyor ve yalnızca 'Temizle' ile hepsini silebiliyor.
 
 **Önerilen aksiyon:** Seçimde `{id, title, thumb}` saklayın. Çubukta her seçim için bir çip (küçük görsel + başlık + `<button aria-label={t('removeNamed', {title})}>×</button>`) gösterin. Mobilde çipleri açılır bir panelde sunun.
+
+**Yapılan düzeltme:** The bar lists each selected listing as a chip (title, or 'İlan N' if it can't be loaded) with a × button labelled 'Karşılaştırmadan çıkar: {title}'. After removing one, focus moves to the next chip. Titles come from the public GET /api/properties/[id] through a new hook useCompareListingTitles (cached in memory), so useCompareSelection is unchanged. On mobile the chips scroll sideways inside the bar; thumbnails were not added.
 
 ## F687 — 'Temizle' tüm seçimi onaysız ve geri alınamaz şekilde siliyor; etiket bağlamsız
 
@@ -1005,13 +1055,15 @@
 | Renk/tema           | Hayır                                                                            |
 | Efor                | S                                                                                |
 | Kaynak denetçiler   | area:cards                                                                       |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                     |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p070)                                                  |
 
 **Kanıt:** CompareBar.tsx:36-38: `<button type='button' onClick={clear} ...>{t('clear')}</button>`. compare.json:9 'Temizle' / 'Clear'. useCompareSelection.ts:70'te `clear = () => write([])` çalışıyor; önceki değer saklanmıyor.
 
 **Etki:** Farklı aramalardan topladığı 4 ilanı yanlışlıkla silen misafir hepsini yeniden bulmak zorunda kalıyor. Ekran okuyucu yalnızca 'Temizle' duyuyor ve neyin temizleneceğini bilmiyor.
 
 **Önerilen aksiyon:** clear öncesi id'leri state'te saklayın ve 8 saniye boyunca `role='status'` içinde 'Seçim temizlendi — Geri al' gösterin (Geri al, `write(prev)` çağırsın). Etiketi 'Seçimi temizle' / 'Clear selection' yapın.
+
+**Yapılan düzeltme:** 'Temizle' is now 'Seçimi temizle' / 'Clear selection' (compare.clear is used only here). Clearing, or removing the last chip, keeps the ids and shows 'Karşılaştırma seçimi temizlendi.' with a 'Geri al' button that gets focus and restores the selection. The strip closes after 8 s, or on the next selection, but stays while focus is inside it (WCAG 2.2.1).
 
 ## F688 — Karşılaştırmaya ekleme yalnızca arama liste görünümünde mümkün
 
@@ -1027,13 +1079,15 @@
 | Renk/tema           | Hayır                                                |
 | Efor                | M                                                    |
 | Kaynak denetçiler   | area:cards                                           |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                         |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p071)               |
 
 **Kanıt:** CompareToggle ve CompareBar yalnızca search/page.tsx:542 ve 558'de kullanılıyor (grep). app/page.tsx:86'daki öne çıkan PropertyCard'larda ve property/[id] detay sayfasında karşılaştırma eylemi yok. /compare'a tek giriş CompareBar.tsx:41.
 
 **Etki:** Ana sayfada ya da ilan detayında beğendiği ilanı karşılaştırmaya eklemek isteyen misafir aramayı yeniden yapıp ilanı listede bulmak zorunda kalıyor.
 
 **Önerilen aksiyon:** CompareToggle'ı PropertyCard içine opsiyonel bir `showCompare` prop'u ile taşıyın ve ana sayfada da açın. İlan detay sayfasına CompareToggle + CompareBar ekleyin.
+
+**Yapılan düzeltme:** The detail-page half was already done: PropertyDetailActions.tsx:121 renders CompareToggle (F917), with its own announcement and a /compare link. I added an optional `className` prop to CompareToggle so it can sit inside PropertyCard above the card-wide title link (`relative z-[2]`). The home-page half needs PropertyCard and app/page.tsx, which belong to other owners; the steps are listed in crossOwner.
 
 ## F689 — Karşılaştırma dolunca düğme disabled oluyor ve nedeni yalnızca title ipucunda
 
@@ -1049,13 +1103,15 @@
 | Renk/tema           | Hayır                                         |
 | Efor                | S                                             |
 | Kaynak denetçiler   | area:cards                                    |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                  |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p071)              |
 
 **Kanıt:** CompareToggle.tsx:12: `const disabled = !selected && full;`, 17: `disabled={disabled}`, 18: `title={disabled ? t('full') : undefined}`. Arama sayfasında 4 ilan sınırı önceden belirtilmiyor; intro yalnızca compare sayfasında (compare.json:3) var. CompareBar 4/4 durumunu da göstermiyor.
 
 **Etki:** Disabled düğme sekme sırasından çıktığı için klavye kullanıcısı ve ekran okuyucu düğmeyi ve nedenini hiç bulamıyor. Dokunmatik kullanıcı title ipucunu göremiyor. Mobil misafir 'neden tıklanmıyor' diye kalıyor.
 
 **Önerilen aksiyon:** `disabled` yerine `aria-disabled={disabled}` kullanın ve onClick'te disabled ise erken dönün. Görünür bir açıklama ekleyin (`aria-describedby` ile bağlı `<span>{t('full')}</span>`). CompareBar metnini `t('bar', {count, max: 4})` ('3/4 ilan seçildi') yapın.
+
+**Yapılan düzeltme:** Already fixed in the current code. The button uses aria-disabled instead of disabled, onClick returns early when blocked, and a visible hint (`fullHint`, "4/4 ilan seçildi. Yeni eklemek için birini çıkarın.") is linked by aria-describedby. There is no title attribute any more. CompareBar.tsx:177-181 shows the same 4/4 hint when the selection is full.
 
 ## F690 — Önemli açıklamalar yalnız `title` ipucunda, dokunmatikte hiç görünmüyor
 
@@ -1071,13 +1127,15 @@
 | Renk/tema           | Hayır                                                                                 |
 | Efor                | S                                                                                     |
 | Kaynak denetçiler   | lens:mobile                                                                           |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                          |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p071)                                                      |
 
 **Kanıt:** CompareToggle.tsx:18 `title={disabled ? t("full") : undefined}`. 5. ilanda düğme devre dışı kalıyor ve nedeni ('En fazla 4 ilan karşılaştırılabilir') yalnız title'da. Devre dışı öğelerde ve dokunmatik ekranlarda bu ipucu hiç görünmez. ui.tsx:135 LlmBadge `title={t("ai.hint")}` ('Yapay zekâ çıktısı — doğruluğunu kontrol edin') tüm AI rozetlerinde yalnız hover'da. AccessibilitySection.tsx:46'da 'Doğrulandı' rozetinin anlamı ('Platform ekibi … fotoğraf kanıtıyla doğruladı') yalnız title'da.
 
 **Etki:** Mobil misafir karşılaştırma düğmesinin neden çalışmadığını göremiyor. AI çıktısını doğrulama uyarısını ve erişilebilirlik 'Doğrulandı' rozetinin anlamını hiç görmüyor, güven kararlarını eksik bilgiyle veriyor.
 
 **Önerilen aksiyon:** CompareToggle: düğmeyi `aria-disabled` ile etkin bırak; dokunulunca CompareBar'da `role="status"` ile 'En fazla 4 ilan; önce birini çıkarın' göster. LlmBadge: yanına ⓘ toggletip düğmesi koy (`aria-expanded`, dokunarak açılan popover) ya da kısa uyarıyı görünür metin olarak ekle. AccessibilitySection: verifiedHint'i bölüm açıklamasında (:30) bir kez görünür metin olarak yaz.
+
+**Yapılan düzeltme:** The CompareToggle part is already fixed: the button stays focusable with aria-disabled, the reason is shown as visible text, and CompareBar has a role=status announcement. LlmBadge already shows ai.hint as visible text (ui.tsx:243). The verifiedHint in AccessibilitySection is still only in a title attribute (line 59); that file is not mine, so it is handed over in crossOwner.
 
 ## F691 — Karşılaştırma sınırı (en fazla 4) yalnız title ipucuyla bildiriliyor
 
@@ -1093,13 +1151,15 @@
 | Renk/tema           | Hayır                                         |
 | Efor                | S                                             |
 | Kaynak denetçiler   | lens:copy                                     |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                  |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p071)              |
 
 **Kanıt:** CompareToggle.tsx:17-18 `disabled={disabled}` ve `title={disabled ? t("full") : undefined}` — devre dışı düğme klavyeyle odaklanamaz, dokunmatikte title görünmez; neden pasif olduğu başka hiçbir yerde yazmaz.
 
 **Etki:** Mobil misafir beşinci ilanı eklemeye çalıştığında düğmenin neden çalışmadığını anlamaz.
 
 **Önerilen aksiyon:** Düğmeyi pasif yapmak yerine tıklamada CompareBar'da role=status ile 'En fazla 4 ilan karşılaştırılabilir — birini çıkarın' mesajı gösterin veya pasif düğmenin yanına görünür kısa açıklama ekleyin.
+
+**Yapılan düzeltme:** Already fixed. The 4-listing limit is shown as visible text next to the blocked button (aria-describedby), in the CompareBar text, and in its role=status live region (CompareBar.tsx:136-151). The button is no longer disabled and has no title attribute.
 
 ## F692 — Fotoğrafı olmayan ilanda stok otel fotoğrafı ilanın kendi fotoğrafı gibi gösteriliyor
 
@@ -1116,13 +1176,15 @@
 | Renk/tema           | Hayır                                                |
 | Efor                | S                                                    |
 | Kaynak denetçiler   | area:cards                                           |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                         |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p100)                      |
 
 **Kanıt:** PropertyCard.tsx:14'te `imageUrl: string` zorunlu. Çağıranlar boş görsel için sabit bir Unsplash fotoğrafı geçiyor: search/page.tsx:511-514 ve app/page.tsx:91-94 `?? 'https://images.unsplash.com/photo-1566073771259-...'`. PropertyCard.tsx:97 bu stok görsele de `alt={title}` veriyor.
 
 **Etki:** Misafir, gerçekte ev sahibinin fotoğraf yüklemediği bir pansiyonu lüks otel havuzu fotoğrafıyla görüyor. Ekran okuyucu bunu ilanın fotoğrafı olarak duyuruyor. Beklenti ile gerçek arasındaki uyumsuzluk güveni zedeliyor.
 
 **Önerilen aksiyon:** `imageUrl` alanını opsiyonel yapın. Yoksa kartta nötr bir yer tutucu (ikon + görünür 'Fotoğraf eklenmemiş' metni) gösterin ve `alt=''` verin. Stok URL'yi çağıranlardan kaldırın.
+
+**Yapılan düzeltme:** Confirmed. imageUrl is now optional (string \| null \| undefined), which does not break callers. With no image the card shows a neutral placeholder: a photo icon (aria-hidden) and the visible text card.noPhoto 'Fotoğraf eklenmemiş' in existing gray classes, with no img or alt. Removing the stock Unsplash fallback is up to the callers (see crossOwner).
 
 ## F693 — Oturumsuz misafir favori düğmesine basınca hiçbir şey olmuyor (401 kontrolü mesaj metninde aranıyor)
 
@@ -1138,13 +1200,15 @@
 | Renk/tema           | Hayır                                         |
 | Efor                | S                                             |
 | Kaynak denetçiler   | area:home                                     |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                  |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p100)              |
 
 **Kanıt:** `if (!res.ok) throw new Error("Favori eklenemedi");` (80) ardından catch'te `if (err instanceof Error && err.message.includes("401")) { router.push("/login"); }` (84-88). Mesaj hiçbir zaman '401' içermediği için oturumsuz kullanıcıda (api/favorites/route.ts:8-9 401 döndürür) yönlendirme çalışmıyor ve başka bir geri bildirim de yok. Ham `fetch` kullanıldığı için apiFetch'in 401'de token yenileme davranışı (api-client.ts:66-68) da devre dışı.
 
 **Etki:** Oturumsuz misafir ana sayfada kalbe basıyor; düğme kısa süre pasifleşiyor ve hiçbir şey olmuyor. Favori özelliğinin bozuk olduğunu düşünüyor, giriş yapması gerektiğini öğrenemiyor.
 
 **Önerilen aksiyon:** `res.ok` kontrolünden önce `if (res.status === 401) { router.push(`/login?next=${encodeURIComponent(window.location.pathname)}`); return; }` ekleyin (ya da `apiFetch` kullanıp `ApiError.status === 401` kontrol edin). Diğer hatalarda kart içinde `role="status"` bir mesaj gösterin (`t('card.favoriteFailed')`).
+
+**Yapılan düzeltme:** Not reproducible in the current code. toggleFavorite already uses apiFetch, which retries a 401 once after a refresh. In catch it checks `err instanceof ApiError && err.status === 401` and calls router.push(loginHref()), which returns the user to the current page (PropertyCard.tsx ~L123-128). Other errors set a role=status notice (card.favoriteAddFailed / favoriteRemoveFailed), shown visibly in error tone.
 
 ## F694 — İlan kartında görsele dokunmak hiçbir şey yapmıyor
 
@@ -1160,13 +1224,15 @@
 | Renk/tema           | Hayır                                                                                          |
 | Efor                | S                                                                                              |
 | Kaynak denetçiler   | lens:mobile                                                                                    |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                   |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p100)                                                                |
 
 **Kanıt:** PropertyCard.tsx:94-101 görsel kabı (`<div className="relative h-48 overflow-hidden">`) bir bağlantı değil. İlana yalnız :134'teki başlık metniyle ve :190'daki 'Fırsatı gör' bağlantısıyla gidiliyor. Kartın en büyük alanı (192px'lik görsel) etkileşimsiz. :100 `group-hover:scale-105` etkileşim ipucunu yalnız fareyle veriyor.
 
 **Etki:** Mobil kullanıcı alışkanlıkla fotoğrafa dokunuyor ve tepki alamıyor. Tekrar dokunurken aynı alandaki (:108) favori düğmesine yanlışlıkla basabiliyor.
 
 **Önerilen aksiyon:** Görseli `<Link href={href} tabIndex={-1} aria-hidden="true">` ile sar (klavye ve ekran okuyucu için tek bağlantı başlık kalsın) ya da başlık bağlantısına `after:absolute after:inset-0` ile 'stretched link' uygula. Favori düğmesine `relative z-10` ver.
+
+**Yapılan düzeltme:** Same fix as F480. The stretched title link covers the photo, so tapping the photo opens the listing. The favourite button sits above the overlay at z-[2] with a 44px target, so it stays separate.
 
 ## F695 — Kart fotoğrafı tıklanmıyor ama hover'da büyüyerek tıklanabilir izlenimi veriyor
 
@@ -1181,13 +1247,15 @@
 | Renk/tema           | Hayır                                          |
 | Efor                | S                                              |
 | Kaynak denetçiler   | area:cards                                     |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                   |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p100)                |
 
 **Kanıt:** PropertyCard.tsx:94-101: `<div className='relative h-48 ...'><Image ... className='... group-hover:scale-105' />` herhangi bir Link içinde değil. Bağlantı yalnızca h3 başlıkta (134) ve 'Fırsatı Gör' düğmesinde (190) bulunuyor.
 
 **Etki:** Mobil ağırlıklı misafir kartın en büyük alanı olan fotoğrafa (192px yükseklik) dokunuyor ve hiçbir şey olmuyor. OTA alışkanlığıyla (fotoğraf = detay) çelişiyor. Hover efekti masaüstünde yanlış affordance veriyor.
 
 **Önerilen aksiyon:** Başlık bağlantısına `after:absolute after:inset-0 after:content-['']` (stretched link) uygulayıp kart köküne `relative` verin. Favori düğmesine `relative z-10` vererek üstte tutun. Böylece tüm kart tek sekme duraklı bir bağlantı olur. Bu yapılmazsa `group-hover:scale-105` efektini kaldırın.
+
+**Yapılan düzeltme:** The photo is now clickable through the stretched title link, so the group-hover:scale-105 hint is accurate and was kept. Keyboard focus shows a ring around the whole card (focus-visible:after:ring-2 ring-inset ring-brand, an existing token that adapts to dark mode) instead of only on the title text.
 
 ## F696 — Favori isteği sırasında düğme disabled oluyor ve klavye odağı kayboluyor
 
@@ -1203,13 +1271,15 @@
 | Renk/tema           | Hayır                                          |
 | Efor                | S                                              |
 | Kaynak denetçiler   | area:cards                                     |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                   |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p100)                |
 
 **Kanıt:** PropertyCard.tsx:105: `disabled={busy}`. HTML focus fixup kuralına göre odaklı öğe disabled olunca odak viewport/body'ye düşüyor. 66'daki `if (busy) return;` çift tıklamayı zaten engelliyor, yani `disabled` gereksiz. Ayrıca `aria-busy` ya da yükleniyor göstergesi yok; yalnızca `disabled:opacity-50` var.
 
 **Etki:** Klavyeyle Enter'a basan kullanıcı odağı kaybediyor. Sonraki Tab'ın nereden devam edeceği belirsizleşiyor ve ekran okuyucu bağlamı sıfırlanıyor.
 
 **Önerilen aksiyon:** `disabled` yerine `aria-disabled={busy}` ve `aria-busy={busy}` kullanın; mevcut `if (busy) return` korumasını bırakın. Görsel olarak `aria-[disabled=true]:opacity-50` uygulayın.
+
+**Yapılan düzeltme:** Confirmed. disabled={busy} is replaced by aria-disabled={busy \|\| undefined}, keeping aria-busy and the existing `if (busy) return` guard. disabled:opacity-50 becomes aria-disabled:opacity-50, so the button keeps focus during the request.
 
 ## F697 — Aç/kapa düğmelerinde hem aria-pressed hem değişen etiket kullanılıyor, duyurular çelişkili
 
@@ -1226,13 +1296,15 @@
 | Renk/tema           | Hayır                                                                                        |
 | Efor                | S                                                                                            |
 | Kaynak denetçiler   | area:cards                                                                                   |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                 |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p100)                                                              |
 
 **Kanıt:** PropertyCard.tsx:106-107: `aria-pressed={isFavorite}` + `aria-label={isFavorite ? t('card.removeFavorite') : t('card.addFavorite')}`. CompareToggle.tsx:16 ve 25: `aria-pressed={selected}` + `{selected ? t('remove') : t('add')}`.
 
 **Etki:** Ekran okuyucu 'Favorilerden çıkar, aç/kapa düğmesi, basılı' ya da 'Karşılaştırmadan çıkar, basılı' okuyor. Kullanıcı düğmeye basarsa ne olacağını ve şu anki durumu ayırt edemiyor; durum çift kodlandığı için ters anlaşılıyor.
 
 **Önerilen aksiyon:** İki yoldan birini tutarlı uygulayın: (a) sabit etiket + aria-pressed, örneğin `aria-label={t('card.favorite', {title})}` ('Favori: {title}') ve 'Karşılaştır: {title}'; (b) aria-pressed'i kaldırıp yalnızca eylem etiketi kullanmak. Bileşenler arasında aynı deseni seçin.
+
+**Yapılan düzeltme:** Confirmed. I used pattern (b): aria-pressed is removed and the button keeps a single action label that includes the title ('Favorilere ekle: X' / 'Favorilerden çıkar: X'). The existing role=status notice announces the result. CompareToggle should follow the same pattern (see crossOwner).
 
 ## F698 — Kart eylem düğmelerinin erişilebilir adı ilan adını içermiyor; favori düğmesi başlıktan önce geliyor
 
@@ -1249,13 +1321,15 @@
 | Renk/tema           | Hayır                                                                                         |
 | Efor                | S                                                                                             |
 | Kaynak denetçiler   | area:cards                                                                                    |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                  |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p101)                                                              |
 
 **Kanıt:** PropertyCard.tsx:107 her kartta aynı 'Favorilere ekle' etiketini veriyor. CompareToggle.tsx:8 yalnızca `propertyId` alıyor, 25'te etiket her yerde 'Karşılaştırmaya ekle'. PropertyCard.tsx:190-195'teki 'Fırsatı Gör' bağlantısı 24 kez aynı metinle tekrar ediyor. Favori düğmesi (102) DOM'da h3 başlıktan (133) önce yer alıyor.
 
 **Etki:** Ekran okuyucunun düğme/bağlantı listesinde 24 adet özdeş 'Favorilere ekle', 'Karşılaştırmaya ekle' ve 'Fırsatı Gör' görünüyor. Sekmeyle gezen kullanıcı favori düğmesine ilan adını duymadan ulaşıyor ve hangi ilanı eklediğini bilemiyor.
 
 **Önerilen aksiyon:** Favori için `aria-label={t('card.favorite', {title})}` kullanın. CompareToggle'a `title` prop'u ekleyip `aria-label={t('addNamed', {title})}` verin. 'Fırsatı Gör' bağlantısına `<span className='sr-only'>: {title}</span>` ekleyin. Favori düğmesini DOM'da başlıktan sonraya taşıyın; görsel konum `absolute` ile korunabilir.
+
+**Yapılan düzeltme:** Already fixed in PropertyCard by p100. The favorite button's aria-label names the listing (card.addFavoriteNamed / card.removeFavoriteNamed with {title}), and the button comes after the h3 in the DOM (placed with absolute right-3 top-3). The duplicate 'Fırsatı Gör' link is now an aria-hidden visual cue, and the title is a stretched link. The CompareToggle part is in another file (see crossOwner).
 
 ## F699 — Sık kullanılan dokunma hedefleri 44px önerisinin altında
 
@@ -1272,13 +1346,15 @@
 | Renk/tema           | Hayır                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | Efor                | M                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | Kaynak denetçiler   | lens:mobile                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p101)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 
 **Kanıt:** PropertyCard.tsx:108 favori düğmesi `p-2` + 20px ikon = 36px ve görselin köşesinde. SearchBar.tsx:155/164/180/189/202/211 adımlayıcılar `h-8 w-8` (32px), aralarında 12px. DateRangePicker.tsx:146/174 ay okları `p-1.5` + 20px = 32px. ThemeToggle.tsx:43 ve LocaleSwitcher.tsx:29 `min-h-[1.75rem]` (28px). search/page.tsx:448 liste/harita geçişi `px-3 py-1 text-sm` ≈28px. PriceCalendar.tsx:206/217 ay gezinme `px-3 py-1` ≈30px. SmartFilter.tsx:140 çip kaldırma `px-3 py-1 text-xs` ≈24px. SessionManager.tsx:139 ve PasskeyManager.tsx:136 'Kapat/Sil' `px-3 py-1 text-xs` ≈26px. SplitPayPanel.tsx:234 '×' `pb-2 text-sm` (genişliği yalnız globals.css:81 min-width 24px'ten geliyor). RankingWhy.tsx:23 `<summary>` text-xs, ReviewsSection.tsx:73-95 şikâyet düğmeleri text-xs. globals.css:73-82 güvenlik ağı yalnız 24px sağlıyor ve `a`/`summary` öğelerini kapsamıyor.
 
 **Etki:** Mobil misafir favori, misafir sayısı, ay değiştirme ve görünüm geçişi gibi sık dokunulan kontrollerde ıskalıyor. Yan yana küçük hedeflerde (−/+, Kapat/Sil) yanlış eylem riski var. Motor güçlüğü olan kullanıcı için Fitts maliyeti yüksek.
 
 **Önerilen aksiyon:** globals.css'e şunu ekle: `@media (pointer: coarse) { button, select, summary, [role=button] { min-height: 2.75rem; min-width: 2.75rem } }`. İkon düğmelerinde (favori, adımlayıcı, ay okları) `h-11 w-11` kullan. Metin düğmelerinde AccessibilityReviewQueue.tsx:98'deki `min-h-[2.5rem]` desenini `inline-flex min-h-11 items-center px-2` olarak uygula. '×' yerine görünür 'Kaldır' metni koy. Onay kutusu ve radyo satırlarında etiketi `min-h-11` yap.
+
+**Yapılan düzeltme:** The favorite button in PropertyCard already has min-h-[44px] min-w-[44px], so its target is 44px. The other listed files belong to other packages.
 
 ## F700 — Arama sayfasında kart başlıkları 'Filtreler' başlığının altına düşüyor; sonuçlar liste değil
 
@@ -1295,13 +1371,15 @@
 | Renk/tema           | Hayır                                                        |
 | Efor                | S                                                            |
 | Kaynak denetçiler   | area:cards                                                   |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                 |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p101)                             |
 
 **Kanıt:** PropertyCard.tsx:133 `<h3>`, kart kökü 93 `<div>`. search/page.tsx:326'da aside içinde `<h2>{t('filters.title')}</h2>` var; sonuç bölümünde h2 yok. 504-505'te ızgara `<div className='grid ...'>{visibleResults.map(... <div key>)}` şeklinde, liste semantiği yok.
 
 **Etki:** Başlıklarla gezinen ekran okuyucu kullanıcısı tüm ilan başlıklarını 'Filtreler' bölümünün alt başlıkları olarak duyuyor. 'Liste, 24 öğe' bilgisi olmadığından sonuç sayısı ve konumu (3/24) algılanamıyor.
 
 **Önerilen aksiyon:** search/page.tsx'te ızgaradan önce `<h2 className='sr-only'>{t('resultsHeading')}</h2>` ekleyin. Izgarayı `<ul role='list'>` ve her öğeyi `<li>` yapın. PropertyCard kökünü `<article aria-labelledby={`card-${id}-title`}>` yapıp h3'e o id'yi verin.
+
+**Yapılan düzeltme:** The PropertyCard root is already <article aria-labelledby={titleId}> and the h3 carries that id. The search page grid is already <ul role="list"> with <li> items, which the search page owner handled. The sr-only results h2 also belongs to search/page.tsx.
 
 ## F701 — Değerlendirmesi olmayan ilan '0.0' puan rozetiyle gösteriliyor
 
@@ -1317,13 +1395,15 @@
 | Renk/tema           | Hayır                                          |
 | Efor                | S                                              |
 | Kaynak denetçiler   | area:cards                                     |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                   |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p101)               |
 
 **Kanıt:** PropertyCard.tsx:163-168 `reviewCount` 0 olduğunda da `{rating.toFixed(1)}` ('0.0') ve '0 değerlendirme' basıyor. Karşılaştırma sayfası (compare/page.tsx:155-157) aynı durumda `t('noRating')` ('Henüz puan yok') gösteriyor.
 
 **Etki:** Yeni ilanlar en kötü puanlı ilan gibi görünüyor ve misafir bunları yanlış yere eliyor. İki ekran aynı durumu farklı gösteriyor.
 
 **Önerilen aksiyon:** `reviewCount === 0` ise rozeti gizleyin ve yerine `t('card.noReviews')` ('Henüz değerlendirme yok' / 'Yeni') metnini koyun. Anahtarı search.json TR/EN'ye ekleyin.
+
+**Yapılan düzeltme:** The card already shows t("card.noRating") ('Henüz puan yok') when reviewCount is 0, so no badge and no '0 değerlendirme' appear. This matches compare/page.tsx.
 
 ## F702 — Puan rozetinde ölçek yok ve sayı yerelleştirilmemiş; karşılaştırma sayfası aynı veriyi '/5' ile gösteriyor
 
@@ -1339,13 +1419,15 @@
 | Renk/tema           | Hayır                                                                                         |
 | Efor                | M                                                                                             |
 | Kaynak denetçiler   | area:results                                                                                  |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                  |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p101)                                                               |
 
 **Kanıt:** PropertyCard.tsx:163-165 `{rating.toFixed(1)}` '8.6' üretiyor: ölçek belirtilmiyor, TR'de '8,6' olmalı, puansız ilanda '0.0' görünüyor. Seed verisi 0-10 ölçeğinde (prisma/seed.ts:311 `ratingAvg: 8.9`), ama compare/page.tsx:156 ile messages/tr/compare.json:22 '{avg}/5' kullanıyor ve '8,9/5' çıkıyor. Sıralama da puanı 5'e bölüyor (src/lib/search/ranking.ts:69 `rating: clamp01(bayesianRating(...) / 5)`); bu yüzden 5'in üstündeki her ilan 1'e kırpılıyor ve 'Bu sıralama neden?' her kartta aynı 'Misafir puanı 0.350' değerini gösteriyor.
 
 **Etki:** Misafir 8.6'nın 10 üzerinden mi olduğunu bilemiyor; karşılaştırma sayfasında '8,9/5' gibi imkânsız bir değer görüyor. Şeffaflık panelinde puanın sıralamaya etkisi anlamsız görünüyor.
 
 **Önerilen aksiyon:** Tek bir ölçek belirleyin (0-10). Kartta f.number(rating) ile görünür '/10' ya da sözel bir etiket ('Çok iyi') kullanın. Puansız ilanda 'Henüz puan yok' (compare.json noRating) gösterin. compare.json'daki ratingValue'yu '/10' yapın ve ranking.ts'deki böleni ölçekle eşleştirin. Rozete aria-label='Misafir puanı 8,6 / 10' verin.
+
+**Yapılan düzeltme:** The card's rating spans are replaced with the shared RatingBadge. It shows a visible, localized '4,5/5' (property.ratingOutOf) and gives screen readers 'Misafir puanı: 5 üzerinden 4,5' (property.ratingAria). The finding assumed a 0-10 scale, which is out of date: seed ratingAvg values are 4.0-4.9 and review rating is int 1-5. So compare's '{avg}/5' and ranking.ts's '/5' already match, and those files need no change.
 
 ## F703 — Sayılar yerel ayara göre biçimlenmiyor (toFixed ile '4.5', '%72.5', '×1.08')
 
@@ -1361,13 +1443,15 @@
 | Renk/tema           | Hayır                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | Efor                | S                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | Kaynak denetçiler   | lens:copy                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p101)                                                                                                                                                                                                                                                                                                                                                                                                                       |
 
 **Kanıt:** PropertyCard.tsx:164 `rating.toFixed(1)`; property/[id]/page.tsx:145, account/page.tsx:380, HostDashboard.tsx:232 aynı; RevenueDashboard.tsx:264 `(k.occupancy * 100).toFixed(1)` → '%72.5', 195 `×{c.multiplier.toFixed(2)}`; AdminDashboard.tsx:443; RankingWhy.tsx:27,34; SupportAdmin.tsx:93; QuoteBreakdown.tsx:20 ve PromotionsPanel.tsx:74 `String(bps / 100)`. Karşı örnek: compare/page.tsx:156 `f.number(l.rating.avg)` doğru.
 
 **Etki:** TR kullanıcı ondalık virgül beklerken nokta görür; aynı puan karşılaştırmada '8,6', kartta '8.6' olarak tutarsız görünür.
 
 **Önerilen aksiyon:** Tüm toFixed/String(bps/100) çağrılarını f.number(value, { maximumFractionDigits: n }) ve yüzdeler için f.number(v, { style: 'percent' }) ile değiştirin; ESLint kuralıyla TSX'te toFixed kullanımını yasaklayın.
+
+**Yapılan düzeltme:** The card already formatted the rating with f.number and now does it through RatingBadge (TR '4,5'). The TR review count ('1240' → '1.240') depends on p006's patch, which changes search.card.reviews to an ICU plural with #; I did not duplicate it. The other listed files are owned by other packages.
 
 ## F704 — Tarih seçiliyken kart 'tarih seçince vergi ve ücretler eklenir' diyor (akıllı filtre yolu)
 
@@ -1383,13 +1467,15 @@
 | Renk/tema           | Hayır                                                        |
 | Efor                | S                                                            |
 | Kaynak denetçiler   | area:cards                                                   |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                 |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p101)                              |
 
 **Kanıt:** PropertyCard.tsx:183-187: `stay` yoksa `t('card.fromPerNight')` + `t('card.taxesOnDates')` gösteriliyor. search/page.tsx:179-182'de akıllı filtre aktifken `params = smartToParams(smartFilters)` URL'deki checkIn/checkOut'u taşımıyor; 521 ise `property.quote && checkIn && checkOut` arıyor. docs/img/search-smart-filter.png'de başlıkta '29.10.2026 - 01.11.2026' yazarken kartlarda 'tarih seçince vergi ve ücretler eklenir' görünüyor.
 
 **Etki:** Misafir ekranın üstünde seçili tarihlerini, kartta ise 'tarih seçin' uyarısını görüyor. Kartta gördüğü fiyatın toplam mı gecelik mi olduğu belirsizleşiyor; çelişkili durum güveni zedeliyor.
 
 **Önerilen aksiyon:** smartToParams'a, akıllı filtre tarih çıkarmadıysa URL'deki `checkIn`/`checkOut` değerlerini ekleyin. PropertyCard'a `datesSelected` prop'u verin; tarih var ama `stay` yoksa `taxesOnDates` yerine 'Bu tarihler için toplam hesaplanamadı' gibi doğru bir metin gösterin.
+
+**Yapılan düzeltme:** Added an optional `datesSelected?: boolean` prop. When it is not passed, the card derives it from searchContext.checkIn/checkOut. If dates are selected but there is no `stay` quote, the card now says 'vergi ve ücretler hariç, seçili tarihlerin toplamı değil' (new key search.card.notStayTotal) and no longer says 'tarih seçince vergi ve ücretler eklenir'. search/page.tsx must pass the context (see crossOwner).
 
 ## F705 — Mülk kartında aynı hedefe iki bağlantı; 'Fırsatı Gör' bağlamsız ve 24 kez tekrarlanıyor
 
@@ -1406,13 +1492,15 @@
 | Renk/tema           | Hayır                                                                         |
 | Efor                | S                                                                             |
 | Kaynak denetçiler   | lens:a11y                                                                     |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                  |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p101)                                              |
 
 **Kanıt:** 133-136 başlık bağlantısı `<Link href={href}>{title}</Link>` ve 190-195 `<Link href={href} ...>{t("card.seeDeal")}</Link>` aynı href; kart kapsayıcısı `<div>` (93) ve sonuç ızgarası da `<div>` (search/page.tsx:504-506) — bağlantı bağlamı programatik olarak belirlenemiyor.
 
 **Etki:** Ekran okuyucu bağlantı listesinde 24 adet 'Fırsatı Gör' ayırt edilemiyor; klavye kullanıcısı her kartta iki gereksiz Tab durağıyla karşılaşıyor (karşılaştırma görevi yavaşlıyor).
 
 **Önerilen aksiyon:** seeDeal bağlantısına `<span className="sr-only">: {title}</span>` ya da `aria-describedby={titleId}` ekleyin; mümkünse tek bağlantı (başlık) bırakıp kartı 'stretched link' yapın; sonuçları `<ul>/<li>` içine alın.
+
+**Yapılan düzeltme:** Already fixed by p100. The card has one link, the title, made a stretched link with after:inset-0 that covers the whole card. The CTA is an aria-hidden span, so there is no duplicate link name and no second tab stop. Results are already in ul/li.
 
 ## F706 — 'Fırsatı Gör' CTA'sı sonucu doğru öngörmüyor ve aynı hedefe ikinci sekme durağı ekliyor
 
@@ -1429,13 +1517,15 @@
 | Renk/tema           | Hayır                                                        |
 | Efor                | S                                                            |
 | Kaynak denetçiler   | area:cards                                                   |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                 |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p101)                             |
 
 **Kanıt:** PropertyCard.tsx:190-195'teki `<Link href={href}>{t('card.seeDeal')}</Link>`, 134'teki başlık bağlantısıyla aynı `href`'e gidiyor. messages/tr/search.json:111 'Fırsatı Gör', en: 'See deal'. Kartta indirim ya da fırsat bilgisi bulunmuyor.
 
 **Etki:** 'Fırsat' kelimesi indirim vaat ediyor ama hedef sıradan ilan detayı; bu yanıltıcı bir feedforward. Her kart 2 bağlantı + favori + karşılaştır + benzerleri olmak üzere 5 sekme durağı içeriyor; 24 kartta yaklaşık 120 durak ediyor ve klavye kullanıcısının işini yavaşlatıyor.
 
 **Önerilen aksiyon:** Metni duruma göre değiştirin: `stay` varsa 'Odayı gör' / 'See room', yoksa 'Fiyatları gör' / 'See prices'. Stretched-link uygulanırsa CTA'ya `tabIndex={-1} aria-hidden` verin ya da başlık bağlantısını tek sekme durağı olarak bırakın.
+
+**Yapılan düzeltme:** The CTA text already depends on state: card.seeRoom ('Odayı gör') when stay is set, otherwise card.seePrices ('Fiyatları gör'). It is aria-hidden, not a link, so it adds no tab stop.
 
 ## F707 — Harita başlatılırken ve karolar yüklenirken durum bildirimi yok, işaretçiler geç beliriyor
 
@@ -1452,13 +1542,15 @@
 | Renk/tema           | Hayır                                       |
 | Efor                | S                                           |
 | Kaynak denetçiler   | area:cards                                  |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p117)             |
 
 **Kanıt:** ResultsMap.tsx:98: `useState<...>(null)`; 124: `view ? index.items(...) : []`. İşaretçiler ancak `onLoad={syncView}` (164) sonrasında çiziliyor. Bu arada yalnızca boş bir kutu var. search/page.tsx:32'deki `MapLoading` yalnızca JS paketi için gösteriliyor ve `<p>` öğesinin `role='status'` özniteliği yok.
 
 **Etki:** Yavaş ağda misafir saniyelerce boş gri bir kutu görüyor ve haritanın bozuk olduğunu düşünüyor. Ekran okuyucu yükleme durumunu ya da tamamlandığını duymuyor.
 
 **Önerilen aksiyon:** `const [ready, setReady] = useState(false)` ekleyin, onLoad'da `setReady(true)` yapın. Hazır olana kadar kap üzerinde `<p role='status' className='absolute inset-0 grid place-items-center'>{t('mapLoading')}</p>` gösterin. MapLoading'e `role='status'` ekleyin.
+
+**Yapılan düzeltme:** Added `ready` state, set in onLoad. Until then a persistent `<p role="status">` shows search.mapLoading as a pill over the map; it does not block pointer input. After load it turns sr-only and announces mapView.ready with the count. Markers no longer wait for tiles: `onRender` runs syncView once on the first frame. MapLoading in page.tsx still needs role=status (crossOwner).
 
 ## F708 — Mobilde 480px sabit yükseklikteki harita sayfa kaydırmasını yutuyor
 
@@ -1473,13 +1565,15 @@
 | Renk/tema           | Hayır                                      |
 | Efor                | S                                          |
 | Kaynak denetçiler   | area:cards                                 |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**               |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p117)            |
 
 **Kanıt:** ResultsMap.tsx:158: `<div className='h-[480px] w-full ...'>`. 159-171'de `cooperativeGestures` verilmemiş. MapLibre tek parmakla sürüklemeyi pan olarak yorumluyor. search/page.tsx:486'da mobilde `grid-cols-1` olduğu için yan liste haritanın altında kalıyor.
 
 **Etki:** 360x640 ekranda harita görünür alanın yaklaşık %75'ini kaplıyor. Mobil misafir aşağı kaydırmak istediğinde haritayı kaydırıyor ve haritanın altındaki liste ile Footer'a ulaşamıyor (kaydırma tuzağı).
 
 **Önerilen aksiyon:** Map'e `cooperativeGestures` prop'u verin ve mesajlarını `locale` ile yerelleştirin ('CooperativeGesturesHandler.MobileHelpText'). Kap yüksekliğini `h-[60vh] max-h-[480px] min-h-[280px]` yapın.
+
+**Yapılan düzeltme:** Same change as F484: `cooperativeGestures` plus a localized CooperativeGesturesHandler.MobileHelpText/WindowsHelpText/MacHelpText. The container went from fixed `h-[480px]` to `h-[50svh] max-h-[480px] min-h-[280px] lg:h-[480px]`.
 
 ## F709 — Mobil harita görünümü sayfa kaydırmasını yutuyor, kontrolleri küçük
 
@@ -1495,13 +1589,15 @@
 | Renk/tema           | Hayır                                                                                                                 |
 | Efor                | M                                                                                                                     |
 | Kaynak denetçiler   | lens:mobile                                                                                                           |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                          |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p117)                                                                                |
 
 **Kanıt:** ResultsMap.tsx:158 `h-[480px] w-full`. :159-170'teki `<Map …>` bileşeninde `cooperativeGestures` yok, yani tek parmakla sürükleme haritayı kaydırıyor. search/page.tsx:583'teki yan liste `max-h-[480px] overflow-y-auto` mobilde haritanın altına yığılıyor; sonuçta ≈1000px'lik iç içe kaydırma alanı oluşuyor. :172 NavigationControl ve :235 Popup `closeButton` MapLibre varsayılanları (~29px ve ~16px).
 
 **Etki:** 360×740 telefonda harita ekranın ≈%65'ini kaplıyor. Sayfayı aşağı kaydırmak isteyen kullanıcı haritayı kaydırıyor (kaydırma tuzağı). Listenin de kendi içinde kayması 'sayfa mı liste mi kayıyor' belirsizliği yaratıyor. Popup'ı parmakla kapatmak zor.
 
 **Önerilen aksiyon:** `<Map cooperativeGestures …>` kullan: tek parmak sayfayı, iki parmak haritayı kaydırsın. Harita yüksekliğini `h-[55dvh] lg:h-[480px]` yap. Mobilde MapResultList'i haritanın altında yatay bir `flex overflow-x-auto snap-x` kart şeridi olarak göster. NavigationControl ve Popup kapatma düğmelerine CSS ile `min-width/min-height: 44px` ver. İç kaydırma alanlarına `overscroll-contain` ekle.
+
+**Yapılan düzeltme:** Added cooperativeGestures and the mobile height (`50svh`; 480px on lg). Below lg the NavigationControl buttons and the popup close button are now 44px, done with Tailwind arbitrary variants (`TOUCH_CONTROLS`, no colors). The popup content got `max-lg:pr-9` so the close button doesn't cover the title. The nested scroll in MapResultList (overscroll/max-h on mobile) is in page.tsx (crossOwner). The horizontal snap card strip was not done; it would be an M-size redesign of page.tsx.
 
 ## F710 — Tek bir karo hatası haritayı tamamen kapatıyor ve uyarı yeniden deneme yolunu söylemiyor
 
@@ -1517,13 +1613,15 @@
 | Renk/tema           | Hayır                                                       |
 | Efor                | M                                                           |
 | Kaynak denetçiler   | area:cards                                                  |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p117)                      |
 
 **Kanıt:** ResultsMap.tsx:166-170: `if (/fetch|network|tile|webgl|failed/i.test(msg)) onFail(msg);`. Tek bir karo 404/429 hatası bile `onFail` tetikliyor. search/page.tsx:460-463 haritayı unmount edip `t('mapFailed')` gösteriyor. Uyarıda 'Tekrar dene' düğmesi yok; yeniden deneme ancak 'Harita' görünüm düğmesine tekrar basınca (446) mümkün ve bu hiçbir yerde söylenmiyor.
 
 **Etki:** Harita kullanan misafir, geçici tek bir karo hatasında haritanın kaybolduğunu ve liste görünümüne atıldığını görüyor. Haritaya nasıl döneceğini bilmiyor.
 
 **Önerilen aksiyon:** Yalnızca WebGL başlatma hatasında ya da ilk 10 saniyede hiç karo yüklenmediyse `onFail` çağırın; tekil karo hatalarını sayıp eşik (ör. 5) aşılınca düşürün. mapFailed uyarısına `<button onClick={() => setMapError(null)}>{t('mapRetry')}</button>` ekleyin.
+
+**Yapılan düzeltme:** onError no longer fails on any message that matches a regex. Tile errors (`'tile' in e`) are counted and reset on every successful tile (onSourceData with e.tile); fallback happens only after 5 consecutive tile errors (TILE_ERROR_LIMIT). It also happens when onLoad finds that no tile in the first view loaded. Init/WebGL failures (`!e.target` or /webgl/) still fall back immediately. The 'Tekrar dene' button in the mapFailed alert belongs to page.tsx (crossOwner).
 
 ## F711 — Harita işaretçileri uzun ve anlamsız bir sekme dizisi oluşturuyor, atlama yolu yok
 
@@ -1540,13 +1638,15 @@
 | Renk/tema           | Hayır                                      |
 | Efor                | S                                          |
 | Kaynak denetçiler   | area:cards                                 |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**               |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p117)     |
 
 **Kanıt:** ResultsMap.tsx:173-227'de her küme ve nokta bir `<button>`. Sıralama map-cluster.ts:80-86'da 'kümeler önce (büyükten küçüğe), sonra noktalar id'ye göre' yapılıyor; bu ne coğrafi ne de yan liste sırası. Bunlara ek olarak tuval (tabindex=0) ve 3 NavigationControl düğmesi de sekme durağı. Haritadan önce 'haritayı atla' bağlantısı yok.
 
 **Etki:** Klavye kullanıcısı aynı işlevi sunan yan listeye (search/page.tsx:581) ulaşmak için 24'e kadar işaretçi boyunca sekmeliyor. Sıra rastgele göründüğü için hangi işaretçide olduğunu takip edemiyor.
 
 **Önerilen aksiyon:** Harita kabından önce `<a href='#map-results-list' className='sr-only focus:not-sr-only'>{t('mapView.skipToList')}</a>` ekleyin ve MapResultList `ul`'sine `id` verin. İşaretçileri yan listeyle aynı sırada render edin ya da yan liste eşdeğer olduğu için işaretçi düğmelerine `tabIndex={-1}` verin.
+
+**Yapılan düzeltme:** Markers are now rendered in side-list order: points in list order, each cluster at the position of its earliest member. Previously clusters came first, then points by id. Added an optional `resultsListId` prop that renders a skip link before the map (visible on mobile, sr-only until focused on lg) with the new key mapView.skipToList. It is active only after page.tsx passes the prop and sets the id on the MapResultList ul (crossOwner). Markers that are created later as the map moves may still be appended at the end of the DOM order.
 
 ## F712 — Seçili ilanı içeren küme yalnızca renk değişimiyle belirtiliyor
 
@@ -1562,13 +1662,15 @@
 | Renk/tema           | Hayır                                      |
 | Efor                | S                                          |
 | Kaynak denetçiler   | area:cards                                 |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**               |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p117)            |
 
 **Kanıt:** ResultsMap.tsx:190-195: `selectedId && item.memberIds.includes(selectedId) ? 'border-[#003580] bg-amber-300 text-gray-900' : 'border-white bg-[#003580] text-white'` ve `aria-label={t('mapView.cluster', {count})}`. Etikette ve görsel içerikte seçim bilgisi yok.
 
 **Etki:** Renk körü misafir ve ekran okuyucu kullanıcısı listeden seçtiği ilanın hangi kümede olduğunu anlayamıyor; ilanı haritada bulamıyor.
 
 **Önerilen aksiyon:** Renge ek olarak seçili kümede sayının yanına bir işaret ikonu (ör. `<svg aria-hidden>` konum iğnesi) ya da `ring-4 ring-offset-2` gibi şekil farkı ekleyin. aria-label'ı `t('mapView.clusterSelected', {count})` ('{count} konaklama, seçili ilan bu kümede') yapın.
+
+**Yapılan düzeltme:** A cluster that contains the selected stay now shows an aria-hidden map-pin SVG next to the count and widens (`min-w-10 px-2`) in addition to the existing color change. Its aria-label uses the new mapView.clusterSelected key, which keeps the 'konaklama; yakınlaştırmak için tıklayın' text the e2e regex matches and adds 'Seçili ilan bu kümede'. No color classes changed.
 
 ## F713 — Seçili işaretçiye tekrar basınca seçim kalkmıyor; aria-pressed aç/kapa vaadi bozuk
 
@@ -1585,13 +1687,15 @@
 | Renk/tema           | Hayır                                      |
 | Efor                | S                                          |
 | Kaynak denetçiler   | area:cards                                 |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**               |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p117)            |
 
 **Kanıt:** ResultsMap.tsx:213: `onSelect(item.point.id);` her basışta aynı id'yi seçiyor, 215: `aria-pressed={item.point.id === selectedId}`. Yan liste (search/page.tsx:598) ise `onSelect(active ? null : p.id)` ile gerçekten aç/kapa yapıyor.
 
 **Etki:** Ekran okuyucu 'basılı' dediği düğmeye tekrar basan kullanıcı durumun değişmesini bekliyor ama değişmiyor. Harita ile liste aynı eylemde farklı davranıyor.
 
 **Önerilen aksiyon:** 213'ü `onSelect(item.point.id === selectedId ? null : item.point.id)` olarak değiştirin.
+
+**Yapılan düzeltme:** Pressing a selected point marker again now calls onSelect(null), so it toggles like the side list. The aria-pressed state now behaves as announced. The popup-focus and trigger refs are set only when a marker is being selected.
 
 ## F714 — Harita popup'ı Escape ile ya da haritaya tıklayarak kapanmıyor
 
@@ -1606,13 +1710,15 @@
 | Renk/tema           | Hayır                                          |
 | Efor                | S                                              |
 | Kaynak denetçiler   | area:cards                                     |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                   |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p117)                |
 
 **Kanıt:** ResultsMap.tsx:234: `closeOnClick={false}`. Popup içinde ya da haritada `onKeyDown` yok. MapLibre popup modülünde (maplibre-gl-dev.mjs:29660-30142) Escape işleyicisi bulunmuyor. Popup yalnızca varsayılan boyutsuz '×' düğmesiyle kapanıyor.
 
 **Etki:** Klavye kullanıcısı popup'ı kapatmak için × düğmesini sekmeyle bulmak zorunda. Fare/dokunmatik kullanıcı haritanın boş yerine dokunarak kapatmayı (yaygın harita alışkanlığı) deniyor ve popup kapanmıyor.
 
 **Önerilen aksiyon:** Popup içerik div'ine `onKeyDown={(e) => { if (e.key === 'Escape') { onSelect(null); lastTriggerRef.current?.focus(); } }}` ekleyin. Map'e `onClick={() => selectedId && onSelect(null)}` verin; işaretçi tıklamalarında zaten `stopPropagation` var (ResultsMap.tsx:212).
+
+**Yapılan düzeltme:** An onKeyDown handler on the map wrapper closes an open popup on Escape. If focus is inside the popup, closePopup() also returns focus to the trigger; otherwise it only deselects. Map onClick deselects when the click target is the map canvas itself, so marker and popup clicks are excluded and drags don't count.
 
 ## F715 — Harita görünümünde kart eylemleri ve bilgileri yok; detaya gitmek iki adım
 
@@ -1628,13 +1734,15 @@
 | Renk/tema           | Hayır                                                        |
 | Efor                | M                                                            |
 | Kaynak denetçiler   | area:cards                                                   |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                 |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p117)                              |
 
 **Kanıt:** ResultsMap.tsx:237-247'deki popup yalnızca başlık bağlantısı + `{city} · {priceLabel}` içeriyor; puan, fotoğraf, favori ve karşılaştır yok. search/page.tsx:503'te `!showMap` olduğu için kartlar (ve CompareToggle, 542) harita görünümünde render edilmiyor. Yan liste düğmesi (595-609) yalnızca seçim yapıyor, detay bağlantısı yok.
 
 **Etki:** Harita ile karar veren misafir karşılaştırmaya ekleyemiyor, favoriye alamıyor, puanı göremiyor. Detaya gitmek için önce listeye sonra popup bağlantısına basmak gerekiyor; ya da liste görünümüne dönmek zorunda kalıyor.
 
 **Önerilen aksiyon:** Popup'a puan (/5), 'Karşılaştırmaya ekle' (`<CompareToggle propertyId title />`) ve detay CTA'sı ekleyin. MapResultList öğelerine ikincil bir 'Detay' bağlantısı ve CompareToggle ekleyin.
+
+**Yapılan düzeltme:** MapPoint gained optional `rating`/`reviewCount`; page.tsx's MapListItem already supplies them, so no caller change is needed. The popup now shows RatingBadge (x/5, with an sr-only rating) and card.reviews, or card.noRating when there are no reviews, plus `<CompareToggle propertyId>`. The title link stays as the one-step detail link. The side list already has a 'mapList.view' detail link; adding CompareToggle to list items is in page.tsx (crossOwner).
 
 ## F1096 — Puan rozeti ölçek ve etiket olmadan yalnız '9.7' gösteriyor
 
@@ -1649,13 +1757,15 @@
 | Renk/tema           | Hayır                                          |
 | Efor                | S                                              |
 | Kaynak denetçiler   | runtime:home                                   |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                   |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p101)                |
 
 **Kanıt:** RUNTIME links.mjs ariaSnapshot: 'text: 9.7 220 değerlendirme'. Ekranda yalnız lacivert kutuda '9.7' var ('/10' veya 'Olağanüstü' gibi sözel karşılık yok). TR'de ondalık nokta kullanılıyor ('9.7', TR normu '9,7'). Kod: 163-165 {rating.toFixed(1)}.
 
 **Etki:** Yeni kullanıcı ölçeği (5 mi 10 mu) bilmiyor. Ekran okuyucu yalnız '9.7' okuyor. TR ondalık biçimi tutarsız.
 
 **Önerilen aksiyon:** f.number ile yerel biçimle ('9,7'). aria-label='10 üzerinden 9,7 puan' ekle, yanına sözel derece ekle ('Olağanüstü').
+
+**Yapılan düzeltme:** The card now uses RatingBadge: a visible scale ('9,7' is now '4,7/5', since data is on the 1-5 scale), locale formatting through f.number, and an sr-only label 'Misafir puanı: 5 üzerinden 4,7'. I did not add a verbal grade such as 'Olağanüstü'. Showing the scale plus a screen-reader label removes the ambiguity, and any thresholds for a verbal grade would be arbitrary.
 
 ## F1097 — Kart puanı ölçeksiz ve etiketsiz, ayrıca TR yerelinde biçimlendirilmemiş ("8.9", "1240")
 
@@ -1670,13 +1780,15 @@
 | Renk/tema           | Hayır                                               |
 | Efor                | S                                                   |
 | Kaynak denetçiler   | runtime:results                                     |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                        |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p101)              |
 
 **Kanıt:** RUNTIME p8-tab.mjs: kart puan bloğunun metni "8.91240 değerlendirme". TR yerelinde ondalık ayıracı nokta, karşılaştırma sayfası ise "8,9" gösteriyor. "Puan" ya da "/10" ibaresi ve sözel bir niteleme yok. Ekran okuyucu "8.9 1240 değerlendirme" okuyor. Kartta "değerlendirme", karşılaştırmada "yorum" terimi kullanılıyor.
 
 **Etki:** Düşük okuryazarlığa sahip kullanıcı rozetin puan mı yoksa fiyat ya da indirim mi olduğunu anlamakta zorlanıyor.
 
 **Önerilen aksiyon:** f.number(rating, {maximumFractionDigits: 1}) kullanın ve aria-label="Puan 8,9/10, 1.240 değerlendirme" verin. "Çok iyi" gibi sözel bir niteleme ekleyin. Terim her yerde "değerlendirme" olsun.
+
+**Yapılan düzeltme:** Fixed: the rating now shows a scale, is localized and has a label (RatingBadge: '4,5/5' plus sr 'Misafir puanı: 5 üzerinden 4,5'). TR count formatting comes from p006's search.card.reviews plural. Not done: unifying 'değerlendirme' and 'yorum' across the product. p001 set compare.ratingValue to use 'yorum', and the reviews namespace uses 'yorum' widely, so this is a product-wide terminology decision outside this package. No verbal grade was added.
 
 ## F1098 — Tekrarlayan ve yanıltıcı "Fırsatı Gör" bağlantıları; masaüstünde metin iki satıra kırılıyor
 
@@ -1692,13 +1804,15 @@
 | Renk/tema           | Hayır                                                            |
 | Efor                | S                                                                |
 | Kaynak denetçiler   | runtime:results                                                  |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                     |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p102)                                  |
 
 **Kanıt:** RUNTIME 002 gövde metni: 4 kartta da "Fırsatı Gör" yazıyor (tüm ilanlarda 24 adet). İndirimi olmayan ilanlarda da "fırsat" deniyor. Ekran görüntüsü crops/search/all-stays-bottom.png (1280px): düğme "Fırsatı / Gör" şeklinde iki satıra kırılıyor. Ekran okuyucunun bağlantılar listesinde birbirinden ayırt edilemeyen 4-24 adet "Fırsatı Gör" var.
 
 **Etki:** Bağlantı listesiyle gezinen kullanıcı hangi ilana gideceğini bilemiyor. "Fırsat" sözcüğü beklentiyi şişiriyor.
 
 **Önerilen aksiyon:** Etiketi "Müsaitliği gör" ya da "İncele" yapın, sonuna sr-only olarak başlığı ekleyin (veya aria-describedby ile başlık id'sine bağlayın). Düğmeye whitespace-nowrap verin.
+
+**Yapılan düzeltme:** Most of this was already done by an earlier package. The duplicated "Fırsatı Gör" label is now "Odayı gör" / "Fiyatları gör", and the span is aria-hidden, so the only link is the card-covering title link and there are no duplicate link names. The remaining issue was the label wrapping onto two lines: I added whitespace-nowrap to the visual CTA span.
 
 ## F1202 — /compare doğrudan açıldığında kayıtlı seçim kullanılmıyor
 
@@ -1713,13 +1827,15 @@
 | Renk/tema           | Hayır                            |
 | Efor                | S                                |
 | Kaynak denetçiler   | area:cards                       |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**     |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p021)  |
 
 **Kanıt:** compare/page.tsx:61: `const ids = (sp.get('ids') ?? '').split(',')` yalnızca URL'yi okuyor. useCompareSelection (localStorage) burada kullanılmıyor; 73-81'de 'en az 2 ilan seçin' gösteriliyor.
 
 **Etki:** Yer imi ya da geçmişten /compare açan misafir, 3 ilanı seçili olduğu halde 'en az 2 ilan seçin' mesajını görüyor.
 
 **Önerilen aksiyon:** `ids` boşsa `useCompareSelection().ids` değerini kullanın ve `router.replace(`/compare?ids=...`)` ile URL'yi tamamlayın.
+
+**Yapılan düzeltme:** When the address has no ids parameter, the page uses the ids saved by useCompareSelection. An effect then calls router.replace('/compare?...&ids=...') so the link can be shared and the bookmark keeps working. The query is built so that filling in the address produces the same API URL, so there is no second request. An empty ids= (all listings removed) still shows the 'select at least 2' message.
 
 ## F1203 — Karşılaştırma tablosunun adı yok; köşe hücresi sayfa başlığını sütun başlığı gibi tekrarlıyor
 
@@ -1735,7 +1851,7 @@
 | Renk/tema           | Hayır                                             |
 | Efor                | S                                                 |
 | Kaynak denetçiler   | area:cards                                        |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                      |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p021)                   |
 
 **Kanıt:** compare/page.tsx:107: `<table ... data-testid='compare-table'>` içinde `<caption>` yok. 110-112: `<th scope='col' className='sr-only'>{t('title')}</th>`. Bu hücre satır başlıkları sütununun başlığı oluyor, bu yüzden her satır başlığında 'İlan karşılaştırma' duyuruluyor.
 
@@ -1743,26 +1859,30 @@
 
 **Önerilen aksiyon:** `<caption className='sr-only'>{t('tableCaption', {dates})}</caption>` ekleyin. Köşe hücresini `<td />` yapın ya da metnini 'Özellik' / 'Feature' olarak değiştirin.
 
+**Yapılan düzeltme:** The table now has a <caption className="sr-only"> using compare.tableLabel. The corner header cell is now an empty <td>, so screen readers no longer read 'İlan karşılaştırma' as the heading for every row header.
+
 ## F1204 — Olanaklarda ortak olanlar her sütunda tekrar ediyor; 'yalnızca farkları göster' seçeneği yok
 
-| Alan                | Değer                          |
-| ------------------- | ------------------------------ |
-| Severity            | Low                            |
-| Durum               | Aday                           |
-| Konum               | `src/app/compare/page.tsx:192` |
-| Kullanıcılar        | misafir                        |
-| Prensip             | flexibility · customizability  |
-| Sezgisel madde      | H8 — Estetik/minimal tasarım   |
-| Renk/tema           | Hayır                          |
-| Efor                | S                              |
-| Kaynak denetçiler   | area:cards                     |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**   |
+| Alan                | Değer                           |
+| ------------------- | ------------------------------- |
+| Severity            | Low                             |
+| Durum               | Aday                            |
+| Konum               | `src/app/compare/page.tsx:192`  |
+| Kullanıcılar        | misafir                         |
+| Prensip             | flexibility · customizability   |
+| Sezgisel madde      | H8 — Estetik/minimal tasarım    |
+| Renk/tema           | Hayır                           |
+| Efor                | S                               |
+| Kaynak denetçiler   | area:cards                      |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p021) |
 
 **Kanıt:** compare/page.tsx:192-210'da her sütun tüm olanakları listeliyor. API'nin döndürdüğü `data.diff.commonAmenities` (37) arayüzde hiç kullanılmıyor. Fark yalnızca her öğenin yanındaki '(Yalnızca bu ilanda)' ile belirtiliyor.
 
 **Etki:** 4 ilan ve uzun olanak listelerinde tablo çok uzuyor. Misafir farkları bulmak için tüm listeyi taramak zorunda kalıyor; mobilde bu yük artıyor.
 
 **Önerilen aksiyon:** Tabloya 'Yalnızca farkları göster' onay kutusu ekleyin; açıkken `commonAmenities` öğelerini gizleyip 'Ortak: Ücretsiz WiFi, Oda Servisi' satırını tek sefer gösterin.
+
+**Yapılan düzeltme:** Adds an 'Olanaklarda yalnızca farkları göster' checkbox, shown only when there are shared amenities. When it is on, the amenities that all visible columns share appear once in a 'Hepsinde ortak olanaklar' row spanning the columns. The per-column row is renamed 'Farklı olanaklar' and lists only the rest, with a fallback text when a column has none.
 
 ## F1205 — Toggle düğmelerinde aria-pressed ile değişen etiket birlikte kullanılıyor
 
@@ -1779,13 +1899,15 @@
 | Renk/tema           | Hayır                                          |
 | Efor                | S                                              |
 | Kaynak denetçiler   | lens:a11y                                      |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                   |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p071)               |
 
 **Kanıt:** CompareToggle.tsx:16-25 `aria-pressed={selected}` + metin `{selected ? t("remove") : t("add")}` ('Karşılaştırmadan çıkar, basılı'); PropertyCard.tsx:106-107 `aria-pressed={isFavorite}` + `aria-label={isFavorite ? t("card.removeFavorite") : t("card.addFavorite")}`.
 
 **Etki:** Ekran okuyucu 'Favorilerden çıkar, basılı' gibi çelişkili bir durum duyuruyor; düğmenin şimdi ne yapacağı belirsiz.
 
 **Önerilen aksiyon:** Ya sabit etiket + aria-pressed ('Favorilere ekle: {title}', basılı/basılı değil) ya da aria-pressed'i kaldırıp eylem etiketini koruyun; iki deseni karıştırmayın.
+
+**Yapılan düzeltme:** aria-pressed is already gone from CompareToggle; its label states the action (add/remove), following the F90 pattern. The PropertyCard favorite button (PropertyCard.tsx:277-286) also has only an action label (`addFavoriteNamed`/`removeFavoriteNamed`) and no aria-pressed, so the two patterns are no longer mixed.
 
 ## F1206 — Karşılaştırma listesi dolunca (4 ilan) düğmeler gerekçesi gösterilmeden devre dışı kalıyor
 
@@ -1800,13 +1922,15 @@
 | Renk/tema           | Hayır                                         |
 | Efor                | S                                             |
 | Kaynak denetçiler   | area:results                                  |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                  |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p071)              |
 
 **Kanıt:** CompareToggle.tsx:17-18 `disabled={disabled} title={disabled ? t('full') : undefined}`: gerekçe ('En fazla 4 ilan karşılaştırılabilir') yalnızca title özniteliğinde. Devre dışı düğme klavyeyle odaklanamıyor; dokunmatik ekranda title görünmüyor.
 
 **Etki:** Mobil misafir beşinci ilanı eklemeye çalıştığında düğmenin neden tepki vermediğini anlamıyor.
 
 **Önerilen aksiyon:** disabled yerine aria-disabled='true' kullanın ve tıklamada 'En fazla 4 ilan karşılaştırılabilir · birini çıkarın' mesajını role='status' ile gösterin. Ya da CompareBar'da '4/4 dolu' bilgisini görünür metin olarak verin.
+
+**Yapılan düzeltme:** Already fixed: aria-disabled with an early return, a visible fullHint linked by aria-describedby, and the 4/4 full state shown in CompareBar text plus its role=status region.
 
 ## F1207 — Bilgi yalnız title (tooltip) özniteliğinde; klavye ve dokunmatikte erişilemiyor
 
@@ -1823,13 +1947,15 @@
 | Renk/tema           | Hayır                                                                                 |
 | Efor                | S                                                                                     |
 | Kaynak denetçiler   | lens:a11y                                                                             |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                          |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p071)                                                      |
 
 **Kanıt:** CompareToggle.tsx:17-18 `disabled={disabled} title={disabled ? t("full") : undefined}` — disabled düğme odak almadığı için 'En fazla 4 ilan' açıklamasına klavye/ekran okuyucu ulaşamıyor; ui.tsx:135 LlmBadge `title={t("ai.hint")}` ('doğruluğunu kontrol edin'); AccessibilitySection.tsx:46 doğrulama açıklaması `title={t("verifiedHint")}`.
 
 **Etki:** Mobil (dokunmatik) ve klavye misafiri neden ekleyemediğini ve AI çıktısını doğrulaması gerektiğini göremiyor.
 
 **Önerilen aksiyon:** Açıklamayı görünür metin ya da `aria-describedby` ile bağlı sr-only/görünür ipucu yapın; karşılaştırmada `aria-disabled` + açıklama, ya da CompareBar'da kalıcı 'Sınır doldu' mesajı.
+
+**Yapılan düzeltme:** The CompareToggle reason is no longer in a title attribute; it is visible text linked by aria-describedby, on a button that can still take focus. LlmBadge already has a visible hint (ui.tsx:243). AccessibilitySection.tsx:59 still has the verifiedHint only in a title attribute; that is handed over in crossOwner.
 
 ## F1208 — Karşılaştırma listesi dolunca neden yalnız fareyle görülen title'da; seçim sayısı duyurulmuyor
 
@@ -1846,13 +1972,15 @@
 | Renk/tema           | Hayır                                         |
 | Efor                | S                                             |
 | Kaynak denetçiler   | lens:status                                   |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                  |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p071)              |
 
 **Kanıt:** CompareToggle.tsx:12-18 `disabled={disabled}` + `title={disabled ? t("full") : undefined}` — disabled buton klavye odağı almıyor, dokunmatikte title görünmüyor. CompareBar.tsx:34 `{t("bar", { count: ids.length })}` canlı bölge değil.
 
 **Etki:** Mobil misafir 5. ilanı neden ekleyemediğini anlamıyor; ekran okuyucu kullanıcı ekleme sonucunu duymuyor.
 
 **Önerilen aksiyon:** `disabled` yerine `aria-disabled` + tıklamada satır içi 'En fazla 4 ilan karşılaştırılabilir' mesajı; CompareBar sayacına `aria-live="polite"`.
+
+**Yapılan düzeltme:** The CompareToggle reason is visible and linked by aria-describedby, and the button stays focusable. CompareBar.tsx:149-151 already announces the selection count, and the limit when full, through a role=status region that is always mounted.
 
 ## F1209 — Karşılaştır düğmesi bağlantı gibi görünüyor ve mobil için küçük bir dokunma hedefi
 
@@ -1869,13 +1997,15 @@
 | Renk/tema           | Hayır                                         |
 | Efor                | S                                             |
 | Kaynak denetçiler   | area:cards                                    |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                  |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p071)               |
 
 **Kanıt:** CompareToggle.tsx:20-22: `mr-3 mt-1 inline-block text-sm font-medium underline ... text-blue-700`. Dolgu yok; yükseklik globals.css:73-80'deki min-height 1.5rem (24px) ile sınırlı. Aynı alt çizgili mavi stil search/page.tsx:546'daki 'Benzerlerini göster' bağlantısında da kullanılıyor.
 
 **Etki:** Bağlantı ile aç/kapa düğmesi görsel olarak ayırt edilemiyor; kullanıcı yeni sayfaya gideceğini sanıyor. Mobil misafir 24px yükseklikteki metne isabetle dokunmakta zorlanıyor.
 
 **Önerilen aksiyon:** Onay kutusu görünümlü bir düğme kullanın: önde `<svg aria-hidden>` (boş/işaretli kare), `inline-flex items-center gap-2 rounded-md border px-3 py-2 min-h-[44px]`. Alt çizgiyi kaldırın.
+
+**Yapılan düzeltme:** The underlined, link-style text is now a bordered button that looks like a checkbox, with no underline. An aria-hidden SVG square in front of the label is empty when the listing is not selected and shows a check mark when it is. Classes added: `inline-flex items-center gap-2 rounded-md border border-current px-3 py-1`, with `min-h-[44px]` on mobile. The accessible name and colours are unchanged; the border uses currentColor, so no new colour was introduced.
 
 ## F1210 — Kart görselinin alt metni başlığı tekrarlıyor
 
@@ -1891,13 +2021,15 @@
 | Renk/tema           | Hayır                                         |
 | Efor                | S                                             |
 | Kaynak denetçiler   | area:cards                                    |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                  |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p102)               |
 
 **Kanıt:** PropertyCard.tsx:97: `alt={title}`. Hemen ardından 134-136'da aynı `{title}` başlık bağlantısı geliyor.
 
 **Etki:** Ekran okuyucu her kartta ilan adını iki kez duyuyor; 24 kartta gereksiz bir dinleme yükü oluşuyor.
 
 **Önerilen aksiyon:** Görsel bilgi taşımıyorsa `alt=''` verin. Taşıyorsa `alt={t('card.photoOf', {title})}` ('{title} — kapak fotoğrafı') kullanın.
+
+**Yapılan düzeltme:** Confirmed: the image had alt={title}, repeating the title link that is read just before it. The card image is now decorative (alt=""), with a short comment explaining why.
 
 ## F1211 — Kart görsellerinde `sizes` gerçek ızgarayla uyuşmuyor; iki farklı görsel hattı
 
@@ -1913,13 +2045,15 @@
 | Renk/tema           | Hayır                                                                                                  |
 | Efor                | S                                                                                                      |
 | Kaynak denetçiler   | lens:mobile                                                                                            |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                           |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p102)                                                                        |
 
 **Kanıt:** PropertyCard.tsx:99 `sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"`. Oysa ana sayfa (page.tsx:84) `lg:grid-cols-3` (≈33vw), arama sayfası (search/page.tsx:504) lg:col-span-3 içinde `sm:grid-cols-2 xl:grid-cols-3` (1024–1280 arası ≈37vw); masaüstünde düşük çözünürlüklü görsel seçiliyor. Kaynak URL'ler (page.tsx:93, search/page.tsx:513) `w=600&h=400` ile sınırlı; 360px × DPR3 = 1080px ekranda görsel büyütülüyor. Kartlar Next görsel optimizasyonunu, PropertyGallery.tsx:33 ise CDN `unsplashLoader`'ı kullanıyor.
 
 **Etki:** Yüksek DPR'li telefonlarda kart fotoğrafları bulanık. Optimize edici üzerinden geçen ek sunucu adımı ilk kart görsellerini geciktiriyor.
 
 **Önerilen aksiyon:** Kartlarda `loader={unsplashLoader}` kullan ve kaynak URL'den boyut parametrelerini kaldır. `sizes` değerini `(min-width:1280px) 25vw, (min-width:1024px) 33vw, (min-width:640px) 50vw, 100vw` yap.
+
+**Yapılan düzeltme:** Confirmed that sizes said 25vw on desktop, which is wrong for the home grid (lg:3 columns) and the search grid (lg:2, xl:3 columns, both inside max-w-7xl). Added a module-level CARD_IMAGE_SIZES of "(min-width: 1280px) 400px, (min-width: 1024px) 34vw, (min-width: 640px) 50vw, 100vw" and loader={unsplashLoader}, the same CDN loader PropertyGallery uses. The w=600&h=400 source URLs cited in the evidence no longer exist: cards use property.images[0], the seed URLs carry w=1200 and no h, and the loader overrides w and q, so other files need no change.
 
 ## F1212 — Favori düğmesinde aria-pressed ile değişen aria-label birlikte kullanılıyor
 
@@ -1935,13 +2069,15 @@
 | Renk/tema           | Hayır                                          |
 | Efor                | S                                              |
 | Kaynak denetçiler   | area:home                                      |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                   |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p102)               |
 
 **Kanıt:** `aria-pressed={isFavorite}` ile birlikte `aria-label={isFavorite ? t("card.removeFavorite") : t("card.addFavorite")}` (102-103) kullanılıyor; hem ad hem durum değişiyor.
 
 **Etki:** Ekran okuyucu 'Favorilerden çıkar, basılı' gibi çelişkili ya da çift durum okuyor; ana sayfadaki her öne çıkan kartta bu tekrarlanıyor.
 
 **Önerilen aksiyon:** aria-pressed korunacaksa sabit bir etiket kullanın: `aria-label={t('card.favorite')}` (TR 'Favorilere kaydet'). Ya da aria-pressed'i kaldırıp değişen etiketi tutun.
+
+**Yapılan düzeltme:** The favourite button has no aria-pressed; it uses only the changing named label t("card.removeFavoriteNamed"/"card.addFavoriteNamed", {title}). This is the finding's second option (drop aria-pressed, keep the changing label), so the screen reader no longer hears a doubled state.
 
 ## F1213 — Puan değeri toFixed ile biçimleniyor; TR'de ondalık ayırıcı tutarsız (8.6 ve 8,8)
 
@@ -1957,13 +2093,15 @@
 | Renk/tema           | Hayır                                          |
 | Efor                | S                                              |
 | Kaynak denetçiler   | area:cards                                     |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                   |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p102)               |
 
 **Kanıt:** PropertyCard.tsx:164: `{rating.toFixed(1)}` her dilde '.' üretiyor. compare/page.tsx:156 `f.number(l.rating.avg)` TR'de ',' üretiyor. Ekran görüntülerinde kartta '8.6', karşılaştırmada '8,8' görünüyor.
 
 **Etki:** Aynı metrik iki ekranda farklı biçimde görünüyor ve TR ekran okuyucu '8 nokta 6' diye okuyor.
 
 **Önerilen aksiyon:** `f.number(rating, { minimumFractionDigits: 1, maximumFractionDigits: 1 })` kullanın. property/[id]/page.tsx:145'te de aynısını uygulayın.
+
+**Yapılan düzeltme:** The card no longer uses toFixed. It renders <RatingBadge value={rating} />, which formats with f.number(value, {minimumFractionDigits:1, maximumFractionDigits:1}) (RatingBadge.tsx:32). src/app/property/[id]/page.tsx:284 also uses RatingBadge now, so TR shows a comma on both screens.
 
 ## F1214 — Tarihli toplam fiyat kaç misafir/oda için olduğunu söylemiyor
 
@@ -1978,10 +2116,12 @@
 | Renk/tema           | Hayır                                          |
 | Efor                | S                                              |
 | Kaynak denetçiler   | area:cards                                     |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                   |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p102)                |
 
 **Kanıt:** PropertyCard.tsx:175-177: `t('card.nightsTotal', {count: stay.nights})` ('3 gece toplam'). `stay.guests` mevcut ama gösterilmiyor.
 
 **Etki:** Misafir sayısını değiştiren ya da başlıktaki özeti görmeyen misafir toplamın kaç kişi için hesaplandığından emin olamıyor.
 
 **Önerilen aksiyon:** Mesajı `'{nights} gece, {guests} misafir · toplam'` yapın (search.json `card.nightsGuestsTotal`, EN çoğul ICU).
+
+**Yapılan düzeltme:** Confirmed: stay.guests was available but not shown. The dated total label now uses the new key search.card.nightsGuestsTotal with {nights, guests}. TR reads "3 gece, 2 misafir için toplam"; EN reads "total for 3 nights, 2 guests" with ICU plurals. Both locales are in msg-ml/p102.json. card.nightsTotal is now unused but was left in place.

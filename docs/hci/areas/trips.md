@@ -285,13 +285,15 @@
 | Renk/tema           | Hayır                                                                           |
 | Efor                | S                                                                               |
 | Kaynak denetçiler   | runtime:trips, area:trips, lens:consistency                                     |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                    |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p010)                                          |
 
 **Kanıt:** p-variants.mts (API taklit): CANCELLED 'Rezervasyon iptal edildi', EXPIRED 'Ödeme süresi doldu', HELD 'Oda sizin için tutuluyor — ödemeyi tamamlayın', PENDING 'Rezervasyon beklemede' — hepsinde bant rgb(21,128,61) (bg-green-700). Ekran: scratchpad/runtime/probes/booking/status-CANCELLED.png. İptal sonrası (p-cancel-accept.mts, 390x844) yeşil bant + yeşil (text-green-700, BookingActions.tsx:366) 'İptal edildi. Politika gereği iade yok.' — sıfır iade 'olumlu' renkle; ekran after-cancel-mobile.png.
 
 **Etki:** Hızlı bakan/düşük okuryazarlıklı misafir yeşili 'her şey yolunda' diye okuyor; HELD durumunda ödemenin henüz yapılmadığını kaçırabilir, iptal edilmiş rezervasyonu geçerli sanabilir.
 
 **Önerilen aksiyon:** Paleti değiştirmeden: yeşil bandı yalnız CONFIRMED/COMPLETED'da gösterin; diğer durumlarda bandı kaldırıp mevcut beyaz kart başlığı + durum ikonu ve metin rozeti (ör. ✕ 'İptal edildi', ⏳ 'Ödeme bekleniyor') kullanın. İade bilgisini 'info' yerine nötr metinle verin.
+
+**Yapılan düzeltme:** The status band now shows an aria-hidden status icon: a check for CONFIRMED/COMPLETED, a clock for HELD/PENDING, and an X for CANCELLED/EXPIRED. Under the heading, non-success statuses also get an explanatory line (detail.statusHint.*), so a cancelled, expired or unpaid booking no longer reads as success from the text and shape. The band colour stays green (color/theme out of scope), and the green refund text in BookingActions (not my file) is also a colour change, so it was left as is.
 
 ## F449 — Ödeme bekleyen (HELD) durum, onaylanan rezervasyonla aynı yeşil başarı bandıyla gösteriliyor
 
@@ -328,13 +330,15 @@
 | Renk/tema           | Hayır                                            |
 | Efor                | S                                                |
 | Kaynak denetçiler   | runtime:trips, area:trips                        |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                     |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p057)                  |
 
 **Kanıt:** p-booking.mts B1: label 'Mesajınız' class='sr-only'; görünür tek ipucu placeholder 'Mesajınızı yazın' (yazmaya başlayınca kayboluyor); aria-describedby=null — 'Güvenliğiniz için telefon, e-posta, IBAN ve bağlantılar otomatik gizlenir…' notu (satır 131) alana bağlı değil. Ekran crops/booking/072-guest-…-0.png ve 073-…-1.png.
 
 **Etki:** Düşük okuryazarlık/yaşlı kullanıcılar ve bilişsel yükü yüksek mobil kullanıcılar alanın amacını yazarken kaybediyor; SR kullanıcısı maskeleme kuralını alana gelince duymuyor.
 
 **Önerilen aksiyon:** Görünür etiket ekleyin ('Ev sahibine mesajınız' / 'Misafire mesajınız', role'e göre); safetyNotice p'sine id verip textarea aria-describedby ile bağlayın (sayaç id'si ile birlikte).
+
+**Yapılan düzeltme:** The sr-only label is now a visible label that depends on role: GUEST sees chat.inputLabelToHost and HOST sees chat.inputLabelToGuest. The safety notice <p> now has id="msg-safety". The textarea's aria-describedby always includes msg-safety and msg-count, and also msg-ai-notice and msg-error when those are shown.
 
 ## F451 — Mesajda istemci tarafı uzunluk sınırı/sayaç yok; hata ancak gönderimden sonra geliyor ve alana bağlanmıyor
 
@@ -351,13 +355,15 @@
 | Renk/tema           | Hayır                                                                  |
 | Efor                | S                                                                      |
 | Kaynak denetçiler   | runtime:trips, area:trips                                              |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                           |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p057)                                        |
 
 **Kanıt:** p-booking.mts B1/B5/B6: textarea maxLength=-1, aria-describedby=null; 2500 karakter kabul edildi, sayaç yok; Gönder -> ~1.2 sn sonra role=alert 'Mesaj en fazla 2000 karakter olabilir'; textarea aria-invalid=null, odak body. Sunucu sınırı MESSAGE_MAX_LENGTH 2000 (app-config.ts:299). Olumlu: metin korunuyor (2500).
 
 **Etki:** Uzun check-in talimatı yazan ev sahibi sınırı ancak gönderdikten sonra öğreniyor ve neyi ne kadar kısaltacağını bilmiyor.
 
 **Önerilen aksiyon:** Sınırı thread yanıtında (maxLength) istemciye verin; textarea'ya maxLength yerine canlı sayaç ('1980/2000', aria-describedby ile bağlı, eşik aşınca aria-live polite) ekleyin; hata p'sine id verip aria-describedby + aria-invalid ile alana bağlayın.
+
+**Yapılan düzeltme:** Added a live counter (chat.counter, id msg-count) linked through aria-describedby. When the text crosses 90% of the limit or goes over it, an sr-only polite live region announces it once per state change (counterNear/counterOver). A send over the limit is blocked on the client and the text is kept. A tooLong error (with the over count) is linked to the field with aria-invalid and msg-error, and it clears itself once the text is short enough. The limit comes from an optional thread.maxLength and falls back to 2000. The server part is listed in crossOwner.
 
 ## F565 — Giriş bağlantıları geri dönüş adresi taşımıyor (/booking/<id> ve /trips)
 
@@ -373,7 +379,7 @@
 | Renk/tema           | Hayır                                                        |
 | Efor                | S                                                            |
 | Kaynak denetçiler   | runtime:trips                                                |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                 |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p010)                             |
 
 **Kanıt:** anon.mjs (TR/EN, 1280x800): /booking/cmv2uyf700o3c92w2ti427b8v 'Giriş Yap' href='/login'; /trips 'Giriş yap' href='/login'. Giriş sayfası ?redirect= destekliyor (src/app/login/page.tsx:63,141) ve başka akışlar kullanıyor (checkout/page.tsx:123, AddToCartButton.tsx:59).
 
@@ -381,26 +387,30 @@
 
 **Önerilen aksiyon:** href={`/login?redirect=${encodeURIComponent(pathname)}`} (TripsView.tsx:91 için '/trips').
 
+**Yapılan düzeltme:** The current code already uses loginHref() for the sign-in link (page.tsx needsLogin view, `<Link href={loginHref()}>`). It produces /login?redirect=<current path+query+hash>, so after signing in the guest comes back to /booking/<id>. TripsView is owned by another package.
+
 ## F566 — Yazdır çıktısı: başlık/menü/footer, iptal düğmesi ve formlar basılıyor; onay bandı soluk, 2 sayfa
 
-| Alan                | Değer                              |
-| ------------------- | ---------------------------------- |
-| Severity            | Medium                             |
-| Durum               | Gözlemlendi                        |
-| Konum               | `src/app/booking/[id]/page.tsx:95` |
-| Kullanıcılar        | misafir                            |
-| Prensip             | learnability · Task conformance    |
-| Sezgisel madde      | H8 — Estetik/minimal tasarım       |
-| Renk/tema           | Hayır                              |
-| Efor                | S                                  |
-| Kaynak denetçiler   | runtime:trips                      |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**       |
+| Alan                | Değer                                  |
+| ------------------- | -------------------------------------- |
+| Severity            | Medium                                 |
+| Durum               | Gözlemlendi                            |
+| Konum               | `src/app/booking/[id]/page.tsx:95`     |
+| Kullanıcılar        | misafir                                |
+| Prensip             | learnability · Task conformance        |
+| Sezgisel madde      | H8 — Estetik/minimal tasarım           |
+| Renk/tema           | Hayır                                  |
+| Efor                | S                                      |
+| Kaynak denetçiler   | runtime:trips                          |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p010) |
 
 **Kanıt:** p-print-sse.mts emulateMedia('print'): görünür öğe sayıları header 1, nav 1, footer 1, DEMO şeridi 1, iptal düğmesi 1, mesaj formu 1, talep formu 1; hiçbir stil sayfasında @media print kuralı yok, print:hidden sınıfı 0. PDF (scratchpad/runtime/probes/booking/booking-print.pdf) 2 sayfa; arka plan düştüğü için 'Rezervasyonunuz onaylandı' ve 'Konaklamayı Görüntüle' beyaz metinleri açık griye dönüyor; tema/dil seçicileri ve 'Çıkış yap' basılıyor.
 
 **Etki:** Resepsiyonda/vize başvurusunda kullanılacak çıktı kalabalık, iki sayfa ve en önemli satır (onay durumu) okunaksız.
 
 **Önerilen aksiyon:** Header, Footer, DEMO şeridi, BookingActions, BookingMessages, BookingResolutionPanel ve eylem satırına print:hidden; banda print:bg-white print:text-gray-900 print:border; yalnız baskıda görünen adres, giriş saati, misafir adı ve QR/kod bloğu ekleyin.
+
+**Yapılan düzeltme:** When printing, the Header, Footer, the wrapper around BookingActions/BookingMessages/BookingResolutionPanel and the action row are hidden (print:hidden). The status band keeps its colour in print ([print-color-adjust:exact]; autoprefixer adds the -webkit- prefix), so the white status text stays readable. Check-in and check-out times from property.checkInTime/checkOutTime are now shown under the dates, on screen and in print. The DEMO ribbon was left visible on purpose so a printed demo confirmation can't pass as a real one. Address, guest name and QR/code are not in the booking GET response (the Property schema has no address field), so the print-only block was not added.
 
 ## F567 — İptal edilen/süresi dolan rezervasyonda mesaj geçmişi tamamen gizleniyor
 
@@ -416,13 +426,15 @@
 | Renk/tema           | Hayır                                                     |
 | Efor                | S                                                         |
 | Kaynak denetçiler   | runtime:trips                                             |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                              |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p010)                           |
 
 **Kanıt:** p-variants.mts: CANCELLED/EXPIRED/PENDING sayfalarında başlıklar yalnız 'Grand Deluxe Hotel', 'Mesajlar' bölümü yok. p-cancel-accept.mts: thread'de 'İade konusunu konuşalım' ev sahibi mesajı varken iptalden sonra messagesSectionVisible=false, mesaj görünmüyor. BookingMessages zaten salt-okunur modu destekliyor (canWrite=false -> 'Mesajlaşma yalnızca onaylı rezervasyonlarda açıktır.', satır 216-218) ama sayfa bileşeni yalnız CONFIRMED/COMPLETED'da render ediyor.
 
 **Etki:** Uyuşmazlık/iade sürecinin tam ortasında misafir ev sahibiyle yaptığı yazılı anlaşmalara erişemiyor.
 
 **Önerilen aksiyon:** BookingMessages'ı tüm durumlarda render edin; yazma izni sunucunun canWrite alanına bırakılsın (salt-okunur geçmiş + 'kapalı' notu).
+
+**Yapılan düzeltme:** BookingMessages now also renders for CANCELLED bookings (CONFIRMED/COMPLETED/CANCELLED), in read-only mode, with write permission taken from the server's canWrite. It gets key={booking.status} so the thread is fetched again when the status changes; otherwise a CONFIRMED→CANCELLED thread would keep showing the write form. HELD, PENDING and EXPIRED can never have messages, because messaging only opens at CONFIRMED (message-service WRITABLE) and EXPIRED only comes from PENDING/HELD, so they are not rendered there.
 
 ## F568 — Fatura indirme yolu arayüzde yok (API mevcut)
 
@@ -438,13 +450,15 @@
 | Renk/tema           | Hayır                                        |
 | Efor                | S                                            |
 | Kaynak denetçiler   | runtime:trips                                |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                 |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p010)              |
 
 **Kanıt:** Gerçek oturumlu tarama 072/073 gövde metni ve Tab sırası: 'Rezervasyonu iptal et', textarea, 'Çözüm merkezine git', talep alanları, 'Talebi gönder', 'Konaklamayı Görüntüle', 'Rezervasyonlarım', 'Yazdır' — fatura/invoice yok. src altında hiçbir .tsx '/invoice' referansı yok (grep). GET /api/bookings/<id>/invoice anon curl -> 401 JSON (rota canlı); route.ts:7 'Mock e-Arşiv fatura PDF'i (yalnızca rezervasyon sahibi; CONFIRMED/COMPLETED)'.
 
 **Etki:** Masraf beyanı için fatura isteyen misafir destek talebi açmak zorunda; özellik keşfedilemez.
 
 **Önerilen aksiyon:** CONFIRMED/COMPLETED için eylem satırına 'Faturayı indir (PDF)' bağlantısı ekleyin: href=`/api/bookings/${id}/invoice`, dosya türü ipucu ile.
+
+**Yapılan düzeltme:** For CONFIRMED/COMPLETED bookings the action row now has an `<a href=/api/bookings/{id}/invoice download type="application/pdf">` link labelled 'Faturayı indir (PDF)' / 'Download invoice (PDF)' (new key detail.invoice). It uses the same style as the other secondary actions.
 
 ## F569 — Canlı bağlantı yeniden kurulunca kaçırılan mesajlar gelmiyor; bağlantı durumu gösterilmiyor
 
@@ -460,13 +474,15 @@
 | Renk/tema           | Hayır                                                                            |
 | Efor                | M                                                                                |
 | Kaynak denetçiler   | runtime:trips                                                                    |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                     |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p057)                                                  |
 
 **Kanıt:** p-print-sse.mts (akış taklidi her bağlantıda kapanıyor = ağ kopması simülasyonu): bağlantı arasında 'sunucuya' eklenen 'Kapı kodu değişti, lütfen bu mesajı okuyun' mesajı 13 yeniden bağlanma boyunca hiç gösterilmedi; thread GET sayısı 2'de kaldı (yalnız ilk yükleme). Akış olaylarında id: alanı yok (stream/route.ts:85) -> Last-Event-ID kullanılamaz; hub.ts:51 yorumu 'istemci GET ile yakalar' diyor ama istemci yeniden bağlantıda GET yapmıyor. 429 TOO_MANY_STREAMS (route.ts:66-71) durumunda EventSource kalıcı kapanır, UI'da gösterge yok (sayfada bağlantı durumu öğesi bulunamadı).
 
 **Etki:** Mobil ağ değişiminde/uyku sonrası gelen kritik mesajlar (kapı kodu, gecikme) sayfa yenilenene kadar görünmüyor; kullanıcı 'canlı' olduğunu varsayıyor.
 
 **Önerilen aksiyon:** es.onopen'da (ilk açılış hariç) thread'i yeniden GET edip add() ile birleştirin; olaylara id: ekleyip Last-Event-ID desteği verin; es.onerror'da readyState===CLOSED ise 'Canlı güncelleme durdu — Yenile' düğmesi gösterin; 30-60 sn yedek yoklama ekleyin.
+
+**Yapılan düzeltme:** The EventSource now has open and error handlers. When it reopens, the thread is fetched again with GET and merged by id and sorted by createdAt. A GET also runs when the tab becomes visible again. While the GET is in flight, live events are buffered instead of dropped. On error the UI shows a role=status message: 'reconnecting' while the state is CONNECTING, or 'stopped' plus a Reconnect button when it is CLOSED (for example a 429). While not live there is a 30s fallback poll. Last-Event-ID / id: was not added because the GET-on-reopen fills the gap.
 
 ## F570 — Gönderim sürerken yazılan metin başarıdan sonra siliniyor; meşgul durumu metinle bildirilmiyor
 
@@ -481,13 +497,15 @@
 | Renk/tema           | Hayır                                           |
 | Efor                | S                                               |
 | Kaynak denetçiler   | runtime:trips                                   |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                    |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p057)                 |
 
 **Kanıt:** p-variants.mts RACE (POST 2 sn geciktirildi): gönderim sırasında ' Ayrıca otopark var mı?' yazıldı -> değer 'Merhaba, saat kaçta giriş yapabiliriz? Ayrıca otopark var mı?'; yanıt gelince değer '' ve sunucuya yalnız ilk cümle gitti (ikinci soru kayboldu). p-booking.mts B8: gönderim sırasında düğme metni 'Gönder' kalıyor (yalnız disabled), textarea düzenlenebilir.
 
 **Etki:** Yavaş mobil ağda (hedef kitle) ardışık soru yazan misafirin metni sessizce kayboluyor.
 
 **Önerilen aksiyon:** Başarıda setText(prev => prev.startsWith(sent) ? prev.slice(sent.length).trimStart() : prev) kullanın veya gönderim sırasında textarea'yı readOnly + aria-busy yapın; düğme etiketini 'Gönderiliyor…' yapın (support.json chat.sending anahtarı zaten var).
+
+**Yapılan düzeltme:** On a successful send, only the sent prefix is removed from the latest text (tracked in textRef). Anything typed during the send is kept and fromDraft is reset. The busy state now records whether a send or a draft is running. The send button reads chat.sending and the draft button reads chat.drafting, each with aria-busy.
 
 ## F571 — AI taslağı ev sahibinin yazdığı metni onaysız eziyor; taslak uyarısı duyurulmuyor, AI rozeti yok
 
@@ -503,13 +521,15 @@
 | Renk/tema           | Hayır                                            |
 | Efor                | S                                                |
 | Kaynak denetçiler   | runtime:trips                                    |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                     |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p057)                  |
 
 **Kanıt:** p-host.mts (HOST, API taklit): textarea'ya 'Evet, 12:00 gibi gelebilirsiniz; odayı hazırlıyoruz.' yazıldı -> 'Yanıt taslağı öner' Enter -> değer 'Merhaba, girişiniz 15:00 itibarıyla mümkündür. İyi yolculuklar!' ile değişti (önceki metin kayıp, geri al yok). 'Yapay zekâ taslağı — göndermeden önce kontrol edin…' notu live region'da değil, textarea'ya bağlı değil (aria-describedby null); [data-ai-generated] LlmBadge sayısı 0; odak body.
 
 **Etki:** Ev sahibi kendi yazdığı (daha doğru) yanıtı kaybediyor; SR kullanıcısı metnin AI tarafından değiştirildiğini fark etmeyebilir ve AI metnini kontrolsüz gönderebilir.
 
 **Önerilen aksiyon:** Metin doluysa taslağı ayrı öneri kutusunda gösterin veya 'Mevcut metni değiştir?' onayı isteyin; 'Taslağı geri al' ile önceki metni geri yükleyin; notu role=status içine alıp aria-describedby ile bağlayın, yanına <LlmBadge mode=…/> koyun; işlem bitince odağı textarea'ya verin.
+
+**Yapılan düzeltme:** If the textarea already has text when a draft arrives, the draft goes into a separate group box instead. The box shows a title, the draft text, an LlmBadge (llmMode), the AI notice, and three buttons: Replace / Append / Dismiss. Focus moves to the box. After Replace or Append, a 'Restore my previous text' undo button appears. The AI notice now sits in a role=status region next to an <LlmBadge mode={llmMode}/> and is linked to the textarea (msg-ai-notice). Focus goes back to the textarea afterwards.
 
 ## F572 — AI taslağından gönderilen mesaj konuşmada (alıcı dahil) işaretlenmiyor
 
@@ -525,13 +545,15 @@
 | Renk/tema           | Hayır                                                              |
 | Efor                | S                                                                  |
 | Kaynak denetçiler   | runtime:trips                                                      |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                       |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p057)                                    |
 
 **Kanıt:** p-booking.mts C1/C3: SSE ile gelen fromAiDraft:true ev sahibi mesajı misafirde 'Ev sahibi: Hoş geldiniz! Erken giriş mümkün. 11.10.2026 00:32' olarak, hiçbir AI işareti olmadan göründü ([data-ai-generated]=0). p-host.mts: ev sahibinin AI taslağından gönderdiği mesaj kendi görünümünde de işaretsiz. fromAiDraft DB'ye yazılıyor (message-service.ts:155) ama BookingMessages render'ında kullanılmıyor; projede 'her AI çıktısının yanında' rozet için LlmBadge (ui.tsx) mevcut.
 
 **Etki:** Misafir otomatik üretilmiş bir yanıtı kişisel taahhüt sanabilir (ör. 'erken giriş mümkün'); AI şeffaflığı ilkesine aykırı, uyuşmazlıkta güveni zedeler.
 
 **Önerilen aksiyon:** m.fromAiDraft true ise meta satırında küçük 'AI taslağından' etiketi/LlmBadge gösterin (sr-only öneke de ekleyin).
+
+**Yapılan düzeltme:** When m.fromAiDraft is true, the meta line shows a small 'Yapay zekâ taslağından' pill with data-ai-generated="true" (marked aria-hidden). The same text is added to the sr-only sender prefix, so screen readers hear it before the message body.
 
 ## F573 — Service worker yokken izin verilince bildirim düğmesi 'İşleniyor…' durumunda sonsuza dek asılı kalıyor
 
@@ -547,13 +569,15 @@
 | Renk/tema           | Hayır                                                                    |
 | Efor                | S                                                                        |
 | Kaynak denetçiler   | runtime:trips                                                            |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                             |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p106)                                          |
 
 **Kanıt:** p-trips.mts 'granted-no-sw' (390x844, izin granted, push etkin taklit): tıklamadan 1.5 sn sonra 'İşleniyor…', 9.5 sn sonra hâlâ 'İşleniyor…'; navigator.serviceWorker.getRegistration() = yok; odak body. navigator.serviceWorker.ready kayıt olmadan hiç çözülmez; kayıt dev'de ve NEXT_PUBLIC_PWA_DISABLED=true iken atlanıyor (ServiceWorkerRegistrar.tsx:12-13); pushSupported() yalnız API varlığına bakıyor (client.ts:16-23).
 
 **Etki:** PWA kapalı yapılandırmada kullanıcı sonsuz bekleme görür, hata mesajı yok; güven ve zaman kaybı.
 
 **Önerilen aksiyon:** detectPushState'te getRegistration() boşsa kartı 'unsupported' gösterin; enable()'da serviceWorker.ready'yi 10 sn zaman aşımıyla yarıştırıp t('error') gösterin.
+
+**Yapılan düzeltme:** detectPushState now shows the 'server-off' view when there is no SW registration and this build never registers one. That covers dev and NEXT_PUBLIC_PWA_DISABLED=true, through a new exported serviceWorkerRegistrationEnabled() in ServiceWorkerRegistrar.tsx. I used 'server-off' rather than 'unsupported' because the browser is not at fault. enable() now races serviceWorker.ready against a 10 s timeout and shows the new t('notReady') error, and focus stays on the button.
 
 ## F574 — Oturumlu /trips'te ağ 25 sn boşa çıkmadı; istemci tarafı sürekli bağlantı/döngü değil, ayrıca anon yüklemede 3 kez refresh
 
@@ -569,13 +593,15 @@
 | Renk/tema           | Hayır                                                                                                 |
 | Efor                | M                                                                                                     |
 | Kaynak denetçiler   | runtime:trips                                                                                         |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                          |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p107)                                                                |
 
 **Kanıt:** Tarama 066/067 (guest /trips, iki viewport): networkIdleTimeout=true, loadMs 26541/26476 — 128 ziyaret içinde yalnız bu rota; içerik yine de render olmuş. trips-net.mjs (anon, gerçek sunucu): networkidle 2.09 sn, açık kalan istek 0, WS yalnız Next HMR; /api/user/me, /api/itinerary, /api/push/subscription (dev StrictMode nedeniyle ikişer) + 3x POST /api/auth/refresh (TripsView.loadItinerary kendi refresh'ini apiFetch'in tekilleştirilmiş refreshSession'ından ayrı yapıyor, satır 38-44). p-trips.mts (üç API taklit): networkidle 1.3–1.7 sn, EventSource/yoklama yok. Sonuç: sürekli açık bağlantı ya da sonsuz render döngüsü YOK; gecikme oturumlu gerçek sunucu yanıtlarından birinde (büyük olasılıkla /api/itinerary: imza+QR üretimi, itinerary.ts:56-73). Hazır storageState'lerin erişim token'ı 20:48Z'de dolmuş, refresh 401 verdiği için oturumlu ölçüm tekrarlanamadı — kök neden doğrulanmadı.
 
 **Etki:** Seyahat kartı/QR resepsiyonda hızlı açılmalı; yavaş yanıt süresince yalnız 'Seyahatler yükleniyor…' görünür, mobil veride terk riski.
 
 **Önerilen aksiyon:** /api/itinerary ve /api/push/subscription'a Server-Timing ekleyip oturumlu ölçün; QR SVG'yi rezervasyon başına önbelleğe alın; loadItinerary'de AbortController ile zaman aşımı + 'Tekrar dene'; kendi refresh çağrısını kaldırıp apiFetch'in tekil refreshSession'ını kullanın.
+
+**Yapılan düzeltme:** Client side is done. loadItinerary no longer runs its own POST /api/auth/refresh. On a 401 it calls refreshSessionUser(), which shares the Header's in-flight /api/user/me request and so reuses apiFetch's single deduplicated refreshSession. An AbortController now cancels the fetch on effect cleanup, which removes the StrictMode duplicate request and its extra refresh. A 20 s timeout ends in the error state with a 'Tekrar dene' button. Server-Timing and QR caching are in files I don't own and are handed off in crossOwner.
 
 ## F575 — /trips hata ve boş durumları: tekrar dene yok, boşta yönlendirme yok, QR yokken QR ipucu gösteriliyor
 
@@ -590,13 +616,15 @@
 | Renk/tema           | Hayır                                  |
 | Efor                | S                                      |
 | Kaynak denetçiler   | runtime:trips                          |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**           |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p107)        |
 
 **Kanıt:** p-trips-states.mts (390x844): /api/itinerary 500 -> yalnız role=alert 'Seyahatler yüklenemedi.', main'de hiç eylem yok. Boş liste -> 'Yaklaşan onaylı rezervasyonunuz yok.' + ardından 'Girişte bu QR kodu gösterin. Kod kişisel bilgi içermez…' (sayfada QR yok), eylem 0.
 
 **Etki:** Hata alan kullanıcı yalnızca sayfayı yenilemeyi tahmin edebilir; boş durumda sonraki adım belirsiz, alakasız QR metni kafa karıştırır.
 
 **Önerilen aksiyon:** Hata durumunda 'Tekrar dene' düğmesi (loadItinerary'yi yeniden çalıştırır); boş durumda 'Konaklama ara' (/) ve 'Tüm rezervasyonlarım' (/account) bağlantıları; qrHint'i yalnız items.length>0 iken render edin (satır 179).
+
+**Yapılan düzeltme:** The error state now shows a 'Tekrar dene' button (Button busy, which keeps focus) that reruns the load; the role=alert text is re-keyed so each failure is announced again, and on success focus moves to the trips container (tabIndex=-1). The empty state has 'Konaklama ara' (/) and 'Tüm rezervasyonlarım' (/account) links. qrHint now renders only when there are items.
 
 ## F576 — Seyahat kartı rezervasyon detayına bağlanmıyor; kod 11px ve kopyalanamıyor
 
@@ -611,13 +639,15 @@
 | Renk/tema           | Hayır                                              |
 | Efor                | S                                                  |
 | Kaynak denetçiler   | runtime:trips                                      |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                       |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p107)                    |
 
 **Kanıt:** p-trips.mts (390x844, itinerary taklit): trip-card içinde a/button sayısı 0; kod 11px ui-monospace (TripsView.tsx:170). Tarama 066/067 tinyText: '11px code.break-all.text-[11px] "BK1.cmv2uyf700o3c92w2ti427b8v.GvTvtzPNrmepLzIkYf75"'. PWA kısayolu ve push bildirimleri /trips'e açılıyor (src/lib/pwa/manifest.ts:40, src/lib/push/notifications.ts:46), ama buradan iptal/mesaj/fatura için detaya geçiş yok. Ekran crops/booking/067-guest-tr-mobile-_trips-0.png.
 
 **Etki:** Bildirime dokunup /trips'e gelen misafir ev sahibine yazmak veya rezervasyonu yönetmek için menülerde kaybolur; resepsiyonda 52 karakterlik 11px kodu okumak/söylemek zor.
 
 **Önerilen aksiyon:** Başlığı /booking/{id} bağlantısı yapın ve 'Rezervasyonu yönet' bağlantısı ekleyin; kodu en az text-sm gösterin, 'Kodu kopyala' düğmesi + role=status geri bildirimi ekleyin.
+
+**Yapılan düzeltme:** Each card now has a /booking/{id} link under the h2, described by the title through aria-describedby. It is one explicit link rather than also making the title a link, to avoid two tab stops to the same page. The number is now text-sm font-mono instead of 11px. A 'Numarayı kopyala' button uses navigator.clipboard and reports 'kopyalandı' or 'kopyalanamadı' in a per-card role=status.
 
 ## F601 — Rezervasyon detayında başlık bandı tüm durumlarda yeşil (İptal/Süresi doldu/Beklemede dahil)
 
@@ -655,13 +685,15 @@
 | Renk/tema           | Hayır                                                                 |
 | Efor                | S                                                                     |
 | Kaynak denetçiler   | lens:status, lens:copy                                                |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                          |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p010)                                       |
 
 **Kanıt:** booking/[id]/page.tsx:116 `<div className="bg-green-700 px-8 py-6 text-white">` durumdan bağımsız; 117-119 başlık yalnız durum adını veriyor ('Rezervasyon iptal edildi', 'Ödeme süresi doldu'), ikon veya ne yapılacağına dair açıklama yok.
 
 **Etki:** Hızlı bakan mobil misafir bandı 'her şey yolunda' olarak okuyabiliyor; HELD durumunda ödemenin henüz yapılmadığını kaçırabiliyor.
 
 **Önerilen aksiyon:** Renge dokunmadan: başlığın önüne durum ikonu (✓ onaylı, ⏳ ödeme bekliyor, ✕ iptal/süresi doldu; aria-hidden) ve altına durum açıklaması + eylem ('Ödemeyi 14:32'ye kadar tamamlayın' / 'Aynı tarihleri yeniden ara'). Bandın renginin duruma göre değişmesi ayrı bir tema kararıdır, kapsam dışı bırakılabilir.
+
+**Yapılan düzeltme:** Confirmed: the band was always bg-green-700 with only the status name, no icon and no explanation. The heading now has an aria-hidden status icon in front and, for HELD/PENDING/CANCELLED/EXPIRED, an explanation line under it (detail.statusHint.*). For CANCELLED/EXPIRED bookings with a future check-in, the primary link becomes 'Aynı tarihler için yeniden ara', pointing to /property/{id}?checkIn&checkOut&guests. The heading's accessible name is unchanged and the band colour was not touched.
 
 ## F603 — Başlık hiyerarşisi tutarsız: host mesaj sayfasında h1 yok, arama sonuçları 'Filtreler' h2'sinin altına düşüyor, aynı h2 düzeyi üç farklı boyutta
 
@@ -678,13 +710,15 @@
 | Renk/tema           | Hayır                                                                                                                                                                                                                                                                                 |
 | Efor                | S                                                                                                                                                                                                                                                                                     |
 | Kaynak denetçiler   | lens:consistency, lens:a11y                                                                                                                                                                                                                                                           |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                                                                                                                                                                          |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p025)                                                                                                                                                                                                                                                |
 
 **Kanıt:** host/messages/[bookingId]/page.tsx:17-24 `<main>` içinde önce geri bağlantısı, ardından BookingMessages geliyor. İlk başlık BookingMessages.tsx'teki `<h2 id="msg-title">`, sayfada h1 yok, hangi rezervasyon ya da misafir olduğu da yazmıyor. search/page.tsx:326'da kenar çubuğu `<h2>{t("filters.title")}</h2>`, sonuç alanında başlık yok, kartlar PropertyCard.tsx:133'te `<h3>`, dolayısıyla belge yapısında sonuçlar 'Filtreler'in alt başlığı. Hesap sayfasında aynı h2 düzeyi :274 `text-2xl`, PasskeyManager.tsx:104 `text-xl` ve Card (ui.tsx:107) `text-lg`. booking/[id]/page.tsx:117'de sayfanın h1'i rezervasyon durum cümlesi.
 
 **Etki:** Ekran okuyucuyla başlıklar arasında gezinen host mesaj sayfasında sayfa başlığı bulamaz. Misafir arama sonuçlarına başlıkla atlayamaz. Görsel olarak aynı önemdeki bölümler farklı büyüklükte göründüğünden sayfa taraması zorlaşır.
 
 **Önerilen aksiyon:** host/messages sayfasını PageShell'e taşıyın: title "Mesajlar: {ilan} · {tarihler}", geri bağlantısı intro'da. Arama sayfasında sonuç listesinin üstüne `<h2 className="sr-only">{t("resultsHeading")}</h2>` ekleyin. Card başlığını tek h2 stili kabul edip hesap sayfasındaki h2'leri ona hizalayın. Booking detayında h1'i "Rezervasyon {kısa no}" yapın, durumu h1 altında rozet olarak gösterin.
+
+**Yapılan düzeltme:** Host messages page now uses PageShell, so it gets the shared h1 ('Misafir yazışması') with focus on client navigation, the back link sits in the intro and the content is in a max-w-3xl card. Reservation context comes from BookingMessages showContext (see trips#2). Search already has an sr-only results h2. The account h2 sizes and the booking-detail h1 are in other owners' files and are listed in crossOwner.
 
 ## F604 — Ev sahibi 'Yanıt taslağı öner' yazılmış metnin üzerine onaysız yazıyor
 
@@ -700,13 +734,15 @@
 | Renk/tema           | Hayır                                                |
 | Efor                | S                                                    |
 | Kaynak denetçiler   | lens:forms, lens:status                              |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                         |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p057)                      |
 
 **Kanıt:** src/components/booking/BookingMessages.tsx:99-113 `const res = await apiFetch(…/draft); setText(res.draft); setFromDraft(true);` — mevcut `text` dolu olsa da koşulsuz değiştiriliyor; geri al yok.
 
 **Etki:** Mobilde misafire yanıt yazan ev sahibi taslak düğmesine basınca kendi metnini kaybeder.
 
 **Önerilen aksiyon:** `text.trim()` doluysa taslağı ayrı önizleme kutusunda göster ('Taslağı ekle' / 'Değiştir' / 'Vazgeç') ya da önceki metni saklayıp 'Geri al' bağlantısı sun.
+
+**Yapılan düzeltme:** Confirmed: the original draft() called setText(res.draft) without any condition. It is now fixed by the same change as F571. Text that is already written is never overwritten: the draft is offered as a suggestion (Replace/Append/Dismiss), and Undo restores the previous text.
 
 ## F981 — Yeniden yükleme bir kez başarısız olursa sayfa kalıcı olarak 'Hata' ekranında kalıyor
 
@@ -721,13 +757,15 @@
 | Renk/tema           | Hayır                              |
 | Efor                | S                                  |
 | Kaynak denetçiler   | area:trips                         |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**       |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p010)    |
 
 **Kanıt:** load() başarı yolunda `setBooking(data.booking); setPlan(...)` yapıyor ama hiçbir yerde `setError(null)` yok (51-65). Render önceliği `loading ? … : error ? (hata görünümü) : booking ? …` (101-114). load() ödeme ve iptal sonrası `onChanged` ile yeniden çağrılıyor (171).
 
 **Etki:** Başarılı ödemenin hemen ardından geçici bir 503 alınırsa onaylanan rezervasyon tamamen 'Hata' ekranıyla değişiyor. Sonraki başarılı yüklemede de öyle kalıyor. Misafir ödemenin başarısız olduğunu sanabilir.
 
 **Önerilen aksiyon:** load() başında ve başarı yolunda `setError(null)` çağır. Rezervasyon zaten yüklüyse hatayı sayfanın yerine geçirme; `error && !booking` iken tam hata görünümünü, aksi hâlde kart üstünde `role='alert'` satır içi bant ve 'Tekrar dene' göster.
+
+**Yapılan düzeltme:** Confirmed: load() never cleared the error and the error view took priority over the booking. load() now calls setError(null) on success. The full error view only renders when there is an error and no booking. When a booking is already shown, a reload failure shows an inline band above the card (p role=alert with 'Rezervasyon bilgileri yenilenemedi…' and a 'Tekrar dene' button) and keeps the card.
 
 ## F982 — Hata metinleri ham ve yalnız Türkçe gösteriliyor ('Failed to fetch', sunucu mesajları EN arayüzde Türkçe)
 
@@ -743,13 +781,15 @@
 | Renk/tema           | Hayır                                                                                                                                                                          |
 | Efor                | M                                                                                                                                                                              |
 | Kaynak denetçiler   | area:trips                                                                                                                                                                     |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                                                                   |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p010)                                                                                                                                                |
 
 **Kanıt:** `setError(err instanceof Error ? err.message : t('detail.loadFailed'))`. fetch'in TypeError'ı da Error olduğu için 'Failed to fetch' veya 'Load failed' 'Hata' başlığı altında çıkıyor. ApiError mesajları sunucudaki Türkçe metinler: 'Rezervasyon bulunamadı' (booking-service.ts:114), 'Mesaj en fazla 2000 karakter olabilir' (message-service.ts:135), 'İstek başarısız (502)' (api-client.ts:40). Bunlar BookingMessages.tsx:57, 93 ve 109'da doğrudan gösteriliyor. Projede kod→çeviri eşleme deseni zaten var (resolution/shared.tsx:128 KNOWN_ERROR_CODES).
 
 **Etki:** EN arayüzdeki misafir ve ev sahibi Türkçe veya teknik İngilizce hata görüyor. Ne yapacağını anlamıyor.
 
 **Önerilen aksiyon:** Hataları `err.status`/`err.code` ile çevir: BOOKING_NOT_FOUND/404 → t('detail.notFound') ('Rezervasyon bulunamadı veya bu hesaba ait değil'), ApiError olmayan ağ hatası → t('detail.network'), VALIDATION_ERROR (mesaj) → t('chat.tooLong', {max}), CONFLICT → t('chat.closed'), diğerleri → mevcut fallback anahtarları. ApiError dışındaki hataların `message` alanını asla gösterme.
+
+**Yapılan düzeltme:** Confirmed: the page showed raw err.message. Errors are now mapped by type. A 404 shows the new detail.notFound text. A timeout or abort shows common.errors.network. ApiError and network TypeErrors go through useErrorText with a detail.tryLater fallback (generic codes and 5xx are localised; server text only appears in the TR UI). Any other Error falls back to detail.tryLater, so its message is never shown. The BookingMessages parts belong to another package; that file already has its own describeError.
 
 ## F983 — Oturumsuz durumda girişten sonra bağlama geri dönülmüyor; ev sahibi mesaj sayfasında giriş bağlantısı da yok
 
@@ -765,13 +805,15 @@
 | Renk/tema           | Hayır                                                                                                                                    |
 | Efor                | S                                                                                                                                        |
 | Kaynak denetçiler   | area:trips                                                                                                                               |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                             |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p010)                                                                                                         |
 
 **Kanıt:** page.tsx:80-85 `<Link href='/login'` ve TripsView.tsx:91 `href='/login'`. Login sayfası `?redirect` destekliyor (login/page.tsx:63 `get('redirect') ?? '/'`) ve checkout/page.tsx:123 bunu kullanıyor. host/messages/[bookingId]/page.tsx:14-27 oturum durumunu hiç ele almıyor: 401 olunca BookingMessages.tsx:121 ham 'Oturum açmanız gerekiyor' (errors.ts:26) metnini bağlantısız gri metin olarak gösteriyor.
 
 **Etki:** Oturumu düşen misafir giriş yapınca ana sayfaya atılıyor ve rezervasyonu yeniden bulamıyor (bkz. navigasyon çıkmazı). Ev sahibinin giriş yapacak bir yolu yok.
 
 **Önerilen aksiyon:** `href={`/login?redirect=${encodeURIComponent(`/booking/${id}`)}`}` kullan. TripsView'da `/login?redirect=%2Ftrips` kullan. BookingMessages'ta `err instanceof ApiError && err.status === 401` durumunda redirect'li bir giriş bağlantısı render et.
+
+**Yapılan düzeltme:** In this file the sign-in link already uses loginHref(), which carries ?redirect= with the current /booking/<id> path. The TripsView, host messages page and BookingMessages parts are owned by other packages (BookingMessages already has a needsLogin/loginPrompt branch).
 
 ## F984 — Yükleme hatalarında 'Tekrar dene' yok, hata başlığı yalnız 'Hata', zaman aşımı yok
 
@@ -787,13 +829,15 @@
 | Renk/tema           | Hayır                                                                                                                           |
 | Efor                | S                                                                                                                               |
 | Kaynak denetçiler   | area:trips                                                                                                                      |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                    |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p010)                                                                                                 |
 
 **Kanıt:** page.tsx:104-113 `<h1 className='text-xl font-bold text-red-600'>{t('detail.error')}</h1>` ('Hata') ve yalnızca 'Ana sayfaya dön' bağlantısı var. BookingMessages.tsx:121 `{error ?? t('loading')}`; yeniden deneme yok. TripsView.tsx:104-110 `t('loadError')`; yeniden deneme yok. Çevrimdışı durumlar (97-103, 115-123) `online` olayını dinlemiyor. apiFetch (api-client.ts:65) zaman aşımı koymuyor; askıda kalan ağda 'Yükleniyor...' sonsuza kadar duruyor.
 
 **Etki:** Yavaş veya kesintili mobil ağda misafir sayfayı elle yenilemesi gerektiğini bilmiyor. Ana sayfaya dönünce rezervasyona tekrar ulaşamıyor.
 
 **Önerilen aksiyon:** Hata görünümlerine `<button onClick={() => { setLoading(true); void load(); }}>Tekrar dene</button>` ekle. Başlığı 'Rezervasyon yüklenemedi' gibi belirli bir metin yap. TripsView'da `window.addEventListener('online', reload)` ile bağlantı gelince yeniden çek ve çevrimdışı bandına 'Yenile' düğmesi koy. İsteklere `signal: AbortSignal.timeout(15000)` ekleyip zaman aşımında yeniden denenebilir bir hata göster.
+
+**Yapılan düzeltme:** Confirmed: the error view had no retry, only a generic 'Hata' title, and no timeout. The error view heading is now 'Rezervasyon yüklenemedi' (existing detail.loadFailed). It has a 'Tekrar dene' Button (busy guard keeps focus; on success focus moves to the booking heading; hidden for 404) and links to Rezervasyonlarım and the home page. The load request uses AbortSignal.timeout(15000) when available, so it can't hang on 'Yükleniyor...' forever and ends in a retryable error. The TripsView parts (online listener, offline refresh) are other owners'.
 
 ## F985 — Fiyat kırılımı ve iptal politikası API'de var ama detay sayfasında gösterilmiyor
 
@@ -808,13 +852,15 @@
 | Renk/tema           | Hayır                               |
 | Efor                | M                                   |
 | Kaynak denetçiler   | area:trips                          |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**        |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p011)     |
 
 **Kanıt:** BookingDetail arayüzü (16-31) `priceBreakdown` ve `policySnapshot` alanlarını almıyor. Oysa API tüm genel alanları döndürüyor (booking-service.ts:894-910; şemada `priceBreakdown Json?` 'geceler, ara toplam, vergiler, toplam', `policySnapshot Json?` 'Rezervasyon anındaki iptal politikası'). Sayfa yalnız 'Toplam Tutar' ve tek tutar gösteriyor (156-161). Yeniden kullanılabilecek components/booking/QuoteBreakdown.tsx mevcut.
 
 **Etki:** Misafir gecelik fiyat × gece sayısını, vergileri ve indirimleri doğrulayamıyor. Ücretsiz iptal son tarihini bilmeden iptal kararı veriyor.
 
 **Önerilen aksiyon:** Arayüze iki alanı ekle. Toplamın üstünde QuoteBreakdown ile `<dl>` biçiminde gece, ara toplam, vergi, indirim ve toplamı göster. İptal düğmesinin yanında policySnapshot'tan 'Ücretsiz iptal: {tarih saat} tarihine kadar' satırını göster.
+
+**Yapılan düzeltme:** BookingDetail now reads priceBreakdown, policySnapshot, createdAt and property.timeZone, which GET /api/bookings/[id] already returns. Above the total, BookingPriceSnapshot renders a headed <dl> with nights x price, discounts/coupons, fees and excluded taxes; included taxes appear as a note. For HELD, PENDING and CONFIRMED bookings, CancellationDeadlineNote sits just above the actions block (the cancel button is inside BookingActions). It shows the policy kind and 'Ücretsiz iptal: {date} {time} tarihine kadar' (or ended/none), computed in the property's time zone with the same rules as computeRefund.
 
 ## F986 — Tutma (hold) süresi dolunca sayfa güncellenmiyor, geri sayım yok
 
@@ -830,13 +876,15 @@
 | Renk/tema           | Hayır                                           |
 | Efor                | S                                               |
 | Kaynak denetçiler   | area:trips                                      |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                    |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p011)                 |
 
 **Kanıt:** `holdExpiresAt={booking.holdExpiresAt}` yalnız 'Oda sizin için {time}'e kadar tutuluyor.' metni için kullanılıyor (BookingActions.tsx:268-271). Sayfada zamanlayıcı veya yeniden çekme yok. Süre dolsa da h1 HELD 'ödemeyi tamamlayın' olarak kalıyor ve ödeme formu açık duruyor.
 
 **Etki:** Misafir süresi dolmuş tutmaya kart bilgisi girip ödeme deniyor ve hata alıyor. Kalan süreyi hesaplaması gerekiyor.
 
 **Önerilen aksiyon:** page.tsx'te `setTimeout(load, Date.parse(holdExpiresAt) - Date.now() + 1000)` kur. Kalan dakikayı dakikada bir güncellenen 'Kalan süre: 12 dk' metniyle göster; son 2 dakikada `aria-live='polite'` ile duyur. Süre dolunca 'Süre doldu. Tarihler uygunsa yeniden rezervasyon yapın' metni ve tesis bağlantısı göster.
+
+**Yapılan düzeltme:** The page sets a timer for holdExpiresAt + 1 s that marks the hold as lapsed and calls load() again. Until the server reports EXPIRED, the h1, icon and hint show EXPIRED ('Ödeme süresi doldu' plus the EXPIRED hint), and the bottom link becomes 'Aynı tarihler için yeniden ara' with the dates filled in. BookingActions already has the per-second 'Kalan süre' text, the 5- and 1-minute live announcements and the expired panel, so it needed no change.
 
 ## F987 — Fatura PDF ucu var ama arayüzde fatura indirme bağlantısı yok
 
@@ -851,13 +899,15 @@
 | Renk/tema           | Hayır                               |
 | Efor                | S                                   |
 | Kaynak denetçiler   | area:trips                          |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**        |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p011)    |
 
 **Kanıt:** `GET /api/bookings/[id]/invoice` e-Arşiv fatura PDF'i döndürüyor (invoice/route.ts:7 'yalnızca rezervasyon sahibi; CONFIRMED/COMPLETED'). Hiçbir .tsx dosyası `/invoice` adresine bağlantı vermiyor (grep). Detay sayfasının alt satırında (182-201) yalnız tesisi görüntüleme, Rezervasyonlarım ve Yazdır var.
 
 **Etki:** İş seyahati yapan veya gider belgesi isteyen misafir faturasına ulaşamıyor ve destek talebi açmak zorunda kalıyor.
 
 **Önerilen aksiyon:** CONFIRMED/COMPLETED durumunda `<a href={`/api/bookings/${booking.id}/invoice`} target='_blank' rel='noopener'>Faturayı indir (PDF, yeni sekmede açılır)</a>` ekle ve metni booking.detail.invoice anahtarına taşı.
+
+**Yapılan düzeltme:** The page already has an invoice link for CONFIRMED and COMPLETED bookings: <a href={`/api/bookings/${booking.id}/invoice`} download type="application/pdf"> with the text booking.detail.invoice, which p010's message patch sets to 'Faturayı indir (PDF)'. This was added earlier in this round.
 
 ## F988 — 'Rezervasyonlarım' (/account) ve 'Seyahatlerim' (/trips) iki ayrı merkez; ekranlar farklı olanına yönlendiriyor ve ikisi de ana menüde yok
 
@@ -874,13 +924,15 @@
 | Renk/tema           | Hayır                                                                                                                                                                                                                      |
 | Efor                | M                                                                                                                                                                                                                          |
 | Kaynak denetçiler   | lens:consistency                                                                                                                                                                                                           |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                                                                                                               |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p011)                                                                                                                                                                                     |
 
 **Kanıt:** booking/[id]/page.tsx:189-194 `href="/account"` ve metin booking.json:56 "Rezervasyonlarım". checkout/cart/page.tsx:205-210 `href="/trips"` ve cart.json:51 "Seyahatlerim". pay/share/[token]/page.tsx:162 ile offline/page.tsx:14 /trips'e gidiyor. account/page.tsx:262 bağlantıyı pwa.json:25 "Seyahatlerim (çevrimdışı)" olarak adlandırıyor. Header.tsx:19-30 NAV_ITEMS bu iki sayfadan hiçbirini içermiyor. /account tüm rezervasyonları detaya bağlantı olmadan, /trips ise yalnızca yaklaşan onaylıları QR ile listeliyor.
 
 **Etki:** Misafir 'rezervasyonum nerede' sorusuna iki farklı yanıt öğrenir. İki sayfa farklı alt kümeler gösterdiği için bir rezervasyonu birinde görüp diğerinde göremez. Ana menüde bulunmadığından mobilde bulunabilirlik düşer.
 
 **Önerilen aksiyon:** Tek bir 'Rezervasyonlarım' merkezi belirleyin (/trips ya da /account/bookings). Yaklaşan, geçmiş ve iptal sekmeleri olsun, her kart detaya bağlansın, QR çevrimdışı görünümü yaklaşan sekmesinin parçası olsun. Header NAV_ITEMS'a oturum açıkken görünen 'Rezervasyonlarım' öğesi ekleyin. Tüm 'geri' bağlantıları aynı hedefe ve aynı anahtara (nav.bookings) gitsin.
+
+**Yapılan düzeltme:** Both 'Rezervasyonlarım' links on the detail page (error state and the bottom action row) now go to /account#account-bookings. That section lists bookings of every status with links to their detail pages, and its heading is also 'Rezervasyonlarım'. /trips only lists upcoming confirmed bookings, so a held or cancelled booking would be missing there. Merging the two pages (tabs) and the header menu belong to other owners; Header already has a 'Seyahatlerim' item from p091. A crossOwner asks TripsView to link to the full list.
 
 ## F989 — Ev sahibi mesaj sayfasında h1 ve rezervasyon bağlamı yok; oturumsuzken giriş yolu yok
 
@@ -897,13 +949,15 @@
 | Renk/tema           | Hayır                                                  |
 | Efor                | S                                                      |
 | Kaynak denetçiler   | lens:nav                                               |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                           |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p025)                 |
 
 **Kanıt:** 70-76: main içinde yalnız geri bağlantı ve `<BookingMessages>` var; bileşenin başlığı h2 "Mesajlar" (BookingMessages.tsx:118/128). Sayfada h1 yok; misafir, ilan ve tarih bilgisi yok. RoleGate olmadığı için oturumsuzken API hata metni gri `<p>` içinde (BookingMessages.tsx:121) giriş bağlantısı olmadan gösteriliyor.
 
 **Etki:** Mobilden mesaja dönen ev sahibi hangi rezervasyonla yazıştığını göremiyor. Ekran okuyucu kullanıcısı h1 ile gezinemiyor. Oturumu düşmüşse çıkış yolu yok.
 
 **Önerilen aksiyon:** "Mesajlar — {ilan} · {giriş}–{çıkış} · {misafir sayısı}" biçiminde bir h1 ekleyin (/api/bookings/{id} ile). Sayfayı `<RoleGate roles={["HOST","ADMIN"]}>` ve loginHref ile sarın.
+
+**Yapılan düzeltme:** The h1 and a RoleGate with a login link (loginHref) were already present. The page now uses PageShell and passes showContext, so BookingMessages shows property, dates, guest and status. ADMIN was not added to RoleGate on purpose: resolveThreadAccess only lets the guest or the property host in, so an admin would just get a 404. The h1 stays generic because /api/bookings/{id} is guest-only (BOLA), so the page cannot load booking data for the title.
 
 ## F990 — Canlı bağlantı (SSE) koptuğunda kullanıcı bilgilendirilmiyor, kaçan mesajlar yeniden çekilmiyor
 
@@ -918,13 +972,15 @@
 | Renk/tema           | Hayır                                           |
 | Efor                | M                                               |
 | Kaynak denetçiler   | area:trips                                      |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                    |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p057)                 |
 
 **Kanıt:** `const es = new EventSource(...)` için yalnız 'message' dinleyicisi var; `onerror` ve `open` işleyicisi yok (59-66). hub.ts:51 yorumu 'mesaj DB'de kalıcıdır, istemci GET ile yakalar' diyor ama yeniden bağlanınca GET yapılmıyor. `add` thread null iken `prev` döndürüyor (42-47), yani ilk GET'ten önce gelen olaylar atılıyor. 429 TOO_MANY_STREAMS (stream/route.ts) da sessizce başarısız oluyor.
 
 **Etki:** Kullanıcı sohbetin canlı olduğunu sanıyor ama sayfayı yenileyene kadar mesaj kaçırıyor.
 
 **Önerilen aksiyon:** `es.onerror` içinde 'Canlı bağlantı kesildi — yeniden bağlanılıyor' (`role='status'`) göster. Hatadan sonraki `open` olayında GET'i yeniden çağırıp id'ye göre birleştir. thread null iken olayları tamponla ve yükleme bitince ekle.
+
+**Yapılan düzeltme:** Confirmed: the code had no onerror or open handlers, and add() dropped events while thread was null. Now the live status is announced with role=status, the thread is fetched again with GET after reconnecting and merged by id, and events that arrive before the first GET are buffered and merged in. The first-open race between the initial GET and the subscription is also covered.
 
 ## F991 — Canlı mesajlaşmada bağlantı durumu görünmüyor; ileti dizisi yükleme hatası hata gibi görünmüyor ve yeniden deneme yok
 
@@ -941,13 +997,15 @@
 | Renk/tema           | Hayır                                                                                              |
 | Efor                | M                                                                                                  |
 | Kaynak denetçiler   | lens:status                                                                                        |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                       |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p057)                                                             |
 
 **Kanıt:** BookingMessages.tsx:59-66 `new EventSource(...)` için onerror/bağlantı durumu işlenmiyor; 113-121 dizi yüklenemezse hata `text-gray-500` paragrafında (`{error ?? t("loading")}`), role=alert ve 'Tekrar dene' yok. resolution/ClaimMessages.tsx hiç canlı güncellenmiyor (yalnız kendi gönderiminde onSent=reload).
 
 **Etki:** Mesajlara mobilden bakan ev sahibi bağlantı koptuğunda yeni misafir mesajlarını görmüyor ama ekran güncelmiş gibi duruyor; talep tarafları karşı yanıtı sayfayı yenilemeden görmüyor.
 
 **Önerilen aksiyon:** `es.onerror`'da role=status 'Canlı bağlantı koptu — yeniden bağlanılıyor…', yeniden bağlanınca GET /messages ile boşlukları doldur; yükleme hatasını role=alert + 'Tekrar dene' ile göster; ClaimMessages için görünür sekmede periyodik yenileme veya aynı SSE deseni.
+
+**Yapılan düzeltme:** Confirmed and fixed in BookingMessages: the connection status is shown and gaps are filled. A load failure is now shown as role=alert in red text with a 'Tekrar dene' (retry) button, which reruns the load and the stream. The retry button is hidden for 403/404, and loading uses role=status. The ClaimMessages periodic refresh belongs to another owner and is listed in crossOwner.
 
 ## F992 — Engellenen mesajda hangi içeriğin sorun olduğu söylenmiyor
 
@@ -962,13 +1020,15 @@
 | Renk/tema           | Hayır                                           |
 | Efor                | S                                               |
 | Kaynak denetçiler   | area:trips                                      |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                    |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p058)                 |
 
 **Kanıt:** `if (err instanceof ApiError && err.code === 'MESSAGE_BLOCKED') setError(tt('message.blocked'));`. Sunucu `details: { reasons }` gönderiyor (trust/message-risk.ts:23-31). Gerekçe çevirileri trust.json `reasons.*` altında hazır ama kullanılmıyor.
 
 **Etki:** Kullanıcı mesajındaki bağlantının mı, IBAN'ın mı, yoksa 'acil' kelimesinin mi engellemeye yol açtığını bilmiyor ve deneme yanılmaya düşüyor.
 
 **Önerilen aksiyon:** Hata metnine `tt('message.reasonsLabel')` ve `reasons.map(r => tt.has(`reasons.${r}`) ? tt(`reasons.${r}`) : r).join(', ')` ekle. Ardından 'Bu kısmı çıkarıp tekrar gönderin' ipucunu göster. Metin zaten kutuda korunuyor.
+
+**Yapılan düzeltme:** When a message is blocked (MESSAGE_BLOCKED), the error now lists the reasons the server sent in `details.reasons`. It reuses trust `message.reasonsLabel` and `reasons.*`, drops reason codes that have no translation so no raw code is shown, and adds a new hint, chat.blockedHint, telling the user to remove the flagged part and resend. The typed text stays in the box and focus goes back to it.
 
 ## F993 — Yapay zekâ taslağı ev sahibinin yazdığı metni onaysız ve geri alınamaz şekilde siliyor
 
@@ -983,13 +1043,15 @@
 | Renk/tema           | Hayır                                            |
 | Efor                | S                                                |
 | Kaynak denetçiler   | area:trips                                       |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                     |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p058)                 |
 
 **Kanıt:** draft() içinde koşulsuz `setText(res.draft);`. Kutuda metin varken de taslak düğmesi etkin (`disabled={busy}`, 208). Geri alma yok.
 
 **Etki:** Yarıya kadar yanıt yazmış ev sahibi 'Yanıt taslağı öner'e basınca kendi metnini kaybediyor.
 
 **Önerilen aksiyon:** `text.trim()` doluysa ya 'Yazdığınız metin taslakla değiştirilsin mi?' onayı sor ya da taslağı mevcut metnin altına ekle. Önceki metni state'te tutup 10 saniye görünen 'Geri al' düğmesiyle `setText(prev)` yap.
+
+**Yapılan düzeltme:** Already fixed in the current code. draft() only writes into an empty box. If the box has text, the draft appears in a separate suggestion panel with 'Replace my text', 'Add to the end of my text' and 'Dismiss'. undoText plus the draftUndo button restores the previous text.
 
 ## F994 — Mesajın kimden geldiği görsel olarak yalnız hizalama ve renkle anlaşılıyor
 
@@ -1004,13 +1066,15 @@
 | Renk/tema           | Hayır                                            |
 | Efor                | S                                                |
 | Kaynak denetçiler   | area:trips                                       |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                     |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p058)                  |
 
 **Kanıt:** `<li className={mine ? 'text-right' : 'text-left'}>` ve balon `mine ? 'bg-[#003580] text-white' : 'bg-gray-100 text-gray-900'` (160-162). Gönderen adı yalnız `<span className='sr-only'>` içinde (164-166) ve misafirin kendi mesajında 'Siz' değil 'Misafir:' diyor. messaging.png'de hiç isim görünmüyor.
 
 **Etki:** Sohbet uygulaması alışkanlığı olmayan misafir ve 360px'te max-w-[80%] balonların neredeyse üst üste geldiği ekranda kullanıcı kimin yazdığını ayırt edemiyor. Ekran okuyucu kullanıcısı kendi mesajını 'Misafir' olarak duyuyor.
 
 **Önerilen aksiyon:** Her balonun üstüne görünür bir text-xs satır ekle: kendi mesajı için 'Siz', karşı taraf için 'Ev sahibi' / 'Misafir' (varsa ad). sr-only metni de aynı yap. Renk değişmiyor.
+
+**Yapılan düzeltme:** The sender name was only in an sr-only span; each message now shows a visible text-xs line above the bubble with '{Siz \| Ev sahibi \| Misafir} · {date}'. The user's own messages now say 'Siz'/'You' instead of their role. The AI-draft note stays as sr-only text in that line, and the meta line under the bubble appears only when contact details were hidden or the message came from an AI draft. No colors were changed.
 
 ## F995 — Mesaj balonunda satır sonları kayboluyor, uzun kelimeler 360px'te taşıyor
 
@@ -1026,13 +1090,15 @@
 | Renk/tema           | Hayır                                            |
 | Efor                | S                                                |
 | Kaynak denetçiler   | area:trips                                       |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                     |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p058)                  |
 
 **Kanıt:** Balon sınıfı `inline-block max-w-[80%] rounded-lg px-3 py-2 text-sm` içinde `whitespace-pre-wrap` ve `break-words` yok. textarea `rows={3}` ile çok satırlı yazmayı teşvik ediyor ama gönderilen satır sonları tek paragrafa çöküyor. Bölünmeyen uzun dizeler (ör. ~52 karakterlik BK1… kodu) mobilde yatay taşma yaratıyor.
 
 **Etki:** Ev sahibinin '1. Anahtar kutusu… 2. Kapı kodu…' gibi adımlı talimatları tek satırlık okunaksız bir metne dönüşüyor.
 
 **Önerilen aksiyon:** Balona `whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-left` sınıflarını ekle.
+
+**Yapılan düzeltme:** Added `whitespace-pre-wrap break-words text-left [overflow-wrap:anywhere]` to the message bubble. Line breaks are now kept and long unbroken strings wrap instead of overflowing at 360px.
 
 ## F996 — Rezervasyon mesajlarında gönderen yalnızca konum ve renkle ayırt ediliyor; talep mesajları ve destek sohbetinde görünür etiket var
 
@@ -1049,13 +1115,15 @@
 | Renk/tema           | Hayır                                                                                                                                                       |
 | Efor                | S                                                                                                                                                           |
 | Kaynak denetçiler   | lens:consistency                                                                                                                                            |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                                                |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p058)                                                                                                                      |
 
 **Kanıt:** BookingMessages.tsx:158-167 gönderen için yalnızca `mine ? "bg-[#003580] text-white" : "bg-gray-100"` ve `text-right/text-left` kullanıyor, gönderen adı :164 `<span className="sr-only">`. ClaimMessages.tsx:86 görünür `{m.mine ? t("messages.you") : t(`role.${m.role}`)} · {f.dateTime(...)}` gösteriyor. SupportChat.tsx:106 görünür `t("you")` ve `t("assistant")` etiketi kullanıyor. Mesaj kutusu etiketi de farklı: BookingMessages.tsx:179 sr-only label ve placeholder, ClaimMessages Field ile görünür etiket.
 
 **Etki:** Dar ekranda ya da renk ayrımı zayıf kullanıcıda ev sahibi ile misafir mesajlarını ayırt etmek zorlaşır. Hosta gönderilecek mesajı yanlış okuma riski doğar. Üç sohbet ekranı üç farklı okuma deseni öğretir.
 
 **Önerilen aksiyon:** BookingMessages'te sr-only span'i görünür küçük bir başlıkla değiştirin (`<p className="text-xs text-gray-600">{mine ? t("you") : t("host")} · {f.dateTime}</p>`, ClaimMessages'teki gibi). Mesaj kutusunu Field ile görünür etiketli yapın. Üç sohbeti ortak bir `MessageList` ve `MessageItem` bileşenine taşıyın.
+
+**Yapılan düzeltme:** The sr-only sender span is replaced by a visible '{sender} · {dateTime}' header, the same pattern as ClaimMessages. The message box already had a visible label (inputLabelToHost/inputLabelToGuest). The shared MessageList/MessageItem component for all three chats was not done, because that refactor would touch files I don't own.
 
 ## F997 — Karakter sınırları ve asgari uzunluklar söylenmiyor, sayaç yok; mesaj kutusunda maxLength hiç yok
 
@@ -1072,13 +1140,15 @@
 | Renk/tema           | Hayır                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | Efor                | M                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | Kaynak denetçiler   | lens:forms                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                                                                                                                                                                                                                                                                                                                             |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p058)                                                                                                                                                                                                                                                                                                                                                                                                         |
 
 **Kanıt:** src/components/booking/BookingMessages.tsx:182-189 textarea'da maxLength yok; sunucu src/lib/messaging/message-service.ts:134-135 `Mesaj en fazla ${max} karakter olabilir` (varsayılan 2000, app-config.ts:299) — kullanıcı ancak gönderince öğreniyor. Projede hiç karakter sayacı yok (`grep length}` sonuçsuz); maxLength'li alanlar sessizce kesiyor: SupportChat.tsx:127 (1000), OpenClaimForm.tsx:85-86 (10–4000), NoticeForm.tsx:103-104, AppealForm.tsx:73-74, HostDashboard.tsx:268-269 (açıklama min 10, metinde yazmıyor). Asgari uzunluk hiç belirtilmeyenler: AppealQueue.tsx:143 (min 10), ComplianceDashboard.tsx:125 (min 3), :190 (min 10).
 
 **Etki:** Uzun mesaj yazan misafir/ev sahibi metnini gönderdiğinde reddedilir; kopyala-yapıştırla gelen uzun metin uyarısız kesilir; yönetici kısa gerekçede tarayıcının genel mesajıyla karşılaşır.
 
 **Önerilen aksiyon:** Ortak <TextAreaField maxLength minLength> bileşeni: altında `aria-live="polite"` sayaç ('{n}/{max}', son %10'da metin uyarısı) ve hint'te asgari uzunluk ('en az 10 karakter'); aria-describedby ile bağla. BookingMessages'a `maxLength={2000}` (config'den) ekle.
+
+**Yapılan düzeltme:** Already fixed in BookingMessages: there is a visible '{count}/{max}' counter (msg-count, linked through aria-describedby), a polite sr-only announcement near and over the limit, and a tooLong error before sending. The limit comes from the server (thread.maxLength, fallback 2000). There is deliberately no maxLength attribute, so pasted text is not silently cut. The other files named in the finding still need counters and minimum-length hints from their owners (see crossOwner).
 
 ## F998 — Gönder, taslak ve bildirim düğmeleri işlem sırasında disabled olunca odak kayboluyor; gönderimde meşgul metni yok
 
@@ -1095,13 +1165,15 @@
 | Renk/tema           | Hayır                                                                                                                    |
 | Efor                | S                                                                                                                        |
 | Kaynak denetçiler   | area:trips                                                                                                               |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                             |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p058)                                                                                         |
 
 **Kanıt:** `disabled={busy || !text.trim()}`: tıklamada `setBusy(true)` odaktaki düğmeyi devre dışı bırakıyor, başarıda `setText('')` disabled durumunu sürdürüyor. Taslak düğmesi `disabled={busy}` (208). Düğme etiketi gönderim sırasında 'Gönder' olarak kalıyor. PushToggle.tsx:117-124 `disabled={busy}` ve ardından görünüm değişince düğme başka bir düğmeyle değişiyor.
 
 **Etki:** Klavye ve ekran okuyucu kullanıcısı gönderdikten sonra odağı kaybediyor, sanal imleç sayfa başına dönebiliyor. Mesaj kutusuna geri dönmek için uzun bir Tab yolu gerekiyor.
 
 **Önerilen aksiyon:** Meşgulken `disabled` yerine `aria-disabled='true'` kullan ve işleyicide `if (busy) return` ile koru. Başarıdan sonra `textareaRef.current?.focus()` çağır. Gönderimde düğmede 'Gönderiliyor…' göster. PushToggle'da yeni düğmeye ref ile odak ver.
+
+**Yapılan düzeltme:** Already fixed. The send and draft buttons use aria-disabled and aria-busy with an `if (busy) return` guard instead of disabled. The send label switches to t('sending') while busy. The finally block focuses the textarea. PushToggle already moves focus to the new button through actionRef and pendingFocus.
 
 ## F999 — Taslak üretimi sırasında ilerleme metni, bittiğinde duyuru ve odak taşıma yok
 
@@ -1117,13 +1189,15 @@
 | Renk/tema           | Hayır                                            |
 | Efor                | S                                                |
 | Kaynak denetçiler   | area:trips                                       |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                     |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p058)                 |
 
 **Kanıt:** draft() sürerken düğme yine `{t('suggestDraft')}` ('Yanıt taslağı öner') diyor, yalnızca disabled. Başarıda metin kutuya sessizce yazılıyor. `aiDraftNotice` (190) live region olmayan düz bir `<p>`. LLM çağrısı saniyeler sürebiliyor. Projedeki benzer akış 'Öneri hazırlanıyor…' metnini gösteriyor (host.json:91).
 
 **Etki:** Ev sahibi işlemin sürüp sürmediğini anlamıyor ve tekrar tıklıyor. Ekran okuyucu kullanıcısı taslağın eklendiğini öğrenemiyor.
 
 **Önerilen aksiyon:** `busy` iken etiketi t('drafting') = 'Taslak hazırlanıyor…' yap. Başarıda textarea'ya odak ver ve `role='status'` ile 'Taslak mesaj kutusuna eklendi; göndermeden önce kontrol edip düzenleyin' duyur.
+
+**Yapılan düzeltme:** Already fixed. The draft button shows t('drafting') ('Taslak hazırlanıyor…') while busy. On success the draft goes into the textarea and focus moves there. An always-present role='status' container shows the badge and aiDraftNotice, so the insertion is announced; the notice is also part of the textarea's aria-describedby. When the box already has text, focus moves to the labelled suggestion group instead.
 
 ## F1000 — iPhone'da anlık bildirim için yol gösterilmiyor; yanıltıcı 'desteklemiyor' mesajı çıkıyor
 
@@ -1138,13 +1212,15 @@
 | Renk/tema           | Hayır                                  |
 | Efor                | S                                      |
 | Kaynak denetçiler   | area:trips                             |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**           |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p106)        |
 
 **Kanıt:** `if (!pushSupported()) return { view: 'unsupported', status: null };` → 'Tarayıcınız anlık bildirimleri desteklemiyor.' (pwa.json:35). iOS/iPadOS Safari'de Web Push yalnız ana ekrana eklenmiş web uygulamasında var. Sekmede `'PushManager' in window` false döndüğü için bu mesaj gösteriliyor.
 
 **Etki:** iPhone kullanan misafire özellik imkânsızmış gibi sunuluyor; aslında ana ekrana ekleyerek açabilir.
 
 **Önerilen aksiyon:** iOS'ta ve standalone değilken (`!matchMedia('(display-mode: standalone)').matches && /iPhone|iPad/.test(navigator.userAgent)`) şu talimatı göster: 'iPhone'da bildirim için: Paylaş → Ana Ekrana Ekle, ardından uygulamayı ana ekrandan açın.'
+
+**Yapılan düzeltme:** Confirmed: line 19 returned 'unsupported' for any browser without PushManager, including iOS tabs. It now checks for iOS/iPadOS outside standalone mode (iPadOS reports a Mac UA, so maxTouchPoints is checked too). If the server has push enabled it shows a new 'ios-install' view with a home-screen instruction (pwa.push.iosInstall). If the server has push off it still shows server-off.
 
 ## F1001 — Çevrimdışı bandı veri tazeliğini göstermiyor: yalnız tarih, saat yok ve UTC
 
@@ -1159,13 +1235,15 @@
 | Renk/tema           | Hayır                                  |
 | Efor                | S                                      |
 | Kaynak denetçiler   | area:trips                             |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**           |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p107)        |
 
 **Kanıt:** `t('offlineBanner', { time: fmt.date(data.generatedAt, 'long') })`. Yer tutucunun adı `time` ama `date()` yalnız gün, ay ve yıl biçimliyor ve varsayılan `timeZone = 'UTC'` (lib/i18n/format.ts:64). Türkiye'de 00:00-03:00 arasında kaydedilen plan bir önceki günün tarihiyle görünüyor.
 
 **Etki:** Çevrimdışı misafir gösterilen planın 5 dakikalık mı 2 günlük mü olduğunu ayırt edemiyor. Bu arada iptal veya değişiklik olduysa yanlış bilgiyle tesise gidebilir.
 
 **Önerilen aksiyon:** `fmt.dateTime(data.generatedAt)` kullan (yerel saat dilimi) veya Intl.RelativeTimeFormat ile '3 saat önce kaydedildi' göster.
+
+**Yapılan düzeltme:** Confirmed: the banner used fmt.date(...,'long'), which is UTC and has no time. It now uses fmt.dateTime(data.generatedAt), which shows date and time in the browser's local time zone. The banner text now reads '{time} tarihinde kaydedilen … sonraki değişiklikler görünmeyebilir'.
 
 ## F1002 — Rezervasyon kimliği tutarsız ve okunamaz: detayda ham cuid, seyahat kartında 52 karakterlik 11px kod
 
@@ -1181,13 +1259,15 @@
 | Renk/tema           | Hayır                                                                         |
 | Efor                | M                                                                             |
 | Kaynak denetçiler   | area:trips                                                                    |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                  |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p107)                                        |
 
 **Kanıt:** Detay sayfasında 'Rezervasyon numarası: <b>{id}</b>' ham cuid, ör. 'cmummzo3200m53s50ynklp0sx' (page.tsx:121-124, v5-rnpl-plan.png). TripsView'da 'Rezervasyon kodu' `<code className='break-all text-[11px] text-gray-900'>{item.code}</code>` = `BK1.<id>.<22 karakter imza>` (booking-code.ts:23), ~52 karakter. E-posta yine bookingId kullanıyor (templates.ts:181). Kopyalama düğmesi yok.
 
 **Etki:** Resepsiyonda 'rezervasyon numaranız' sorulan misafir iki farklı değer görüyor. 52 karakteri sesli okuyamıyor, 11px metin mobilde zor okunuyor, numarayı elle seçip kopyalaması gerekiyor.
 
 **Önerilen aksiyon:** Tek bir insan-okunur referans tanımla (ör. id'nin son 8 karakteri büyük harfle, 'MZO3-200M' gibi gruplanmış). Her yerde aynı etiketi kullan ('Rezervasyon no'). İmzalı kodu yalnız QR içinde tut. Referansı `text-sm font-mono` ile göster ve 'Kopyala' düğmesi ekle (`navigator.clipboard.writeText` + `role='status'` 'Kopyalandı').
+
+**Yapılan düzeltme:** Confirmed. The card now shows item.id, the same value the detail page ('Rezervasyon numarası') and the e-mail use, labelled 'Rezervasyon numarası' (codeLabel text changed). It is text-sm font-mono with a copy button. The signed BK1 code now appears only inside the QR, and nothing in src types it in by hand. I did not add a shorter grouped reference: it would not be searchable, and it would need the detail page, e-mail and server changed together.
 
 ## F1151 — 'Giriş Yap' / 'Giriş yap' büyük harf tutarsızlığı aynı ekranda
 
@@ -1203,13 +1283,15 @@
 | Renk/tema           | Hayır                              |
 | Efor                | S                                  |
 | Kaynak denetçiler   | runtime:trips                      |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**       |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p011)   |
 
 **Kanıt:** Tarama 044 Tab sırası: başlıkta 'a "Giriş yap"' hemen ardından içerikte 'a "Giriş Yap"' (booking.json detail.login); /trips'te 'Giriş yap' (anon.mjs).
 
 **Etki:** Küçük cila sorunu; tutarsız terminoloji güven algısını hafifçe düşürür.
 
 **Önerilen aksiyon:** booking.json detail.login değerini 'Giriş yap' yapın.
+
+**Yapılan düzeltme:** booking.detail.login is used only on this page. p002's message patch (msg-ml/p002.json) already changes it to 'Giriş yap', so I made no further change, to avoid a conflicting patch.
 
 ## F1152 — Rezervasyon sayfası yüklenirken büyük düzen kayması (CLS 0.75)
 
@@ -1224,13 +1306,15 @@
 | Renk/tema           | Hayır                                                           |
 | Efor                | S                                                               |
 | Kaynak denetçiler   | runtime:checkout                                                |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                    |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p011)                                 |
 
 **Kanıt:** RUNTIME p16-mobile-layout.mjs (390x844): PerformanceObserver layout-shift değeri 0.7524 (t=746ms, kaynak FOOTER), ardından FORM.space-y-3 0.007 (RNPL ve kredi seçenekleri sonradan ekleniyor). p2'de RNPL seçeneği 800 ms'de henüz yoktu, yenilemede vardı.
 
 **Etki:** Yükleme sırasında dokunan mobil kullanıcı yanlış öğeye basabiliyor; kart formu RNPL eklenince aşağı kayıyor.
 
 **Önerilen aksiyon:** 'Yükleniyor' yerine gerçek kart düzeninde, min-height'lı bir iskelet gösterilsin. RNPL ve kredi seçenekleri için yer tutucu ayrılsın ya da ödeme formu bu istekler bitince birlikte render edilsin.
+
+**Yapılan düzeltme:** While loading, the page now shows a card-shaped skeleton (aria-hidden, motion-safe pulse) instead of the bare 'Yükleniyor' line. The Footer is not rendered until loading ends, so it can no longer jump down when the content arrives; that jump was the 0.75 shift. The small FORM shift (0.007) comes from the RNPL and wallet-credit options appearing late inside BookingActions; a crossOwner covers it.
 
 ## F1153 — Rezervasyon numarası 25 karakterlik ham veritabanı kimliği
 
@@ -1245,13 +1329,15 @@
 | Renk/tema           | Hayır                                                               |
 | Efor                | M                                                                   |
 | Kaynak denetçiler   | runtime:checkout                                                    |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                        |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p011)                              |
 
 **Kanıt:** RUNTIME p2: 'Rezervasyon numarası: cmv2vvnye001bkd9zog9rjey5' (crops/checkout/p2-desktop-booking-s-0.png).
 
 **Etki:** Telefonla destek ya da otel girişinde numarayı okumak ve yazmak hataya açık.
 
 **Önerilen aksiyon:** Kısa ve gruplanmış bir referans (ör. BK-7F3K-29QM) üretilip gösterilsin; ham id yalnız URL'de kalsın.
+
+**Yapılan düzeltme:** The booking number now shows in monospace, split into 5-character groups by spacing only, with translate="no". Copying it gives the exact id, and it stays the same as the 'Rezervasyon no' in the confirmation e-mail, which e2e checks. The shared helper is the new component src/components/booking/BookingNumberText.tsx. A truly short reference like BK-7F3K-29QM needs a backend reference column plus lookup, e-mail and admin changes, which are outside this package.
 
 ## F1154 — Rezervasyon için iki farklı, okunması zor kimlik: ham DB id ve 52 karakterlik kod
 
@@ -1267,13 +1353,15 @@
 | Renk/tema           | Hayır                                    |
 | Efor                | M                                        |
 | Kaynak denetçiler   | runtime:trips                            |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**             |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p011)   |
 
 **Kanıt:** Tarama 072: 'Rezervasyon numarası: cmv2uyf700o3c92w2ti427b8v' (25 karakter küçük harf+rakam); tarama 066: 'Rezervasyon kodu BK1.cmv2uyf700o3c92w2ti427b8v.GvTvtzPNrmepLzIkYf75_Q'. Aynı rezervasyon iki sayfada iki farklı adla/biçimde.
 
 **Etki:** Telefonda/resepsiyonda kodu söylemek ve karşılaştırmak zor; 'numara' ile 'kod' aynı şey mi belirsiz.
 
 **Önerilen aksiyon:** 8-10 karakterlik insan-dostu referans (ör. 'BK-7F3K-2Q9M') üretip her iki sayfada aynı etiketle gösterin; imzalı kod yalnız QR içinde kalsın.
+
+**Yapılan düzeltme:** TripsView already shows the raw id, not the signed BK1 code, but labels it 'Rezervasyon kodu'. The detail page now uses the grouped BookingNumberText. A crossOwner asks TripsView to use the same component and the label 'Rezervasyon numarası', so both pages show one identifier with one name. A short human reference still needs the backend work described under F1153.
 
 ## F1155 — Ödeme adımında fiyat dökümü yok; yalnız 'Toplam Tutar' gösteriliyor
 
@@ -1288,13 +1376,15 @@
 | Renk/tema           | Hayır                                                                    |
 | Efor                | M                                                                        |
 | Kaynak denetçiler   | runtime:checkout                                                         |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                             |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p011)                                          |
 
 **Kanıt:** RUNTIME p4 MAIN metni: 'Toplam Tutar ₺4.276,36' dışında gece fiyatı, vergi ya da kupon satırı yok. Checkout'ta görülen döküm (gecelik × gece, konaklama vergisi, KDV dahil, kupon −₺150) ödeme adımında tekrarlanmıyor.
 
 **Etki:** Kupon uygulanmış mı, vergiler dahil mi, kullanıcı checkout ekranını hatırlamak zorunda; güven kontrolü zorlaşıyor.
 
 **Önerilen aksiyon:** Rezervasyon anındaki teklif kalemleri saklanıp QuoteBreakdown bileşeniyle katlanabilir bir 'Fiyat dökümü' bölümünde gösterilsin.
+
+**Yapılan düzeltme:** The breakdown saved at booking time (Booking.priceBreakdown) now appears on the payment and detail page, above 'Toplam tutar', as a 'Fiyat dökümü' section with its own heading: nights x price, coupon/promotion lines, fees, excluded taxes and an 'included VAT' note. When the charge currency differs from the breakdown currency, the breakdown also shows its own total. It is always visible rather than collapsible, because it is only a few lines.
 
 ## F1156 — Kaydırılabilir mesaj listesi odaklanabilir ama erişilebilir adı/rolü yok
 
@@ -1310,13 +1400,15 @@
 | Renk/tema           | Hayır                                            |
 | Efor                | S                                                |
 | Kaynak denetçiler   | runtime:trips                                    |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                     |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p058)                  |
 
 **Kanıt:** p-variants.mts LIST (14 mesaj): ol scrollHeight 950 / clientHeight 320; iptal düğmesinden Tab -> odak 'ol' (Chrome otomatik odaklanabilir kaydırıcı), erişilebilir ad tüm içerikten türüyor ('Misafir: Mesaj 1: uzun bir içerik…'); aria-label/role/tabindex yok.
 
 **Etki:** SR kullanıcısı listeye gelince tüm konuşmanın okunmasına maruz kalıyor; bölgenin ne olduğu söylenmiyor.
 
 **Önerilen aksiyon:** ol'a role='log' aria-label={t('title')} tabIndex={0} ve görünür focus halkası (focusRing) ekleyin; aria-relevant='additions'.
+
+**Yapılan düzeltme:** The scrollable role='log' container already had aria-labelledby='msg-title' and tabIndex={0}. Added aria-relevant='additions' and a visible focus ring (`rounded-md ${focusRing}`).
 
 ## F1157 — Push kartı misafire teknik jargon gösteriyor ('VAPID anahtarları yok')
 
@@ -1332,13 +1424,15 @@
 | Renk/tema           | Hayır                                   |
 | Efor                | S                                       |
 | Kaynak denetçiler   | runtime:trips                           |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**            |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p106)         |
 
 **Kanıt:** Tarama 066/067 (gerçek oturum, /trips): 'Anlık bildirimler bu sunucuda yapılandırılmamış (VAPID anahtarları yok); e-posta bildirimleri çalışmaya devam eder.' Ekran crops/booking/066-guest-tr-desktop-_trips-0.png.
 
 **Etki:** Teknik olmayan misafir için anlamsız ve güven azaltıcı; eyleme dönük bilgi yok.
 
 **Önerilen aksiyon:** Kullanıcı diliyle: 'Bu cihaza anlık bildirim şu an kullanılamıyor; e-posta bildirimleri açık.' — ya da server-off durumunda kartı gizleyin.
+
+**Yapılan düzeltme:** Rewrote pwa.push.disabledServer in both locales to plain wording without VAPID ('Anlık bildirimler şu an kullanılamıyor; e-posta bildirimleri çalışmaya devam eder.'). PushToggle is the only user, and it now also covers the case where the service worker is disabled.
 
 ## F1369 — Detay sayfasının yükleniyor durumu duyurulmuyor, genel ve tutarsız metin
 
@@ -1355,13 +1449,15 @@
 | Renk/tema           | Hayır                                                                       |
 | Efor                | S                                                                           |
 | Kaynak denetçiler   | area:trips                                                                  |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p011)                                             |
 
 **Kanıt:** `<p className='text-center text-gray-500'>{t('detail.loading')}</p>` içinde role='status' veya aria-live yok. TripsView.tsx:82 ve RoleGate (ui.tsx:209) aria-live kullanıyor, yani tutarsız. Metin 'Yükleniyor...' üç nokta (booking.json:46, chat.json:3), common.json:11'de ise 'Yükleniyor…'.
 
 **Etki:** Ekran okuyucu kullanıcısı sayfanın yüklendiğini veya ne yüklendiğini bilmiyor.
 
 **Önerilen aksiyon:** `role='status'` ekle. Metni 'Rezervasyon yükleniyor…' ve 'Mesajlar yükleniyor…' olarak bağlamlı yap ve tüm çevirilerde '…' karakterine birleştir.
+
+**Yapılan düzeltme:** The loading text now goes into the page's always-mounted role="status" region, with the skeleton as the visual placeholder. The patch changes booking.detail.loading to 'Rezervasyon yükleniyor…' and chat.loading, which only BookingMessages uses and which is already role=status, to 'Mesajlar yükleniyor…', both with the '…' character.
 
 ## F1370 — Ayrıntı sayfalarının h1'i bağlam taşımıyor; bazı yükleme ve boş durumlarda h1 hiç yok
 
@@ -1378,13 +1474,15 @@
 | Renk/tema           | Hayır                                                                                                                                             |
 | Efor                | S                                                                                                                                                 |
 | Kaynak denetçiler   | lens:nav                                                                                                                                          |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                                      |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p012)                                                                                                                   |
 
 **Kanıt:** booking/[id] 117-119 h1 yalnız durum ("Rezervasyonunuz onaylandı"); ilan adı h2 (130). resolution/[id]/page.tsx:53 her talep için aynı başlık: "Talep ayrıntısı". Hata h1'i "Hata" (105). h1 olmayan durumlar: checkout/cart/page.tsx:217-223 (noCart), cart/page.tsx:52-58 (loading), pay/share:168-174 (loading), booking/[id] loading (101-102).
 
 **Etki:** Birden çok rezervasyon veya talep sekmesi açık olan kullanıcı ve ekran okuyucu kullanıcısı h1'den hangi kaydın açık olduğunu anlayamıyor.
 
 **Önerilen aksiyon:** h1'i "{property.title} — {durum}" yapın ya da durumu alt başlığa taşıyın. Talep sayfasında yükleme sonrası "{tür} talebi · {ilan}" gösterin (ClaimDetail'den callback ile). Yükleme ve boş durumlarda da sayfa h1'ini render edin.
+
+**Yapılan düzeltme:** Confirmed: the h1 showed only the status and the loading state had no h1. The h1 now comes from the new key detail.heading, '{status}<sr> · {property}</sr>', with the property title in a sr-only span, so the visible text stays the same. While loading, a sr-only h1 shows the existing titles.booking key ('Rezervasyon ayrıntıları'). The other files listed in the finding (resolution, cart, pay/share) now use PageShell, which always renders an h1, so I requested nothing for them.
 
 ## F1371 — Durum başlığı PENDING/EXPIRED/CANCELLED için sonraki adımı söylemiyor; mesajlaşmanın yokluğu açıklanmıyor
 
@@ -1399,13 +1497,15 @@
 | Renk/tema           | Hayır                                       |
 | Efor                | S                                           |
 | Kaynak denetçiler   | area:trips                                  |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p012)             |
 
 **Kanıt:** Başlıklar 'Rezervasyon beklemede', 'Ödeme süresi doldu' ve 'Rezervasyon iptal edildi' (booking.json:35-39); açıklayıcı alt cümle veya eylem yok. Mesajlaşma yalnız `['CONFIRMED','COMPLETED'].includes(booking.status)` iken render ediliyor (174-176); HELD/PENDING durumunda bölüm sessizce yok.
 
 **Etki:** Misafir neyin beklendiğini ve ne yapması gerektiğini bilmiyor. Ödeme öncesi ev sahibine soru sormak isteyince mesaj alanını bulamıyor.
 
 **Önerilen aksiyon:** Her durum için bir alt metin ekle: neyin beklendiği ve sonraki adım (EXPIRED için 'Oda serbest bırakıldı; tarihler uygunsa yeniden rezervasyon yapın' + tesis bağlantısı). HELD/PENDING için 'Mesajlaşma rezervasyon onaylandıktan sonra açılır.' notunu göster.
+
+**Yapılan düzeltme:** The per-status hints (detail.statusHint.*) and the 'search again for the same dates' button for EXPIRED/CANCELLED were already there. I added the missing part: when the shown status is HELD or PENDING, a note says host messaging opens after confirmation and links to /support?bookingId= for questions before then (new key detail.messagingAfterConfirm).
 
 ## F1372 — Mobilde aşırı iç boşluk (p-8/px-8) içerik alanını daraltıyor
 
@@ -1421,13 +1521,15 @@
 | Renk/tema           | Hayır                                                                                                                                                                                    |
 | Efor                | S                                                                                                                                                                                        |
 | Kaynak denetçiler   | lens:mobile                                                                                                                                                                              |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                                                                             |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p012)                                                                                                                                                          |
 
 **Kanıt:** booking/[id]/page.tsx:116 `px-8 py-6` ve :128 `space-y-6 px-8 py-6`; host/messages/[bookingId]/page.tsx:21 `p-8`; AuthCard.tsx:22, login/page.tsx:79 ve register/page.tsx:56 `p-8`. Hepsi `px-4`'lük main içinde; 360px'te içerik ≈264px'e iniyor. Ortak Card bileşeni (ui.tsx:104) ise `p-5` kullanıyor.
 
 **Etki:** Mesaj balonları (max-w-[80%]) ≈210px'e iniyor; ev sahibinin mobil mesajlaşmasında satıra birkaç kelime sığıyor. Ekranlar arasında kenar boşlukları tutarsız.
 
 **Önerilen aksiyon:** `p-4 sm:p-8` ve `px-4 sm:px-8` kullan; mümkün olan yerlerde ortak Card bileşenine geç.
+
+**Yapılan düzeltme:** In this file, the status band and the card body change from px-8 to 'px-4 sm:px-8'. The skeleton gets the same change, and the full-page error card changes from p-8 to 'p-4 sm:p-8'. host/messages already uses p-4 sm:p-8; AuthCard still uses p-8, so I requested a change there (crossOwner).
 
 ## F1373 — Uzun tek sütunlu sayfada sayfa içi gezinme yok; gezinme düğmeleri en altta
 
@@ -1442,13 +1544,15 @@
 | Renk/tema           | Hayır                                            |
 | Efor                | S                                                |
 | Kaynak denetçiler   | area:trips                                       |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                     |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p012)                  |
 
 **Kanıt:** Sıra şöyle: durum bandı → detay → toplam → RNPL → işlemler → mesajlar (max-h-80) → çözüm paneli (depozito, talepler, talep formu) → en sonda 'Konaklamayı Görüntüle / Rezervasyonlarım / Yazdır' satırı (182-201).
 
 **Etki:** 360px mobilde 'Rezervasyonlarım' ve 'Yazdır'a ulaşmak için birkaç ekran kaydırmak gerekiyor; mesajlara doğrudan atlama yolu yok.
 
 **Önerilen aksiyon:** Bandın altına kısa bir sayfa içi bağlantı satırı ekle: 'Mesajlar' (`#msg-title`), 'Hasar ve çözüm' (`#resolution-panel-title`), 'Yazdır'. Ya da gezinme satırını mesajlar bölümünün üstüne taşı.
+
+**Yapılan düzeltme:** Added a shortcuts nav under the status band (aria-label from detail.shortcuts, print:hidden). It links to #msg-title when messages exist and to #resolution-panel-title for settled bookings (reusing chat.title and resolution.panel.title), plus the booking support link and a Print button. Each item has about 28px of touch height and the focusRing style. The bottom action row is unchanged.
 
 ## F1374 — Yazdır çıktısına özel stil yok: menü, mesajlar, form ve düğmeler de basılıyor
 
@@ -1463,13 +1567,15 @@
 | Renk/tema           | Hayır                               |
 | Efor                | S                                   |
 | Kaynak denetçiler   | area:trips                          |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**        |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p012)     |
 
 **Kanıt:** `<button onClick={print}>` doğrudan window.print() çağırıyor. Projede hiç `print:` sınıfı veya `@media print` yok (grep). Header, DEMO şeridi, çerez bandı, özel mesaj yazışması, mesaj kutusu, talep formu ve footer çıktıya giriyor.
 
 **Etki:** Basılan onay belgesi kalabalık, birkaç sayfa uzunluğunda oluyor ve özel yazışmaları içeriyor.
 
 **Önerilen aksiyon:** Header, Footer, BookingActions, BookingMessages, BookingResolutionPanel ve düğme satırına `print:hidden` ekle. Kartta `print:shadow-none` kullan. Çıktıda yalnız rezervasyon no, tesis, tarihler, toplam ve iptal politikası kalsın.
+
+**Yapılan düzeltme:** Most of this was already done: Header, Footer, the interactive sections (actions, messages, resolution), the bottom button row and the refresh error were already print:hidden. I added print:shadow-none to the card and print:hidden to the new shortcuts nav. The cookie banner is in a file I don't own (crossOwner). I left the DEMO ribbon in the printout on purpose so a printed demo confirmation can't pass as a real one.
 
 ## F1375 — Ev sahibi mesaj sayfasında rezervasyon bağlamı ve oturum kapısı yok
 
@@ -1485,13 +1591,15 @@
 | Renk/tema           | Hayır                                            |
 | Efor                | S                                                |
 | Kaynak denetçiler   | lens:status                                      |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                     |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p025)           |
 
 **Kanıt:** host/messages/[bookingId]/page.tsx:17-23 yalnız 'Geri' bağlantısı + BookingMessages; misafir/tarih/ilan bilgisi yok, RoleGate yok → oturumsuzken BookingMessages.tsx:121 gri metinle sunucu mesajını gösteriyor.
 
 **Etki:** Ev sahibi hangi rezervasyonla yazıştığını görmek için panele dönmek zorunda; oturum düştüğünde giriş yolu yok.
 
 **Önerilen aksiyon:** Başlığa ilan adı, tarih aralığı ve misafir sayısı; sayfayı `<RoleGate roles={['HOST','ADMIN']}>` ile sar.
+
+**Yapılan düzeltme:** Same as F989: RoleGate (HOST) with a login link was already in place. Booking context is shown through BookingMessages showContext, which depends on the BookingMessages and message-service owners (trips#2).
 
 ## F1376 — Gönderen, mesajının alıcıya dolandırıcılık uyarısıyla gösterildiğini bilmiyor
 
@@ -1506,13 +1614,15 @@
 | Renk/tema           | Hayır                                            |
 | Efor                | S                                                |
 | Kaynak denetçiler   | area:trips                                       |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                     |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p059)                  |
 
 **Kanıt:** `{!mine && m.risk && (` risk bandı yalnız alıcıya gösteriliyor. Yorum satırı 16: 'yalnızca alıcıya bant olarak gösterilir'. Gönderenin kendi balonunda bu konuda hiçbir işaret yok.
 
 **Etki:** Meşru bir harici bağlantı (EXTERNAL_LINK) paylaşan ev sahibi, misafire 'şüpheli' göründüğünü bilmiyor ve mesajını düzeltemiyor.
 
 **Önerilen aksiyon:** `mine && m.risk` durumunda kendi balonunun altına nötr bir not ekle: 'Bu mesaj alıcıya güvenlik uyarısıyla gösterildi: {gerekçeler}'.
+
+**Yapılan düzeltme:** Confirmed: the risk band only rendered when `!mine && m.risk`. When `mine && m.risk`, a neutral note now appears under your own bubble: chat.riskSentNotice ("Bu mesaj alıcıya güvenlik uyarısıyla gösterildi. Gerekçeler: {reasons}."). Translated reasons come from a shared riskReasons() helper. The POST response already carries `risk`, so the note shows right after sending.
 
 ## F1377 — Canlı bölge gürültüsü: geçmiş risk bantları role=alert, kendi mesajlar da duyuruluyor, boş durum liste öğesi
 
@@ -1528,13 +1638,15 @@
 | Renk/tema           | Hayır                                            |
 | Efor                | S                                                |
 | Kaynak denetçiler   | area:trips                                       |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                     |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p059)                  |
 
 **Kanıt:** Her risk bandı `role='alert'` (140). Thread yüklenince tüm işaretli geçmiş mesajların uyarıları aynı anda DOM'a giriyor. `<ol aria-live='polite'>` (132) kullanıcının kendi gönderdiği mesajı da (`add(message)`, 87) zaman damgasıyla birlikte duyuruyor. Boş durum `<li>` olarak render ediliyor (133); ekran okuyucu 'liste, 1 öğe' diyor.
 
 **Etki:** Sayfa açılışında art arda ve kesintili (assertive) duyurular oluyor. Ekran okuyucu kullanıcısı gönderdiği metni tekrar dinliyor.
 
 **Önerilen aksiyon:** Listeye `role='log'` ve `aria-relevant='additions'` ver. Geçmiş risk bantlarından `role='alert'` kaldır (başlıklı düz bant yeterli). Yalnız karşı taraftan yeni gelen mesajları ayrı bir `role='status'` alanında kısa duyur. Boş durumu `<ol>` dışında `<p>` olarak render et.
+
+**Yapılan düzeltme:** Removed role="alert" from the history risk bands. The role="log" container now has aria-live="off" so it no longer reads its own changes aloud. Instead, a separate sr-only role="status" area announces only messages from the other party that were not seen before (sender + body cut at 140 chars + risk title, or "{count} new messages"). The first load is recorded silently and reconnect/refetch catch-up is announced. Your own sent messages are never announced. The empty state is now a <p> outside the list. aria-live="off" replaces aria-relevant="additions" so incoming messages are not announced twice.
 
 ## F1378 — Zaman damgaları makine-okunur değil, gün gruplaması yok
 
@@ -1549,13 +1661,15 @@
 | Renk/tema           | Hayır                                            |
 | Efor                | S                                                |
 | Kaynak denetçiler   | area:trips                                       |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                     |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p059)                  |
 
 **Kanıt:** `<div className='mt-0.5 text-xs text-gray-500'>{f.dateTime(m.createdAt)}` düz metin. Her mesajda '29.09.2026 15:12' tam tarihi tekrarlanıyor (messaging.png). `<time dateTime>` öğesi ve 'Bugün/Dün' ayracı yok.
 
 **Etki:** Uzun sohbette hangi mesajın ne zaman geldiğini taramak zorlaşıyor; tekrar eden tarih görsel kalabalık yaratıyor.
 
 **Önerilen aksiyon:** `<time dateTime={m.createdAt}>` kullan. Mesajları gün başlıklarıyla grupla ('Bugün', 'Dün', '29 Eylül') ve grup içinde yalnız saati göster.
+
+**Yapılan düzeltme:** Messages are grouped by local calendar day (groupByDay). Each group has an <h3><time dateTime="YYYY-MM-DD"> heading reading Bugün/Dün or a long date (f.date "long" in the browser time zone) and its own <ol>. Each message shows only the time, as <time dateTime={createdAt}>{f.time(...)}</time>.
 
 ## F1379 — 'fromAiDraft' işareti metin silinip yeniden yazılsa da açık kalıyor
 
@@ -1570,13 +1684,15 @@
 | Renk/tema           | Hayır                                            |
 | Efor                | S                                                |
 | Kaynak denetçiler   | area:trips                                       |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                     |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p059)                 |
 
 **Kanıt:** `setFromDraft(true)` taslakta (107) çalışıyor, sıfırlama yalnız başarılı gönderimde (89). `onChange={(e) => setText(e.target.value)}` (186) işareti sıfırlamıyor. Kutu tamamen temizlense de 'Yapay zekâ taslağı' notu (190) görünür kalıyor ve mesaj `fromAiDraft: true` ile kaydediliyor.
 
 **Etki:** Ev sahibinin kendi yazdığı mesaj AI taslağı olarak işaretleniyor; denetim kaydı ve şeffaflık verisi yanlış oluyor.
 
 **Önerilen aksiyon:** onChange içinde `if (!e.target.value.trim()) setFromDraft(false)` ekle; isteğe bağlı olarak taslaktan büyük oranda farklılaşınca da sıfırla.
+
+**Yapılan düzeltme:** Already fixed in the current code: the textarea onChange (BookingMessages.tsx ~L650-657) calls setFromDraft(false) and setDraftMode(null) when the value trims to empty. undoDraft also clears the flag, so a fully cleared box is no longer sent with fromAiDraft: true.
 
 ## F1380 — Mesaj kutusu 14px; iOS Safari odaklanınca sayfayı yakınlaştırıyor
 
@@ -1591,13 +1707,15 @@
 | Renk/tema           | Hayır                                            |
 | Efor                | S                                                |
 | Kaynak denetçiler   | area:trips                                       |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                     |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p059)                  |
 
 **Kanıt:** textarea `text-sm` (14px). iOS Safari 16px altındaki form alanlarına odaklanınca otomatik yakınlaştırıyor.
 
 **Etki:** iPhone'da mesaj yazmaya başlayan misafirin ekranı büyüyor, gönder düğmesi görünümden çıkıyor ve elle uzaklaştırması gerekiyor.
 
 **Önerilen aksiyon:** `text-base sm:text-sm` kullan.
+
+**Yapılan düzeltme:** Changed the textarea text size from text-sm to `text-base sm:text-sm` (16px on mobile) so iOS Safari no longer zooms in on focus.
 
 ## F1381 — Taslak düğmesi yapay zekâ kullanıldığını önceden söylemiyor, taslakta standart AI rozeti yok
 
@@ -1612,13 +1730,15 @@
 | Renk/tema           | Hayır                                            |
 | Efor                | S                                                |
 | Kaynak denetçiler   | area:trips                                       |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                     |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p059)                  |
 
 **Kanıt:** Taslak yanıtı `{ draft, llmMode }` ve `ai_generated` içeriyor (message-service.ts:188, draft/route.ts) ama bileşen yalnız `res.draft` okuyor (103-107). Diğer AI çıktıları `<LlmBadge mode=…>` kullanıyor (HostDashboard.tsx:570, SupportChat.tsx:107, ReviewsSection.tsx:212). Düğme metni 'Yanıt taslağı öner' (chat.json:16) yapay zekâyı anmıyor.
 
 **Etki:** Ev sahibi tıklamadan önce içeriği yapay zekânın üreteceğini bilmiyor. Demo veya yedek mod çıktısını canlı model çıktısından ayırt edemiyor.
 
 **Önerilen aksiyon:** llmMode'u state'te tut ve aiDraftNotice'in yanında `<LlmBadge mode={llmMode} />` render et. Düğmeyi 'Yapay zekâ ile yanıt taslağı öner' olarak yeniden adlandır.
+
+**Yapılan düzeltme:** llmMode was already kept in state and shown with LlmBadge next to aiDraftNotice and in the suggestion box. Both badges now pass audience="staff" (the documented setting for host panels), so live/demo/fallback mode is visible. The button text key chat.suggestDraft now reads "Yapay zekâ ile yanıt taslağı öner" / "Suggest a reply draft with AI". It has one usage and no tests reference it.
 
 ## F1382 — Bildirim izni penceresi kapatılınca geri bildirim yok; 'reddedildi' durumunda yeniden kontrol yolu yok
 
@@ -1633,13 +1753,15 @@
 | Renk/tema           | Hayır                                  |
 | Efor                | S                                      |
 | Kaynak denetçiler   | area:trips                             |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**           |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p106)        |
 
 **Kanıt:** `setView(permission === 'denied' ? 'denied' : 'off'); return;`. Kullanıcı izin penceresini kapatırsa ('default') hiçbir mesaj çıkmıyor. denied metni (pwa.json:36) tarayıcı ayarına yönlendiriyor ama durum yalnız ilk effect'te (42-52) hesaplanıyor ve 'tekrar kontrol et' düğmesi yok.
 
 **Etki:** Kullanıcı düğmenin çalışmadığını sanıyor. Ayarlardan izin verdikten sonra sayfayı yenilemesi gerektiğini bilmiyor.
 
 **Önerilen aksiyon:** 'default' sonucunda `Status` ile 'İzin verilmedi; tekrar denemek için düğmeye basın.' göster. denied görünümüne 'Ayarları değiştirdim, tekrar kontrol et' düğmesi ekleyip detectPushState'i yeniden çağır veya `navigator.permissions.query({ name: 'notifications' })` onchange olayını dinle.
+
+**Yapılan düzeltme:** The closed-prompt ('default') case already showed t('dismissed'), so that part needed no change. The denied view now has an 'İzni yeniden kontrol et' button that re-runs detection and announces 'stillDenied' or 'allowedNow' through Status, with focus handled. While denied, the card also listens for navigator.permissions 'notifications' changes and updates itself. deniedHelp now points to the new button instead of telling the user to reload.
 
 ## F1383 — Çıkış saati, gece sayısı ve giriş/çıkış saatleri eksik
 
@@ -1655,13 +1777,15 @@
 | Renk/tema           | Hayır                                                                  |
 | Efor                | S                                                                      |
 | Kaynak denetçiler   | area:trips                                                             |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                           |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p107)                                 |
 
 **Kanıt:** Seyahat kartı giriş saatini (`checkInFrom`, 147) gösteriyor ama çıkışta saat yok (151-154). itinerary.ts select'i `checkOutTime` alanını almıyor, oysa modelde `checkOutTime @default('11:00')` var. Detay sayfasının `<dl>`'si (page.tsx:136-154) ne saatleri ne de gece sayısını gösteriyor. checkInTime ham '14:00' olarak EN'de de aynı ('from 14:00').
 
 **Etki:** Misafir çıkış saatini öğrenmek için ilana dönmek zorunda kalıyor; konaklama süresini tarihlerden kendisi hesaplıyor.
 
 **Önerilen aksiyon:** İtinerary'ye `checkOutTime` ekle ve 'Çıkış saati: {time}' satırını göster. Detay `<dl>`'sine 'Süre: 2 gece' ile giriş/çıkış saatlerini ekle. Saatleri `fmt.time` ile dile göre biçimlendir.
+
+**Yapılan düzeltme:** Confirmed. The card now shows check-in and check-out times formatted for the locale (for example 2:00 PM in EN), a 'Süre: N gece' row, and a 'Çıkış: … saatine kadar' line when the optional item.checkOutTime is present. Adding checkOutTime to itinerary.ts and the detail-page additions are listed in crossOwner.
 
 ## F1384 — QR ipucu seyahat yokken de gösteriliyor; boş durumda sonraki adım yok
 
@@ -1676,10 +1800,12 @@
 | Renk/tema           | Hayır                                  |
 | Efor                | S                                      |
 | Kaynak denetçiler   | area:trips                             |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**           |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p107)        |
 
 **Kanıt:** `<p className='text-xs text-gray-700'>{t('qrHint')}</p>` koşulun dışında, yani `items.length === 0` iken de 'Girişte bu QR kodu gösterin' görünüyor. Boş durum (124-127) 'Yaklaşan onaylı rezervasyonunuz yok.' metninde eylem bağlantısı yok ve ödemesi tamamlanmamış rezervasyonların burada görünmediğini açıklamıyor.
 
 **Etki:** QR olmayan ekranda QR talimatı kafa karıştırıyor. HELD rezervasyonu olan misafir rezervasyonunun neden listede olmadığını anlamıyor.
 
 **Önerilen aksiyon:** qrHint'i yalnız öğe varken ve listenin üstünde göster. Boş duruma `<Link href='/'>Konaklama ara</Link>` ve 'Ödemesi tamamlanmamış rezervasyonlar burada görünmez' notunu ekle.
+
+**Yapılan düzeltme:** Confirmed. qrHint now renders only when there are items, above the list. The empty state now adds a note that bookings awaiting payment or cancelled are not shown, plus 'Konaklama ara' and 'Tüm rezervasyonlarım' links.

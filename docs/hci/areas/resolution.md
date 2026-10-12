@@ -387,13 +387,15 @@
 | Renk/tema           | Hayır                                                                       |
 | Efor                | S                                                                           |
 | Kaynak denetçiler   | runtime:resolution                                                          |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p109)                                             |
 
 **Kanıt:** Tarama 076/077 + RUNTIME p3-pages (guest TR, /resolution/missing): HTTP 200, H1 "Talep ayrıntısı", içerik yalnızca "Tüm taleplere dön" ve kırmızı role=alert "Talep bulunamadı". Konsolda 2 adet 404 hatası var (API isteği iki kez gidiyor). Ekran görüntüleri: C:/Users/tuna9/AppData/Local/Temp/claude/C--Users-tuna9-projects-booking/62fc84fa-09c9-431e-a0a0-680b0434666c/scratchpad/runtime/crops/resolution/076-guest-tr-desktop-_resolution_missing-0.png ve 077-…-0.png (390px). Sunucu taraf olmayan kullanıcıya da kasıtlı olarak aynı 404'ü veriyor (claims.ts:332). Bu yüzden kullanıcı 'yanlış hesaptayım' ihtimalini düşünemiyor.
 
 **Etki:** E-postadaki bağlantıyla gelen ya da başka hesapla oturum açmış kullanıcı neden talebi göremediğini anlamıyor. Başlık var olmayan bir içerik vaat ediyor.
 
 **Önerilen aksiyon:** Hata durumunda ayrı bir boş durum gösterin. H1/başlık "Talep bulunamadı" olsun. Açıklama: "Bağlantı hatalı olabilir, talep başka bir hesaba ait olabilir veya kaldırılmış olabilir." Seçenekler: "Taleplerime dön", "Farklı hesapla giriş yap", "Destek". Oturumdaki e-postayı gösterin ("ayse@… olarak giriş yaptınız"). document.title'ı da güncelleyin.
+
+**Yapılan düzeltme:** A 404 now shows its own ClaimNotFound card instead of the bare red alert. The card has an h2 "Talep bulunamadı", the possible reasons, the signed-in email (from useSession), and three actions: back to /resolution, "Farklı hesapla giriş yap" (logout, then loginHref back to this page) and "Destek al" (/support). It also prefixes document.title. This uses a local loader that keeps the ApiError so 404 can be detected. The admin (readOnly) view keeps the plain error with a retry button. A new optional onResult prop reports found/notFound so the page can change its h1 if it wants. The duplicate request in the console comes from React StrictMode in dev, so it was left alone.
 
 ## F548 — Talep açıldıktan sonra aynı rezervasyonda boş form yine etkin kalıyor; başarı bildirimi ve kanıt adımı formun altında
 
@@ -409,13 +411,15 @@
 | Renk/tema           | Hayır                                                  |
 | Efor                | S                                                      |
 | Kaynak denetçiler   | runtime:resolution                                     |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                           |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p111)                 |
 
 **Kanıt:** RUNTIME p9-success (POST /api/claims ağda sahte 201, sunucuda kayıt oluşmadı; desktop TR /booking/cmv2uyf700o3c92w2ti427b8v): gönderimden sonra listede yeni "Misafir iade talebi · Yanıt bekleniyor" satırı görünüyor. Altında "İade talebi aç" formu boşaltılmış halde tamamen etkin kalıyor (form count=1, alanlar boş). "Talebiniz açıldı." ve "Talebi görüntüle ve kanıt ekle" bağlantısı formun en altında, odak body'de. Tekrar gönderim ancak sunucunun CLAIM_ALREADY_OPEN hatasıyla engelleniyor. Ekran görüntüsü: C:/Users/tuna9/AppData/Local/Temp/claude/C--Users-tuna9-projects-booking/62fc84fa-09c9-431e-a0a0-680b0434666c/scratchpad/runtime/probes/resolution/shots/panel-after-success-mock.png
 
 **Etki:** Misafir talebin gönderildiğinden emin olamayıp yeniden göndermeye çalışabiliyor. Asıl sonraki adım olan kanıt ekleme görünür değil.
 
 **Önerilen aksiyon:** Rezervasyonda kullanıcının açtığı ACTIVE_STATUSES durumunda bir talep varsa formu gizleyip bir özet kartı gösterin: "Açık talebiniz var · Yanıt için son tarih … · [Kanıt ekle] [Talebi görüntüle]". Başarıdan sonra odağı bu karttaki 'Kanıt ekle' bağlantısına taşıyın.
+
+**Yapılan düzeltme:** New OpenClaimSummaryCard.tsx shows the open claim: status badge, type, amount, SLA date and the next step, with a primary 'Kanıt ekle' link (/resolution/{id}#claim-evidence) and a 'Talebi görüntüle' link. With justCreated it shows the success text and moves focus to 'Kanıt ekle' (aria-describedby carries the success and next-step text). After a successful submit, OpenClaimForm now shows this card instead of the empty form and passes the created claim to onCreated. The panel's reload then unmounts the form, so BookingResolutionPanel must render the same card for openOwnClaim (crossOwner) to keep focus and the summary.
 
 ## F598 — Kanıt yükleme: tek dosya, sınırlar (boyut/adet/tür) önceden söylenmiyor, HEIC kabul listesinde yok
 
@@ -432,13 +436,15 @@
 | Renk/tema           | Hayır                                                                                                                                                                                                  |
 | Efor                | M                                                                                                                                                                                                      |
 | Kaynak denetçiler   | area:resolution, lens:forms                                                                                                                                                                            |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                                                                                           |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p110)                                                                                                                                                                        |
 
 **Kanıt:** ClaimEvidence.tsx:112-118 girdide `multiple` yok, her seferinde tek dosya seçilebiliyor. Sınırlar UI'da yok: app-config.ts:238-242 görsel 8 MB, PDF 5 MB, 40 MP, en fazla 10 dosya. Etiket yalnızca "Kanıt yükle (fotoğraf veya PDF)" (json:139). Kalan hak gösterilmiyor ve sınıra gelinince girdi yine görünüyor (CLAIM_EVIDENCE_LIMIT ancak yüklemeden sonra çıkıyor). :12 ACCEPT HEIC içermiyor, oysa sunucu heic/heif'i tanıyor (evidence.ts:19,50).
 
 **Etki:** Mobilde 5 hasar fotoğrafı yükleyecek ev sahibi işlemi 5 kez tekrarlıyor. 12 MB'lık fotoğrafı seçen misafir, yükleme bitince Türkçe "Dosya çok büyük" hatası alıyor. Masaüstünde HEIC dosyaları seçicide gri görünüyor.
 
 **Önerilen aksiyon:** `multiple` eklenmeli ve dosyalar sırayla yüklenip her biri için durum gösterilmeli ("2/5 yüklendi"). İpucu metni: "JPEG, PNG, WebP, HEIC veya PDF; fotoğraf en fazla 8 MB, PDF en fazla 5 MB. Kalan hakkınız: {10 − evidence.length}." Yüklemeden önce istemci tarafında boyut ve tür kontrolü yapılıp çevrilmiş hata verilmeli. ACCEPT'e `image/heic,image/heif` eklenmeli. Sınıra ulaşınca girdi gizlenip açıklama gösterilmeli.
+
+**Yapılan düzeltme:** Confirmed the finding, though part of it was already fixed: the limits hint and per-file size/type checks existed, but `multiple`, the remaining-count and the limit state were missing. The input now has `multiple` and files go into a queue with name, size and a remove button. They upload one after another with a visible and announced "Dosya 2/5 yükleniyor: x.jpg" status, and each failed file keeps its translated error. The hint now says how many more files can be added. At the 10-file limit the input is hidden and the reason is shown, and selections beyond the remaining count are refused with a message. I did not add HEIC to `accept`: the installed sharp build decodes only AVIF from the HEIF family (`sharp.format.heif.input.fileSuffix` is `['.avif']`), so HEIC uploads would fail on the server, and leaving it out lets iOS convert photos to JPEG. A HEIC file picked on desktop now gets a clear translated error before upload.
 
 ## F599 — Tutar alanında üst sınır yok: misafire iade edilebilir tutar, ev sahibine depozito tutarı söylenmiyor
 
@@ -455,13 +461,15 @@
 | Renk/tema           | Hayır                                                                                                                                                                                                                           |
 | Efor                | M                                                                                                                                                                                                                               |
 | Kaynak denetçiler   | area:resolution, lens:forms                                                                                                                                                                                                     |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                                                                                                                    |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p111)                                                                                                                                                                                          |
 
 **Kanıt:** OpenClaimForm.tsx:68 `<Field label={t("amount", { currency })} ... hint={t("amountHint")}>`: ipucu yalnız biçim örneği veriyor ("örneğin 250,00"). Panelde depozito verisi var (BookingResolutionPanel.tsx:53-57 `deposit.deposit`, `expectedMinor`) ama forma geçirilmiyor (satır 82-87 yalnız bookingId/role/currency). Misafirin iade üst sınırı (refundableMinor) yalnız talep açıldıktan sonra ClaimDetail.tsx:150-153'te görünüyor. Depozitosuz rezervasyonda ev sahibine "onaylanan tutar tahsil edilemez" uyarısı yok, infoHost (json:86) genel bir cümle.
 
 **Etki:** Misafir, ödediğinden fazlasını isteyip sunucu hatası alıyor. Ev sahibi depozitoyu (ya da depozito hiç yokken herhangi bir tutarı) aşan talep açıyor, aşan kısmın "tahsil edilemeyen" olarak kalacağını ancak karardan sonra öğreniyor.
 
 **Önerilen aksiyon:** OpenClaimForm'a `maxMinor` ve `depositMinor` prop'ları eklenmeli. Deposit yanıtı misafir için `refundableMinor` da döndürmeli. İpucu şöyle olmalı: misafire "En fazla {f.money(max)} talep edebilirsiniz", ev sahibine "Depozito: {f.money(deposit)}; bu tutarı aşan kısım tahsil edilemez, yalnızca kayda geçer". Depozito yoksa formun üstünde uyarı paragrafı gösterilmeli. İstemci tarafında `amountMinor > maxMinor` için alan hatası verilmeli.
+
+**Yapılan düzeltme:** Confirmed. Added optional props maxMinor (guest refundable cap) and depositMinor (host deposit; null means no deposit) to OpenClaimForm. The guest hint gets "En fazla {amount} talep edebilirsiniz", and amounts over the cap get a field error before submit. The host hint gets the deposit amount and the note that any excess is only recorded. The live preview says how much is above the deposit, and a notice paragraph appears when the booking has no deposit. The panel must pass these props and the deposit API must return refundableMinor (crossOwner).
 
 ## F943 — Çözüm merkezinde talep açma yolu yok; boş durum sonraki adımı göstermiyor
 
@@ -477,13 +485,15 @@
 | Renk/tema           | Hayır                                                                  |
 | Efor                | S                                                                      |
 | Kaynak denetçiler   | area:resolution                                                        |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                           |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p038)                                        |
 
 **Kanıt:** resolution/page.tsx:31-32 `<p>{t("list.empty")}</p>`, yani yalnızca "Henüz bir talebiniz yok." (json:46). Sayfada "Talep aç" düğmesi, rezervasyonlara bağlantı ya da "talep, rezervasyon sayfasından açılır" bilgisi yok. Talep formu yalnızca booking/[id] sayfasının en altında (booking/[id]/page.tsx:178-180). Giriş metni (json:8) yalnız "izleyin, yanıtlayın ve kanıt ekleyin" diyor.
 
 **Etki:** Sorun yaşayıp Hesabım'dan "Çözüm merkezi"ne gelen misafir, talebin nereden açılacağını bulamıyor ve görevi terk ediyor ya da destek kanalına yöneliyor.
 
 **Önerilen aksiyon:** Boş duruma ve giriş metnine şu eklenmeli: "Talep açmak için Rezervasyonlarım'dan ilgili rezervasyonu açın ve ‘İade talebi aç’ bölümünü kullanın." Yanına `/account` (ya da `/trips`) Link'i konmalı. İsteğe bağlı olarak uygun rezervasyonları listeleyen bir "Yeni talep aç" düğmesi eklenebilir.
+
+**Yapılan düzeltme:** Mostly fixed already: the empty state had the list.emptyHow text and a /trips link, and the intro mentions the booking page. Remaining gap: once a user had claims, the page no longer showed how to open a new one. The how-to text and the "Rezervasyonlarıma git" link are now always shown under the list, and hosts get the HostOpenClaimCard (see trips#0).
 
 ## F944 — Talep listesinde filtre ve sıralama yok; işlem bekleyen talepler öne çıkmıyor
 
@@ -499,13 +509,15 @@
 | Renk/tema           | Hayır                                          |
 | Efor                | M                                              |
 | Kaynak denetçiler   | area:resolution                                |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                   |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p038)                |
 
 **Kanıt:** resolution/page.tsx:21 tüm talepleri tek istekte alıyor (sunucu en fazla 200, claims.ts:510-514, createdAt desc) ve :34 `<ClaimList claims={data.claims} />` filtre, sekme ya da sayaç olmadan gösteriyor. ClaimList.tsx:29 sırayı aynen koruyor. Yanıt bekleyen (RESPONDENT+AWAITING_RESPONSE) talepler yalnız küçük amber metinle ayrışıyor (satır 50-54).
 
 **Etki:** Çok ilanı olan ev sahibi, SLA'sı yaklaşan yanıt bekleyen talebi onlarca sonuçlanmış talebin arasında arıyor ve süreyi kaçırma riski artıyor.
 
 **Önerilen aksiyon:** İstemci tarafında üç sekmeli bir filtre (`role="tablist"`, ya da radio grubu) eklenmeli: "İşlem bekleyen (n)" / "Devam eden" / "Sonuçlanan". İşlem bekleyenler slaDueAt'e göre artan sırada en üstte olmalı. Kart başlığında toplam sayı gösterilmeli ("Taleplerim (12)").
+
+**Yapılan düzeltme:** Confirmed: there was no filter, sort or count. Claims are now sorted on the client: those awaiting the user's reply come first by earliest slaDueAt, then in-progress, then resolved, each in server order. The card title shows the total ("Taleplerim ({count})"). With more than one claim, a native radio group appears (same pattern as AccessibilityReviewQueue, 44px targets): Tümü / Yanıtınızı bekleyen / Devam eden / Sonuçlanan, each with a count. An empty group shows its own message. ClaimList is unchanged and receives the filtered, sorted array.
 
 ## F945 — Yükleme hatasında "Tekrar dene" yok; yeniden yükleme hatası tüm ayrıntıyı siliyor, panelde tek hata her şeyi gizliyor
 
@@ -521,13 +533,15 @@
 | Renk/tema           | Hayır                                                                                                                                    |
 | Efor                | S                                                                                                                                        |
 | Kaynak denetçiler   | area:resolution                                                                                                                          |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                             |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p109)                                                                                                   |
 
 **Kanıt:** ClaimDetail.tsx:38 `if (error) return <Status error={error} />;`: useLoader (ui.tsx:248-256) reload sırasında hata alırsa veri dursa bile tüm detay (mesajlar, kanıtlar, az önce gösterilen başarı mesajı) kayboluyor. Hiçbir hata durumunda `reload` düğmesi yok (resolution/page.tsx:24, BookingResolutionPanel.tsx:44). BookingResolutionPanel.tsx:26-31 `Promise.all`: talep listesi isteği başarısız olursa depozito ve talep açma formu da gösterilmiyor.
 
 **Etki:** Mobil ağda mesaj gönderen misafir, gönderim sonrası yenileme başarısız olursa tüm yazışmayı kaybediyor ve tek yolu sayfayı yenilemek. Liste ucu geçici olarak hata verince talep açma görevi tamamen engelleniyor.
 
 **Önerilen aksiyon:** ClaimDetail'de koşul `if (error && !data)` yapılmalı. Veri varsa hata üstte satır içi uyarı olarak gösterilmeli. Status'un yanına `<Button variant="secondary" onClick={reload}>Tekrar dene</Button>` eklenmeli (sayfa, panel ve detay). Panelde `Promise.allSettled` kullanılıp depozito, liste ve form bağımsız gösterilmeli.
+
+**Yapılan düzeltme:** Confirmed. ClaimDetail now uses its own loader. If a reload fails, the detail already on screen stays (messages, evidence and the earlier success message are not lost) and an inline alert (detail.stale) with a "Tekrar dene" button (common.retry, busy-guarded) appears above it. If the first load fails, Status plus a retry button is shown. Status gets a new key on each failed result, so a repeated error is announced again. The page list retry and the panel Promise.allSettled change are in other owners' files (see crossOwner).
 
 ## F946 — Yönetici talep taraflarına mesaj yazamıyor ve ek kanıt isteyemiyor
 
@@ -543,13 +557,15 @@
 | Renk/tema           | Hayır                                          |
 | Efor                | L                                              |
 | Kaynak denetçiler   | area:admin                                     |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                   |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p109)         |
 
 **Kanıt:** ClaimDetail.tsx:48 `const isParty = !readOnly && claim.role !== "ADMIN";` ve 50 `canReply = isParty && ...` yönetici görünümünde (ClaimAdmin.tsx:85 `readOnly`) yazışmayı salt okunur yapıyor. Yöneticinin taraflara ulaşabildiği tek kanal geri alınamaz karar notu (ClaimAdmin.tsx:219).
 
 **Etki:** Kanıt eksik olduğunda yönetici açıklama ya da ek fotoğraf isteyemiyor ve eksik bilgiyle karar vermek zorunda kalıyor. Bu, hatalı iade veya ret riskini artırıyor.
 
 **Önerilen aksiyon:** ESCALATED durumunda yöneticiye 'Taraflara mesaj' alanı açın (rol ADMIN, iki tarafa görünür). Hazır şablon olarak 'Ek kanıt iste' ekleyin; bu, kanıt yüklemeyi ve SLA'yı yeniden başlatsın. ClaimDetail'e `canAdminMessage` prop'u ekleyin.
+
+**Yapılan düzeltme:** Confirmed. Admins can now message both parties from the claim detail (see F947), controlled by a new optional canAdminMessage prop (default true). The ESCALATED-only "Ek kanıt iste" template that restarts evidence upload and the SLA needs a server action in claims.ts and a button in ClaimAdmin, so it is listed in crossOwner.
 
 ## F947 — Yönetici, talep ayrıntısında taraflara mesaj yazamıyor (sunucu izin verdiği halde)
 
@@ -565,13 +581,15 @@
 | Renk/tema           | Hayır                                                                               |
 | Efor                | S                                                                                   |
 | Kaynak denetçiler   | area:resolution                                                                     |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                        |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p109)                                              |
 
 **Kanıt:** ClaimDetail.tsx:48 `const isParty = !readOnly && claim.role !== "ADMIN"` ve :50 canReply buna bağlı. ClaimAdmin.tsx:85 `readOnly` geçiyor. Sunucu ise claims.ts:331 ve :352-357'de ADMIN rolünün mesaj yazmasına izin veriyor (`role ... : "ADMIN"`).
 
 **Etki:** Karar öncesi taraflardan ek bilgi ya da kanıt istemesi gereken yönetici bunu arayüzden yapamıyor. Karar ya eksik bilgiyle veriliyor ya da kanal dışı iletişime gidiliyor.
 
 **Önerilen aksiyon:** `readOnly` ayrı yeteneklere bölünmeli (`canWithdraw`, `canUpload`, `canReply`). Yönetici görünümünde aktif ve CHARGEBACK olmayan taleplerde canReply=true olmalı. Alan etiketi "Taraflara mesaj (yönetici)" olmalı ve yanında "Bu mesaj her iki tarafa da görünür" ipucu bulunmalı.
+
+**Yapılan düzeltme:** Confirmed: the server lets ADMIN post messages. Party actions are now separate from admin messaging. readOnly still hides the party actions (reply, upload, withdraw). Admins (claim.role ADMIN) get the reply form on active, non-CHARGEBACK claims unless canAdminMessage is false, so ClaimAdmin needs no change. ClaimDetail passes viewerRole={claim.role} to ClaimMessages. The "Taraflara mesaj (yönetici)" label and the "visible to both parties" hint have to go inside ClaimMessages (crossOwner).
 
 ## F948 — Yanıt ve kanıt alanlarının neden gizli olduğu açıklanmıyor (sonuçlanmış talep, ters ibraz)
 
@@ -587,13 +605,15 @@
 | Renk/tema           | Hayır                                                                                               |
 | Efor                | S                                                                                                   |
 | Kaynak denetçiler   | area:resolution                                                                                     |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                        |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p109)                                                                     |
 
 **Kanıt:** ClaimDetail.tsx:50 `const canReply = isParty && active && claim.type !== "CHARGEBACK"` ve :78 `canUpload={isParty && active}`. ClaimMessages.tsx:93 `{canReply && (<form…)}` ve ClaimEvidence.tsx:107 `{canUpload && (…)}` false olduğunda hiçbir şey göstermiyor. Ters ibrazda yazışmanın ödeme sağlayıcısında yürüdüğü bilgisi yalnız koddaki yorumda (satır 49), kullanıcıya iletilmiyor.
 
 **Etki:** Ters ibraz talebindeki misafir neden yanıt yazamadığını anlamıyor ve hata sanıyor. Sonuçlanmış talebe kanıt eklemek isteyen kullanıcı yükleme alanını bulamayınca arayüzde dolaşıyor.
 
 **Önerilen aksiyon:** `!canReply` durumunda ClaimMessages'a bir `readOnlyReason` prop'u verilip şu metinler gösterilmeli: kapalı talepte "Talep sonuçlandığı için yeni mesaj gönderilemez.", CHARGEBACK'te "Ters ibrazda yazışma kart sağlayıcınız üzerinden yürür; buraya yalnızca kanıt ekleyebilirsiniz." ClaimEvidence'da kapalı talep için "Sonuçlanmış talebe kanıt eklenemez." yazılmalı.
+
+**Yapılan düzeltme:** Confirmed. When a party can't reply, a reason now shows in the messages card: detail.replyClosed for a closed claim and detail.replyChargeback for an active CHARGEBACK. The evidence card shows detail.uploadClosed when the claim is closed. Both are rendered from ClaimDetail, so ClaimMessages and ClaimEvidence need no new props.
 
 ## F949 — Eşzamansız işlemlerden sonra klavye odağı kayboluyor
 
@@ -610,13 +630,15 @@
 | Renk/tema           | Hayır                                                                                                                                                  |
 | Efor                | S                                                                                                                                                      |
 | Kaynak denetçiler   | area:resolution                                                                                                                                        |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                                           |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p109)                                                                                                                 |
 
 **Kanıt:** ClaimDetail.tsx:168-174: geri çekme başarılı olunca `onChanged()` -> reload -> `canWithdraw` false olduğu için odaktaki düğme DOM'dan kalkıyor. ClaimEvidence.tsx:116 `disabled={busy}` odaktaki dosya girdisini devre dışı bırakıyor. ClaimMessages.tsx:106 `disabled={busy || !body.trim()}` gönderim sırasında ve sonrasında odaktaki düğmeyi devre dışı bırakıyor (gövde temizlendiği için kapalı kalıyor). OpenClaimForm.tsx:91 `disabled={busy}` aynı durumda. Her durumda odak `body`'ye düşüyor.
 
 **Etki:** Yalnız klavye ya da ekran okuyucu kullanan kullanıcı, mesaj gönderdikten, kanıt yükledikten ya da talebi geri çektikten sonra sayfanın en başına atılıyor ve yerini yeniden bulmak zorunda kalıyor.
 
 **Önerilen aksiyon:** Meşgul durumda odaktaki denetimlerde `disabled` yerine `aria-disabled="true"` kullanılıp tıklama işleyicisinde `if (busy) return` ile korunmalı. Başarıdan sonra odak bilinçli yere taşınmalı: mesaj sonrası textarea'ya (`ref.focus()`), yükleme sonrası dosya girdisine, geri çekme sonrası `tabIndex={-1}` verilmiş durum/rozet başlığına.
+
+**Yapılan düzeltme:** Confirmed. The withdraw button now uses Button busy (aria-disabled, stays focused) instead of disabled. After a successful withdraw, focus moves to the status/badge line (tabIndex=-1 ref) before the reload removes the button. The retry buttons are busy-guarded and keep focus. The message, evidence and OpenClaimForm controls are in other owners' files (crossOwner).
 
 ## F950 — Karar sonucu etiketleri belirsiz ve kimin bakış açısından yazıldığı belli değil
 
@@ -632,13 +654,15 @@
 | Renk/tema           | Hayır                                                                        |
 | Efor                | M                                                                            |
 | Kaynak denetçiler   | area:resolution                                                              |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                 |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p109)                                              |
 
 **Kanıt:** ClaimDetail.tsx:185-190 tüm rollerde aynı etiketleri kullanıyor: json:120-122 "Ödenen / tahsil edilen", "Tahsil edilemeyen", "Platformun karşıladığı". İade talebinde "settled" misafire iade edilen tutar, hasar talebinde misafirin kartından alınan tutar. Etiket ikisini "/" ile birleştiriyor. "Tahsil edilemeyen" misafire gösterildiğinde borç gibi okunuyor (sunucu claims.ts:913-914'e göre alacak kaydı YOK). "Platformun karşıladığı" taraflar için iç muhasebe bilgisi.
 
 **Etki:** Karar sonrası misafir kendisine ne iade edileceğini ya da kartından ne alındığını net okuyamıyor. "Tahsil edilemeyen ₺X" satırını ödemesi gereken bir borç sanıyor.
 
 **Önerilen aksiyon:** Tür ve role göre etiketler kullanılmalı: GUEST_REFUND'da misafire "Size iade edilen" + "Kartınıza 5–10 iş günü içinde yansır", ev sahibine "Kazancınızdan düşülen"; HOST_DAMAGE'da misafire "Kartınızdan tahsil edilen", ev sahibine "Size ödenecek". Misafire "uncollected" ya hiç gösterilmemeli ya da "Depozitoyu aşan kısım sizden tahsil edilmez" açıklamasıyla gösterilmeli. platformCovered yalnız yöneticiye gösterilmeli.
+
+**Yapılan düzeltme:** Confirmed. Outcome labels now depend on claim type and the viewer's side. GUEST_REFUND: the guest sees "Size iade edilen" with the 5–10 business-day hint; host and admin see "Misafire iade edilen". HOST_DAMAGE: the guest sees "Kartınızdan tahsil edilen" and "Depozitoyu aşan kısım" with "Bu tutar sizden tahsil edilmez."; the host sees "Depozitodan tahsil edilen" and "Depozitoyu aştığı için tahsil edilemeyen". platformCovered is shown only to admins. CHARGEBACK keeps the generic labels. For the host on a refund, "Misafire iade edilen" was chosen over "Kazancınızdan düşülen" because part of the refund may be covered by the platform.
 
 ## F951 — Geri çekilen talep "Karar" kartında "Karar notu: withdrawn" olarak görünüyor
 
@@ -654,13 +678,15 @@
 | Renk/tema           | Hayır                                                 |
 | Efor                | S                                                     |
 | Kaynak denetçiler   | area:resolution                                       |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                          |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p109)                       |
 
 **Kanıt:** Sunucu geri çekmede claims.ts:388 `data: { status: "CLOSED", decidedAt: now, decisionNote: "withdrawn" }` yazıyor. ClaimDetail.tsx:59 `{!active && <ClaimOutcome .../>}` ve :193 koşulu decidedAt dolu olduğu için kartı render ediyor. Sonuçta "Karar", "Karar tarihi: …" ve :211-214 "Karar notu" altında ham İngilizce "withdrawn" çıkıyor. Rozet de yalnız "Kapandı" diyor.
 
 **Etki:** Talebini geri çeken misafir, yönetici karar vermiş gibi bir "Karar" kartı ve anlamsız İngilizce bir not görüyor. Karşı taraf da talebin neden kapandığını anlamıyor.
 
 **Önerilen aksiyon:** Sunucu görünümüne `closeReason: "WITHDRAWN"` (ya da `withdrawnAt`) eklenmeli. ClaimOutcome'da bu durumda karar kartı yerine şu metin gösterilmeli: "Bu talep {date} tarihinde {kim tarafından} geri çekildi." ClaimStatusBadge'e "Geri çekildi" etiketi eklenmeli. Geçici çözüm olarak istemci `decisionNote === "withdrawn"` kontrolüyle aynı metni gösterebilir.
+
+**Yapılan düzeltme:** Confirmed (claims.ts withdrawClaim writes decisionNote "withdrawn"). Used the stopgap the finding offers: when status is CLOSED and decisionNote is "withdrawn", ClaimOutcome shows a "Talep geri çekildi" card in place of the decision card. The text is "Bu talebi {date} tarihinde geri çektiniz." for the opener and "Talebi açan taraf bu talebi {date} tarihinde geri çekti." for others. The raw "withdrawn" note no longer appears. The badge still says "Kapandı", but the card directly below explains it.
 
 ## F952 — Yönetici seçiminde aria-pressed yanlış semantik; seçim sonrası odak/kaydırma yok; seçim yalnız renkle belirtiliyor
 
@@ -677,13 +703,15 @@
 | Renk/tema           | Hayır                                              |
 | Efor                | M                                                  |
 | Kaynak denetçiler   | area:resolution                                    |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                       |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p110)                    |
 
 **Kanıt:** ClaimList.tsx:57-63 `<button aria-pressed={selectedId === c.id} onClick={() => onSelect(c.id)}>`: basılı düğmeye tekrar basmak seçimi kaldırmıyor, yani toggle semantiği yanlış. Seçili kart yalnızca :33 `border-[#003580] bg-blue-50` ile, renk farkıyla belirtiliyor. Metin ya da ikon yok. ClaimAdmin.tsx:72-84 detayı listenin ALTINA render ediyor, odak ve kaydırma taşınmıyor. docs/img/v4-resolution.png her satırda aynı "Ayrıntıyı göster" metnini gösteriyor.
 
 **Etki:** Yönetici uzun kuyrukta "Ayrıntıyı göster"e basınca ekranda değişiklik görmüyor (detay en altta). Ekran okuyucu "basılı düğme" diyor ve yanlış model kuruyor. Renk algısı zayıf yönetici hangi talebin seçili olduğunu ayırt edemiyor.
 
 **Önerilen aksiyon:** `aria-pressed` kaldırılıp seçili öğeye `aria-current="true"` verilmeli ve görünür bir "Seçili" metin rozeti (ikonlu) eklenmeli. Renk paleti değişmiyor. Seçimden sonra `document.getElementById("claim-admin-selected")` öğesi `tabIndex={-1}` ile focus alıp `scrollIntoView` yapmalı. Masaüstünde iki sütunlu ana-detay yerleşimi (liste solda, detay sağda sticky) değerlendirilmeli. Düğme metnine görünmez bağlam eklenmeli: `<span className="sr-only">: {tür} – {mülk}</span>`.
+
+**Yapılan düzeltme:** Removed `aria-pressed`. The selected `<li>` now has `aria-current="true"` and a visible "✓ Seçili" badge (existing colours, no palette change). On the selected row the button reads "Ayrıntıya git"; it calls onSelect again, and ClaimAdmin's existing focus counter then moves focus to the detail heading. Each row button has hidden screen-reader context "(type, property)". Focus and scroll to #claim-admin-selected and the two-column desktop layout already existed in ClaimAdmin. ClaimAdmin.closeDetail still searches for aria-pressed and needs one selector change (see crossOwner). Until that change it falls back to the opener ref, so nothing breaks.
 
 ## F953 — Ödeme sağlayıcısı durumları ham kod olarak gösteriliyor ("needs_response", "fraudulent")
 
@@ -700,13 +728,15 @@
 | Renk/tema           | Hayır                                                                                     |
 | Efor                | S                                                                                         |
 | Kaynak denetçiler   | area:resolution                                                                           |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                              |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p111)                                                           |
 
 **Kanıt:** ClaimMessages.tsx:18-21 `const [, status] = m.body.split(":"); return t("psp", { status: status ?? m.body });`. disputes.ts:247 gövdeyi `PSP_DISPUTE_CREATED:${disputeStatus ?? ""}` olarak yazıyor. Sonuç: "Ödeme sağlayıcısı güncellemesi: needs_response". disputeStatus boşsa split "" döndürüyor, `??` devreye girmiyor ve metin "…güncellemesi: " ile bitiyor. Olay türü (açıldı/kapandı) atılıyor. ClaimDetail.tsx:161-164 da `externalStatus` ve `externalReason`'ı ham basıyor.
 
 **Etki:** Ters ibraz yaşayan misafir ve ev sahibi İngilizce makine kodlarıyla karşılaşıyor ve sürecin ne durumda olduğunu anlamıyor.
 
 **Önerilen aksiyon:** i18n'e `externalStatus.{needs_response, under_review, won, lost, warning_closed…}` ve `externalReason.{fraudulent, product_not_received, duplicate…}` eşlemeleri eklenmeli (bilinmeyende "Diğer"). PSP gövdesindeki olay türü de çevrilmeli (DISPUTE_CREATED → "Kart itirazı açıldı"). status boşsa iki noktadan sonraki kısım gösterilmemeli.
+
+**Yapılan düzeltme:** Confirmed: PSP system messages showed raw codes, and an empty status left a dangling colon. Added useDisputeText() to shared.tsx, which maps the event (DISPUTE_CREATED/UPDATED/CLOSED), the Stripe dispute status and the reason to i18n text; unknown codes show "Diğer". If the status is empty, only the event sentence is shown. ClaimMessages now uses it. ClaimDetail's raw externalStatus/externalReason is requested via crossOwner.
 
 ## F954 — Talep yazışması canlı güncellenmiyor; rezervasyon mesajlarıyla tutarsız
 
@@ -722,13 +752,15 @@
 | Renk/tema           | Hayır                                               |
 | Efor                | M                                                   |
 | Kaynak denetçiler   | area:resolution                                     |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                        |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p111)                     |
 
 **Kanıt:** ClaimMessages.tsx:73-91 mesajları yalnız sayfa yüklemesinde ve kullanıcının kendi gönderiminden sonra (onSent -> reload) gösteriyor. Yoklama (polling), SSE ya da "Yenile" düğmesi yok. Aynı uygulamada BookingMessages.tsx:59 `new EventSource(.../messages/stream)` ve :132 `<ol aria-live="polite">` ile canlı güncelleniyor.
 
 **Etki:** Karşı tarafın yanıtı ya da SLA/ödeme sağlayıcısı sistem mesajı, sayfa elle yenilenene kadar görünmüyor. Kullanıcı karşı tarafın yanıt vermediğini sanıyor. Rezervasyon mesajlarına alışmış kullanıcının beklentisi (canlı akış) karşılanmıyor.
 
 **Önerilen aksiyon:** Talep aktifken ve sekme görünürken (`document.visibilityState`) 30 sn'de bir `reload()` çağrılmalı ya da BookingMessages'taki SSE deseni uygulanmalı. Başlığın yanına "Yenile" düğmesi ve "Son güncelleme: {saat}" eklenmeli. Yeni mesaj geldiğinde `aria-live="polite"` alana "1 yeni mesaj" yazılmalı.
+
+**Yapılan düzeltme:** Confirmed: there was no live update. ClaimMessages now calls onRefresh (defaults to onSent, the parent's reload) every 30s while live (defaults to canReply), the tab is visible and the browser is online. It also refreshes when the tab becomes visible if the last check is stale. Added a "Yazışmayı yenile" button and "Son kontrol: {time}". New messages from others are counted against the previous list and announced in a polite live region. New optional props: live, onRefresh, refreshing.
 
 ## F955 — Uzun URL ya da kelimeler 360px ekranda yatay taşma yapıyor (yalnızca whitespace-pre-wrap kullanılmış)
 
@@ -745,13 +777,15 @@
 | Renk/tema           | Hayır                                                                                             |
 | Efor                | S                                                                                                 |
 | Kaynak denetçiler   | area:resolution                                                                                   |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                      |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p111)                                                                   |
 
 **Kanıt:** ClaimMessages.tsx:88 `<p className="mt-1 whitespace-pre-wrap">{text(m)}</p>`, ClaimDetail.tsx:167 açıklama ve :214 karar notu aynı sınıfı kullanıyor. Hiçbirinde `break-words` (overflow-wrap) yok. pre-wrap yalnız boşlukta satır kırıyor. Kullanıcı girdisindeki uzun bir bağlantı (ör. bulut fotoğraf linki) ya da boşluksuz dizi kartı aşıyor. Mesaj balonları ayrıca ml-6/mr-6 ile daralıyor.
 
 **Etki:** Mobilde (360px) misafir yazışmayı okumak için sayfayı yatay kaydırmak zorunda kalıyor ve kartlar taşıyor.
 
 **Önerilen aksiyon:** Bu üç `<p>` öğesine `break-words` (gerekirse `[overflow-wrap:anywhere]`) eklenmeli. Liste öğelerine `min-w-0` verilmeli. ClaimList.tsx:41'deki rezervasyon kimliği de aynı sınıfla korunmalı.
+
+**Yapılan düzeltme:** Confirmed. Message bodies now use whitespace-pre-wrap break-words [overflow-wrap:anywhere], and message list items get min-w-0. The same change for ClaimDetail (description, decision note) and ClaimList is requested via crossOwner.
 
 ## F956 — Form hataları alana bağlanmıyor; yerel doğrulama baloncukları tarayıcı dilinde çıkıyor
 
@@ -768,13 +802,15 @@
 | Renk/tema           | Hayır                                                                                               |
 | Efor                | M                                                                                                   |
 | Kaynak denetçiler   | area:resolution                                                                                     |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                        |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p111)                                                                     |
 
 **Kanıt:** OpenClaimForm.tsx:40-42 `setFeedback({ error: t("invalidAmount") })`: hata, gönder düğmesinin ALTINDAKİ genel Status'a (satır 94) yazılıyor. `Field` bileşeninin `error` prop'u (ui.tsx:51,67 aria-invalid + aria-describedby sağlıyor) kullanılmıyor ve odak hatalı alana taşınmıyor. Formda `noValidate` yok, bu yüzden `required` (73,87), `pattern` (75) ve `minLength={10}` (85) için tarayıcının kendi baloncukları çıkıyor: dil tarayıcıya ait ("Lütfen istenen biçimle eşleştirin"), kalıcı değil ve neyin yanlış olduğunu söylemiyor. Sunucudan dönen tutar hatası da alana bağlanmıyor.
 
 **Etki:** Ekran okuyucu kullanıcısı hatayı duyuyor ama hangi alanın geçersiz olduğu (aria-invalid) bildirilmiyor. Odak düğmede kaldığı için geri dönüp alanı aramak zorunda. Mobil misafir kısa süre görünüp kaybolan baloncuğu kaçırıyor. Desen hatasında neyin yanlış olduğu yazmıyor.
 
 **Önerilen aksiyon:** `<form noValidate>` yapılmalı. Alan bazlı `amountError` ve `descError` state'leri tutulup `<Field error={amountError}>` ile geçilmeli. Gönderimde ilk hatalı alana `ref.current.focus()` yapılmalı. Boş, desen ve minLength durumları için i18n metinleri eklenmeli (ör. "Açıklama en az 10 karakter olmalı (şu an {n})"). CLAIM_AMOUNT_EXCEEDS_REFUNDABLE hatası tutar alanına bağlanmalı.
+
+**Yapılan düzeltme:** Most of this was already in OpenClaimForm: noValidate, Field error wiring, focus on the first invalid field, and the server amount error bound to the field. Added a separate empty-amount message (amountRequired), the current count in the too-short description error, and a too-long error. Button now uses busy instead of disabled, so focus stays on it. Also fixed ClaimMessages (listed under otherFiles): the form now has noValidate, a field error through Field, and focus moves to the textarea.
 
 ## F957 — Depozito metinleri role göre ayrılmıyor ve kesinleşmiş durumlarla çelişiyor
 
@@ -790,13 +826,15 @@
 | Renk/tema           | Hayır                                                                                                                                                |
 | Efor                | S                                                                                                                                                    |
 | Kaynak denetçiler   | area:resolution                                                                                                                                      |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                                         |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p111)                                                                                                                      |
 
 **Kanıt:** shared.tsx:224 `<p>{t("note")}</p>` her rol ve her durumda aynı: json:65 "Depozito kartınızdan çekilmez; yalnızca provizyon alınır…". json:58 "…kartınızda provizyon olarak bloke edilir" ev sahibine de gösteriliyor (BookingResolutionPanel.tsx:53-57, rol prop'u yok). Durum CAPTURED olsa bile "çekilmez" yazıyor. shared.tsx:208-213, VOIDED/EXPIRED/CAPTURED gibi kesinleşmiş durumlarda bile gelecek zamanlı "Serbest bırakılma" satırını, FAILED durumunda "Provizyon zamanı" satırını gösteriyor.
 
 **Etki:** Ev sahibi "kartınızdan" ifadesini kendine yönelik sanıyor. Hasar tahsil edilmiş misafir aynı kartta hem "Tahsil edildi" hem "Depozito kartınızdan çekilmez" okuyor ve iki bilgi birbirini yalanlıyor. Para ile ilgili güven zedeleniyor.
 
 **Önerilen aksiyon:** DepositSummary'ye `viewerRole` prop'u eklenmeli ve `note.guest` / `note.host` anahtarları ayrılmalı (ev sahibine: "Provizyon misafirin kartında tutulur…"). CAPTURED veya CAPTURED_PARTIAL'da not yerine "Onaylanan hasar için {captured} tahsil edildi" yazılmalı. VOIDED/EXPIRED'da voidAfter satırı "Serbest bırakıldı: {date}" olmalı. FAILED'da "Provizyon alınamadı; hasar tutarı tahsil edilemeyebilir" açıklaması eklenmeli.
+
+**Yapılan düzeltme:** Confirmed. DepositSummary has a new optional viewerRole prop. Guests get noteGuest ("kartınızdan"); host, admin and callers that pass no role get a neutral note ("misafirin kartından"; the existing note text was rewritten for this). Hosts and admins get expectedOther. Settled states replace the note: CAPTURED/CAPTURED_PARTIAL say "{captured} tahsil edildi", and VOIDED, EXPIRED and FAILED each get their own explanation. The future-tense voidAfter row now appears only for SCHEDULED/AUTHORIZED, and the authorizeAfter row only for SCHEDULED, so FAILED no longer shows it. Callers passing viewerRole is crossOwner.
 
 ## F1135 — Panel başlığının altında boş Status alanı yaklaşık 40px gereksiz boşluk bırakıyor
 
@@ -811,13 +849,15 @@
 | Renk/tema           | Hayır                                                     |
 | Efor                | S                                                         |
 | Kaynak denetçiler   | runtime:resolution                                        |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                              |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p108)                           |
 
 **Kanıt:** RUNTIME p1-panel ve p8-mobile ekran görüntülerinde "Hasar depozitosu ve çözüm merkezi" H2'si ile ilk H3 "Hasar depozitosu" arasında belirgin bir boşluk var. Hata yokken de min-h-[1.25rem] Status div'i render ediliyor ve space-y-5 ile iki kez aralık ekleniyor. C:/Users/tuna9/AppData/Local/Temp/claude/C--Users-tuna9-projects-booking/62fc84fa-09c9-431e-a0a0-680b0434666c/scratchpad/runtime/probes/resolution/shots/panel-mobile-tr.png
 
 **Etki:** Başlık ile içerik arasındaki ilişki zayıflıyor ve mobilde panel daha uzun görünüyor.
 
 **Önerilen aksiyon:** Status'ı yalnızca error varken render edin (`{error && <Status error={error} />}`). Canlı bölge gerekiyorsa sr-only ve sıfır yükseklikli bir kapsayıcı kullanın.
+
+**Yapılan düzeltme:** Status now renders only when there is an error (`{error && <Status error={error} />}`). The always-present live region is an sr-only `<p role="status">`, which is absolutely positioned, so the min-h-[1.25rem] div and the extra space-y-5 gap no longer sit between the H2 and the first H3.
 
 ## F1136 — 'Yanıt için son tarih' kimin yanıt vereceğini belirtmiyor (talebi açan ile yanıtlayan aynı metni görüyor)
 
@@ -833,13 +873,15 @@
 | Renk/tema           | Hayır                                                                      |
 | Efor                | S                                                                          |
 | Kaynak denetçiler   | runtime:resolution                                                         |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                               |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p110)                                            |
 
 **Kanıt:** RUNTIME p4-mock (sahte liste/detay, desktop TR): role=OPENER olan talepte "Yanıt için son tarih: 13.10.2026 00:57" yazıyor, detay kartında da "Yanıt için son tarih". Aynı metin role=RESPONDENT için de kullanılıyor (ClaimList.tsx:50-53, ClaimDetail.tsx:122-123). C:/Users/tuna9/AppData/Local/Temp/claude/C--Users-tuna9-projects-booking/62fc84fa-09c9-431e-a0a0-680b0434666c/scratchpad/runtime/crops/resolution/mock-detail-0.png
 
 **Etki:** Talebi açan misafir kendisinin bir şey yapması gerektiğini sanabiliyor. Yanıtlayan taraf ise kendisine verilen sürenin aciliyetini kaçırabiliyor.
 
 **Önerilen aksiyon:** Role göre metin kullanın: OPENER için "Ev sahibinin yanıt vermesi için son tarih: …", RESPONDENT için "Yanıt vermeniz gereken son tarih: … (yanıt vermezseniz talep yöneticiye aktarılır)". Kalan süreyi de gösterin ("2 gün kaldı").
+
+**Yapılan düzeltme:** Part of this was already done: the list used role-specific text (respondCta for RESPONDENT, awaitingOther for OPENER, slaDue for ADMIN), and ClaimDetail does the same. Added the remaining time before that text, for example "2 gün kaldı · …", or "1 saatten az kaldı" / "Süre doldu". It uses a once-a-minute clock built with useSyncExternalStore, so render stays pure.
 
 ## F1137 — Talep listesinde her satırda aynı 'Ayrıntıyı aç' bağlantısı var ve hedefi 19px yüksekliğinde
 
@@ -855,13 +897,15 @@
 | Renk/tema           | Hayır                                                                                                                          |
 | Efor                | S                                                                                                                              |
 | Kaynak denetçiler   | runtime:resolution                                                                                                             |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                   |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p110)                                                                                                |
 
 **Kanıt:** RUNTIME p4-mock (desktop TR, sahte 3 talep): row links = ['Ayrıntıyı aç -> /resolution/mock-1 19px', 'Ayrıntıyı aç -> /resolution/mock-2 19px', 'Ayrıntıyı aç -> /resolution/mock-3 19px']. Ekran okuyucunun bağlantı listesinde üçü birbirinden ayırt edilemiyor. Mobilde dokunma hedefi 19px yüksekliğinde (komşu hedef olmadığı için 2.5.8 boşluk istisnasıyla geçiyor).
 
 **Etki:** Mobil ağırlıklı misafir küçük bağlantıyı kaçırabiliyor. Ekran okuyucu kullanıcısı bağlantı listesinden hangi talebe gideceğini seçemiyor.
 
 **Önerilen aksiyon:** Bağlantıya talebin türünü ve mülkünü içeren görünmez bir ek ad verin (aria-describedby ile satır başlığı ya da sr-only "– Misafir iade talebi, İzmir Alsancak"). Ya da kartın tamamını min-h-11 tıklanabilir bir bağlantı yapın.
+
+**Yapılan düzeltme:** The "Ayrıntıyı aç" and "Şimdi yanıtla" links (and the admin button) each have an sr-only suffix "({type}, {property or booking ref})", so they can be told apart in a links list. The minimum target height on desktop is now 24px (`sm:min-h-0` changed to `sm:min-h-[24px]`); mobile stays at 44px.
 
 ## F1345 — Talep ayrıntısında rezervasyona bağlantı ve talep numarası yok; h1 ve geri bağlantı genel
 
@@ -878,13 +922,15 @@
 | Renk/tema           | Hayır                                                   |
 | Efor                | S                                                       |
 | Kaynak denetçiler   | area:resolution                                         |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                            |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p038)                         |
 
 **Kanıt:** [id]/page.tsx:15 h1 her talepte "Talep ayrıntısı". :17-19 geri bağlantı yalnız /resolution'a gidiyor (kullanıcı rezervasyon sayfasından gelmiş olsa bile). ClaimDetail.tsx:125-133 rezervasyon satırı yalnız tarih metni, `/booking/{id}` bağlantısı yok. claim.id hiçbir yerde gösterilmiyor (destekle yazışırken referans verilemiyor). :139 propertyTitle düz `<span>`.
 
 **Etki:** Misafir talepten rezervasyon detayına dönmek için menülerde arama yapıyor. Destekle iletişimde talebi tanımlayamıyor.
 
 **Önerilen aksiyon:** Rezervasyon satırının değeri `<Link href={`/booking/${booking.id}`}>` yapılmalı. Özete "Talep no: {claim.id.slice(-8).toUpperCase()}" satırı eklenmeli. h1 "Talep ayrıntısı: {tür}" olmalı.
+
+**Yapılan düzeltme:** Confirmed: the h1 always said "Talep ayrıntısı", there was no booking link, and the claim id was never shown. The page now uses ClaimDetail's existing onResult prop. The h1 becomes "Talep ayrıntısı: {type}", or "Talep bulunamadı" on a 404; a later 404 on reload does not replace a heading that was already loaded. The intro row now has three items: the back link, "Talep no: {last 8 chars}" (same slice(-8) convention as booking refs), and a "Rezervasyonu görüntüle" link. The link goes to /booking/{id} for the guest side, to /host/messages/{id} for the host side, and is not shown for admins.
 
 ## F1346 — Panel başlığı misafirin "sorun bildir / iade iste" görevini gizliyor
 
@@ -900,13 +946,15 @@
 | Renk/tema           | Hayır                                                                     |
 | Efor                | S                                                                         |
 | Kaynak denetçiler   | area:resolution                                                           |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                              |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p108)                                    |
 
 **Kanıt:** BookingResolutionPanel.tsx:41-43 başlık her rol için aynı: "Hasar depozitosu ve çözüm merkezi" (json:77). Misafir için asıl eylem olan "İade talebi aç" bu başlığın altında ve sayfanın en sonunda, mesajlardan sonra (booking/[id]/page.tsx:174-180). Sayfanın üst kısmında bu bölüme giden bir bağlantı yok.
 
 **Etki:** Konaklamada sorun yaşayan misafir "hasar depozitosu" başlığını kendisiyle ilgisiz sanıp bölümü atlıyor ve iade talebi açma yolunu kaçırıyor.
 
 **Önerilen aksiyon:** Başlık role göre değişmeli: misafire "Sorun mu yaşadınız? İade talebi ve depozito", ev sahibine "Hasar talebi ve depozito". Rezervasyon özetinin yanına `#resolution-panel-title` bağlantısı "Sorun bildir" eklenmeli.
+
+**Yapılan düzeltme:** Confirmed: the heading was the same `panel.title` for every role. The heading now changes with the loaded role: guests get panel.titleGuest ("Sorun mu yaşadınız? İade talebi ve depozito"), hosts get panel.titleHost ("Hasar talebi ve depozito"), and admins and the loading state keep panel.title. Added `export const RESOLUTION_PANEL_TITLE_ID` and scroll-mt-24 on the H2 so an in-page link can target it. The "Sorun bildir" link next to the booking summary belongs to src/app/booking/[id]/page.tsx and is passed on as crossOwner, with the panel.jumpLink string already in the patch.
 
 ## F1347 — Yükleniyor durumları içerikle birlikte eklenen live region'a yazılıyor; iskelet yok
 
@@ -923,13 +971,15 @@
 | Renk/tema           | Hayır                                                                                  |
 | Efor                | S                                                                                      |
 | Kaynak denetçiler   | area:resolution                                                                        |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                           |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p108)                                                        |
 
 **Kanıt:** BookingResolutionPanel.tsx:45-49 `{!data && !error && (<p aria-live="polite">…)}`: live region metinle aynı anda DOM'a giriyor, bu yüzden birçok ekran okuyucu duyurmuyor. Aynı desen ClaimDetail.tsx:39-44 ve resolution/page.tsx:25-29'da da var. Yükleme yalnız düz "Yükleniyor…" metni. Veri gelince kartlar birden belirip yerleşimi kaydırıyor.
 
 **Etki:** Ekran okuyucu kullanıcısı içeriğin yüklendiğini ya da beklemesi gerektiğini duymuyor. Mobilde rezervasyon sayfasının altındaki panel geç gelince sayfa zıplıyor.
 
 **Önerilen aksiyon:** Yükleme metni, her zaman DOM'da duran `role="status"` bir kapsayıcının içine yazılmalı (Status bileşenindeki gibi). Depozito ve liste için sabit yükseklikli iskelet blokları (`aria-hidden`) eklenmeli.
+
+**Yapılan düzeltme:** Confirmed: an `aria-live` `<p>` was inserted together with its text. It is replaced by an always-mounted sr-only `<p role="status">`, and the text (new key panel.loading, "Depozito ve talepler yükleniyor…") is written into it 400ms after mount, so screen readers announce it and fast loads stay silent. While loading, aria-hidden, fixed-height pulse skeletons (motion-safe, the repo's existing bg-gray-100 skeleton class) stand in for the deposit block and the claims list. The same pattern in ClaimDetail.tsx:154 and resolution/page.tsx:27 is passed on as crossOwner.
 
 ## F1348 — Yönetici bilgilendirmesi yönetim paneline bağlantı vermiyor
 
@@ -945,13 +995,15 @@
 | Renk/tema           | Hayır                                                                |
 | Efor                | S                                                                    |
 | Kaynak denetçiler   | area:resolution                                                      |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                         |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p108)                                      |
 
 **Kanıt:** BookingResolutionPanel.tsx:79-80 `<p>{t("open.adminInfo")}</p>` = "…talepleri yönetim panelinden inceleyebilirsiniz." (json:87). Bağlantı yok, oysa yönetim ekranı /admin/claims (src/app/admin/claims/page.tsx).
 
 **Etki:** Rezervasyon sayfasındaki yönetici talep kuyruğuna gitmek için menüde ekstra gezinmek zorunda kalıyor.
 
 **Önerilen aksiyon:** Metin `t.rich` ile kurulup "yönetim paneli" ifadesi `<Link href="/admin/claims">` yapılmalı.
+
+**Yapılan düzeltme:** Confirmed: the admin info text had no link. It now uses `t.rich("open.adminInfo", { link })`, which turns "yönetim panelinden" / "admin panel" into a `<Link href="/admin/claims">` styled like the panel's other links. The open.adminInfo text in both locales was changed to add the `<link>` tag; this file is the key's only usage.
 
 ## F1349 — Başlık hiyerarşisi bozuk: Yazışmalar/Kanıtlar h3 ama başlıksız kartta; liste öğelerinde başlık yok
 
@@ -968,13 +1020,15 @@
 | Renk/tema           | Hayır                                                                                                                                            |
 | Efor                | S                                                                                                                                                |
 | Kaynak denetçiler   | area:resolution                                                                                                                                  |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                                     |
+| **Düzeltme durumu** | **Atlandı** (paket: ml-p109)                                                                                                                     |
 
 **Kanıt:** ClaimDetail.tsx:66-81 `<Card>` başlıksız (ui.tsx:106 h2 render etmiyor). İçeride ClaimMessages.tsx:69 ve ClaimEvidence.tsx:56 `<h3>` var. Sıra h1 → h2 (tür) → h3 Açıklama → h2 Hasar depozitosu → h3 Yazışmalar → h3 Kanıtlar olduğu için yazışma ve kanıtlar ana hatta depozitonun alt bölümü gibi görünüyor. ClaimList.tsx:37 tür adı `<span>`, bu yüzden talepler arasında başlıkla gezinilemiyor.
 
 **Etki:** Ekran okuyucu kullanıcısı başlık listesiyle (H tuşu) gezinirken yazışmaları depozitonun altında sanıyor ve talepler arasında hızlıca atlayamıyor.
 
 **Önerilen aksiyon:** ClaimDetail'de `<Card title={t("messages.title")} id="claim-messages">` ve `<Card title={t("evidence.title")} id="claim-evidence">` kullanılmalı. Alt bileşenlere `headingLevel` prop'u ya da `hideTitle` verilip iç h3 kaldırılmalı. ClaimList'te tür adı `<h3>` (panel ve liste bağlamında) yapılmalı.
+
+**Yapılan düzeltme:** Confirmed, but the h3 headings are rendered inside ClaimMessages, ClaimEvidence and ClaimList, which I don't own. Giving the Cards a title from ClaimDetail would duplicate the headings until those h3s are removed. I only added ids to the Cards (claim-messages, claim-evidence) and filed the heading-level change as crossOwner.
 
 ## F1350 — Geri çekme onayı sonuçları anlatmıyor; işlem sürerken düğme metni değişmiyor
 
@@ -990,13 +1044,15 @@
 | Renk/tema           | Hayır                                           |
 | Efor                | S                                               |
 | Kaynak denetçiler   | area:resolution                                 |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                    |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p109)                 |
 
 **Kanıt:** ClaimDetail.tsx:103 `window.confirm(t("detail.withdrawConfirm"))`: metin (json:113) yalnız "geri alınamaz" diyor. HOST_DAMAGE geri çekilince depozitonun serbest bırakıldığı (claims.ts:392) ve yeniden talep süresinin dolmuş olabileceği söylenmiyor. Native confirm'ün başlığı tarayıcı dilinde ve stili uygulamadan kopuk. :170-172 düğme busy iken yalnız devre dışı kalıyor, "Geri çekiliyor…" metni yok.
 
 **Etki:** Ev sahibi, hasar talebini geri çekerse depozito güvencesinin de kalkacağını bilmeden işlemi onaylıyor.
 
 **Önerilen aksiyon:** Tür ve role göre onay metni yazılmalı. HOST_DAMAGE: "Geri çekerseniz misafirin depozito provizyonu serbest bırakılır ve bu hasar için yeniden tahsilat yapılamayabilir." busy iken düğme metni `t("detail.withdrawing")` = "Geri çekiliyor…" olmalı. İsteğe bağlı olarak window.confirm yerine "Talebi geri çek" / "Vazgeç" düğmeli, sayfa içi `role="alertdialog"` kullanılabilir.
+
+**Yapılan düzeltme:** The useConfirm dialog was already in place (no window.confirm). HOST_DAMAGE now gets its own confirm body (detail.withdrawConfirmDamage), which warns that the guest's deposit hold may be released and that a later collection may not be possible. Other types keep detail.withdrawConfirm. While busy, the button reads "Geri çekiliyor…" (detail.withdrawing) and uses busy instead of disabled.
 
 ## F1351 — Yönetici görünümünde gereksiz 'Rolünüz: Yönetici' satırı var; talebi açan ve yanıtlayan bilgisi yok
 
@@ -1011,13 +1067,15 @@
 | Renk/tema           | Hayır                                           |
 | Efor                | S                                               |
 | Kaynak denetçiler   | area:admin                                      |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                    |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p109)          |
 
 **Kanıt:** ClaimDetail.tsx:120 `[t("detail.yourRole"), t(`role.${claim.role}`)]` readOnly yönetici görünümünde de render ediliyor ve 'Rolünüz: Yönetici' bilgi taşımıyor. Talebi açanın ve yanıtlayanın kim olduğu (misafir ya da ev sahibi adı) gösterilmiyor.
 
 **Etki:** Yönetici özet alanında işe yaramayan bir satır görüyor. Asıl karar bilgisi olan tarafların kim olduğu eksik.
 
 **Önerilen aksiyon:** readOnly olduğunda bu satır yerine 'Talebi açan: {displayName} (Misafir)' ve 'Yanıtlayan: {displayName} (Ev sahibi)' satırlarını gösterin; API ayrıntı yanıtına parties alanı eklensin.
+
+**Yapılan düzeltme:** Confirmed. For an ADMIN viewer, the meaningless "Rolünüz: Yönetici" row is replaced by "Talebi açan: Misafir/Ev sahibi/Kart sahibi" and "Yanıtlayan taraf: …", derived from the claim type (parties use the role.OPENER and role.RESPONDENT labels). Party display names need a new API field (crossOwner).
 
 ## F1352 — Fotoğraf/kanıt yüklemede ilerleme yüzdesi ve gönderim öncesi boyut/tür kontrolü yok
 
@@ -1033,13 +1091,15 @@
 | Renk/tema           | Hayır                                                                                    |
 | Efor                | M                                                                                        |
 | Kaynak denetçiler   | lens:status                                                                              |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                             |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p110)                                                          |
 
 **Kanıt:** ClaimEvidence.tsx:35-52 `apiFetch(…/evidence, { method: "POST", body })` ilerlemesiz; 131 yalnız 'Yükleniyor' metni. HostDashboard.tsx:600-619 PhotoUpload ve 652 aynı. Boyut sınırı aşımı ancak sunucu hatasıyla öğreniliyor.
 
 **Etki:** Mobil veride büyük fotoğraf yükleyen kullanıcı ne kadar süreceğini bilmiyor; sınır aşımını yükleme bittikten sonra öğreniyor.
 
 **Önerilen aksiyon:** XMLHttpRequest `upload.onprogress` ile `<progress>` + yüzde metni (aria-valuenow); seçimde dosya boyutu/tür ön kontrolü ve sınırın ipucu olarak gösterilmesi.
+
+**Yapılan düzeltme:** Added a new shared helper, `apiUploadWithProgress` in src/lib/api-upload-progress.ts. It uses XHR `upload.onprogress` and follows the same contract as `apiFetch`: cookie auth, one session refresh on 401, `ApiError` built from the error body, and `TypeError` on network failure. ClaimEvidence uses it to show a `<progress>` bar with an aria-label (file i/n) and a visible percentage that screen readers skip. Size and type are checked when files are selected, before any upload.
 
 ## F1353 — PDF kanıt bağlantısı boş sekme açıp indiriyor; adlar ayırt edilemiyor, küçük dosyalar "0 KB" görünüyor
 
@@ -1056,13 +1116,15 @@
 | Renk/tema           | Hayır                                                       |
 | Efor                | S                                                           |
 | Kaynak denetçiler   | area:resolution                                             |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p110)                             |
 
 **Kanıt:** ClaimEvidence.tsx:69-77 `<a href=… target="_blank">{t("evidence.pdf", { size })}</a>`. Sunucu PDF'i `content-disposition: attachment` ile veriyor (evidence/[evidenceId]/route.ts:24), yani yeni sekme açılıp hemen indirme başlıyor. Metinde indirme ya da yeni sekme bilgisi yok. Tüm PDF'ler "PDF belgesi (N KB)" diye adlandırılıyor. :76 `byteSize / 1024` ve `maximumFractionDigits: 0` yüzünden 400 B'lık dosya "0 KB" görünüyor. Görsel bağlantıları da (80-84) yeni sekmede açılıyor ama bunu bildirmiyor.
 
 **Etki:** Mobil misafir boş bir sekmeye düşüyor ve dosyanın nereye indiğini anlamıyor. Yönetici birden çok PDF'i adından ayırt edemiyor.
 
 **Önerilen aksiyon:** PDF bağlantısından `target="_blank"` kaldırılıp `download` özniteliği eklenmeli. Metin: "PDF kanıtını indir ({i}. dosya, {size})". Boyut 1024 B altındaysa bayt, üstündeyse en az 1 KB gösterilmeli (`Intl.NumberFormat` `style:"unit"`). Görsel bağlantılarına `<span className="sr-only">(yeni sekmede açılır)</span>` eklenmeli.
+
+**Yapılan düzeltme:** The PDF link no longer opens a new tab; it uses `download` and reads "PDF kanıtını indir (dosya {i}/{n}, {size})". Sizes now use Intl unit formatting: bytes under 1 KB, at least 1 kB under 1 MB, otherwise MB. The queued-file list uses the same formatting. Image links now say "(yeni sekmede açılır)" in an sr-only span.
 
 ## F1354 — Kanıt görseli alt metinleri ayırt edici değil ve hemen altındaki açıklamayı tekrarlıyor
 
@@ -1079,13 +1141,15 @@
 | Renk/tema           | Hayır                                            |
 | Efor                | S                                                |
 | Kaynak denetçiler   | area:resolution                                  |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                     |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p110)                  |
 
 **Kanıt:** ClaimEvidence.tsx:90-93 alt="Kanıt fotoğrafı: {role}, {date}" ve :101 `<p>{by}</p>`, by="{role} · {date}" (satır 62-65). Ekran okuyucu aynı bilgiyi iki kez okuyor. Aynı kişinin aynı dakikada yüklediği fotoğrafların alt metinleri birebir aynı.
 
 **Etki:** Ekran okuyucu kullanıcısı galeride hangi fotoğrafta olduğunu ayırt edemiyor ve gereksiz tekrar dinliyor.
 
 **Önerilen aksiyon:** alt metnine sıra numarası eklenmeli: "Kanıt fotoğrafı {i}/{n}, {party}, {date}". Alttaki açıklama `aria-hidden="true"` yapılmalı, ya da alt yalnız "Kanıt fotoğrafı {i}/{n}" olup açıklama `aria-describedby` ile bağlanmalı.
+
+**Yapılan düzeltme:** Image alt text is now numbered: "Kanıt fotoğrafı {i}/{n}: {role}, {date}". The role/date caption under images is aria-hidden so it is not read twice. Under PDFs the caption stays readable because the link text does not include role or date.
 
 ## F1355 — Seçili talep satırı ağırlıkla renkle belirtiliyor; aria-pressed toggle olmayan bir düğmede kullanılıyor
 
@@ -1102,13 +1166,15 @@
 | Renk/tema           | Hayır                                                |
 | Efor                | S                                                    |
 | Kaynak denetçiler   | area:admin                                           |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                         |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p110)                      |
 
 **Kanıt:** ClaimList.tsx:33 `selectedId === c.id ? "border-[#003580] bg-blue-50" : ...`: seçim görsel olarak çerçeve ve zemin rengiyle gösteriliyor, düğme metni değişmiyor. 60 `aria-pressed={selectedId === c.id}` var ama tekrar basınca seçim kalkmıyor (onSelect aynı id'yi atıyor), yani bu bir toggle değil.
 
 **Etki:** Ekran okuyucu 'basılı' diye duyuruyor ama düğme açılıp kapanmıyor. Renk algısı zayıf kullanıcı hangi talebin seçili olduğunu metinden anlayamıyor.
 
 **Önerilen aksiyon:** Seçiliyken düğme metnini 'Seçili, ayrıntı aşağıda' yapın ve li'ye `aria-current="true"` verin. aria-pressed'i kaldırın ya da ikinci basışta seçimi kaldıran gerçek bir toggle'a dönüştürün. Renk değişikliği gerekmez.
+
+**Yapılan düzeltme:** Same change as F952. `aria-pressed` is gone, the li has `aria-current="true"`, there is a visible text badge with an icon, and the selected row's button text changes to "Ayrıntıya git". Colour is no longer the only signal.
 
 ## F1356 — Listede tekrar eden belirsiz bağlantı metni ve ham rezervasyon kimliği
 
@@ -1125,13 +1191,15 @@
 | Renk/tema           | Hayır                                        |
 | Efor                | S                                            |
 | Kaynak denetçiler   | area:resolution                              |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                 |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p110)       |
 
 **Kanıt:** ClaimList.tsx:66-68 her öğede aynı metin var: "Ayrıntıyı aç" (json:53). Ekran okuyucunun bağlantı listesinde N tane özdeş "Ayrıntıyı aç" çıkıyor. :41 propertyTitle yoksa `t("list.bookingRef", { id: c.bookingId })`, yani "Rezervasyon cmx…" gibi ham bir kimlik gösteriliyor. Dokunma hedefi yalnız kısa bir metin bağlantısı, kartın kendisi tıklanmıyor.
 
 **Etki:** Ekran okuyucu kullanıcısı bağlantı listesinden doğru talebi seçemiyor. Mobil misafir küçük metin bağlantısını hedeflemek zorunda kalıyor.
 
 **Önerilen aksiyon:** Bağlantıya görünmez bağlam eklenmeli: `<span className="sr-only">: {t(`type.${c.type}`)} – {c.propertyTitle}</span>`. İsterseniz kartın tamamı "stretched link" deseniyle tıklanabilir yapılabilir. bookingRef'te kimlik yerine giriş tarihi gösterilmeli ("{checkIn} tarihli rezervasyon").
+
+**Yapılan düzeltme:** Added the hidden link context (type and property). The full booking id in bookingRef is replaced by the short last-8 reference that HostDashboard already uses. Showing the check-in date instead needs a `checkIn` field in ClaimSummary and the claims list APIs, which other packages own (see crossOwner). The card is not a stretched link, but targets meet the 24px/44px minimums.
 
 ## F1357 — Mesaj ve açıklama alanlarında karakter sayacı yok; 4000 sınırı yapıştırılan metni sessizce kırpıyor
 
@@ -1147,10 +1215,12 @@
 | Renk/tema           | Hayır                                               |
 | Efor                | S                                                   |
 | Kaynak denetçiler   | area:resolution                                     |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                        |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p111)                     |
 
 **Kanıt:** ClaimMessages.tsx:101 `maxLength={4000}` ve OpenClaimForm.tsx:85-86 `minLength={10} maxLength={4000}`: sayaç yok. Tarayıcı fazlasını uyarı vermeden kesiyor. Mesaj düğmesi (ClaimMessages.tsx:106) boşken neden pasif olduğunu söylemiyor. Açıklamada boşluklar minLength'i geçiyor ama sunucu trim sonrası "Geçersiz talep" döndürüyor (claims.ts:86, route.ts:22).
 
 **Etki:** Uzun hasar açıklamasını yapıştıran ev sahibi metnin sonunun kesildiğini fark etmiyor. Kısa açıklama yazan misafir genel bir "Geçersiz talep" hatası alıyor.
 
 **Önerilen aksiyon:** Alan ipucuna sayaç eklenmeli: `{body.length}/4000`. 3600'ü geçince `aria-live="polite"` ile duyurulmalı. Açıklama için "En az 10 karakter (şu an {n})" gösterilmeli. İstemci tarafında `description.trim().length < 10` kontrolü alan hatası olarak verilmeli.
+
+**Yapılan düzeltme:** Removed the silent maxLength=4000 truncation from both textareas and replaced it with validation. The message field hint shows a {count}/4000 counter. At 3600+ characters a polite live note warns about the limit, and over 4000 it says by how much. Submitting an empty or too-long message shows a field error and moves focus to the field; the button is no longer silently disabled. The description gets the same near/over-limit live note, a trim-based too-short error that includes the current count, and a too-long error.

@@ -409,13 +409,15 @@
 | Renk/tema           | Hayır                                                                                                |
 | Efor                | M                                                                                                    |
 | Kaynak denetçiler   | runtime:compliance, area:compliance                                                                  |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                         |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p033)                                                               |
 
 **Kanıt:** Sweep 030/031 ve p6: /report/appeal, ?notice=x&role=host&token=invalid-token ve ?notice=x&role=reporter (token yok) adreslerinin üçü de aynı mesajı veriyor: 'İtiraz bağlantısı geçersiz ya da süresi dolmuş. Lütfen karar e-postanızdaki bağlantıyı kullanın.' main içindeki eylemler = []. Üstteki giriş metni hâlâ 'itiraz edebilirsiniz' diyor (RT/crops/compliance/031-anon-tr-mobile-_report_appeal-0.png). Belirteç süresiz bir HMAC (dsa-appeal.ts appealToken); süre dolumu ayrı bir mesajla (windowClosed) ele alınıyor, dolayısıyla 'süresi dolmuş' hiçbir zaman bu mesajın nedeni değil.
 
 **Etki:** Bağlantısı bozulmuş (ör. e-posta istemcisi tarafından kırpılmış) ev sahibi ya da bildiren, yasal itiraz hakkını kullanmanın yolunu bulamıyor. Mesaj, gerçekte olmayan bir 'süre doldu' nedenini ima ediyor.
 
 **Önerilen aksiyon:** Mesajı 'Bağlantı eksik ya da hatalı.' olarak değiştirin. Eylemler ekleyin: 'Destekle iletişime geç' (/support), referans numarası ve e-posta ile 'Karar e-postasını yeniden gönder', 'Yeni bildirim' (/report). Henüz karar verilmemiş bildirim (NotFound) için ayrı bir açıklama gösterin.
+
+**Yapılan düzeltme:** The invalid-link state now tells the cases apart: a bad or truncated signature (403) shows the reworded invalidLink text ('eksik ya da hatalı', no false 'expired' cause); a 404 shows a new notDecided explanation; a DB/other failure shows loadFailed. Each state has 'Destekle iletişime geç' (/support) and 'Yeni bildirim yap' (/report) ButtonLinks, and the misleading 'itiraz edebilirsiniz' intro is hidden when no context loads. 'Karar e-postasını yeniden gönder' is not implemented because it needs a new resend API and email flow in the dsa-appeal domain (see crossOwner).
 
 ## F443 — 'DSA şeffaflık raporu' bağlantısı herkese açık sayfadan yönetici kapısına götürüyor
 
@@ -431,13 +433,15 @@
 | Renk/tema           | Hayır                                                                  |
 | Efor                | M                                                                      |
 | Kaynak denetçiler   | runtime:compliance, area:compliance                                    |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                           |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p039)                                        |
 
 **Kanıt:** p6, anon: /admin/compliance açıldığında H1 'Uyum' ve 'Bu sayfa için giriş yapın.' görünüyor (RT/crops/compliance/p6-anon-admin-compliance.png). Bağlantı diğer kamu bağlantılarıyla aynı stilde; 'yönetici yetkisi gerekir' notu bağlantıdan SONRA ve 14px.
 
 **Etki:** Halka açık olduğu varsayılan şeffaflık raporu kamuya kapalı. Kullanıcı çıkmaz bir giriş sayfasına düşüyor, güven algısı zedeleniyor.
 
 **Önerilen aksiyon:** Toplu rakamları herkese açık bir /trust/transparency sayfasında (HTML tablo ile CSV/JSON) yayımlayın. Bu yapılamıyorsa yönetici olmayanlar için bağlantıyı kaldırın ya da kilit ikonu ve '(yalnız yöneticiler)' ibaresiyle etiketleyin.
+
+**Yapılan düzeltme:** Used the fix's fallback option instead of building a public report page. The 'DSA şeffaflık raporu' link now has a lock icon (aria-hidden) and a visible '(yalnız yöneticiler)' inside the link, so it is part of the accessible name and appears before the note. The note is tied to the link with aria-describedby and now says the report is only reachable from the admin dashboard; pageIntro no longer promises that every link is public. A public /trust/transparency page was not built, because publishing admin-only DSA aggregates is a product decision.
 
 ## F503 — Güven merkezi tüketiciye değil geliştiriciye göre yazılmış; tüketiciyi ilgilendiren öğeler en sonda ve açıklamasız
 
@@ -453,13 +457,15 @@
 | Renk/tema           | Hayır                                               |
 | Efor                | M                                                   |
 | Kaynak denetçiler   | runtime:compliance                                  |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                        |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p039)                     |
 
 **Kanıt:** Sweep 024/025: H2 sırası 'Tedarik zinciri', 'Doğrulama uçları', 'Politikalar ve şeffaflık'. Metinde SBOM, CycloneDX, SLSA provenance, artefakt, 'main dalı', JWKS, mandate, ES256, OpenAPI 3.1 geçiyor. Misafiri ilgilendiren 'Sıralama nasıl çalışır?', 'Yasa dışı içerik bildir (DSA)' ve 'Gizlilik ve KVKK bildirimi' bağlantıları son kartın son üç öğesi ve açıklamaları yok (RT/crops/compliance/024-anon-tr-desktop-_trust-1.png; mobilde yaklaşık 1,5 ekran kaydırdıktan sonra görünüyor: 025-…-1.png). Footer'daki 'Güven merkezi' etiketi tüketiciye güvenlik vaadi (dolandırıcılık, güvenli ödeme) çağrıştırıyor.
 
 **Etki:** Geniş okuryazarlık yelpazesindeki misafir sayfayı anlamıyor ve aradığı bildirim ya da gizlilik yolunu kaçırıyor. Sayfa güven vermek yerine yabancılaştırıyor.
 
 **Önerilen aksiyon:** Sayfayı 'Güvenliğiniz ve haklarınız' bölümüyle açın: içerik bildir, karara itiraz, sıralama, gizlilik, ödeme güvenliği; her biri için bir cümlelik sade açıklama. SBOM, JWKS ve benzeri öğeleri 'Geliştiriciler ve denetçiler için' başlığı altında bir details öğesine ya da /trust/developers sayfasına taşıyın. Terimler için kısa açıklamalar ekleyin.
+
+**Yapılan düzeltme:** The page now opens with a 'Güvenliğiniz ve haklarınız' card covering report, appeal, ranking, privacy and payment security, each with a one-sentence plain description; appeal and payment are text items with no link. Next comes 'Politikalar ve şeffaflık'. Supply chain and APIs moved to the end, as h3 subsections inside a 'Geliştiriciler ve denetçiler için' card with a short intro saying guests do not need them. I did not use a collapsed <details>, because the e2e getByRole('link', {name: /JWKS/ and /OpenAPI/}) checks cannot find links hidden inside a closed details element.
 
 ## F504 — 'SBOM (CycloneDX) indir' bir indirme değil; üç farklı etiket aynı GitHub iş akışı sayfasına gidiyor
 
@@ -476,13 +482,15 @@
 | Renk/tema           | Hayır                                       |
 | Efor                | S                                           |
 | Kaynak denetçiler   | runtime:compliance                          |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p039)             |
 
 **Kanıt:** p6: 'SBOM (CycloneDX) indir', 'SLSA provenance (build kanıtı)' ve 'OpenSSF Scorecard' bağlantılarının üçünün de href'i https://github.com/tunadeniz1304/booking-platform/actions/workflows/security.yml; download özniteliği yok. Hedef sayfanın başlığı (curl) 'Security · Workflow runs'. Scorecard notu 'Yayınlanmadı' dediği halde öğe bağlantı olarak duruyor.
 
 **Etki:** 'İndir' fiili bir dosya beklentisi yaratıyor; kullanıcı iş akışı listesine düşüp ne yapacağını bilemiyor. Yayımlanmamış bir öğeye tıklamak boşa çıkıyor.
 
 **Önerilen aksiyon:** Etiketi 'SBOM — CI iş akışı (GitHub)' yapın ya da doğrudan bir release asset'ine bağlayın. Scorecard yayımlanana kadar bağlantı yerine düz metin kullanın. Her öğenin hedefi kendine özgü olsun.
+
+**Yapılan düzeltme:** The SBOM label no longer says 'indir'. It reads 'SBOM (CycloneDX) — üreten CI iş akışı (GitHub, depo erişimi gerekir)'. SLSA provenance is plain text now, because its only possible target was the same workflow URL; its note points to the same run's Artifacts. Scorecard is plain text with a 'Yayınlanmadı' status badge. No two links share a target any more.
 
 ## F505 — Uyum karar formlarında varsayılanlar ve önden bilgilendirme (feedforward) yanlış: 'İşlem yapma' seçiliyken 'Dayanak' görünüyor, itirazda 'Ret' ön seçili, zorunlu alanlar işaretsiz
 
@@ -499,13 +507,15 @@
 | Renk/tema           | Hayır                                                   |
 | Efor                | S                                                       |
 | Kaynak denetçiler   | runtime:admin                                           |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                            |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p072)                         |
 
 **Kanıt:** RUNTIME p5-compliance.mjs: DSA bildiriminde karar varsayılanı NO_ACTION, ama 'Dayanak' select'i görünür (groundVisible=true). Bu değer yalnızca REMOVED'da gönderiliyor (satır 218). İtirazda varsayılan sonuç ['REJECTED'] (AppealQueue.tsx:49,75). Takedown'da İlan kimliği ve Gerekçe required, Evrak no isteğe bağlı, ama etiketlerde fark yok; boş gönderimde yalnızca tarayıcı balonu çıkıyor.
 
 **Etki:** Admin anlamsız bir alanı doldurmaya zaman harcıyor ve hangi seçimin etkili olduğunu öngöremiyor. 'Ret' ön seçimi aceleyle verilen kararları itiraz edenin aleyhine çeviriyor (DSA md. 20 adilliği).
 
 **Önerilen aksiyon:** 'Dayanak' alanını yalnızca 'Kaldır' seçiliyken gösterin (AppealQueue'daki needsGround kalıbı gibi). İtiraz sonucunda varsayılan bırakmayın, seçimi zorunlu tutun. Etiketlere '(zorunlu)' ya da '(isteğe bağlı)' ekleyin.
+
+**Yapılan düzeltme:** Two parts were already done when I started: the decision select had no default ('Seçin…'), and 'Dayanak' only rendered when REMOVED was picked. I added the missing feedforward. Required fields now use Field `required` (visual * plus required attribute), with a RequiredLegend at the top of the takedown card and of the notice list. This covers İlan kimliği, Gerekçe, the new receipt time, Karar, Dayanak, Olgular and Kapatma gerekçesi. Facts got a minimum-length hint (factsHint) and reason got one too (reasonHint). The AppealQueue part needs nothing: it no longer preselects REJECTED.
 
 ## F506 — Form alanı kenarlıkları 1.47:1 kontrastta; bildirim formu ortak inputClass yerine kendi stilini kullanıyor
 
@@ -544,13 +554,15 @@
 | Renk/tema           | Hayır                                                                            |
 | Efor                | S                                                                                |
 | Kaynak denetçiler   | runtime:compliance                                                               |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                     |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p074)                                                  |
 
 **Kanıt:** p3 sonrası main içeriği yalnızca H1, giriş metni ve 'Bildiriminiz alındı. Başvuru numaranız: cmv2xa4e4003vkd9zfp46lk49. Onay e-postası gönderildi.' satırından oluşuyor; main içindeki etkileşimli öğeler = []. propertyId bilindiği halde 'İlana dön' bağlantısı yok; 'Başka bir içerik bildir', 'Kopyala' ve 'Ne olacak?' (inceleme süresi, karar e-postası, md. 20 itiraz hakkı) bilgileri yok. Referans, 25 karakterlik gruplanmamış küçük harfli bir cuid.
 
 **Etki:** Kullanıcı kontrolü kaybediyor: geri dönmek için tarayıcı geri tuşuna ya da header'a muhtaç kalıyor. Referansı not almak hataya açık. Sürecin nasıl ilerleyeceği belirsiz kaldığı için destek talepleri artar.
 
 **Önerilen aksiyon:** Başarı kartına h2 ekleyin. Referansı monospace ve gruplanmış gösterip yanına 'Kopyala' butonu koyun. 2-3 maddelik bir 'Bundan sonra ne olacak?' listesi ekleyin: insan incelemesi, karar ve gerekçe e-postası, itiraz hakkı. Eylem olarak 'İlana dön' (/property/{id}), 'Ana sayfa' ve 'Başka bir içerik bildir' sunun.
+
+**Yapılan düzeltme:** The success card now has the h2 (which gets focus), a confirmation line naming the email address, and the reference in monospace split into groups of 5 (the copied value has no spaces). Next to it is a 'Numarayı kopyala' button with a role=status result line (copied / copy failed) and a support hint. Below come a 3-item 'Bundan sonra ne olacak?' list (human review, decision and reasons by email, DSA Art. 20 appeal) and actions: 'İlana dön' (/property/{id}, only when a listing was linked), 'Ana sayfaya dön', and 'Başka bir içerik bildir', which resets to an empty, unlinked form and focuses the URL field.
 
 ## F508 — Bildirim formu tarayıcının geçici balonlarına dayanıyor; itiraz formunun satır içi hata deseniyle tutarsız
 
@@ -567,13 +579,15 @@
 | Renk/tema           | Hayır                                                            |
 | Efor                | M                                                                |
 | Kaynak denetçiler   | runtime:compliance                                               |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                     |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p074)                                  |
 
 **Kanıt:** p1, desktop: boş gönderimde yalnızca ilk alan (#notice-contentUrl) odaklanıyor ve uygulama dilinden bağımsız tarayıcı balonu çıkıyor ('Please fill out this field.'; headless Chromium'da İngilizce). explanation, email ve goodFaith da invalid ama görsel olarak işaretlenmiyor; tüm alanlarda aria-invalid=null. Dört hatayı görmek için dört ayrı gönderim gerekti (adım A-E). Balon birkaç saniye sonra kayboluyor. RT/crops/compliance/p1-empty-desktop.png. Buna karşılık AppealForm.tsx:67 noValidate ile Field error (satır içi, kalıcı, aria-invalid) kullanıyor.
 
 **Etki:** Hatalar tek tek ve kalıcı olmayan biçimde keşfediliyor. Düşük okuryazarlığa sahip ya da büyüteç kullanan kullanıcı balonu kaçırıyor. Aynı uyum alanındaki iki form farklı davranıyor.
 
 **Önerilen aksiyon:** Forma noValidate ekleyin. Zod şemasının istemci tarafındaki eşiyle tüm alanları tek seferde doğrulayın. Her alanın altında kalıcı Field error ve üstte bağlantılı bir hata özeti gösterin. AppealForm ile aynı ortak bileşeni kullanın.
+
+**Yapılan düzeltme:** The form now has noValidate. A VALIDATORS map mirrors noticeInputSchema on the client and checks every field in one pass, including the good-faith checkbox, which gets its own aria-invalid, aria-describedby and inline error. Errors stay inline under each field through the shared Field error prop, the same pattern AppealForm uses. A summary at the top links to each invalid field, and focus moves to the first invalid field after render. Each error clears once its field becomes valid, via one form-level onChange.
 
 ## F509 — URL alanı hatırlamaya dayanıyor ve şeması olmayan adresi açıklamasız reddediyor; bildirilen ilan tanınabilir değil
 
@@ -588,13 +602,15 @@
 | Renk/tema           | Hayır                                         |
 | Efor                | M                                             |
 | Kaynak denetçiler   | runtime:compliance                            |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                  |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p074)        |
 
 **Kanıt:** p13, mobile: 'www.ornek.com/ilan/123' girildiğinde invalid, yalnızca 'Please enter a URL.' mesajı çıkıyor. 'localhost:3000/property/abc' ise geçerli sayılıyor. placeholder=null, ipucu yok (#notice-contentUrl-hint sayısı 0). Trust center'dan açılan genel /report'ta URL boş geliyor; kullanıcı ilanı başka sekmede bulup adresini kopyalamak zorunda. propertyId ile gelindiğinde (p2) alanda yalnızca ham 'http://localhost:3000/property/cmv2uydl30fot92w2i9c8a4fa' adresi var; ilan adı ya da fotoğrafı gösterilmiyor (main metni yalnızca form etiketlerinden oluşuyor).
 
 **Etki:** Mobil kullanıcı URL kopyalama ve yapıştırma ile uğraşırken hata yapıyor. Doğru ilanı bildirdiğinden emin olamıyor. Teknik bilgisi az kullanıcı 'URL' kavramında takılıyor.
 
 **Önerilen aksiyon:** Alana ipucu ekleyin: 'Örn. https://…/property/… — ilan sayfasındaki "Bu ilanı bildir" bağlantısı alanı otomatik doldurur'. Şema eksikse doğrulamadan önce https:// ekleyerek normalize edin. propertyId varsa salt okunur bir ilan özet kartı (ad, şehir, küçük fotoğraf) ve 'Değiştir' seçeneği gösterin. İsteğe bağlı olarak ilan arama alanı ekleyin.
+
+**Yapılan düzeltme:** The URL field now has a hint: an example full address, plus a note that the listing page's 'Bu ilanı bildir' link fills the field. An address without a scheme gets https:// added on blur and on submit, so 'www.ornek.com/ilan/123' is accepted. Validation only accepts http and https. When propertyId is set, a read-only summary card replaces the URL input: title, city and thumbnail when the page supplies them, plus the address, and a 'Başka bir içerik bildir' button that unlinks the listing. The title, city and photo need the report/page.tsx change (crossOwner). The optional listing search was not added.
 
 ## F593 — Güven merkezinde bağlantı metni ile hedef uyuşmuyor: 'SBOM indir' özel bir deponun Actions sayfasına gidiyor; üç öğe aynı URL'yi kullanıyor; yayınlanmamış Scorecard'a bağlantı veriliyor
 
@@ -611,13 +627,15 @@
 | Renk/tema           | Hayır                                                                                                                        |
 | Efor                | S                                                                                                                            |
 | Kaynak denetçiler   | area:compliance, lens:a11y                                                                                                   |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                 |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p039)                                                                                       |
 
 **Kanıt:** trust/page.tsx:32-34'te sbom, provenance ve scorecard'ın üçü de `href: SECURITY_WORKFLOW_URL`. tr trustCenter.json:6 "SBOM (CycloneDX) indir"; :7 "(depo erişimi gerekir)"; :11 "Yayınlanmadı: depo şu an özel (private)". :47 güvenlik politikası da aynı özel depoya (SECURITY_POLICY_URL, :11) gidiyor. pageIntro (:3) "Buradaki her bağlantı kamuya açık bilgi içerir" diyor.
 
 **Etki:** Bağlantıya tıklayan misafir dosya indirmek yerine erişim olmadığı için GitHub 404 sayfasıyla karşılaşır. Aynı hedefe giden üç farklı metin ve 'kamuya açık' vaadi güveni azaltır; bu, sayfanın amacının tersidir.
 
 **Önerilen aksiyon:** Bağlantı metinlerini davranışı anlatacak şekilde değiştirin, ör. 'SBOM'u üreten iş akışı (GitHub, depo erişimi gerekir)'. Scorecard'ı bağlantı olmaktan çıkarıp düz metin ve 'Yayınlanmadı' durum etiketi olarak gösterin. SECURITY.md içeriğini uygulamadan servis edin (/.well-known/security.txt ya da /security-policy). pageIntro'yu 'Bazı kaynaklar depo ya da yönetici erişimi gerektirir' olarak düzeltin.
+
+**Yapılan düzeltme:** Confirmed in the code: all three links used SECURITY_WORKFLOW_URL, and the intro said every link was public. Fixed: link texts now describe what you get, the duplicate links are gone, Scorecard is plain text with a 'Yayınlanmadı' badge, and links to the private repo or admin area say so in the link text ('GitHub, depo erişimi gerekir' / 'yalnız yöneticiler'). pageIntro now says these resources are marked. Not done: serving SECURITY.md from the app (/.well-known/security.txt or /security-policy). That needs new route content, so the security-policy link still goes to the private repo but is labelled that way.
 
 ## F772 — Uyum sayfası uzun ve tek parça: bölüm içi gezinme ve sayaç yok, bölüm sırası mantıksız, giriş metni bölümleri eksik sayıyor
 
@@ -634,13 +652,15 @@
 | Renk/tema           | Hayır                                                                                     |
 | Efor                | M                                                                                         |
 | Kaynak denetçiler   | area:compliance                                                                           |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                              |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p009)                                                    |
 
 **Kanıt:** admin/compliance/page.tsx:19-23'te ComplianceDashboard, AppealQueue ve AccessibilityReviewQueue art arda render ediliyor. ComplianceDashboard.tsx:207'deki 'Şeffaflık raporu' kartı, bildirimler ile itirazlar arasına düşüyor. Kartların id'leri var (takedowns, notices, transparency, appeals, accessibility-review) ama bunlara bağlantı veren bir nav yok. Giriş metni (tr compliance.json:30) "7565 kaldırma talepleri (24 saat SLA), DSA bildirimleri ve şeffaflık raporu." itirazları ve erişilebilirlik kuyruğunu saymıyor.
 
 **Etki:** Her biri 200 öğeye kadar uzayabilen ve her öğesinde form bulunan beş bölümde, itiraz kuyruğuna ulaşmak için yüzlerce alan geçmek gerekir. Hangi kuyrukta iş biriktiği sayfanın başında görünmez.
 
 **Önerilen aksiyon:** PageShell intro'sunun altına `<nav aria-label="Uyum bölümleri">` ekleyin; içinde #takedowns, #notices, #appeals, #accessibility-review ve #transparency bağlantıları ile bekleyen sayılar ('Bildirimler (12)') olsun. Şeffaflık kartını en sona taşıyın. intro metnine '…, md. 20 itirazları ve erişilebilirlik doğrulama kuyruğu' ekleyin.
+
+**Yapılan düzeltme:** Confirmed. Inside RoleGate the compliance page now has AdminPagesNav plus an in-page <nav aria-label='Uyum bölümleri'> with anchor links to #takedowns, #notices, #transparency, #appeals and #accessibility-review, in page order. The intro text now also names md. 20 appeals and the accessibility queue (compliance.admin.intro, used only here). Not done: pending counts, because they live in the child components, and moving the transparency card last, which is inside ComplianceDashboard (crossOwner).
 
 ## F773 — İtiraz sayfasında gerekçeli karar bildirimi kapalı geliyor ve iki dilli ham metin (ISO zaman damgası) olarak sunuluyor
 
@@ -656,13 +676,15 @@
 | Renk/tema           | Hayır                                         |
 | Efor                | M                                             |
 | Kaynak denetçiler   | area:compliance                               |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                  |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p033)               |
 
 **Kanıt:** appeal/page.tsx:63-70 `<details className="mt-3"><summary ...>{t("statement")}</summary><pre ...>{ctx.statementOfReasons}</pre></details>` varsayılan olarak kapalı. İçerik dsa.ts:157-167'den geliyor: "Tarih / Date: 2026-…T…Z", "Kısıtlama / Restriction: İlan yayından kaldırıldı (görünürlük kısıtlaması: tamamen) / Listing removed", "Otomatik araç / Automated means: …".
 
 **Etki:** İtiraz yazacak misafir ya da ev sahibi, kararın gerekçesini (itirazın asıl dayanağını) açılır bölümde aramak zorunda kalır. Açtığında iki dilin karıştığı, ISO tarihli, hukuki jargonla dolu bir metinle karşılaşır; okuryazarlığı düşük kullanıcı ne itiraz edeceğini sentezleyemez.
 
 **Önerilen aksiyon:** Gerekçeyi yapılandırılmış alanlardan (decisionGround, legalReference, facts) etkin dilde bir <dl> olarak gösterin: 'Dayanak', 'Hukuki referans', 'Olgular ve gerekçe'. Tarihi f.dateTime ile biçimlendirin. Ham resmî metni 'Resmî karar metni (TR/EN)' başlıklı ayrı bir <details> içinde tutun. Olgular bölümü varsayılan olarak açık gelsin.
+
+**Yapılan düzeltme:** Confirmed: the statement sat in a closed <details> as raw bilingual text with ISO dates. The decision card now shows an always-open <dl> with Dayanak (localized admin.grounds), Hukuki referans and Olgular ve gerekçe, reusing the compliance.admin labels. The raw text moved into a separate <details> titled 'Resmî karar metni (TR/EN)', and the decision date is formatted in Europe/Istanbul. Notice has no facts column, so the new src/lib/compliance/dsa-appeal-details.ts parses facts from the statementOfReasons line and falls back to the raw text only.
 
 ## F774 — Güven merkezi açıklanmamış teknik jargonla dolu, ama sayfa global footer'dan tüm misafirlere açık
 
@@ -679,13 +701,15 @@
 | Renk/tema           | Hayır                                                                   |
 | Efor                | S                                                                       |
 | Kaynak denetçiler   | area:compliance                                                         |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                            |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p039)                                         |
 
 **Kanıt:** tr trustCenter.json:7 "sbom-cyclonedx artefaktı", :9 "SLSA provenance", :15-16 "JWKS", "ES256 açık anahtarları", "Ajan yetkilerini (mandate)", :17 "OpenAPI 3.1 sözleşmesi". Footer.tsx:57-62 /trust'a her sayfadan bağlantı veriyor. trust/page.tsx:28-54 bölüm sırası: tedarik zinciri, API'ler, en sonda misafiri ilgilendiren politikalar.
 
 **Etki:** Bilgisayar okuryazarlığı düşük misafir 'Güven merkezi'ne güvenlik ya da veri koruma bilgisi aramak için girer, ilk iki bölümü anlamaz. Kendisi için yararlı olan 'Yasa dışı içerik bildir' ve 'Gizlilik' bağlantıları sayfanın en altında kalır.
 
 **Önerilen aksiyon:** Sayfanın en üstüne düz dilde bir özet kartı ekleyin ('Bu sayfada ne var?' 2-3 cümle). 'Politikalar ve şeffaflık' bölümünü ilk sıraya alın. SBOM, SLSA, JWKS gibi kısaltmaları ilk geçtikleri yerde `<abbr title="…">` ile ve notlarda bir cümlelik açıklamayla tanımlayın.
+
+**Yapılan düzeltme:** Confirmed in the code. pageIntro is now a plain-language summary of what is on the page and who each part is for. Guest-facing sections come first. On first use, SBOM, SLSA and JWKS are wrapped in <abbr title> through t.rich tags (glossary.* keys). Each developer note now starts with a one-sentence plain explanation: what an SBOM, provenance, Scorecard, JWKS and OpenAPI are.
 
 ## F775 — Yönetici kuyruklarında yükleniyor göstergesi yok; filtre değişince bir önceki filtrenin listesi gösterilmeye devam ediyor
 
@@ -701,13 +725,15 @@
 | Renk/tema           | Hayır                                                                          |
 | Efor                | S                                                                              |
 | Kaynak denetçiler   | area:compliance                                                                |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                   |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p078)                                                |
 
 **Kanıt:** AccessibilityReviewQueue.tsx:28-34 `useLoader(() => apiFetch(`/api/admin/accessibility?status=${tab}`)..., [tab])`, :58 `aria-pressed={tab === key}` anında değişiyor. ui.tsx:241-262'deki useLoader deps değişince `data`yı sıfırlamıyor ve `loading` döndürmüyor; `setData` yalnızca promise çözülünce çağrılıyor. AppealQueue.tsx:38-42 yüklenirken yalnızca intro gösteriyor; liste ya da boş durum yok.
 
 **Etki:** Yavaş ağda 'Doğrulanmış' sekmesi seçili görünürken bekleyen kayıtlar listeleniyor. Yönetici neye baktığını yanlış yorumlar; ekran okuyucu kullanıcısı yüklemenin sürdüğünden haberdar olmaz.
 
 **Önerilen aksiyon:** useLoader'a `loading` bayrağı ekleyin (deps değişince true yapılsın ve data null'a çekilsin). Bileşenlerde loading sırasında `<p role="status">Yükleniyor…</p>` gösterin, <ul>'ye `aria-busy={loading}` verin. Filtre düğmeleri loading sırasında disabled olsun.
+
+**Yapılan düzeltme:** Confirmed: useLoader keeps the old tab's data while the new tab loads. useLoader in ui.tsx is not mine, so the fetcher now returns {tab, features} and the list renders only when data.tab matches the selected filter. Otherwise the existing role=status 'Yükleniyor…' shows and the <ul> gets aria-busy. Filters are not disabled because that would drop focus; stale responses are discarded instead. AppealQueue already shows a loading status, so nothing was needed there.
 
 ## F776 — Yönetici panelindeki sunucu hata metinleri yerelleştirilmemiş; EN arayüzde Türkçe hata görünüyor ve alan bilgisi verilmiyor
 
@@ -724,13 +750,15 @@
 | Renk/tema           | Hayır                                                                                                                                                                   |
 | Efor                | M                                                                                                                                                                       |
 | Kaynak denetçiler   | area:compliance                                                                                                                                                         |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                                                            |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p072)                                                                                                                                         |
 
 **Kanıt:** ComplianceDashboard.tsx:48 `setError(errorMessage(e))` sunucunun `error` alanını olduğu gibi gösteriyor: dsa.ts:129 "Kaldırma kararı için dayanak (ground) zorunlu", errors.ts:154 "Doğrulama hatası", takedown.ts:66 "İlan bulunamadı". api-client.ts:40 `İstek başarısız (${res.status})` ve ui.tsx:266 `fallback = "Beklenmeyen bir hata oluştu"` sabit Türkçe. AppealQueue.tsx:64 ve AccessibilityReviewQueue.tsx:47'de de aynı desen var.
 
 **Etki:** EN dilini seçmiş yönetici Türkçe ve teknik ('ground') hata metinleri görür. 'Doğrulama hatası' hangi alanın (ör. facts en az 10 karakter) eksik olduğunu söylemez, düzeltme deneme yanılmayla yapılır.
 
 **Önerilen aksiyon:** ApiError.code değerlerini compliance.admin.errors.* çeviri anahtarlarına eşleyin (NOTICE_DECIDED, APPEAL_DECIDED, TAKEDOWN_CLOSED, NOT_FOUND, VALIDATION_ERROR, TRANSACTION_CONFLICT). VALIDATION_ERROR'da `details.fieldErrors` değerlerini ilgili Field'lara verin. Bilinmeyen durumlarda `errorMessage(err, tc("unexpectedError"))` kullanın.
+
+**Yapılan düzeltme:** Confirmed: in EN, codes like NOTICE_DECIDED fell through to the generic 'unexpected error'. Server error codes now map to new compliance.admin.errors.* keys: NOT_FOUND gives propertyNotFound (create), takedownNotFound (close) or noticeNotFound (decide); TAKEDOWN_CLOSED, NOTICE_DECIDED and TAKEDOWN_DUPLICATE get their own messages, and for the stale cases the list is also reloaded. VALIDATION_ERROR spreads details.fieldErrors onto the matching Field errors (errors.fields.*), shows a summary and focuses the first invalid field. Anything else still goes through useErrorText.
 
 ## F777 — Kaldırma talebi formu başarılı kayıttan sonra temizlenmiyor; aynı talebin yeniden gönderilme riski var
 
@@ -745,13 +773,15 @@
 | Renk/tema           | Hayır                                                  |
 | Efor                | S                                                      |
 | Kaynak denetçiler   | area:compliance                                        |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                           |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p072)                        |
 
 **Kanıt:** ComplianceDashboard.tsx:52-67 `createTakedown` başarıdan sonra `e.currentTarget.reset()` çağırmıyor. Alanlar kontrolsüz (:119, :122, :125) olduğundan propertyId, Evrak no ve Gerekçe dolu kalıyor. Sunucuda yineleme kontrolü yok (takedown.ts:68 `tx.takedownRequest.create`).
 
 **Etki:** Başarı mesajı ekranın üstünde kalırken formu hâlâ dolu gören yönetici tekrar gönderebilir. Böylece aynı yazı için iki talep kaydı ve iki SLA işi oluşur.
 
 **Önerilen aksiyon:** submit başında `const formEl = e.currentTarget;` saklayın ve başarıdan sonra `formEl.reset()` çağırın. İlk alana (td-source) odaklanın. Sunucuda aynı propertyId + referenceNo için açık talep varsa 409 döndürmeyi değerlendirin.
+
+**Yapılan düzeltme:** Part of this was already in place: form.reset() and preview clearing ran after a successful save. I added: focus moves to the first field (td-source) after success, the receipt-time field resets to now, and the success message names the listing. The optional server-side duplicate check is passed to the owner as a crossOwner item; the client already handles its TAKEDOWN_DUPLICATE code.
 
 ## F778 — Kaldırma talebi formunda yazının alındığı zaman girilemiyor; SLA kayıt anından başlıyor
 
@@ -767,13 +797,15 @@
 | Renk/tema           | Hayır                                                  |
 | Efor                | S                                                      |
 | Kaynak denetçiler   | area:compliance                                        |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                           |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p072)                        |
 
 **Kanıt:** ComplianceDashboard.tsx:59-64 gövdesi `{ source, propertyId, referenceNo, reason }` içeriyor, receivedAt yok. takedown.ts:45-46 `/** Yazının alındığı an (verilmezse şimdi). SLA bu andan sayılır. */ receivedAt: z.coerce.date().optional()`.
 
 **Etki:** Bakanlık yazısı sabah gelip öğleden sonra sisteme girildiğinde SLA bitişi ve şeffaflık raporundaki süreler olduğundan iyi görünür; yasal 24 saatlik süre panelde yanlış izlenir.
 
 **Önerilen aksiyon:** Forma `<input type="datetime-local" name="receivedAt">` alanı ekleyin. Etiket 'Yazının alındığı tarih ve saat', varsayılan şimdi, max şimdi olsun. Hint: '24 saatlik süre bu andan başlar.' Değer ISO formatında gönderilsin.
+
+**Yapılan düzeltme:** Added a required datetime-local field 'Yazının alındığı tarih ve saat (TSİ)' (receivedAt). Its hint says the 24-hour deadline starts from this moment. It is prefilled with the current Turkey time and refreshed while the admin hasn't edited it; max is kept at now. The value is sent as ISO with a fixed +03:00 offset (Turkey has had no DST since 2016).
 
 ## F779 — Şeffaflık raporunun dönemi 'bu yıl'a sabit; geçmiş dönem dışa aktarılamıyor ve JSON aynı sekmede ham açılıyor
 
@@ -789,13 +821,15 @@
 | Renk/tema           | Hayır                                                  |
 | Efor                | S                                                      |
 | Kaynak denetçiler   | area:compliance                                        |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                           |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p072)                        |
 
 **Kanıt:** ComplianceDashboard.tsx:99-102 `const from = `${now.getUTCFullYear()}-01-01`; const to = ...; const reportUrl = ...`; :209 ve :213 bağlantıları sabit. API keyfî aralığı destekliyor (api/admin/compliance/transparency/route.ts:7-11 `from`, `to`). :213 JSON bağlantısı aynı sekmede ham JSON açıyor; oturum süresi dolduysa {"error":"Oturum açmanız gerekiyor"} gösteriyor.
 
 **Etki:** Ocak ayında geçen yılın yıllık DSA raporunu hazırlayacak yönetici bunu arayüzden indiremez; URL'yi elle düzenlemesi gerekir. JSON'a tıklayan yönetici panelden çıkar.
 
 **Önerilen aksiyon:** Karta iki `<input type="date">` (Başlangıç, Bitiş; label'lı) ve 'Bu yıl / Geçen yıl / Son 6 ay' hazır seçimleri ekleyin; URL state'ten üretilsin. CSV bağlantısına `download` özniteliği ekleyin. JSON bağlantısına `target="_blank" rel="noopener"` ve görünür '(yeni sekmede açılır)' metni ekleyin.
+
+**Yapılan düzeltme:** The transparency card now has a 'Rapor dönemi' fieldset with labelled Start/End date inputs (end date inclusive) and aria-pressed presets: This year, Last year, Last 6 months. The report URL is built from this state, with the end date sent as the next day because the API's `to` is exclusive. Missing dates or an end before the start show Field errors and hide the links. The CSV link has `download`; the JSON link opens in a new tab (target=_blank rel=noopener) and its visible text says '(yeni sekmede açılır)'.
 
 ## F780 — Satır/kalem eylemlerinin geri bildirimi eylemden uzakta ve hangi öğeye ait olduğunu söylemiyor
 
@@ -811,13 +845,15 @@
 | Renk/tema           | Hayır                                                                                                                                           |
 | Efor                | S                                                                                                                                               |
 | Kaynak denetçiler   | lens:status                                                                                                                                     |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                                    |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p072)                                                                                                                 |
 
 **Kanıt:** ComplianceDashboard.tsx:107 sayfanın tek Status'u en üstte; alttaki bildirim kararı formundan (199) ekran boyu uzakta. AccessibilityPanel.tsx:322 Status kartın en altında; satır içi kanıt seçimi (221 `onChange={(e) => void setEvidence(feature, e.target.value)}`) ve 'Sil' sonuçları oraya düşüyor. AppealQueue.tsx:71 Status listenin üstünde. PromotionsPanel.tsx:116-127 `toggle` başarıda hiç mesaj vermiyor.
 
 **Etki:** Yönetici/ev sahibi uzun listede işlemin sonucunu görmek için kaydırmak zorunda; görsel geri bildirim kaçırılıyor, aynı işlem tekrarlanıyor.
 
 **Önerilen aksiyon:** Sonuç mesajını eylemin yapıldığı satırda (role=status, öğe adıyla) göster; sayfa düzeyi Status'u yalnız yükleme hataları için kullan; PromotionsPanel toggle'da '‘Erken rezervasyon %10’ pasifleştirildi'.
+
+**Yapılan düzeltme:** Every result is now shown next to its action and names the item. Takedown create/close and notice decision messages now include the listing, the request label or the content URL. When the item drops out of the list (closing in the Open filter, deciding a notice, stale 404/409), the message goes to a status region on the list or card, and focus moves to the neighbouring item's heading or the list heading. The parts in AccessibilityPanel, AppealQueue and PromotionsPanel are listed under crossOwner.
 
 ## F781 — Kaldırma talepleri listesinde açık ve kapalı talepler karışık; filtre, sıralama, boş durum ve alt başlık yok
 
@@ -833,13 +869,15 @@
 | Renk/tema           | Hayır                                                   |
 | Efor                | S                                                       |
 | Kaynak denetçiler   | area:compliance                                         |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                            |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p072)                         |
 
 **Kanıt:** ComplianceDashboard.tsx:131-147 `(takedowns.data ?? []).map(...)` statü filtresi olmadan geliyor (takedown.ts:270-276 `take: 200`, receivedAt desc). Liste formun hemen altında başlıksız duruyor; boş liste mesajı yok. API `?status=` parametresini destekliyor (api/admin/takedowns/route.ts:14-17).
 
 **Etki:** Zamanla yüzlerce kapalı talep, açık ve SLA'sı yaklaşan talepleri listenin altına iter. Yönetici acil talebi bulmak için listeyi taramak zorunda kalır.
 
 **Önerilen aksiyon:** Listeye `<h3>Kayıtlı talepler</h3>` ekleyin. AccessibilityReviewQueue'daki gibi aria-pressed ile çalışan 'Açık / Kapalı / Tümü' filtresi koyun (varsayılan Açık). Açık talepleri slaDueAt'e göre artan sıralayın. Boş liste için 'Kayıtlı talep yok.' mesajı gösterin.
+
+**Yapılan düzeltme:** Added an h3 'Kayıtlı talepler' and an Open/Closed/All filter using aria-pressed (default Open), with a status region below it. Open fetches ?status=RECEIVED and ?status=ACTIONED, so the 200-row cap cannot push open requests out. Open requests are sorted by slaDueAt ascending, with closed ones after them. Each filter has its own empty message, and rows from a previous filter are never shown while the new ones load.
 
 ## F782 — Kaldırma talepleri listesi ham kimlikleri ve UTC ISO dilimini gösteriyor; ilan adı ve bağlantısı yok
 
@@ -855,13 +893,15 @@
 | Renk/tema           | Hayır                                                   |
 | Efor                | S                                                       |
 | Kaynak denetçiler   | area:compliance                                         |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                            |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p072)                  |
 
 **Kanıt:** ComplianceDashboard.tsx:135 `<strong>{td.referenceNo ?? td.id}</strong> — {td.propertyId} —`, :137 `t("slaDue", { at: td.slaDueAt.slice(0, 16).replace("T", " ") })` → "SLA bitişi 2026-10-11 14:30 UTC". Yerelleştirilmiş formatlayıcı mevcut ama kullanılmıyor (src/lib/i18n/format.ts:68 `dateTime(value, timeZone)`).
 
 **Etki:** Türkiye'deki yönetici 24 saatlik yasal süreyi kafasında UTC+3'e çevirmek zorunda kalır, saat hesabında hata yapabilir. Satırda hangi ilanın kaldırıldığı (yalnızca cuid görünüyor) ve evrak no ile iç kimliğin hangisinin hangisi olduğu anlaşılmıyor.
 
 **Önerilen aksiyon:** `const f = useFormat()` ile `f.dateTime(td.slaDueAt, "Europe/Istanbul")` kullanın ve kalan süreyi ekleyin ('12 sa 30 dk kaldı'). Satırı <dl> ile yapılandırın: 'Evrak no', 'İlan' (başlık + /property/{id} bağlantısı), 'Durum', 'SLA bitişi'.
+
+**Yapılan düzeltme:** Each row now has an h4 title (source · document no, or the receipt time) and a <dl> with Listing, Evrak no, Durum, receipt time and SLA due. Times use fmt.dateTime(..., 'Europe/Istanbul') with a '(TSİ)' label. Open rows show a remaining-time line that refreshes every minute, or 'Süre doldu'. The listing title appears only if the API returns property.title, which needs the crossOwner change in takedown.ts. I did not add a /property/{id} link, because taken-down listings are inactive and the public page returns 404.
 
 ## F783 — Tekrarlanan denetimlerin adları bağlamsız ('Kapat', 'Kararı kaydet', 'Doğrula', 'Kanıt fotoğrafı', 'Karar') ve öğe başlıkları yok
 
@@ -878,13 +918,15 @@
 | Renk/tema           | Hayır                                                                                                                                                                                                                                                                                 |
 | Efor                | S                                                                                                                                                                                                                                                                                     |
 | Kaynak denetçiler   | area:compliance                                                                                                                                                                                                                                                                       |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                                                                                                                                                                          |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p072)                                                                                                                                                                                                                                                       |
 
 **Kanıt:** ComplianceDashboard.tsx:141-143 her satırda `{t("close")}` ("Kapat"), :199 `{t("decide")}`, :163 'Karar' etiketi her bildirimde aynı. AppealQueue.tsx:107 legend 'Sonuç', :151 'İtiraz kararını kaydet'. AccessibilityReviewQueue.tsx:100 `{t("evidence")}` bağlantısı ve :104-108 'Doğrula' düğmesi her satırda aynı metne sahip. Öğe başlığı olarak heading değil `<p className="font-semibold">` kullanılıyor (AppealQueue.tsx:79, AccessibilityReviewQueue.tsx:79). Formların erişilebilir adı yok.
 
 **Etki:** Ekran okuyucu kullanıcısı düğme ya da form alanı listesinde 'Kapat, Kapat, Kapat…' duyar; hangi talebi kapatacağını bilemez. Başlık gezinmesiyle öğeler arasında atlayamaz. Ayrıca 'Kapat' bir iletişim kutusunu kapatma eylemiyle karıştırılabilir.
 
 **Önerilen aksiyon:** Bağlamlı aria-label ekleyin, ör. `aria-label={t("closeLabel", { ref: td.referenceNo ?? td.id })}` → '{ref} numaralı talebi kapat', ve görünür metni 'Talebi kapat' yapın. Her <li> içine `<h3 id=...>` (kategori + alan adı / rol + tarih / özellik + ilan) koyun ve `<form aria-labelledby={h3Id}>` verin. Kanıt bağlantısına `aria-label={`${t("evidence")}: ${t(`codes.${row.code}`)} – ${row.propertyTitle}`}` ekleyin.
+
+**Yapılan düzeltme:** Each takedown row has an h4 (id td-<id>-title). The open-close button's visible text is now 'Talebi kapat…'. Both it and the submit button get aria-labelledby (the button itself plus the row title), so the accessible name keeps the visible text and adds the item. The close form and each notice form get aria-labelledby pointing at their item heading. The notice 'Kararı kaydet' button is labelled the same way (button plus notice h3). The AppealQueue and AccessibilityReviewQueue parts are listed under crossOwner.
 
 ## F784 — Bildirim kaydında karar için gereken bağlam eksik: alınma zamanı, bekleme süresi, ilan, bildiren ve bekleyen sayısı
 
@@ -900,13 +942,15 @@
 | Renk/tema           | Hayır                                                   |
 | Efor                | M                                                       |
 | Kaynak denetçiler   | area:compliance                                         |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                            |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p073)                  |
 
 **Kanıt:** ComplianceDashboard.tsx:153-161'de her bildirim için yalnızca kategori, URL ve açıklama gösteriliyor. dsa.ts:234-239 `listNotices` tüm alanları (createdAt, reporterName, propertyId) döndürüyor ama NoticeRow (:17-22) bunları atıyor. Kart başlığı (:150) `t("notices")` herhangi bir sayı içermiyor.
 
 **Etki:** Yönetici hangi bildirimin en uzun süredir beklediğini göremez, önceliklendiremez; hangi ilanı kaldıracağını da URL'den tahmin etmek zorunda kalır. DSA 'gecikmeksizin' işlem beklentisi takip edilemez.
 
 **Önerilen aksiyon:** Her öğede 'Alındı: {f.dateTime(createdAt)} · {saat} saattir bekliyor' satırı, ilan başlığı bağlantısı ve bildirenin adı gösterilsin. Liste en eski önce sıralansın. Kart başlığı 'Bekleyen DSA bildirimleri ({n})' biçiminde olsun.
+
+**Yapılan düzeltme:** Confirmed. NoticeRow now also reads propertyId, reporterName and createdAt from the API. Each notice shows the received time (TSİ) with a live waiting time, the listing (a link, or 'not linked to a listing') and the reporter's name or 'Name not given'. The queue is sorted oldest first and the card title reads 'Bekleyen DSA bildirimleri ({count})'. The listing title shows only once the server attaches `property.title`; until then the listing id is shown (see crossOwner for dsa.ts).
 
 ## F785 — Bildirim kategorisi ham enum kodu olarak gösteriliyor
 
@@ -921,13 +965,15 @@
 | Renk/tema           | Hayır                                                   |
 | Efor                | S                                                       |
 | Kaynak denetçiler   | area:compliance                                         |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                            |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p073)                         |
 
 **Kanıt:** ComplianceDashboard.tsx:156 `<strong>{n.category}</strong>` ekranda "FRAUD_SCAM", "IP_INFRINGEMENT" olarak görünüyor. Çeviriler mevcut: messages/tr/compliance.json:8-16 `report.categories` ("Dolandırıcılık", "Fikrî mülkiyet ihlali"…).
 
 **Etki:** Yönetici kategoriyi büyük harfli, alt çizgili kodlardan okumak zorunda kalıyor. Ekran okuyucu 'FRAUD underscore SCAM' gibi okuyor; EN ve TR arayüzde aynı kod çıkıyor.
 
 **Önerilen aksiyon:** `const tr = useTranslations("compliance.report");` tanımlayıp `<strong>{tr(`categories.${n.category}`)}</strong>` kullanın.
+
+**Yapılan düzeltme:** Confirmed (`<strong>{n.category}</strong>`). Categories now use compliance.report categories.* via `tr`. An unknown code falls back to the raw value (`tr.has`).
 
 ## F786 — Yönetici kuyruklarındaki içerik ve ilan bağlantıları aynı sekmede açılıyor; yazılmakta olan gerekçe kayboluyor
 
@@ -943,13 +989,15 @@
 | Renk/tema           | Hayır                                                                                                       |
 | Efor                | S                                                                                                           |
 | Kaynak denetçiler   | area:compliance                                                                                             |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p073)                                                                             |
 
 **Kanıt:** ComplianceDashboard.tsx:157 `<a className="text-[#003580] underline" href={n.contentUrl}>` ile AppealQueue.tsx:86-89 `<a ... href={row.notice.contentUrl}>` ve AccessibilityReviewQueue.tsx:84 `<a href={`/property/${row.propertyId}`} ...>` aynı sekmede açılıyor. Karar alanları kontrolsüz textarea'lar (ComplianceDashboard.tsx:186-193, AppealQueue.tsx:139-147) ve kalıcı bir taslak tutulmuyor.
 
 **Etki:** Yönetici olgular metnini yazarken içeriği doğrulamak için URL'ye tıklarsa sayfadan çıkar. Geri döndüğünde istemci tarafı state ve yazdığı gerekçe kaybolur; kuyruğu yeniden yüklemesi gerekir.
 
 **Önerilen aksiyon:** Bu bağlantılara `target="_blank" rel="noopener noreferrer"` ve görünür ya da sr-only '(yeni sekmede açılır)' metni ekleyin. Ek olarak facts ve response alanlarının taslaklarını sessionStorage'da öğe id'sine göre saklayın (try/catch içinde).
+
+**Yapılan düzeltme:** Confirmed. The content URL and listing links now open with target=_blank and rel="noopener noreferrer". 'Opens in a new tab' is announced through aria-describedby pointing at one hidden span, so the heading text, which also names the form and button, stays clean. Facts and legal reference are now controlled fields. Their drafts are saved in sessionStorage per notice id (all reads and writes in try/catch) and cleared once the notice leaves the queue. AppealQueue and AccessibilityReviewQueue belong to other owners.
 
 ## F787 — 'Kaldır' seçeneği bir ilana bağlı olmayan bildirimlerde de sunuluyor; bildirimin ilanla ilişkisi gösterilmiyor
 
@@ -965,13 +1013,15 @@
 | Renk/tema           | Hayır                                                   |
 | Efor                | S                                                       |
 | Kaynak denetçiler   | area:compliance                                         |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                            |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p073)                  |
 
 **Kanıt:** ComplianceDashboard.tsx:17-22 `interface NoticeRow { id; contentUrl; category; explanation }`: propertyId istemciye alınmıyor. :170 `<option value="REMOVED">` her bildirimde sunuluyor. Sunucu dsa.ts:183-184'te `throw new ValidationError("İlana bağlı olmayan bildirimde kaldırma uygulanamaz")` ile reddediyor.
 
 **Etki:** Yönetici olgular metnini yazıp 'Kaldır'ı seçtikten sonra hata alır; bu hata da sayfanın en üstünde gösterildiği için çoğu zaman fark edilmez. Kaldırılamaz bir içerik için zaman harcanır.
 
 **Önerilen aksiyon:** NoticeRow'a propertyId ekleyin (API zaten döndürüyor, dsa.ts:234-239) ve mümkünse ilan başlığını da alın. propertyId null ise REMOVED seçeneğini `disabled` yapın ve Field hint'i olarak 'Bu bildirim bir ilana bağlı değil; yalnızca İşlem yapma seçilebilir' metnini gösterin. propertyId varsa 'İlan: {başlık}' bağlantısını görüntüleyin.
+
+**Yapılan düzeltme:** Confirmed. When propertyId is null the REMOVED option is disabled and the decision Field shows a hint that only taking no action is possible. When there is a propertyId, a listing link is shown. It shows the title once the server provides it (crossOwner dsa.ts), otherwise the id.
 
 ## F788 — İlandan bildirim akışında ilan adı gösterilmiyor; URL değiştirilebilir ama gizli propertyId sabit kalıyor; ön-doldurma hydration'a bağlı
 
@@ -987,13 +1037,15 @@
 | Renk/tema           | Hayır                                         |
 | Efor                | M                                             |
 | Kaynak denetçiler   | area:compliance                               |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                  |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p074)        |
 
 **Kanıt:** NoticeForm.tsx:27-30 `propertyId && typeof window !== "undefined" ? `${window.location.origin}/property/${propertyId}` : ""`: sunucu render'ında boş, istemcide dolu oluyor (hydration uyumsuzluğu). :41 `propertyId: propertyId || undefined` her durumda gönderiliyor; kullanıcı :79'daki `defaultValue={defaultUrl}` alanını başka bir içerikle değiştirse bile. report/page.tsx:19 yalnızca ID'yi geçiriyor, ilan başlığını geçirmiyor.
 
 **Etki:** 'Bu ilanı bildir' ile gelen misafir hangi ilanı bildirdiğini yalnızca uzun bir URL'den anlamaya çalışır. URL'yi başka bir ilanla değiştirirse bildirim yine ilk ilana bağlanır ve kaldırma kararı yanlış ilanı etkileyebilir.
 
 **Önerilen aksiyon:** report/page.tsx'te (server) ilan başlığını getirin; contentUrl'yi sunucuda NEXT_PUBLIC_APP_URL ile oluşturup prop olarak geçirin. Formun üstünde salt okunur bir özet gösterin: 'Bildirilen ilan: {başlık}'. Yanına 'Başka bir içerik bildir' bağlantısı koyun (propertyId'siz /report). Kullanıcı contentUrl'yi değiştirirse propertyId'yi düşürün.
+
+**Yapılan düzeltme:** Confirmed: the default URL read window.location during render, which causes a hydration mismatch, and propertyId was always sent even after the user edited the URL. The fix adds two optional props, contentUrl (built on the server) and property {title, city, imageUrl}. Without contentUrl, the origin comes from useSyncExternalStore with an empty server snapshot, so there is no hydration mismatch. While a listing is linked the URL cannot be edited. The only way to change it is 'Başka bir içerik bildir', which drops propertyId, so propertyId is never sent with a different URL. Fetching the title and building the URL on the server belong to report/page.tsx (crossOwner).
 
 ## F789 — Sunucu hata kodları genel bir mesaja indirgeniyor; geçersiz propertyId bildirimi kalıcı bir çıkmaza sokuyor
 
@@ -1010,13 +1062,15 @@
 | Renk/tema           | Hayır                                                                                                       |
 | Efor                | M                                                                                                           |
 | Kaynak denetçiler   | area:compliance                                                                                             |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p074)                                                                      |
 
 **Kanıt:** NoticeForm.tsx:57-59 `res?.status === 400 ? t("invalid") : t("error")` → "Lütfen tüm zorunlu alanları doğru doldurun." Yanıttaki `details: error.flatten()` (errors.ts:153-155) kullanılmıyor. dsa.ts:93 `throw new ValidationError("Bildirilen ilan bulunamadı")` da aynı 400 mesajına düşüyor; propertyId URL'den geldiği ve formda görünmediği için (:41 `propertyId: propertyId || undefined`) her deneme başarısız oluyor. AppealForm.tsx:46-54'te 403 APPEAL_TOKEN_INVALID, 404 ve NOTICE_NOT_DECIDED için 'İtiraz gönderilemedi. Lütfen tekrar deneyin.' gösteriliyor; yeniden denemek işe yaramıyor.
 
 **Etki:** Kaldırılmış bir ilanı bildirmek isteyen misafir tüm alanları doğru doldursa da sonsuza kadar 'alanları doğru doldurun' hatası alır ve görevi tamamlayamaz. Hangi alanın hatalı olduğu söylenmediği için deneme yanılmaya zorlanır.
 
 **Önerilen aksiyon:** 400 yanıtında `details.fieldErrors` anahtarlarını (contentUrl, explanation, reporterEmail…) ilgili Field `error` prop'larına eşleyin. 'Bildirilen ilan bulunamadı' durumunu ayrı bir koda bağlayın: istemci propertyId'yi düşürsün ve 'Bu ilan artık bulunamadı; içerik adresini kontrol edip yeniden gönderin' desin. AppealForm'da 403/404 için `t("invalidLink")`, NOTICE_NOT_DECIDED için ayrı bir metin gösterin.
+
+**Yapılan düzeltme:** Confirmed for the 'listing not found' dead end. A 400 that carries fieldErrors.propertyId, or no fieldErrors at all, for a linked notice is now treated as 'listing not found'. The form unlinks the listing, puts the address in an editable URL field with the error 'Bu ilan artık bulunamadı…', and moves focus there, so resubmitting works. Other 400 fieldErrors map to their Field errors and the summary instead of the generic text. Two parts are left to their owners (crossOwner): an explicit not-found signal from dsa.ts, and AppealForm's mapping of 403, 404 and NOTICE_NOT_DECIDED.
 
 ## F790 — Formlar tarayıcının yerleşik doğrulamasına bırakılmış: mesajlar uygulama dilinde değil, AppealForm ile tutarsız ve zorunlu alanlar işaretli değil
 
@@ -1033,13 +1087,15 @@
 | Renk/tema           | Hayır                                                                                                                                                             |
 | Efor                | M                                                                                                                                                                 |
 | Kaynak denetçiler   | area:compliance                                                                                                                                                   |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                                                      |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p074)                                                                                                                            |
 
 **Kanıt:** NoticeForm.tsx:72 `<form onSubmit={submit} className="space-y-4">` noValidate içermiyor; :77 `type="url" required`, :103 `minLength={20}`, :129 checkbox `required` doğrulamayı tarayıcıya bırakıyor. AppealForm.tsx:67 ise `noValidate` ve Field `error` ile yerelleştirilmiş hata gösteriyor. Yönetici formlarında da aynı durum var: ComplianceDashboard.tsx:110, :162; AppealQueue.tsx:105. Zorunluluk işareti yok; yalnızca "Adınız (isteğe bağlı)" yazıyor (tr compliance.json:18). "Evrak no" ve "Hukuki referans" isteğe bağlı olduğu hâlde bu belirtilmiyor (:40, :67).
 
 **Etki:** İngilizce tarayıcıda TR sitede "Please enter a URL." çıkar. Baloncuk birkaç saniyede kaybolur. type=url alanı 'https://' olmadan girilen 'www.site.com' değerini reddeder, ama bunu önceden söyleyen bir ipucu yok. Okuryazarlığı düşük misafir neyi yanlış yaptığını anlamaz.
 
 **Önerilen aksiyon:** Formlara `noValidate` ekleyin. submit'te alan bazlı kontrol yapın ve yerelleştirilmiş mesajları Field `error` prop'u ile gösterin; ilk hatalı alana focus() yapın. contentUrl Field'ına hint ekleyin: 'https:// ile başlayan tam adres'. İsteğe bağlı alan etiketlerine tutarlı olarak '(isteğe bağlı)' ekleyin: 'Evrak no (isteğe bağlı)', 'Hukuki referans (isteğe bağlı)'.
+
+**Yapılan düzeltme:** Confirmed for NoticeForm, and the NoticeForm part is fixed: noValidate, all-field localized validation with focus on the first invalid field, a contentUrl hint, required markers through Field required, a '*' on the good-faith checkbox, and a RequiredLegend at the top of the form. The name field already says '(isteğe bağlı)'. The admin forms (ComplianceDashboard, AppealQueue) and the 'Evrak no' and 'Hukuki referans' labels are in other owners' files (crossOwner).
 
 ## F1079 — Bildirim türü 'Yasa dışı ilan' olarak önceden seçili; bilinçli seçim yapılmıyor
 
@@ -1054,13 +1110,15 @@
 | Renk/tema           | Hayır                                         |
 | Efor                | S                                             |
 | Kaynak denetçiler   | runtime:compliance, area:compliance           |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                  |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p074)               |
 
 **Kanıt:** Sweep 028/029 ve p2: select varsayılan olarak 'Yasa dışı ilan' gösteriyor. Probe sırasında select'e dokunulmadan gönderilen iki bildirim DB'ye category=ILLEGAL_LISTING olarak kaydedildi.
 
 **Etki:** Dolandırıcılık ya da güvensiz konaklama gibi bildirimler yanlış kategoride kalıyor. Moderasyon önceliklendirmesi ve DSA şeffaflık sayıları bozuluyor.
 
 **Önerilen aksiyon:** Boş bir 'Seçin…' seçeneği ekleyin (value='' ve required). Alternatif olarak her kategoriye bir satırlık açıklama veren bir radio grubu kullanın.
+
+**Yapılan düzeltme:** The category select now defaults to an empty 'Bir tür seçin…' option (value=""). The field is marked required, and submitting without a choice shows the existing errors.category message inline and in the summary.
 
 ## F1103 — Sayfa başlıkları: /trust genel başlıkla kalıyor; alandaki başlık deseni tutarsız
 
@@ -1077,7 +1135,7 @@
 | Renk/tema           | Hayır                                                                       |
 | Efor                | S                                                                           |
 | Kaynak denetçiler   | runtime:compliance                                                          |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p039)                                             |
 
 **Kanıt:** Sweep 024/025: /trust başlığı 'booking-platform — konaklama arama ve rezervasyon (demo)'. p6 EN: /trust başlığı 'booking-platform — search and book stays (demo)', H1 ise 'Trust center'. /ranking 'Sıralama nasıl çalışır? — booking-platform' (marka son ekli), /report 'İçerik bildir' ve /report/appeal 'Karara itiraz' (marka eki yok). Kök neden: trust/page.tsx 'use client' olduğu için metadata export edemiyor.
 
@@ -1085,26 +1143,30 @@
 
 **Önerilen aksiyon:** Sayfayı sunucu bileşeni yapın (yalnızca çeviri kullanıyor; getTranslations yeterli) ya da listeyi bir alt istemci bileşenine taşıyıp generateMetadata ile 'Güven merkezi' başlığını verin. Kök layout'ta title.template '%s — booking-platform' kullanıp ranking.metaTitle'daki elle eklenmiş son eki kaldırın.
 
+**Yapılan düzeltme:** /trust already gets its title from src/app/trust/layout.tsx (generateMetadata → titles.trust), and the root layout template is '%s — booking-platform', so the tab shows 'Güven merkezi — booking-platform'. The page is unchanged for this item. The inconsistent brand suffix came from strings that added it by hand and so got it twice. The patch removes it from ranking.metaTitle ('Sıralama nasıl çalışır?' / 'How ranking works') and from privacy.meta.title ('KVKK Aydınlatma Metni (demo)' / 'KVKK Privacy Notice (demo)'), which is used only in its page's generateMetadata. /report and /report/appeal already get the suffix from the template.
+
 ## F1104 — Dış site ve ham JSON bağlantıları hiçbir şekilde belirtilmiyor
 
-| Alan                | Değer                         |
-| ------------------- | ----------------------------- |
-| Severity            | Low                           |
-| Durum               | Gözlemlendi                   |
-| Konum               | `src/app/trust/page.tsx:71`   |
-| Kullanıcılar        | tümü                          |
-| Prensip             | learnability · Predictability |
-| Sezgisel madde      | H13 — Feedforward             |
-| Renk/tema           | Hayır                         |
-| Efor                | S                             |
-| Kaynak denetçiler   | runtime:compliance            |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**  |
+| Alan                | Değer                           |
+| ------------------- | ------------------------------- |
+| Severity            | Low                             |
+| Durum               | Gözlemlendi                     |
+| Konum               | `src/app/trust/page.tsx:71`     |
+| Kullanıcılar        | tümü                            |
+| Prensip             | learnability · Predictability   |
+| Sezgisel madde      | H13 — Feedforward               |
+| Renk/tema           | Hayır                           |
+| Efor                | S                               |
+| Kaynak denetçiler   | runtime:compliance              |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p039) |
 
 **Kanıt:** p6: GitHub bağlantılarında target=null, dış bağlantı ikonu ya da sr-only bir ibare yok. JWKS ve OpenAPI bağlantıları aynı sekmede ham JSON açıyor (200, application/jwk-set+json ve application/json).
 
 **Etki:** Misafir habersizce GitHub'a ya da okunamaz bir JSON ekranına düşüyor ve geri dönüş için tarayıcının geri tuşuna muhtaç kalıyor.
 
 **Önerilen aksiyon:** Dış bağlantılara ikon ve sr-only '(GitHub'da açılır)' ekleyin. API bağlantılarına '(JSON, geliştiriciler için)' rozeti koyun.
+
+**Yapılan düzeltme:** GitHub links now end with a visible '(GitHub, depo erişimi gerekir)' and an aria-hidden external-link icon. JWKS and OpenAPI links end with a visible '(JSON, geliştiriciler için)'. Both badges are inside the link, so they are part of the accessible name.
 
 ## F1105 — Güven merkezi açıklamaları masaüstünde satır başına yaklaşık 136 karakter
 
@@ -1120,13 +1182,15 @@
 | Renk/tema           | Hayır                                  |
 | Efor                | S                                      |
 | Kaynak denetçiler   | runtime:compliance                     |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**           |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p039)        |
 
 **Kanıt:** p6, desktop 1280: 'main li p' öğeleri 14px/20px; genişliğe göre tahmin yaklaşık 136 karakter/satır (RT/crops/compliance/024-anon-tr-desktop-_trust-0.png).
 
 **Etki:** Yoğun teknik metinde uzun satırlar satır takibini zorlaştırıyor, okuma hızı ve anlama düşüyor.
 
 **Önerilen aksiyon:** Not paragraflarına max-w-prose (yaklaşık 65ch) verin ya da masaüstünde kartları 2 sütuna bölün.
+
+**Yapılan düzeltme:** Note paragraphs, the page intro, the developer intro and the footnote now use max-w-prose (about 65ch). Only layout classes were changed; no colour classes were touched.
 
 ## F1106 — Erişilebilirlik kuyruğunun filtre düğmeleri eylem düğmeleriyle aynı görünüyor; 'Doğrula' ve 'Doğrulanmış' adları neredeyse aynı
 
@@ -1141,13 +1205,15 @@
 | Renk/tema           | Hayır                                                        |
 | Efor                | S                                                            |
 | Kaynak denetçiler   | runtime:admin                                                |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                 |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p078)                              |
 
 **Kanıt:** crops/admin/p5c-1.png: seçili filtre 'Bekleyen' dolgulu mavi birincil düğme, satır eylemi 'Doğrula' da aynı stilde. p5 probunda Playwright getByRole('button',{name:'Doğrula'}) iki öğeye çözüldü ('Doğrulanmış' ve 'Doğrula').
 
 **Etki:** Filtre ile eylem karışabiliyor. Sesli komut ve arama ile hedeflemek belirsizleşiyor.
 
 **Önerilen aksiyon:** Filtreyi segment/sekme görünümüne çevirin (role=tablist ya da radyo grubu). Adı 'Doğrulananlar' yapın.
+
+**Yapılan düzeltme:** The aria-pressed Button filter is now a fieldset/legend radio group drawn as a segmented control (sr-only radios, a light selected background plus a ✓ cue, a focus ring on the label), so it no longer looks like the primary action button and has radio semantics. Labels changed to 'İnceleme bekleyenler' / 'Doğrulananlar' (en 'Awaiting review' / 'Verified features') and the legend to 'Göster' / 'Show', so filter names no longer collide with 'Doğrula'.
 
 ## F1107 — SLA son tarihi ham ISO biçiminde ve UTC olarak gösteriliyor
 
@@ -1162,13 +1228,15 @@
 | Renk/tema           | Hayır                                                   |
 | Efor                | S                                                       |
 | Kaynak denetçiler   | runtime:admin                                           |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                            |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p073)                         |
 
 **Kanıt:** RUNTIME p5-compliance.mjs: 'SLA bitişi 2026-10-11 21:49 UTC' (slaDueAt.slice(0,16)). Aynı uygulamada talepler f.dateTime ile '13.10.2026 00:48' biçiminde gösteriliyor. Probe saat dilimi Europe/Istanbul.
 
 **Etki:** 24 saatlik yasal SLA'da admin UTC'yi zihinde +3 saate çevirmek zorunda; kaçırma riski doğuyor.
 
 **Önerilen aksiyon:** Tarihi f.dateTime ile yerel saatte gösterin ve kalan süreyi ekleyin ('18 sa kaldı'). Son 4 saatte metin uyarısı verin (yalnız renk değil, 'Yaklaşıyor' etiketi).
+
+**Yapılan düzeltme:** An earlier package (p072) already shows the SLA due time with fmt.dateTime in TSİ plus the remaining time. Added a text label 'SLA bitişi yaklaşıyor' when an open, non-breached takedown has 4 hours or less left. It is a plain <strong>, with no new color class.
 
 ## F1108 — Mobilde form alanları 14px; iOS odaklanınca sayfayı yakınlaştırıyor
 
@@ -1183,13 +1251,15 @@
 | Renk/tema           | Hayır                                         |
 | Efor                | S                                             |
 | Kaynak denetçiler   | runtime:compliance                            |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                  |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p074)               |
 
 **Kanıt:** p13, mobile 390x844: INPUT, SELECT ve TEXTAREA computed font-size değeri 14px (text-sm). iOS Safari, 16px altındaki alanlara odaklanıldığında otomatik yakınlaştırma yapar ve sayfa yatayda kayar.
 
 **Etki:** Mobil misafir her alana dokunduğunda yakınlaştırılmış bir görünümle uğraşıyor ve yatayda kaydırmak zorunda kalıyor.
 
 **Önerilen aksiyon:** Alan sınıfında text-base sm:text-sm kullanın (mobilde 16px).
+
+**Yapılan düzeltme:** The local input class now uses 'text-base … sm:text-sm', so fields are 16px on mobile and iOS no longer zooms on focus. No color classes changed.
 
 ## F1109 — Ad ve e-posta toplanırken kullanım amacı ve gizlilik bildirimi bağlantısı yok
 
@@ -1204,13 +1274,15 @@
 | Renk/tema           | Hayır                                          |
 | Efor                | S                                              |
 | Kaynak denetçiler   | runtime:compliance                             |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                   |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p075)                |
 
 **Kanıt:** Sweep 028 tabOrder: 'Bildirimi gönder' butonundan sonraki durak footer'daki 'Yardım Merkezi'; main içinde /privacy bağlantısı ya da veri kullanım notu yok (p3'te main içi bağlantı sayısı 0). Form 'Adınız (isteğe bağlı)' ve 'E-posta adresiniz' alanlarını topluyor.
 
 **Etki:** Bildirimde bulunan kişi kimliğinin ev sahibiyle paylaşılıp paylaşılmayacağını bilmediği için çekiniyor ve formu yarıda bırakabiliyor. KVKK açısından veri toplanan noktada bilgilendirme beklentisi karşılanmıyor.
 
 **Önerilen aksiyon:** E-posta alanının altına bir hint ekleyin: 'E-postanız yalnız bu bildirimle ilgili iletişim için kullanılır' ve 'Gizlilik bildirimi' (/privacy) bağlantısı. Adın kimlerle paylaşılacağını bir cümleyle açıklayın.
+
+**Yapılan düzeltme:** The email field now has a hint (reporterEmailHint) saying the address is used only for confirmation and decision emails about this notice. Below it, a new paragraph (privacyNote) says the name and email are not shared with the property owner and only the review team sees them, with a link to /privacy. The code backs this up: the host email only carries the statement of reasons and the appeal link.
 
 ## F1110 — İyi niyet beyanı onay kutusu 13x13 px
 
@@ -1226,13 +1298,15 @@
 | Renk/tema           | Hayır                                                                                |
 | Efor                | S                                                                                    |
 | Kaynak denetçiler   | runtime:compliance                                                                   |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                         |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p075)                                                      |
 
 **Kanıt:** Sweep 028/029 targetsLt24: 'input.mt-1 13x13' (masaüstü ve mobil). p1: kutuyu saran label 950x20 px olduğu için metne tıklayınca işaretleniyor; ancak mobilde 2 satırlık label'ın görsel hedefi küçük kutu.
 
 **Etki:** Zorunlu yasal beyan kutusu mobilde ıskalanıyor, kullanıcı gönderimde 'kutuyu işaretleyin' balonuyla karşılaşıyor.
 
 **Önerilen aksiyon:** Kutuyu h-5 w-5 (20px) ya da 24px yapın. Label'a py-2 vererek 44px yüksekliğinde bir satır elde edin.
+
+**Yapılan düzeltme:** The good-faith checkbox went from the 13px default with mt-1 to h-5 w-5 shrink-0 (20px, lined up with the first text line), and its label got py-2 for a taller tap row. No colors changed.
 
 ## F1239 — İtirazın son tarihi yalnızca tarih olarak ve UTC'ye göre gösteriliyor
 
@@ -1248,13 +1322,15 @@
 | Renk/tema           | Hayır                               |
 | Efor                | S                                   |
 | Kaynak denetçiler   | area:compliance                     |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**        |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p033)     |
 
 **Kanıt:** appeal/page.tsx:56 ve :60 `f.date(ctx.windowEndsAt, "long")`. format.ts:63'te `date(value, style = "short", timeZone = "UTC")` olduğu için saat ve yerel saat dilimi kaybolıyor. Pencere, decidedAt + 180 gün olarak dakikası belli bir anda kapanıyor (dsa-appeal.ts:115-116).
 
 **Etki:** Son gün itiraz etmeye çalışan TR kullanıcısı, gösterilen tarihin tamamını kullanabileceğini düşünür; oysa pencere o gün sabah saatlerinde (UTC+3 farkıyla) kapanmış olabilir.
 
 **Önerilen aksiyon:** `f.dateTime(ctx.windowEndsAt, "Europe/Istanbul")` kullanın ve saat dilimini yazın ('10 Nisan 2027 01:30 (TSİ)'). Kalan gün sayısını ekleyin ('({n} gün kaldı)').
+
+**Yapılan düzeltme:** Confirmed: the deadline used f.date(..., 'long'), which defaults to UTC and drops the time. It now renders through windowEndsAt '{date}, {time} (TSİ)' / '(Turkey time, GMT+3)' using f.date/f.time with Europe/Istanbul. While the window is open and no appeal exists, a daysLeft plural line ('N gün kaldı') is added.
 
 ## F1240 — Sonuçlanmış itirazda yöneticinin gerekçesi gösterilmiyor; DSA md. 21 için yönlendirme bağlantısı yok
 
@@ -1270,13 +1346,15 @@
 | Renk/tema           | Hayır                                  |
 | Efor                | S                                      |
 | Kaynak denetçiler   | area:compliance                        |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**           |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p033) |
 
 **Kanıt:** appeal/page.tsx:72-77 yalnızca `t(`existing.${ctx.appeal.status}`, { reference })` gösteriyor. AppealContext.appeal yalnızca `{ id, status, createdAt }` taşıyor (dsa-appeal.ts:112). REJECTED metni (tr compliance.json:156) "DSA md. 21 kapsamında mahkeme dışı uyuşmazlık çözümüne başvurabilirsiniz." diyor ama bağlantı vermiyor.
 
 **Etki:** Reddedilen bir itirazın gerekçesini görmek için kullanıcı e-postasını aramak zorunda kalır. Sonraki hukuki adımın nasıl atılacağı belirsiz kalır.
 
 **Önerilen aksiyon:** Bağlama `response` ve `decidedAt` alanlarını ekleyip karar sonrası bir <dl> içinde gösterin ('Karar tarihi', 'Gerekçe'). md. 21 cümlesine onaylı uyuşmazlık çözüm kuruluşlarını açıklayan bir yardım sayfası bağlantısı ekleyin.
+
+**Yapılan düzeltme:** Confirmed: the context carried only id/status/createdAt. getAppealDecisionDetails now loads the appeal's response and decidedAt, and a decided appeal shows a <dl> with 'İtiraz karar tarihi' and 'Gerekçe'. REJECTED appeals get a link about DSA Art. 21 out-of-court settlement, but it points to /support: the repo has no DSA help page, and the EC certified-body list URL could not be verified from this environment.
 
 ## F1241 — Açıklama notları bağlantılara programatik olarak bağlı değil; harici ve yeni sekme bağlantıları belirtilmiyor
 
@@ -1293,13 +1371,15 @@
 | Renk/tema           | Hayır                                                       |
 | Efor                | S                                                           |
 | Kaynak denetçiler   | area:compliance                                             |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p039)                             |
 
 **Kanıt:** trust/page.tsx:71-73 `<a href={item.href} className={linkClass} rel="noopener noreferrer">` ve :84-86 `<p className="mt-1 text-sm text-gray-700">{note}</p>` arasında aria-describedby yok; GitHub'a giden harici bağlantılarda bir gösterge yok. AccessibilityReviewQueue.tsx:94-97 `target="_blank"` ama yeni sekmede açılacağı söylenmiyor.
 
 **Etki:** Ekran okuyucu kullanıcısı Tab ile bağlantılarda gezerken 'depo erişimi gerekir' ya da 'yönetici yetkisi gerekir' notlarını duymaz. Siteden ayrılacağını ya da yeni sekme açılacağını önceden bilmez.
 
 **Önerilen aksiyon:** Not <p>'sine `id={`trust-${item.key}-note`}`, bağlantıya `aria-describedby` verin. Harici bağlantılara sr-only ' (GitHub, harici site)' metni ve aria-hidden bir ikon ekleyin. target=_blank olan bağlantılara '(yeni sekmede açılır)' metni ekleyin.
+
+**Yapılan düzeltme:** Confirmed in the code. Each note <p> now has id='trust-<key>-note', and its link points to it with aria-describedby. Links leaving the site carry visible access text plus an aria-hidden icon. No link on the trust page opens a new tab. The AccessibilityReviewQueue.tsx target=_blank part is in another owner's file and is listed under crossOwner.
 
 ## F1242 — Erişilebilirlik doğrulamasında geri alma yok, işlenen satır listeden kayboluyor, önizleme küçük ve tıklanamaz, gönderim tarihi gösterilmiyor
 
@@ -1314,13 +1394,15 @@
 | Renk/tema           | Hayır                                                       |
 | Efor                | S                                                           |
 | Kaynak denetçiler   | area:compliance                                             |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p078)                             |
 
 **Kanıt:** AccessibilityReviewQueue.tsx:43-46 `setStatus({ message: verified ? t("admin.verifiedOk") : t("admin.unverifiedOk") }); rows.reload();` mesajında geri alma düğmesi yok. :72-76 `<img ... className="h-16 w-24 rounded object-cover" />` 96×64 boyutunda ve tıklanamaz; büyük görüntü yalnızca ayrı bağlantıda (:93-101). ReviewRow (:9-19) gönderim tarihini ya da ev sahibini içermiyor.
 
 **Etki:** Yanlış 'Doğrula'ya basan yönetici, satırı geri almak için 'Doğrulanmış' sekmesine geçip aramak zorunda kalır. Kanıtı küçük önizlemeden değerlendirmek zor; en eski beyanı önceliklendirmek mümkün değil.
 
 **Önerilen aksiyon:** Başarı mesajının yanına 'Geri al' düğmesi ekleyin; düğme `verify(row, !verified)` çağırsın. Önizlemeyi bir `<button aria-label="Kanıtı büyüt">` içine alın ve büyük görüntüyü bir <dialog> içinde gösterin. Satıra 'Gönderildi: {f.date(createdAt)}' bilgisini ekleyin.
+
+**Yapılan düzeltme:** After a successful action, the success message names the feature and listing and a 'Geri al' button appears, with aria-label 'Geri al: {name} ({property})'. Undo calls verify(row, !verified) without the confirm dialog, then focuses the restored row (or the card title). An undo error is shown in the top Status and can be retried. The thumbnail is now a button ('Kanıtı büyüt: {name}') that opens a native <dialog> with the large image and a Close button, returning focus to the thumbnail. Each row shows 'Gönderildi: {date}' and, if verified, 'Doğrulandı: {date}'; the API already returns createdAt and verifiedAt.
 
 ## F1243 — Yönetici kuyruklarında filtre ve geri bildirim desenleri değişiyor (select, düğme sekmesi, filtresiz; Status üstte veya altta)
 
@@ -1336,13 +1418,15 @@
 | Renk/tema           | Hayır                                                                                                                                                                                                                                             |
 | Efor                | M                                                                                                                                                                                                                                                 |
 | Kaynak denetçiler   | lens:consistency                                                                                                                                                                                                                                  |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                                                                                                                                      |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p078)                                                                                                                                                                                                            |
 
 **Kanıt:** AccessibilityReviewQueue.tsx:64-74 durum filtresi `aria-pressed` toggle Button grubu. ClaimAdmin.tsx:36-50 Field ve select. SupportAdmin.tsx:63-77 Field olmadan ham label ve select. AppealQueue ile Fraud kuyruğunda filtre yok. Status konumu: AdminDashboard kartlarında üstte (:147, :330), SupportAdmin.tsx:125, PayoutAdmin ve SupportChat'te kartın en altında, HostDashboard.tsx:304'te düğmenin yanında. ComplianceDashboard.tsx:25-26 inputClass yerine kendi `input` sınıfını tanımlıyor.
 
 **Etki:** Yönetici her kuyrukta filtreyi ve işlem sonucunu farklı yerde arar. Uzun listelerde alttaki onay mesajı görünmez kalır ve işlemin yapılıp yapılmadığı belirsizleşir.
 
 **Önerilen aksiyon:** `QueueCard` adlı ortak bir kalıp tanımlayın: üstte Field+select filtre, hemen altında Status (aria-live), sonra liste. Satır içi eylem sonucunu satırın yanında da kısa bir rozetle gösterin. ComplianceDashboard'daki yerel input sınıfını inputClass ile değiştirin.
+
+**Yapılan düzeltme:** Confirmed. In my files the order is now filter at top, then Status (live region) directly below, then the list, matching the recommended pattern. The processed row is named in the success message next to an undo button. AppealQueue already has Status above the list. A shared QueueCard and changes to ClaimAdmin, SupportAdmin and ComplianceDashboard are outside my files and are listed in crossOwner. The filter is a radio segment, not Field+select, as F1106 recommends for a two-option filter.
 
 ## F1244 — İtiraz kuyruğunda itiraz edilen karar emir kipiyle ('Kaldır') gösteriliyor; tarih etiketsiz; TR 'İşlem yapma' iki anlama gelebiliyor
 
@@ -1358,13 +1442,15 @@
 | Renk/tema           | Hayır                                          |
 | Efor                | S                                              |
 | Kaynak denetçiler   | area:compliance                                |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                   |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p078)                |
 
 **Kanıt:** AppealQueue.tsx:80-82 `{t(`roles.${row.appellantRole}`)} · {row.notice?.decision ? ta(`decisions.${row.notice.decision}`) : "-"} · {f.date(row.createdAt, "medium")}` çıktısı "Bildiren · Kaldır · 11 Eki 2026". admin.decisions (tr compliance.json:57-60) seçenek etiketleri için yazılmış: "Kaldır", "İşlem yapma". Uygun geçmiş zaman metni appeal.decisions'ta mevcut (:147 "İçerik yayından kaldırıldı"). Tarihin itiraz tarihi mi karar tarihi mi olduğu belirtilmiyor; karar yoksa ekran okuyucu "-" okuyor.
 
 **Etki:** Yönetici 'Kaldır' sözcüğünü önerilen bir eylem ya da düğme sanabilir. 'İşlem yapma' hem 'işlem yapılması' (ad) hem 'işlem yapmayın' (emir) olarak okunabiliyor. Tarih bağlamı belirsiz.
 
 **Önerilen aksiyon:** AppealQueue'da `useTranslations("compliance.appeal")` ile `decisions.*` (geçmiş zaman) kullanın. Tarihi etiketleyin: 'İtiraz tarihi: {tarih}'. "-" yerine 'Karar bilgisi yok' yazın. Select seçeneklerini 'Kaldır (ilan yayından kalkar)' ve 'İşlem yapılmasın' olarak yeniden adlandırın.
+
+**Yapılan düzeltme:** Confirmed. The row heading now uses compliance.appeal.decisions (past tense) through a new 'İtiraz eden: {role} · Karar: {decision}' key; a missing decision shows 'kayıtlı değil' instead of '-'. The date is labelled 'İtiraz tarihi: {date}'. The patch also renames the compliance.admin.decisions options to 'Kaldır (ilan yayından kalkar)' / 'İşlem yapılmasın' (en 'Remove (listing is taken down)' / 'Take no action'). The only other users of those keys are ComplianceDashboard's select options and its confirm summary 'Karar: {decision}', and both still read correctly.
 
 ## F1245 — Uzun metin alanlarında karakter sayacı yok; istemci sınırları sunucu şemasıyla uyuşmuyor; hukuki gerekçe alanları 2 satır
 
@@ -1380,13 +1466,15 @@
 | Renk/tema           | Hayır                                                                                                                                          |
 | Efor                | S                                                                                                                                              |
 | Kaynak denetçiler   | area:compliance                                                                                                                                |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                                   |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p073)                                                                                                                |
 
 **Kanıt:** ComplianceDashboard.tsx:186-193 facts: `minLength={10} rows={2}`, maxLength yok (sunucuda max 5000, dsa.ts:124). :196 legalReference'ta maxLength yok (sunucuda 300, dsa.ts:126). :125 reason tek satırlı `<input minLength={3}>` (sunucuda max 2000, takedown.ts:44). AppealQueue.tsx:145 `rows={2}`. NoticeForm.tsx:104 ve AppealForm.tsx:74 `maxLength={5000}` sayaç olmadan; yapıştırılan metin sessizce kırpılıyor.
 
 **Etki:** Yönetici 300 karakterden uzun bir hukuki referans girerse genel bir 'Doğrulama hatası' alır. İki satırlık alanda uzun gerekçeyi gözden geçirmek zorlaşır. Misafir 5000 karakteri aşan metni yapıştırdığında sonunun kesildiğini fark etmez.
 
 **Önerilen aksiyon:** Tüm alanlara şemayla aynı maxLength değerini verin (facts/response 5000, legalReference 300, reason 2000, referenceNo 120). Hint olarak '{n}/5000' sayacı ekleyin (aria-describedby; aria-live yalnızca %90 eşiğinde). facts ve response için rows={4} kullanın, takedown reason'ı textarea yapın. Min uzunluk ipucu verin: '(en az 10 karakter)'.
+
+**Yapılan düzeltme:** Confirmed. maxLength now matches the server schemas: propertyId 64, referenceNo 120, reason 2000, resolution 2000, facts 5000, legalReference 300. The takedown reason is now a textarea (rows=3). Facts uses rows=4 and resolution rows=3. Each field's hint (wired to aria-describedby by Field) carries an '{n}/{max} karakter' counter. Resolution also gets the 'en az 3 karakter' hint. An sr-only polite live region speaks only when 90% of the limit is reached and when the limit is hit, not on every keystroke.
 
 ## F1246 — Bağlantılarda ve summary öğelerinde ortak odak halkası (focusRing) tutarsız kullanılıyor
 
@@ -1403,13 +1491,15 @@
 | Renk/tema           | Hayır                                                                                                                     |
 | Efor                | S                                                                                                                         |
 | Kaynak denetçiler   | area:compliance                                                                                                           |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                              |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p073)                                                                                           |
 
 **Kanıt:** ComplianceDashboard.tsx:157, :209 ve :213 bağlantılarında focusRing yok; AppealQueue.tsx:87'de var. trust/page.tsx:13 `linkClass = "font-semibold text-brand underline underline-offset-2 hover:no-underline"` focus stili tanımlamıyor. appeal/page.tsx:64 `<summary className="cursor-pointer text-sm font-medium text-gray-900">` focusRing kullanmıyor; AppealQueue.tsx:97'deki summary kullanıyor.
 
 **Etki:** Klavye kullanıcısı aynı alanda bazı öğelerde kalın mavi halka, bazılarında tarayıcının ince varsayılan çerçevesini görür; odak takibi tutarsızlaşır.
 
 **Önerilen aksiyon:** Bu bağlantıların ve summary'nin className'ine ui.tsx'teki mevcut `${focusRing}` değerini ekleyin (yeni renk tanımlanmıyor).
+
+**Yapılan düzeltme:** Added `${focusRing}` from ui.tsx to the content URL link, the new listing link and the CSV/JSON export links. No color changes. trust/page.tsx and report/appeal/page.tsx belong to other owners (see crossOwner).
 
 ## F1247 — Bileşen içindeki yerel input sınıfı ortak inputClass'tan farklı (köşe yuvarlaklığı, odak halkası)
 
@@ -1425,13 +1515,15 @@
 | Renk/tema           | Hayır                                                  |
 | Efor                | S                                                      |
 | Kaynak denetçiler   | area:compliance                                        |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                           |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p075)                        |
 
 **Kanıt:** NoticeForm.tsx:17 `rounded-lg ... focus:outline-none focus:ring-1 focus:ring-[#003580]` ve ComplianceDashboard.tsx:24 `rounded-md ... focus:ring-1`. Ortak ui.tsx:21 `inputClass` = `rounded-md ... ${focusRing}` (focus-visible:ring-2 ring-offset-2). AppealForm.tsx:76 ve AppealQueue.tsx:129 ise ortak inputClass'ı kullanıyor.
 
 **Etki:** Aynı alandaki (bildirim ile itiraz) formlar farklı köşe ve odak görünümüne sahip. Klavye kullanıcısı odak göstergesinin kalınlığını sayfadan sayfaya farklı görür.
 
 **Önerilen aksiyon:** NoticeForm ve ComplianceDashboard'daki yerel `input` sabitini silip `import { inputClass } from "@/components/ui/ui"` kullanın.
+
+**Yapılan düzeltme:** Confirmed: the local `input` constant used rounded-lg and focus:ring-1. I deleted it, and all 5 controls (URL, category select, explanation textarea, name, email) now use the shared inputClass and focusRing from ui.tsx. ComplianceDashboard.tsx still has its own local input class; that change is filed as crossOwner.
 
 ## F1248 — Kamu formlarında istek zaman aşımı ya da iptal yolu yok; yavaş ağda form 'Gönderiliyor…' durumunda kalabiliyor
 
@@ -1447,13 +1539,15 @@
 | Renk/tema           | Hayır                                         |
 | Efor                | S                                             |
 | Kaynak denetçiler   | area:compliance                               |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                  |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p075)               |
 
 **Kanıt:** NoticeForm.tsx:37-50 `await fetch("/api/notices", {...}).catch(() => null)` AbortController ya da timeout kullanmıyor; :132 `disabled={state === "sending"}`. AppealForm.tsx:34-38'de de aynı durum var.
 
 **Etki:** Mobil ağı takılan misafirin düğmesi süresiz devre dışı kalır. İptal edip yeniden deneyemez; sayfayı yenilerse yazdığı açıklama kaybolur.
 
 **Önerilen aksiyon:** `AbortSignal.timeout(20000)` kullanın. Zaman aşımında state'i 'idle' yapın ve 'Bağlantı zaman aşımına uğradı; metniniz korunuyor, tekrar gönderebilirsiniz' mesajını gösterin.
+
+**Yapılan düzeltme:** Confirmed: the fetch had no timeout. A new postNotice() helper uses AbortSignal.timeout(20000) when the browser supports it (same guard as account/booking pages) and returns "timeout" on TimeoutError. The form then goes back to idle and shows the new compliance.report.timeout message; its text stays because the form never unmounts. The 201 body read now has a .catch so it can't hang, and the reference block only renders when there is a reference. AppealForm is filed as crossOwner.
 
 ## F1249 — DSA bildirim formu 400 yanıtında hangi alanın hatalı olduğunu söylemiyor
 
@@ -1470,13 +1564,15 @@
 | Renk/tema           | Hayır                                         |
 | Efor                | S                                             |
 | Kaynak denetçiler   | lens:forms                                    |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                  |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p075)              |
 
 **Kanıt:** src/components/compliance/NoticeForm.tsx:56-59 `res?.status === 400 ? t("invalid")` → 'Lütfen tüm zorunlu alanları doğru doldurun.'; sunucu şeması src/lib/compliance/dsa.ts:44-48 (URL ≤2000, açıklama 20–5000, e-posta) `details.fieldErrors` döndürüyor ama okunmuyor.
 
 **Etki:** Bildirim yapan kişi hangi alanı düzelteceğini bilemez; özellikle 'URL' alanında sitede olmayan bir adres girildiğinde.
 
 **Önerilen aksiyon:** `details.fieldErrors`'ı Field `error`'larına dağıt ve ilk hatalı alana odaklan; genel mesajı yalnız alan eşleşmesi yoksa göster.
+
+**Yapılan düzeltme:** Already done in the current code: the 400 handler reads details.fieldErrors, sends each one to its Field error and moves focus to the first invalid field through showFieldErrors. A missing propertyId falls back to errors.propertyNotFound, and the generic t("invalid") only shows when no field matches. The keys come from the earlier patch msg-ml/p074.json.
 
 ## F1250 — Başarı ekranında sonraki adım yok, e-posta adresi tekrar gösterilmiyor, başvuru numarası kopyalanamıyor
 
@@ -1492,13 +1588,15 @@
 | Renk/tema           | Hayır                                         |
 | Efor                | S                                             |
 | Kaynak denetçiler   | area:compliance                               |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                  |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p075)              |
 
 **Kanıt:** NoticeForm.tsx:62-68 yalnızca `<Status message={t("sent", { reference: reference ?? "" })} />` gösteriyor ("Bildiriminiz alındı. Başvuru numaranız: {reference}. Onay e-postası gönderildi."). Bağlantı ya da düğme yok. AppealForm.tsx:57-63'te de aynısı var.
 
 **Etki:** Misafir uzun bir cuid'i elle not etmek zorunda kalır. E-postayı yanlış yazdıysa bunu fark edemez. Sayfada geri dönülecek bir yer önerilmiyor.
 
 **Önerilen aksiyon:** Mesaja '{email} adresine onay gönderildi' satırını ekleyin. 'Başvuru numarasını kopyala' düğmesi ekleyin (navigator.clipboard, sonuç role=status ile duyurulsun). propertyId varsa 'İlana dön', yoksa 'Ana sayfaya dön' bağlantısı koyun.
+
+**Yapılan düzeltme:** Already done in the current code: the success screen shows sentEmail with the email address, a 'Numarayı kopyala' button using navigator.clipboard with a role=status result, next steps, 'İlana dön' when a listing is linked, and 'Ana sayfaya dön'. I only made the reference block conditional, which belongs to F1248. AppealForm's success screen is filed as crossOwner.
 
 ## F1251 — Bildirim formunda oturumu açık kullanıcının adı ve e-postası önceden doldurulmuyor
 
@@ -1514,10 +1612,12 @@
 | Renk/tema           | Hayır                                          |
 | Efor                | S                                              |
 | Kaynak denetçiler   | area:compliance                                |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                   |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p075)                |
 
 **Kanıt:** NoticeForm.tsx:109-126'da reporterName ve reporterEmail alanlarında defaultValue yok. ui.tsx:183 `useSession()` hazır ve SessionUser email, firstName ve lastName içeriyor (api-client.ts:73-79).
 
 **Etki:** Mobil ağırlıklı misafir, giriş yapmış olsa bile e-postasını yeniden yazmak zorunda kalır; yazım hatası yaparsa karar e-postasını alamaz.
 
 **Önerilen aksiyon:** `const session = useSession();` ile alanlara `defaultValue={session.status === "ready" ? session.user?.email : undefined}` (ad için `${firstName} ${lastName}`) verin. Alanların düzenlenebilir kalmasına dikkat edin. Değerin hydration sonrası gelmesi nedeniyle `key` ile yeniden mount gerekebilir.
+
+**Yapılan düzeltme:** Confirmed: the fields had no default values. The form now calls useSession() and gives the name field defaultValue=`${firstName} ${lastName}` and the email field defaultValue=user.email; both stay editable. The session arrives after mount, and React writes a changed defaultValue to the value attribute, which only shows if the user hasn't typed yet. So typed input is never overwritten and no key remount is needed. After 'report another' the form remounts already filled.

@@ -822,13 +822,15 @@
 | Renk/tema           | Hayır                                                                                                          |
 | Efor                | S                                                                                                              |
 | Kaynak denetçiler   | runtime:account, area:account, lens:forms                                                                      |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                   |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p044)                                                                                |
 
 **Kanıt:** Probe p4: label[for=passkey-name] class='sr-only' ('Passkey adı'), görünen tek ipucu placeholder 'Ad (ör. Dizüstü)'; alanın isteğe bağlı olduğu belirtilmiyor. Ekran: crops/account/060-guest-tr-desktop-_account-1.png (üstte) — yazmaya başlayınca ipucu kayboluyor.
 
 **Etki:** Kullanıcı yazarken alanın amacını unutur; bilişsel engelli ve düşük okuryazarlıklı kullanıcılar için alanın zorunlu olup olmadığı belirsiz.
 
 **Önerilen aksiyon:** Görünür label 'Passkey adı (isteğe bağlı)' ekle (sr-only kaldır), placeholder'ı örnek olarak koru; boş bırakılınca 'Adsız passkey' olacağını ipucu satırında yaz.
+
+**Yapılan düzeltme:** Removed the sr-only class, so the 'Passkey adı (isteğe bağlı)' / 'Passkey name (optional)' label is now visible. Added a hint line linked to the input with aria-describedby (passkey-name-hint). It says blank names show as the unnamed label, which it reuses through {unnamed}. The placeholder is now just an example ('ör. Dizüstü' / 'e.g. Laptop'), and the input and button still sit on one row.
 
 ## F438 — Kimlik doğrulama hatası ham sağlayıcı kodu olarak gösteriliyor ("Sağlayıcı kodu: document_unreadable")
 
@@ -844,13 +846,15 @@
 | Renk/tema           | Hayır                                                                                                      |
 | Efor                | S                                                                                                          |
 | Kaynak denetçiler   | runtime:account, area:account2                                                                             |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                               |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p043)                                                                            |
 
 **Kanıt:** Probe p4 (guest, desktop; GET /api/account/identity REQUIRES_INPUT + lastError=document_unreadable olarak mock'landı — kyc.ts:105 'Bulanık fotoğraf' test belgesinin gerçek sonucu): bölüm metni 'Durum: Ek bilgi gerekiyor / Sağlayıcı kodu: document_unreadable / … / Yeniden dene'. Ne yapılması gerektiği (net fotoğraf, süresi geçerli belge) yazmıyor. Ekran: probes/account/shots/p4-kyc-mock.png
 
 **Etki:** Misafir/ev sahibi neden başarısız olduğunu ve nasıl düzelteceğini anlamaz; özellikle ev sahibi için ilan yayınlamayı engelleyen adımda destek talebine yol açar.
 
 **Önerilen aksiyon:** lastError kodlarını çeviri anahtarına eşle (document_unreadable → 'Belge fotoğrafı okunamadı; ışıklı ortamda, parlama olmadan tekrar çekin', document_expired → 'Belgenizin süresi dolmuş; geçerli bir belge kullanın', document_fraudulent → 'Belge doğrulanamadı; destekle iletişime geçin'); kodu yalnız destek için küçük ek bilgi olarak bırak.
+
+**Yapılan düzeltme:** lastError codes are now mapped to actionable trust.kyc.errors.<code> text: document_unreadable, document_expired, document_fraudulent, the Stripe document_* codes, consent_declined, abandoned, device_not_supported, country_not_supported and under_supported_age. Any other code falls back to errors.unknown via t.has. The raw code now appears only as a small 'Hata kodu (destek için): {code}' line, with a /support link next to it.
 
 ## F439 — Hesap silme ve 'Vazgeç' adımlarında odak body'ye düşüyor; onay grubu duyurulmuyor
 
@@ -867,13 +871,15 @@
 | Renk/tema           | Hayır                                                                                                                                                |
 | Efor                | S                                                                                                                                                    |
 | Kaynak denetçiler   | runtime:account, area:account2                                                                                                                       |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                                         |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p097)                                                                                                                      |
 
 **Kanıt:** Probe p3-privacy (desktop ve mobil): 'Hesabımı sil' Enter → 'focus after Hesabımı sil: body' (buton DOM'dan kalkıyor); 'Vazgeç' tıklaması sonrası da 'focus: body'. Onay grubu role=group, aria-live yok. Son buton 'Evet, hesabımı sil' onay kutusu işaretlenene kadar disabled (doğru) — son butona tıklanmadı.
 
 **Etki:** Ekran okuyucu kullanıcısı onay adımının açıldığını duymaz, nerede olduğunu kaybeder; vazgeçince sayfanın başına döner.
 
 **Önerilen aksiyon:** Onay grubu açıldığında başlığına (tabIndex=-1) veya onay kutusuna focus() ver; 'Vazgeç'te odağı yeniden görünen 'Hesabımı sil' butonuna döndür (ref + useEffect).
+
+**Yapılan düzeltme:** Opening the confirm step still moves focus to the checkbox, and the group's name is read when focus enters it. 'Vazgeç' now sets a returnFocus ref, and an effect moves focus back to the 'Hesabımı sil' button when it reappears (the button now has a ref) instead of dropping it to body.
 
 ## F453 — İşlem hatası tüm hesap sayfasını başlıksız tek hata kutusuyla değiştiriyor
 
@@ -888,13 +894,15 @@
 | Renk/tema           | Hayır                                                                           |
 | Efor                | S                                                                               |
 | Kaynak denetçiler   | runtime:account                                                                 |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                    |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p007)                                                |
 
 **Kanıt:** Probe p6-cancel (mobil): mock'lanmış 500 iptal hatasından sonra sayfa: h1=0, main=0, header=0, metin yalnız 'Rezervasyon iptal edilemedi / Tekrar Dene'. Kod: cancelBooking (150) ve toggleFavorite (133) setError çağırıyor; 191-205 error doluysa tüm sayfa erken return ile değişiyor. Ekran: probes/account/shots/p6-after-cancel-error-mobile.png
 
 **Etki:** Bir favori/iptal hatası kullanıcının rezervasyon listesini, navigasyonu ve kaydırma konumunu siler; neyin başarısız olduğu ve verinin durumu belirsizleşir, yeniden yükleme gerekir.
 
 **Önerilen aksiyon:** Yükleme hatası ile işlem hatasını ayır: işlem hatalarını ilgili kartın içinde (veya sayfa üstünde) role=alert satır içi mesaj olarak göster, listeyi koru. Tam sayfa hata yalnız ilk yükleme başarısızsa ve PageShell içinde gösterilsin.
+
+**Yapılan düzeltme:** Cancel and favorite errors were already shown inside the affected card (ActionNotice + renderNotice, role=alert in a persistent aria-live region), and the full-page error used PageShell. As part of F605 the full-page error branch is now gone: load failures appear per section with their own retry.
 
 ## F454 — Rezervasyon durumu ham enum olarak görünüyor: "HELD" (TR ve EN)
 
@@ -910,13 +918,15 @@
 | Renk/tema           | Hayır                                                  |
 | Efor                | S                                                      |
 | Kaynak denetçiler   | runtime:account                                        |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                           |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p007)                        |
 
 **Kanıt:** Probe p6-cancel (TR): iki kartta status 'HELD'. Probe p7-verify (EN): durum çipleri ['Cancelled','HELD','Confirmed','Completed']. getStatusLabel (160-168) yalnız PENDING/CONFIRMED/CANCELLED/COMPLETED eşliyor; HELD için çeviri yok, renk de varsayılan sarı.
 
 **Etki:** Misafir rezervasyonunun ödeme bekleyen/tutulmuş olduğunu anlamaz; 'HELD' İngilizce teknik terim, süresi dolabileceği bilgisi de verilmiyor.
 
 **Önerilen aksiyon:** status.held anahtarı ekle (TR: 'Ödeme bekleniyor / Tutuluyor', EN: 'On hold – awaiting payment'), varsa tutma bitiş süresini ve 'Ödemeyi tamamla' bağlantısını göster; bilinmeyen durumlar için genel 'İşleniyor' etiketi kullan.
+
+**Yapılan düzeltme:** HELD already had a translation and a 'Complete payment' link; the status is now rendered by the new shared BookingStatusBadge (label + icon). Unknown statuses show 'Durum bilinmiyor' instead of the raw code. HELD cards also show the payment deadline: holdExpiresAt (already in the /api/bookings response) is added to the Booking type and shown with the new bookings.holdUntil message.
 
 ## F455 — Hesap sayfası bilgi mimarisi: rezervasyonlar 2+ ekran aşağıda, gizlilik merkezi hiç bağlanmamış
 
@@ -932,13 +942,15 @@
 | Renk/tema           | Hayır                                                                                      |
 | Efor                | M                                                                                          |
 | Kaynak denetçiler   | runtime:account                                                                            |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                               |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p007)                                                            |
 
 **Kanıt:** Probe p4 (desktop) h2 konumları: Profil y=207, Cüzdan 352, Kimlik doğrulama 907, Passkey 1178, AI ödeme yetkileri 1385, Rezervasyonlarım 1859. Probe p8 (mobil 390): Rezervasyonlarım y=1909 (≈2.3 ekran), Favorilerim y=4881, sayfa yüksekliği 7687px. p9: main içinde /account/privacy bağlantısı yok; 'Gizlilik ve verilerim'e yalnız footer'daki 47x16px 'Verilerim' bağlantısıyla (tarama targetsLt24) ulaşılıyor. Oturum/Seyahat/Çözüm bağlantıları formların arasına sıkışmış tek satır metin (page.tsx:257-269).
 
 **Etki:** Mobil ağırlıklı misafir en sık işi olan rezervasyonlarını görmek için KYC test belgesi, passkey ve AI yetki formlarını geçmek zorunda; KVKK haklarını kullanacağı sayfayı keşfetmesi zor.
 
 **Önerilen aksiyon:** Hesabı bölümlere ayır (sekme veya sol menü/alt sayfalar): 'Rezervasyonlarım' (varsayılan, en üstte), 'Favoriler', 'Cüzdan', 'Güvenlik' (passkey + oturumlar + kimlik doğrulama), 'Gizlilik ve verilerim', 'Gelişmiş: AI ödeme yetkileri'. Mobilde üstte yatay kaydırmalı sekme şeridi; /account/privacy'yi bu menüye ekle.
+
+**Yapılan düzeltme:** Added an 'Hesap bölümleri' nav under the h1 (a <ul> that scrolls sideways on mobile and wraps from sm up). It jumps to bookings, favorites, wallet and security, and links to trips, sessions, /account/privacy and resolution. Bookings and favorites stay right after the profile. Identity verification, passkeys and a new Oturumlar card (sessions link + logout) are grouped under #account-security. AgentMandates moved into a <details id="account-advanced"> that is closed by default.
 
 ## F456 — Favori 'Kaldır' anında siliyor: geri alma yok, odak kayboluyor, 10 özdeş buton adı
 
@@ -954,13 +966,15 @@
 | Renk/tema           | Hayır                                                 |
 | Efor                | S                                                     |
 | Kaynak denetçiler   | runtime:account                                       |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                          |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p007)                       |
 
 **Kanıt:** Probe p4 (DELETE /api/favorites mock'landı, sunucu değişmedi; p7 favori sayısı 10): ilk 'Kaldır' Enter → dialogs [], kart sayısı 10→9, 'focus: body', 'Geri al'/toast 0. Butonların aria-label'ı yok (p4 'Favorilere Ekle|aria=null', 'Rezervasyonu İptal Et|aria=null'); tarama tabOrder'da ardışık 'Kaldır','Kaldır','Kaldır'.
 
 **Etki:** Yanlışlıkla kaldırılan favori geri getirilemez (ilanı arayıp yeniden eklemek gerekir); klavye kullanıcısı listede yerini kaybeder; ekran okuyucu hangi ilanın kaldırılacağını duymaz.
 
 **Önerilen aksiyon:** Kaldırınca 5 sn 'Villa Amara favorilerden kaldırıldı · Geri al' (role=status) göster; odağı bir sonraki kartın butonuna taşı. aria-label='{ilan adı} favorilerden kaldır' ve rezervasyon butonlarına da ilan adını ekle.
+
+**Yapılan düzeltme:** Removing from the favorites list now goes through removeFavorite. It shows '{title} favorilerden kaldırıldı.' in a persistent role=status region with a 'Geri al' button that stays until the next favorite action (no time limit). Undo POSTs the favorite back at its original position. Focus moves to the next or previous card's remove button (or to Geri al if the list is empty), and back to the restored card after undo. Remove, cancel and favorite-toggle buttons now include the listing title as sr-only text and use aria-disabled instead of disabled, so focus is not lost while a request runs. The redundant aria-pressed on the toggle, whose label already changes, was dropped. After a successful cancel, focus moves to that card's details link.
 
 ## F457 — AI ödeme yetkisi ekranı misafir için anlaşılmaz: jargon, ajan/belge kullanımına yardım yok, ana sayfada orta konumda
 
@@ -976,13 +990,15 @@
 | Renk/tema           | Hayır                                                                            |
 | Efor                | M                                                                                |
 | Kaynak denetçiler   | runtime:account                                                                  |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                     |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p040)                                                  |
 
 **Kanıt:** Tarama 060/061 metni: 'Bir yapay zekâ ajanının sizin adınıza rezervasyon ödemesi yapabilmesi için sınırlı bir yetki (mandate) verin…'. Probe p4 (POST mock'lu başarı): 'Bu yetki belgesi yalnızca şimdi gösterilir. Ajanınıza iletin; başkalarıyla paylaşmayın.' + base64 token textarea + 'Kopyala'. Hangi ajanların desteklendiği, belgenin nasıl iletileceği, kullanılınca ne olacağı için yardım/bağlantı yok. Bölüm passkey ile rezervasyonlar arasında, varsayılan açık form olarak duruyor (p4 y=1385). Ekran: probes/account/shots/p4-mandate-issued.png
 
 **Etki:** Okuryazarlığı geniş yelpazedeki misafir, para harcama yetkisi veren bir formu ne işe yaradığını anlamadan doldurabilir veya bölümden çekinir; güven ve bilişsel yük sorunu.
 
 **Önerilen aksiyon:** Bölümü varsayılan kapalı 'Gelişmiş' alana taşı; 'mandate' yerine düz dil ('Ajanınızın harcayabileceği üst sınır'), 3 adımlı mini açıklama ve 'Nasıl kullanılır?' yardım bağlantısı ekle; özet önizleme göster ('X saat boyunca en fazla ₺1.500, yalnız 1 ilan için'). Token yerine mümkünse 'Ajana bağlantı paylaş' akışı.
+
+**Yapılan düzeltme:** The section was already inside the closed-by-default "advanced" <details id="account-advanced"> on the account page, so it did not need moving. I rewrote the intro in plain language without the word "mandate" and switched the English copy from "mandate" to "permission". I added a 3-step "Nasıl kullanılır?" disclosure and a live one-sentence summary of what will be granted. A "share a link with the agent" flow, offered instead of a token, needs a new server API, so I did not build it.
 
 ## F458 — AI yetkisinin ilan kısıtı kullanıcıdan dahili ilan kimliklerini ezberden yazmasını istiyor
 
@@ -997,13 +1013,15 @@
 | Renk/tema           | Hayır                                                |
 | Efor                | M                                                    |
 | Kaynak denetçiler   | runtime:account                                      |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                         |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p040)                      |
 
 **Kanıt:** Alan ipucu: 'Yalnız belirli ilanlar için yetki vermek istiyorsanız ilan kimliklerini virgülle ayırarak girin.' İlan kimlikleri cuid (örn. URL /property/{id}, booking/[id]/page.tsx:184). Probe p4: alana 'villa-amara' yazıldı, istemci doğrulaması olmadan POST gönderildi (mock'landı). Favoriler/rezervasyonlardan seçim yok.
 
 **Etki:** Misafir ilan kimliğini bilmez; kısıt alanı fiilen kullanılamaz ya da yanlış girilir ve yetki beklenenden geniş kalır.
 
 **Önerilen aksiyon:** Serbest metin yerine favoriler + geçmiş rezervasyonlardan çoklu seçim (combobox/checkbox listesi, ilan adı ve şehirle) sun; ayrıca ilan adıyla arama. Girilen kimlikleri istemci tarafında doğrula ve seçilen ilan adlarını özet olarak göster.
+
+**Yapılan düzeltme:** I replaced the free-text ID input with a checkbox fieldset of listings taken from the guest's favorites and bookings, showing title, city and currency. A listing can also be added by pasting its page link. That link is checked with GET /api/properties/{id}: a 404 or a malformed link shows a field error, and a valid one is added and pre-checked. Selection is capped at 20.
 
 ## F459 — Oturumlar listesi ayırt edilemiyor: 10 özdeş "Chrome · Windows", mevcut oturum üstte değil, butonların erişilebilir bağlamı yok
 
@@ -1020,13 +1038,15 @@
 | Renk/tema           | Hayır                                                            |
 | Efor                | S                                                                |
 | Kaynak denetçiler   | runtime:account                                                  |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                     |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p046)                           |
 
 **Kanıt:** Probe p2-sessions (guest, desktop): 10 satırın hepsi 'Chrome · Windows', ipHint yok; 'Bu cihaz' rozeti 2. satırda (ilk satır 00:32 son etkinlikli başka oturum). 10 butonun hepsi 'Oturumu kapat', aria-label=null, 109x26px; mevcut oturumun butonu da aynı etiket. Sayfa açıklaması 'Tanımadığınız bir cihaz görürseniz oturumu kapatın' diyor. Tarama 063 mobil: butonlar iki satıra kırılıyor. Ekran: crops/account/062-guest-tr-desktop-_account_sessions-0.png
 
 **Etki:** Kullanıcı tanımadığı cihazı ayırt edemez, güvenlik tavsiyesi uygulanamaz; ekran okuyucu kullanıcısı 10 aynı 'Oturumu kapat' duyar ve hangisinin kendi cihazı olduğunu bilemez.
 
 **Önerilen aksiyon:** Mevcut oturumu her zaman ilk sıraya sabitle ve butonunu 'Bu cihazdan çıkış yap' olarak etiketle; diğerlerine aria-label='{cihaz}, son etkinlik {tarih} oturumunu kapat' ver (AgentMandates revokeLabel deseni gibi). Konum/IP ipucu, ilk görülme yeri ve 'x gün önce' göreli zaman ekle; aynı cihaz/tarayıcıdan eski oturumları gruplandır.
+
+**Yapılan düzeltme:** The current session is now always sorted first; the rest keep the server's last-seen order. The current row's button reads 'Bu cihazda çıkış yap' (revokeCurrent). Every other row gets aria-label revokeLabel 'Oturumu kapat: {device}, son etkinlik {date}'. Each row now shows relative time ('3 gün önce') via Intl.RelativeTimeFormat, using the load timestamp rather than the clock at render. On mobile the row stacks (flex-col → sm:flex-row) so the button no longer wraps. Not done: grouping same-device sessions, and location or first-seen place, because the API exposes no location and ipHint is null server-side (not my file).
 
 ## F583 — 'Kopyala' düğmesi başarı/başarısızlık geri bildirimi vermiyor; pano yoksa sessizce hiçbir şey olmuyor
 
@@ -1043,13 +1063,15 @@
 | Renk/tema           | Hayır                                                                                                                                                                                                  |
 | Efor                | S                                                                                                                                                                                                      |
 | Kaynak denetçiler   | area:account2, lens:consistency, lens:status                                                                                                                                                           |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                                                                                           |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p040)                                                                                                                                                                        |
 
 **Kanıt:** AgentMandates.tsx:177-183 `onClick={() => void navigator.clipboard?.writeText(issued)}` — Promise sonucu işlenmiyor; `navigator.clipboard` güvensiz bağlamda (http) undefined iken optional chaining sessizce no-op; reddedilen izin yakalanmıyor. Belge 'yalnızca şimdi gösterilir' (account.json:120).
 
 **Etki:** Misafir belgeyi kopyaladığını sanıp sayfadan ayrılıyor; belge tek seferlik olduğu için kaybediliyor ve yeniden doğrulama ile yeni yetki vermek zorunda kalıyor.
 
 **Önerilen aksiyon:** writeText'i await edip başarıda düğme metnini 2 sn "Kopyalandı" yapın ve `Status` alanına `t("copied")` yazın; hata ya da clipboard yoksa `t("copyFailed")` ("Kopyalanamadı; metni seçip Ctrl+C ile kopyalayın") gösterip textarea'yı `select()` edin.
+
+**Yapılan düzeltme:** Confirmed: the Copy button ignored the result of the writeText promise. Copy now awaits navigator.clipboard.writeText. On success the button shows "Kopyalandı" for 2 seconds and the status line announces t("copied"). When the clipboard is missing or permission is refused, t("copyFailed") is shown as an alert and the token textarea is focused with its text selected for manual Ctrl+C.
 
 ## F585 — Hesap silindi mesajı anında yönlendirmeyle kayboluyor; ana sayfada onay yok
 
@@ -1066,7 +1088,7 @@
 | Renk/tema           | Hayır                                                                                                                              |
 | Efor                | S                                                                                                                                  |
 | Kaynak denetçiler   | area:account2, lens:status                                                                                                         |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                       |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p097)                                                                                                    |
 
 **Kanıt:** PrivacyCenter.tsx:47-49 `setFeedback({ message: t("deleted") }); router.push("/"); router.refresh();` — mesaj ("Hesabınız silindi. Ana sayfaya yönlendiriliyorsunuz…") aynı tikte sayfa değiştiği için görünmüyor/okunmuyor; '/' sayfası bir silme onayı göstermiyor.
 
@@ -1074,21 +1096,23 @@
 
 **Önerilen aksiyon:** Yönlendirmeyi `/?accountDeleted=1` yapın ve ana sayfada (ya da ayrı bir /goodbye sayfasında) `role="status"` ile "Hesabınız silindi; iade edilen rezervasyonlar için e-posta alacaksınız" bildirimini gösterin; alternatif olarak mesajı gösterip 'Ana sayfaya git' düğmesiyle kullanıcı kontrolünde yönlendirin.
 
+**Yapılan düzeltme:** Confirmed: the message was lost in the instant router.push('/'). Removed the redirect. After deletion the header cache is cleared (setSessionUserCache(null)), router.refresh() runs, and the page shows a 'Hesabınız silindi' card whose h2 (tabIndex=-1) gets focus. The card lists cancelled bookings and withdrawn transfer listings from the DELETE response and has a 'Ana sayfaya git' ButtonLink, so the user decides when to leave. Nothing on the home page needs to change.
+
 ## F605 — Tek bir uç nokta hatası tüm hesap sayfasını kilitliyor ve hatanın kaynağını yanlış söylüyor
 
-| Alan                | Değer                         |
-| ------------------- | ----------------------------- |
-| Severity            | Medium                        |
-| Durum               | Aday                          |
-| Konum               | `src/app/account/page.tsx:87` |
-| Diğer konumlar      | `src/app/account/page.tsx:96` |
-| Kullanıcılar        | tümü                          |
-| Prensip             | robustness · recoverability   |
-| Sezgisel madde      | H9 — Hata mesajları           |
-| Renk/tema           | Hayır                         |
-| Efor                | M                             |
-| Kaynak denetçiler   | area:account                  |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**  |
+| Alan                | Değer                           |
+| ------------------- | ------------------------------- |
+| Severity            | Medium                          |
+| Durum               | Aday                            |
+| Konum               | `src/app/account/page.tsx:87`   |
+| Diğer konumlar      | `src/app/account/page.tsx:96`   |
+| Kullanıcılar        | tümü                            |
+| Prensip             | robustness · recoverability     |
+| Sezgisel madde      | H9 — Hata mesajları             |
+| Renk/tema           | Hayır                           |
+| Efor                | M                               |
+| Kaynak denetçiler   | area:account                    |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p007) |
 
 **Kanıt:** page.tsx:87-89 `if (!userRes.ok || !bookingsRes.ok) throw new Error(t("errors.userLoad"))`: rezervasyon hatası da 'Kullanıcı bilgileri yüklenemedi' olarak raporlanıyor. 96 `await fetchFavorites()` hatası tüm sayfayı 'Favoriler yüklenemedi' ekranına çeviriyor.
 
@@ -1096,27 +1120,31 @@
 
 **Önerilen aksiyon:** Bölümleri Promise.allSettled ile bağımsız yükleyin ve her bölümde kendi hatasını, yeniden deneme düğmesiyle gösterin. Profil, çıkış ve güvenlik bölümleri her durumda render edilsin.
 
+**Yapılan düzeltme:** Confirmed: Promise.all made any single endpoint failure replace the whole page, with a misleading userLoad message. The page now uses Promise.allSettled. A 401 from any endpoint shows the session-expired view; other failures are stored per section (user/bookings/favorites) with their own message (new errors.bookingsLoad; userLoad and favoritesLoad reused) and a retry button that reloads only that section. Profile, security, logout, wallet and the other sections always render. The favorite toggle on booking cards is hidden while favorites have failed to load.
+
 ## F606 — Hesabım'daki iptalden sonra iade sonucu bildirilmiyor
 
-| Alan                | Değer                          |
-| ------------------- | ------------------------------ |
-| Severity            | Medium                         |
-| Durum               | Aday                           |
-| Konum               | `src/app/account/page.tsx:146` |
-| Kullanıcılar        | misafir                        |
-| Prensip             | robustness · observability     |
-| Sezgisel madde      | H12 — Feedback                 |
-| WCAG                | 4.1.3                          |
-| Renk/tema           | Hayır                          |
-| Efor                | S                              |
-| Kaynak denetçiler   | area:account                   |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**   |
+| Alan                | Değer                            |
+| ------------------- | -------------------------------- |
+| Severity            | Medium                           |
+| Durum               | Aday                             |
+| Konum               | `src/app/account/page.tsx:146`   |
+| Kullanıcılar        | misafir                          |
+| Prensip             | robustness · observability       |
+| Sezgisel madde      | H12 — Feedback                   |
+| WCAG                | 4.1.3                            |
+| Renk/tema           | Hayır                            |
+| Efor                | S                                |
+| Kaynak denetçiler   | area:account                     |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p007) |
 
 **Kanıt:** page.tsx:145-148 `if (!res.ok) throw ...; setBookings(prev => prev.map(b => b.id === bookingId ? { ...b, status: "CANCELLED" } : b))`. Yanıt gövdesindeki `refund { refundMinor, refundPercent }` okunmuyor ve durum mesajı gösterilmiyor. BookingActions.tsx:214-222 aynı yanıtla `cancel.refunded` / `cancel.noRefund` mesajını gösteriyor.
 
 **Etki:** Misafir ne kadar iade alacağını öğrenemiyor, para konusunda belirsizlik kalıyor. Ekran okuyucu kullanıcısı da yalnızca rozetin sessizce değiştiğini fark edebiliyor.
 
 **Önerilen aksiyon:** Yanıtı JSON olarak okuyun. Kartın içinde sürekli bağlı duran bir aria-live bölgesinde şu mesajı gösterin: 'Rezervasyon iptal edildi. {amount} (%{percent}) iade edilecek' ya da 'Bu iptal için iade yok'. BookingActions'taki çeviri anahtarlarını yeniden kullanın.
+
+**Yapılan düzeltme:** cancelBooking already reads the DELETE response's refund and shows bookings.cancelDone.refunded/noRefund/plain in the card's persistent aria-live region (renderNotice). Focus now also moves to the card's details link after a successful cancel.
 
 ## F607 — Aynı rezervasyon durumu üç ekranda üç farklı etiket ve görsel ile gösteriliyor; hesap sayfasında HELD/EXPIRED ham kod olarak çıkıyor
 
@@ -1132,13 +1160,15 @@
 | Renk/tema           | Hayır                                                                                                                                                                                                                            |
 | Efor                | S                                                                                                                                                                                                                                |
 | Kaynak denetçiler   | lens:consistency                                                                                                                                                                                                                 |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                                                                                                                     |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p007)                                                                                                                                                                                           |
 
 **Kanıt:** account/page.tsx:160-168 yalnızca PENDING, CONFIRMED, CANCELLED ve COMPLETED değerlerini eşliyor, gerisi için `return labels[status] || status`. /api/bookings durum süzmediği için HELD ve EXPIRED ham olarak çıkıyor, :178'de de sarı rozet alıyor. booking/[id]/page.tsx:34 STATUS_KEYS altı durumu kapsıyor ve booking.json'daki cümle biçimli metinleri ("Oda sizin için tutuluyor — ödemeyi tamamlayın") h1 olarak kullanıyor. HostDashboard.tsx:57-74 ve :168 host.bookingStatus'u ("İptal", "Tutuldu") düz tablo metni olarak yazıyor. Etiketler de uyuşmuyor: account.status.cancelled "İptal Edildi", host "İptal", booking "Rezervasyon iptal edildi".
 
 **Etki:** Misafir hesap sayfasında "HELD" gibi teknik bir kod görür ve ödemenin beklediğini anlamaz. Ev sahibi ile misafir aynı rezervasyonu farklı adlarla konuşur, bu da destek yazışmalarında karışıklığa yol açar.
 
 **Önerilen aksiyon:** `BookingStatusBadge` adlı ortak bir bileşen yapın: altı durumun hepsi için tek bir `bookingStatus.<STATUS>` kısa etiketi ve her durum için ayırt edici bir ikon (renge ek olarak) olsun. Mevcut renk sınıfları korunabilir. account, HostDashboard ve booking detay alt başlığında bu bileşeni kullanın. Uzun açıklama cümleleri ayrı bir `bookingStatusHint.<STATUS>` anahtarında dursun.
+
+**Yapılan düzeltme:** Created src/components/booking/BookingStatusBadge.tsx: short labels from common.bookingStatus.<STATUS> for all six statuses plus UNKNOWN, a distinct aria-hidden SVG icon per status, and the existing colour classes unchanged. It also exports bookingStatusKey() and BOOKING_STATUSES. The account page uses it. HostDashboard and the booking detail page still need to adopt it (see crossOwner). No bookingStatusHint keys were added, because the long sentences already live in booking.json.
 
 ## F608 — Misafirin birincil görevi olan rezervasyonlar sayfanın en altında, alt sayfa bağlantıları gömülü
 
@@ -1154,13 +1184,15 @@
 | Renk/tema           | Hayır                                                                 |
 | Efor                | M                                                                     |
 | Kaynak denetçiler   | area:account                                                          |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                          |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p007)                                       |
 
 **Kanıt:** page.tsx:249-255 sırası: WalletPanel, IdentityVerification, PasskeyManager, AgentMandates ('Yapay zekâ ajanı ödeme yetkileri'). Rezervasyonlar ancak bunlardan sonra geliyor (271-357). Alt sayfa bağlantıları (257-269) ' · ' ile ayrılmış bir `<p>` içinde, nav değil. /account/privacy yalnızca Footer.tsx:64'te bağlı.
 
 **Etki:** 360px ekrandaki misafir rezervasyonlarını bulmak için dört karmaşık paneli geçmek zorunda. Oturum yönetimi bağlantısını fark etmek zor. Ekran okuyucu ' · ' ayraçlarını okuyor.
 
 **Önerilen aksiyon:** Rezervasyonlar ve favorileri profilin hemen altına alın ya da sekme veya çapa menüsü ekleyin. Bağlantıları h1'in altına `<nav aria-label="Hesap bölümleri"><ul>` olarak taşıyın: Oturumlar, Seyahatlerim, Çözüm merkezi, Gizlilik ve verilerim. AgentMandates gibi ileri düzey bölümleri 'Gelişmiş' başlığı altında daraltılabilir yapın.
+
+**Yapılan düzeltme:** The ' · '-separated <p> of links is replaced by <nav aria-label="Hesap bölümleri"><ul> right under the h1. It covers Oturumlar, Seyahatlerim, Çözüm merkezi and Gizlilik ve verilerim, plus in-page anchors. Rezervasyonlar and Favoriler come first. AgentMandates sits in a <details> that starts collapsed, with the summary 'Gelişmiş: yapay zekâ ajanı ödeme yetkileri'.
 
 ## F609 — Hesap sayfasından 'Gizlilik ve verilerim'e bağlantı yok; yalnız altbilgide
 
@@ -1177,13 +1209,15 @@
 | Renk/tema           | Hayır                                   |
 | Efor                | S                                       |
 | Kaynak denetçiler   | area:account2                           |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**            |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p007)         |
 
 **Kanıt:** account/page.tsx:257-269 hesap bağlantıları: `/account/sessions`, `/trips`, `/resolution` — `/account/privacy` yok. Tek giriş Footer.tsx:63-68 `href="/account/privacy"` (text-xs). privacy.json:38 KVKK metni de bu sayfaya yönlendiriyor.
 
 **Etki:** Verisini indirmek veya hesabını silmek isteyen kullanıcı 'Hesabım'da aradığı işlevi bulamıyor; mobilde uzun sayfanın en altındaki küçük altbilgi bağlantısını keşfetmesi zor.
 
 **Önerilen aksiyon:** account/page.tsx:257 bağlantı satırına `<Link href="/account/privacy">{tPrivacy("accountPage.title")}</Link>` ekleyin; tercihen hesap sayfasında 'Gizlilik ve güvenlik' başlıklı bir bölümde Oturumlar ile birlikte gruplayın.
+
+**Yapılan düzeltme:** The account section nav links to /account/privacy using the existing privacy.accountPage.title ('Gizlilik ve verilerim'). It sits next to Oturumlar and the security group anchor.
 
 ## F610 — Rezervasyon ve favori kartlarından ayrıntı ya da ilan sayfasına gidilemiyor
 
@@ -1199,13 +1233,15 @@
 | Renk/tema           | Hayır                            |
 | Efor                | S                                |
 | Kaynak denetçiler   | area:account                     |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**     |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p007) |
 
 **Kanıt:** page.tsx:285-287 `<h3 className="text-lg font-semibold text-gray-900">{booking.property.title}</h3>` düz metin. Favori başlığı (372-374) da düz metin. Oysa src/app/booking/[id]/page.tsx ve src/app/property/[id]/page.tsx sayfaları mevcut.
 
 **Etki:** Misafir fatura, mesajlar, depozito ya da ödeme gibi rezervasyon ayrıntılarına ulaşamıyor. Favori bir ilanı yeniden rezerve etmek için baştan arama yapması gerekiyor.
 
 **Önerilen aksiyon:** Rezervasyon başlığını `<Link href={`/booking/${booking.id}`}>` ile, favori başlığını `<Link href={`/property/${favorite.propertyId}`}>` ile sarın. Kartlara ayrıca 'Ayrıntıları gör' bağlantısı ekleyin.
+
+**Yapılan düzeltme:** Already fixed in the current code: booking titles link to /booking/{id}, favorite titles link to /property/{propertyId}, and every booking card has an 'Ayrıntılar ve mesajlar' link (sr-only title), plus 'Ödemeyi tamamla' for HELD bookings.
 
 ## F611 — Gizlilik ve verilerim sayfasının kendi <title>'ı yok
 
@@ -1222,13 +1258,15 @@
 | Renk/tema           | Hayır                                |
 | Efor                | S                                    |
 | Kaynak denetçiler   | area:account2                        |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**         |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p009)     |
 
 **Kanıt:** account/privacy/page.tsx:1 `"use client"` ve :8 `export default function AccountPrivacyPage()` — `generateMetadata`/`metadata` yok; başlık layout.tsx:16 genel `t("meta.title")` olarak kalıyor. Aynı durum src/app/account/page.tsx:1/59 (hesap sayfası; cüzdan, kimlik ve yetki kartlarının bulunduğu sayfa).
 
 **Etki:** Ekran okuyucu ve çok sekmeli masaüstü kullanıcısı sekme/geçmişte 'Gizlilik ve verilerim' sayfasını ayırt edemiyor; sayfaya gelindiğinde başlık duyurusu bağlam vermiyor.
 
 **Önerilen aksiyon:** Sayfayı sunucu bileşeni sarmalayıcıya bölün (page.tsx sunucu, içerik istemci bileşeni) ve `generateMetadata` ile `title: t("privacy.accountPage.title")` döndürün; aynı kalıbı /account için `account.title` ile uygulayın.
+
+**Yapılan düzeltme:** Not a real problem in the current code. src/app/account/privacy/layout.tsx already exports generateMetadata returning titles.accountPrivacy ('Gizlilik ve verilerim'). src/app/account/layout.tsx does the same with titles.account. The client page inherits these titles.
 
 ## F612 — Aydınlatma metninde sayılan düzeltme/itiraz/bilgi talebi hakları için kanal yok
 
@@ -1244,13 +1282,15 @@
 | Renk/tema           | Hayır                                                                        |
 | Efor                | M                                                                            |
 | Kaynak denetçiler   | area:account2                                                                |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                 |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p031)                                       |
 
 **Kanıt:** privacy/page.tsx:92-100 `t.rich("rights.body", ...)` → privacy.json:38 "öğrenme, bilgi talep etme, düzeltme, silme ve itiraz haklarına sahipsiniz. Verilerinizi indirmek veya hesabınızı silmek için <link>..." — PrivacyCenter.tsx yalnız dışa aktarma (:59-62) ve silme (:64-107) sunuyor; düzeltme/itiraz/bilgi talebi için form, e-posta veya destek bağlantısı yok; veri sorumlusu bölümünde (privacy.json:11) iletişim bilgisi yok.
 
 **Etki:** Kullanıcı ad/e-posta düzeltme ya da analitik işlemeye itiraz gibi haklarını nasıl kullanacağını bulamıyor; metin ile sunulan işlevler uyuşmuyor.
 
 **Önerilen aksiyon:** PrivacyCenter'a üçüncü kart ekleyin: 'Diğer talepler (düzeltme, itiraz, bilgi)' — /support'a önceden doldurulmuş kategoriyle bağlantı veya basit talep formu; profil düzeltmesi için ilgili ayar sayfasına bağlantı. Aydınlatma metninin 'Veri sorumlusu' bölümüne başvuru kanalını (e-posta/form) yazın.
+
+**Yapılan düzeltme:** I added the request channel to the privacy notice. The controller section now has a paragraph (controller.contact) and the rights section has another (rights.requests). Both link to /support, where the 'İnsana bağlan' button opens a ticket with the human support team. The third card in PrivacyCenter belongs to another package, so I sent it as a crossOwner request.
 
 ## F613 — Yetki kuralları açıklanmıyor: tek kullanımlık, ödeme başına üst sınır, para birimi eşleşmesi zorunlu
 
@@ -1267,13 +1307,15 @@
 | Renk/tema           | Hayır                                                          |
 | Efor                | S                                                              |
 | Kaynak denetçiler   | area:account2                                                  |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                   |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p040)                                |
 
 **Kanıt:** AgentMandates.tsx:115 `<p ...>{t("intro")}</p>` → account.json:105 "Yetki tutar, süre ve isteğe bağlı olarak ilanlarla sınırlıdır". Sunucu davranışı: nonce tek checkout oturumuna bağlanır (mandate.ts durableNonceStore.bind, ikinci kullanım MANDATE_REPLAYED), `charge.amountMinor > claims.maxAmountMinor` ödeme başına kontrol (:448), `MANDATE_CURRENCY_MISMATCH` (:443). 'Azami tutar' (account.json:106) toplam mı rezervasyon başına mı belirsiz; para birimi alanında (:129-137) ilanın para birimiyle eşleşmesi gerektiği söylenmiyor.
 
 **Etki:** Misafir aynı yetkiyle birden fazla rezervasyon yaptırabileceğini veya EUR yetkisiyle TRY fiyatlı ilanı ödeyebileceğini sanıyor; ajan ödemeleri öngörülemez biçimde reddediliyor.
 
 **Önerilen aksiyon:** Intro'nun altına 3 maddelik kural listesi ekleyin: "Her yetki tek bir rezervasyon ödemesinde kullanılabilir", "Tutar, o tek ödemenin üst sınırıdır", "Para birimi ilanın fiyat para birimiyle aynı olmalı". 'Azami tutar' etiketini "Rezervasyon başına en fazla tutar" yapın; para birimi alanına bu kuralı `hint` olarak verin.
+
+**Yapılan düzeltme:** I added a 3-item rules list under a "Bilmeniz gerekenler" heading: single use, the amount is a cap per payment, and the currency must match the listing. The amount label is now "Rezervasyon başına en fazla tutar" and the currency field has a hint. When a selected listing is priced in a different currency, the currency field shows an inline error and submit focuses that field instead of sending.
 
 ## F614 — İlan kısıtı için kullanıcıdan ezbere ilan kimliği yazması isteniyor; geçersiz kimlik doğrulanmıyor
 
@@ -1290,13 +1332,15 @@
 | Renk/tema           | Hayır                                                                          |
 | Efor                | M                                                                              |
 | Kaynak denetçiler   | area:account2                                                                  |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                   |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p040)                                                |
 
 **Kanıt:** AgentMandates.tsx:153-154 `<Field id="mandate-properties" label={t("properties")} hint={t("propertiesHint")}><input id="mandate-properties" name="propertyIds" .../>` → account.json:116 "ilan kimliklerini virgülle ayırarak girin". Kimliklerin nereden bulunacağı söylenmiyor (yalnız /property/[id] URL'sinde var). Sunucu şeması (mandate.ts:106) `z.array(z.string().min(1).max(64)).min(1).max(20)` var olmayan kimliği reddetmiyor; 20 sınırı ipucunda yok, aşılırsa genel "Doğrulama hatası" dönüyor.
 
 **Etki:** Misafir kimlikleri bulamıyor; yanlış/yazım hatalı kimlikle oluşan yetki hiçbir ilanda çalışmıyor (ajan ödemesi MANDATE_PROPERTY_MISMATCH ile düşüyor) ve kullanıcı nedenini göremiyor.
 
 **Önerilen aksiyon:** Serbest metin yerine favoriler/son görüntülenen/sepetteki ilanlardan çoklu seçim (checkbox listesi veya combobox, `aria-multiselectable`) sunun; serbest giriş korunacaksa istemci tarafında kimlikleri GET ile doğrulayıp bilinmeyenleri alan hatası olarak gösterin ve ipucuna "En fazla 20 ilan; kimliği ilan sayfası adresinin sonunda bulabilirsiniz" ekleyin. Listede yalnız sayı yerine ilan adlarını gösterin (AgentMandates.tsx:209).
+
+**Yapılan düzeltme:** Listings are now picked from favorites and bookings, and pasted links are validated against the listing API, so unknown IDs never reach the mandate. The hint states the limit of 20 and checkboxes are disabled once 20 are selected. The issued-permission list shows listing names (t("scopedTo") with Intl.ListFormat) instead of only a count, and falls back to the count when an ID is not in the known list.
 
 ## F615 — Tanıma yerine hatırlama: ham ilan kimliği ve 'Fotoğraf N' seçenekleri
 
@@ -1312,13 +1356,15 @@
 | Renk/tema           | Hayır                                                              |
 | Efor                | M                                                                  |
 | Kaynak denetçiler   | lens:forms                                                         |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                       |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p040)                             |
 
 **Kanıt:** src/components/account/AgentMandates.tsx:153-155 serbest metin; messages/tr/account.json `"propertiesHint": "…ilan kimliklerini virgülle ayırarak girin."` — kullanıcı arayüzde hiçbir yerde görmediği cuid'leri yazmak zorunda. src/components/host/AccessibilityPanel.tsx:83-84 `t("host.photoOption", { index })` → kanıt seçenekleri 'Fotoğraf 1, Fotoğraf 2…' (:225-228, :304-307), küçük resim yok.
 
 **Etki:** Misafir ajan yetkisini ilanla sınırlayamaz (ya da yanlış kimlik girer → yetki boşa çıkar); ev sahibi hangi fotoğrafın rampa/kapı kanıtı olduğunu seçenek metninden anlayamaz.
 
 **Önerilen aksiyon:** İlan kısıtı için favoriler/arama tabanlı çoklu seçim (başlık + şehir) bileşeni; kanıt seçimi için küçük resimli radyo ızgarası (img alt + 'Fotoğraf 3, yükleme tarihi').
+
+**Yapılan düzeltme:** The AgentMandates part is fixed: users now choose listings by title and city instead of typing IDs from memory. The other half of the finding, the 'Fotoğraf N' evidence options in src/components/host/AccessibilityPanel.tsx, is not my file, so I handed it to that file's owner under crossOwner.
 
 ## F616 — Yetki vermeden önce özet/onay yok; neyin verileceği tek bakışta görülmüyor
 
@@ -1335,13 +1381,15 @@
 | Renk/tema           | Hayır                                          |
 | Efor                | S                                              |
 | Kaynak denetçiler   | area:account2                                  |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                   |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p040)                |
 
 **Kanıt:** AgentMandates.tsx:157-161 `<Button type="submit" disabled={busy}>{busy ? t("creating") : t("create")}</Button>` — 'Yetki ver' doğrudan POST yapıyor; yeniden doğrulama (useReauth) yalnız sunucu 403 REAUTH_REQUIRED döndüğünde çıkıyor, yakın zamanda doğrulanmış oturumda hiçbir onay görülmüyor. Form başarıdan sonra sıfırlanmıyor (:83-85), aynı düğmeye tekrar basmak ikinci bir yetki üretiyor.
 
 **Etki:** Para harcama yetkisi veren misafir, hangi tutar/süre/ilan kapsamıyla yetki verdiğini son kez görmeden onaylıyor; çift gönderimle gereksiz ikinci aktif yetki oluşabiliyor.
 
 **Önerilen aksiyon:** Gönder düğmesinin hemen üstüne canlı özet ekleyin: "Ajanınız {süre} boyunca tek bir rezervasyon için en fazla {₺tutar} ödeyebilecek ({tüm ilanlar | N ilan})."; düğme metnini dinamik yapın ("₺1.500'e kadar yetki ver"); başarıdan sonra `e.currentTarget.reset()` ile formu temizleyin.
+
+**Yapılan düzeltme:** I added a summary box right above the submit button, linked to it with aria-describedby: "Özet: Ajanınız {duration} boyunca tek bir rezervasyon için en fazla {amount} ödeyebilecek ({scope})." The button label now includes the amount ("En fazla {amount} için yetki ver"). After a successful grant the form resets amount, selected listings and duration, so pressing the button again cannot create a second permission.
 
 ## F617 — Tek seferlik yetki belgesi için odak taşınmıyor, sayfadan çıkış uyarısı yok, yeni yetki eskisini sessizce değiştiriyor
 
@@ -1358,13 +1406,15 @@
 | Renk/tema           | Hayır                                          |
 | Efor                | S                                              |
 | Kaynak denetçiler   | area:account2                                  |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                   |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p041)                |
 
 **Kanıt:** AgentMandates.tsx:83-84 `setIssued(out.mandate); setStatus({ message: t("created") });` — odak 'Yetki ver' düğmesinde kalıyor; :163-185 belge kutusu formun altında beliriyor. Status mesajı yalnız "Yetki oluşturuldu." diyor, belgeyi şimdi kopyalamak gerektiğini söylemiyor. `beforeunload` koruması yok; ikinci yetki verildiğinde `issued` üzerine yazılıyor. 'Kaydettim/Kapat' eylemi yok.
 
 **Etki:** Ekran okuyucu kullanıcısı belgenin nerede olduğunu bilmiyor; mobil kullanıcı kutuyu görmeden sayfadan ayrılıp belgeyi kaybedebiliyor; ikinci yetkide ilk belge geri getirilemez biçimde ekrandan kalkıyor.
 
 **Önerilen aksiyon:** Belge kutusuna `ref` + `tabIndex={-1}` verip oluşturma sonrası `focus()` ve `scrollIntoView()` uygulayın; created mesajını "Yetki oluşturuldu. Aşağıdaki belgeyi şimdi kopyalayın; tekrar gösterilmeyecek." yapın; `issued` doluyken `beforeunload` uyarısı ekleyin; kutuya 'Belgeyi kaydettim, kapat' düğmesi koyun; yeni yetki öncesi kopyalanmamış belge varsa uyarın.
+
+**Yapılan düzeltme:** Confirmed. When `issued` is set, an effect now moves focus to the token textarea, which selects its value, and scrolls it to the center of the view. The textarea is `aria-describedby` the one-time warning (#mandate-token-note). The `created` message now says to copy the document now because it won't be shown again. While the token is shown and not yet copied, a `beforeunload` warning is active (same pattern as TransferMarket). A 'Belgeyi kaydettim, kapat' button closes the box and returns focus to the submit button. Granting a new permission while an uncopied token is on screen first asks for confirmation through useConfirm.
 
 ## F618 — Kullanılmış yetki hâlâ 'Etkin' görünüyor ve iptal düğmesi sunuluyor
 
@@ -1380,13 +1430,15 @@
 | Renk/tema           | Hayır                                          |
 | Efor                | S                                              |
 | Kaynak denetçiler   | area:account2                                  |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                   |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p041)                |
 
 **Kanıt:** AgentMandates.tsx:196-205 aynı satırda `{t(`status.${m.status}`)}` ("Etkin") ve `{m.used && <span ...>{t("used")}</span>}` ("Kullanıldı") birlikte çıkıyor; :212 `m.status === "active"` ise iptal düğmesi gösteriliyor. Sunucu listMandates (mandate.ts) used durumunu status'a yansıtmıyor; nonce bir checkout'a bağlandıktan sonra başka ödemede kullanılamıyor.
 
 **Etki:** Misafir 'Etkin + Kullanıldı' rozetlerini çelişkili okuyor; ajanının yetkiyi tekrar kullanabileceğini sanıyor ya da gereksiz iptal yapıyor.
 
 **Önerilen aksiyon:** used=true olan etkin yetki için tek birleşik durum gösterin: "Kullanıldı — yeni ödeme için geçerli değil"; iptal düğmesini yalnız `status === "active" && !m.used` iken gösterin ya da etiketini "Bağlı ödemeyi durdur" gibi gerçek etkisine göre değiştirin.
+
+**Yapılan düzeltme:** Confirmed: the server returns status 'active' even after the nonce is bound (`used`). An active permission with used=true now shows one combined badge, 'Kullanıldı — yeni ödeme için geçerli değil' (reusing the existing used badge classes). The revoke button and the 'valid until' text are hidden for it. The separate 'Kullanıldı' badge now appears only on expired or revoked permissions.
 
 ## F619 — Hesap kartlarında tarih biçimleri tutarsız ve EN'de belirsiz (kısa sayısal biçim)
 
@@ -1402,13 +1454,15 @@
 | Renk/tema           | Hayır                                                                                                              |
 | Efor                | S                                                                                                                  |
 | Kaynak denetçiler   | area:account2                                                                                                      |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                       |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p041)                                                                                    |
 
 **Kanıt:** AgentMandates.tsx:208 `t("validUntil", { date: f.dateTime(m.expiresAt) })` → format.ts:72 `dateStyle: "short"` (EN: "10/11/26, 2:30 PM"; ay/gün sırası ve 2 haneli yıl). IdentityVerification.tsx:121 `fmt.date(data.verifiedAt)` varsayılan "short" ("10/11/2026"). WalletPanel.tsx:114/129/156 `fmt.date(..., "long")`. TR metin account.json:132 "Geçerlilik: {date}" bitiş mi başlangıç mı belirtmiyor; süresi dolmuş yetkide de aynı metin.
 
 **Etki:** EN arayüzü kullanan Türk misafir 10/11'i 10 Kasım olarak okuyup yetkinin bitişini yanlış anlıyor; aynı sayfada üç farklı tarih biçimi öğrenmeyi zorlaştırıyor.
 
 **Önerilen aksiyon:** Hesap kartlarında tarihler için `"medium"` biçimini ("11 Eki 2026" / "Oct 11, 2026") ve saat gereken yerde `dateStyle: "medium"` kullanan bir dateTime varyantı kullanın; validUntil metnini aktifte "{date} tarihine kadar geçerli", süresi dolmuşta "{date} tarihinde sona erdi" olarak ayırın.
+
+**Yapılan düzeltme:** Confirmed. Dates in the list and the revoke confirmation now use a local memoized `Intl.DateTimeFormat(f.locale, { dateStyle: "medium", timeStyle: "short" })`, since format.ts is not mine and `f.date` defaults to UTC. The end-date text is split by status: active shows validUntil ('{date} tarihine kadar geçerli'), expired shows expiredOn ('{date} tarihinde sona erdi'). The IdentityVerification date is listed in crossOwner.
 
 ## F620 — Demo doğrulama sonucu ekran okuyucuya duyurulmuyor
 
@@ -1425,13 +1479,15 @@
 | Renk/tema           | Hayır                                                 |
 | Efor                | S                                                     |
 | Kaynak denetçiler   | area:account2                                         |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                          |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p043)                       |
 
 **Kanıt:** IdentityVerification.tsx:80 `await load();` — başarılı başlatmadan sonra yalnız rozet metni (:113-118, live region değil) değişiyor; `setInfo` çağrılmıyor. Ayrıca :104-108 `{info && (<p role="status">...)}` koşullu eklendiği için içerikle birlikte eklenen role=status bazı ekran okuyucularda okunmuyor.
 
 **Etki:** Ekran okuyucu kullanıcısı 'Doğrulamayı başlat'a bastıktan sonra sonucun Doğrulandı mı, Ek bilgi gerekiyor mu olduğunu duymuyor; form kaybolduğu için (VERIFIED) sessizlik daha da kafa karıştırıcı.
 
 **Önerilen aksiyon:** Bileşende her zaman DOM'da duran tek bir `<div aria-live="polite">` (ui.tsx `Status` bileşeni) kullanın; load() sonrası `setInfo(t("resultAnnounce", { status: t(`status.${fresh.status}`) }))` ile "Doğrulama sonucu: Doğrulandı" yazın.
+
+**Yapılan düzeltme:** Confirmed: the old code never called setInfo after the mock start, and its role=status <p> was inserted conditionally. A role=status div now stays in the DOM, and after load() the mock start writes t('resultAnnounce', {status}) into it. The polling and refresh results are announced the same way.
 
 ## F621 — Stripe dönüşü ve 'İnceleniyor' durumunda yenileme/bilgi yok
 
@@ -1447,13 +1503,15 @@
 | Renk/tema           | Hayır                                                |
 | Efor                | M                                                    |
 | Kaynak denetçiler   | area:account2                                        |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                         |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p043)                      |
 
 **Kanıt:** IdentityVerification.tsx:88 `const canStart = data && data.status !== "VERIFIED" && data.status !== "PENDING";` — PENDING'de hiçbir eylem veya açıklama yok; durum yalnız bileşen ilk yüklemede (:50-62) çekiliyor. Sağlayıcı dönüş adresi kyc.ts:408 `${appUrl()}/account?kyc=return` ama bileşen `kyc` sorgu parametresini okumuyor, kullanıcıyı karta kaydırmıyor veya 'sonuç işleniyor' demiyor.
 
 **Etki:** Stripe'tan dönen kullanıcı uzun hesap sayfasının en üstüne düşüyor, doğrulamanın alınıp alınmadığını görmüyor; 'İnceleniyor' ne kadar sürer bilmiyor ve sonucu görmek için sayfayı elle yenilemesi gerekiyor.
 
 **Önerilen aksiyon:** `useSearchParams().get("kyc") === "return"` ise kartı `scrollIntoView` + odak ile öne getirip `role="status"` ile "Doğrulama sonucunuz işleniyor; birkaç dakika sürebilir" gösterin; PENDING iken 10-15 sn aralıkla (en fazla birkaç dakika) `load()` ile yoklayın ve 'Durumu yenile' düğmesi ekleyin; PENDING için beklenen süreyi metinle yazın.
+
+**Yapılan düzeltme:** Confirmed. On ?kyc=return (read from window.location in the initial fetch callback, so no useSearchParams Suspense requirement), the card heading is scrolled into view and focused, and returnPending or the result is announced. While PENDING the component polls every 15 s (at most 20 times, about 5 min), shows the expected-duration text and has a 'Durumu yenile' button (stillPending or the result is announced). In Stripe mode a PENDING session can be restarted with an explanation, because an abandoned Stripe session otherwise stays PENDING and was a dead end.
 
 ## F622 — Sağlayıcı ham hata/durum kodları çözüm önermeden gösteriliyor
 
@@ -1469,13 +1527,15 @@
 | Renk/tema           | Hayır                                                                                                                       |
 | Efor                | S                                                                                                                           |
 | Kaynak denetçiler   | lens:copy                                                                                                                   |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p043)                                                                                             |
 
 **Kanıt:** IdentityVerification.tsx:123-124 `t("lastError", { code: data.lastError })` → trust.json:35 'Sağlayıcı kodu: {code}'; PayoutPanel.tsx:222 `{p.failureCode ? ` (${p.failureCode})` : ""}`; ClaimDetail.tsx:161-164 'Ödeme sağlayıcısı durumu: {status}' ham PSP durumu; AdminDashboard.tsx:168 outbox `{m.lastError}`.
 
 **Etki:** Kimlik doğrulaması başarısız olan misafir/ev sahibi ve ödemesi başarısız ev sahibi ne yapması gerektiğini bilmez; destek yükü artar.
 
 **Önerilen aksiyon:** Bilinen sağlayıcı kodlarını i18n'e eşleyin (ör. document_expired → 'Belgenizin süresi dolmuş. Geçerli bir belgeyle yeniden deneyin.'), bilinmeyende 'Doğrulama tamamlanamadı. Yeniden deneyin veya destekle iletişime geçin' + destek bağlantısı; ham kodu yalnız 'Ayrıntı' altında küçük gösterin.
+
+**Yapılan düzeltme:** Fixed for IdentityVerification in the same way as F438: known codes map to i18n text with a solution, unknown codes show a generic 'try again or contact support' message plus a support link, and the raw code is only a small detail line. The PayoutPanel, ClaimDetail and AdminDashboard parts of the evidence are in files other packages own.
 
 ## F623 — Form alanı kenarlıkları 3:1 bileşen kontrastını sağlamıyor
 
@@ -1515,13 +1575,15 @@
 | Renk/tema           | Hayır                                                                                                                                        |
 | Efor                | M                                                                                                                                            |
 | Kaynak denetçiler   | area:account2                                                                                                                                |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                                 |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p043)                                                                                                              |
 
 **Kanıt:** src/app/api/account/identity/route.ts POST `requireVerifiedEmail(req)` ve src/app/api/account/agent-mandates/route.ts POST `requireVerifiedEmail(req)` → 403 EMAIL_NOT_VERIFIED, mesaj errors.ts:42. IdentityVerification.tsx:150-156 ve AgentMandates.tsx:158 düğmeleri e-posta durumu bilinmeden etkin; hata yalnız metin olarak gösteriliyor. Projede /api/auth/verify-email/resend mevcut ama hiçbir yerden önerilmiyor.
 
 **Etki:** Misafir test belgesini seçip veya formu doldurup (AgentMandates'te parolayı da girip) sonunda yalnız 'e-postanızı doğrulayın' metniyle karşılaşıyor; doğrulama e-postasını yeniden almak için bir yol görmüyor.
 
 **Önerilen aksiyon:** `err.code === "EMAIL_NOT_VERIFIED"` için hata yanında 'Doğrulama e-postasını yeniden gönder' düğmesi (POST /api/auth/verify-email/resend) ve sonuç mesajı gösterin; tercihen /api/user/me'den e-posta doğrulama durumunu okuyup bu iki kartın başında önden uyarı gösterin.
+
+**Yapılan düzeltme:** Confirmed: POST requires a verified email. On ApiError code EMAIL_NOT_VERIFIED, the translated error now comes with a 'resend verification email' button (POST /api/auth/verify-email/resend, Button busy guard) and a persistent role=status result. It reuses auth.verify.resend/resending/resendFailed/loginToResend and adds kyc.emailSent and kyc.emailAlreadyVerified. The suggested up-front warning was not added, because /api/user/me does not expose email verification status.
 
 ## F625 — Gerçek sağlayıcı modunda 'Doğrulamayı başlat' dış siteye gideceğini ve neye ihtiyaç olduğunu söylemiyor
 
@@ -1538,13 +1600,15 @@
 | Renk/tema           | Hayır                                                 |
 | Efor                | S                                                     |
 | Kaynak denetçiler   | area:account2                                         |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                          |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p043)                       |
 
 **Kanıt:** IdentityVerification.tsx:130-149 açıklama yalnız `data.provider === "mock"` için (mockNotice); Stripe modunda :155 `t("start")` ("Doğrulamayı başlat") tıklanınca :77 `window.location.assign(res.redirectUrl)` ile sağlayıcı sayfasına gidiliyor. Kamera, kimlik belgesi gereksinimi ve günlük deneme sınırı (kyc.ts KYC_MAX_STARTS_PER_DAY) hiçbir yerde anlatılmıyor.
 
 **Etki:** Mobil misafir, belgesi yanında değilken başlatıp yarıda bırakıyor ve günlük deneme hakkını tüketiyor; beklenmedik site değişimi güvensizlik (oltalama şüphesi) yaratıyor.
 
 **Önerilen aksiyon:** Stripe modunda düğmenin üstüne: "Güvenli doğrulama sağlayıcısının sayfasına yönlendirileceksiniz. Geçerli kimlik belgeniz ve kameralı bir cihaz gerekir. Günde en fazla N deneme hakkınız var." metnini ekleyin; düğme metnini "Doğrulamaya devam et (sağlayıcı sayfası)" yapın.
+
+**Yapılan düzeltme:** In Stripe mode a role=note box above the button now says you will go to the provider's (Stripe) page and return here, and that you need a valid ID document and a device with a camera. It also states the daily attempt limit: data.maxStartsPerDay when the API sends it, otherwise generic wording. The button text is now 'Doğrulamaya devam et (sağlayıcı sayfası)'.
 
 ## F626 — Onay pencereleri hangi öğenin etkileneceğini ve sonucunu söylemiyor (yerel window.confirm)
 
@@ -1560,13 +1624,15 @@
 | Renk/tema           | Hayır                                                                         |
 | Efor                | M                                                                             |
 | Kaynak denetçiler   | area:account                                                                  |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                  |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p044)                                               |
 
 **Kanıt:** PasskeyManager.tsx:87 `window.confirm(t("passkeys.confirmDelete"))` yalnızca 'Bu passkey silinsin mi?' diyor (account.json:61). Passkey adı da sonucu da yok: son passkey silinirse parolasız giriş kaybolur ve ödemede passkey doğrulaması yerine 3DS'e düşülür. SessionManager.tsx:71 `window.confirm(confirmText)` 'Bu oturum kapatılsın mı?' diyor (account.json:97), cihaz adı yok. Ayrıca tarayıcı 'ek iletişim kutularını engelle' ayarıyla confirm'ü sessizce false döndürebiliyor.
 
 **Etki:** Birkaç passkey'i ya da oturumu olan kullanıcı yanlış öğeyi silebiliyor. Engellenmiş confirm durumunda düğme hiçbir şey yapmıyormuş gibi görünüyor.
 
 **Önerilen aksiyon:** Onay metnine adı ve sonucu ekleyin: '“{name}” passkey'i silinsin mi? Bu cihazla parolasız giriş yapamayacaksınız.' Son passkey için ayrıca uyarın. window.confirm yerine uygulama içi role="alertdialog" kullanın; ReauthDialog'un kabuğu yeniden kullanılabilir.
+
+**Yapılan düzeltme:** Confirmed the problem: the code used window.confirm with a generic text. Replaced it with useConfirm (a native <dialog>, danger tone, 'Passkey'i sil' confirm label). The title names the passkey (“{name}” silinsin mi?), and the body gives the date added and what deleting it means. When it is the last passkey, an extra paragraph warns that passwordless sign-in turns off and risky payments fall back to 3D Secure. SessionManager was already migrated by its owner.
 
 ## F627 — Tekrarlanan eylem düğmeleri hangi öğeye ait olduğunu söylemiyor ('Sil', 'Şikâyet et', 'Mesajlar', 'Kabul et')
 
@@ -1583,13 +1649,15 @@
 | Renk/tema           | Hayır                                                                                                                                                                                     |
 | Efor                | S                                                                                                                                                                                         |
 | Kaynak denetçiler   | lens:copy                                                                                                                                                                                 |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                                                                              |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p044)                                                                                                                                                           |
 
 **Kanıt:** PasskeyManager.tsx:138 her satırda 'Sil'; ReviewsSection.tsx:94 her yorumda 'Şikâyet et'; HostDashboard.tsx:175 her satırda 'Mesajlar' bağlantısı; RevenueDashboard.tsx:209 her öneride 'Kabul et'/'Reddet'; SplitPayPanel.tsx:235 `aria-label={t("removeParticipant")}` katılımcı numarasız. Buna karşın AgentMandates revokeLabel, cart item.removeLabel ve PromotionsPanel.tsx:212-213 sr-only ad ekleyerek doğru yapıyor.
 
 **Etki:** Ekran okuyucu bağlantı/düğme listesinde aynı adlardan oluşan bir liste duyar; yanlış passkey'i silme veya yanlış öneriyi kabul etme riski.
 
 **Önerilen aksiyon:** İlgili öğeyi ada ekleyin: 'Sil: {passkey adı}', '{yazar} yorumunu şikâyet et', '{mülk} {tarih} mesajları', '{oda} {tarih} önerisini kabul et', 'Katılımcı {n}'i kaldır' — ICU parametreli anahtarlar veya sr-only span ile.
+
+**Yapılan düzeltme:** Confirmed: every row's button was just 'Sil'. Each delete button now has aria-label passkeys.deleteLabel, 'Sil: {name}, eklendi {date}'. It starts with the visible word, so label-in-name holds, and the date also tells unnamed passkeys apart. The other files listed in the finding belong to other packages.
 
 ## F628 — Yeniden doğrulama hataları nasıl düzeltileceğini söylemiyor (bekleme süresi, ağ hatası)
 
@@ -1605,13 +1673,15 @@
 | Renk/tema           | Hayır                                        |
 | Efor                | S                                            |
 | Kaynak denetçiler   | area:account                                 |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                 |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p045)              |
 
 **Kanıt:** ReauthDialog.tsx:58-62 `err.code === "REAUTH_RATE_LIMITED" ? t("rateLimited") : passkeyErrorMessage(err, t("failed"))`. Sunucunun gönderdiği details.retryAfterSeconds (recent-auth.ts:37-40) kullanılmıyor, account.json:79 yalnızca 'daha sonra tekrar deneyin' diyor. Durum kodu olmayan ağ hatası passkey-client.ts:89 üzerinden 'Doğrulama başarısız' mesajına düşüyor. Kalan deneme hakkı (REAUTH_MAX_ATTEMPTS=5, app-config.ts:527) gösterilmiyor.
 
 **Etki:** Kilitlenen kullanıcı ne kadar bekleyeceğini bilmeden denemeye devam ediyor. Çevrimdışı kullanıcı parolasını yanlış girdiğini sanıp gereksiz yere parola sıfırlamaya gidebiliyor.
 
 **Önerilen aksiyon:** rateLimited metnini '{minutes} dakika sonra tekrar deneyin' olarak details.retryAfterSeconds ile doldurun. Ağ hatası için 'Bağlantı kurulamadı, internetinizi kontrol edin' gösterin. Yanlış parola için 'Parola hatalı' mesajının yanına /forgot-password bağlantısı koyun.
+
+**Yapılan düzeltme:** Confirmed: REAUTH_RATE_LIMITED showed the generic 'try again later' text and ignored details.retryAfterSeconds. It now shows the new account.reauth.rateLimitedFor text, '{minutes} dakika sonra tekrar deneyin', with the minutes rounded up from retryAfterSeconds; if that value is missing it falls back to rateLimited. A wrong password or a lockout now also shows a 'Şifremi unuttum' link to /forgot-password, reusing auth.login.forgotPassword. Network errors were already handled: useAccountErrorText maps TypeError to common.errors.network. Remaining attempts are still not shown because the server does not send that count.
 
 ## F629 — Modal diyaloglar kısa ekranda ve klavye açıkken taşıyor, kaydırılamıyor
 
@@ -1628,13 +1698,15 @@
 | Renk/tema           | Hayır                                                                                      |
 | Efor                | S                                                                                          |
 | Kaynak denetçiler   | lens:mobile                                                                                |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                               |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p045)                                                            |
 
 **Kanıt:** ReauthDialog.tsx:68 ve StepUpDialog.tsx:50 `fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4` kullanıyor; panellerde (:69-75 ve :51-57) `max-h` ya da `overflow-y-auto` yok. ReauthDialog açılışta (:43) parola alanına odaklanıyor, bu da mobil klavyeyi açıyor. Gövde kaydırması kilitlenmiyor.
 
 **Etki:** Yatay telefonda (~375px yükseklik) ya da klavye açıkken 'Doğrula' ve 'İptal' düğmeleri görünür alanın dışında kalıyor ve panel kaydırılamıyor; arkadaki sayfa kayıyor. Hassas işlemler (oturum kapatma, hesap silme, ödeme step-up) yarıda kalıyor.
 
 **Önerilen aksiyon:** Panele `max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain` ekle. Mobilde alt sayfa düzenine geç (`items-end sm:items-center`, `rounded-t-xl`). Diyalog açıkken `document.body.style.overflow="hidden"` uygula. z-index'i `z-[60]` yap (bkz. sabit bant bulgusu).
+
+**Yapılan düzeltme:** The panel is already a native <dialog> with showModal, which uses the top layer, so a z-index change is not needed. Added max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain so the dialog scrolls on short screens and when the keyboard is open. Background scroll is now locked: the open effect sets body overflow to hidden and restores the old value on close. The password input uses text-base sm:text-sm so iOS does not zoom on focus. I skipped the bottom-sheet layout. StepUpDialog needs the same change (see crossOwner).
 
 ## F630 — Hesabında passkey olmayan kullanıcıya da 'Passkey ile doğrula' seçeneği gösteriliyor
 
@@ -1649,13 +1721,15 @@
 | Renk/tema           | Hayır                                         |
 | Efor                | S                                             |
 | Kaynak denetçiler   | area:account                                  |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                  |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p045)               |
 
 **Kanıt:** ReauthDialog.tsx:114-121 `{supported && (<button ... onClick={() => void attempt(reauthWithPasskey)}>` yalnızca tarayıcı desteğini kontrol ediyor. Sunucu passkey.ts:255-260'ta 'Hesapta kayıtlı passkey yok' hatası fırlatıyor. Pencere tam da hiç passkey'i olmayan kullanıcı ilk passkey'ini eklerken açılıyor (PasskeyManager.tsx:75). Açıklama metni de 'parolanızı ya da passkey'inizi' diyor (account.json:72).
 
 **Etki:** Kullanıcı işe yaramayacak bir yolu deniyor, bir hata alıyor ve deneme hakkı tüketebiliyor. Yalnızca parolayla doğrulayabileceğini öğrenmesi gecikiyor.
 
 **Önerilen aksiyon:** useReauth ve ReauthDialog'a `hasPasskey` bilgisi geçirin. PasskeyManager liste uzunluğundan bilir, diğerleri REAUTH_REQUIRED yanıtının details alanında `methods` döndürebilir. Passkey yoksa düğmeyi gizleyin ve açıklamayı 'parolanızı girin' olarak değiştirin.
+
+**Yapılan düzeltme:** Confirmed: the passkey button only checked browser support. ReauthDialog gets an optional hasPasskey prop and useReauth an optional options arg ({ hasPasskey }); both are backward compatible. If hasPasskey is not passed, the dialog calls GET /api/account/passkeys (requireAuth only) when it opens. The passkey button only appears once a registered passkey is known, and if that request fails it falls back to showing the button as before. The description switches to the new descriptionPasswordOnly text when there is no passkey path.
 
 ## F631 — Listeden öğe kaldırılınca klavye odağı kayboluyor
 
@@ -1672,13 +1746,15 @@
 | Renk/tema           | Hayır                                                                          |
 | Efor                | S                                                                              |
 | Kaynak denetçiler   | area:account                                                                   |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                   |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p046)                                                |
 
 **Kanıt:** SessionManager.tsx:81-82 `setStatus(...); await load();` çağrısı odaktaki 'Oturumu kapat' düğmesinin bulunduğu satırı (129-142) DOM'dan kaldırıyor. PasskeyManager.tsx:94-95 silmeden sonra aynısını yapıyor. page.tsx:121 `setFavorites(prev => prev.filter(...))` odaktaki 'Kaldır' düğmesini (397-405) kaldırıyor. Hiçbir yerde odak programla taşınmıyor.
 
 **Etki:** Klavye ve ekran okuyucu kullanıcısının odağı <body>'ye düşüyor. Kullanıcı nerede olduğunu bilemiyor ve sayfanın başından yeniden gezinmek zorunda kalıyor.
 
 **Önerilen aksiyon:** Kaldırmadan sonra odağı tabIndex={-1} verilmiş durum mesajına, sonraki öğenin eylem düğmesine ya da liste yoksa bölüm başlığına taşıyın.
+
+**Yapılan düzeltme:** Confirmed: after a revoke, load() removed the focused row. A pendingFocus ref now records the removed row's index. After the list reloads, an effect moves focus to the next row's button, else the previous one, else the h2 (now tabIndex=-1). For 'others' it goes to the h2, and after a successful retry too. Focus is moved only if it fell to <body>, so it is never taken from somewhere else.
 
 ## F632 — Başarı mesajları sonradan eklenen role=status öğesiyle veriliyor, ekran okuyucu kaçırabilir
 
@@ -1695,13 +1771,15 @@
 | Renk/tema           | Hayır                                                                           |
 | Efor                | S                                                                               |
 | Kaynak denetçiler   | area:account                                                                    |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                    |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p046)                                                 |
 
 **Kanıt:** SessionManager.tsx:97-104 `{status && (<p role={status.kind === "error" ? "alert" : "status"} ...>`: canlı bölge, içeriğiyle birlikte koşullu olarak DOM'a ekleniyor ve rolü alert ile status arasında değişiyor. PasskeyManager.tsx:109-116'da da aynısı var. Projenin kendi Status bileşeni (ui.tsx:144-155) ise sürekli bağlı bir aria-live konteyner kullanıyor.
 
 **Etki:** NVDA ya da JAWS kullanıcısı 'Oturum kapatıldı' veya 'Passkey eklendi' mesajlarını duymayabilir ve işlemin başarılı olduğunu bilemez.
 
 **Önerilen aksiyon:** ui.tsx'teki Status bileşenini kullanın ya da her zaman DOM'da duran bir `<div aria-live="polite" aria-atomic="true">` içinde yalnızca metni güncelleyin.
+
+**Yapılan düzeltme:** Confirmed: a conditional <p role=alert\|status> was used. It is replaced by ui.tsx's Status component: success text goes to an always-mounted role=status region, and errors go to role=alert with icon and prefix.
 
 ## F633 — Liste yüklenemediğinde 'Yükleniyor…' yazısı hiç kaybolmuyor ve yeniden deneme yok
 
@@ -1717,13 +1795,15 @@
 | Renk/tema           | Hayır                                           |
 | Efor                | S                                               |
 | Kaynak denetçiler   | area:account                                    |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                    |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p046)                 |
 
 **Kanıt:** SessionManager.tsx:60-63 hata durumunda yalnızca setStatus çağrılıyor ve sessions null kalıyor. Bu yüzden 105-106 `sessions === null ? <p>{t("loading")}</p>` hata uyarısıyla aynı anda görünüyor. PasskeyManager.tsx:61-63 ve 117-118'de de aynısı oluyor.
 
 **Etki:** Kullanıcı aynı anda hem 'Oturumlar yükleniyor…' hem 'Oturumlar yüklenemedi' görüyor. Sayfayı yenilemekten başka çıkar yol yok.
 
 **Önerilen aksiyon:** Ayrı bir loadError state'i tutun. Hata varsa yükleniyor metnini gizleyin, hata mesajıyla birlikte load() çağıran bir 'Tekrar dene' düğmesi gösterin.
+
+**Yapılan düzeltme:** Confirmed: 'Yükleniyor…' and the error showed together, with no retry. There is now a separate loadError state. While it is set, the loading text is hidden and a Status error is shown with a 'Tekrar Dene' Button (reuses account.retry; busy while reloading) that calls load(). A successful load clears the error. A 401 during a retry also redirects to loginHref().
 
 ## F634 — Oturum kapatma ve passkey ekleme/silme sürerken düğme metni değişmiyor
 
@@ -1739,13 +1819,15 @@
 | Renk/tema           | Hayır                                                                                                                                             |
 | Efor                | S                                                                                                                                                 |
 | Kaynak denetçiler   | area:account                                                                                                                                      |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                                      |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p046)                                                                                                                   |
 
 **Kanıt:** SessionManager.tsx:138-141 `disabled={busy}` ile `{t("revoke")}`, 151-154 'Diğer tüm oturumları kapat'. PasskeyManager.tsx:157-162 'Passkey ekle' etiketi ağ isteği ve işletim sistemi istemi boyunca değişmiyor. 135-138 'Sil' de öyle. Buna karşılık hesap sayfası `cancelling` ve `removing` metinlerini kullanıyor (page.tsx:332-334, 402-404).
 
 **Etki:** Yavaş ağda kullanıcı yalnızca soluklaşan düğmeleri görüyor. Hangi işlemin sürdüğünü ve passkey eklerken cihaz istemini beklemesi gerektiğini anlamıyor.
 
 **Önerilen aksiyon:** sessions.revoking 'Kapatılıyor…', passkeys.adding 'Passkey oluşturuluyor… cihazınızdaki istemi onaylayın' ve passkeys.deleting 'Siliniyor…' anahtarlarını ekleyin. Metni yalnızca tetiklenen düğmede gösterin ve bölüme aria-busy verin.
+
+**Yapılan düzeltme:** Confirmed. busy is replaced by revoking (session id, or OTHERS). Only the triggered button changes its text to sessions.revoking 'Kapatılıyor…' / 'Signing out…' and gets aria-busy; its aria-label is dropped while busy so the visible text is its name. The list <ul> gets aria-busy while an action runs. Buttons stay busy until the list has reloaded, and for this-device logout until navigation.
 
 ## F635 — Tekrarlanan eylem düğmeleri hangi öğeye ait olduklarını söylemiyor
 
@@ -1762,13 +1844,15 @@
 | Renk/tema           | Hayır                                                                                                                                          |
 | Efor                | S                                                                                                                                              |
 | Kaynak denetçiler   | area:account                                                                                                                                   |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                                   |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p046)                                                                                                                |
 
 **Kanıt:** SessionManager.tsx:141 her satırda 'Oturumu kapat' yazıyor. Bu, sizi çıkış yaptıran mevcut cihaz satırında da aynı. EN'de en/account.json:95 'Sign out', hesap çıkışı da 'Sign Out' (en:3). PasskeyManager.tsx:138 'Sil', page.tsx:334 'Rezervasyonu İptal Et', 404 'Kaldır', 349-350 'Favorilere Ekle'. Projede örnek desen hazır: account.json:135 mandates.revokeLabel '{amount} limitli yetkiyi iptal et'.
 
 **Etki:** Düğmeler arasında gezinen ekran okuyucu kullanıcısı art arda 'Oturumu kapat, Oturumu kapat…' duyuyor. EN kullanıcısı kendi oturumundan mı yoksa uzaktaki bir oturumdan mı çıktığını ayırt edemiyor.
 
 **Önerilen aksiyon:** aria-label ile nesneyi belirtin: sessions.revokeLabel '{device} oturumunu kapat', passkeys.deleteLabel '“{name}” passkey'ini sil', bookings.cancelLabel '{property} rezervasyonunu iptal et', favorites.removeLabel. Mevcut cihaz satırında görünür etiket 'Bu cihazda çıkış yap' olsun. EN revoke etiketi 'Sign out this session' olsun.
+
+**Yapılan düzeltme:** Confirmed: every row button was 'Oturumu kapat'. Non-current rows now have aria-label revokeLabel, which starts with the visible text (label-in-name) and adds the device and last-seen date. The current row's visible text is revokeCurrent 'Bu cihazda çıkış yap' / 'Sign out on this device'. EN revoke changes from 'Sign out' to 'Sign out session'; the key is used only in SessionManager.
 
 ## F636 — Yükleme hatalarında 'Tekrar dene' yolu yok (cüzdan, kimlik durumu, yetki listesi)
 
@@ -1784,13 +1868,15 @@
 | Renk/tema           | Hayır                                                                                                |
 | Efor                | S                                                                                                    |
 | Kaynak denetçiler   | area:account2                                                                                        |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                         |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p052)                                                                      |
 
 **Kanıt:** WalletPanel.tsx:79-83 `{error && (<p role="alert" ...>{t("loadFailed")}</p>)}` — yeniden deneme yok, useEffect (:59-67) tek sefer çalışıyor. IdentityVerification.tsx:99-103 aynı; AgentMandates.tsx:186 `<Status error={status.error ?? list.error} .../>` list.reload var ama kullanıcıya düğme sunulmuyor; ayrıca list.error doluyken yeni bir başarı mesajı (`!error && message`, ui.tsx:152) bastırılıyor.
 
 **Etki:** Yavaş/kesintili mobil ağdaki misafir bakiyesini, doğrulama durumunu veya yetkilerini görmek için tüm hesap sayfasını yenilemek zorunda; sayfa yenilemesi diğer kartların form durumunu da siliyor.
 
 **Önerilen aksiyon:** Her hata paragrafının yanına `<Button variant="secondary" onClick={reload}>{t("retry")}</Button>` ekleyin (WalletPanel'de fetch'i `useLoader`'a taşıyın; IdentityVerification'da `load()`'u çağırın; AgentMandates'te `list.reload`). AgentMandates'te liste hatasını form Status'undan ayırıp liste başlığının altına taşıyın.
+
+**Yapılan düzeltme:** Confirmed: the old useEffect ran only once and the error paragraph had no retry. WalletPanel now refetches through an attempt counter and shows a secondary Button with the existing common errorPage.retry text next to the alert. The button uses busy so it keeps focus during the retry. The alert remounts on each new failure so it is announced again. After a successful retry, focus moves to the wallet h2 (tabIndex -1). The IdentityVerification and AgentMandates parts are handed off in crossOwner.
 
 ## F637 — Cüzdanda kredinin nerede/nasıl kullanılacağı ve bekleyen tutarlar gösterilmiyor
 
@@ -1806,13 +1892,15 @@
 | Renk/tema           | Hayır                                                      |
 | Efor                | M                                                          |
 | Kaynak denetçiler   | area:account2                                              |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                               |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p052)                     |
 
 **Kanıt:** WalletPanel.tsx:101-121 yalnız bakiye ve 'En yakın son kullanma: {date}' (o tarihte ne kadarının yanacağı yok); :123-133 bekleyen cashback `t("pending.item", { date, rate })` → wallet.json:33 "{date} tarihinde krediye dönüşür (%{rate}); iade/talep penceresi bekleniyor." — tutar ve hangi rezervasyon olduğu (bookingId mevcut) yok. Kredinin ödeme adımında 'Kredimi kullan' ile uygulandığı (wallet.json:37) cüzdan kartında hiç söylenmiyor.
 
 **Etki:** Misafir kredisini nasıl harcayacağını bilmiyor, birden fazla rezervasyonda hangi cashback'in hangisine ait olduğunu ve ne kadar geleceğini göremiyor; 'iade/talep penceresi' jargonu anlamı bulanıklaştırıyor.
 
 **Önerilen aksiyon:** Bakiye altına "Kredinizi ödeme adımında 'Kredimi kullan' ile harcayabilirsiniz" yardım satırı ekleyin; nextExpiry'yi "{tutar} kredinin süresi {date} tarihinde doluyor" yapın (sunucu `nextExpiryMinor` döndürsün); bekleyen öğede ilan adı + tahmini tutar (`estimatedMinor`) ve rezervasyon bağlantısı gösterin; "iade/talep penceresi" yerine "iptal/şikâyet süresi bitince" yazın.
+
+**Yapılan düzeltme:** Added a help line under the balance that interpolates checkout.use, so it stays consistent with p006's renaming. The expiry line now reads '{date} tarihinde {amount} tutarın süresi doluyor'; the amount comes from the server's nextExpiryMinor if sent, otherwise it is summed from live lots. pending.item no longer says 'iade/talep penceresi' and now says 'İptal/şikâyet süresi bitince'. Each pending item links to /booking/{id} and shows the estimated amount and property title when the API sends them. Those two fields still need the server change described in crossOwner.
 
 ## F638 — Tam kullanılmış kredi, son kullanma tarihi geçince 'Süresi doldu' olarak (kırmızı) gösteriliyor
 
@@ -1828,13 +1916,15 @@
 | Renk/tema           | Hayır                                        |
 | Efor                | S                                            |
 | Kaynak denetçiler   | area:account2                                |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                 |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p052)              |
 
 **Kanıt:** WalletPanel.tsx:151-156 `l.expired ? t("lots.expired") : l.remainingMinor === 0 ? t("lots.used") : ...` — sunucu wallet-service.ts `expired: l.expiresAt.getTime() <= now.getTime()` kalan tutara bakmıyor; tamamen harcanmış lot süresi geçince 'Kalan ₺0 / ₺100 · Süresi doldu' görünür. Lot listesi oluşturulma tarihi veya kaynak rezervasyon göstermiyor.
 
 **Etki:** Krediyi harcamış misafir parasının yandığını düşünüyor; para hatası toleransı çok düşük kullanıcıda destek talebi ve güven kaybı.
 
 **Önerilen aksiyon:** Koşul sırasını değiştirin: önce `l.remainingMinor === 0 → "Kullanıldı"`, sonra `l.expired && l.remainingMinor > 0 → "Süresi doldu ({kalan} kullanılmadan)"`; her lota `fmt.date(l.createdAt, "medium")` ile 'Kazanıldı: …' ekleyin.
+
+**Yapılan düzeltme:** Confirmed. A plain reorder would have been wrong: the expiry sweep sets remainingMinor to 0 and moves the rest to expiredMinor, so an expired unused lot would show 'Kullanıldı'. The new logic computes lost = expiredMinor + (expired ? remaining : 0). If lost > 0 it shows 'Süresi doldu ({amount} kullanılmadan)' in the existing red. Otherwise remaining 0 shows 'Kullanıldı', and a live lot shows 'Son kullanma: {date}'. Until the server sends expiredMinor, an expired lot at ₺0 shows a neutral 'Son kullanma tarihi: {date}' and is never called expired. Each lot also shows 'Kazanıldı: {date}' (or 'İade edildi:' for refunds) and a booking link when bookingId is sent.
 
 ## F639 — Hesap silme sonrası onay mesajı görünmeden ana sayfaya yönlendiriliyor
 
@@ -1849,13 +1939,15 @@
 | Renk/tema           | Hayır                                         |
 | Efor                | S                                             |
 | Kaynak denetçiler   | lens:nav                                      |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                  |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p097)               |
 
 **Kanıt:** 47-49 `setFeedback({ message: t("deleted") }); router.push("/"); router.refresh();` Status bileşeni PrivacyCenter içinde ve hemen unmount oluyor; ana sayfada karşılık gelen bir mesaj yok.
 
 **Etki:** Geri alınamaz bir işlemin sonucu kullanıcıya hiç gösterilmiyor. Kullanıcı hesabın silinip silinmediğinden ve verilerin ne zaman kaldırılacağından emin olamıyor.
 
 **Önerilen aksiyon:** `/?accountDeleted=1` adresine yönlendirip ana sayfada kapatılabilir bir role="status" bandı gösterin ("Hesabınız silindi; verileriniz … içinde kaldırılır"), ya da "Ana sayfaya dön" bağlantılı ayrı bir onay ekranı kullanın.
+
+**Yapılan düzeltme:** Same fix as F585: the deletion result stays on the page as a focused result card. It says what happened to the data (signed out, personal fields deleted or pseudonymised, records anonymised) and has a link back to the home page.
 
 ## F640 — Yeniden doğrulamadan 'Vazgeç' denince kırmızı hata olarak (ve sabit Türkçe) gösteriliyor
 
@@ -1871,13 +1963,15 @@
 | Renk/tema           | Hayır                                                                                       |
 | Efor                | S                                                                                           |
 | Kaynak denetçiler   | area:account2                                                                               |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p097)                                                             |
 
 **Kanıt:** PrivacyCenter.tsx:50-52 `catch (err) { setFeedback({ error: errorMessage(err) }) ...}` ReauthCancelledError'ı ayırt etmiyor; ReauthDialog.tsx:16 mesajı sabit "Yeniden doğrulama iptal edildi". Aynı durumda AgentMandates.tsx:87 `if (!(err instanceof ReauthCancelledError)) setStatus(...)` sessiz kalıyor — iki ekran tutarsız.
 
 **Etki:** Kullanıcı bilinçli olarak vazgeçtiğinde role="alert" ile kırmızı hata duyuyor/görüyor; EN arayüzde Türkçe metin çıkıyor; kendi kontrolündeki bir eylemin 'hata' gibi sunulması güveni zedeliyor.
 
 **Önerilen aksiyon:** PrivacyCenter.remove() catch bloğuna `if (err instanceof ReauthCancelledError) { setBusy(false); return; }` ekleyin (AgentMandates ile aynı davranış); isteğe bağlı olarak nötr bir `privacy.center.deleteCancelled` mesajı gösterin.
+
+**Yapılan düzeltme:** Confirmed: the hard-coded Turkish text had already been localised through useAccountErrorText, but cancelling still showed a red role=alert error. The catch in remove() now does `if (err instanceof ReauthCancelledError) { setBusy(false); return; }`, the same silent behaviour as AgentMandates.
 
 ## F1082 — Çift ve tutarsız çıkış eylemi: header 'Çıkış yap' + sayfa başında kırmızı 'Çıkış Yap'
 
@@ -1893,13 +1987,15 @@
 | Renk/tema           | Hayır                                                         |
 | Efor                | S                                                             |
 | Kaynak denetçiler   | runtime:account                                               |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                  |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p007)                               |
 
 **Kanıt:** Tarama 060 tabOrder: 'button "Çıkış yap"' (header) hemen ardından 'button "Çıkış Yap"' (sayfa). Ekran crops/account/060-guest-tr-desktop-_account-0.png: h1 yanında kırmızı çerçeveli 'Çıkış Yap' (danger görünümü), header'da beyaz çerçeveli 'Çıkış yap'. Büyük/küçük harf farkı account.json 'logout' vs nav 'logout'.
 
 **Etki:** Hesap sayfasının en görünür eylemi nadir kullanılan çıkış; kırmızı stil yıkıcı bir işlem izlenimi veriyor, tekrarlayan öğe klavye sırasını uzatıyor.
 
 **Önerilen aksiyon:** Sayfa içi çıkışı kaldır veya 'Güvenlik' bölümünün altına ikincil olarak taşı; metni tek anahtarla ('Çıkış yap') birleştir.
+
+**Yapılan düzeltme:** Removed the red 'Çıkış Yap' button next to the h1. Logout now lives in the security group's Oturumlar card as a secondary button (existing gray secondary style) next to the sessions link. It uses the header's key nav.logout ('Çıkış yap'), so the casing matches, and has a double-click guard (aria-disabled/aria-busy).
 
 ## F1083 — Hesap alt sayfalarında geri/ekmek kırıntısı yok; header hesap bağlantısı aria-current taşımıyor
 
@@ -1915,13 +2011,15 @@
 | Renk/tema           | Hayır                                                                  |
 | Efor                | S                                                                      |
 | Kaynak denetçiler   | runtime:account                                                        |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                           |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p009)                                        |
 
 **Kanıt:** Probe p2: /account/sessions main içinde bağlantı yok ('main links: []'). /account/privacy'de yalnız 'aydınlatma metninde' bağlantısı (tarama 064 tabOrder). Probe p1: header 'Hesabım' bağlantısı /account'ta accountLinkAriaCurrent=null (diğer nav öğeleri aria-current kullanıyor, Header.tsx:90).
 
 **Etki:** Kullanıcı hesap merkezine dönmek için tarayıcı geri tuşuna veya avatar ikonuna güvenmek zorunda; nerede olduğunu (Hesap > Oturumlar) görmez.
 
 **Önerilen aksiyon:** PageShell'e isteğe bağlı breadcrumb prop'u ekle ('Hesabım › Oturumlar'); Header hesap bağlantısına pathname.startsWith('/account') iken aria-current="page" ver.
+
+**Yapılan düzeltme:** Added a new AccountBreadcrumb component: <nav aria-label=account.breadcrumb><ol>, a 'Hesabım' link to /account, a hidden › separator, and the current page marked aria-current='page'. It renders right under the h1 (in PageShell intro) on /account/sessions and /account/privacy. PageShell has no breadcrumb slot and ui.tsx is not mine, so it sits in intro. The Header account link already sets aria-current when pathname.startsWith('/account') (Header.tsx:172/275).
 
 ## F1084 — Yeniden doğrulama iptali bileşenlere göre tutarsız: AI yetkisinde sessiz, oturum/passkey'de kırmızı hata
 
@@ -1937,13 +2035,15 @@
 | Renk/tema           | Hayır                                                                                    |
 | Efor                | S                                                                                        |
 | Kaynak denetçiler   | runtime:account                                                                          |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                             |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p041)                                                   |
 
 **Kanıt:** Probe p4: AI yetkisi reauth diyaloğunda Escape → durum metni '' ve odak body. Passkey ekle → Escape → 'Yeniden doğrulama iptal edildi' (role=alert, text-red-700). Probe p2 oturumlar → Escape → aynı kırmızı role=alert mesaj. Ayrıca p4: başarılı yetkiden sonra odak body (token alanına gitmiyor), 'Kopyala' (AgentMandates.tsx:177-183) clipboard yazıyor ama 'Kopyalandı' geri bildirimi yok.
 
 **Etki:** Kullanıcının kendi vazgeçmesi bir yerde hata gibi, bir yerde hiç bildirilmiyor; tek seferlik gösterilen belgenin kopyalandığından emin olunamıyor.
 
 **Önerilen aksiyon:** Ortak bir durum deseni: kullanıcı iptalinde nötr role=status ('İşlem iptal edildi, değişiklik yapılmadı'); hata yalnız gerçek hatada role=alert. Yetki oluşunca odağı token textarea'ya taşı; Kopyala'da 2 sn 'Kopyalandı' metni (aria-live).
+
+**Yapılan düzeltme:** In AgentMandates, cancelling the re-auth now sets a neutral `info` text ('İşlem iptal edildi; yetki verilmedi.') in a separate, always-present role=status paragraph, with no red alert. If focus has fallen to body, it goes back to the submit button. After a successful grant, focus moves to the token textarea. Copy feedback was already in place. PasskeyManager still shows the cancel as a red error and SessionManager is silent; both are listed in crossOwner.
 
 ## F1085 — KYC demo formu: buton seçiciden 278px uzakta, kontrol yükseklikleri tutarsız, demo notu 12px
 
@@ -1958,13 +2058,15 @@
 | Renk/tema           | Hayır                                                           |
 | Efor                | S                                                               |
 | Kaynak denetçiler   | runtime:account                                                 |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                    |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p043)                                 |
 
 **Kanıt:** Probe p4 (desktop): #kyc-doc sağ kenarı x=219, 'Yeniden dene/Doğrulamayı başlat' butonu x=497 (boşluk 278px); select yüksekliği 31px, buton 36px. mockNotice <p> text-xs select ile aynı sarmalayıcıda olduğu için sarmalayıcıyı genişletiyor. Ekranlar: crops/account/060-guest-tr-desktop-_account-0.png, probes/account/shots/p4-kyc-mock.png
 
 **Etki:** Seçim ile başlatma eylemi görsel olarak kopuk; 'Demo modu' açıklaması küçük ve soluk kaldığı için gerçek belge istendiği sanılabilir.
 
 **Önerilen aksiyon:** mockNotice'i formun üstüne ayrı bilgi kutusu (role=note, text-sm) olarak taşı; select'i inputClass ile (py-2) diğer alanlarla aynı yüksekliğe getir, butonu select'in hemen yanına hizala.
+
+**Yapılan düzeltme:** mockNotice moved out of the select wrapper into a separate role=note box (text-sm) above the form. The select now uses inputClass inside Field, in a w-full sm:w-64 wrapper, so the submit Button sits right next to it with items-end alignment and a matching control height.
 
 ## F1086 — Reauth diyaloğu kayıtlı passkey yokken de "Passkey ile doğrula" sunuyor
 
@@ -1979,13 +2081,15 @@
 | Renk/tema           | Hayır                                                          |
 | Efor                | S                                                              |
 | Kaynak denetçiler   | runtime:account                                                |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                   |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p045)                                |
 
 **Kanıt:** Probe p2: diyalog butonları ['Doğrula(disabled)','Passkey ile doğrula','Vazgeç']; aynı hesapta /account 'Kayıtlı passkey yok.' (tarama 060 metni). supported yalnız tarayıcı yeteneğine bakıyor (36. satır).
 
 **Etki:** Kullanıcı başarısız olacak bir seçeneği dener, tarayıcı passkey penceresi boşa açılır ve hata görür.
 
 **Önerilen aksiyon:** Kullanıcının kayıtlı passkey sayısını (/api/account/passkeys veya oturum bilgisi) kontrol et; yoksa butonu gizle ya da 'Passkey eklemediniz' açıklamasıyla devre dışı göster.
+
+**Yapılan düzeltme:** Same fix as F630: 'Passkey ile doğrula' is hidden unless the account has a registered passkey, whether that comes from the hasPasskey prop or from /api/account/passkeys.
 
 ## F1087 — Cüzdan geçmişi zayıf: kazanım tarihi/kaynak rezervasyon yok, harcamalar yok, sütunlar kayık, bekleyen cashback tutarı yok
 
@@ -2001,13 +2105,15 @@
 | Renk/tema           | Hayır                                                 |
 | Efor                | M                                                     |
 | Kaynak denetçiler   | runtime:account                                       |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                          |
+| **Düzeltme durumu** | **Kısmen düzeltildi** (paket: ml-p052)                |
 
 **Kanıt:** Probe p4 (GET /api/account/wallet lot/bekleyen verisiyle mock'landı): 'Kredi hareketleri' satırları yalnız 'Cashback / Kalan ₺100,00 / ₺100,00 / Son kullanma: 15 Ocak 2027'; createdAt ve bookingId gösterilmiyor; kredi harcamaları listelenmiyor. justify-between nedeniyle orta sütun satırdan satıra kayıyor. 'Bekleyen cashback: 30 Ekim 2026 tarihinde krediye dönüşür (%2)' — tutar yok. Rozet 'Gümüş seviye'/'Üye seviye' (wallet.json:11) Türkçede 'seviyesi' olmalı; altındaki metin 'Altın seviyesi' diyor. Ekran: probes/account/shots/p4-wallet-mock.png
 
 **Etki:** Misafir kredisinin nereden geldiğini ve nereye harcandığını izleyemez; son kullanma tarihli krediyi kaçırabilir.
 
 **Önerilen aksiyon:** Hareketleri tarih sıralı tablo/ızgara olarak göster (Tarih · Açıklama 'Grand Deluxe Hotel konaklaması cashback'i' · +/− tutar · Kalan · Son kullanma), checkout'ta kullanılan krediyi eksi satır olarak ekle; bekleyen cashback'te tahmini tutarı göster. tierBadge'i '{tier} seviyesi' yap.
+
+**Yapılan düzeltme:** The credit history is now one list sorted newest first. Each row is a two-column grid: description and earned date on the left, the signed amount right-aligned, then a row with remaining amount and status, so columns no longer shift between rows. Spend rows (shown as −amount, 'Ödemede kullanıldı' / 'Ödeme için ayrıldı', with a booking link) appear when the API sends spends. Pending cashback shows 'Tahmini tutar' when estimatedMinor is sent. tierBadge is now '{tier} seviyesi', the same value p006 uses. The spends, estimatedMinor and propertyTitle data need the wallet-service change in crossOwner.
 
 ## F1088 — Gizlilik merkezinde başlık ile ilk kart arasında 68px boş alan (boş canlı bölge)
 
@@ -2023,13 +2129,15 @@
 | Renk/tema           | Hayır                                            |
 | Efor                | S                                                |
 | Kaynak denetçiler   | runtime:account                                  |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                     |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p097)                  |
 
 **Kanıt:** Probe p3-privacy: 'gap intro->first card px: 68' (desktop ve mobil). Status bileşeni (ui.tsx:146) boşken min-h-[1.25rem] + space-y-6 iki kez boşluk ekliyor. Ekran: crops/account/064-guest-tr-desktop-_account_privacy-0.png
 
 **Etki:** Sayfa boş/yükleniyor gibi görünür; mobilde içerik gereksiz aşağı itilir.
 
 **Önerilen aksiyon:** Status'u kartların altına veya ilgili kartın içine taşı ya da boşken sr-only/yüksekliksiz render et (aria-live kapsayıcısı DOM'da kalsın).
+
+**Yapılan düzeltme:** Removed the always-present empty Status between the page intro and the first card. The export feedback Status (the live region stays in the DOM) now sits inside the export card under its button, so no empty gap shows above the cards.
 
 ## F1089 — Veri dışa aktarmada ~2 sn ilerleme göstergesi yok; buton etkin kalıyor ve indirme engellense de 'indirildi' diyor
 
@@ -2044,7 +2152,7 @@
 | Renk/tema           | Hayır                                                 |
 | Efor                | S                                                     |
 | Kaynak denetçiler   | runtime:account                                       |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                          |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p097)                       |
 
 **Kanıt:** Probe p3b-export (desktop, acceptDownloads=false): tıklamadan sonra 1.7 sn boyunca 'disabled=false text=Verilerimi indir fb=' (geri bildirim yok), ~2.0 sn'de 'Verileriniz indirildi (verilerim.json).' — tarayıcı indirmeyi kaydetmediği hâlde başarı mesajı. Kod: download() (22-40) busy state'i yok.
 
@@ -2052,20 +2160,22 @@
 
 **Önerilen aksiyon:** busy state ekle (buton disabled + 'Hazırlanıyor…', aria-busy); mesajı 'Dosyanız hazırlandı; indirme başlamadıysa buraya tıklayın' olarak değiştir ve yedek bağlantı sun.
 
+**Yapılan düzeltme:** Added an `exporting` state. The button uses Button busy (aria-busy/aria-disabled, keeps focus, blocks double clicks) and reads 'Hazırlanıyor…' while working. The success text now says the file is ready ('Dosyanız hazırlandı') instead of 'downloaded', and a fallback `<a download>` link offers the file again if the download did not start.
+
 ## F1164 — Rezervasyon listesi sayfalama imlecini yok sayıyor, 50'den sonrası görünmüyor
 
-| Alan                | Değer                          |
-| ------------------- | ------------------------------ |
-| Severity            | Low                            |
-| Durum               | Aday                           |
-| Konum               | `src/app/account/page.tsx:84`  |
-| Kullanıcılar        | misafir                        |
-| Prensip             | robustness · task conformance  |
-| Sezgisel madde      | H1 — Sistem durumu görünürlüğü |
-| Renk/tema           | Hayır                          |
-| Efor                | S                              |
-| Kaynak denetçiler   | area:account                   |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**   |
+| Alan                | Değer                           |
+| ------------------- | ------------------------------- |
+| Severity            | Low                             |
+| Durum               | Aday                            |
+| Konum               | `src/app/account/page.tsx:84`   |
+| Kullanıcılar        | misafir                         |
+| Prensip             | robustness · task conformance   |
+| Sezgisel madde      | H1 — Sistem durumu görünürlüğü  |
+| Renk/tema           | Hayır                           |
+| Efor                | S                               |
+| Kaynak denetçiler   | area:account                    |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p008) |
 
 **Kanıt:** page.tsx:84 `fetch("/api/bookings")` imleç işlemiyor. bookings/route.ts:44-48 X-Next-Cursor başlığını gönderiyor. BOOKINGS_PAGE_SIZE_DEFAULT=50 (app-config.ts:98).
 
@@ -2073,20 +2183,22 @@
 
 **Önerilen aksiyon:** X-Next-Cursor başlığını okuyun ve 'Daha fazla rezervasyon göster' düğmesi ekleyin. Liste başlığında toplam sayıyı gösterin.
 
+**Yapılan düzeltme:** Confirmed: the code already reads X-Next-Cursor through fetchBookingsPage() and has a 'load more' Button (busy, appends without duplicates, moves focus to the first new booking, 401 → session expired) with a shown-count line. The API gives no total, so the page shows how many are loaded instead. The keys it uses (account.bookings.loadMore, account.bookings.shown) were missing from messages, so I added them to the p008 patch.
+
 ## F1165 — Favoriler ve alt paneller sıralı yükleniyor, ilk görüntü gecikiyor
 
-| Alan                | Değer                         |
-| ------------------- | ----------------------------- |
-| Severity            | Low                           |
-| Durum               | Aday                          |
-| Konum               | `src/app/account/page.tsx:96` |
-| Kullanıcılar        | misafir                       |
-| Prensip             | robustness · responsiveness   |
-| Sezgisel madde      | H15 — Performans              |
-| Renk/tema           | Hayır                         |
-| Efor                | S                             |
-| Kaynak denetçiler   | area:account                  |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**  |
+| Alan                | Değer                            |
+| ------------------- | -------------------------------- |
+| Severity            | Low                              |
+| Durum               | Aday                             |
+| Konum               | `src/app/account/page.tsx:96`    |
+| Kullanıcılar        | misafir                          |
+| Prensip             | robustness · responsiveness      |
+| Sezgisel madde      | H15 — Performans                 |
+| Renk/tema           | Hayır                            |
+| Efor                | S                                |
+| Kaynak denetçiler   | area:account                     |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p008) |
 
 **Kanıt:** page.tsx:82-96 user ve bookings paralel çekildikten sonra `await fetchFavorites()` sıralı çalışıyor. Alt paneller (WalletPanel, IdentityVerification, PasskeyManager, AgentMandates; 249-255) üç isteğin tamamı bitince mount oluyor ve kendi isteklerini ancak o zaman başlatıyor (PasskeyManager.tsx:55-64).
 
@@ -2094,26 +2206,30 @@
 
 **Önerilen aksiyon:** Favorileri de aynı Promise.all'a alın. Sayfa iskeletini hemen render edin ve her bölümde kendi iskelet görünümünü gösterin.
 
+**Yapılan düzeltme:** Already fixed in the current code. user, bookings and favorites load together in a single Promise.allSettled, and each section fails on its own with its own retry. The heading, section nav, skeletons and the Wallet/Identity/Passkey/AgentMandates panels render right away, so the panels start their own requests in parallel.
+
 ## F1166 — Hesap sayfasındaki çıkış düğmesinde bekleme durumu ve çift tıklama koruması yok
 
-| Alan                | Değer                          |
-| ------------------- | ------------------------------ |
-| Severity            | Low                            |
-| Durum               | Aday                           |
-| Konum               | `src/app/account/page.tsx:213` |
-| Kullanıcılar        | tümü                           |
-| Prensip             | robustness · responsiveness    |
-| Sezgisel madde      | H12 — Feedback                 |
-| Renk/tema           | Hayır                          |
-| Efor                | S                              |
-| Kaynak denetçiler   | area:account                   |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**   |
+| Alan                | Değer                            |
+| ------------------- | -------------------------------- |
+| Severity            | Low                              |
+| Durum               | Aday                             |
+| Konum               | `src/app/account/page.tsx:213`   |
+| Kullanıcılar        | tümü                             |
+| Prensip             | robustness · responsiveness      |
+| Sezgisel madde      | H12 — Feedback                   |
+| Renk/tema           | Hayır                            |
+| Efor                | S                                |
+| Kaynak denetçiler   | area:account                     |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p008) |
 
 **Kanıt:** page.tsx:213-217 `onClick={async () => { await logout(); router.push("/"); }}`: disabled ya da busy yok, router.refresh() da yok. Header.tsx:60-65'teki çıkış ise refresh yapıyor. logout() çevrimdışı veriyi temizlemeyi bekliyor (api-client.ts:97).
 
 **Etki:** Yavaş cihazda kullanıcı tepki görmediği için birkaç kez tıklıyor. Çıkıştan sonra önbellekteki sunucu bileşenleri eski oturumu gösterebilir.
 
 **Önerilen aksiyon:** busy state ekleyin ve düğme metnini 'Çıkış yapılıyor…' yapıp düğmeyi devre dışı bırakın. router.refresh() çağırın ya da Header'daki ortak handleLogout'u yeniden kullanın.
+
+**Yapılan düzeltme:** Already fixed. handleLogout guards with a loggingOut state and uses Button busy with the label nav.loggingOut ('Çıkış yapılıyor…'). After logout it clears the session user cache, calls invalidateFavoriteIds(), then router.push('/') and router.refresh(), the same as Header.
 
 ## F1167 — Çıkış eylemi iki yerde farklı görünümle var; hesap sayfasında yıkıcı (kırmızı) stil kullanılıyor
 
@@ -2129,13 +2245,15 @@
 | Renk/tema           | Hayır                                                                                                                                        |
 | Efor                | S                                                                                                                                            |
 | Kaynak denetçiler   | lens:consistency                                                                                                                             |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                                                                 |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p008)                                                                                                             |
 
 **Kanıt:** account/page.tsx:213-221 `className="rounded-md border border-red-300 … text-red-600"` ve `{t("logout")}` ("Çıkış Yap"). Bu stil :330'daki 'Rezervasyonu İptal Et' düğmesiyle aynı, ayrıca `router.refresh()` çağrılmıyor. Header.tsx:114-120 aynı eylemi nötr beyaz çerçeveli düğme olarak sunuyor ve :62-64'te `router.refresh()` yapıyor. Etiketler de farklı: "Çıkış Yap" ile "Çıkış yap".
 
 **Etki:** Yıkıcı eylemlerle aynı görünen çıkış düğmesi kullanıcıyı gereksiz tedirgin eder. İki ayrı implementasyon, sunucu bileşenlerinin oturum sonrası yenilenmesinde farklı sonuç verebilir.
 
 **Önerilen aksiyon:** Hesap sayfasındaki çıkış düğmesini kaldırın (Header'daki yeterli) ya da Button `variant="secondary"` ile ortak bir `useLogout()` kancası kullanın. Etiketi nav.logout anahtarında birleştirin.
+
+**Yapılan düzeltme:** Already fixed. The logout control is now a neutral Button variant="secondary" (not the red destructive style) labelled tNav("logout"), the same label as Header, and it does the same refresh. account.logout is no longer used by this page.
 
 ## F1168 — Avatar baş harfleri ekran okuyucuda gereksiz yere okunuyor, avatarUrl kullanılmıyor
 
@@ -2151,13 +2269,15 @@
 | Renk/tema           | Hayır                            |
 | Efor                | S                                |
 | Kaynak denetçiler   | area:account                     |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**     |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p008) |
 
 **Kanıt:** page.tsx:228-231 baş harfleri gösteren div'de aria-hidden yok, ekran okuyucu addan önce 'AY' okuyor. User arayüzündeki avatarUrl alanı (21) hiç render edilmiyor. Baş harfler Header.tsx'teki gibi `.toUpperCase()` ile büyütülmüyor.
 
 **Etki:** Ekran okuyucu kullanıcısı anlamsız harfler duyuyor. Küçük harfle kaydolmuş kullanıcının avatarı Header'dakinden farklı görünüyor.
 
 **Önerilen aksiyon:** Baş harf div'ine aria-hidden="true" verin. avatarUrl varsa `<img alt="">` gösterin. Baş harfleri büyük harfe çevirin.
+
+**Yapılan düzeltme:** Already fixed. The initials div is aria-hidden="true" and its text is uppercased. If avatarUrl is set, an <img alt=""> renders instead, falling back to the initials when the image fails to load (onError).
 
 ## F1169 — Bağlantı rengi için dört farklı sınıf kullanılıyor ve alt çizgi kullanımı tutarsız
 
@@ -2184,24 +2304,26 @@
 
 ## F1170 — Hesap sayfası rolden bağımsız: yöneticiye misafir listeleri ve yanlış çözüm merkezi bağlantısı
 
-| Alan                | Değer                          |
-| ------------------- | ------------------------------ |
-| Severity            | Low                            |
-| Durum               | Aday                           |
-| Konum               | `src/app/account/page.tsx:266` |
-| Kullanıcılar        | ev sahibi, admin               |
-| Prensip             | flexibility · customizability  |
-| Sezgisel madde      | H8 — Estetik/minimal tasarım   |
-| Renk/tema           | Hayır                          |
-| Efor                | S                              |
-| Kaynak denetçiler   | area:account                   |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**   |
+| Alan                | Değer                           |
+| ------------------- | ------------------------------- |
+| Severity            | Low                             |
+| Durum               | Aday                            |
+| Konum               | `src/app/account/page.tsx:266`  |
+| Kullanıcılar        | ev sahibi, admin                |
+| Prensip             | flexibility · customizability   |
+| Sezgisel madde      | H8 — Estetik/minimal tasarım    |
+| Renk/tema           | Hayır                           |
+| Efor                | S                               |
+| Kaynak denetçiler   | area:account                    |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p008) |
 
 **Kanıt:** page.tsx:266-268 her rol için `/resolution` ve `tRes("link")` kullanılıyor. Yöneticinin kuyruğu /admin/claims ve resolution.json'daki adminLink ile hostLink başka sayfalarda kullanılıyor (admin/page.tsx:27, HostDashboard.tsx:108). ADMIN'e de 'Rezervasyonlarım' ve 'Favorilerim' boş durumlarıyla gösteriliyor. Misafir rol rozeti 'Kullanıcı' (account.json:18) yazıyor.
 
 **Etki:** Yönetici kendi talep kuyruğu yerine boş bir 'Taleplerim' sayfasına gidiyor. Misafir kendini sistemin diliyle 'Kullanıcı' olarak görüyor.
 
 **Önerilen aksiyon:** Bağlantıları role göre verin: HOST için ev sahibi paneli ve hostLink, ADMIN için /admin/claims ve adminLink. ADMIN'de rezervasyon ve favori bölümlerini boşsa gizleyin. role.user etiketini 'Misafir' yapın.
+
+**Yapılan düzeltme:** Role-based links were already in the code: HOST gets /host plus resolution.hostLink, ADMIN gets /admin plus /admin/claims with resolution.adminLink, and ADMIN does not see empty bookings or favorites sections. What was missing was the label: the p008 patch now changes account.role.user to 'Misafir' / 'Guest'. That key is used only in account/page.tsx.
 
 ## F1171 — Rezervasyon ve favori listeleri liste ve tanım listesi semantiği kullanmıyor
 
@@ -2218,13 +2340,15 @@
 | Renk/tema           | Hayır                                                          |
 | Efor                | S                                                              |
 | Kaynak denetçiler   | area:account                                                   |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                   |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p008)                               |
 
 **Kanıt:** page.tsx:275 `<div className="mt-4 space-y-4">` ve 282 `<div key={booking.id}`. 362 ve 369'da da aynısı. 304-323 etiket/değer çiftleri düz `<p>`. Buna karşılık SessionManager.tsx:110 ve PasskeyManager.tsx:122 `<ul>` kullanıyor.
 
 **Etki:** Ekran okuyucu kaç rezervasyon olduğunu duyurmuyor. 'Giriş' ile tarih arasındaki ilişki yapısal olarak kurulmamış.
 
 **Önerilen aksiyon:** Listeleri `<ul role="list">` ve `<li>` ile işaretleyin. Ayrıntıları `<dl><dt>Giriş</dt><dd>…</dd></dl>` olarak yazın.
+
+**Yapılan düzeltme:** Already fixed. The bookings and favorites lists use <ul role="list"> with <li> cards, and the check-in, check-out, guests and total details are a <dl> with <dt>/<dd> pairs.
 
 ## F1172 — Boş durumlarda sonraki adım önerilmiyor
 
@@ -2240,7 +2364,7 @@
 | Renk/tema           | Hayır                                                                                        |
 | Efor                | S                                                                                            |
 | Kaynak denetçiler   | lens:copy                                                                                    |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                 |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p008)                                                              |
 
 **Kanıt:** account/page.tsx:276-279 'Henüz rezervasyonunuz yok.' (account.json:28) ve 363-366 'Henüz favori eklemediniz.' — eylem bağlantısı yok; pwa trips.empty de aynı. cart/page.tsx:82-91 ise sepeti hiç olmamış kullanıcıya da 'Süresi dolan sepeti geri yükle' düğmesini gösterir.
 
@@ -2248,26 +2372,30 @@
 
 **Önerilen aksiyon:** Boş durumlara 'Konaklama ara' bağlantısı ekleyin; 'Süresi dolan sepeti geri yükle'yi yalnız sunucu süresi dolmuş sepet olduğunu bildirdiğinde gösterin.
 
+**Yapılan düzeltme:** The empty states for bookings and favorites already had a primary 'search stays' link, but it used a missing key, account.searchStays. I switched it to the existing common.notFound.search ('Konaklama ara' / 'Search stays'), which TripsView uses for the same link. TripsView's empty state already links to search. The cart page already has a browse link and hides 'reopen' after the server says there is nothing to restore. Showing it only when there is an expired cart needs an API change, filed as crossOwner.
+
 ## F1173 — Puan TR ondalık biçiminde değil, değerlendirmesi olmayan ilanda '0.0' görünüyor
 
-| Alan                | Değer                          |
-| ------------------- | ------------------------------ |
-| Severity            | Low                            |
-| Durum               | Aday                           |
-| Konum               | `src/app/account/page.tsx:380` |
-| Kullanıcılar        | misafir                        |
-| Prensip             | learnability · consistency     |
-| Sezgisel madde      | H4 — Tutarlılık/standartlar    |
-| Renk/tema           | Hayır                          |
-| Efor                | S                              |
-| Kaynak denetçiler   | area:account                   |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**   |
+| Alan                | Değer                            |
+| ------------------- | -------------------------------- |
+| Severity            | Low                              |
+| Durum               | Aday                             |
+| Konum               | `src/app/account/page.tsx:380`   |
+| Kullanıcılar        | misafir                          |
+| Prensip             | learnability · consistency       |
+| Sezgisel madde      | H4 — Tutarlılık/standartlar      |
+| Renk/tema           | Hayır                            |
+| Efor                | S                                |
+| Kaynak denetçiler   | area:account                     |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p008) |
 
 **Kanıt:** page.tsx:380 `{favorite.property.ratingAvg.toFixed(1)}` TR'de '4.5' üretiyor (olması gereken '4,5'). Oysa useFormat().number mevcut (format.ts). ratingCount 0 olduğunda '0.0' ve '0 değerlendirme' görünüyor. Rozette puanın ölçeğini belirten bir bağlam yok.
 
 **Etki:** TR misafir ondalık ayıracında tutarsızlık görüyor. Değerlendirmesiz bir ilan çok düşük puanlı gibi algılanıyor.
 
 **Önerilen aksiyon:** `fmt.number(ratingAvg, { minimumFractionDigits: 1, maximumFractionDigits: 1 })` kullanın. ratingCount 0 ise 'Henüz değerlendirme yok' yazın. Rozete görsel olarak gizli 'Puan' metni ekleyin.
+
+**Yapılan düzeltme:** Already fixed. Favorites use the shared RatingBadge (locale-aware 1-decimal format, '/5' scale, sr-only label) when ratingCount > 0, and otherwise show property.noRatingYet ('Henüz puan yok') instead of '0.0'.
 
 ## F1174 — Oturumlar sayfasında Hesabım'a dönüş bağlantısı yok
 
@@ -2282,13 +2410,15 @@
 | Renk/tema           | Hayır                                  |
 | Efor                | S                                      |
 | Kaynak denetçiler   | area:account                           |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**           |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p009)        |
 
 **Kanıt:** sessions/page.tsx:11-13 yalnızca `<PageShell title={t("title")} intro={t("description")}><RoleGate>...` içeriyor, breadcrumb ya da geri bağlantısı yok. Sayfaya yalnızca hesap sayfasından gelinebiliyor (page.tsx:258).
 
 **Etki:** Kullanıcı hesap hiyerarşisinde nerede olduğunu göremiyor. Geri dönmek için tarayıcının geri tuşuna ya da Header ikonuna güvenmek zorunda.
 
 **Önerilen aksiyon:** Başlığın üstüne `<nav aria-label="Konum"><Link href="/account">Hesabım</Link> › Oturumlar</nav>` ekleyin.
+
+**Yapılan düzeltme:** Confirmed: the sessions page had no way back. It now shows the AccountBreadcrumb 'Hesabım › Oturumlar' under the title, with a link to /account. The description text moved into a <p> after it.
 
 ## F1175 — Aydınlatma metninde her bölüm ayrı 'region' yer imi oluşturuyor
 
@@ -2304,13 +2434,15 @@
 | Renk/tema           | Hayır                                  |
 | Efor                | S                                      |
 | Kaynak denetçiler   | area:account2                          |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**           |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p031)        |
 
 **Kanıt:** privacy/page.tsx:36, 43, 55, 62, 69, 76, 88 — yedi `<section aria-labelledby="p-...">`; aria-labelledby ile adlandırılan her section 'region' yer imine dönüşüyor (Header/main/footer ile birlikte 10+ yer imi).
 
 **Etki:** Ekran okuyucu kullanıcısının yer imi listesi şişiyor; başlıklarla zaten gezinilebilen içerik için gezinmeyi yavaşlatıyor.
 
 **Önerilen aksiyon:** Bölümlerden `aria-labelledby`'yi kaldırın (h2 başlıkları gezinmeye yeter) veya `<section>` yerine `<div>` kullanın; başlık id'lerini (#p-cookies çapası için) koruyun.
+
+**Yapılan düzeltme:** I confirmed the problem: there were 7 sections with aria-labelledby. I removed aria-labelledby from all of them, so they are now unnamed sections and no longer create region landmarks. The h2 ids stay in place, so the Footer's /privacy#p-cookies anchor still works.
 
 ## F1176 — Kopyala düğmeleri arasında geri bildirim tutarsız (yetki belgesi kopyalanınca bildirim yok)
 
@@ -2326,13 +2458,15 @@
 | Renk/tema           | Hayır                                                 |
 | Efor                | S                                                     |
 | Kaynak denetçiler   | lens:copy                                             |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                          |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p041)                      |
 
 **Kanıt:** AgentMandates.tsx:177-183 `onClick={() => void navigator.clipboard?.writeText(issued)}` — başarı/başarısızlık bildirilmez; TransferMarket.tsx 'Kopyalandı.' ve hata mesajı, SplitPayPanel 'Kopyalandı' veriyor.
 
 **Etki:** Yalnız bir kez gösterilen imzalı belgenin kopyalandığından emin olunamaz.
 
 **Önerilen aksiyon:** Kopyalama sonucunu aria-live alanında 'Kopyalandı' / 'Kopyalanamadı; metni seçip elle kopyalayın' olarak gösterin.
+
+**Yapılan düzeltme:** Already fixed by an earlier package (F583). copyToken() (AgentMandates.tsx ~L290) announces t("copied") through Status's role=status and changes the button label to 'Kopyalandı' for 2 seconds. On failure it shows t("copyFailed") as an alert and focuses and selects the textarea for manual copying. The only change here is that a successful copy now also sets `tokenCopied`, which turns off the leave-page warning and the replace confirmation.
 
 ## F1177 — Yetki listesinde yükleniyor durumu yok
 
@@ -2347,13 +2481,15 @@
 | Renk/tema           | Hayır                                          |
 | Efor                | S                                              |
 | Kaynak denetçiler   | area:account2                                  |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                   |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p041)                |
 
 **Kanıt:** AgentMandates.tsx:188-190 başlık her zaman render ediliyor; `{list.data?.length === 0 && <p>{t("empty")}</p>}` yalnız boş durumda; `list.data === null && !list.error` için hiçbir metin yok (WalletPanel.tsx:84 ve IdentityVerification.tsx:98'de 'Yükleniyor…' var).
 
 **Etki:** Yavaş ağda 'Verilmiş yetkiler' başlığının altı boş kalıyor; kullanıcı yetkisi olmadığını sanabiliyor; diğer kartlarla tutarsız.
 
 **Önerilen aksiyon:** `{!list.data && !list.error && <p className="text-sm text-gray-600">{t("loading")}</p>}` ekleyin ve account.json mandates altına `loading` anahtarı tanımlayın.
+
+**Yapılan düzeltme:** Confirmed. Under the list heading, the existing common.loading key ('Yükleniyor…') is now shown while `list.data === null && !list.error`, so no new key was needed.
 
 ## F1178 — Yetki iptal düğmelerinin erişilebilir adları aynı tutarlı yetkilerde ayırt edilemiyor
 
@@ -2370,13 +2506,15 @@
 | Renk/tema           | Hayır                                          |
 | Efor                | S                                              |
 | Kaynak denetçiler   | area:account2                                  |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                   |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p041)                |
 
 **Kanıt:** AgentMandates.tsx:216-218 `aria-label={t("revokeLabel", { amount: f.money(m.maxAmountMinor, m.currency) })}` → "₺1.500,00 limitli yetkiyi iptal et"; aynı tutarla verilen iki yetkide iki düğme aynı adı taşıyor (bitiş tarihi veya veriliş zamanı yok).
 
 **Etki:** Ekran okuyucunun düğme listesinde kullanıcı hangi yetkiyi iptal edeceğini seçemiyor.
 
 **Önerilen aksiyon:** revokeLabel'ı "{amount} limitli, {date} tarihine kadar geçerli yetkiyi iptal et" yapıp `date: f.dateTime(m.expiresAt)` geçin; satırda veriliş zamanını (`m.issuedAt`) da görünür metin olarak gösterin.
+
+**Yapılan düzeltme:** Confirmed. revokeLabel now includes the expiry: '{amount} limitli, {date} tarihine kadar geçerli yetkiyi iptal et'. The call passes `date` in the medium date-time format. Each row also shows when the permission was granted ('Verildi: {date}' from issuedAt).
 
 ## F1179 — Hesap sayfasındaki kartlar ortak bileşenleri kullanmıyor; kenarlık, köşe, başlık boyutu ve odak halkası tutarsız
 
@@ -2392,13 +2530,15 @@
 | Renk/tema           | Hayır                                                                                              |
 | Efor                | S                                                                                                  |
 | Kaynak denetçiler   | area:account2                                                                                      |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                       |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p043)                                                                    |
 
 **Kanıt:** IdentityVerification.tsx:93 `<section ... className="mt-8 rounded-xl bg-white p-6 shadow-sm">` + h2 `text-xl`; WalletPanel.tsx:72 `mt-6 rounded-2xl ... p-6`; AgentMandates.tsx:114 ortak `Card` (ui.tsx:104 `rounded-xl border border-gray-200 ... p-5`, h2 `text-lg`). IdentityVerification.tsx:150-154 gönder düğmesi ortak `Button` yerine elle sınıflandırılmış ve `focusRing` içermiyor; :140 select `inputClass` yerine kendi sınıfı (odak halkası yok). Ekran görüntüsü docs/img/v4-wallet.png: mock modda select ile düğme arasında geniş boşluk (mockNotice paragrafı :132 aynı flex öğesinde).
 
 **Etki:** Aynı sayfadaki kartlar farklı görünüp farklı odak göstergesi veriyor; klavye kullanıcısı bazı kontrollerde yalnız tarayıcı varsayılan halkasını görüyor; select ile ilgili düğme görsel olarak ayrışıyor.
 
 **Önerilen aksiyon:** IdentityVerification ve WalletPanel'i `Card` ile sarın; gönder düğmesini `<Button type="submit">`, select'i `className={inputClass}` ve `Field` ile yeniden yazın; mockNotice paragrafını flex satırının dışına (formun üstüne) taşıyın.
+
+**Yapılan düzeltme:** The section is now the shared Card (id='kyc', so the heading id stays kyc-title) in a mt-8 wrapper. The submit button is the shared Button (busy guard and focusRing), the select uses Field and inputClass (focus ring), and mockNotice is outside the flex row. Side effect: Button's primary hover colour (#002b66) replaces the old hand-written hover (#00224f); no palette change. Neighbouring sections on the account page (PasskeyManager, SessionManager and the page's own sections) still use the older section style.
 
 ## F1180 — Kimlik doğrulama zorunluluk metni, doğrulama tamamlandıktan sonra da gösteriliyor
 
@@ -2413,13 +2553,15 @@
 | Renk/tema           | Hayır                                                 |
 | Efor                | S                                                     |
 | Kaynak denetçiler   | area:account2                                         |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                          |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p043)                       |
 
 **Kanıt:** IdentityVerification.tsx:89-90 `const showHost = data?.required.host && (...)`, `const showGuest = data?.required.guest;` durum kontrolü yok; :126-127 VERIFIED kullanıcıya da "Misafirlerin rezervasyon için kimliğini doğrulaması gerekir." gösteriliyor.
 
 **Etki:** Doğrulanmış kullanıcı ek bir işlem gerekip gerekmediğinden emin olamıyor.
 
 **Önerilen aksiyon:** `showHost`/`showGuest` koşullarına `data.status !== "VERIFIED"` ekleyin; VERIFIED'de "Rezervasyon için gereken doğrulama tamam." gibi olumlu teyit gösterin.
+
+**Yapılan düzeltme:** Confirmed. When the status is VERIFIED, the requirement lines are replaced by positive confirmations, requiredHostDone and requiredGuestDone; requiredHost and requiredGuest are shown only when the user is not verified.
 
 ## F1181 — Yeni passkey'in ödeme doğrulamasında 24 saat kullanılamayacağı söylenmiyor
 
@@ -2434,13 +2576,15 @@
 | Renk/tema           | Hayır                                          |
 | Efor                | S                                              |
 | Kaynak denetçiler   | area:account                                   |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                   |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p044)                |
 
 **Kanıt:** PasskeyManager.tsx:77 başarı mesajı 'Passkey eklendi.' (account.json:62). Sunucuda passkey.ts:258 'yeni passkey'ler 24 saat bekler' kuralı var. Bu sürede pay.ts:300-310 3DS'e düşüyor. Bölüm açıklaması (account.json:50) passkey'i riskli ödemeler için öneriyor.
 
 **Etki:** Riskli bir ödemeden hemen önce passkey ekleyen misafir yine 3DS ya da farklı bir doğrulama ile karşılaşıyor ve sistemin tutarsız davrandığını düşünüyor.
 
 **Önerilen aksiyon:** addedOk metnini şöyle genişletin: 'Passkey eklendi. Girişte hemen, ödeme doğrulamasında güvenliğiniz için 24 saat sonra kullanılabilir.'
+
+**Yapılan düzeltme:** Confirmed in passkey.ts: PASSKEY_STEP_UP_COOLDOWN_HOURS (default 24) applies only to step-up, so login and reauth work right away. Changed the text of account.passkeys.addedOk, which is used only in PasskeyManager, to say the passkey works for sign-in now and for payment verification after 24 hours.
 
 ## F1182 — Passkey tarihleri UTC takvim günü olarak ve saatsiz gösteriliyor
 
@@ -2455,13 +2599,15 @@
 | Renk/tema           | Hayır                                           |
 | Efor                | S                                               |
 | Kaynak denetçiler   | area:account                                    |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                    |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p044)                 |
 
 **Kanıt:** PasskeyManager.tsx:128-129 `fmt.date(p.createdAt)` çağrısı format.ts'deki `date(value, style = "short", timeZone = "UTC")` varsayılanına düşüyor. TR saatiyle 01:30'da eklenen passkey bir önceki günün tarihiyle görünüyor. SessionManager.tsx:123-125 ise yerel saatli fmt.dateTime kullanıyor.
 
 **Etki:** Güvenlik denetimi yapan kullanıcı 'son kullanım' zamanını yanlış günle görüyor ve saat bilgisi olmadığı için yetkisiz kullanımı fark edemiyor.
 
 **Önerilen aksiyon:** createdAt ve lastUsedAt için fmt.dateTime(...) kullanın ya da timeZone parametresini vermeden yerel saat dilimiyle biçimlendirin.
+
+**Yapılan düzeltme:** Confirmed: fmt.date defaults to the UTC time zone and shows no time. createdAt and lastUsedAt now use fmt.dateTime, which uses the local time zone and includes the time; so do the new delete aria-label and the confirm body. There is no hydration risk, because the list loads on the client after mount.
 
 ## F1183 — Escape işlem sürerken de pencereyi kapatıyor, devre dışı 'Vazgeç' düğmesiyle tutarsız
 
@@ -2476,13 +2622,15 @@
 | Renk/tema           | Hayır                                        |
 | Efor                | S                                            |
 | Kaynak denetçiler   | area:account                                 |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                 |
+| **Düzeltme durumu** | **Zaten uygun** (paket: ml-p045)             |
 
 **Kanıt:** ReauthDialog.tsx:44-46 `if (e.key === "Escape") onCancel();` busy durumuna bakmıyor ve window'a bağlı. Öte yandan 'Vazgeç' düğmesi 127'de `disabled={busy}`.
 
 **Etki:** Doğrulama isteği sürerken Escape'e basılırsa pencere kapanıyor ve 'iptal edildi' hatası çıkıyor. Ama sunucu oturumu tazelemiş olabilir, kullanıcı sonucun ne olduğunu anlamıyor.
 
 **Önerilen aksiyon:** busy iken Escape'i yok sayın ya da AbortController ile isteği gerçekten iptal edip bunu bildirin. Dinleyiciyi window yerine pencere öğesine bağlayın.
+
+**Yapılan düzeltme:** Not reproducible in the current code. The dialog is a native <dialog>, and Escape goes through its onCancel handler on the dialog element, not on window. That handler calls e.preventDefault() and only calls onCancel() when !busy, which matches the aria-disabled Vazgeç button.
 
 ## F1184 — Parola hatası alana programatik olarak bağlanmıyor, hatadan sonra odak alana dönmüyor
 
@@ -2498,13 +2646,15 @@
 | Renk/tema           | Hayır                                                         |
 | Efor                | S                                                             |
 | Kaynak denetçiler   | area:account                                                  |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                  |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p045)                               |
 
 **Kanıt:** ReauthDialog.tsx:92-100 input'ta aria-invalid ve aria-describedby yok. 101-105 hata `<p role="alert">` öğesinin id'si yok. Hatadan sonra (63 `setBusy(false)`) odak düğmede kalıyor. Projede ui.tsx:47-88'deki Field bileşeni bu bağlantıyı zaten kuruyor.
 
 **Etki:** Ekran okuyucu kullanıcısı alana döndüğünde alanın hatalı olduğunu duymuyor. Klavye kullanıcısı yeniden yazmak için alana kendisi dönmek zorunda.
 
 **Önerilen aksiyon:** Hata paragrafına id="reauth-error" verin. Input'a `aria-invalid={!!error}` ve `aria-describedby="reauth-desc reauth-error"` ekleyin. Hata sonrasında `input.current?.select()` ile odağı alana taşıyın.
+
+**Yapılan düzeltme:** Mostly fixed already: the input had aria-invalid and an aria-describedby pointing at a useId error id, the error has role=alert, and focus went back to the input after a password failure. I added input.select() after the focus so a wrong password can be retyped right away.
 
 ## F1185 — Yeniden doğrulama formunda parola yöneticisi için kullanıcı adı bağlamı ve 'parolayı göster' yok
 
@@ -2519,13 +2669,15 @@
 | Renk/tema           | Hayır                                        |
 | Efor                | S                                            |
 | Kaynak denetçiler   | area:account                                 |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                 |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p045)              |
 
 **Kanıt:** ReauthDialog.tsx:82-100 formda yalnızca `type="password" autoComplete="current-password"` alanı var. E-postayı taşıyan gizli bir `autocomplete="username"` alanı yok, parolayı göster/gizle düğmesi de yok.
 
 **Etki:** Parola yöneticileri hangi hesap için doldurduğunu bilemeyebiliyor. Mobilde parolayı elle yazan kullanıcı yazım hatasını göremiyor.
 
 **Önerilen aksiyon:** Kullanıcı e-postasını taşıyan readonly ve görsel olarak gizli bir `<input autoComplete="username">` ekleyin. aria-pressed kullanan bir 'Parolayı göster' düğmesi ekleyin.
+
+**Yapılan düzeltme:** Added a hidden readonly <input type=email autoComplete=username> filled with the session email from fetchCurrentUser, so password managers know which account the password is for. The password field now has name=password, autoCapitalize=none, autoCorrect=off and spellCheck=false. Added a 'Parolayı göster' checkbox (new key showPassword) with a 44px-tall label that switches the field between password and text. I did not reuse the eye-icon PasswordRevealInput, because p023 is still creating it and it is not committed yet.
 
 ## F1186 — Passkey ile doğrulama sürerken 'Doğrulanıyor...' yazısı parola düğmesinde çıkıyor
 
@@ -2540,13 +2692,15 @@
 | Renk/tema           | Hayır                                         |
 | Efor                | S                                             |
 | Kaynak denetçiler   | area:account                                  |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                  |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p045)               |
 
 **Kanıt:** ReauthDialog.tsx:112 parola gönderme düğmesinde `{busy ? t("verifying") : t("verify")}`. Passkey düğmesinin etiketi (118-121) busy iken de 'Passkey ile doğrula' olarak kalıyor.
 
 **Etki:** Kullanıcı cihazındaki passkey istemini beklemesi gerektiğini anlamıyor ve parola yolunun çalıştığını sanıyor.
 
 **Önerilen aksiyon:** Hangi yolun çalıştığını `mode: "password" | "passkey"` ile tutun. Passkey düğmesinde 'Cihazınızdaki istemi onaylayın…' yazsın ve forma aria-busy="true" verilsin.
+
+**Yapılan düzeltme:** Replaced the busy boolean with mode: "password" \| "passkey" \| null, so busy = mode !== null. 'Doğrulanıyor...' now appears only on the password button. During passkey auth the passkey button reads the new passkeyPrompt text, 'Cihazınızdaki istemi onaylayın…'. An sr-only role=status region announces which path is in progress, and the form keeps aria-busy.
 
 ## F1187 — Kullanıcının kendi vazgeçtiği doğrulama kırmızı hata uyarısı olarak duyuruluyor
 
@@ -2562,13 +2716,15 @@
 | Renk/tema           | Hayır                                          |
 | Efor                | S                                              |
 | Kaynak denetçiler   | area:account                                   |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                   |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p046)                |
 
 **Kanıt:** SessionManager.tsx:38 `if (err instanceof ReauthCancelledError) return tr("cancelled");` sonucu 84'te kind "error" oluyor ve role="alert" ile kırmızı gösteriliyor. PasskeyManager.tsx:39'da da aynısı.
 
 **Etki:** Bilerek 'Vazgeç' diyen kullanıcı bir hata yaptığını sanıyor ve ekran okuyucu bunu acil bir uyarı olarak bölüyor.
 
 **Önerilen aksiyon:** ReauthCancelledError gelince status'u null bırakın ya da nötr bir role="status" ile 'İşlem yapılmadı' yazın.
+
+**Yapılan düzeltme:** Confirmed: a ReauthCancelledError became a red role=alert. It is now caught explicitly: status stays null, the button is released, and there is no reload, since nothing changed.
 
 ## F1188 — Toplu oturum kapatmada kaç oturumun kapatıldığı bildirilmiyor
 
@@ -2583,13 +2739,15 @@
 | Renk/tema           | Hayır                                          |
 | Efor                | S                                              |
 | Kaynak denetçiler   | area:account                                   |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                   |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p046)                |
 
 **Kanıt:** SessionManager.tsx:81 scope=others için de tekil 'Oturum kapatıldı' (account.json:100) mesajını veriyor. API ise `{ revoked: count }` döndürüyor (sessions/route.ts:30). 154'teki düğme etiketi 90'da hesaplanan `others` sayısını göstermiyor.
 
 **Etki:** Kullanıcı işlemden önce kaç cihazın etkileneceğini, sonra da kaçının kapatıldığını bilmiyor.
 
 **Önerilen aksiyon:** Düğme etiketini 'Diğer {count} oturumu kapat' yapın. Başarı mesajı için '{count} oturum kapatıldı' metniyle plural ICU kullanın.
+
+**Yapılan düzeltme:** Confirmed. The 'others' button now reads revokeOthers with an ICU plural count ('Diğer {count} oturumu kapat'; the key is used only here). After the DELETE, the success text uses the new revokedCount plural built from the API's {revoked} value. Single-session revokes keep revokedOk.
 
 ## F1189 — Sadakat rozetinde genel <span> üzerinde aria-label kullanılıyor
 
@@ -2605,13 +2763,15 @@
 | Renk/tema           | Hayır                                       |
 | Efor                | S                                           |
 | Kaynak denetçiler   | area:account2                               |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p052)             |
 
 **Kanıt:** WalletPanel.tsx:40-45 `<span aria-label={t("tierAria", { tier: name })} ...>{t("tierBadge", { tier: name })}</span>` — rolü olmayan span'de aria-label ARIA 1.2'de desteklenmiyor; ekran okuyucular çoğunlukla yok sayıyor, bazıları görünür metinle çelişen etiketi okuyor.
 
 **Etki:** Ekran okuyucu kullanıcıları arasında tutarsız duyurum; 'Sadakat seviyesi' bağlamı bazılarında hiç okunmuyor.
 
 **Önerilen aksiyon:** aria-label'ı kaldırıp `<span className="sr-only">{t("tierAriaPrefix")} </span>` ("Sadakat seviyesi:") ile görünür metni birleştirin ya da span'e `role="img"` vermek yerine düz metinle bırakın.
+
+**Yapılan düzeltme:** Confirmed. Removed aria-label from the role-less span in TierBadge. An sr-only prefix span ('Sadakat programı:' / 'Loyalty program:', new key wallet.tierPrefix) now sits in front of the visible text, so screen readers hear 'Sadakat programı: Altın seviyesi'. wallet.tierAria is no longer used, but I left it in the messages.
 
 ## F1190 — Eşzamansız eylemlerde bekleme durumu yok: yetki iptali ve veri dışa aktarma
 
@@ -2627,13 +2787,15 @@
 | Renk/tema           | Hayır                                                                                         |
 | Efor                | S                                                                                             |
 | Kaynak denetçiler   | area:account2                                                                                 |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                                                                  |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p097)                                                               |
 
 **Kanıt:** PrivacyCenter.tsx:61 `<Button onClick={download}>{t("exportButton")}</Button>` — busy/disabled yok; büyük veri setinde istek sürerken tekrar tıklama birden fazla indirme başlatıyor. AgentMandates.tsx:213-215 iptal düğmesi istek sırasında etkin kalıyor ve metni değişmiyor. Ek olarak PrivacyCenter.tsx:33-35 `a.click(); a.remove(); URL.revokeObjectURL(url);` nesne URL'sini aynı tikte iptal ediyor (bazı mobil tarayıcılarda indirmenin başlamamasına yol açabilir).
 
 **Etki:** Yavaş ağdaki kullanıcı tıklamanın algılanıp algılanmadığını bilmiyor; tekrar tekrar basıyor, birden çok dosya iniyor.
 
 **Önerilen aksiyon:** download() ve revoke() için ayrı `exporting` / `revokingNonce` state'i tutun; düğmeyi `disabled` + `aria-busy` yapıp metni "Hazırlanıyor…" / "İptal ediliyor…" olarak değiştirin; `URL.revokeObjectURL`'ü `setTimeout(..., 0)` ya da birkaç saniye sonrasına erteleyin.
+
+**Yapılan düzeltme:** PrivacyCenter part: export busy state as in F1089, plus the object URL is no longer revoked in the same tick. It is kept in state for the fallback link and revoked in an effect cleanup on the next export or on unmount. The AgentMandates revoke button belongs to another package's file and was not touched.
 
 ## F1191 — Devre dışı 'Evet, hesabımı sil' düğmesinin neden pasif olduğu programatik olarak bağlanmamış
 
@@ -2649,10 +2811,12 @@
 | Renk/tema           | Hayır                                         |
 | Efor                | S                                             |
 | Kaynak denetçiler   | area:account2                                 |
-| **Düzeltme durumu** | **Sonraki tur (Medium/Low)**                  |
+| **Düzeltme durumu** | **Düzeltildi** (paket: ml-p097)               |
 
 **Kanıt:** PrivacyCenter.tsx:92 `<Button variant="danger" disabled={!acknowledged || busy} onClick={remove}>` — `disabled` düğme sekme sırasından çıkıyor; onay kutusuyla ilişki `aria-describedby` ile kurulmuyor. Onay kutusu :80-86 `h-4 w-4` (16px; etiket tıklanabilir olduğu için hedef boyutu telafi ediliyor).
 
 **Etki:** Ekran okuyucu kullanıcısı Tab ile 'Vazgeç'e atlıyor, silme düğmesinin varlığını ve etkinleştirme koşulunu kaçırabiliyor.
 
 **Önerilen aksiyon:** `disabled` yerine `aria-disabled={!acknowledged}` kullanıp onClick'te onay yoksa onay kutusuna odak verin; düğmeye `aria-describedby="delete-ack-label"` ekleyip etikete bu id'yi verin.
+
+**Yapılan düzeltme:** Confirmed. The 'Evet, hesabımı sil' button now uses aria-disabled instead of disabled, so it stays in the tab order. Until the checkbox is ticked the button has aria-describedby pointing at the checkbox label (id=delete-ack-label). Clicking it without the checkbox ticked moves focus to the checkbox.

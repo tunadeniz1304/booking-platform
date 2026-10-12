@@ -9,7 +9,7 @@
     "controller": {
       "title": "1. Data controller",
       "body": "Under Personal Data Protection Law No. 6698 (\"KVKK\"), the data controller is the operator of this demo platform. No real payments are taken in the demo environment, and no real personal data should be entered.",
-      "contact": "How to apply: after signing in, you can send requests such as information requests, rectification or objection directly to our human support team on the <link>Support</link> page using \"Talk to a human\"."
+      "contact": "How to apply: after signing in, you can send requests such as information requests, rectification or objection directly to our human support team on the <link>Help & support</link> page using \"Talk to a human\"."
     },
     "data": {
       "title": "2. Personal data processed",
@@ -38,7 +38,7 @@
     "rights": {
       "title": "7. Your rights (KVKK Art. 11)",
       "body": "You have the right to learn whether your data is processed, to request information, and to rectification, erasure and objection. To download your data or delete your account, you can use the <link>Privacy and my data</link> page.",
-      "requests": "To exercise your rights to information, rectification (for example, correcting your name or email address) and objection, you can write to our human support team on the <link>Support</link> page."
+      "requests": "To exercise your rights to information, rectification (for example, correcting your name or email address) and objection, you can write to our human support team on the <link>Help & support</link> page."
     },
     "lastUpdated": "Last updated: <time>{date}</time>",
     "summary": {
@@ -80,6 +80,7 @@
     },
     "exportFailed": "Could not download your data. Please try again.",
     "deleteFailed": "Could not delete your account. Please try again.",
+    "deleteCancelled": "Cancelled; your account was not deleted.",
     "obligations": {
       "title": "Your account cannot be deleted yet. Please resolve the following first:",
       "hostedBookings": "{count, plural, one {You have # upcoming confirmed booking as a host.} other {You have # upcoming confirmed bookings as a host.}}",

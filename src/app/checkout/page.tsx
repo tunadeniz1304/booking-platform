@@ -7,11 +7,13 @@ import { useTranslations } from "next-intl";
 import QuoteBreakdown from "@/components/booking/QuoteBreakdown";
 import { useQuote, type QuoteView } from "@/components/booking/useQuote";
 import CouponField from "@/components/booking/CouponField";
+import { useQuoteError } from "@/components/booking/quote-error";
 import { ResendVerificationButton } from "@/components/auth/AuthCard";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import {
   Button,
+  ErrorText,
   focusRing,
   loginHref,
   useErrorText,
@@ -21,6 +23,7 @@ import {
 import { ApiError, apiFetch, isNetworkError } from "@/lib/api-client";
 import { useFormat } from "@/i18n/use-format";
 import { bedTypeKey } from "@/lib/i18n/bed-type";
+import { MEAL_PLAN_KEYS } from "@/lib/i18n/meal-plan";
 
 interface CheckoutRatePlan {
   id: string;
@@ -146,6 +149,7 @@ function CheckoutContent() {
   const t = useTranslations("checkout");
   const tq = useTranslations("quote");
   const tc = useTranslations("common");
+  const tb = useTranslations("booking");
   const router = useRouter();
   const searchParams = useSearchParams();
   const f = useFormat();
@@ -164,6 +168,17 @@ function CheckoutContent() {
   const guestParam = searchParams.get("guestCount") ?? searchParams.get("guests");
   const guestCount = guestParam === null ? 1 : Number(guestParam);
   const ratePlanId = searchParams.get("ratePlanId") ?? undefined;
+  // F2-13: yetişkin/çocuk ayrımı (widget gönderir); toplamla tutarsızsa yok sayılır.
+  const adultsParam = Number(searchParams.get("adults") ?? NaN);
+  const childrenParam = Number(searchParams.get("children") ?? 0);
+  const guestSplit =
+    Number.isInteger(adultsParam) &&
+    adultsParam >= 1 &&
+    Number.isInteger(childrenParam) &&
+    childrenParam >= 0 &&
+    adultsParam + childrenParam === guestCount
+      ? { adults: adultsParam, children: childrenParam }
+      : null;
 
   // Eski yer imi / bozuk bağlantı: boş fiyat kutusu ve "NaN" yerine nedeni gösterilir (F746).
   const [minCheckIn] = useState(earliestCheckIn);
@@ -197,6 +212,7 @@ function CheckoutContent() {
     loading: quoteLoading,
     error: quoteError,
     code: quoteErrorCode,
+    details: quoteErrorDetails,
   } = useQuote({
     roomId,
     propertyId,
@@ -208,6 +224,13 @@ function CheckoutContent() {
     refreshKey,
     couponCode: couponCode || undefined,
   });
+  // Hook erken dönüşlerden önce çağrılır.
+  // F2-16: teklif hatası arayüz dilinde (widget ile ortak); kısıtlarda yeniden hesaplama yok.
+  const { text: quoteErrorText, action: quoteErrorAction } = useQuoteError(
+    quoteError,
+    quoteErrorCode,
+    quoteErrorDetails
+  );
 
   // Yeniden hesaplama sürerken önceki toplam görünür; kupon ya da fiyat değişince eski ve yeni
   // toplam yan yana gösterilir (F749). Türetilmiş durum render sırasında güncellenir.
@@ -259,6 +282,10 @@ function CheckoutContent() {
     propertyParams.set("checkOut", checkOut);
   }
   if (guestsValid) propertyParams.set("guests", String(guestCount));
+  if (guestsValid && guestSplit) {
+    propertyParams.set("adults", String(guestSplit.adults));
+    propertyParams.set("children", String(guestSplit.children));
+  }
   if (roomId) propertyParams.set("roomId", roomId);
   if (ratePlanId) propertyParams.set("ratePlanId", ratePlanId);
   const propertyQuery = propertyParams.toString();
@@ -460,12 +487,13 @@ function CheckoutContent() {
     </>
   );
   // Gönder düğmesi neden devre dışı: hesaplanıyor / dolu / fiyat alınamadı (F758).
-  const soldOut = quoteErrorCode === "SOLD_OUT";
+  // Bilinen kodlu hatada (dolu, kısıt…) neden metni hata paragrafındadır.
+  const knownQuoteError = quoteError !== null && quoteErrorAction !== "retry";
   const submitReasonIds = quote
     ? ""
     : quoteLoading
       ? "checkout-quote-loading"
-      : soldOut
+      : knownQuoteError
         ? "checkout-quote-error"
         : "checkout-submit-reason";
 
@@ -570,16 +598,21 @@ function CheckoutContent() {
               )}
               <div className="flex justify-between gap-4">
                 <dt className="text-gray-600">{t("guests")}</dt>
-                <dd className="text-right font-medium text-gray-900">{guestCount}</dd>
+                <dd className="text-right font-medium text-gray-900">
+                  {guestSplit ? tb("widget.guestSplit", guestSplit) : guestCount}
+                </dd>
               </div>
               {plan && (
                 <div className="flex justify-between gap-4">
                   <dt className="text-gray-600">{t("ratePlan")}</dt>
                   <dd className="text-right font-medium text-gray-900">
-                    {plan.name}
+                    {/* Plan adı içerik dilinde (Türkçe); widget ile aynı (F2-14). */}
+                    <span lang={f.locale === "tr" ? undefined : "tr"}>{plan.name}</span>
                     <span className="block font-normal text-gray-600">
                       {plan.refundable ? t("refundable") : t("nonRefundable")}
-                      {plan.mealPlan === "BREAKFAST" ? ` · ${t("breakfastIncluded")}` : ""}
+                      {MEAL_PLAN_KEYS[plan.mealPlan]
+                        ? ` · ${tb(MEAL_PLAN_KEYS[plan.mealPlan])}`
+                        : ""}
                     </span>
                   </dd>
                 </div>
@@ -612,11 +645,10 @@ function CheckoutContent() {
               )}
               {quoteError && (
                 <div className="space-y-2">
-                  <p id="checkout-quote-error" role="alert" className="text-sm text-red-600">
-                    {soldOut ? t("soldOut") : quoteError}
-                  </p>
+                  <ErrorText id="checkout-quote-error">{quoteErrorText}</ErrorText>
                   <div className="flex flex-wrap items-center gap-3">
-                    {!soldOut && (
+                    {/* Yalnız kodsuz/ağ ya da bilinmeyen hatada yeniden hesaplama (F2-16). */}
+                    {quoteErrorAction === "retry" && (
                       <Button
                         type="button"
                         variant="secondary"
@@ -649,7 +681,8 @@ function CheckoutContent() {
             <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
               {/* Canlı bölgede yalnız metin; düğmeler (kendi Status bölgesiyle) dışında (F1). */}
               <div role="alert">
-                <p>{error.message}</p>
+                {/* F2-44: simge + gizli önek; canlı bölge üstteki kapta. */}
+                <ErrorText live={false}>{error.message}</ErrorText>
                 {error.code === "EMAIL_NOT_VERIFIED" && (
                   <p className="mt-1">{t("emailNotVerifiedHint")}</p>
                 )}
@@ -710,9 +743,15 @@ function CheckoutContent() {
             size="lg"
             fullWidth
             busy={submitting}
-            disabled={submitDisabled}
+            // F2-03: `disabled` yerine aria-disabled; teklif düşünce odak düğmede kalır ve neden
+            // okunur (handleSubmit teklifsiz gönderimi zaten yok sayar).
+            aria-disabled={submitDisabled || undefined}
             aria-describedby={`checkout-next-step ${submitReasonIds}`.trim()}
-            className="disabled:bg-gray-300 disabled:text-gray-700 disabled:opacity-100"
+            className={
+              submitDisabled && !submitting
+                ? "aria-disabled:bg-gray-300 aria-disabled:text-gray-700 aria-disabled:opacity-100"
+                : undefined
+            }
           >
             {submitting ? t("processing") : t("submit")}
           </Button>

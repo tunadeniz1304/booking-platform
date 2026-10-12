@@ -6,9 +6,17 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { ApiError, apiFetch } from "@/lib/api-client";
 import { useFormat } from "@/i18n/use-format";
-import { Button, LlmBadge, PageShell, focusRing, useErrorText } from "@/components/ui/ui";
+import {
+  Button,
+  ErrorText,
+  LlmBadge,
+  PageShell,
+  focusRing,
+  useErrorText,
+} from "@/components/ui/ui";
 import { propertyHref } from "@/components/property/PropertyCard";
 import { useCompareSelection } from "@/components/compare/useCompareSelection";
+import { usePlaceLabel } from "@/lib/i18n/use-place-label";
 
 type PolicyKind = "FLEXIBLE" | "MODERATE" | "STRICT" | "NON_REFUNDABLE";
 type Unavailable = "NO_DATES" | "NO_ROOM_FOR_GUESTS" | "UNAVAILABLE";
@@ -107,7 +115,7 @@ function searchHref(sp: { get(name: string): string | null }): string {
   const from = sp.get("from");
   const params = new URLSearchParams(from ? from.slice(from.indexOf("?") + 1) : "");
   if (!from) {
-    for (const key of ["destination", "checkIn", "checkOut", "guests"]) {
+    for (const key of ["destination", "checkIn", "checkOut", "guests", "adults", "children"]) {
       const v = sp.get(key);
       if (v) params.set(key, v);
     }
@@ -166,6 +174,7 @@ function CompareContent() {
   const t = useTranslations("compare");
   const tSearch = useTranslations("search");
   const tProperty = useTranslations("property");
+  const placeLabel = usePlaceLabel();
   const errorText = useErrorText();
   const f = useFormat();
   const locale = useLocale();
@@ -239,9 +248,7 @@ function CompareContent() {
     const specific = code && t.has(`errors.${code}`) ? t(`errors.${code}`) : null;
     return (
       <div className="space-y-3">
-        <p role="alert" className="text-sm text-red-700">
-          {specific ?? errorText(res.error)}
-        </p>
+        <ErrorText>{specific ?? errorText(res.error)}</ErrorText>
         {!specific && <p className="text-sm text-gray-700">{t("errorHelp")}</p>}
         <div className="flex flex-wrap items-center gap-3">
           <Button busy={res.loading} onClick={res.reload}>
@@ -277,7 +284,19 @@ function CompareContent() {
     );
   }
 
-  const ctx = { checkIn: data.checkIn, checkOut: data.checkOut, guests: data.guests };
+  // F2-19: ilan sayfası "Sonuçlara dön" bağlantısını ve yetişkin/çocuk dağılımını korusun.
+  const countParam = (key: string) => {
+    const n = Number(sp.get(key));
+    return Number.isInteger(n) && n > 0 ? n : null;
+  };
+  const ctx = {
+    checkIn: data.checkIn,
+    checkOut: data.checkOut,
+    guests: data.guests,
+    adults: countParam("adults"),
+    children: countParam("children"),
+    from: backHref,
+  };
   const badges = badgeIds(listings);
 
   // F680: saat yerine gün; tarihler biliniyorsa son ücretsiz iptal günü mutlak tarih olarak.
@@ -467,7 +486,7 @@ function CompareContent() {
               </th>
               {listings.map((l) => (
                 <td key={l.id} className={cell}>
-                  {l.city}, {l.country}
+                  {placeLabel.place(l.city, l.country)}
                 </td>
               ))}
             </tr>

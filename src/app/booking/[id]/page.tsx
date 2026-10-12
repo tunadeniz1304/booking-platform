@@ -16,11 +16,12 @@ import BookingResolutionPanel, {
 import BookingPriceSnapshot, {
   CancellationDeadlineNote,
 } from "@/components/booking/BookingPriceSnapshot";
-import BookingNumberText from "@/components/booking/BookingNumberText";
+import { shortRef } from "@/lib/ui/short-ref";
 import BookingStatusBadge, { bookingStatusKey } from "@/components/booking/BookingStatusBadge";
 import { useFormat } from "@/i18n/use-format";
 import {
   Button,
+  ErrorText,
   focusRing,
   loginHref,
   useErrorText,
@@ -75,6 +76,16 @@ const SETTLED_STATUSES = ["CONFIRMED", "COMPLETED"];
 const AWAITING_STATUSES = ["HELD", "PENDING"];
 /** Henüz iptal edilebilen durumlar: ücretsiz iptal son anı gösterilir. */
 const CANCELLABLE_STATUSES = ["HELD", "PENDING", "CONFIRMED"];
+
+/** F2-02: durum bandının rengi durumu izler (rozetle çelişmesin); beyaz metin her bantta okunur. */
+const STATUS_BAND: Record<string, string> = {
+  CONFIRMED: "bg-green-700",
+  COMPLETED: "bg-green-700",
+  HELD: "bg-[#003580]",
+  PENDING: "bg-[#003580]",
+  CANCELLED: "bg-gray-700",
+  EXPIRED: "bg-gray-700",
+};
 
 /** Tüm rezervasyonların (iptal ve geçmiş dahil) listelendiği bölüm. */
 const MY_BOOKINGS_HREF = "/account#account-bookings";
@@ -180,6 +191,9 @@ export default function BookingConfirmationPage() {
   const [needsLogin, setNeedsLogin] = useState(false);
   /** Ödeme/iptal sonrası durum değişikliği duyurusu (her zaman mount edilen canlı bölge). */
   const [announcement, setAnnouncement] = useState("");
+  /** F2-04: iptal sonucu (iade metni); durum duyurusuna eklenir ve başlığın altında gösterilir. */
+  const [resultNote, setResultNote] = useState<string | null>(null);
+  const pendingResult = useRef<string | null>(null);
   /** Süresi dolan tutmanın bitiş anı: sunucu durumu güncelleyene dek başlık "süre doldu" olur. */
   const [lapsedHold, setLapsedHold] = useState<string | null>(null);
   const prevStatus = useRef<string | null>(null);
@@ -203,16 +217,19 @@ export default function BookingConfirmationPage() {
           }
         );
         const next = data.booking.status;
+        const result = pendingResult.current;
+        pendingResult.current = null;
         if (prevStatus.current !== null && prevStatus.current !== next) {
-          setAnnouncement(
+          const changed =
             next === "CONFIRMED"
               ? t("detail.statusChanged.CONFIRMED")
               : next === "CANCELLED"
                 ? t("detail.statusChanged.CANCELLED")
                 : t("detail.statusChanged.other", {
                     status: isStatusKey(next) ? t(`status.${next}`) : tc(bookingStatusKey(next)),
-                  })
-          );
+                  });
+          // F2-04: tek canlı bölge; iade sonucu aynı duyuruda okunur.
+          setAnnouncement(result ? `${changed} ${result}` : changed);
           // Ödeme formu gibi odaktaki öğe DOM'dan kalkabileceği için odak başlığa taşınır.
           focusHeading.current = true;
         }
@@ -342,6 +359,20 @@ export default function BookingConfirmationPage() {
       ? "EXPIRED"
       : (booking?.status ?? "");
 
+  /** Aynı tarihlerle tesis sayfası (giriş tarihi geçmediyse); süresi dolan tutmada da kullanılır. */
+  const sameDatesHref = booking
+    ? canRebook
+      ? `/property/${booking.property.id}?${new URLSearchParams({
+          checkIn: booking.checkIn.slice(0, 10),
+          checkOut: booking.checkOut.slice(0, 10),
+          guests: String(booking.guestCount),
+        }).toString()}`
+      : `/property/${booking.property.id}`
+    : "/search";
+
+  /** F2-15: tutma istemcide dolduğunda yeniden arama bağlantısı ödeme bölümündedir (tek bağlantı). */
+  const expiredHoldShown = booking?.status === "HELD" && shownStatus === "EXPIRED";
+
   /** Rezervasyon akışındaki adım (checkout ile aynı gösterge); iptal/süresi dolmuşta yok. */
   const flowStep = AWAITING_STATUSES.includes(shownStatus)
     ? 2
@@ -384,9 +415,7 @@ export default function BookingConfirmationPage() {
             >
               {error.notFound ? t("detail.notFoundTitle") : t("detail.loadFailed")}
             </h1>
-            <p role="alert" className="mt-2 text-gray-600">
-              {error.text}
-            </p>
+            <ErrorText className="mt-2">{error.text}</ErrorText>
             <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
               {error.retryable && (
                 <Button busy={retrying} onClick={() => void retry()}>
@@ -435,10 +464,10 @@ export default function BookingConfirmationPage() {
             )}
             {error && (
               // Rezervasyon zaten gösteriliyorsa yenileme hatası sayfanın yerine geçmez.
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 print:hidden">
-                <p role="alert">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-red-50 px-4 py-3 text-sm print:hidden">
+                <ErrorText>
                   {t("detail.refreshFailed")} {error.text}
-                </p>
+                </ErrorText>
                 {error.retryable && (
                   <Button variant="secondary" busy={retrying} onClick={() => void retry()}>
                     {tc("errorPage.retry")}
@@ -448,7 +477,9 @@ export default function BookingConfirmationPage() {
             )}
             <div className="overflow-hidden rounded-2xl bg-white shadow-sm print:shadow-none">
               {/* Baskıda arka plan düşer; beyaz başlık okunur kalsın diye renk korunur. */}
-              <div className="flex items-start gap-3 bg-green-700 px-4 py-6 text-white [print-color-adjust:exact] sm:px-8">
+              <div
+                className={`flex items-start gap-3 ${STATUS_BAND[shownStatus] ?? "bg-gray-700"} px-4 py-6 text-white [print-color-adjust:exact] sm:px-8`}
+              >
                 <StatusIcon status={shownStatus} />
                 <div className="min-w-0">
                   {/* Ekran okuyucuda hangi rezervasyon olduğu başlıktan anlaşılsın. */}
@@ -470,13 +501,25 @@ export default function BookingConfirmationPage() {
                       {t(`detail.statusHint.${shownStatus}`)}
                     </p>
                   )}
+                  {resultNote && (
+                    <p className="mt-1 text-sm font-semibold text-white">{resultNote}</p>
+                  )}
                   {/* Kısa durum etiketi: hesap sayfası ve ev sahibi paneliyle aynı ad ve simge. */}
                   <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-green-50">
                     <BookingStatusBadge status={shownStatus} />
                     <p>
                       {t.rich("detail.bookingNumber", {
                         id: booking.id,
-                        b: () => <BookingNumberText id={booking.id} />,
+                        // Ev sahibi paneliyle aynı kısa no; tam kimlik destek için title'da (F2-41).
+                        b: () => (
+                          <span
+                            translate="no"
+                            title={booking.id}
+                            className="font-mono font-semibold"
+                          >
+                            {shortRef(booking.id)}
+                          </span>
+                        ),
                       })}
                     </p>
                   </div>
@@ -604,7 +647,19 @@ export default function BookingConfirmationPage() {
                     chargePending={
                       plan ? plan.status === "SCHEDULED" || plan.status === "RETRYING" : undefined
                     }
-                    onChanged={() => void load()}
+                    onChanged={(result) => {
+                      if (result) {
+                        pendingResult.current = result;
+                        setResultNote(result);
+                      }
+                      void load();
+                    }}
+                    rebookHref={sameDatesHref}
+                    policySnapshot={booking.policySnapshot}
+                    checkIn={booking.checkIn}
+                    createdAt={booking.createdAt}
+                    timeZone={booking.property.timeZone}
+                    checkInTime={booking.property.checkInTime}
                   />
 
                   {/* İptalden sonra da geçmiş okunur; yazma izni sunucunun `canWrite` alanında.
@@ -634,21 +689,23 @@ export default function BookingConfirmationPage() {
                 </div>
 
                 <div className="flex flex-wrap gap-3 border-t border-gray-100 pt-6 print:hidden">
-                  <Link
-                    href={
-                      rebookQuery
-                        ? `/property/${booking.property.id}?${rebookQuery}`
-                        : `/property/${booking.property.id}`
-                    }
-                    className={
-                      // Ödeme bekleyen rezervasyonda tek birincil eylem ödeme düğmesidir.
-                      shownStatus === "HELD"
-                        ? secondaryAction
-                        : "rounded-lg bg-[#003580] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#002b66]"
-                    }
-                  >
-                    {rebookQuery ? t("detail.rebook") : t("detail.viewProperty")}
-                  </Link>
+                  {!expiredHoldShown && (
+                    <Link
+                      href={
+                        rebookQuery
+                          ? `/property/${booking.property.id}?${rebookQuery}`
+                          : `/property/${booking.property.id}`
+                      }
+                      className={
+                        // Ödeme bekleyen rezervasyonda tek birincil eylem ödeme düğmesidir.
+                        shownStatus === "HELD"
+                          ? secondaryAction
+                          : "rounded-lg bg-[#003580] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#002b66]"
+                      }
+                    >
+                      {rebookQuery ? t("detail.rebook") : t("detail.viewProperty")}
+                    </Link>
+                  )}
                   {SETTLED_STATUSES.includes(booking.status) && (
                     <a
                       href={`/api/bookings/${booking.id}/invoice`}

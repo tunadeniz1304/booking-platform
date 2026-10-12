@@ -49,11 +49,8 @@
     "details": "Details and messages",
     "completePayment": "Complete payment",
     "cancelConfirm": {
-      "title": "Do you want to cancel this booking?",
       "summary": "{checkIn} – {checkOut} · Total {total}",
-      "refundNote": "How much you get back depends on the listing's cancellation policy and when you cancel; the amount is shown right after cancelling. You can check the policy first in the <link>booking details</link>. This cannot be undone.",
-      "confirm": "Yes, cancel",
-      "keep": "Keep booking"
+      "refundNote": "How much you get back depends on the listing's cancellation policy and when you cancel; the amount is shown right after cancelling. You can check the policy first in the <link>booking details</link>."
     },
     "cancelDone": {
       "refunded": "Booking cancelled. {amount} will be refunded ({percent}%).",
@@ -118,7 +115,6 @@
     "wrongPassword": "Incorrect password. Please check it and try again.",
     "descriptionPasswordOnly": "For your security, please re-enter your password before continuing.",
     "rateLimitedFor": "Too many failed attempts. Please try again in {minutes, plural, one {# minute} other {# minutes}}.",
-    "showPassword": "Show password",
     "passkeyPrompt": "Confirm the prompt on your device…"
   },
   "sessions": {

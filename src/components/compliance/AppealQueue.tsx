@@ -61,6 +61,12 @@ function writeResponseDraft(id: string, value: string) {
   }
 }
 
+/** Başlık için kısaltılmış içerik adresi (protokolsüz, en çok 48 karakter). */
+function shortUrl(url: string): string {
+  const bare = url.replace(/^https?:\/\//, "").replace(/\/$/, "");
+  return bare.length > 48 ? `${bare.slice(0, 47)}…` : bare;
+}
+
 /** VALIDATION_ERROR yanıtındaki (`details.fieldErrors`, zod flatten) hatalı alan adları. */
 function invalidFields(error: unknown): string[] {
   if (!(error instanceof ApiError) || error.code !== "VALIDATION_ERROR") return [];
@@ -109,10 +115,13 @@ export default function AppealQueue() {
     el.focus();
   }, [appeals.data]);
 
+  // F2-07: aynı rollü satırlar ayırt edilsin diye başlıkta içerik ve itiraz tarihi de var.
   const rowTitle = (row: AppealRow) =>
     t("rowTitle", {
+      content: row.notice ? shortUrl(row.notice.contentUrl) : t("noContent"),
       role: t(`roles.${row.appellantRole}`),
       decision: row.notice?.decision ? tp(`decisions.${row.notice.decision}`) : t("noDecision"),
+      date: f.date(row.createdAt, "medium"),
     });
   /** Satır listeden kalktığında duyurularda öğeyi tanıtan metin. */
   const itemLabel = (row: AppealRow) => row.notice?.contentUrl ?? rowTitle(row);
@@ -159,7 +168,14 @@ export default function AppealQueue() {
       title: t("confirm.title"),
       body: (
         <>
-          <span className="block">{t(`outcomes.${outcome}`)}</span>
+          <span className="block break-all">
+            {t("confirm.summary", {
+              url: row.notice?.contentUrl ?? t("noContent"),
+              role: t(`roles.${row.appellantRole}`),
+              date: f.date(row.createdAt, "medium"),
+            })}
+          </span>
+          <span className="mt-1 block">{t(`outcomes.${outcome}`)}</span>
           <span className="mt-1 block">
             {outcome === "UPHELD"
               ? row.notice?.decision === "NO_ACTION"

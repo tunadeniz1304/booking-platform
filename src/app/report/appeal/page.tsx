@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
-import { ButtonLink, Card, PageShell, focusRing } from "@/components/ui/ui";
+import { ButtonLink, Card, ErrorText, PageShell, focusRing } from "@/components/ui/ui";
 import AppealForm from "@/components/compliance/AppealForm";
 import {
   appealRoleSchema,
@@ -69,9 +69,7 @@ export default async function AppealPage({
     <PageShell title={t("title")} intro={ctx ? t("intro") : undefined}>
       {!ctx ? (
         <Card>
-          <p role="alert" className="text-sm text-red-700">
-            {t(loadError)}
-          </p>
+          <ErrorText>{t(loadError)}</ErrorText>
           <div className="mt-4 flex flex-wrap gap-3">
             <ButtonLink href="/support">{t("contactSupport")}</ButtonLink>
             <ButtonLink href="/report" variant="secondary">
@@ -174,9 +172,7 @@ export default async function AppealPage({
             </Card>
           ) : !ctx.windowOpen ? (
             <Card>
-              <p role="alert" className="text-sm text-red-700">
-                {t("windowClosed")}
-              </p>
+              <ErrorText>{t("windowClosed")}</ErrorText>
             </Card>
           ) : (
             <AppealForm noticeId={ctx.noticeId} role={ctx.role} token={str("token")} />

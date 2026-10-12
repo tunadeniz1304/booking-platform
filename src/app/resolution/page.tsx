@@ -48,7 +48,7 @@ export default function ResolutionPage() {
       <RoleGate>
         {(user) => (
           <>
-            <MyClaims />
+            <MyClaims isHost={user.role === "HOST"} />
             {user.role === "HOST" && <HostOpenClaimCard />}
           </>
         )}
@@ -57,7 +57,8 @@ export default function ResolutionPage() {
   );
 }
 
-function MyClaims() {
+/** `isHost`: misafir kuralı ve "Rezervasyonlarıma git" gizlenir; yol aşağıdaki karttır (F2-54). */
+function MyClaims({ isHost }: { isHost: boolean }) {
   const t = useTranslations("resolution");
   const { data, error, loading, reload } = useLoader(() =>
     apiFetch<{ claims: ClaimSummary[] }>("/api/claims")
@@ -135,14 +136,16 @@ function MyClaims() {
               )}
             </>
           )}
-          <div className="space-y-2 text-sm text-gray-700">
-            <p>{t("list.emptyHow", { days: CLAIM_GUEST_WINDOW_DAYS })}</p>
-            <p>
-              <Link href="/trips" className={linkClass}>
-                {t("list.goToTrips")}
-              </Link>
-            </p>
-          </div>
+          {!isHost && (
+            <div className="space-y-2 text-sm text-gray-700">
+              <p>{t("list.emptyHow", { days: CLAIM_GUEST_WINDOW_DAYS })}</p>
+              <p>
+                <Link href="/trips" className={linkClass}>
+                  {t("list.goToTrips")}
+                </Link>
+              </p>
+            </div>
+          )}
         </div>
       )}
     </Card>

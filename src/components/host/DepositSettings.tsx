@@ -8,6 +8,7 @@ import { Button, Field, Status, inputClass, useErrorText, useLoader } from "@/co
 import { minorToInput } from "@/components/resolution/shared";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { parseAmountToMinor } from "@/lib/ui/amount-input";
+import { useHostUnsavedChanges } from "./useHostUnsavedChanges";
 
 /** Para biriminin ondalık basamak sayısı (TRY/EUR 2, JPY 0). */
 function fractionDigitsOf(currency: string): number {
@@ -132,6 +133,10 @@ function DepositRow({
   const { confirm, confirmDialog } = useConfirm();
   const digits = fractionDigitsOf(currency);
   const preview = value.trim() ? parseAmountToMinor(value, digits) : null;
+  // Kaydedilmiş tutardan farklı giriş ayrılma uyarısına sayılır (F2-24).
+  useHostUnsavedChanges(
+    value.trim() ? preview === null || preview !== row.amountMinor : row.amountMinor !== null
+  );
 
   async function put(amountMinor: number | null) {
     if (busy) return;

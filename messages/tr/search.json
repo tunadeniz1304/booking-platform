@@ -39,7 +39,8 @@
     "priceOrder": "En az tutar, en çok tutardan büyük olamaz.",
     "anyType": "Tümü",
     "toggle": "Filtre ve sıralama ({count} etkin)",
-    "clearAll": "Tüm filtreleri temizle"
+    "clearAll": "Tüm filtreleri temizle",
+    "showResults": "{total, number} konaklamayı göster"
   },
   "sort": {
     "recommended": "Önerilen",
@@ -73,7 +74,6 @@
     "decrease": "Azalt",
     "increase": "Artır",
     "submit": "Ara",
-    "datesDialog": "Giriş ve çıkış tarihleri",
     "roomsHint": "Her odada en az bir yetişkin kalmalı",
     "decreaseAdults": "Yetişkin sayısını azalt",
     "increaseAdults": "Yetişkin sayısını artır",
@@ -118,8 +118,9 @@
     "count": "{count} öneri",
     "error": "Öneriler yüklenemedi. Yazdığınızla yine de arayabilirsiniz.",
     "searchFor": "“{query}” için ara",
+    "didYouMean": "Bunu mu demek istediniz: {place}",
     "clear": "Varış yerini temizle",
-    "properties": "Tesisler"
+    "properties": "İlanlar"
   },
   "mapView": {
     "initFailed": "harita başlatılamadı",
@@ -242,16 +243,12 @@
     "destination": "Nereye?",
     "checkIn": "Giriş tarihi",
     "checkOut": "Çıkış tarihi",
-    "guests": "Misafir sayısı",
-    "submit": "Aramayı güncelle",
-    "datesBoth": "Giriş ve çıkış tarihini birlikte seçin.",
-    "datesOrder": "Çıkış tarihi giriş tarihinden sonra olmalı.",
-    "guestsInvalid": "Misafir sayısı 1 ile 30 arasında olmalı."
+    "guests": "Misafir sayısı"
   },
   "resultsHeading": "Sonuçlar",
   "retry": "Tekrar dene",
   "mapList": {
-    "view": "İlanı gör",
+    "view": "İlanı görüntüle",
     "selected": "Seçili",
     "selectHint": "Seçince ilan haritada vurgulanır."
   },

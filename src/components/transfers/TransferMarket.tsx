@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { apiFetch } from "@/lib/api-client";
 import { parseAmountToMinor } from "@/lib/ui/amount-input";
 import { useFormat } from "@/i18n/use-format";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { AmountPreview } from "@/components/ui/AmountPreview";
 import { VerifyEmailNotice, isEmailNotVerified } from "@/components/transfers/ClaimForm";
 import {
   Button,
@@ -234,6 +235,53 @@ function SellPanel({ userId, emailVerified }: { userId: string; emailVerified?: 
     return () => window.removeEventListener("beforeunload", warn);
   }, [claimUrl, sent]);
 
+  // F2-32: yeni bağlantı görününce odak (değer seçili) bağlantı alanına taşınır.
+  useEffect(() => {
+    if (!claimUrl) return;
+    const input = document.getElementById("claim-url") as HTMLInputElement | null;
+    input?.focus();
+    input?.select();
+  }, [claimUrl]);
+
+  // F2-32: beforeunload Next <Link> geçişinde çalışmaz; uygulama içi bağlantı tıklamaları
+  // yakalanır ve kopyalanmamış tek seferlik bağlantı için onay istenir.
+  const confirmRef = useRef(confirm);
+  useEffect(() => {
+    confirmRef.current = confirm;
+  }, [confirm]);
+  const bypassRef = useRef(false);
+  useEffect(() => {
+    if (!claimUrl || sent) return;
+    const onClick = (e: MouseEvent) => {
+      if (bypassRef.current || e.defaultPrevented || e.button !== 0) return;
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return; // yeni sekme: sayfa kalır
+      const anchor = (e.target as Element | null)?.closest?.("a[href]");
+      if (!(anchor instanceof HTMLAnchorElement)) return;
+      if (anchor.target === "_blank" || anchor.hasAttribute("download")) return;
+      if (anchor.getAttribute("href")?.startsWith("#")) return;
+      e.preventDefault();
+      e.stopPropagation();
+      void confirmRef
+        .current({
+          title: t("sell.closeTitle"),
+          body: t("sell.closeBody"),
+          confirmLabel: t("sell.leaveConfirm"),
+          tone: "danger",
+        })
+        .then((ok) => {
+          if (!ok || !anchor.isConnected) return;
+          bypassRef.current = true;
+          try {
+            anchor.click();
+          } finally {
+            bypassRef.current = false;
+          }
+        });
+    };
+    document.addEventListener("click", onClick, true);
+    return () => document.removeEventListener("click", onClick, true);
+  }, [claimUrl, sent, t]);
+
   async function submit(e: FormEvent) {
     e.preventDefault();
     if (!selected || busy) return;
@@ -392,26 +440,34 @@ function SellPanel({ userId, emailVerified }: { userId: string; emailVerified?: 
                 })}
               </select>
             </Field>
-            <Field
-              label={t("sell.askPrice", { currency: selected.currency })}
-              id="sell-ask"
-              hint={t("sell.askHint", { max: f.money(maxAskOf(selected), selected.currency) })}
-              error={askError}
-            >
-              <input
+            <div>
+              <Field
+                label={t("sell.askPrice", { currency: selected.currency })}
                 id="sell-ask"
-                inputMode="decimal"
-                autoComplete="off"
-                className={inputClass}
+                hint={t("sell.askHint", { max: f.money(maxAskOf(selected), selected.currency) })}
+                error={askError}
+              >
+                <input
+                  id="sell-ask"
+                  inputMode="decimal"
+                  autoComplete="off"
+                  className={inputClass}
+                  value={ask}
+                  required
+                  onChange={(e) => setAsk(e.target.value)}
+                />
+              </Field>
+              {/* F2-33: çözülen tutar önizlemesi ("1.250" = bin iki yüz elli). */}
+              <AmountPreview
                 value={ask}
-                required
-                onChange={(e) => setAsk(e.target.value)}
+                currency={selected.currency}
+                fractionDigits={fractionDigits(selected.currency)}
               />
-            </Field>
+            </div>
             <div className="flex items-end">
               <Button
                 type="submit"
-                disabled={busy}
+                busy={busy}
                 className="w-full"
                 aria-describedby="sell-submit-note"
               >

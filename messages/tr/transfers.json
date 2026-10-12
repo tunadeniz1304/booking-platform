@@ -45,6 +45,7 @@
     "closeTitle": "Bağlantıyı kopyalamadan kapatılsın mı?",
     "closeBody": "Bu bağlantı bir daha gösterilmeyecek. Kopyalamadıysanız alıcıya iletemezsiniz.",
     "closeConfirm": "Yine de kapat",
+    "leaveConfirm": "Yine de ayrıl",
     "tooLateSuffix": "(girişe {hours} saatten az; devredilemez)",
     "askTooHigh": "Satış fiyatı en fazla {max} olabilir.",
     "keepNote": "Bu adım rezervasyonu hemen devretmez: rezervasyon, alıcı bağlantıyla ödeme yapana kadar sizde kalır. Ödeme onaylanınca satış fiyatı size ödenir.",

@@ -5,6 +5,7 @@
     "dates": "Giriş – Çıkış",
     "guests": "Misafir sayısı",
     "guestOption": "{count} misafir",
+    "guestSplit": "{children, plural, =0 {{adults} yetişkin} other {{adults} yetişkin, # çocuk}}",
     "room": "Oda",
     "noRooms": "Bu tesiste şu an rezerve edilebilir oda yok.",
     "roomOption": "{name} - {capacity} kişi - {bedType}",
@@ -105,7 +106,7 @@
     "roomGuests": "Oda / Misafir",
     "roomGuestsValue": "{room} · {count} kişi",
     "total": "Toplam tutar",
-    "viewProperty": "Tesisi görüntüle",
+    "viewProperty": "İlanı görüntüle",
     "myBookings": "Rezervasyonlarım",
     "print": "Yazdır",
     "statusChanged": {

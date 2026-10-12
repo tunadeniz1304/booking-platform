@@ -83,6 +83,7 @@ export function Notice({
   children: ReactNode;
   live?: boolean;
 }) {
+  const tc = useTranslations("common");
   return (
     <div
       role={live ? (kind === "error" ? "alert" : "status") : undefined}
@@ -90,6 +91,13 @@ export function Notice({
         kind === "error" ? "bg-red-50 text-red-700" : "bg-green-50 text-green-800"
       }`}
     >
+      {/* F2-44: hata kutusunda ErrorText ile aynı simge + ekran okuyucu "Hata:" öneki. */}
+      {kind === "error" && (
+        <>
+          <span aria-hidden="true">{"⚠︎"} </span>
+          <span className="sr-only">{tc("errorPrefix")} </span>
+        </>
+      )}
       {children}
     </div>
   );

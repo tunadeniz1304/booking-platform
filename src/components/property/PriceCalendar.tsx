@@ -11,7 +11,7 @@ import {
   type StaySelection,
 } from "@/components/booking/stay-selection";
 import { publishStaySelectionClear } from "@/components/booking/stay-selection-clear";
-import { focusRing } from "@/components/ui/ui";
+import { ErrorText, focusRing } from "@/components/ui/ui";
 
 /**
  * Esnek tarih fiyat takvimi (v4 P1-3): ay ızgarası, her gece için en ucuz 1 gecelik fiyat.
@@ -636,9 +636,7 @@ export default function PriceCalendar({
       </p>
       {error && (
         <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
-          <p className="text-sm text-red-700" role="alert">
-            {t("error")}
-          </p>
+          <ErrorText>{t("error")}</ErrorText>
           <button
             ref={retryRef}
             type="button"

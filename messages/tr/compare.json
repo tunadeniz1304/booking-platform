@@ -45,7 +45,7 @@
   "commentary": "Yapay zekâ karşılaştırma özeti",
   "fullHint": "{max}/{max} ilan seçildi. Yeni eklemek için birini çıkarın.",
   "ready": "Karşılaştırmaya hazır.",
-  "retry": "Yeniden dene",
+  "retry": "Tekrar dene",
   "resetAndBack": "Seçimi temizle ve aramaya dön",
   "errorHelp": "Seçtiğiniz ilanlardan biri artık yayında olmayabilir. Yeniden deneyin ya da seçimi temizleyip aramaya dönün.",
   "tableLabel": "Seçilen ilanların karşılaştırma tablosu",

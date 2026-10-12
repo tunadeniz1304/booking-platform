@@ -40,8 +40,8 @@ const NAV_ITEMS: readonly NavItem[] = [
   { key: "stays", href: "/", match: ["/", "/search", "/property", "/compare"] },
   { key: "plan", href: "/plan", requiresLogin: true },
   { key: "transfers", href: "/transfers", overflow: true },
-  // v5 P2-1: AI destek asistanı oturum ister.
-  { key: "support", href: "/support", requiresLogin: true },
+  // F2-39: sayfa (SSS) herkese açık; asistan girişi sayfanın içinde istenir.
+  { key: "support", href: "/support" },
   { key: "trips", href: "/trips", roles: ["USER", "HOST", "ADMIN"] },
   // P1-1 grup sepeti: yalnızca oturum açmış kullanıcıya.
   { key: "cart", href: "/cart", roles: ["USER", "HOST", "ADMIN"] },

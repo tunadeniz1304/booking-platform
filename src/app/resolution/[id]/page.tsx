@@ -7,6 +7,7 @@ import { useTranslations } from "next-intl";
 import { ButtonLink, PageShell, RoleGate, focusRing } from "@/components/ui/ui";
 import ClaimDetail, { type ClaimDetailResult } from "@/components/resolution/ClaimDetail";
 import type { ClaimSummary } from "@/components/resolution/shared";
+import { shortRef } from "@/lib/ui/short-ref";
 
 const linkClass = `inline-flex min-h-[44px] items-center font-semibold text-[#003580] underline sm:min-h-0 ${focusRing}`;
 
@@ -57,7 +58,7 @@ export default function ClaimDetailPage() {
           </Link>
           {claim && (
             <span className="whitespace-nowrap">
-              {t("detailPage.reference", { ref: claim.id.slice(-8) })}
+              {t("detailPage.reference", { ref: shortRef(claim.id) })}
             </span>
           )}
           {href && (

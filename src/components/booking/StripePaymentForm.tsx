@@ -5,6 +5,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
 import { useFormat } from "@/i18n/use-format";
+import { Button } from "@/components/ui/ui";
 
 /** Sunucunun `/pay` yanıtı (yalnızca formun ihtiyaç duyduğu alanlar). */
 export interface PayResponse {
@@ -104,16 +105,18 @@ function InnerForm({
           ? t("stripeTestMode")
           : t("stripeLiveCharge", { amount: f.money(amountMinor, currency) })}
       </p>
-      <button
+      {/* F2-11: `disabled` odağı <body>'ye düşürür; busy/aria-disabled odakta tutar. */}
+      <Button
         type="submit"
-        aria-busy={busy || working || undefined}
-        disabled={busy || working || !stripe}
-        className="w-full rounded-lg bg-[#003580] px-4 py-3 text-sm font-semibold text-white disabled:bg-gray-300 disabled:text-gray-700"
+        size="lg"
+        fullWidth
+        busy={busy || working}
+        aria-disabled={!stripe || undefined}
       >
         {busy || working
           ? t("processing")
           : `${t("payAndConfirm")} · ${f.money(amountMinor, currency)}`}
-      </button>
+      </Button>
     </form>
   );
 }

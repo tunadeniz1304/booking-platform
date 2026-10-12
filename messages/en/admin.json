@@ -47,6 +47,7 @@
   "events": {
     "title": "Event signal queue",
     "textLabel": "Propose an event from text",
+    "textTooShort": "The text must be at least {min} characters.",
     "textHint": "{min}–{max} characters. E.g. a news snippet: 'An international trade fair will be held in İzmir on 12–15 October.' A proposal does not affect prices until it is approved.",
     "extracting": "Extracting…",
     "create": "Create proposal",
@@ -160,7 +161,7 @@
     "remove": "Remove",
     "confirmRemove": {
       "title": "Remove the review of “{property}”?",
-      "body": "The review is unpublished and the property's rating is recalculated. This decision cannot be undone here.",
+      "body": "The review is unpublished and the listing's rating is recalculated. This decision cannot be undone here.",
       "confirm": "Remove review"
     },
     "reviewOf": "Review of “{property}”",
@@ -221,7 +222,9 @@
     "updatedFromTo": "Role of user {user} changed: {from} → {to}. Their sessions were signed out; the new role applies at their next sign-in.",
     "errors": {
       "notFound": "No user found with this ID. Check the ID.",
-      "forbidden": "This role cannot be changed: you cannot change your own role, or you no longer have admin rights."
+      "forbidden": "This role cannot be changed: you cannot change your own role, or you no longer have admin rights.",
+      "userIdRequired": "Enter the user ID.",
+      "roleRequired": "Choose the new role."
     }
   },
   "nav": {
@@ -241,6 +244,13 @@
     "RATE_LIMITED": "Too many actions in a short time. Wait a moment and try again."
   },
   "staleRecord": "Another admin may have already handled this record; the list was refreshed.",
+  "confirmResume": {
+    "title": "Resume payouts for {name} ({shortId})?",
+    "body": "{count, plural, =0 {No payouts are pending.} one {# pending payout is released for sending right away.} other {# pending payouts are released for sending right away.}}",
+    "reason": "Pause reason: {reason}",
+    "noReason": "No pause reason on record.",
+    "confirm": "Resume payouts"
+  },
   "refresh": {
     "button": "Refresh",
     "updatedAt": "Last updated: {time}"

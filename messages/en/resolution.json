@@ -98,7 +98,7 @@
     "authorizeAfter": "Pre-authorization time",
     "authorizedAt": "Pre-authorized at",
     "voidAfter": "Release time",
-    "note": "The deposit is not charged to the guest's card; only a pre-authorization (temporary hold) is placed. It is released at the end of the period unless a damage claim is approved. With a split payment the pre-authorization is placed on the organizer’s (booking owner’s) card; participants’ cards are not used.",
+    "note": "The deposit is not charged to the guest's card; only a pre-authorization (temporary hold) is placed. It is released at the end of the period unless a damage claim is approved. With a group payment the pre-authorization is placed on the organizer’s (booking owner’s) card; participants’ cards are not used.",
     "statuses": {
       "SCHEDULED": "Scheduled",
       "AUTHORIZED": "Pre-authorized",
@@ -108,7 +108,7 @@
       "EXPIRED": "Expired",
       "FAILED": "Pre-authorization failed"
     },
-    "noteGuest": "The deposit is not charged to your card; only a pre-authorization (temporary hold) is placed. It is released at the end of the period unless a damage claim is approved. With a split payment the pre-authorization is placed on the organizer’s (booking owner’s) card; participants’ cards are not used.",
+    "noteGuest": "The deposit is not charged to your card; only a pre-authorization (temporary hold) is placed. It is released at the end of the period unless a damage claim is approved. With a group payment the pre-authorization is placed on the organizer’s (booking owner’s) card; participants’ cards are not used.",
     "noteCaptured": "{amount} of the deposit was charged for an approved damage claim.",
     "noteVoided": "The pre-authorization was released; the deposit was not charged.",
     "noteExpired": "The pre-authorization expired and was released automatically; the deposit was not charged and can no longer be captured.",
@@ -296,6 +296,11 @@
     "explainRefund": "Approving a refund claim refunds the guest: from escrow if the funds are still held, otherwise from the host's reserve / balance after release; the platform covers any shortfall.",
     "explainDamage": "Approving a damage claim captures at most the damage deposit pre-authorization; any excess is only recorded as \"uncollected\".",
     "chooseFirst": "Choose a decision first.",
+    "noteTooShort": "The decision note must be at least 3 characters.",
+    "fixErrors": "Fix the marked fields before saving.",
+    "nextClaim": "Next claim",
+    "backToList": "Back to the list",
+    "noNextClaim": "No other claim in this list is waiting for a decision.",
     "confirm": {
       "title": {
         "APPROVE": "Approve the claim in full?",
@@ -328,7 +333,7 @@
     "CLAIM_BOOKING_NOT_ELIGIBLE": "A claim cannot be opened for this booking.",
     "CLAIM_TRANSFERRED_BOOKING": "Refund claims cannot be opened for transferred bookings.",
     "CLAIM_REFUND_IN_PROGRESS": "This claim's refund was partly issued with a different amount; please contact support.",
-    "CLAIM_SPLIT_CAPACITY": "There is no refundable amount left on the split-payment shares.",
+    "CLAIM_SPLIT_CAPACITY": "There is no refundable amount left on the group payment shares.",
     "CLAIM_EVIDENCE_LIMIT": "The evidence limit for this claim has been reached.",
     "CLAIM_PSP_MANAGED": "This claim is managed by the payment provider.",
     "CLAIM_CLOSED": "The claim is closed; no action is possible.",
@@ -433,7 +438,7 @@
   },
   "hostOpen": {
     "title": "Opening a damage claim",
-    "body": "You open a damage claim from the booking's messages page: find the booking in the Bookings section of your host dashboard, open its “Messages” link and use the “File a damage claim” form at the bottom of the page. A claim can be opened after check-in and before the deposit hold period ends.",
+    "body": "You open a damage claim from the booking's messages page: find the booking in the Bookings section of your host dashboard, open its “Messages & damage claim” link and use the “File a damage claim” form at the bottom of the page. A claim can be opened after check-in and before the deposit hold period ends.",
     "link": "Go to bookings in the host dashboard"
   },
   "hostLinkClaims": "My damage claims",

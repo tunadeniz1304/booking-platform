@@ -24,8 +24,11 @@ interface Props {
   disabled?: boolean;
   selected: boolean;
   onChange: (rnpl: boolean) => void;
-  /** Seçiliyken cüzdan kredisinin bu seçenekle kullanılamayacağını açıklayan notu gösterir. */
-  creditNote?: boolean;
+  /**
+   * F2-12: kullanılacak cüzdan kredisi (minor-unit). "Şimdi öde" tutarından düşülür; "sonra öde"
+   * seçiliyken > 0 ise kredinin bu seçenekle kullanılamayacağı notu gösterilir.
+   */
+  creditMinor?: number;
   /** Teklif yanıtı gelince bir kez çağrılır: seçenek gösteriliyor mu (F1021). */
   onLoaded?: (shown: boolean) => void;
 }
@@ -39,7 +42,7 @@ export default function RnplOption({
   disabled,
   selected,
   onChange,
-  creditNote,
+  creditMinor = 0,
   onLoaded,
 }: Props) {
   const [offer, setOffer] = useState<RnplOffer | null>(null);
@@ -79,7 +82,7 @@ export default function RnplOption({
       disabled={disabled}
       selected={selected}
       onChange={onChange}
-      creditNote={creditNote}
+      creditMinor={creditMinor}
     />
   );
 }
@@ -90,12 +93,14 @@ export function RnplChoice({
   disabled,
   selected,
   onChange,
-  creditNote,
+  creditMinor = 0,
 }: Omit<Props, "bookingId"> & { offer: RnplOffer | null }) {
   const t = useTranslations("payment.rnpl");
   const f = useFormat();
   if (!offer?.available || !offer.dueAt || !offer.freeCancellationUntil) return null;
   const amount = f.money(offer.amountMinor, offer.currency);
+  // F2-12: ödeme düğmesindeki tutarla aynı (kredi düşülmüş).
+  const payNowAmount = f.money(Math.max(0, offer.amountMinor - creditMinor), offer.currency);
   const today = f.money(0, offer.currency);
   // Son tarih bir andır (tesis yerel saatiyle giriş saatine bağlı): tarih + saat + saat dilimi.
   const tz = offer.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -120,7 +125,7 @@ export function RnplChoice({
           checked={!selected}
           onChange={() => onChange(false)}
         />
-        <span>{t("payNow", { amount })}</span>
+        <span>{t("payNow", { amount: payNowAmount })}</span>
       </label>
       <label className="flex items-start gap-2 text-sm text-gray-700">
         <input
@@ -148,7 +153,7 @@ export function RnplChoice({
           </li>
         </ol>
       )}
-      {selected && creditNote && (
+      {selected && creditMinor > 0 && (
         <p className="ml-6 text-sm text-gray-600" data-testid="rnpl-credit-note">
           {t("creditUnavailable")}
         </p>

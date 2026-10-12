@@ -5,7 +5,15 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { ApiError, apiFetch } from "@/lib/api-client";
 import { useFormat } from "@/i18n/use-format";
-import { Button, Card, Field, LoadError, focusRing, inputClass } from "@/components/ui/ui";
+import {
+  Button,
+  Card,
+  ErrorText,
+  Field,
+  LoadError,
+  focusRing,
+  inputClass,
+} from "@/components/ui/ui";
 import { useAccountErrorText } from "./ReauthDialog";
 
 type KycStatus = "NOT_STARTED" | "PENDING" | "VERIFIED" | "REQUIRES_INPUT" | "FAILED";
@@ -261,11 +269,7 @@ export default function IdentityVerification({ role }: { role?: string }) {
             <LoadError error={t("loadFailed")} onRetry={() => void retryLoad()} busy={reloading} />
           </div>
         )}
-        {error && (
-          <p role="alert" className="mt-3 text-sm text-red-700">
-            {error}
-          </p>
-        )}
+        {error && <ErrorText className="mt-3">{error}</ErrorText>}
         {emailBlocked && (
           <div className="mt-2 text-sm">
             <KycEmailResend />

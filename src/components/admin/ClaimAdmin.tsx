@@ -11,6 +11,7 @@ import {
   LoadError,
   RefreshStatus,
   Status,
+  focusFirstInvalid,
   inputClass,
   useLoader,
 } from "@/components/ui/ui";
@@ -123,15 +124,33 @@ export default function ClaimAdmin() {
   const list = data && data.filter === status ? data.claims : null;
   // Rezervasyon no, talep no ya da mülk adına göre istemci tarafı arama.
   const needle = query.trim().toLocaleLowerCase(locale);
+  // Kimlikler yerel kuralsız karşılaştırılır (tr'de "I" -> "ı" eşleşmeyi bozar).
+  const idNeedle = query.trim().toLowerCase();
   const shown =
     list && needle
-      ? list.filter((c) =>
-          [c.bookingId, c.id, c.propertyTitle ?? ""].some((v) =>
-            v.toLocaleLowerCase(locale).includes(needle)
-          )
+      ? list.filter(
+          (c) =>
+            [c.bookingId, c.id].some((v) => v.toLowerCase().includes(idNeedle)) ||
+            (c.propertyTitle ?? "").toLocaleLowerCase(locale).includes(needle)
         )
       : list;
   const refreshing = loading && list !== null;
+  // F2-26: karar sonrası "Sıradaki talep" — karar anındaki listeden hesaplanır (yenilemede
+  // sonuçlanan talep filtreden düşebilir).
+  const [nextAfterDecision, setNextAfterDecision] = useState<{
+    from: string;
+    next: string | null;
+  } | null>(null);
+  const nextActiveAfter = (id: string): string | null => {
+    const items = shown ?? [];
+    const index = items.findIndex((c) => c.id === id);
+    const isOpen = (c: ClaimSummary) => c.id !== id && ACTIVE_STATUSES.includes(c.status);
+    return (
+      items.slice(index + 1).find(isOpen)?.id ??
+      items.slice(0, Math.max(index, 0)).find(isOpen)?.id ??
+      null
+    );
+  };
   const counts = data?.counts;
   const withCount = (label: string, count: number) =>
     counts ? t("admin.optionCount", { label, count }) : label;
@@ -239,9 +258,18 @@ export default function ClaimAdmin() {
               <DecisionForm
                 detail={detail}
                 onDecided={() => {
+                  setNextAfterDecision({
+                    from: detail.claim.id,
+                    next: nextActiveAfter(detail.claim.id),
+                  });
                   reloadDetail();
                   reload();
                 }}
+                nextId={
+                  nextAfterDecision?.from === detail.claim.id ? nextAfterDecision.next : undefined
+                }
+                onNext={select}
+                onBack={closeDetail}
               />
             )}
           />
@@ -285,11 +313,19 @@ function DecisionCard({ children }: { children: ReactNode }) {
 function DecisionForm({
   detail,
   onDecided,
+  nextId,
+  onNext,
+  onBack,
 }: {
   detail: ClaimDetailResponse;
   onDecided: () => void;
+  /** Karar bu oturumda verildiyse sıradaki aktif talep (`null`: yok; `undefined`: karar yok). */
+  nextId?: string | null;
+  onNext: (id: string) => void;
+  onBack: () => void;
 }) {
   const t = useTranslations("resolution");
+  const tc = useTranslations("common");
   const f = useFormat();
   const claimError = useClaimErrorText();
   const { claim, deposit } = detail;
@@ -301,10 +337,12 @@ function DecisionForm({
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<{ error?: string; message?: string }>({});
   const [amountError, setAmountError] = useState<string | null>(null);
+  const [decisionError, setDecisionError] = useState<string | null>(null);
+  const [noteError, setNoteError] = useState<string | null>(null);
   const { confirm, confirmDialog } = useConfirm();
   const closedRef = useRef<HTMLDivElement>(null);
-  const firstRadioRef = useRef<HTMLInputElement>(null);
   const amountRef = useRef<HTMLInputElement>(null);
+  const firstRadioRef = useRef<HTMLInputElement>(null);
   const isClosed = !ACTIVE_STATUSES.includes(claim.status);
 
   // Karar kaydedilince form "sonuçlandı" görünümüne geçer; odak, başarı mesajını da içeren
@@ -327,6 +365,20 @@ function DecisionForm({
           {feedback.message && <Status message={feedback.message} />}
           <p className="text-sm text-gray-700">{t("decision.closed")}</p>
         </div>
+        {nextId !== undefined && (
+          <div className="mt-3 space-y-2">
+            {nextId === null && (
+              <p className="text-sm text-gray-700">{t("decision.noNextClaim")}</p>
+            )}
+            {nextId ? (
+              <Button onClick={() => onNext(nextId)}>{t("decision.nextClaim")}</Button>
+            ) : (
+              <Button variant="secondary" onClick={onBack}>
+                {t("decision.backToList")}
+              </Button>
+            )}
+          </div>
+        )}
       </DecisionCard>
     );
   }
@@ -364,16 +416,25 @@ function DecisionForm({
           ? t("decision.submitReject")
           : t("decision.submit");
 
-  async function submit(e: FormEvent) {
+  async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (busy) return;
+    const formEl = e.currentTarget;
     setFeedback({});
     setAmountError(null);
-    if (!decision) {
-      setFeedback({ error: t("decision.chooseFirst") });
-      firstRadioRef.current?.focus();
+    // F2-25: tarayıcı balonu yerine alan hataları (noValidate); odak ilk hatalı alana.
+    const missingDecision = !decision;
+    const shortNote = note.trim().length < 3;
+    setDecisionError(missingDecision ? t("decision.chooseFirst") : null);
+    setNoteError(shortNote ? t("decision.noteTooShort") : null);
+    if (missingDecision || shortNote) {
+      setFeedback({ error: t("decision.fixErrors") });
+      // Karar grubu formda ilk alan: seçilmemişse odak ilk radyoya (radyoda aria-invalid yok).
+      if (missingDecision) requestAnimationFrame(() => firstRadioRef.current?.focus());
+      else focusFirstInvalid(formEl);
       return;
     }
+    if (!decision) return;
     if (
       decision === "APPROVE" &&
       refundableMinor !== null &&
@@ -461,10 +522,11 @@ function DecisionForm({
         {claim.type === "GUEST_REFUND" ? t("decision.explainRefund") : t("decision.explainDamage")}
       </p>
       {limitText && <p className="mb-3 text-sm font-medium text-gray-800">{limitText}</p>}
-      <form onSubmit={submit} className="space-y-3">
-        <fieldset>
+      <form onSubmit={submit} noValidate className="space-y-3">
+        <fieldset aria-describedby={decisionError ? `${fid}-decision-error` : undefined}>
           <legend className="text-sm font-medium text-gray-800">
             {t("decision.decisionLabel")}
+            <span aria-hidden="true"> *</span>
           </legend>
           <div className="mt-1 flex flex-wrap gap-4">
             {DECISIONS.map((d, i) => (
@@ -473,18 +535,30 @@ function DecisionForm({
                 className="flex min-h-[44px] items-center gap-2 text-sm text-gray-800 sm:min-h-0"
               >
                 <input
-                  ref={i === 0 ? firstRadioRef : undefined}
                   type="radio"
                   name={`${fid}-decision`}
                   value={d}
                   required
+                  ref={i === 0 ? firstRadioRef : undefined}
+                  // F2-25: hata metni odaklı radyoda da okunur.
+                  aria-describedby={decisionError ? `${fid}-decision-error` : undefined}
                   checked={decision === d}
-                  onChange={() => setDecision(d)}
+                  onChange={() => {
+                    setDecision(d);
+                    setDecisionError(null);
+                  }}
                 />
                 {t(`decision.${d}`, { amount: requestedMoney })}
               </label>
             ))}
           </div>
+          {decisionError && (
+            <p id={`${fid}-decision-error`} className="mt-1 text-xs font-medium text-red-700">
+              <span aria-hidden="true">{"⚠︎"} </span>
+              <span className="sr-only">{tc("errorPrefix")} </span>
+              {decisionError}
+            </p>
+          )}
         </fieldset>
         {decision === "PARTIAL" && (
           <div>
@@ -514,7 +588,13 @@ function DecisionForm({
             </p>
           </div>
         )}
-        <Field label={t("decision.note")} id={`${fid}-note`} hint={t("decision.noteHint")}>
+        <Field
+          label={t("decision.note")}
+          id={`${fid}-note`}
+          hint={t("decision.noteHint")}
+          error={noteError}
+          required
+        >
           <textarea
             id={`${fid}-note`}
             rows={3}
@@ -523,7 +603,10 @@ function DecisionForm({
             minLength={3}
             maxLength={4000}
             required
-            onChange={(e) => setNote(e.target.value)}
+            onChange={(e) => {
+              setNote(e.target.value);
+              if (e.target.value.trim().length >= 3) setNoteError(null);
+            }}
           />
         </Field>
         <Button type="submit" variant={decision === "REJECT" ? "danger" : "primary"} busy={busy}>

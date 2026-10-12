@@ -6,7 +6,7 @@ import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import { apiFetch } from "@/lib/api-client";
 import { useFormat } from "@/i18n/use-format";
-import { Button, RoleGate, buttonClass, focusRing, useErrorText } from "@/components/ui/ui";
+import { Button, RoleGate, Status, buttonClass, focusRing, useErrorText } from "@/components/ui/ui";
 
 interface Mail {
   id: string;
@@ -150,9 +150,9 @@ function MailboxList() {
         </p>
       </div>
       {failure && (
-        <p role="alert" className="mt-4 text-red-700">
-          {errorText(failure.error)}
-        </p>
+        <div className="mt-4">
+          <Status error={errorText(failure.error)} />
+        </div>
       )}
       {mails?.length === 0 && <p className="mt-6 text-gray-500">{t("empty")}</p>}
       {mails && mails.length >= MAILBOX_LIMIT && (

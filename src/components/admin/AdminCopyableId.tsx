@@ -3,15 +3,16 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { focusRing } from "@/components/ui/ui";
+import { shortRef } from "@/lib/ui/short-ref";
 
 /**
  * Uzun kimlik: kısaltılmış görünür, tam değer `title`da; düğme tam değeri panoya kopyalar.
- * (AdminDashboard içindeki `IdText` ile aynı davranış; diğer yönetici kartları için.)
+ * Kısa biçim tüm ekranlarda ortak `shortRef` (F2-41).
  */
 export function AdminCopyableId({ id, label }: { id: string; label: (short: string) => string }) {
   const t = useTranslations("admin");
   const [copied, setCopied] = useState(false);
-  const short = id.length > 12 ? `${id.slice(0, 6)}…${id.slice(-4)}` : id;
+  const short = shortRef(id);
   async function copy() {
     try {
       await navigator.clipboard.writeText(id);

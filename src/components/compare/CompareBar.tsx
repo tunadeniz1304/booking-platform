@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { focusRing } from "@/components/ui/ui";
-import { COMPARE_MAX, useCompareSelection } from "./useCompareSelection";
+import { COMPARE_MAX, useCompareBaseline, useCompareSelection } from "./useCompareSelection";
 import { useCompareListingTitles } from "./useCompareListingTitles";
 
 /** "Geri al" şeridinin süresi; odak şeritteyken süre işlemez (WCAG 2.2.1). */
@@ -17,11 +17,17 @@ export default function CompareBar({
   checkIn,
   checkOut,
   guests,
+  adults,
+  childCount,
   from,
 }: {
   checkIn?: string;
   checkOut?: string;
   guests?: number;
+  /** F2-19: yetişkin/çocuk dağılımı karşılaştırma adresine taşınır (isteğe bağlı). */
+  adults?: number;
+  /** `children` React'in ayrılmış prop adı olduğu için çocuk sayısı bu adla gelir. */
+  childCount?: number;
   /** Arama sorgusu (filtreler dahil); karşılaştırmadaki "Aramaya dön" bu aramaya döner. */
   from?: string;
 }) {
@@ -42,6 +48,10 @@ export default function CompareBar({
     if (ids.length > 0 && undo) setUndo(null);
   }
   const undoIds = ids.length === 0 ? undo : null;
+  // F2-51: açılışta localStorage'dan dolan seçim duyurulmaz; yalnızca seçim değişince duyurulur.
+  const { initialKey, hydrated } = useCompareBaseline();
+  const [selectionChanged, setSelectionChanged] = useState(false);
+  if (hydrated && !selectionChanged && ids.join(",") !== initialKey) setSelectionChanged(true);
   const visible = ids.length > 0 || undoIds !== null;
 
   // F89/F165: çubuk görünürken yüksekliği kadar sayfa sonuna boşluk ve kaydırma payı ayır;
@@ -56,7 +66,10 @@ export default function CompareBar({
     const outer = { padding: body.style.paddingBottom, scroll: root.style.scrollPaddingBottom };
     const applied = { padding: "", scroll: "" };
     const apply = () => {
-      const h = `calc(${Math.ceil(el.getBoundingClientRect().height)}px + ${COOKIE_OFFSET})`;
+      const barH = `${Math.ceil(el.getBoundingClientRect().height)}px`;
+      const h = `calc(${barH} + ${COOKIE_OFFSET})`;
+      // F2-22: yapışkan (sticky) alt öğeler çubuğun üstünde kalsın diye yükseklik değişkeni.
+      root.style.setProperty("--compare-bar-h", h);
       body.style.paddingBottom = h;
       root.style.scrollPaddingBottom = h;
       applied.padding = body.style.paddingBottom;
@@ -83,6 +96,7 @@ export default function CompareBar({
       mo?.disconnect();
       body.style.paddingBottom = outer.padding;
       root.style.scrollPaddingBottom = outer.scroll;
+      root.style.removeProperty("--compare-bar-h");
     };
   }, [visible]);
 
@@ -135,11 +149,13 @@ export default function CompareBar({
     params.set("checkOut", checkOut);
   }
   if (guests) params.set("guests", String(guests));
+  if (adults) params.set("adults", String(adults));
+  if (childCount) params.set("children", String(childCount));
   if (from) params.set("from", from);
 
   const announcement = undoIds
     ? t("cleared")
-    : !visible
+    : !visible || !selectionChanged
       ? ""
       : full
         ? `${t("bar", { count: ids.length })} ${t("fullHint", { max: COMPARE_MAX })}`

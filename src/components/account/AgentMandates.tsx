@@ -17,6 +17,7 @@ import {
   useLoader,
 } from "@/components/ui/ui";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { AmountPreview } from "@/components/ui/AmountPreview";
 import { ReauthCancelledError, useAccountErrorText, useReauth } from "./ReauthDialog";
 
 /**
@@ -411,11 +412,11 @@ export default function AgentMandates() {
                 className={inputClass}
               />
             </Field>
-            <p aria-live="polite" className="mt-1 min-h-[1rem] text-xs text-gray-700">
-              {validMinor !== null
-                ? t("amountPreview", { amount: f.money(validMinor, currency) })
-                : ""}
-            </p>
+            <AmountPreview
+              value={amountText}
+              currency={currency}
+              format={(amount) => t("amountPreview", { amount })}
+            />
           </div>
           <Field
             id="mandate-currency"

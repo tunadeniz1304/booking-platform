@@ -98,7 +98,7 @@
     "authorizeAfter": "Provizyon zamanı",
     "authorizedAt": "Provizyon alındı",
     "voidAfter": "Serbest bırakılma",
-    "note": "Depozito misafirin kartından çekilmez; yalnızca provizyon (geçici bloke) alınır. Onaylanmış bir hasar talebi yoksa süre sonunda serbest bırakılır. Bölünmüş ödemede provizyon organizatörün (rezervasyon sahibinin) kartından alınır; katılımcı kartları kullanılmaz.",
+    "note": "Depozito misafirin kartından çekilmez; yalnızca provizyon (geçici bloke) alınır. Onaylanmış bir hasar talebi yoksa süre sonunda serbest bırakılır. Grup ödemesinde provizyon organizatörün (rezervasyon sahibinin) kartından alınır; katılımcı kartları kullanılmaz.",
     "statuses": {
       "SCHEDULED": "Planlandı",
       "AUTHORIZED": "Provizyon alındı",
@@ -108,7 +108,7 @@
       "EXPIRED": "Süresi doldu",
       "FAILED": "Provizyon alınamadı"
     },
-    "noteGuest": "Depozito kartınızdan çekilmez; yalnızca provizyon (geçici bloke) alınır. Onaylanmış bir hasar talebi yoksa süre sonunda serbest bırakılır. Bölünmüş ödemede provizyon organizatörün (rezervasyon sahibinin) kartından alınır; katılımcı kartları kullanılmaz.",
+    "noteGuest": "Depozito kartınızdan çekilmez; yalnızca provizyon (geçici bloke) alınır. Onaylanmış bir hasar talebi yoksa süre sonunda serbest bırakılır. Grup ödemesinde provizyon organizatörün (rezervasyon sahibinin) kartından alınır; katılımcı kartları kullanılmaz.",
     "noteCaptured": "Onaylanan hasar talebi için depozitodan {amount} tahsil edildi.",
     "noteVoided": "Provizyon serbest bırakıldı; depozito tutarı karttan çekilmedi.",
     "noteExpired": "Provizyonun süresi doldu ve kendiliğinden serbest bırakıldı; depozito tutarı karttan çekilmedi ve artık tahsil edilemez.",
@@ -296,6 +296,11 @@
     "explainRefund": "İade talebi onaylanırsa misafire iade yapılır: tutar henüz emanetteyse emanetten, ev sahibine aktarıldıysa ev sahibinin rezervinden / bakiyesinden karşılanır; yetmeyen kısmı platform üstlenir.",
     "explainDamage": "Hasar talebi onaylanırsa en fazla hasar depozitosu provizyonu kadar tahsil edilir; bunu aşan kısım yalnızca \"tahsil edilemeyen\" olarak kaydedilir.",
     "chooseFirst": "Önce bir karar seçin.",
+    "noteTooShort": "Karar notu en az 3 karakter olmalı.",
+    "fixErrors": "Kaydetmeden önce işaretli alanları düzeltin.",
+    "nextClaim": "Sıradaki talep",
+    "backToList": "Listeye dön",
+    "noNextClaim": "Bu listede karar bekleyen başka talep yok.",
     "confirm": {
       "title": {
         "APPROVE": "Talep tam olarak onaylansın mı?",
@@ -328,7 +333,7 @@
     "CLAIM_BOOKING_NOT_ELIGIBLE": "Bu rezervasyon için talep açılamaz.",
     "CLAIM_TRANSFERRED_BOOKING": "Devredilmiş rezervasyonda iade talebi açılamaz.",
     "CLAIM_REFUND_IN_PROGRESS": "Bu talebin iadesi farklı bir tutarla kısmen yapılmış; lütfen destek ekibiyle iletişime geçin.",
-    "CLAIM_SPLIT_CAPACITY": "Bölünmüş ödemenin paylarında iade edilebilir tutar kalmadı.",
+    "CLAIM_SPLIT_CAPACITY": "Grup ödemesinin paylarında iade edilebilir tutar kalmadı.",
     "CLAIM_EVIDENCE_LIMIT": "Bu talep için kanıt sınırına ulaşıldı.",
     "CLAIM_PSP_MANAGED": "Bu talep ödeme sağlayıcısı tarafından yönetiliyor.",
     "CLAIM_CLOSED": "Talep kapanmış; işlem yapılamaz.",
@@ -428,12 +433,12 @@
     "you": "{party} (siz)"
   },
   "errorAction": {
-    "contactSupport": "Destekle iletişime geç",
+    "contactSupport": "Destek ekibine yazın",
     "viewClaims": "Çözüm merkezine git"
   },
   "hostOpen": {
     "title": "Hasar talebi açma",
-    "body": "Hasar talebini ilgili rezervasyonun mesajlar sayfasından açarsınız: Ev sahibi panelindeki Rezervasyonlar bölümünde rezervasyonu bulun, “Mesajlar” bağlantısını açın ve sayfanın altındaki “Hasar talebi aç” formunu kullanın. Talep, girişten sonra ve depozito tutma süresi bitmeden açılabilir.",
+    "body": "Hasar talebini ilgili rezervasyonun mesajlar sayfasından açarsınız: Ev sahibi panelindeki Rezervasyonlar bölümünde rezervasyonu bulun, “Mesajlar ve hasar talebi” bağlantısını açın ve sayfanın altındaki “Hasar talebi aç” formunu kullanın. Talep, girişten sonra ve depozito tutma süresi bitmeden açılabilir.",
     "link": "Ev sahibi panelindeki rezervasyonlara git"
   },
   "hostLinkClaims": "Hasar taleplerim",

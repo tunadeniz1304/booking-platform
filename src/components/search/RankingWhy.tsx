@@ -99,7 +99,7 @@ export default function RankingWhy({
       )}
       <Link
         href={q ? `/ranking?from=${encodeURIComponent(q)}` : "/ranking"}
-        className={`mt-1 inline-block underline ${focusRing}`}
+        className={`mt-1 inline-flex min-h-[24px] items-center underline ${focusRing}`}
       >
         {t("title")}
       </Link>

@@ -6,12 +6,21 @@ import { useTranslations } from "next-intl";
 import AuthCard, {
   Notice,
   authInputClass,
+  safeRedirect,
   submitButtonProps,
   useAuthErrorText,
   useSearchParam,
+  withRedirect,
 } from "@/components/auth/AuthCard";
+import {
+  POST_RESET_REDIRECT_KEY,
+  clearAuthRedirect,
+  matchAuthRedirect,
+  readAuthRedirect,
+} from "@/components/auth/authRedirectStorage";
 import NewPasswordField, { newPasswordOk } from "@/components/auth/NewPasswordField";
 import PasswordRevealInput from "@/components/auth/PasswordRevealInput";
+import { rememberAuthEmail } from "@/lib/auth/auth-email-handoff";
 
 /** Sunucunun kabul ettiği en kısa token (password/reset route: z.string().min(20)). */
 const MIN_TOKEN_LENGTH = 20;
@@ -21,6 +30,8 @@ const RESET_TIMEOUT_MS = 20_000;
 const noopSubscribe = () => () => {};
 const clientSnapshot = () => true;
 const serverSnapshot = () => false;
+
+const readResetRedirect = () => readAuthRedirect(POST_RESET_REDIRECT_KEY);
 
 const focusPassword = () => document.getElementById("password")?.focus();
 
@@ -38,6 +49,14 @@ export default function ResetPasswordPage() {
   const [email, setEmail] = useState<string | null>(null);
   // Hidrasyondan önce gönder düğmesi devre dışı: Enter yerel GET gönderimiyle sayfayı yenilemez.
   const hydrated = useSyncExternalStore(noopSubscribe, clientSnapshot, serverSnapshot);
+  // F2-34: "Şifremi unuttum" isteğinde saklanan dönüş adresi; giriş bağlantıları onu taşır.
+  // Yalnızca bağlantının hesabıyla eşleşen ve süresi geçmemiş kayıt kullanılır.
+  const storedRedirect = useSyncExternalStore(noopSubscribe, readResetRedirect, () => null);
+  const matchedRedirect = email ? matchAuthRedirect(storedRedirect, email) : null;
+  const [doneRedirect, setDoneRedirect] = useState<string | null>(null);
+  const returnTo = doneRedirect ?? safeRedirect(matchedRedirect);
+  const loginHref = withRedirect("/login", returnTo);
+  const forgotHref = withRedirect("/forgot-password", returnTo);
 
   // Token'ı tüketmeden ön kontrol: kullanılmış/süresi dolmuş bağlantıda form hiç gösterilmez.
   useEffect(() => {
@@ -51,8 +70,13 @@ export default function ResetPasswordPage() {
       .then(async (res) => {
         const body = (await res.json().catch(() => ({}))) as { email?: string; code?: string };
         if (!active) return;
-        if (res.ok && body.email) setEmail(body.email);
-        else if (body.code === "VALIDATION_ERROR") {
+        if (res.ok && body.email) {
+          setEmail(body.email);
+          // Başka hesaba ait ya da eskimiş dönüş kaydı silinir (F2-34).
+          if (!matchAuthRedirect(readResetRedirect(), body.email)) {
+            clearAuthRedirect(POST_RESET_REDIRECT_KEY);
+          }
+        } else if (body.code === "VALIDATION_ERROR") {
           setState((s) => (s === "idle" ? "invalidLink" : s));
         }
       })
@@ -81,6 +105,10 @@ export default function ResetPasswordPage() {
       signal: AbortSignal.timeout(RESET_TIMEOUT_MS),
     }).catch(() => null);
     if (res?.ok) {
+      // Dönüş adresi bir kez kullanılır; giriş formu hesabın e-postasıyla dolar.
+      setDoneRedirect(returnTo);
+      clearAuthRedirect(POST_RESET_REDIRECT_KEY);
+      if (email) rememberAuthEmail(email);
       setState("done");
       return;
     }
@@ -124,7 +152,7 @@ export default function ResetPasswordPage() {
       >
         <p className="mt-6 text-center text-sm">
           <Link
-            href="/login"
+            href={loginHref}
             className="inline-flex min-h-[44px] items-center font-semibold text-[#003580] hover:underline sm:min-h-[24px]"
           >
             {t("reset.loginLink")}
@@ -141,14 +169,14 @@ export default function ResetPasswordPage() {
       <AuthCard title={t("reset.invalidTitle")} focusTitle>
         <Notice kind="error">{t("reset.invalidLink")}</Notice>
         <Link
-          href="/forgot-password"
+          href={forgotHref}
           className="mt-6 flex min-h-[44px] w-full items-center justify-center rounded-lg bg-[#003580] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#002b66]"
         >
           {t("reset.requestNew")}
         </Link>
         <p className="mt-4 text-center text-sm">
           <Link
-            href="/login"
+            href={loginHref}
             className="inline-flex min-h-[44px] items-center font-semibold text-[#003580] hover:underline sm:min-h-[24px]"
           >
             {t("backToLogin")}
@@ -211,7 +239,7 @@ export default function ResetPasswordPage() {
       {networkFailed && (
         <p className="mt-4 text-center text-sm">
           <Link
-            href="/forgot-password"
+            href={forgotHref}
             className="inline-flex min-h-[44px] items-center font-semibold text-[#003580] hover:underline sm:min-h-[24px]"
           >
             {t("reset.requestNew")}
@@ -220,7 +248,7 @@ export default function ResetPasswordPage() {
       )}
       <p className="mt-6 text-center text-sm">
         <Link
-          href="/login"
+          href={loginHref}
           className="inline-flex min-h-[44px] items-center font-semibold text-[#003580] hover:underline sm:min-h-[24px]"
         >
           {t("backToLogin")}

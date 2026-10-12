@@ -24,12 +24,14 @@ import {
   Status,
   focusRing,
   inputClass,
+  ErrorText,
   useErrorText,
   useLoader,
 } from "@/components/ui/ui";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { useFormat } from "@/i18n/use-format";
 import { HOST_PHOTOS_CHANGED_EVENT } from "./host-photos-changed";
+import { useHostUnsavedChanges } from "./useHostUnsavedChanges";
 
 /**
  * P2-1a / P1-13(e): ev sahibi erişilebilirlik beyanları — özellik ekle, kanıt fotoğrafı bağla,
@@ -170,7 +172,7 @@ export default function AccessibilityPanel({
   properties: ReadonlyArray<PropertyRef>;
 }) {
   const t = useTranslations("compliance.accessibility");
-  const tc = useTranslations("common");
+  const tHost = useTranslations("host");
   const errorText = useErrorText();
   const fmt = useFormat();
   const [propertyId, setPropertyId] = useState(properties[0]?.id ?? "");
@@ -212,11 +214,20 @@ export default function AccessibilityPanel({
   const [widthError, setWidthError] = useState<string | null>(null);
   // Satır içi kanıt seçimi yalnız yerel taslaktır; "Kanıtı kaydet" ile gönderilir (WCAG 3.2.2).
   const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const evidenceDirty = (featureList ?? []).some(
+    (f) => drafts[f.id] !== undefined && drafts[f.id] !== (f.evidencePhotoId ?? "")
+  );
   const [addEvidence, setAddEvidence] = useState("");
   const [editing, setEditing] = useState<string | null>(null);
   const [editWidthError, setEditWidthError] = useState<string | null>(null);
   const [noteLength, setNoteLength] = useState(0);
   const [editNoteLength, setEditNoteLength] = useState(0);
+  // Açık düzenleme formu ve ekleme formu da kirli sayılır (F2-24).
+  const [editDirty, setEditDirty] = useState(false);
+  const [addWidthFilled, setAddWidthFilled] = useState(false);
+  const addDirty = noteLength > 0 || addEvidence !== "" || addWidthFilled;
+  // Kaydedilmemiş kanıt seçimi ve form taslakları ayrılma uyarısına sayılır (F2-24).
+  useHostUnsavedChanges(evidenceDirty || editDirty || addDirty);
   const [busy, setBusy] = useState<string | null>(null);
   const { confirm, confirmDialog } = useConfirm();
   // Silinen satırın komşusu (ya da boş liste metni); yeni liste çizilince odak buraya geçer.
@@ -260,8 +271,23 @@ export default function AccessibilityPanel({
   const noteLimit = (length: number) =>
     t("host.noteHint", { max: NOTE_MAX, remaining: NOTE_MAX - length });
 
-  function changeProperty(id: string) {
+  /** Kaydedilmemiş taslak atılacaksa önce sorar (PromotionsPanel.startEdit ile aynı diyalog). */
+  async function confirmDiscard(dirty: boolean): Promise<boolean> {
+    if (!dirty) return true;
+    return confirm({
+      title: tHost("unsaved.discardConfirm.title"),
+      body: tHost("unsaved.discardConfirm.body"),
+      confirmLabel: tHost("unsaved.discardConfirm.confirm"),
+      cancelLabel: tHost("unsaved.discardConfirm.cancel"),
+      tone: "danger",
+    });
+  }
+
+  async function changeProperty(id: string) {
+    // İlan değişince kanıt taslakları, açık düzenleme ve eklemedeki kanıt seçimi silinir (F2-24).
+    if (!(await confirmDiscard(evidenceDirty || editDirty || addEvidence !== ""))) return;
     setPropertyId(id);
+    setEditDirty(false);
     setPickedCode(null);
     setScope("");
     setAddEvidence("");
@@ -333,6 +359,7 @@ export default function AccessibilityPanel({
         });
         form.reset();
         setNoteLength(0);
+        setAddWidthFilled(false);
         setAddEvidence("");
         setScope("");
         setPickedCode(null);
@@ -373,6 +400,7 @@ export default function AccessibilityPanel({
 
   function closeEdit(id: string) {
     setEditing(null);
+    setEditDirty(false);
     setEditWidthError(null);
     requestAnimationFrame(() => document.getElementById(`a11y-edit-${id}`)?.focus());
   }
@@ -478,7 +506,7 @@ export default function AccessibilityPanel({
           <select
             id="a11y-property"
             value={propertyId}
-            onChange={(e) => changeProperty(e.target.value)}
+            onChange={(e) => void changeProperty(e.target.value)}
             className={inputClass}
           >
             {properties.map((p) => (
@@ -581,7 +609,10 @@ export default function AccessibilityPanel({
                       aria-expanded={isEditing}
                       aria-controls={isEditing ? editFormId : undefined}
                       aria-label={t("host.editLabel", { name: fullName })}
-                      onClick={() => {
+                      onClick={async () => {
+                        // Açık formdaki taslak sorulmadan atılmaz (F2-24).
+                        if (!(await confirmDiscard(editDirty))) return;
+                        setEditDirty(false);
                         setEditWidthError(null);
                         setEditNoteLength(feature.note?.length ?? 0);
                         setEditing(isEditing ? null : feature.id);
@@ -639,6 +670,16 @@ export default function AccessibilityPanel({
                     id={editFormId}
                     noValidate
                     onSubmit={(e) => void saveEdit(e, feature)}
+                    onChange={(e) => {
+                      // Kirlilik: alanlar kayıtlı değerlerden farklı mı (F2-24).
+                      const els = e.currentTarget.elements;
+                      const width = els.namedItem("widthCm") as HTMLInputElement | null;
+                      const noteEl = els.namedItem("note") as HTMLTextAreaElement | null;
+                      setEditDirty(
+                        (width !== null && width.value !== String(feature.widthCm ?? "")) ||
+                          (noteEl !== null && noteEl.value !== (feature.note ?? ""))
+                      );
+                    }}
                     aria-label={t("host.editLabel", { name: fullName })}
                     className="mt-3 grid gap-3 rounded-md border border-gray-200 p-3 sm:grid-cols-2"
                   >
@@ -705,13 +746,7 @@ export default function AccessibilityPanel({
                     </p>
                   )}
                 </div>
-                {rowStatus?.error && (
-                  <p role="alert" className="mt-1 text-red-700">
-                    <span aria-hidden="true">{"⚠︎"} </span>
-                    <span className="sr-only">{tc("errorPrefix")} </span>
-                    {rowStatus.error}
-                  </p>
-                )}
+                {rowStatus?.error && <ErrorText className="mt-1">{rowStatus.error}</ErrorText>}
               </li>
             );
           })}
@@ -784,6 +819,7 @@ export default function AccessibilityPanel({
               inputMode="numeric"
               min={MIN_WIDTH_CM}
               max={MAX_WIDTH_CM}
+              onChange={(e) => setAddWidthFilled(e.target.value !== "")}
               className={inputClass}
             />
           </Field>

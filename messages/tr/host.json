@@ -32,7 +32,7 @@
     "filterLabel": "İlan ara",
     "filterHint": "İlanları başlığa göre süzer.",
     "filterEmpty": "Aramanızla eşleşen ilan yok.",
-    "retry": "Yeniden dene",
+    "retry": "Tekrar dene",
     "revenueHint": "Gelir paneli: doluluk, ortalama gecelik fiyat (ADR), müsait oda başına gelir (RevPAR) ve fiyat önerileri.",
     "openClaimLink": "Hasar talebi aç: rezervasyonu seçin"
   },
@@ -338,6 +338,7 @@
     "activatedNamed": "«{name}» etkinleştirildi.",
     "updated": "Promosyon güncellendi.",
     "cannotDelete": "«{name}» kullanıldığı için silinemez; zaten durdurulmuş durumda.",
+    "cannotDeleteInline": "Kullanıldığı için silinemez",
     "deleteConfirm": {
       "title": "«{name}» silinsin mi?",
       "body": "Promosyon kalıcı olarak silinir. Bu işlem geri alınamaz.",
@@ -391,6 +392,12 @@
       "body": "Bu sayfada kaydetmediğiniz değişiklikler var. Sayfadan ayrılırsanız kaybolur.",
       "confirm": "Kaydetmeden ayrıl",
       "cancel": "Sayfada kal"
+    },
+    "discardConfirm": {
+      "title": "Değişiklikler atılsın mı?",
+      "body": "Formda kaydetmediğiniz değişiklikler var. Devam ederseniz kaybolur.",
+      "confirm": "Değişiklikleri at",
+      "cancel": "Formda kal"
     }
   }
 }

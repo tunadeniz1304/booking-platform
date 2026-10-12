@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { loginWithPasskey, passkeyErrorCode, passkeySupported } from "@/lib/auth/passkey-client";
 import { ApiError } from "@/lib/api-client";
 import { useAuthErrorText } from "@/components/auth/AuthCard";
+import { ErrorText } from "@/components/ui/ui";
 
 const noopSubscribe = () => () => {};
 
@@ -113,11 +114,7 @@ export default function PasskeyLoginButton({
         <summary className="cursor-pointer underline">{t("passkey.whatIs")}</summary>
         <p className="mt-1">{t("passkey.whatIsBody")}</p>
       </details>
-      {error && (
-        <p role="alert" className="mt-2 text-sm text-red-700">
-          {error}
-        </p>
-      )}
+      {error && <ErrorText className="mt-2">{error}</ErrorText>}
       <div role="status">{notice && <p className="mt-2 text-sm text-gray-600">{notice}</p>}</div>
     </div>
   );

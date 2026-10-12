@@ -7,6 +7,7 @@ import { ApiError, apiFetch } from "@/lib/api-client";
 import { useFormat } from "@/i18n/use-format";
 import {
   Button,
+  ErrorText,
   Field,
   LlmBadge,
   focusRing,
@@ -65,7 +66,6 @@ function ReportButton({
   propertyId?: string;
 }) {
   const t = useTranslations("reviews");
-  const tc = useTranslations("common");
   const errorText = useErrorText();
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState<string>("");
@@ -263,9 +263,7 @@ function ReportButton({
         </div>
       )}
       {error && (
-        <p role="alert" className="mt-1 text-gray-700">
-          <span aria-hidden="true">{"\u26A0\uFE0E"} </span>
-          <span className="font-semibold">{tc("errorPrefix")}</span>{" "}
+        <ErrorText className="mt-1">
           {error.kind === "login"
             ? t.rich("report.loginRequired", {
                 link: (chunks) => (
@@ -278,7 +276,7 @@ function ReportButton({
                 ),
               })
             : error.text}
-        </p>
+        </ErrorText>
       )}
     </div>
   );
@@ -625,9 +623,8 @@ export default function ReviewsSection({
 
       {reviews.error && (
         <div className="mt-3 text-sm">
-          <p role="alert" className="text-red-700">
-            {t("loadFailed")}
-          </p>
+          {/* F2-44: ortak ErrorText; düğme metni Status'tan farklı olduğu için ayrı kalır. */}
+          <ErrorText>{t("loadFailed")}</ErrorText>
           <Button variant="secondary" className="mt-2" onClick={reviews.reload}>
             {t("retry")}
           </Button>

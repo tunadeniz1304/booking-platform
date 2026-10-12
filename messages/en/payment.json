@@ -12,25 +12,27 @@
   "cvc": "CVC",
   "testCards": "Demo test cards: {success} (approve), {decline} (decline), {threeDs} (3D Secure). No real payment is taken.",
   "stripeTestMode": "Stripe test mode — no real payment is taken.",
-  "processing": "Processing...",
+  "processing": "Processing…",
   "payAndConfirm": "Pay and confirm",
   "threeDsTitle": "3D Secure verification",
   "verificationCode": "Verification code",
   "verify": "Verify",
   "cancel": {
-    "confirm": "Are you sure you want to cancel the booking?",
     "refunded": "Cancelled. Refund: {amount} ({percent}%).",
     "noRefund": "Cancelled. No refund under the policy.",
     "failed": "The booking could not be cancelled",
     "button": "Cancel booking",
     "dialogTitle": "Cancel this booking?",
     "dialogBodyHeld": "No payment has been taken yet. Cancelling releases the room hold.",
-    "dialogBodyConfirmed": "Your refund is calculated from the cancellation policy you accepted when booking and is shown right after cancelling.",
+    "dialogBodyConfirmed": "Your refund is calculated from the cancellation policy you accepted when booking and from when you cancel.",
+    "dialogRefundUntil": "Free cancellation until {date}, {time} (property local time): if you cancel now, you get a full refund.",
+    "dialogRefundEnded": "Free cancellation ended on {date} at {time}: under the cancellation policy you get a partial refund or no refund.",
+    "dialogRefundNone": "This booking has no free cancellation: under the cancellation policy you get a partial refund or no refund.",
     "irreversible": "This cannot be undone.",
     "confirmButton": "Yes, cancel",
     "keep": "Keep booking",
     "cancelledNoCharge": "Cancelled. Your card was not charged.",
-    "processing": "Cancelling..."
+    "processing": "Cancelling…"
   },
   "stepUp": {
     "failed": "Verification failed",
@@ -84,14 +86,13 @@
   "threeDsDemoHint": "Demo verification code: {code}",
   "threeDsAnnounce": "3D Secure verification required. Enter the code your bank sent you.",
   "threeDsBack": "Go back and use another card",
-  "paidAnnounce": "Payment received, your booking is confirmed.",
   "hold": {
     "remaining": "Time left: {time}",
     "warnMinutes": "Your room hold ends in {minutes, plural, one {# minute} other {# minutes}}.",
     "expired": "The hold has expired. The room is no longer reserved for you.",
     "expiredTitle": "Hold expired",
     "expiredBody": "The payment was not completed in time, so the room was released. You have not been charged. You can search the same dates again.",
-    "rebook": "Search again and book"
+    "rebook": "Search again for the same dates"
   },
   "errors": {
     "EXPIRY_FORMAT": "Enter the expiry date as MM/YY, e.g. 08/28.",

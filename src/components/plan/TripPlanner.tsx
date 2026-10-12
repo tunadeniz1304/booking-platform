@@ -13,10 +13,13 @@ import {
   LlmBadge,
   Status,
   focusRing,
+  ErrorText,
   inputClass,
   useErrorText,
 } from "@/components/ui/ui";
 import { GuestCountStepper } from "@/components/booking/GuestCountStepper";
+import { propertyHref } from "@/components/property/PropertyCard";
+import { usePlaceLabel } from "@/lib/i18n/use-place-label";
 
 interface TripStop {
   city: string;
@@ -171,6 +174,7 @@ function stayTotals(stops: TripStop[]): { currency: string; total: number }[] {
 export default function TripPlanner() {
   const t = useTranslations("plan");
   const tc = useTranslations("common");
+  const placeLabel = usePlaceLabel();
   const locale = useLocale();
   const errorText = useErrorText();
   const f = useFormat();
@@ -437,7 +441,16 @@ export default function TripPlanner() {
 
   const holdable = plan ? plan.stops.filter((s) => s.stay).length : 0;
   const heldCount = Object.keys(held).length;
-  const missing = plan ? plan.stops.filter((s) => !s.stay).map((s) => s.city) : [];
+  const missing = plan ? plan.stops.filter((s) => !s.stay).map((s) => placeLabel.city(s.city)) : [];
+  const stopGuests = request?.guests ?? Number(guests);
+  // F2-20: konaklaması olmayan durak için aynı tarih/misafirle şehir araması.
+  const searchCityHref = (s: TripStop) =>
+    `/search?${new URLSearchParams({
+      destination: s.city,
+      checkIn: s.checkIn,
+      checkOut: s.checkOut,
+      guests: String(stopGuests),
+    }).toString()}`;
   const amount = plan ? totalsText(plan.stops) : "";
 
   return (
@@ -586,13 +599,25 @@ export default function TripPlanner() {
             {plan.stops.map((s, i) => (
               <li key={`${s.city}-${s.checkIn}`} className="rounded-md border p-3 text-sm">
                 <p className="font-semibold text-gray-900">
-                  {i + 1}. {s.city} · {f.date(s.checkIn)} – {f.date(s.checkOut)} (
+                  {i + 1}. {placeLabel.city(s.city)} · {f.date(s.checkIn)} – {f.date(s.checkOut)} (
                   {t("result.nights", { count: s.nights })})
                 </p>
                 {s.stay ? (
                   <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
                     <span>
-                      {s.stay.title} · <strong>{f.money(s.stay.total, s.stay.currency)}</strong>
+                      {/* F2-20: ayırmadan önce ilan aynı tarih/misafir/odayla incelenebilsin. */}
+                      <Link
+                        href={propertyHref(s.stay.propertyId, {
+                          checkIn: s.checkIn,
+                          checkOut: s.checkOut,
+                          guests: stopGuests,
+                          roomId: s.stay.roomId,
+                        })}
+                        className={`font-medium text-[#003580] underline ${focusRing}`}
+                      >
+                        {s.stay.title}
+                      </Link>{" "}
+                      · <strong>{f.money(s.stay.total, s.stay.currency)}</strong>
                     </span>
                     {held[i] ? (
                       <span className="flex flex-wrap items-center gap-3">
@@ -604,7 +629,7 @@ export default function TripPlanner() {
                         <Link
                           href={`/booking/${held[i]}`}
                           className={`inline-flex min-h-[44px] items-center font-semibold text-[#003580] underline sm:min-h-0 ${focusRing}`}
-                          aria-label={t("result.payLabel", { city: s.city })}
+                          aria-label={t("result.payLabel", { city: placeLabel.city(s.city) })}
                         >
                           {t("result.pay")}
                         </Link>
@@ -618,8 +643,8 @@ export default function TripPlanner() {
                         aria-describedby={stale ? STALE_ID : undefined}
                         aria-label={
                           holding === i
-                            ? t("result.holdingLabel", { city: s.city })
-                            : t("result.holdLabel", { city: s.city })
+                            ? t("result.holdingLabel", { city: placeLabel.city(s.city) })
+                            : t("result.holdLabel", { city: placeLabel.city(s.city) })
                         }
                       >
                         {holding === i ? t("result.holding") : t("result.hold")}
@@ -627,15 +652,19 @@ export default function TripPlanner() {
                     )}
                   </div>
                 ) : (
-                  <p className="mt-1 text-gray-700">{t("result.noStay")}</p>
+                  <p className="mt-1 text-gray-700">
+                    {t("result.noStay")}{" "}
+                    <Link
+                      href={searchCityHref(s)}
+                      className={`inline-flex min-h-[44px] items-center font-semibold text-[#003580] underline sm:min-h-0 ${focusRing}`}
+                    >
+                      {t("result.searchCity", { city: placeLabel.city(s.city) })}
+                    </Link>
+                  </p>
                 )}
                 {holdErrors[i] && (
                   <div className="mt-2 flex flex-wrap items-center gap-2">
-                    <p role="alert" className="text-red-700">
-                      <span aria-hidden="true">{ERROR_ICON} </span>
-                      <span className="sr-only">{tc("errorPrefix")} </span>
-                      {holdErrors[i].text}
-                    </p>
+                    <ErrorText>{holdErrors[i].text}</ErrorText>
                     {holdErrors[i].canRefresh && (
                       <Button variant="secondary" busy={busy} onClick={() => refresh(i)}>
                         {busy ? t("result.refreshing") : t("result.refresh")}

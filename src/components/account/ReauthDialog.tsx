@@ -2,10 +2,14 @@
 
 import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { ApiError, apiFetch, fetchCurrentUser } from "@/lib/api-client";
 import { passkeySupported, reauthWithPasskey, reauthWithPassword } from "@/lib/auth/passkey-client";
-import { focusRing, useErrorText } from "@/components/ui/ui";
+import { Button, ErrorText, focusRing, inputClass, useErrorText } from "@/components/ui/ui";
+import { withRedirect } from "@/components/auth/AuthCard";
+import PasswordRevealInput from "@/components/auth/PasswordRevealInput";
+import { rememberAuthEmail } from "@/lib/auth/auth-email-handoff";
 
 /** Kullanıcı yeniden doğrulama penceresini kapattı. */
 export class ReauthCancelledError extends Error {
@@ -55,7 +59,12 @@ export function useAccountErrorText(): (err: unknown, fallback?: string) => stri
 
 type ReauthMode = "password" | "passkey";
 
-type ReauthErrorState = { text: string; offerReset: boolean };
+/** `empty`: parola boş gönderildi (yazmaya başlayınca kalkar). */
+type ReauthErrorState = { text: string; offerReset: boolean; empty?: boolean };
+
+const PASSWORD_ID = "reauth-password";
+/** PasswordRevealInput ref almaz; alan kimlikle bulunur. */
+const passwordInput = () => document.getElementById(PASSWORD_ID) as HTMLInputElement | null;
 
 /** Sunucunun `details.retryAfterSeconds` değeri dakikaya (yukarı) yuvarlanır; yoksa null. */
 function retryAfterMinutes(err: ApiError): number | null {
@@ -92,14 +101,15 @@ export default function ReauthDialog({
   const errorText = useAccountErrorText();
   const supported = useSyncExternalStore(noopSubscribe, passkeySupported, () => false);
   const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
   const [mode, setMode] = useState<ReauthMode | null>(null);
   const [error, setError] = useState<ReauthErrorState | null>(null);
   const [fetchedHasPasskey, setFetchedHasPasskey] = useState<boolean | null>(null);
   const [email, setEmail] = useState<string | null>(null);
   const dialog = useRef<HTMLDialogElement>(null);
-  const input = useRef<HTMLInputElement>(null);
   const errorId = useId();
+  // F2-35: "Şifremi unuttum" bu sayfaya dönüş adresini ve hesabın e-postasını taşır.
+  const pathname = usePathname();
+  const forgotHref = withRedirect("/forgot-password", pathname || "/");
   const busy = mode !== null;
   const passkeyAvailable = supported && (hasPasskey ?? fetchedHasPasskey) === true;
   const needPasskeyInfo = supported && hasPasskey === undefined;
@@ -113,7 +123,7 @@ export default function ReauthDialog({
     const { overflow } = document.body.style;
     document.body.style.overflow = "hidden";
     if (el && !el.open) el.showModal();
-    input.current?.focus();
+    passwordInput()?.focus();
     return () => {
       document.body.style.overflow = overflow;
       if (el?.open) el.close();
@@ -177,8 +187,8 @@ export default function ReauthDialog({
       setError(describeError(err, via));
       setMode(null);
       if (via === "password") {
-        input.current?.focus();
-        input.current?.select();
+        passwordInput()?.focus();
+        passwordInput()?.select();
       }
     }
   }
@@ -205,7 +215,14 @@ export default function ReauthDialog({
         aria-busy={busy || undefined}
         onSubmit={(e) => {
           e.preventDefault();
-          if (password) void attempt(() => reauthWithPassword(password), "password");
+          if (busy) return;
+          // F2-37: boş gönderim sessiz kalmaz; hata alana bağlanır ve odak alana döner.
+          if (!password) {
+            setError({ text: tAuth("login.passwordRequired"), offerReset: false, empty: true });
+            passwordInput()?.focus();
+            return;
+          }
+          void attempt(() => reauthWithPassword(password), "password");
         }}
       >
         {email && (
@@ -218,42 +235,33 @@ export default function ReauthDialog({
             hidden
           />
         )}
-        <label htmlFor="reauth-password" className="block text-sm font-medium text-gray-800">
+        <label htmlFor={PASSWORD_ID} className="block text-sm font-medium text-gray-800">
           {t("password")}
         </label>
-        <input
-          ref={input}
-          id="reauth-password"
+        {/* F2-37: giriş/kayıt/sıfırlama ile aynı göster/gizle düğmeli alan. */}
+        <PasswordRevealInput
+          id={PASSWORD_ID}
           name="password"
-          type={showPassword ? "text" : "password"}
           autoComplete="current-password"
-          autoCapitalize="none"
-          autoCorrect="off"
-          spellCheck={false}
           value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          onChange={(e) => {
+            setPassword(e.target.value);
+            if (error?.empty) setError(null);
+          }}
           aria-invalid={error ? true : undefined}
           aria-describedby={error ? errorId : undefined}
-          className="w-full rounded-lg border border-gray-500 px-3 py-2 text-base sm:text-sm"
+          className={inputClass}
         />
-        <label className="flex min-h-[44px] items-center gap-2 text-sm text-gray-800">
-          <input
-            type="checkbox"
-            checked={showPassword}
-            onChange={(e) => setShowPassword(e.target.checked)}
-            className="h-4 w-4"
-          />
-          {t("showPassword")}
-        </label>
         {error && (
           <div className="space-y-1">
-            <p id={errorId} role="alert" className="text-sm text-red-700">
-              {error.text}
-            </p>
+            <ErrorText id={errorId}>{error.text}</ErrorText>
             {error.offerReset && (
               <p className="text-sm">
                 <Link
-                  href="/forgot-password"
+                  href={forgotHref}
+                  onClick={() => {
+                    if (email) rememberAuthEmail(email);
+                  }}
                   className={`inline-flex min-h-[44px] items-center font-semibold text-[#003580] underline sm:min-h-[24px] ${focusRing}`}
                 >
                   {tAuth("login.forgotPassword")}
@@ -267,35 +275,36 @@ export default function ReauthDialog({
           {mode === "passkey" ? t("passkeyPrompt") : mode === "password" ? t("verifying") : ""}
         </p>
         <div className="flex flex-wrap gap-2">
-          {/* busy iken `disabled` yerine aria-disabled: odak pencere içinde kalır. */}
-          <button
+          {/* F2-37/F2-11: `disabled` yok; busy iken aria-disabled, odak pencere içinde kalır. */}
+          <Button
             type="submit"
-            disabled={!password}
+            busy={mode === "password"}
             aria-disabled={busy || undefined}
-            className="min-h-[44px] flex-1 rounded-lg bg-[#003580] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 aria-disabled:opacity-50"
+            className="min-h-[44px] flex-1"
           >
             {mode === "password" ? t("verifying") : t("verify")}
-          </button>
+          </Button>
           {passkeyAvailable && (
-            <button
-              type="button"
+            <Button
+              variant="secondary"
+              busy={mode === "passkey"}
               aria-disabled={busy || undefined}
               onClick={() => void attempt(reauthWithPasskey, "passkey")}
-              className="min-h-[44px] rounded-lg border border-[#003580] px-4 py-2 text-sm font-semibold text-[#003580] aria-disabled:opacity-50"
+              className="min-h-[44px]"
             >
               {mode === "passkey" ? t("passkeyPrompt") : t("withPasskey")}
-            </button>
+            </Button>
           )}
-          <button
-            type="button"
+          <Button
+            variant="secondary"
             aria-disabled={busy || undefined}
             onClick={() => {
               if (!busy) onCancel();
             }}
-            className="min-h-[44px] rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 aria-disabled:opacity-50"
+            className="min-h-[44px]"
           >
             {t("cancel")}
-          </button>
+          </Button>
         </div>
       </form>
     </dialog>

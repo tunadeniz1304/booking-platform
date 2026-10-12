@@ -5,7 +5,7 @@
   "featured": "Öne çıkan konaklama yerleri",
   "empty": "Henüz konaklama ilanı yok.",
   "featuredError": "Öne çıkan konaklama yerleri şu anda yüklenemedi. Yukarıdaki arama formunu kullanmaya devam edebilirsiniz.",
-  "retry": "Yeniden dene",
+  "retry": "Tekrar dene",
   "featuredLoading": "Öne çıkan konaklama yerleri yükleniyor…",
   "places": {
     "istanbul": "İstanbul",

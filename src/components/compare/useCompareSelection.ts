@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useSyncExternalStore } from "react";
+import { useCallback, useState, useSyncExternalStore } from "react";
 
 /** Karşılaştırma seçimi (v4 P1-9): tarayıcıda yerel kolaylık; sunucuya gitmez. */
 export const COMPARE_MAX = 4;
@@ -54,6 +54,24 @@ function subscribe(onChange: () => void): () => void {
     window.removeEventListener(EVENT, onChange);
     window.removeEventListener("storage", onChange);
   };
+}
+
+const noopSubscribe = () => () => {};
+
+/**
+ * F2-51: sayfa açılışındaki kayıtlı seçim (anahtar) ve hidrasyon durumu. Canlı bölge yalnızca
+ * seçim bu ilk değerden farklılaşınca (kullanıcı eylemi) duyuru yapsın diye.
+ */
+export function useCompareBaseline(): { initialKey: string | null; hydrated: boolean } {
+  const [initialKey] = useState(() =>
+    typeof window === "undefined" ? null : snapshot().join(",")
+  );
+  const hydrated = useSyncExternalStore(
+    noopSubscribe,
+    () => true,
+    () => false
+  );
+  return { initialKey, hydrated };
 }
 
 export function useCompareSelection() {

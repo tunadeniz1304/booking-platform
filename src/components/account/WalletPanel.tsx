@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { apiFetch } from "@/lib/api-client";
 import { useFormat } from "@/i18n/use-format";
-import { Button, focusRing } from "@/components/ui/ui";
+import { Button, ErrorText, focusRing } from "@/components/ui/ui";
 
 export interface WalletData {
   tier: number;
@@ -186,9 +186,8 @@ export default function WalletPanel() {
       </div>
       {failures > 0 && (
         <div className="mt-3 flex flex-wrap items-center gap-3">
-          <p key={failures} role="alert" className="text-sm text-red-700">
-            {t("loadFailed")}
-          </p>
+          {/* F2-44: ortak ErrorText; düğme `busy` tuttuğu için Status yerine ayrı. */}
+          <ErrorText key={failures}>{t("loadFailed")}</ErrorText>
           <Button variant="secondary" busy={retrying} onClick={retry}>
             {tc("errorPage.retry")}
           </Button>

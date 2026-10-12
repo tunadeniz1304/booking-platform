@@ -95,6 +95,13 @@
     "rejectAllConfirmTitle": "Reject all {count, plural, one {# suggestion} other {# suggestions}} for {room}?",
     "rejectAllConfirm": "Reject all",
     "rejectAllNote": "Rejecting doesn't change any prices; the suggestions are removed from the list.",
+    "allSummary": {
+      "range": "Dates: {from} – {to}",
+      "maxIncrease": "Largest increase: {percent}",
+      "maxDecrease": "Largest decrease: {percent}",
+      "total": "Total difference (suggested − current): {amount}",
+      "lower": "{count, plural, =0 {No suggestion lowers the price} one {# suggestion lowers the price} other {# suggestions lower the price}}"
+    },
     "acceptAllDone": "{count, plural, one {# suggestion} other {# suggestions}} accepted for {room}; the prices are set and locked.",
     "rejectAllDone": "{count, plural, one {# suggestion} other {# suggestions}} rejected for {room}; no prices changed.",
     "bulkFailed": "{done} of {total} suggestions were processed, then it stopped: {reason}"

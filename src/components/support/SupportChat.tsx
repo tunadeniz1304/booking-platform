@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { apiFetch } from "@/lib/api-client";
+import { ApiError, apiFetch } from "@/lib/api-client";
 import { useFormat } from "@/i18n/use-format";
 import {
   Button,
@@ -157,6 +157,8 @@ export default function SupportChat() {
   const [restoredFor, setRestoredFor] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** Panoya kopyalanan talep no (kısa "Kopyalandı" duyurusu için). */
+  const [copiedTicket, setCopiedTicket] = useState<string | null>(null);
 
   // Oturum belli olunca kayıtlı konuşma geri yüklenir (yenileme/gezinme sonrası).
   if (userId && userId !== restoredFor) {
@@ -213,7 +215,10 @@ export default function SupportChat() {
       setTurns((prev) => prev.map((x): Turn => (x.id === id ? { ...x, status: "failed" } : x)));
       // Yazılan metin kaybolmasın: kutu boşsa geri konur (düzenlenip yeniden gönderilebilir).
       if (!requestHuman) setMessage((cur) => (cur === "" ? text : cur));
-      setError(errorText(err));
+      // Asistan kapalı: genel "hizmet yanıt vermiyor" yerine insana devir yolu gösterilir (F406).
+      const agentOff =
+        !requestHuman && err instanceof ApiError && err.code === "SERVICE_UNAVAILABLE";
+      setError(agentOff ? t("agentOff", { button: t("connectHuman") }) : errorText(err));
     } finally {
       setBusy(false);
     }
@@ -248,6 +253,18 @@ export default function SupportChat() {
     void ask(text);
   };
 
+  /** Tam talep no panoya kopyalanır (destek ekibi tam numarayla arar). */
+  const copyTicket = async ({ ticketId }: Turn) => {
+    if (!ticketId) return;
+    try {
+      await navigator.clipboard.writeText(ticketId);
+      setCopiedTicket(ticketId);
+      window.setTimeout(() => setCopiedTicket(null), 2000);
+    } catch {
+      // Pano erişimi yok: tam numara üstteki talep listesinde ve düğmenin ipucunda duruyor.
+    }
+  };
+
   const startOver = () => {
     setTurns([]);
     setError(null);
@@ -262,9 +279,11 @@ export default function SupportChat() {
   const limitNote =
     truncated && remaining <= 0
       ? t("truncated", { max: MAX_MESSAGE })
-      : remaining <= LIMIT_WARNING_AT
-        ? t("nearLimit", { max: MAX_MESSAGE })
-        : "";
+      : remaining <= 0
+        ? t("atLimit", { max: MAX_MESSAGE })
+        : remaining <= LIMIT_WARNING_AT
+          ? t("nearLimit", { max: MAX_MESSAGE })
+          : "";
 
   return (
     <Card id="support-chat">
@@ -321,9 +340,20 @@ export default function SupportChat() {
             )}
             <p className="whitespace-pre-line">{turn.text}</p>
             {turn.ticketId && (
-              <p className="mt-2 text-xs font-medium text-amber-900">
-                {t("handoff", { id: turn.ticketId })}
-              </p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <p className="text-xs font-medium text-amber-900">
+                  {t("handoff", { id: turn.ticketId.slice(-6).toUpperCase() })}
+                </p>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  title={turn.ticketId}
+                  aria-label={t("copyRefLabel", { id: turn.ticketId.slice(-6).toUpperCase() })}
+                  onClick={() => void copyTicket(turn)}
+                >
+                  {copiedTicket === turn.ticketId ? t("copied") : t("copyRef")}
+                </Button>
+              </div>
             )}
             {turn.status === "failed" && (
               <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -337,6 +367,9 @@ export default function SupportChat() {
         ))}
         {busy && <p className="text-sm text-gray-600">{t("thinking")}</p>}
       </div>
+      <p role="status" className="sr-only">
+        {copiedTicket ? t("copied") : ""}
+      </p>
       {turns.length === 0 && (
         <div className="mb-4">
           <p id={suggestId} className="text-sm font-medium text-gray-900">

@@ -7,9 +7,11 @@ import SearchBar from "@/components/search/SearchBar";
 import DestinationCardImage from "@/components/home/DestinationCardImage";
 import HomeDestinationLink from "@/components/home/HomeDestinationLink";
 import HomeFeaturedCard from "@/components/home/HomeFeaturedCard";
+import CompareBar from "@/components/compare/CompareBar";
 import { getLocale, getTranslations } from "next-intl/server";
 import { getPopularProperties } from "@/lib/search";
 import { getAuth } from "@/lib/auth";
+import { HOME_POPULAR_COUNT, POPULAR_DESTINATIONS } from "@/lib/popular-destinations";
 import { prisma } from "@/lib/prisma";
 import { propertyTypeKey } from "@/lib/i18n/property-type";
 import { localizeCountryName, placeCityKey } from "@/lib/i18n/place-display-names";
@@ -19,25 +21,8 @@ export const dynamic = "force-dynamic";
 
 const FEATURED_COUNT = 6;
 
-/**
- * `city`/`country` veritabanındaki (Türkçe) adlardır: arama bağlantısında aynen kullanılır, ekranda
- * dile göre çevrilir. `imageUrl` yalnızca destinasyonu gerçekten gösteren bir fotoğraf olabilir;
- * doğrulanmış fotoğraf yoksa `null` kalır ve kartta nötr yer tutucu çizilir.
- */
-const popularDestinations: ReadonlyArray<{
-  city: string;
-  country: string;
-  imageUrl: string | null;
-}> = [
-  {
-    city: "İstanbul",
-    country: "Türkiye",
-    imageUrl: "https://images.unsplash.com/photo-1541432901042-2d8bd64b4a9b?w=400&h=300&fit=crop",
-  },
-  { city: "Antalya", country: "Türkiye", imageUrl: null },
-  { city: "Kapadokya", country: "Türkiye", imageUrl: null },
-  { city: "Bodrum", country: "Türkiye", imageUrl: null },
-];
+// Ana sayfa kartları ile "Nereye?" önerileri aynı listeden beslenir (F1288).
+const popularDestinations = POPULAR_DESTINATIONS.slice(0, HOME_POPULAR_COUNT);
 
 interface HomeViewer {
   /** Oturum açmış kullanıcının rolü; oturum yoksa ya da okunamazsa `null`. */
@@ -147,24 +132,27 @@ async function FeaturedProperties() {
     );
   }
 
+  // Liste olarak duyurulur: ekran okuyucu ilan sayısını ve konumunu bildirir (F481).
   return (
-    <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+    <ul role="list" className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
       {popular.map((property) => (
-        <HomeFeaturedCard
-          key={property.id}
-          id={property.id}
-          title={property.title}
-          location={locationLabel(property.location.city, property.location.country)}
-          imageUrl={property.images?.[0] ?? null}
-          priceMinor={property.basePriceMinor}
-          currency={property.currency}
-          rating={property.ratingAvg}
-          reviewCount={property.ratingCount}
-          propertyType={typeLabel(property.propertyType)}
-          initialFavorite={viewer.favoriteIds.has(property.id)}
-        />
+        <li key={property.id} className="grid">
+          <HomeFeaturedCard
+            id={property.id}
+            title={property.title}
+            location={locationLabel(property.location.city, property.location.country)}
+            imageUrl={property.images?.[0] ?? null}
+            priceMinor={property.basePriceMinor}
+            currency={property.currency}
+            rating={property.ratingAvg}
+            reviewCount={property.ratingCount}
+            propertyType={typeLabel(property.propertyType)}
+            initialFavorite={viewer.favoriteIds.has(property.id)}
+            showCompare
+          />
+        </li>
       ))}
-    </div>
+    </ul>
   );
 }
 
@@ -243,6 +231,8 @@ export default async function HomePage() {
           </Suspense>
         </section>
       </main>
+      {/* Karşılaştırma seçimi: sayı duyurusu ve /compare bağlantısı (F688). */}
+      <CompareBar />
       <Footer />
     </div>
   );

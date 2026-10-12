@@ -24,7 +24,7 @@
     "transparency": "DSA transparency report",
     "transparencyNote": "Shows notice, removal and appeal counts (no personal data). For now the report is exported as JSON/CSV from the compliance dashboard, which only admins can open.",
     "ranking": "How ranking works",
-    "report": "Report an illegal listing or content",
+    "report": "Report content",
     "privacy": "Privacy and KVKK notice"
   },
   "footnote": "Portfolio/demo project; links point to the real workflows and endpoints in the source repository.",

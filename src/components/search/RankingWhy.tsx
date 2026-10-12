@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { focusRing } from "@/components/ui/ui";
 import { useFormat } from "@/i18n/use-format";
@@ -24,13 +25,18 @@ export default function RankingWhy({
   score,
   explain,
   weightsSet,
+  title,
 }: {
   score?: number;
   explain?: Record<string, number>;
   weightsSet?: RankingWeightsSet;
+  /** İlan adı; tekrarlanan özetlerin ekran okuyucuda ayırt edilmesi için (F972). */
+  title?: string;
 }) {
   const t = useTranslations("ranking");
   const f = useFormat();
+  // F1359: açıklama sayfası, filtrelenmiş sonuçlara geri dönebilsin diye aramayı taşır.
+  const q = useSearchParams().toString();
   if (score === undefined && !explain) return null;
 
   const entries = Object.entries(explain ?? {})
@@ -58,6 +64,7 @@ export default function RankingWhy({
     <details className="mt-2 rounded-md border border-gray-200 bg-white px-3 py-2 text-xs text-gray-800">
       <summary className={`cursor-pointer font-semibold text-[#003580] ${focusRing}`}>
         {t("why")}
+        {title && <span className="sr-only"> {t("whyFor", { title })}</span>}
       </summary>
       {setNote && <p className="mt-1">{t(`weightsSet.${setNote}`)}</p>}
       {!experimental && total !== undefined && (
@@ -90,7 +97,10 @@ export default function RankingWhy({
           })}
         </ul>
       )}
-      <Link href="/ranking" className={`mt-1 inline-block underline ${focusRing}`}>
+      <Link
+        href={q ? `/ranking?from=${encodeURIComponent(q)}` : "/ranking"}
+        className={`mt-1 inline-block underline ${focusRing}`}
+      >
         {t("title")}
       </Link>
     </details>

@@ -43,6 +43,10 @@ export interface PriceAlertView {
   /** Omnibus "önceki fiyat" (son N günün en düşüğü); yalnızca güncel fiyattan yüksekse. */
   previousPriceMinor: number | null;
   active: boolean;
+  /** Liste görünümü için (yalnızca `listPriceAlerts` doldurur). */
+  propertyId?: string;
+  propertyName?: string;
+  roomName?: string;
 }
 
 function toView(
@@ -121,12 +125,19 @@ export async function listPriceAlerts(userId: string): Promise<PriceAlertView[]>
   const rows = await prisma.priceAlert.findMany({
     where: { userId, active: true },
     orderBy: { checkIn: "asc" },
-    include: { roomType: { select: { property: { select: { location: true } } } } },
+    include: {
+      roomType: {
+        select: { name: true, property: { select: { id: true, title: true, location: true } } },
+      },
+    },
   });
   const today = todayUtc();
-  return rows.map((r) =>
-    toView(r, today, marketRulesFor(r.roomType.property.location.country).discountReferenceDays)
-  );
+  return rows.map((r) => ({
+    ...toView(r, today, marketRulesFor(r.roomType.property.location.country).discountReferenceDays),
+    propertyId: r.roomType.property.id,
+    propertyName: r.roomType.property.title,
+    roomName: r.roomType.name,
+  }));
 }
 
 export async function deletePriceAlert(userId: string, id: string): Promise<void> {

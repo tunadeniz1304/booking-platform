@@ -7,7 +7,9 @@ import { optimizeRoute, type CityNode, type RoutePlan } from "@/lib/routing/opti
 import { searchProperties } from "@/lib/search";
 import { createQuote, type Quote } from "@/lib/pricing/quote";
 import { ValidationError } from "@/lib/http/errors";
-import { formatMoney, money } from "@/lib/money/money";
+import { getConfig } from "@/lib/config/app-config";
+import { createFormatter } from "@/lib/i18n/format";
+import { normalizePlace } from "@/lib/search/normalize-place";
 import { addDays, monthOf, parseIsoDate, todayUtc, type IsoDate } from "@/lib/time/nights";
 
 /**
@@ -15,16 +17,21 @@ import { addDays, monthOf, parseIsoDate, todayUtc, type IsoDate } from "@/lib/ti
  *
  * Plan DETERMİNİSTİK üretilir: rota (Held-Karp), şehir başına gece dağılımı, her şehirde
  * en iyi skorlu uygun konaklama ve `computeTotal` teklifi. Toplam = tekliflerin toplamı.
- * LLM yalnızca araç çağırır (searchStays / optimizeRoute / quoteStay) ve Türkçe anlatım
- * yazar; anlatımdaki her fiyat/tarih/sayı araç çıktılarında veya planda olmalıdır —
- * değilse demo anlatımına düşülür. Rezervasyon ASLA otomatik yapılmaz ("Tut" butonu).
+ * LLM yalnızca araç çağırır (searchStays / optimizeRoute / quoteStay) ve istenen dilde (tr/en)
+ * anlatım yazar; anlatımdaki her fiyat/tarih/sayı araç çıktılarında veya planda olmalıdır —
+ * değilse demo anlatımına düşülür. Rezervasyon ASLA otomatik yapılmaz («Odayı ayır» düğmesi).
  */
+
+export type TripLocale = "tr" | "en";
 
 export interface TripRequest {
   cities: string[];
+  /** Toplam gece sayısı (duraklara dağıtılır). */
   days: number;
   guests: number;
   startDate?: string;
+  /** Anlatımın dili; verilmezse Türkçe. */
+  locale?: TripLocale;
 }
 
 export interface TripStop {
@@ -49,23 +56,57 @@ export interface TripPlan {
   currency: string;
   narrative: string;
   llmMode: LlmMode;
+  /** Anlatımın dili (istemci `lang` olarak işaretler). */
+  narrativeLocale: TripLocale;
+  /** Durak tekliflerinin en erken bitiş zamanı (ISO); fiyatlı durak yoksa `null`. */
+  quoteExpiresAt: string | null;
+  /** "Odayı ayır" ile odanın ayrıldığı süre (dakika). */
+  holdMinutes: number;
 }
 
-const norm = (s: string) => s.trim().toLocaleLowerCase("tr-TR");
+/** Anlatımın olgu kaynağı olan deterministik plan (eval'ler de bu biçimi kurar). */
+export type TripPlanCore = Omit<
+  TripPlan,
+  "narrative" | "llmMode" | "narrativeLocale" | "quoteExpiresAt" | "holdMinutes"
+>;
+
+/** Yaygın yabancı şehir adları (normalleştirilmiş) → veritabanındaki (Türkçe) ad. */
+const CITY_ALIASES = new Map<string, string>([
+  ["cappadocia", "Kapadokya"],
+  ["rome", "Roma"],
+  ["barcelona", "Barselona"],
+  ["vienna", "Viyana"],
+  ["wien", "Viyana"],
+  ["london", "Londra"],
+]);
+
+function tripLocale(req: TripRequest): TripLocale {
+  return req.locale === "en" ? "en" : "tr";
+}
 
 async function resolveCities(names: string[]): Promise<CityNode[]> {
   const rows = await prisma.location.findMany({
-    where: { OR: names.map((n) => ({ city: { equals: n.trim(), mode: "insensitive" as const } })) },
+    where: { latitude: { not: null }, longitude: { not: null } },
     select: { city: true, latitude: true, longitude: true },
   });
-  const byKey = new Map(rows.map((r) => [norm(r.city), r]));
+  // Büyük/küçük harf, aksan ve İ/ı duyarsız: "Cesme" → Çeşme, "Istanbul" → İstanbul.
+  const byKey = new Map(rows.map((r) => [normalizePlace(r.city), r]));
   return names.map((n) => {
-    const hit = byKey.get(norm(n));
+    const key = normalizePlace(n);
+    const alias = CITY_ALIASES.get(key);
+    const hit = byKey.get(key) ?? (alias ? byKey.get(normalizePlace(alias)) : undefined);
     if (!hit || hit.latitude == null || hit.longitude == null) {
-      throw new ValidationError(`Şehir bulunamadı: ${n}`);
+      const msg = `Şehir bulunamadı: ${n}`;
+      throw new ValidationError(msg, { fieldErrors: { cities: [msg] } });
     }
     return { id: hit.city, name: hit.city, lat: hit.latitude, lng: hit.longitude };
   });
+}
+
+interface StayPick {
+  stay: NonNullable<TripStop["stay"]>;
+  /** Teklifin bitiş zamanı (ISO); plana yalnızca en erkeni girer. */
+  expiresAt: string;
 }
 
 async function bestStay(
@@ -73,7 +114,7 @@ async function bestStay(
   checkIn: IsoDate,
   checkOut: IsoDate,
   guests: number
-): Promise<TripStop["stay"]> {
+): Promise<StayPick | null> {
   const res = await searchProperties({
     city,
     checkIn,
@@ -94,12 +135,15 @@ async function bestStay(
         guests,
       });
       return {
-        propertyId: r.id,
-        title: r.title,
-        roomId: quote.roomId,
-        quoteId: quote.quoteId,
-        total: quote.total,
-        currency: quote.currency,
+        stay: {
+          propertyId: r.id,
+          title: r.title,
+          roomId: quote.roomId,
+          quoteId: quote.quoteId,
+          total: quote.total,
+          currency: quote.currency,
+        },
+        expiresAt: quote.expiresAt,
       };
     } catch {
       // bu oda artık uygun değil → sıradaki sonuç
@@ -109,10 +153,17 @@ async function bestStay(
 }
 
 /** Deterministik plan (demo çıktısı ve canlı anlatımın olgu kaynağı). */
-async function buildTripPlan(req: TripRequest): Promise<Omit<TripPlan, "narrative" | "llmMode">> {
-  if (req.cities.length < 1 || req.cities.length > 6) throw new ValidationError("1–6 şehir seçin");
-  if (req.days < req.cities.length || req.days > 30)
-    throw new ValidationError("Gün sayısı şehir sayısı ile 30 arasında olmalı");
+async function buildTripPlan(
+  req: TripRequest
+): Promise<TripPlanCore & { quoteExpiresAt: string | null }> {
+  if (req.cities.length < 1 || req.cities.length > 6) {
+    const msg = "1–6 şehir seçin";
+    throw new ValidationError(msg, { fieldErrors: { cities: [msg] } });
+  }
+  if (req.days < req.cities.length || req.days > 30) {
+    const msg = "Gece sayısı şehir sayısı ile 30 arasında olmalı";
+    throw new ValidationError(msg, { fieldErrors: { days: [msg] } });
+  }
   const nodes = await resolveCities(req.cities);
   const start = req.startDate ? parseIsoDate(req.startDate) : addDays(todayUtc(), 14);
   const route = optimizeRoute(nodes.slice(1), nodes[0], monthOf(start));
@@ -120,17 +171,16 @@ async function buildTripPlan(req: TripRequest): Promise<Omit<TripPlan, "narrativ
   const base = Math.floor(req.days / route.order.length);
   const extra = req.days % route.order.length;
   const stops: TripStop[] = [];
+  let quoteExpiresAt: string | null = null;
   let cursor = start;
   for (const [i, city] of route.order.entries()) {
     const nights = base + (i < extra ? 1 : 0);
     const checkOut = addDays(cursor, nights);
-    stops.push({
-      city,
-      checkIn: cursor,
-      checkOut,
-      nights,
-      stay: await bestStay(city, cursor, checkOut, req.guests),
-    });
+    const pick = await bestStay(city, cursor, checkOut, req.guests);
+    if (pick && (quoteExpiresAt === null || pick.expiresAt < quoteExpiresAt)) {
+      quoteExpiresAt = pick.expiresAt;
+    }
+    stops.push({ city, checkIn: cursor, checkOut, nights, stay: pick?.stay ?? null });
     cursor = checkOut;
   }
   const priced = stops.filter((s) => s.stay);
@@ -138,28 +188,54 @@ async function buildTripPlan(req: TripRequest): Promise<Omit<TripPlan, "narrativ
   const total = priced
     .filter((s) => s.stay!.currency === currency)
     .reduce((sum, s) => sum + s.stay!.total, 0);
-  return { route, stops, total, currency };
+  return { route, stops, total, currency, quoteExpiresAt };
 }
 
-function demoNarrative(plan: Omit<TripPlan, "narrative" | "llmMode">, guests: number): string {
-  const parts = plan.stops.map((s) =>
-    s.stay
-      ? `${s.city}: ${s.checkIn} – ${s.checkOut} (${s.nights} gece), ${s.stay.title}, ${formatMoney(money(s.stay.total, s.stay.currency))}.`
-      : `${s.city}: ${s.checkIn} – ${s.checkOut} (${s.nights} gece) için uygun konaklama bulunamadı.`
-  );
+/** Deterministik anlatım; tarih ve tutarlar arayüz dilinin biçimindedir. */
+function demoNarrative(plan: TripPlanCore, guests: number, locale: TripLocale): string {
+  const f = createFormatter(locale);
+  const nights = plan.stops.reduce((s, x) => s + x.nights, 0);
+  const order = plan.route.order.join(" → ");
+  const total = f.money(plan.total, plan.currency);
+  if (locale === "en") {
+    const n = (count: number) => `${count} ${count === 1 ? "night" : "nights"}`;
+    const parts = plan.stops.map((s) => {
+      const range = `${s.city}: ${f.date(s.checkIn)} – ${f.date(s.checkOut)} (${n(s.nights)})`;
+      return s.stay
+        ? `${range}, ${s.stay.title}, ${f.money(s.stay.total, s.stay.currency)}.`
+        : `${range}: no available stay found.`;
+    });
+    return [
+      `${n(nights)} route for ${guests} ${guests === 1 ? "guest" : "guests"}: ${order} (${plan.route.totalKm} km in total).`,
+      ...parts,
+      `Total for all stays, taxes included: ${total}. Nothing has been booked; use "Hold room" at each stop to hold the room.`,
+    ].join("\n");
+  }
+  const parts = plan.stops.map((s) => {
+    const range = `${s.city}: ${f.date(s.checkIn)} – ${f.date(s.checkOut)} (${s.nights} gece)`;
+    return s.stay
+      ? `${range}, ${s.stay.title}, ${f.money(s.stay.total, s.stay.currency)}.`
+      : `${range} için uygun konaklama bulunamadı.`;
+  });
   return [
-    `${guests} kişilik ${plan.stops.reduce((s, x) => s + x.nights, 0)} gecelik rota: ${plan.route.order.join(" → ")} (toplam ${plan.route.totalKm} km).`,
+    `${guests} kişilik ${nights} gecelik rota: ${order} (toplam ${plan.route.totalKm} km).`,
     ...parts,
-    `Konaklamaların vergiler dahil toplamı ${formatMoney(money(plan.total, plan.currency))}. Rezervasyon yapılmadı; her durak için "Tut" ile odayı ayırabilirsiniz.`,
+    `Konaklamaların vergiler dahil toplamı ${total}. Rezervasyon yapılmadı; odayı ayırmak için her durakta «Odayı ayır» düğmesini kullanın.`,
   ].join("\n");
 }
 
-export type TripPlanCore = Omit<TripPlan, "narrative" | "llmMode">;
-
 export async function planTrip(req: TripRequest): Promise<TripPlan> {
-  const plan = await buildTripPlan(req);
+  // Teklif bitişi anlatımın olgu kümesine girmez (saat/dakika sayıları guard'ı gevşetmesin).
+  const { quoteExpiresAt, ...plan } = await buildTripPlan(req);
   const { narrative, llmMode } = await narrateTripPlan(req, plan);
-  return { ...plan, narrative, llmMode };
+  return {
+    ...plan,
+    narrative,
+    llmMode,
+    narrativeLocale: tripLocale(req),
+    quoteExpiresAt,
+    holdMinutes: getConfig().BOOKING_HOLD_TTL_MINUTES,
+  };
 }
 
 /**
@@ -170,7 +246,8 @@ export async function narrateTripPlan(
   req: TripRequest,
   plan: TripPlanCore
 ): Promise<{ narrative: string; llmMode: LlmMode }> {
-  const demo = () => ({ narrative: demoNarrative(plan, req.guests) });
+  const locale = tripLocale(req);
+  const demo = () => ({ narrative: demoNarrative(plan, req.guests, locale) });
   const tools: LlmTool[] = [
     {
       name: "optimizeRoute",
@@ -190,7 +267,7 @@ export async function narrateTripPlan(
       parameters: { type: "object", properties: {} },
       execute: async () => ({
         totalMinor: plan.total,
-        total: formatMoney(money(plan.total, plan.currency)),
+        total: createFormatter(locale).money(plan.total, plan.currency),
         currency: plan.currency,
       }),
     },
@@ -202,10 +279,11 @@ export async function narrateTripPlan(
       {
         role: "system",
         content:
-          "Türkçe gezi planı anlatıcısısın. Araçları çağırıp sonuçlarına dayanarak kısa bir plan anlatımı yaz. " +
+          "Gezi planı anlatıcısısın. Araçları çağırıp sonuçlarına dayanarak kısa bir plan anlatımı yaz. " +
+          `Anlatım dili: ${locale === "en" ? "İngilizce" : "Türkçe"}; tarihleri bu dilin günlük biçiminde yaz (ISO değil). ` +
           'Araç çıktısında olmayan fiyat, tarih veya sayı YAZMA. Rezervasyon yapma. Yalnızca JSON: {"narrative": "..."}',
       },
-      { role: "user", content: `${req.cities.join(", ")} — ${req.days} gün, ${req.guests} kişi.` },
+      { role: "user", content: `${req.cities.join(", ")} — ${req.days} gece, ${req.guests} kişi.` },
     ],
     tools,
     {
@@ -217,7 +295,7 @@ export async function narrateTripPlan(
           plan.total,
           plan.route.totalKm,
           JSON.stringify(plan),
-          demoNarrative(plan, req.guests),
+          demoNarrative(plan, req.guests, locale),
           ...calls.map((c) => JSON.stringify(c.result)),
         ]);
         assertNumbersGrounded(data.narrative, facts);

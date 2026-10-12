@@ -3,7 +3,7 @@ import { cache } from "react";
 import { minorFromDb } from "@/lib/money/money";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { getTranslations } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import { prisma } from "@/lib/prisma";
 import { marketRulesFor } from "@/lib/compliance/market-rules";
 import { LISTABLE_PROPERTY } from "@/lib/compliance/listing";
@@ -147,12 +147,15 @@ export default async function PropertyPage({ params, searchParams }: PropertyPag
     roomId: one(sp.roomId),
     ratePlanId: one(sp.ratePlanId),
   };
-  const [property, t, tc, ta] = await Promise.all([
+  const [property, t, tc, ta, locale] = await Promise.all([
     getProperty(id),
     getTranslations("property"),
     getTranslations("compliance.report"),
     getTranslations("compliance.accessibility"),
+    getLocale(),
   ]);
+  // F577: başlık/açıklama ev sahibinin Türkçe metni; başka arayüz dilinde lang="tr".
+  const contentLang = locale === "tr" ? undefined : "tr";
 
   if (!property) {
     notFound();
@@ -260,7 +263,7 @@ export default async function PropertyPage({ params, searchParams }: PropertyPag
             </li>
             <li className="flex min-w-0 max-w-full items-center gap-x-2">
               <span aria-hidden="true">›</span>
-              <span aria-current="page" className="truncate text-gray-900">
+              <span aria-current="page" lang={contentLang} className="truncate text-gray-900">
                 {property.title}
               </span>
             </li>
@@ -270,7 +273,9 @@ export default async function PropertyPage({ params, searchParams }: PropertyPag
           <p className="text-sm text-gray-500">
             {property.location.city}, {property.location.country}
           </p>
-          <h1 className="mt-1 text-3xl font-bold text-gray-900">{property.title}</h1>
+          <h1 lang={contentLang} className="mt-1 text-3xl font-bold text-gray-900">
+            {property.title}
+          </h1>
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
             {reviewCount > 0 ? (
               // F920/F1132: görünür "4,5/5" + ekran okuyucuya "5 üzerinden 4,5" (RatingBadge);
@@ -365,7 +370,9 @@ export default async function PropertyPage({ params, searchParams }: PropertyPag
           <div className="lg:col-span-2 lg:col-start-1 lg:row-start-2">
             <div>
               <h2 className="text-xl font-semibold text-gray-900">{t("description")}</h2>
-              <p className="mt-2 whitespace-pre-line text-gray-700">{property.description}</p>
+              <p lang={contentLang} className="mt-2 whitespace-pre-line text-gray-700">
+                {property.description}
+              </p>
             </div>
 
             <section
@@ -448,9 +455,14 @@ export default async function PropertyPage({ params, searchParams }: PropertyPag
               </section>
             )}
 
-            <PriceCalendar propertyId={property.id} initialCheckIn={initial.checkIn} />
+            <PriceCalendar
+              propertyId={property.id}
+              initialCheckIn={initial.checkIn}
+              initialCheckOut={initial.checkOut}
+              totalPriceRequired={market.totalPriceDisplay === "required"}
+            />
 
-            <ReviewsSection propertyId={property.id} />
+            <ReviewsSection propertyId={property.id} totalCount={reviewCount} />
 
             {/* P1-13b: DSA md. 16 bildirim bağlantısı */}
             <p className="mt-8 text-sm">

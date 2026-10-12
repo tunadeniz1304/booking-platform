@@ -166,6 +166,15 @@ function lastValidDay(endsAt: string): string {
   return localDay(new Date(new Date(endsAt).getTime() - 1));
 }
 
+/** Satır düğmesine odaklanır; dar ekran kartı ile tablodan görünür olan seçilir (F524). */
+function focusVisibleAction(refs: Map<string, HTMLButtonElement>, key: string): boolean {
+  const el = [key, `${key}:card`]
+    .map((k) => refs.get(k))
+    .find((button) => button !== undefined && button.getClientRects().length > 0);
+  el?.focus();
+  return el !== undefined;
+}
+
 export default function PromotionsPanel({
   properties,
 }: {
@@ -199,7 +208,7 @@ export default function PromotionsPanel({
     const target = pendingFocus.current;
     if (!target || data === null) return;
     pendingFocus.current = null;
-    (actionRefs.current.get(target) ?? listRef.current)?.focus();
+    if (!focusVisibleAction(actionRefs.current, target)) listRef.current?.focus();
   }, [data]);
 
   const actionRef = (key: string) => (el: HTMLButtonElement | null) => {
@@ -218,7 +227,9 @@ export default function PromotionsPanel({
 
   const discountText = (p: Promotion) =>
     p.discountBps !== null
-      ? t("promotions.percentOff", { percent: String(p.discountBps / 100) })
+      ? t("promotions.percentOff", {
+          percent: f.number(p.discountBps / 100, { maximumFractionDigits: 2 }),
+        })
       : f.money(p.discountMinor ?? 0, p.currency ?? "TRY");
 
   const conditionText = (p: Promotion) => {
@@ -351,7 +362,7 @@ export default function PromotionsPanel({
     setForm(EMPTY_FORM);
     setFieldErrors({});
     setFormStatus({});
-    if (id) actionRefs.current.get(`${id}:edit`)?.focus();
+    if (id) focusVisibleAction(actionRefs.current, `${id}:edit`);
   }
 
   async function submit(e: FormEvent) {
@@ -530,6 +541,57 @@ export default function PromotionsPanel({
     "aria-disabled:cursor-not-allowed aria-disabled:opacity-60",
     focusRing,
   ].join(" ");
+  const statusText = (p: Promotion) =>
+    p.active ? t("promotions.active") : t("promotions.inactive");
+
+  /** Düzenle / Durdur-Etkinleştir / Sil; kartta dokunma hedefi 44px (F524). */
+  const rowActions = (p: Promotion, variant: "table" | "card") => {
+    const suffix = variant === "card" ? ":card" : "";
+    const action =
+      variant === "card" ? `${rowAction} inline-flex min-h-[44px] items-center` : rowAction;
+    return (
+      // Sil, geri alınabilir eylemlerden ayrık durur (F446).
+      <div
+        className={
+          variant === "card"
+            ? "flex flex-wrap items-center gap-x-4"
+            : "flex items-center gap-x-4 whitespace-nowrap"
+        }
+      >
+        <button
+          type="button"
+          ref={actionRef(`${p.id}:edit${suffix}`)}
+          onClick={() => startEdit(p)}
+          className={`${action} text-[#003580]`}
+        >
+          {t("promotions.edit")}
+          <span className="sr-only">: {p.name}</span>
+        </button>
+        <button
+          type="button"
+          ref={actionRef(`${p.id}:toggle${suffix}`)}
+          onClick={() => toggle(p)}
+          aria-disabled={rowBusy === p.id || undefined}
+          aria-busy={rowBusy === p.id || undefined}
+          className={`${action} text-[#003580]`}
+        >
+          {p.active ? t("promotions.deactivate") : t("promotions.activate")}
+          <span className="sr-only">: {p.name}</span>
+        </button>
+        <button
+          type="button"
+          ref={actionRef(`${p.id}:delete${suffix}`)}
+          onClick={() => remove(p)}
+          aria-disabled={rowBusy === p.id || undefined}
+          aria-busy={rowBusy === p.id || undefined}
+          className={`${action} ml-4 text-red-700`}
+        >
+          {t("promotions.delete")}
+          <span className="sr-only">: {p.name}</span>
+        </button>
+      </div>
+    );
+  };
 
   return (
     <Card title={t("promotions.title")} id="host-promotions">
@@ -543,100 +605,101 @@ export default function PromotionsPanel({
         ) : promotions.length === 0 ? (
           <p className="text-sm text-gray-700">{t("promotions.empty")}</p>
         ) : (
-          <div
-            className="relative max-w-full overflow-x-auto focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
-            role="region"
-            aria-label={t("promotions.caption")}
-            tabIndex={0}
-          >
-            <table className="min-w-full text-left text-sm">
-              <caption className="sr-only">{t("promotions.caption")}</caption>
-              <thead className="border-b text-gray-700">
-                <tr>
-                  <th scope="col" className="py-2 pr-4">
-                    {t("promotions.columns.name")}
-                  </th>
-                  <th scope="col" className="py-2 pr-4">
-                    {t("promotions.columns.type")}
-                  </th>
-                  <th scope="col" className="py-2 pr-4">
-                    {t("promotions.columns.discount")}
-                  </th>
-                  <th scope="col" className="py-2 pr-4">
-                    {t("promotions.columns.scope")}
-                  </th>
-                  <th scope="col" className="py-2 pr-4">
-                    {t("promotions.columns.validity")}
-                  </th>
-                  <th scope="col" className="py-2 pr-4">
-                    {t("promotions.columns.usage")}
-                  </th>
-                  <th scope="col" className="py-2 pr-4">
-                    {t("promotions.columns.status")}
-                  </th>
-                  <th scope="col" className="py-2">
-                    <span className="sr-only">{t("promotions.columns.actions")}</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {promotions.map((p) => (
-                  <tr key={p.id} className="border-b last:border-0" data-testid="promotion-row">
-                    <td className="py-2 pr-4 font-medium">{p.name}</td>
-                    <td className="py-2 pr-4">
+          <>
+            {/* Dar ekranda kart: durum ve işlemler üstte, yatay kaydırma yok (F524). */}
+            <ul className="space-y-3 md:hidden" aria-label={t("promotions.caption")}>
+              {promotions.map((p) => (
+                <li
+                  key={p.id}
+                  className="rounded-lg border border-gray-200 p-3 text-sm"
+                  data-testid="promotion-card"
+                >
+                  <p className="font-medium text-gray-900">{p.name}</p>
+                  <dl className="mt-1 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+                    <dt className="text-gray-600">{t("promotions.columns.status")}</dt>
+                    <dd className="font-medium">{statusText(p)}</dd>
+                  </dl>
+                  {rowActions(p, "card")}
+                  <dl className="mt-1 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+                    <dt className="text-gray-600">{t("promotions.columns.type")}</dt>
+                    <dd>
                       {t(`promotions.types.${p.type}`)}
                       <span className="block text-xs text-gray-600">{conditionText(p)}</span>
-                    </td>
-                    <td className="py-2 pr-4">{discountText(p)}</td>
-                    <td className="py-2 pr-4">{p.propertyTitle ?? t("promotions.allListings")}</td>
-                    <td className="whitespace-nowrap py-2 pr-4">{validityText(p)}</td>
-                    <td className="py-2 pr-4">
+                    </dd>
+                    <dt className="text-gray-600">{t("promotions.columns.discount")}</dt>
+                    <dd>{discountText(p)}</dd>
+                    <dt className="text-gray-600">{t("promotions.columns.scope")}</dt>
+                    <dd>{p.propertyTitle ?? t("promotions.allListings")}</dd>
+                    <dt className="text-gray-600">{t("promotions.columns.validity")}</dt>
+                    <dd>{validityText(p)}</dd>
+                    <dt className="text-gray-600">{t("promotions.columns.usage")}</dt>
+                    <dd>
                       {p.usageLimit !== null ? `${p.usageCount} / ${p.usageLimit}` : p.usageCount}
-                    </td>
-                    <td className="py-2 pr-4">
-                      {p.active ? t("promotions.active") : t("promotions.inactive")}
-                    </td>
-                    <td className="py-2">
-                      {/* Sil, geri alınabilir eylemlerden ayrık durur (F446). */}
-                      <div className="flex items-center gap-x-4 whitespace-nowrap">
-                        <button
-                          type="button"
-                          ref={actionRef(`${p.id}:edit`)}
-                          onClick={() => startEdit(p)}
-                          className={`${rowAction} text-[#003580]`}
-                        >
-                          {t("promotions.edit")}
-                          <span className="sr-only">: {p.name}</span>
-                        </button>
-                        <button
-                          type="button"
-                          ref={actionRef(`${p.id}:toggle`)}
-                          onClick={() => toggle(p)}
-                          aria-disabled={rowBusy === p.id || undefined}
-                          aria-busy={rowBusy === p.id || undefined}
-                          className={`${rowAction} text-[#003580]`}
-                        >
-                          {p.active ? t("promotions.deactivate") : t("promotions.activate")}
-                          <span className="sr-only">: {p.name}</span>
-                        </button>
-                        <button
-                          type="button"
-                          ref={actionRef(`${p.id}:delete`)}
-                          onClick={() => remove(p)}
-                          aria-disabled={rowBusy === p.id || undefined}
-                          aria-busy={rowBusy === p.id || undefined}
-                          className={`${rowAction} ml-4 text-red-700`}
-                        >
-                          {t("promotions.delete")}
-                          <span className="sr-only">: {p.name}</span>
-                        </button>
-                      </div>
-                    </td>
+                    </dd>
+                  </dl>
+                </li>
+              ))}
+            </ul>
+            <div
+              className="relative hidden max-w-full overflow-x-auto focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 md:block"
+              role="region"
+              aria-label={t("promotions.caption")}
+              tabIndex={0}
+            >
+              <table className="min-w-full text-left text-sm">
+                <caption className="sr-only">{t("promotions.caption")}</caption>
+                <thead className="border-b text-gray-700">
+                  <tr>
+                    <th scope="col" className="py-2 pr-4">
+                      {t("promotions.columns.name")}
+                    </th>
+                    <th scope="col" className="py-2 pr-4">
+                      {t("promotions.columns.type")}
+                    </th>
+                    <th scope="col" className="py-2 pr-4">
+                      {t("promotions.columns.discount")}
+                    </th>
+                    <th scope="col" className="py-2 pr-4">
+                      {t("promotions.columns.scope")}
+                    </th>
+                    <th scope="col" className="py-2 pr-4">
+                      {t("promotions.columns.validity")}
+                    </th>
+                    <th scope="col" className="py-2 pr-4">
+                      {t("promotions.columns.usage")}
+                    </th>
+                    <th scope="col" className="py-2 pr-4">
+                      {t("promotions.columns.status")}
+                    </th>
+                    <th scope="col" className="py-2">
+                      <span className="sr-only">{t("promotions.columns.actions")}</span>
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {promotions.map((p) => (
+                    <tr key={p.id} className="border-b last:border-0" data-testid="promotion-row">
+                      <td className="py-2 pr-4 font-medium">{p.name}</td>
+                      <td className="py-2 pr-4">
+                        {t(`promotions.types.${p.type}`)}
+                        <span className="block text-xs text-gray-600">{conditionText(p)}</span>
+                      </td>
+                      <td className="py-2 pr-4">{discountText(p)}</td>
+                      <td className="py-2 pr-4">
+                        {p.propertyTitle ?? t("promotions.allListings")}
+                      </td>
+                      <td className="whitespace-nowrap py-2 pr-4">{validityText(p)}</td>
+                      <td className="py-2 pr-4">
+                        {p.usageLimit !== null ? `${p.usageCount} / ${p.usageLimit}` : p.usageCount}
+                      </td>
+                      <td className="py-2 pr-4">{statusText(p)}</td>
+                      <td className="py-2">{rowActions(p, "table")}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
 
@@ -917,7 +980,7 @@ export default function PromotionsPanel({
                   checked={form.stackable}
                   aria-describedby={`${id}-stack-hint`}
                   onChange={(e) => change({ stackable: e.target.checked })}
-                  className={focusRing}
+                  className={`h-5 w-5 ${focusRing}`}
                 />
                 <label htmlFor={`${id}-stack`} className="text-sm text-gray-800">
                   {t("promotions.form.stackable")}

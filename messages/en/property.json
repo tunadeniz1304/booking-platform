@@ -6,7 +6,7 @@
   "registration": {
     "trPermit": "Tourism accommodation permit no. (Law 7464)",
     "euRegistration": "Short-term rental registration no. (EU 2024/1028)",
-    "platform": "Licence/registration no."
+    "platform": "License/registration no."
   },
   "totalPriceNote": "Prices shown are totals including taxes and mandatory fees.",
   "amenities": "Amenities",
@@ -99,11 +99,11 @@
     "car": "Parking",
     "coffee": "Breakfast included",
     "spa": "Spa and sauna",
-    "dumbbell": "Fitness centre",
+    "dumbbell": "Fitness center",
     "view": "Sea view",
     "paw": "Pets allowed",
     "clock": "24-hour front desk",
-    "city": "City centre",
+    "city": "City center",
     "service": "Room service"
   },
   "policies": {

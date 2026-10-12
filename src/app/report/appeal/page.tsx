@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
-import { ButtonLink, Card, PageShell } from "@/components/ui/ui";
+import { ButtonLink, Card, PageShell, focusRing } from "@/components/ui/ui";
 import AppealForm from "@/components/compliance/AppealForm";
 import {
   appealRoleSchema,
@@ -131,7 +131,9 @@ export default async function AppealPage({
               </dl>
             )}
             <details className="mt-3">
-              <summary className="cursor-pointer text-sm font-medium text-gray-900">
+              <summary
+                className={`cursor-pointer rounded text-sm font-medium text-gray-900 ${focusRing}`}
+              >
                 {t("statementRaw")}
               </summary>
               <pre className="mt-2 whitespace-pre-wrap font-sans text-xs text-gray-800">

@@ -43,5 +43,13 @@
   "yesterday": "Yesterday",
   "newMessage": "New message from {sender}: {body}",
   "newMessages": "{count, plural, one {# new message} other {# new messages}} arrived.",
-  "riskSentNotice": "This message was shown to the recipient with a safety warning. Reasons: {reasons}."
+  "riskSentNotice": "This message was shown to the recipient with a safety warning. Reasons: {reasons}.",
+  "draftLanguage": "Draft language: {language}.",
+  "draftLanguageName": {
+    "tr": "Turkish",
+    "en": "English"
+  },
+  "loadOlder": "Load older messages",
+  "loadingOlder": "Loading older messages…",
+  "loadOlderFailed": "Couldn't load older messages. Please try again."
 }

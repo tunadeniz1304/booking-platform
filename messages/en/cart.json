@@ -90,7 +90,8 @@
     "payMethodLegend": "How would you like to pay?",
     "payMethodCard": "I'll pay the full amount (one card)",
     "payMethodSplit": "We'll split it as a group (everyone pays their own share)",
-    "threeDsNoCode": "Didn't get a code? Wait a few minutes. If it still doesn't arrive, you can try another card below or release the hold."
+    "threeDsNoCode": "Didn't get a code? Wait a few minutes. If it still doesn't arrive, you can try another card below or release the hold.",
+    "timeoutCheck": "The request timed out; your payment may have gone through. We're checking your payment status… If the cart is still awaiting payment, you can try again; the same payment won't be taken twice."
   },
   "split": {
     "title": "Split the payment with your group",
@@ -174,7 +175,9 @@
       "attemptsExceeded": "Card payment for this share has been stopped for your security after too many failed attempts. You have not been charged. You can try again later or let the organizer know.",
       "payInfo": "When you pay, {amount} is only reserved on your card (pre-authorization), not charged right away. Once every share is in, the booking is confirmed and your card is charged; if the shares are not completed, the reserved amount is released and you are not charged.",
       "paidByOther": "This share has already been paid from another account; you don't need to pay.",
-      "aborted": "This split payment was cancelled. If you paid, the reserved amount is released or refunded."
+      "aborted": "This split payment was cancelled. If you paid, the reserved amount is released or refunded.",
+      "backToStatus": "Back to split payment status",
+      "summary": "Share summary"
     },
     "modeLegend": "How should the amount be split?",
     "amountHint": "e.g. 1,250.50",

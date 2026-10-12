@@ -90,7 +90,8 @@
     "payMethodLegend": "Nasıl ödemek istersiniz?",
     "payMethodCard": "Tamamını ben ödeyeceğim (tek kart)",
     "payMethodSplit": "Grupla bölüşeceğiz (herkes kendi payını öder)",
-    "threeDsNoCode": "Kod gelmedi mi? Birkaç dakika bekleyin. Yine gelmezse aşağıdan başka bir kartla deneyebilir ya da tutmayı bırakabilirsiniz."
+    "threeDsNoCode": "Kod gelmedi mi? Birkaç dakika bekleyin. Yine gelmezse aşağıdan başka bir kartla deneyebilir ya da tutmayı bırakabilirsiniz.",
+    "timeoutCheck": "İstek zaman aşımına uğradı; ödemeniz alınmış olabilir. Ödemenizin durumunu kontrol ediyoruz… Sepet hâlâ ödeme bekliyorsa yeniden deneyebilirsiniz; aynı ödeme iki kez alınmaz."
   },
   "split": {
     "title": "Ödemeyi grupla bölüş",
@@ -174,7 +175,9 @@
       "attemptsExceeded": "Çok fazla başarısız ödeme denemesi yapıldığı için bu payın kartla ödenmesi güvenliğiniz adına durduruldu. Kartınızdan ücret alınmadı. Daha sonra tekrar deneyebilir ya da durumu organizatöre bildirebilirsiniz.",
       "payInfo": "Ödediğinizde {amount} kartınızda yalnızca ayrılır (provizyon); hemen çekilmez. Tüm paylar tamamlanınca rezervasyon onaylanır ve tutar kartınızdan çekilir; paylar tamamlanmazsa ayrılan tutar serbest bırakılır ve kartınızdan ücret alınmaz.",
       "paidByOther": "Bu pay başka bir hesapla ödendi; sizin ödeme yapmanıza gerek yok.",
-      "aborted": "Bu bölünmüş ödeme iptal edildi. Ödeme yaptıysanız kartınızda ayrılan tutar serbest bırakılır ya da iade edilir."
+      "aborted": "Bu bölünmüş ödeme iptal edildi. Ödeme yaptıysanız kartınızda ayrılan tutar serbest bırakılır ya da iade edilir.",
+      "backToStatus": "Bölünmüş ödeme durumuna dön",
+      "summary": "Pay özeti"
     },
     "modeLegend": "Tutar nasıl bölünsün?",
     "amountHint": "ör. 1.250,50",

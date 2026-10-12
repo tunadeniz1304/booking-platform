@@ -3,7 +3,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { apiFetch, type SessionUser } from "@/lib/api-client";
+import { apiFetch } from "@/lib/api-client";
 import { parseAmountToMinor } from "@/lib/ui/amount-input";
 import { useFormat } from "@/i18n/use-format";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
@@ -75,11 +75,6 @@ const linkClass = `font-semibold text-[#003580] underline ${focusRing}`;
 /** Sunucu varsayılanı TRANSFER_MAX_ASK_RATIO=1: satış fiyatı ödenen tutarı aşamaz. */
 function maxAskOf(b: MyBooking): number {
   return b.maxAskMinor ?? b.totalPriceMinor;
-}
-
-/** `/api/user/me` doğrulama bilgisini dönmüyorsa `undefined` (sunucu hatasıyla anlaşılır). */
-function emailVerifiedOf(user: SessionUser & { emailVerified?: boolean }): boolean | undefined {
-  return user.emailVerified;
 }
 
 function fractionDigits(currency: string): number {
@@ -167,7 +162,7 @@ export default function TransferMarket() {
       </Card>
 
       {session.status === "ready" && session.user ? (
-        <SellPanel userId={session.user.id} emailVerified={emailVerifiedOf(session.user)} />
+        <SellPanel userId={session.user.id} emailVerified={session.user.emailVerified} />
       ) : session.status === "ready" ? (
         <p id="sell" className="text-sm text-gray-800">
           {t.rich("loginToSell", {
@@ -196,7 +191,9 @@ function SellPanel({ userId, emailVerified }: { userId: string; emailVerified?: 
   const [claimUrl, setClaimUrl] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ error?: string; message?: string }>({});
   const [needsVerify, setNeedsVerify] = useState(emailVerified === false);
-  const [copied, setCopied] = useState(false);
+  const [sent, setSent] = useState<"copied" | "shared" | null>(null);
+  const [shareText, setShareText] = useState("");
+  const [canShare, setCanShare] = useState(false);
   const [busy, setBusy] = useState(false);
   const [withdrawing, setWithdrawing] = useState<string | null>(null);
   const [now] = useState(() => Date.now());
@@ -218,16 +215,22 @@ function SellPanel({ userId, emailVerified }: { userId: string; emailVerified?: 
   const selected = transferable.find((b) => b.id === bookingId) ?? transferable[0];
   const selectedListing = selected ? activeByBooking.get(selected.id) : undefined;
 
-  // Tek seferlik bağlantı kopyalanmadan sayfadan ayrılırken tarayıcı uyarısı.
+  // Paylaşım menüsü (Web Share) yalnız istemcide algılanır; sunucu çıktısıyla uyuşmazlık olmaz.
   useEffect(() => {
-    if (!claimUrl || copied) return;
+    const timer = setTimeout(() => setCanShare(typeof navigator.share === "function"), 0);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Tek seferlik bağlantı kopyalanmadan/paylaşılmadan sayfadan ayrılırken tarayıcı uyarısı.
+  useEffect(() => {
+    if (!claimUrl || sent) return;
     const warn = (e: BeforeUnloadEvent) => {
       e.preventDefault();
       e.returnValue = "";
     };
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
-  }, [claimUrl, copied]);
+  }, [claimUrl, sent]);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -259,13 +262,19 @@ function SellPanel({ userId, emailVerified }: { userId: string; emailVerified?: 
       return;
     }
     setBusy(true);
-    setCopied(false);
+    setSent(null);
     try {
       const res = await apiFetch<CreatedTransfer>("/api/transfers", {
         method: "POST",
         body: JSON.stringify({ bookingId: selected.id, askPriceMinor }),
       });
       setClaimUrl(res.claimUrl);
+      setShareText(
+        t("sell.shareText", {
+          property: selected.property.title,
+          amount: f.money(res.askPriceMinor, res.currency),
+        })
+      );
       setFeedback({
         message: t("sell.created", {
           amount: f.money(res.askPriceMinor, res.currency),
@@ -285,15 +294,27 @@ function SellPanel({ userId, emailVerified }: { userId: string; emailVerified?: 
     if (!claimUrl) return;
     try {
       await navigator.clipboard.writeText(claimUrl);
-      setCopied(true);
+      setSent("copied");
     } catch {
       setFeedback({ error: t("sell.copyFailed") });
     }
   }
 
+  /** Telefonun paylaşım menüsü (WhatsApp, SMS…); kapatılırsa sessiz, hatada kopyalamaya düşer. */
+  async function share() {
+    if (!claimUrl) return;
+    try {
+      await navigator.share({ title: t("sell.shareTitle"), text: shareText, url: claimUrl });
+      setSent("shared");
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return;
+      await copy();
+    }
+  }
+
   async function closeLink() {
     if (
-      !copied &&
+      !sent &&
       !(await confirm({
         title: t("sell.closeTitle"),
         body: t("sell.closeBody"),
@@ -423,6 +444,7 @@ function SellPanel({ userId, emailVerified }: { userId: string; emailVerified?: 
               onFocus={(e) => e.currentTarget.select()}
             />
             <div className="mt-2 flex flex-wrap items-center gap-3">
+              {canShare && <Button onClick={share}>{t("sell.share")}</Button>}
               <Button variant="secondary" onClick={copy}>
                 {t("sell.copy")}
               </Button>
@@ -430,7 +452,7 @@ function SellPanel({ userId, emailVerified }: { userId: string; emailVerified?: 
                 {t("sell.hide")}
               </Button>
               <span aria-live="polite" className="text-green-800">
-                {copied ? t("sell.copied") : ""}
+                {sent ? t(sent === "shared" ? "sell.shared" : "sell.copied") : ""}
               </span>
             </div>
           </div>

@@ -12,6 +12,7 @@ import { Button, PageShell, useErrorText } from "@/components/ui/ui";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { GuestCountStepper } from "@/components/booking/GuestCountStepper";
 import { propertyHref } from "@/components/property/PropertyCard";
+import { setHeaderCartCount } from "@/components/layout/useHeaderCartCount";
 import type { SplitPlanDTO } from "@/lib/cart/split-payment";
 
 const select =
@@ -66,7 +67,7 @@ export default function CartPage() {
   const router = useRouter();
   const genericError = useErrorText();
   const { confirm, confirmDialog } = useConfirm();
-  const { cart, setCart, loading, error, reload } = useCart();
+  const { cart, setCart, loading, error, reload, restorable } = useCart();
   // Odaktaki kontrol `disabled` yapılmaz (odak <body>'ye düşer); meşgulken olaylar yok sayılır.
   const [busy, setBusy] = useState(false);
   // Aynı tıklamada (alan blur → kayıt → bağlantı) state henüz güncellenmemiş olabilir.
@@ -87,6 +88,7 @@ export default function CartPage() {
   // Kalemlerin bekleyen (gecikmeli) kayıtları; "Ödemeye geç" önce bunları kaydeder.
   const flushers = useRef(new Set<() => void>());
   const lockedNoticeId = useId();
+  const nextStepsId = useId();
   const listRef = useRef<HTMLUListElement>(null);
   const emptyHeadingRef = useRef<HTMLHeadingElement>(null);
   const undoRef = useRef<HTMLButtonElement>(null);
@@ -120,6 +122,12 @@ export default function CartPage() {
       (byId ?? links[Math.min(target.index, links.length - 1)]).focus();
     } else emptyHeadingRef.current?.focus();
   }, [focusTick]);
+
+  // Başlıktaki sepet rozeti gezinmeyi beklemeden sepetle eşitlenir (yükleme hatasında dokunulmaz).
+  useEffect(() => {
+    if (loading || (error && !cart)) return;
+    setHeaderCartCount(cart?.items.length ?? 0);
+  }, [cart, loading, error]);
 
   useEffect(() => {
     if (!savedId) return;
@@ -419,8 +427,8 @@ export default function CartPage() {
                 >
                   {t("browse")}
                 </Link>
-                {/* Elle boşaltılan ya da kalem kaldırılan sepette gösterilmez. */}
-                {!cart && !cleared && !removed && !reopenMissing && (
+                {/* Yalnız sunucu geri yüklenebilir sepet bildirdiyse (elle boşaltılanda yok). */}
+                {!cart && restorable && !cleared && !removed && !reopenMissing && (
                   <button
                     type="button"
                     onClick={() => void reopen()}
@@ -501,6 +509,7 @@ export default function CartPage() {
                 <Link
                   href="/checkout/cart"
                   aria-disabled={busy || undefined}
+                  aria-describedby={nextStepsId}
                   onClick={(e) => {
                     // Bekleyen değişiklikler önce kaydedilir.
                     for (const flush of flushers.current) flush();
@@ -522,6 +531,9 @@ export default function CartPage() {
                   {t("cancelCart")}
                 </button>
               </div>
+              <p id={nextStepsId} className="mt-2 text-xs text-gray-600">
+                {t("checkout.nextStepsHint")}
+              </p>
             </section>
           </>
         )}

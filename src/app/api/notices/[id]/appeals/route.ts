@@ -8,7 +8,8 @@ import { appealInputSchema, submitAppeal } from "@/lib/compliance/dsa-appeal";
 
 /**
  * DSA md. 20 itiraz (P2-1a). Oturum gerekmez: karar e-postasındaki imzalı bağlantının
- * belirteci (rol başına HMAC) yetkiyi taşır. Bildirim formuyla aynı istemci limiti.
+ * belirteci (rol başına HMAC) yetkiyi taşır. Bildirim formuyla aynı istemci limiti, ayrı
+ * sayaçla ("appeal"); doğrulama hatalı gönderimler kotayı tüketmez (şema limitten önce).
  */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -18,8 +19,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       trustedProxyHops: config.TRUSTED_PROXY_HOPS,
       trustRealIpHeader: config.TRUST_REAL_IP_HEADER,
     });
-    await assertNoticeRateLimit(redis, client);
-    const appeal = await submitAppeal(id, appealInputSchema.parse(await req.json()));
+    const input = appealInputSchema.parse(await req.json());
+    await assertNoticeRateLimit(redis, client, "appeal");
+    const appeal = await submitAppeal(id, input);
     return NextResponse.json(
       { id: appeal.id, status: appeal.status, createdAt: appeal.createdAt },
       { status: 201 }

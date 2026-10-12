@@ -48,9 +48,10 @@
     "endingIn": "ending in {last4}",
     "destinationDemo": "Demo account; no payouts are made to a real bank account",
     "destinationProvider": "Your bank account is managed in Stripe",
-    "manageAtProvider": "View or change your bank account in Stripe"
+    "manageAtProvider": "View or change your bank account in Stripe",
+    "savingSchedule": "Saving…"
   },
-  "policy": "Funds are released from escrow {hours} hours after check-in; a {commission}% platform commission is deducted and {reserve}% of your share is held in reserve for {days} days.",
+  "policy": "Funds are released from escrow {hours, plural, one {# hour} other {# hours}} after check-in; a {commission}% platform commission is deducted and {reserve}% of your share is held in reserve for {days, plural, one {# day} other {# days}}.",
   "identityRequired": "Identity verification is required for payouts.",
   "balances": {
     "title": "Balance",
@@ -141,9 +142,10 @@
       "pending": "With pending payouts"
     },
     "resultCount": "Showing {shown} of {total, plural, one {# account} other {# accounts}}.",
-    "noMatch": "No accounts match your search or filter."
+    "noMatch": "No accounts match your search or filter.",
+    "pauseHint": "{count, plural, =0 {No payouts are pending. If you pause, new payouts will not be sent until you resume.} one {If you pause, # pending payout will not be sent until you resume.} other {If you pause, # pending payouts will not be sent until you resume.}}"
   },
-  "policyNoReserve": "The amount is released from escrow {hours} hours after check-in; a {commission}% platform commission is deducted and part of your share is held in reserve for {days} days. The reserve rate is shown once you connect your account.",
+  "policyNoReserve": "The amount is released from escrow {hours, plural, one {# hour} other {# hours}} after check-in; a {commission}% platform commission is deducted and part of your share is held in reserve for {days, plural, one {# day} other {# days}}. The reserve rate is shown once you connect your account.",
   "resolve": {
     "identity": "You need to verify your identity to receive payouts.",
     "identityRejected": "Your identity verification was rejected. Check your documents and submit them again.",

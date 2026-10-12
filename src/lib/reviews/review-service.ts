@@ -128,30 +128,29 @@ export async function replyToReview(input: {
   return updated;
 }
 
-export async function listReviews(propertyId: string, take = 50) {
-  const rows = await prisma.review.findMany({
-    where: { propertyId, moderationStatus: "PUBLISHED" },
-    orderBy: { createdAt: "desc" },
-    take,
-    select: {
-      id: true,
-      rating: true,
-      comment: true,
-      hostReply: true,
-      hostRepliedAt: true,
-      cleanliness: true,
-      location: true,
-      staff: true,
-      value: true,
-      createdAt: true,
-      user: { select: { firstName: true, lastName: true } },
-    },
-  });
-  return rows.map((r) => ({
+const reviewListSelect = {
+  id: true,
+  rating: true,
+  comment: true,
+  hostReply: true,
+  hostRepliedAt: true,
+  cleanliness: true,
+  location: true,
+  staff: true,
+  value: true,
+  createdAt: true,
+  user: { select: { firstName: true, lastName: true } },
+} satisfies Prisma.ReviewSelect;
+
+type ReviewListRow = Prisma.ReviewGetPayload<{ select: typeof reviewListSelect }>;
+
+function toReviewListItem(r: ReviewListRow) {
+  return {
     id: r.id,
     rating: r.rating,
     comment: r.comment,
     hostReply: r.hostReply,
+    hostRepliedAt: r.hostRepliedAt ? r.hostRepliedAt.toISOString() : null,
     subScores: {
       cleanliness: r.cleanliness,
       location: r.location,
@@ -161,7 +160,71 @@ export async function listReviews(propertyId: string, take = 50) {
     createdAt: r.createdAt.toISOString(),
     author: `${r.user.firstName} ${r.user.lastName.charAt(0)}.`,
     verifiedStay: true,
-  }));
+  };
+}
+
+export async function listReviews(propertyId: string, take = 50) {
+  const rows = await prisma.review.findMany({
+    where: { propertyId, moderationStatus: "PUBLISHED" },
+    orderBy: { createdAt: "desc" },
+    take,
+    select: reviewListSelect,
+  });
+  return rows.map(toReviewListItem);
+}
+
+export const REVIEW_PAGE_MAX = 50;
+export type ReviewSort = "newest" | "highest" | "lowest";
+
+export interface ListReviewsPageOptions {
+  /** Önceki sayfanın `nextCursor` değeri (yorum kimliği). */
+  cursor?: string;
+  take?: number;
+  sort?: ReviewSort;
+  /** Yalnızca bu genel puandaki (1-5) yorumlar. */
+  rating?: number;
+}
+
+/**
+ * Sunucu tarafı sayfalama (imleç): `listReviews`'in sayfalı karşılığı. Sıra yeniden eskiye
+ * ya da puana göre (eşitlikte yeni önce); `total` aynı süzgeçle sayılır.
+ */
+export async function listReviewsPage(propertyId: string, opts: ListReviewsPageOptions = {}) {
+  const take = Math.min(Math.max(Math.trunc(opts.take ?? 20) || 20, 1), REVIEW_PAGE_MAX);
+  const rating =
+    opts.rating && Number.isInteger(opts.rating) && opts.rating >= 1 && opts.rating <= 5
+      ? opts.rating
+      : undefined;
+  const where: Prisma.ReviewWhereInput = {
+    propertyId,
+    moderationStatus: "PUBLISHED",
+    ...(rating !== undefined ? { rating } : {}),
+  };
+  const orderBy: Prisma.ReviewOrderByWithRelationInput[] = [
+    ...(opts.sort === "highest"
+      ? [{ rating: "desc" as const }]
+      : opts.sort === "lowest"
+        ? [{ rating: "asc" as const }]
+        : []),
+    { createdAt: "desc" },
+    { id: "desc" },
+  ];
+  const [rows, total] = await Promise.all([
+    prisma.review.findMany({
+      where,
+      orderBy,
+      take: take + 1,
+      ...(opts.cursor ? { cursor: { id: opts.cursor }, skip: 1 } : {}),
+      select: reviewListSelect,
+    }),
+    prisma.review.count({ where }),
+  ]);
+  const page = rows.slice(0, take);
+  return {
+    items: page.map(toReviewListItem),
+    nextCursor: rows.length > take ? (page[page.length - 1]?.id ?? null) : null,
+    total,
+  };
 }
 
 /**

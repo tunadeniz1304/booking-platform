@@ -1,5 +1,5 @@
 {
-  "title": "Trip planner",
+  "title": "Plan a trip",
   "intro": "Enter the cities and the number of days; we'll suggest the shortest route and a suitable stay for each stop.",
   "form": {
     "title": "Trip details",
@@ -13,7 +13,11 @@
     "daysHint": "At least 1 night per city: {min}–30 nights.",
     "daysHintCheckout": "At least 1 night per city: {min}–30 nights. Final check-out: {date}.",
     "startDateHint": "If left empty, {date} is used.",
-    "cityOptions": "Supported cities (select to add or remove):"
+    "cityOptions": "Supported cities (select to add or remove):",
+    "decreaseDays": "Decrease number of nights",
+    "increaseDays": "Increase number of nights",
+    "decreaseGuests": "Decrease number of guests",
+    "increaseGuests": "Increase number of guests"
   },
   "result": {
     "title": "Suggested plan",

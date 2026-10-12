@@ -1,17 +1,19 @@
 "use client";
 
 import { useRef, useState, type FormEvent } from "react";
+import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { ApiError, apiFetch } from "@/lib/api-client";
 import { useFormat } from "@/i18n/use-format";
-import { Button, Field, Status, inputClass } from "@/components/ui/ui";
+import { Button, Field, Status, focusRing, inputClass } from "@/components/ui/ui";
 import { ResendVerificationButton } from "@/components/auth/AuthCard";
 import OpenClaimSummaryCard from "./OpenClaimSummaryCard";
 import {
   CLAIM_GUEST_WINDOW_DAYS,
-  isEmailNotVerifiedError,
+  claimErrorAction,
   parseMajorInput,
   useClaimErrorText,
+  type ClaimErrorAction,
   type ClaimStatus,
 } from "./shared";
 
@@ -48,6 +50,7 @@ export default function OpenClaimForm({
 }) {
   const t = useTranslations("resolution.open");
   const tErr = useTranslations("resolution.errors");
+  const tRes = useTranslations("resolution");
   const f = useFormat();
   const claimError = useClaimErrorText();
   const type = role === "GUEST" ? "GUEST_REFUND" : "HOST_DAMAGE";
@@ -60,7 +63,7 @@ export default function OpenClaimForm({
   const [created, setCreated] = useState<CreatedClaim | null>(null);
   const [feedback, setFeedback] = useState<{ error?: string }>({});
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
-  const [needsVerify, setNeedsVerify] = useState(false);
+  const [errorAction, setErrorAction] = useState<ClaimErrorAction>(null);
 
   const parsedAmount = amount.trim() ? parseMajorInput(amount, currency) : null;
   const trimmedLength = description.trim().length;
@@ -85,7 +88,7 @@ export default function OpenClaimForm({
     e.preventDefault();
     if (busy) return;
     setFeedback({});
-    setNeedsVerify(false);
+    setErrorAction(null);
     const amountMinor = parseMajorInput(amount, currency);
     const errors: FieldErrors = {};
     if (!amount.trim()) errors.amount = t("amountRequired");
@@ -125,7 +128,7 @@ export default function OpenClaimForm({
         focusFirst(next);
       } else {
         setFeedback({ error: text });
-        setNeedsVerify(isEmailNotVerifiedError(err));
+        setErrorAction(claimErrorAction(err));
       }
     } finally {
       setBusy(false);
@@ -158,6 +161,9 @@ export default function OpenClaimForm({
     parsedAmount !== null && hostDeposit !== null && hostDeposit > 0 && parsedAmount > hostDeposit
       ? parsedAmount - hostDeposit
       : null;
+  // Sayaç ipucunun parçasıdır; böylece alana aria-describedby ile bağlanır.
+  const descriptionCount = t("descriptionCount", { count: trimmedLength, max: DESCRIPTION_MAX });
+  const descriptionHint = `${t("descriptionHint")} ${descriptionCount}`;
   const limitNote =
     description.length > DESCRIPTION_MAX
       ? t("descriptionOverLimit", {
@@ -215,7 +221,7 @@ export default function OpenClaimForm({
       <Field
         label={t("description")}
         id={`${fid}-desc`}
-        hint={t("descriptionHint")}
+        hint={descriptionHint}
         error={fieldErrors.description}
       >
         <textarea
@@ -235,19 +241,21 @@ export default function OpenClaimForm({
           }}
         />
       </Field>
-      <div className="flex flex-wrap justify-between gap-x-3 text-xs">
-        <p className="text-gray-600">
-          {t("descriptionCount", { count: trimmedLength, max: DESCRIPTION_MAX })}
-        </p>
-        <p aria-live="polite" className="text-gray-700">
-          {limitNote}
-        </p>
-      </div>
+      <p aria-live="polite" className="text-xs text-gray-700">
+        {limitNote}
+      </p>
       <Button type="submit" busy={busy}>
         {busy ? t("submitting") : t("submit")}
       </Button>
       <Status error={feedback.error} />
-      {needsVerify && <ResendVerificationButton />}
+      {errorAction === "resendVerification" && <ResendVerificationButton />}
+      {errorAction && typeof errorAction === "object" && (
+        <p className="text-sm">
+          <Link href={errorAction.href} className={`font-semibold underline ${focusRing}`}>
+            {tRes(errorAction.labelKey)}
+          </Link>
+        </p>
+      )}
     </form>
   );
 }

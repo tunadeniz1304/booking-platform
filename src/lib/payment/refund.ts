@@ -112,6 +112,124 @@ export async function cancelAndRefund(
   return withPaymentLock(bookingId, () => cancelLocked(bookingId, userId, now));
 }
 
+/** İptal ve iade önizlemesinin okuduğu rezervasyon alanları. */
+const CANCEL_BOOKING_SELECT = {
+  id: true,
+  userId: true,
+  status: true,
+  version: true,
+  propertyId: true,
+  roomId: true,
+  checkIn: true,
+  checkOut: true,
+  createdAt: true,
+  currency: true,
+  units: true,
+  policySnapshot: true,
+  priceBreakdown: true,
+  property: { select: { timeZone: true, checkInTime: true, checkOutTime: true } },
+  payment: {
+    select: {
+      id: true,
+      status: true,
+      amountMinor: true,
+      refundedAmountMinor: true,
+      providerRef: true,
+      cartPayment: { select: { id: true, providerRef: true } },
+    },
+  },
+  transfers: {
+    where: { status: "COMPLETED" },
+    orderBy: { completedAt: "desc" },
+    take: 1,
+    select: { askPriceMinor: true, currency: true, claimedById: true, buyerPaymentRef: true },
+  },
+} satisfies Prisma.BookingSelect;
+
+type CancelBooking = Prisma.BookingGetPayload<{ select: typeof CANCEL_BOOKING_SELECT }>;
+
+/** İptal geçişi; iptal edilemeyen durumda 409 INVALID_STATE. */
+function cancelTransition(status: BookingStatus): BookingState {
+  try {
+    return transition(status as BookingState, "CANCEL");
+  } catch {
+    throw new ConflictError("Bu rezervasyon iptal edilemez", "INVALID_STATE");
+  }
+}
+
+/**
+ * İade tabanı (iptal ve iade önizlemesi ortak, yalnız okur): kalan kart + kredi ödemesi ve
+ * rezervasyon anındaki politika snapshot'ına göre iade kararı.
+ */
+async function refundBasis(tx: Prisma.TransactionClient, booking: CancelBooking, now: Date) {
+  const currency = assertCurrency(booking.currency);
+  const target = refundTarget(booking, currency);
+  // fix-sweep-2: iptal iadesi yalnız KALAN iade edilebilir tutar üzerinden hesaplanır —
+  // önceki kısmi iadeler (çözüm merkezi talebi vb.) ve kaybedilen itirazlar düşülür.
+  const refundedBeforeMinor = booking.payment
+    ? minorFromDb(booking.payment.refundedAmountMinor)
+    : 0;
+  const settledPayment =
+    booking.payment !== null && SETTLED_STATUSES.includes(booking.payment.status);
+  const cardPaidMinor = settledPayment
+    ? Math.max(
+        0,
+        target.refundableMinor -
+          refundedBeforeMinor -
+          minorFromDb(await lostChargebackMinor(tx, booking.id))
+      )
+    : 0;
+  // P1-7: krediyle ödenen kısım da iade politikasına girer (devredilmiş rezervasyonda
+  // iade alıcının kart ödemesine gider; satıcının kredisi devir bedeliyle karşılandı).
+  const spend = await activeCreditSpend(tx, booking.id);
+  const ownPayment = target.providerRef === pspRefOf(booking.payment);
+  const creditPaidMinor =
+    spend?.status === "SPENT" && settledPayment && ownPayment
+      ? minorFromDb(spend.amountMinor - spend.refundedMinor)
+      : 0;
+  const paidMinor = cardPaidMinor + creditPaidMinor;
+  const decision = computeRefund(
+    parseSnapshot(booking.policySnapshot),
+    { checkIn: fromDate(booking.checkIn), createdAt: booking.createdAt, paidMinor, currency },
+    now,
+    clockOf(booking.property)
+  );
+  return {
+    currency,
+    target,
+    refundedBeforeMinor,
+    settledPayment,
+    cardPaidMinor,
+    creditPaidMinor,
+    decision,
+  };
+}
+
+export interface RefundQuote {
+  refundMinor: number;
+  refundPercent: number;
+  currency: string;
+}
+
+/**
+ * İade önizlemesi (F500): iptal onayından önce misafire "₺X iade edilecek (%Y)" gösterilir.
+ * İptalle aynı hesap; yan etkisiz (kilit, yazma, PSP çağrısı yok). İptal edilemiyorsa 409.
+ */
+export async function quoteRefund(
+  bookingId: string,
+  userId: string,
+  now = new Date()
+): Promise<RefundQuote> {
+  const booking = await prisma.booking.findUnique({
+    where: { id: bookingId },
+    select: CANCEL_BOOKING_SELECT,
+  });
+  if (!booking || booking.userId !== userId) throw new BookingNotFoundError();
+  cancelTransition(booking.status);
+  const { currency, decision } = await refundBasis(prisma, booking, now);
+  return { refundMinor: decision.refundMinor, refundPercent: decision.refundPercent, currency };
+}
+
 async function cancelLocked(
   bookingId: string,
   userId: string,
@@ -126,79 +244,20 @@ async function cancelLocked(
     await tx.$queryRaw`SELECT id FROM "Booking" WHERE id = ${bookingId} FOR UPDATE`;
     const booking = await tx.booking.findUnique({
       where: { id: bookingId },
-      select: {
-        id: true,
-        userId: true,
-        status: true,
-        version: true,
-        propertyId: true,
-        roomId: true,
-        checkIn: true,
-        checkOut: true,
-        createdAt: true,
-        currency: true,
-        units: true,
-        policySnapshot: true,
-        priceBreakdown: true,
-        property: { select: { timeZone: true, checkInTime: true, checkOutTime: true } },
-        payment: {
-          select: {
-            id: true,
-            status: true,
-            amountMinor: true,
-            refundedAmountMinor: true,
-            providerRef: true,
-            cartPayment: { select: { id: true, providerRef: true } },
-          },
-        },
-        transfers: {
-          where: { status: "COMPLETED" },
-          orderBy: { completedAt: "desc" },
-          take: 1,
-          select: { askPriceMinor: true, currency: true, claimedById: true, buyerPaymentRef: true },
-        },
-      },
+      select: CANCEL_BOOKING_SELECT,
     });
     if (!booking || booking.userId !== userId) throw new BookingNotFoundError();
 
-    let next: BookingState;
-    try {
-      next = transition(booking.status as BookingState, "CANCEL");
-    } catch {
-      throw new ConflictError("Bu rezervasyon iptal edilemez", "INVALID_STATE");
-    }
-    const currency = assertCurrency(booking.currency);
-    const target = refundTarget(booking, currency);
-    // fix-sweep-2: iptal iadesi yalnız KALAN iade edilebilir tutar üzerinden hesaplanır —
-    // önceki kısmi iadeler (çözüm merkezi talebi vb.) ve kaybedilen itirazlar düşülür.
-    const refundedBeforeMinor = booking.payment
-      ? minorFromDb(booking.payment.refundedAmountMinor)
-      : 0;
-    const settledPayment =
-      booking.payment !== null && SETTLED_STATUSES.includes(booking.payment.status);
-    const cardPaidMinor = settledPayment
-      ? Math.max(
-          0,
-          target.refundableMinor -
-            refundedBeforeMinor -
-            minorFromDb(await lostChargebackMinor(tx, booking.id))
-        )
-      : 0;
-    // P1-7: krediyle ödenen kısım da iade politikasına girer (devredilmiş rezervasyonda
-    // iade alıcının kart ödemesine gider; satıcının kredisi devir bedeliyle karşılandı).
-    const spend = await activeCreditSpend(tx, booking.id);
-    const ownPayment = target.providerRef === pspRefOf(booking.payment);
-    const creditPaidMinor =
-      spend?.status === "SPENT" && settledPayment && ownPayment
-        ? minorFromDb(spend.amountMinor - spend.refundedMinor)
-        : 0;
-    const paidMinor = cardPaidMinor + creditPaidMinor;
-    const decision = computeRefund(
-      parseSnapshot(booking.policySnapshot),
-      { checkIn: fromDate(booking.checkIn), createdAt: booking.createdAt, paidMinor, currency },
-      now,
-      clockOf(booking.property)
-    );
+    const next = cancelTransition(booking.status);
+    const {
+      currency,
+      target,
+      refundedBeforeMinor,
+      settledPayment,
+      cardPaidMinor,
+      creditPaidMinor,
+      decision,
+    } = await refundBasis(tx, booking, now);
     // İade simetrisi: kart/kredi ödendikleri oranda (tek yuvarlama `allocateMinor`).
     const parts = splitCardCreditRefund(decision.refundMinor, cardPaidMinor, creditPaidMinor);
     const cardRefundMinor = parts.cardMinor;

@@ -17,8 +17,15 @@ import BookingPriceSnapshot, {
   CancellationDeadlineNote,
 } from "@/components/booking/BookingPriceSnapshot";
 import BookingNumberText from "@/components/booking/BookingNumberText";
+import BookingStatusBadge, { bookingStatusKey } from "@/components/booking/BookingStatusBadge";
 import { useFormat } from "@/i18n/use-format";
-import { Button, focusRing, loginHref, useErrorText } from "@/components/ui/ui";
+import {
+  Button,
+  focusRing,
+  loginHref,
+  useErrorText,
+  usePageHeadingFocus,
+} from "@/components/ui/ui";
 
 interface BookingDetail {
   id: string;
@@ -45,7 +52,7 @@ interface BookingDetail {
   room: { name: string };
 }
 
-/** Başlığı çevrilen rezervasyon durumları; bilinmeyen durum ham hâliyle gösterilir. */
+/** Başlığı çevrilen rezervasyon durumları; bilinmeyen durum ortak kısa etiketle gösterilir. */
 const STATUS_KEYS = ["HELD", "PENDING", "CONFIRMED", "COMPLETED", "CANCELLED", "EXPIRED"] as const;
 type StatusKey = (typeof STATUS_KEYS)[number];
 
@@ -86,6 +93,16 @@ const skeletonBlock = "rounded-lg bg-gray-200 motion-safe:animate-pulse";
 
 /** Yükleme isteği askıda kalırsa "Yükleniyor..." sonsuza dek durmasın diye zaman aşımı. */
 const LOAD_TIMEOUT_MS = 15_000;
+
+const DAY_MS = 86_400_000;
+
+/** Gece sayısı: giriş ve çıkış günlerinin UTC gün farkı (seyahat kartlarıyla aynı hesap). */
+function stayNights(checkIn: string, checkOut: string): number {
+  const diff =
+    Date.parse(`${checkOut.slice(0, 10)}T00:00:00.000Z`) -
+    Date.parse(`${checkIn.slice(0, 10)}T00:00:00.000Z`);
+  return Number.isFinite(diff) ? Math.max(0, Math.round(diff / DAY_MS)) : 0;
+}
 
 /** Durumu yalnız renkle değil biçimle de anlatan simge (✓ onaylı, saat: bekliyor, ✕ geçersiz). */
 const STATUS_ICON_PATHS: Record<StatusKey, string> = {
@@ -129,7 +146,8 @@ function BookingSkeleton() {
           <div className={`h-6 w-1/2 ${skeletonBlock}`} />
           <div className={`h-4 w-1/3 ${skeletonBlock}`} />
         </div>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className={`h-20 ${skeletonBlock}`} />
           <div className={`h-20 ${skeletonBlock}`} />
           <div className={`h-20 ${skeletonBlock}`} />
           <div className={`h-20 ${skeletonBlock}`} />
@@ -148,6 +166,8 @@ export default function BookingConfirmationPage() {
   const tChat = useTranslations("chat");
   const tResolution = useTranslations("resolution");
   const tTitles = useTranslations("titles");
+  const tCheckout = useTranslations("checkout");
+  const tTrips = useTranslations("pwa.trips");
   const f = useFormat();
   const errorText = useErrorText();
   const [booking, setBooking] = useState<BookingDetail | null>(null);
@@ -163,8 +183,11 @@ export default function BookingConfirmationPage() {
   /** Süresi dolan tutmanın bitiş anı: sunucu durumu güncelleyene dek başlık "süre doldu" olur. */
   const [lapsedHold, setLapsedHold] = useState<string | null>(null);
   const prevStatus = useRef<string | null>(null);
-  const headingRef = useRef<HTMLHeadingElement>(null);
+  /** İstemci gezinmesinde odak, o an çizilen h1'e taşınır (yükleme, hata ya da durum başlığı). */
+  const headingRef = usePageHeadingFocus();
   const focusHeading = useRef(false);
+  /** Yükleme başlığındaki odak, yükleme bitince yerine gelen başlığa (kaydırmadan) aktarılır. */
+  const keepHeadingFocus = useRef(false);
 
   const load = useCallback(
     async (focusOnSuccess = false) => {
@@ -187,7 +210,7 @@ export default function BookingConfirmationPage() {
               : next === "CANCELLED"
                 ? t("detail.statusChanged.CANCELLED")
                 : t("detail.statusChanged.other", {
-                    status: isStatusKey(next) ? t(`status.${next}`) : next,
+                    status: isStatusKey(next) ? t(`status.${next}`) : tc(bookingStatusKey(next)),
                   })
           );
           // Ödeme formu gibi odaktaki öğe DOM'dan kalkabileceği için odak başlığa taşınır.
@@ -221,10 +244,13 @@ export default function BookingConfirmationPage() {
           notFound,
         });
       } finally {
+        if (headingRef.current !== null && document.activeElement === headingRef.current) {
+          keepHeadingFocus.current = true;
+        }
         setLoading(false);
       }
     },
-    [id, t, tc, errorText]
+    [id, t, tc, errorText, headingRef]
   );
 
   const retry = async () => {
@@ -244,7 +270,13 @@ export default function BookingConfirmationPage() {
     // Durum bandı ekran dışında kalmış olabilir (ör. ödeme formunun altı): görünür kılınır.
     headingRef.current?.focus({ preventScroll: true });
     headingRef.current?.scrollIntoView({ block: "start" });
-  }, [booking]);
+  }, [booking, headingRef]);
+
+  useEffect(() => {
+    if (!keepHeadingFocus.current) return;
+    keepHeadingFocus.current = false;
+    headingRef.current?.focus({ preventScroll: true });
+  }, [loading, booking, error, needsLogin, headingRef]);
 
   // Tutma süresi dolunca sayfa yeniden çekilir; sunucu hâlâ HELD dönerse başlık yine güncellenir.
   const holdEnd = booking?.status === "HELD" ? (booking.holdExpiresAt ?? null) : null;
@@ -267,7 +299,13 @@ export default function BookingConfirmationPage() {
         <Header />
         <main id="main" className="mx-auto flex max-w-3xl flex-1 items-center justify-center px-4">
           <div className="text-center">
-            <h1 className="text-2xl font-bold text-gray-900">{t("detail.loginRequiredTitle")}</h1>
+            <h1
+              ref={headingRef}
+              tabIndex={-1}
+              className="text-2xl font-bold text-gray-900 focus:outline-none"
+            >
+              {t("detail.loginRequiredTitle")}
+            </h1>
             <p className="mt-2 text-gray-600">{t("detail.loginRequiredText")}</p>
             <Link
               href={loginHref()}
@@ -284,6 +322,10 @@ export default function BookingConfirmationPage() {
 
   const formatDate = (d: string) => f.date(d, "long");
 
+  /** Tesisin "SS:DD" saati etkin dilin saat biçimiyle; başka biçim olduğu gibi gösterilir. */
+  const propertyTime = (hhmm: string) =>
+    /^\d{2}:\d{2}$/.test(hhmm) ? f.time(`1970-01-01T${hhmm}:00.000Z`, "UTC") : hhmm;
+
   const print = () => window.print();
 
   const secondaryAction =
@@ -299,6 +341,13 @@ export default function BookingConfirmationPage() {
     booking?.status === "HELD" && lapsedHold !== null && lapsedHold === booking.holdExpiresAt
       ? "EXPIRED"
       : (booking?.status ?? "");
+
+  /** Rezervasyon akışındaki adım (checkout ile aynı gösterge); iptal/süresi dolmuşta yok. */
+  const flowStep = AWAITING_STATUSES.includes(shownStatus)
+    ? 2
+    : shownStatus === "CONFIRMED"
+      ? 3
+      : null;
 
   /** İptal/süresi dolmuş ve tarihi geçmemiş rezervasyonda tesis bağlantısı aynı tarihleri taşır. */
   const rebookQuery =
@@ -321,12 +370,18 @@ export default function BookingConfirmationPage() {
         </p>
         {loading ? (
           <>
-            <h1 className="sr-only">{tTitles("booking")}</h1>
+            <h1 ref={headingRef} tabIndex={-1} className="sr-only">
+              {tTitles("booking")}
+            </h1>
             <BookingSkeleton />
           </>
         ) : error && !booking ? (
           <div className="rounded-2xl bg-white p-4 text-center shadow-sm sm:p-8">
-            <h1 className="text-xl font-bold text-red-600">
+            <h1
+              ref={headingRef}
+              tabIndex={-1}
+              className="text-xl font-bold text-red-600 focus:outline-none"
+            >
               {error.notFound ? t("detail.notFoundTitle") : t("detail.loadFailed")}
             </h1>
             <p role="alert" className="mt-2 text-gray-600">
@@ -351,6 +406,33 @@ export default function BookingConfirmationPage() {
           </div>
         ) : booking ? (
           <>
+            {flowStep !== null && (
+              <div className="mb-4 print:hidden">
+                <p className="text-sm font-medium text-gray-900">
+                  {tCheckout("steps.position", { current: flowStep, total: 3 })}
+                </p>
+                <ol
+                  aria-label={tCheckout("steps.label")}
+                  className="mt-1 flex flex-wrap items-center gap-x-2 text-sm text-gray-600"
+                >
+                  <li>{tCheckout("steps.details")}</li>
+                  <li
+                    aria-current={flowStep === 2 ? "step" : undefined}
+                    className={flowStep === 2 ? "font-semibold text-gray-900" : undefined}
+                  >
+                    <span aria-hidden="true">· </span>
+                    {tCheckout("steps.payment")}
+                  </li>
+                  <li
+                    aria-current={flowStep === 3 ? "step" : undefined}
+                    className={flowStep === 3 ? "font-semibold text-gray-900" : undefined}
+                  >
+                    <span aria-hidden="true">· </span>
+                    {tCheckout("steps.confirmation")}
+                  </li>
+                </ol>
+              </div>
+            )}
             {error && (
               // Rezervasyon zaten gösteriliyorsa yenileme hatası sayfanın yerine geçmez.
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 print:hidden">
@@ -370,9 +452,15 @@ export default function BookingConfirmationPage() {
                 <StatusIcon status={shownStatus} />
                 <div className="min-w-0">
                   {/* Ekran okuyucuda hangi rezervasyon olduğu başlıktan anlaşılsın. */}
-                  <h1 ref={headingRef} tabIndex={-1} className="scroll-mt-16 text-2xl font-bold">
+                  <h1
+                    ref={headingRef}
+                    tabIndex={-1}
+                    className="scroll-mt-16 text-2xl font-bold focus:outline-none"
+                  >
                     {t.rich("detail.heading", {
-                      status: isStatusKey(shownStatus) ? t(`status.${shownStatus}`) : shownStatus,
+                      status: isStatusKey(shownStatus)
+                        ? t(`status.${shownStatus}`)
+                        : tc(bookingStatusKey(shownStatus)),
                       property: booking.property.title,
                       sr: (chunks) => <span className="sr-only">{chunks}</span>,
                     })}
@@ -382,12 +470,16 @@ export default function BookingConfirmationPage() {
                       {t(`detail.statusHint.${shownStatus}`)}
                     </p>
                   )}
-                  <p className="mt-1 text-sm text-green-50">
-                    {t.rich("detail.bookingNumber", {
-                      id: booking.id,
-                      b: () => <BookingNumberText id={booking.id} />,
-                    })}
-                  </p>
+                  {/* Kısa durum etiketi: hesap sayfası ve ev sahibi paneliyle aynı ad ve simge. */}
+                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-green-50">
+                    <BookingStatusBadge status={shownStatus} />
+                    <p>
+                      {t.rich("detail.bookingNumber", {
+                        id: booking.id,
+                        b: () => <BookingNumberText id={booking.id} />,
+                      })}
+                    </p>
+                  </div>
                 </div>
               </div>
 
@@ -407,7 +499,7 @@ export default function BookingConfirmationPage() {
                   {SETTLED_STATUSES.includes(booking.status) && (
                     <li>
                       <a href={`#${RESOLUTION_PANEL_TITLE_ID}`} className={shortcutLink}>
-                        {tResolution("panel.title")}
+                        {tResolution("panel.jumpLink")}
                       </a>
                     </li>
                   )}
@@ -432,14 +524,16 @@ export default function BookingConfirmationPage() {
                   </p>
                 </div>
 
-                <dl className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-3">
+                <dl className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
                   <div className="rounded-lg bg-gray-50 p-4">
                     <dt className="text-gray-500">{t("detail.checkIn")}</dt>
                     <dd className="mt-1 font-medium text-gray-900">
                       {formatDate(booking.checkIn)}
                       {booking.property.checkInTime && (
                         <span className="block font-normal text-gray-600">
-                          {t("detail.checkInTime", { time: booking.property.checkInTime })}
+                          {t("detail.checkInTime", {
+                            time: propertyTime(booking.property.checkInTime),
+                          })}
                         </span>
                       )}
                     </dd>
@@ -450,9 +544,17 @@ export default function BookingConfirmationPage() {
                       {formatDate(booking.checkOut)}
                       {booking.property.checkOutTime && (
                         <span className="block font-normal text-gray-600">
-                          {t("detail.checkOutTime", { time: booking.property.checkOutTime })}
+                          {t("detail.checkOutTime", {
+                            time: propertyTime(booking.property.checkOutTime),
+                          })}
                         </span>
                       )}
+                    </dd>
+                  </div>
+                  <div className="rounded-lg bg-gray-50 p-4">
+                    <dt className="text-gray-500">{tTrips("stay")}</dt>
+                    <dd className="mt-1 font-medium text-gray-900">
+                      {tTrips("nights", { count: stayNights(booking.checkIn, booking.checkOut) })}
                     </dd>
                   </div>
                   <div className="rounded-lg bg-gray-50 p-4">
@@ -479,7 +581,7 @@ export default function BookingConfirmationPage() {
                   </div>
                 </div>
 
-                <RnplPlanCard plan={plan} />
+                <RnplPlanCard plan={plan} bookingId={booking.id} />
 
                 {CANCELLABLE_STATUSES.includes(shownStatus) && (
                   <CancellationDeadlineNote
@@ -499,6 +601,9 @@ export default function BookingConfirmationPage() {
                     holdExpiresAt={booking.holdExpiresAt}
                     amountMinor={booking.totalPriceMinor}
                     currency={booking.currency}
+                    chargePending={
+                      plan ? plan.status === "SCHEDULED" || plan.status === "RETRYING" : undefined
+                    }
                     onChanged={() => void load()}
                   />
 
@@ -535,7 +640,12 @@ export default function BookingConfirmationPage() {
                         ? `/property/${booking.property.id}?${rebookQuery}`
                         : `/property/${booking.property.id}`
                     }
-                    className="rounded-lg bg-[#003580] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#002b66]"
+                    className={
+                      // Ödeme bekleyen rezervasyonda tek birincil eylem ödeme düğmesidir.
+                      shownStatus === "HELD"
+                        ? secondaryAction
+                        : "rounded-lg bg-[#003580] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#002b66]"
+                    }
                   >
                     {rebookQuery ? t("detail.rebook") : t("detail.viewProperty")}
                   </Link>

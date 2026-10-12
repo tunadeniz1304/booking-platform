@@ -16,6 +16,7 @@ import { useLocale, useTranslations } from "next-intl";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import { refreshSessionUser, useSessionUserCache } from "@/components/layout/useSessionUserCache";
+import { APP_RECONNECT_EVENT } from "@/components/pwa/NetworkStatusBanner";
 import { ApiError, isNetworkError, logout, type SessionUser } from "@/lib/api-client";
 
 /** Ortak odak halkası (klavye kullanıcıları için görünür). */
@@ -173,16 +174,20 @@ export function focusFirstInvalid(form: HTMLFormElement | null | undefined): voi
   else setTimeout(run, 0);
 }
 
+/** `headingLevel={3}`: başka bir h2 bölümünün içindeki kartlar için (başlık sırası atlanmaz). */
 export function Card({
   title,
   children,
   id,
+  headingLevel = 2,
 }: {
   title?: string;
   children: ReactNode;
   id?: string;
+  headingLevel?: 2 | 3;
 }) {
   const headingId = id ? `${id}-title` : undefined;
+  const Heading = headingLevel === 3 ? "h3" : "h2";
   return (
     <section
       id={id}
@@ -190,9 +195,9 @@ export function Card({
       className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm"
     >
       {title && (
-        <h2 id={headingId} className="mb-3 text-lg font-semibold text-gray-900">
+        <Heading id={headingId} className="mb-3 text-lg font-semibold text-gray-900">
           {title}
-        </h2>
+        </Heading>
       )}
       {children}
     </section>
@@ -250,8 +255,17 @@ export function LlmBadge({
  * Asenkron sonuçlar için ekran okuyucu dostu durum alanı. Hata, eklendiğinde okunan ayrı bir
  * `role="alert"` öğesiyle; başarı, her zaman DOM'da duran `role="status"` bölgesiyle duyurulur
  * (iç içe canlı bölge yok, tek duyuru). Renge ek olarak simge ve gizli önek verilir.
+ * `onRetry` (ör. useLoader `reload`): hata varken altında "Tekrar dene" düğmesi gösterilir.
  */
-export function Status({ error, message }: { error?: string | null; message?: string | null }) {
+export function Status({
+  error,
+  message,
+  onRetry,
+}: {
+  error?: string | null;
+  message?: string | null;
+  onRetry?: () => void;
+}) {
   const t = useTranslations("common");
   return (
     <div className="min-h-[1.25rem] text-sm">
@@ -261,6 +275,11 @@ export function Status({ error, message }: { error?: string | null; message?: st
           <span className="sr-only">{t("errorPrefix")} </span>
           {error}
         </p>
+      )}
+      {error && onRetry && (
+        <Button variant="secondary" className="mt-2" onClick={onRetry}>
+          {t("errorPage.retry")}
+        </Button>
       )}
       <div role="status">
         {!error && message && (
@@ -341,7 +360,8 @@ function Breadcrumbs({ items }: { items: ReadonlyArray<Breadcrumb> }) {
 
 /**
  * Sayfa iskeleti (başlık, ana bölge, altbilgi). `breadcrumbs`: h1 üstünde konum gezinmesi
- * (alt sayfalardan üst/kardeş sayfaya tek tık). `width="wide"`: host/admin panelleri için
+ * (alt sayfalardan üst/kardeş sayfaya tek tık). `backHref` + `backLabel`: h1 üstünde her alt
+ * sayfada aynı yerde duran "← geri" bağlantısı. `width="wide"`: host/admin panelleri için
  * başlıkla aynı genişlik; yatay dolgu her iki genişlikte başlık/altbilgiyle aynıdır.
  */
 export function PageShell({
@@ -349,12 +369,16 @@ export function PageShell({
   intro,
   children,
   breadcrumbs,
+  backHref,
+  backLabel,
   width = "narrow",
 }: {
   title: string;
   intro?: ReactNode;
   children: ReactNode;
   breadcrumbs?: ReadonlyArray<Breadcrumb>;
+  backHref?: string;
+  backLabel?: string;
   width?: keyof typeof shellWidths;
 }) {
   const headingRef = usePageHeadingFocus();
@@ -364,6 +388,15 @@ export function PageShell({
       <main id="main" className={`${shellMainClass} ${shellWidths[width]}`}>
         <div>
           {breadcrumbs && breadcrumbs.length > 0 && <Breadcrumbs items={breadcrumbs} />}
+          {backHref && backLabel && (
+            <Link
+              href={backHref}
+              className={`inline-flex items-center gap-1 py-2 text-sm font-semibold text-[#003580] underline-offset-2 hover:underline ${focusRing}`}
+            >
+              <span aria-hidden="true">←</span>
+              {backLabel}
+            </Link>
+          )}
           <h1
             ref={headingRef}
             tabIndex={-1}
@@ -386,7 +419,8 @@ type SessionState = { status: "loading" } | { status: "ready"; user: SessionUser
  * Oturumdaki kullanıcı. Başlıkla aynı önbelleği ve aynı `/api/user/me` isteğini paylaşır (çift
  * istek yok); bilinen kullanıcıyla hemen `ready` döner, korumalı içerik oturum yanıtını beklemeden
  * yüklenmeye başlar ve arka planda doğrulanır. Oturumsuz (`null`) önbellek, yeni girişten sonra
- * eskimiş olabileceği için yalnız bu bağlamadaki doğrulamadan sonra kabul edilir.
+ * eskimiş olabileceği için yalnız bu bağlamadaki doğrulamadan sonra kabul edilir. Bağlantı
+ * geri gelince oturum yeniden doğrulanır (çevrimdışıyken düşen ilk istek "giriş yapın"da kalmaz).
  */
 export function useSession(): SessionState {
   const user = useSessionUserCache();
@@ -396,8 +430,11 @@ export function useSession(): SessionState {
     void refreshSessionUser().then(() => {
       if (active) setVerified(true);
     });
+    const onReconnect = () => void refreshSessionUser();
+    window.addEventListener(APP_RECONNECT_EVENT, onReconnect);
     return () => {
       active = false;
+      window.removeEventListener(APP_RECONNECT_EVENT, onReconnect);
     };
   }, []);
   if (user === undefined || (user === null && !verified)) return { status: "loading" };
@@ -540,6 +577,7 @@ function sameDeps(a: ReadonlyArray<unknown> | null, b: ReadonlyArray<unknown>): 
  * bölgesine `aria-busy={loading}` verip `RefreshStatus` gösterin, hata için `LoadError`.
  * `resetOnDepsChange`: deps (filtre, ilan vb.) değişince önceki sorgunun verisi ve hatası yeni
  * yanıt gelene kadar döndürülmez (eski satırlar güncelmiş gibi görünmez); `reload()` veriyi korur.
+ * Bağlantı geri gelince (`APP_RECONNECT_EVENT`) `reload()` gibi yeniden çeker; veri sıfırlanmaz.
  * setState yalnızca Promise geri çağrısında yapılır (effect gövdesinde değil).
  */
 export function useLoader<T>(
@@ -576,6 +614,10 @@ export function useLoader<T>(
     // eslint-disable-next-line react-hooks/exhaustive-deps -- deps çağıran tarafından verilir
   }, [version, ...deps]);
   const reload = useCallback(() => setVersion((v) => v + 1), []);
+  useEffect(() => {
+    window.addEventListener(APP_RECONNECT_EVENT, reload);
+    return () => window.removeEventListener(APP_RECONNECT_EVENT, reload);
+  }, [reload]);
   const loading = !sameDeps(settledKey, [version, ...deps]);
   const staleData = resetOnDepsChange && !sameDeps(dataDeps, deps);
   const staleError =
@@ -652,6 +694,7 @@ const GENERIC_ERROR_CODES = new Set([
   "INTERNAL_ERROR",
   "INVALID_JSON",
   "TRANSACTION_CONFLICT",
+  "TIMEOUT",
 ]);
 
 /**

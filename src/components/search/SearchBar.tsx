@@ -7,6 +7,7 @@ import { useFormat } from "@/i18n/use-format";
 import { Button } from "@/components/ui/ui";
 import DateRangePicker from "@/components/search/DateRangePicker";
 import DestinationAutocomplete from "@/components/search/DestinationAutocomplete";
+import { publishSearchDraft } from "@/components/search/useSearchDraft";
 import { MAX_SEARCH_GUESTS } from "@/lib/search/guest-limits";
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -175,6 +176,12 @@ export default function SearchBar({ initial }: { initial?: SearchBarInitial } = 
   const totalGuests = adults + children;
   const atGuestLimit = totalGuests >= MAX_SEARCH_GUESTS;
 
+  // F1282: seçili ölçütler sayfadaki destinasyon ve öne çıkan kartların bağlantılarına taşınır.
+  useEffect(() => {
+    publishSearchDraft({ checkIn, checkOut, adults, children });
+  }, [checkIn, checkOut, adults, children]);
+  useEffect(() => () => publishSearchDraft(null), []);
+
   // Dış tıklamada açık paneli kapat (odak taşınmaz; kullanıcı başka yere tıkladı).
   useEffect(() => {
     if (!dateOpen && !guestsOpen) return;
@@ -259,7 +266,13 @@ export default function SearchBar({ initial }: { initial?: SearchBarInitial } = 
 
   const dateSummary = (() => {
     if (checkIn && checkOut) {
-      return `${formatShort(checkIn)} - ${formatShort(checkOut)}`;
+      // F809: gece sayısı da özetlenir.
+      const count = Math.round((Date.parse(checkOut) - Date.parse(checkIn)) / 86400000);
+      return t("bar.dateRange", {
+        checkIn: formatShort(checkIn),
+        checkOut: formatShort(checkOut),
+        nights: t("picker.nights", { count }),
+      });
     }
     if (checkIn) return t("bar.checkInOnly", { date: formatShort(checkIn) });
     return t("bar.pickDate");
@@ -477,14 +490,9 @@ export default function SearchBar({ initial }: { initial?: SearchBarInitial } = 
         </div>
 
         <div className="lg:ml-3 lg:flex lg:items-end">
-          <button
-            type="submit"
-            aria-disabled={isPending || undefined}
-            aria-busy={isPending || undefined}
-            className="w-full rounded-lg bg-[#003580] px-10 py-3 text-sm font-semibold text-white transition hover:bg-[#002b66] aria-disabled:cursor-wait lg:w-auto"
-          >
+          <Button type="submit" size="lg" fullWidth busy={isPending} className="lg:w-auto">
             {isPending ? t("bar.searching") : t("bar.submit")}
-          </button>
+          </Button>
           <span className="sr-only" role="status">
             {isPending ? t("bar.searching") : ""}
           </span>

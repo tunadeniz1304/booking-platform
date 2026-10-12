@@ -3,7 +3,7 @@
 import { useId } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { apiFetch } from "@/lib/api-client";
-import { LlmBadge, focusRing, useLoader } from "@/components/ui/ui";
+import { Button, LlmBadge, focusRing, useLoader } from "@/components/ui/ui";
 
 export interface HighlightQuote {
   reviewId: string;
@@ -85,8 +85,23 @@ export default function ReviewHighlights({
     }
   }
 
-  if (res.error) return <p className="mt-2 text-sm text-gray-700">{t("unavailable")}</p>;
-  if (!res.data || res.data.clusters.length === 0) return null;
+  if (res.error) {
+    return (
+      <div className="mt-2 text-sm">
+        <p className="text-gray-700">{t("unavailable")}</p>
+        <Button variant="secondary" className="mt-2" busy={res.loading} onClick={res.reload}>
+          {t("retry")}
+        </Button>
+      </div>
+    );
+  }
+  // Yüklenirken sabit yükseklikte yer tutucu: temalar sonradan gelince yorum listesi kaymasın.
+  if (!res.data) {
+    return res.loading ? (
+      <div aria-hidden="true" className="mt-3 min-h-[6rem] rounded-lg border border-gray-200" />
+    ) : null;
+  }
+  if (res.data.clusters.length === 0) return null;
   return (
     <div
       className="mt-3 rounded-lg border border-indigo-200 bg-indigo-50 p-4 text-sm text-gray-900"

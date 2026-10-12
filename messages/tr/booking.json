@@ -53,7 +53,9 @@
     "searchOther": "Başka konaklama ara",
     "adults": "Yetişkin",
     "children": "Çocuk (0-12 yaş)",
-    "continuing": "Sonraki adıma geçiliyor…"
+    "continuing": "Sonraki adıma geçiliyor…",
+    "adultsRange": "Yetişkin sayısı {min} ile {max} arasında bir tam sayı olmalı. Önceki değer ({current}) korundu.",
+    "childrenRange": "Çocuk sayısı {min} ile {max} arasında bir tam sayı olmalı. Önceki değer ({current}) korundu."
   },
   "priceInsight": {
     "title": "Bu tarihler için fiyat değerlendirmesi",

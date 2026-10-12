@@ -2,6 +2,7 @@
 
 import { useState, useSyncExternalStore } from "react";
 import { useTranslations } from "next-intl";
+import { requestOfflinePageRefresh } from "@/lib/pwa/refresh-offline-page";
 import {
   THEMES,
   THEME_COOKIE,
@@ -48,11 +49,12 @@ export default function ThemeToggle({
           const next = e.target.value as ThemePreference;
           setValue(next);
           document.cookie = `${THEME_COOKIE}=${next}; path=/; max-age=31536000; samesite=lax`;
+          requestOfflinePageRefresh();
           const attr = themeAttribute(next);
           if (attr) document.documentElement.dataset.theme = attr;
           else delete document.documentElement.dataset.theme;
         }}
-        className={`rounded border border-white/40 bg-transparent px-1 py-0.5 ${showLabel ? "min-h-[44px] min-w-0 flex-1 sm:flex-none" : "min-h-[1.75rem]"} ${className}`}
+        className={`rounded border border-white/40 bg-transparent px-1 py-0.5 text-base lg:text-sm ${showLabel ? "min-h-[44px] min-w-0 flex-1 sm:flex-none" : "min-h-[1.75rem]"} ${className}`}
       >
         {THEMES.map((th) => (
           <option key={th} value={th} className="bg-white text-gray-900">

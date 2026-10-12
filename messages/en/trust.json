@@ -76,11 +76,12 @@
     "requiredHostDone": "The identity verification required to create listings is complete.",
     "requiredGuestDone": "The identity verification required for booking is complete.",
     "emailSent": "Verification email sent. After clicking the link in the email, start verification here again.",
-    "emailAlreadyVerified": "Your email address is verified; you can start identity verification again."
+    "emailAlreadyVerified": "Your email address is verified; you can start identity verification again.",
+    "lastUpdated": "Last updated: {time}"
   },
   "partyRisk": {
     "title": "Party-risk warnings",
-    "intro": "Automatic warnings computed from young account, single night, large group, near date and weekend signals. The booking is not cancelled; confirm the house rules with the guest.",
+    "intro": "Automatic warnings computed from new account, single night, large group, near date and weekend signals. The booking is not cancelled; confirm the house rules with the guest.",
     "loading": "Loading warnings…",
     "loadFailed": "Could not load warnings.",
     "empty": "No party-risk warnings for your upcoming bookings.",

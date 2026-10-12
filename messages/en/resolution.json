@@ -30,7 +30,13 @@
     "optionCount": "{label} ({count})",
     "decideAsAdmin": "Decide as admin",
     "selectedBadge": "Selected",
-    "goToDetail": "Go to details"
+    "goToDetail": "Go to details",
+    "search": {
+      "label": "Search by booking ID, claim ID or property name",
+      "hint": "Part of the ID (e.g. the last 8 characters) is enough.",
+      "resultCount": "Showing {shown} of {total, plural, one {# claim} other {# claims}}.",
+      "noMatch": "No claims match your search."
+    }
   },
   "type": {
     "GUEST_REFUND": "Guest refund claim",
@@ -85,9 +91,9 @@
   "deposit": {
     "title": "Damage deposit",
     "none": "This booking has no damage deposit.",
-    "expected": "Expected deposit: {amount}. It is held on your card as a pre-authorization shortly before check-in.",
+    "expected": "Expected deposit: {amount}. It is held on your card as a pre-authorization (temporary hold) shortly before check-in.",
     "amount": "Amount",
-    "captured": "Captured",
+    "captured": "Charged",
     "status": "Status",
     "authorizeAfter": "Pre-authorization time",
     "authorizedAt": "Pre-authorized at",
@@ -96,18 +102,18 @@
     "statuses": {
       "SCHEDULED": "Scheduled",
       "AUTHORIZED": "Pre-authorized",
-      "CAPTURED_PARTIAL": "Partially captured",
-      "CAPTURED": "Captured",
+      "CAPTURED_PARTIAL": "Partially charged",
+      "CAPTURED": "Charged",
       "VOIDED": "Released",
       "EXPIRED": "Expired",
       "FAILED": "Pre-authorization failed"
     },
     "noteGuest": "The deposit is not charged to your card; only a pre-authorization (temporary hold) is placed. It is released at the end of the period unless a damage claim is approved. With a split payment the pre-authorization is placed on the organizer’s (booking owner’s) card; participants’ cards are not used.",
-    "noteCaptured": "{amount} was captured from the deposit for an approved damage claim.",
+    "noteCaptured": "{amount} of the deposit was charged for an approved damage claim.",
     "noteVoided": "The pre-authorization was released; the deposit was not charged.",
     "noteExpired": "The pre-authorization expired and was released automatically; the deposit was not charged and can no longer be captured.",
     "noteFailed": "The pre-authorization couldn't be placed on the card; an approved damage amount may not be collectable from the deposit.",
-    "expectedOther": "Expected deposit: {amount}. It is held on the guest's card as a pre-authorization shortly before check-in."
+    "expectedOther": "Expected deposit: {amount}. It is held on the guest's card as a pre-authorization (temporary hold) shortly before check-in."
   },
   "panel": {
     "title": "Damage deposit and resolution center",
@@ -229,7 +235,9 @@
     "sendFirstReply": "Send my response",
     "refresh": "Refresh messages",
     "lastChecked": "Last checked: {time}",
-    "newCount": "{count, plural, one {# new message} other {# new messages}} arrived."
+    "newCount": "{count, plural, one {# new message} other {# new messages}} arrived.",
+    "adminLabel": "Message to both parties (admin)",
+    "adminHint": "Both parties will see this message."
   },
   "evidence": {
     "title": "Evidence",

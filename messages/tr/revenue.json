@@ -4,9 +4,9 @@
     "intro": "Doluluk, ortalama gecelik fiyat (ADR) ve müsait oda başına geliri (RevPAR) izleyin; fiyat önerilerini katkı tablosuyla inceleyip kabul edin veya reddedin."
   },
   "loading": "Yükleniyor…",
-  "loadingProperties": "Mülkler yükleniyor…",
-  "noProperties": "Henüz bir mülkünüz yok.",
-  "propertyLabel": "Mülk",
+  "loadingProperties": "İlanlar yükleniyor…",
+  "noProperties": "Henüz bir ilanınız yok.",
+  "propertyLabel": "İlan",
   "percent": "%{value}",
   "factor": {
     "occupancy": "Doluluk",

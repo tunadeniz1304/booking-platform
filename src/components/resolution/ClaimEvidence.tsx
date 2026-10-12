@@ -11,8 +11,11 @@ import {
   EVIDENCE_IMAGE_MAX_MB,
   EVIDENCE_MAX_FILES,
   EVIDENCE_PDF_MAX_MB,
+  isEmailNotVerifiedError,
   useClaimErrorText,
+  usePartyLabel,
   type ClaimDetailResponse,
+  type ClaimType,
 } from "./shared";
 
 type Evidence = ClaimDetailResponse["evidence"][number];
@@ -65,15 +68,22 @@ export default function ClaimEvidence({
   evidence,
   canUpload,
   onUploaded,
+  headingLevel = 2,
+  claimType,
 }: {
   claimId: string;
   evidence: Evidence[];
   canUpload: boolean;
   onUploaded: () => void;
+  /** Başlıksız bir kartta bölüm başlığı h2; başka bir h2 bölümünün içindeyse 3 verin. */
+  headingLevel?: 2 | 3;
+  /** Verilirse yükleyen "Misafir" / "Ev sahibi" olarak adlandırılır (yoksa genel rol adı). */
+  claimType?: ClaimType;
 }) {
   const t = useTranslations("resolution");
   const f = useFormat();
   const claimError = useClaimErrorText();
+  const partyLabel = usePartyLabel();
   const [busy, setBusy] = useState(false);
   const [queue, setQueue] = useState<QueuedFile[]>([]);
   const [progress, setProgress] = useState<UploadProgress | null>(null);
@@ -84,6 +94,7 @@ export default function ClaimEvidence({
   }>({});
   const inputRef = useRef<HTMLInputElement>(null);
   const titleRef = useRef<HTMLHeadingElement>(null);
+  const Heading = headingLevel === 3 ? "h3" : "h2";
   const inputId = `claim-evidence-${claimId}`;
   const remaining = Math.max(0, EVIDENCE_MAX_FILES - evidence.length);
   const fileUrl = (e: Evidence) =>
@@ -147,11 +158,13 @@ export default function ClaimEvidence({
   }
 
   function remove(key: string) {
+    if (busy) return;
     setQueue((q) => q.filter((x) => x.key !== key));
     restoreFocus();
   }
 
   function clearQueue() {
+    if (busy) return;
     setQueue([]);
     setFeedback({});
     restoreFocus();
@@ -197,7 +210,7 @@ export default function ClaimEvidence({
       const error = claimError(stop);
       setFeedback({
         error: uploaded > 0 ? t("evidence.stopped", { uploaded, total, error }) : error,
-        needsVerify: stop instanceof ApiError && stop.code === "EMAIL_NOT_VERIFIED",
+        needsVerify: isEmailNotVerifiedError(stop),
       });
     } else if (failed > 0) {
       setFeedback({ error: t("evidence.someFailed", { uploaded, total }) });
@@ -210,19 +223,19 @@ export default function ClaimEvidence({
 
   return (
     <div className="space-y-3">
-      <h3
+      <Heading
         ref={titleRef}
         tabIndex={-1}
-        className="text-base font-semibold text-gray-900 focus:outline-none"
+        className="text-lg font-semibold text-gray-900 focus:outline-none"
       >
         {t("evidence.title")}
-      </h3>
+      </Heading>
       {evidence.length === 0 ? (
         <p className="text-sm text-gray-700">{t("evidence.empty")}</p>
       ) : (
         <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           {evidence.map((e, i) => {
-            const role = t(`role.${e.role}`);
+            const role = partyLabel(claimType, e.role);
             const date = f.dateTime(e.createdAt);
             const position = { index: i + 1, total: evidence.length };
             const pdf = e.contentType === "application/pdf";
@@ -282,12 +295,16 @@ export default function ClaimEvidence({
               type="file"
               multiple
               accept={ACCEPT}
-              disabled={busy}
+              // Yüklemede odakta kalır; seçici açılmaz, seçim yok sayılır.
+              aria-disabled={busy || undefined}
               aria-describedby={`${inputId}-limits ${inputId}-visibility ${inputId}-privacy`}
-              className="mt-1 block min-h-[44px] text-sm text-gray-800"
+              className="mt-1 block min-h-[44px] text-sm text-gray-800 aria-disabled:cursor-not-allowed aria-disabled:opacity-60"
+              onClick={(e) => {
+                if (busy) e.preventDefault();
+              }}
               onChange={(e) => {
                 const files = Array.from(e.target.files ?? []);
-                if (files.length > 0) select(files);
+                if (!busy && files.length > 0) select(files);
                 e.target.value = "";
               }}
             />
@@ -325,7 +342,7 @@ export default function ClaimEvidence({
                       <Button
                         type="button"
                         variant="secondary"
-                        disabled={busy}
+                        aria-disabled={busy || undefined}
                         aria-label={t("evidence.removeFile", { name: item.file.name })}
                         onClick={() => remove(item.key)}
                       >
@@ -341,7 +358,12 @@ export default function ClaimEvidence({
                       ? t("evidence.uploading")
                       : t("evidence.confirmUploadCount", { count: queue.length })}
                   </Button>
-                  <Button type="button" variant="secondary" disabled={busy} onClick={clearQueue}>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    aria-disabled={busy || undefined}
+                    onClick={clearQueue}
+                  >
                     {t("evidence.cancel")}
                   </Button>
                 </div>

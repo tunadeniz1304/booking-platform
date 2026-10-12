@@ -67,5 +67,6 @@
   "noAmenities": "Olanak belirtilmemiş",
   "cleared": "Karşılaştırma seçimi temizlendi.",
   "undo": "Geri al",
-  "chipFallback": "İlan {n}"
+  "chipFallback": "İlan {n}",
+  "addNamed": "Karşılaştırmaya ekle: {title}"
 }

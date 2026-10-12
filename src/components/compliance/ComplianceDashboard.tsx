@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type FormEvent,
+  type ReactNode,
+} from "react";
 import { useTranslations } from "next-intl";
 import { ApiError, apiFetch } from "@/lib/api-client";
 import { useFormat } from "@/i18n/use-format";
@@ -12,6 +19,7 @@ import {
   Status,
   focusFirstInvalid,
   focusRing,
+  inputClass,
   useErrorText,
   useLoader,
 } from "@/components/ui/ui";
@@ -56,9 +64,6 @@ type ReportPreset = "thisYear" | "lastYear" | "last6Months";
 
 const TAKEDOWN_FILTERS: TakedownFilter[] = ["open", "closed", "all"];
 const REPORT_PRESETS: ReportPreset[] = ["thisYear", "lastYear", "last6Months"];
-
-const input =
-  "mt-1 w-full rounded-md border border-gray-500 px-3 py-2 text-sm focus:border-[#003580] focus:outline-none focus:ring-1 focus:ring-[#003580]";
 
 /** 7565 süreleri Türkiye saatine göre izlenir; TSİ 2016'dan beri yaz saatsiz, sabit UTC+3. */
 const TR_TIME_ZONE = "Europe/Istanbul";
@@ -176,6 +181,37 @@ function invalidFields(error: unknown): string[] {
   });
 }
 
+/**
+ * `noValidate` formlarda tarayıcı balonu yerine: boş zorunlu alan, (kırpılmış) en az uzunluk
+ * altı ya da geçersiz/aralık dışı tarih içeren alan adları, formdaki sırayla.
+ */
+function clientInvalidFields(form: HTMLFormElement): string[] {
+  const names: string[] = [];
+  for (const el of Array.from(form.elements)) {
+    if (
+      !(
+        el instanceof HTMLInputElement ||
+        el instanceof HTMLTextAreaElement ||
+        el instanceof HTMLSelectElement
+      ) ||
+      !el.name ||
+      el.disabled
+    ) {
+      continue;
+    }
+    const value = el.value.trim();
+    const minLength = el instanceof HTMLSelectElement ? 0 : el.minLength;
+    const invalid =
+      (el.required && !value) ||
+      (value.length > 0 && minLength > 0 && value.length < minLength) ||
+      el.validity.badInput ||
+      el.validity.rangeOverflow ||
+      el.validity.rangeUnderflow;
+    if (invalid && !names.includes(el.name)) names.push(el.name);
+  }
+  return names;
+}
+
 const fetchTakedowns = (status?: Takedown["status"]) =>
   apiFetch<{ takedowns: Takedown[] }>(
     `/api/admin/takedowns${status ? `?status=${status}` : ""}`
@@ -202,8 +238,11 @@ function focusById(id: string) {
   el.focus();
 }
 
-/** Minimal uyum paneli (ADMIN): kaldırma talebi kaydı/kapatma, DSA kararı, rapor export. */
-export default function ComplianceDashboard() {
+/**
+ * Minimal uyum paneli (ADMIN): kaldırma talebi kaydı/kapatma, DSA kararı, rapor export.
+ * `afterNotices`: bildirimlerle şeffaflık raporu arasına konan bölümler (ör. itiraz kuyrukları).
+ */
+export default function ComplianceDashboard({ afterNotices }: { afterNotices?: ReactNode } = {}) {
   const t = useTranslations("compliance.admin");
   const tr = useTranslations("compliance.report");
   const tc = useTranslations("common");
@@ -271,13 +310,8 @@ export default function ComplianceDashboard() {
     }
   };
 
-  /** Sunucu hatasını arayüz dilinde gösterir; doğrulama hatalarını ilgili alanlara dağıtır. */
-  const showError = (key: string, error: unknown, form: HTMLFormElement) => {
-    const names = invalidFields(error);
-    if (names.length === 0) {
-      setResult(key, { error: errorText(error) });
-      return;
-    }
+  /** Hatalı alanları ilgili `Field` altında gösterir, özet hatayı yazar ve ilk alana odaklanır. */
+  const markInvalid = (key: string, names: string[], form: HTMLFormElement) => {
     const fields: Record<string, string> = {};
     for (const name of names) {
       fields[name] = t.has(`errors.fields.${name}`)
@@ -287,6 +321,28 @@ export default function ComplianceDashboard() {
     setFieldErrors((prev) => ({ ...prev, [key]: fields }));
     setResult(key, { error: t("errors.validation") });
     focusFirstInvalid(form);
+  };
+
+  /** Sunucu hatasını arayüz dilinde gösterir; doğrulama hatalarını ilgili alanlara dağıtır. */
+  const showError = (key: string, error: unknown, form: HTMLFormElement) => {
+    const names = invalidFields(error);
+    if (names.length === 0) {
+      setResult(key, { error: errorText(error) });
+      return;
+    }
+    markInvalid(key, names, form);
+  };
+
+  /** İstemci denetimi (onay penceresinden önce); geçerse önceki hatalar temizlenir. */
+  const validate = (key: string, form: HTMLFormElement) => {
+    const names = clientInvalidFields(form);
+    if (names.length > 0) {
+      markInvalid(key, names, form);
+      return false;
+    }
+    setFieldErrors((prev) => ({ ...prev, [key]: {} }));
+    setResult(key, {});
+    return true;
   };
 
   const itemLabel = (td: Takedown) =>
@@ -390,6 +446,7 @@ export default function ComplianceDashboard() {
     if (pendingRef.current) return;
     const form = e.currentTarget;
     syncReceivedAt(receivedRef.current, receivedEdited.current);
+    if (!validate("create", form)) return;
     const data = new FormData(form);
     const propertyId = String(data.get("propertyId") ?? "").trim();
     // Bulunamayan ilan için talep gönderilmez; önizleme sürüyorsa ya da hiç yapılmadıysa beklenir.
@@ -456,9 +513,11 @@ export default function ComplianceDashboard() {
 
   const closeTakedown = async (td: Takedown, e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (pendingRef.current) return;
     const form = e.currentTarget;
-    const resolution = String(new FormData(form).get("resolution") ?? "").trim();
     const key = `td-${td.id}`;
+    if (!validate(key, form)) return;
+    const resolution = String(new FormData(form).get("resolution") ?? "").trim();
     const item = itemLabel(td);
     const rows = takedownRows ?? [];
     const index = rows.findIndex((r) => r.id === td.id);
@@ -492,6 +551,8 @@ export default function ComplianceDashboard() {
     e.preventDefault();
     if (pendingRef.current) return;
     const form = e.currentTarget;
+    const key = `n-${n.id}`;
+    if (!validate(key, form)) return;
     const data = new FormData(form);
     const decision = String(data.get("decision") ?? "");
     const ground = decision === "REMOVED" ? String(data.get("ground") ?? "") : "";
@@ -525,7 +586,6 @@ export default function ComplianceDashboard() {
     const list = notices.data ?? [];
     const index = list.findIndex((x) => x.id === n.id);
     const next = list[index + 1] ?? list[index - 1];
-    const key = `n-${n.id}`;
     const res = await run(key, () =>
       apiFetch(`/api/admin/notices/${n.id}`, {
         method: "POST",
@@ -568,16 +628,26 @@ export default function ComplianceDashboard() {
   return (
     <div className="space-y-6">
       {confirmDialog}
+      {/* Başlık metnine girmeden (karar düğmesi adları) bağlantılara "yeni sekme" açıklaması. */}
+      <span id="compliance-new-tab" hidden>
+        {t("noticeQueue.newTab")}
+      </span>
 
       <Card title={t("takedowns")} id="takedowns">
         <RequiredLegend className="mb-3" />
         <form
+          noValidate
           onSubmit={createTakedown}
           onFocus={() => syncReceivedAt(receivedRef.current, receivedEdited.current)}
           className="grid gap-3 sm:grid-cols-2"
         >
           <Field id="td-source" label={t("source")} error={fieldError("create", "source")}>
-            <select id="td-source" name="source" className={input} defaultValue="MINISTRY_7565">
+            <select
+              id="td-source"
+              name="source"
+              className={inputClass}
+              defaultValue="MINISTRY_7565"
+            >
               <option value="MINISTRY_7565">{t("sources.MINISTRY_7565")}</option>
               <option value="COURT_ORDER">{t("sources.COURT_ORDER")}</option>
               <option value="OTHER_AUTHORITY">{t("sources.OTHER_AUTHORITY")}</option>
@@ -593,7 +663,6 @@ export default function ComplianceDashboard() {
             <input
               id="td-property"
               name="propertyId"
-              required
               maxLength={MAX.propertyId}
               autoComplete="off"
               spellCheck={false}
@@ -602,17 +671,21 @@ export default function ComplianceDashboard() {
                 lookupRef.current = null;
                 setPreview(null);
               }}
-              className={input}
+              className={inputClass}
             />
           </Field>
-          <Field id="td-ref" label={t("referenceNo")} error={fieldError("create", "referenceNo")}>
+          <Field
+            id="td-ref"
+            label={t("referenceNoOptional")}
+            error={fieldError("create", "referenceNo")}
+          >
             <input
               id="td-ref"
               name="referenceNo"
               maxLength={MAX.referenceNo}
               autoComplete="off"
               spellCheck={false}
-              className={input}
+              className={inputClass}
             />
           </Field>
           <Field
@@ -630,7 +703,7 @@ export default function ComplianceDashboard() {
               onChange={() => {
                 receivedEdited.current = true;
               }}
-              className={input}
+              className={inputClass}
             />
           </Field>
           <div className="sm:col-span-2">
@@ -644,12 +717,11 @@ export default function ComplianceDashboard() {
               <textarea
                 id="td-reason"
                 name="reason"
-                required
                 minLength={3}
                 maxLength={MAX.reason}
                 rows={3}
                 onChange={(e) => setReasonLength(e.currentTarget.value.length)}
-                className={input}
+                className={inputClass}
               />
             </Field>
             <CharLimitStatus length={reasonLength} max={MAX.reason} />
@@ -731,8 +803,23 @@ export default function ComplianceDashboard() {
                       <dl className="mt-1 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5">
                         <dt>{t("takedownList.listing")}</dt>
                         <dd className="min-w-0 break-words">
-                          {td.property?.title && <>{td.property.title} </>}
-                          <span className="break-all font-mono text-xs">{td.propertyId}</span>
+                          <a
+                            className={`text-[#003580] underline ${focusRing}`}
+                            href={`/property/${encodeURIComponent(td.propertyId)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            aria-describedby="compliance-new-tab"
+                          >
+                            {td.property?.title ?? (
+                              <span className="break-all font-mono text-xs">{td.propertyId}</span>
+                            )}
+                          </a>
+                          {td.property?.title && (
+                            <>
+                              {" "}
+                              <span className="break-all font-mono text-xs">{td.propertyId}</span>
+                            </>
+                          )}
                         </dd>
                         <dt>{t("referenceNo")}</dt>
                         <dd className="min-w-0 break-words">
@@ -774,6 +861,7 @@ export default function ComplianceDashboard() {
                   {open && closingId === td.id && (
                     <form
                       id={`${key}-close`}
+                      noValidate
                       aria-labelledby={titleId}
                       onSubmit={(e) => void closeTakedown(td, e)}
                       className="mt-2 space-y-2 rounded-md border border-gray-200 p-3"
@@ -792,13 +880,12 @@ export default function ComplianceDashboard() {
                         <textarea
                           id={`${key}-resolution`}
                           name="resolution"
-                          required
                           minLength={3}
                           maxLength={MAX.resolution}
                           rows={3}
                           autoFocus
                           onChange={(e) => setResolutionLength(e.currentTarget.value.length)}
-                          className={input}
+                          className={inputClass}
                         />
                       </Field>
                       <CharLimitStatus length={resolutionLength} max={MAX.resolution} />
@@ -833,10 +920,6 @@ export default function ComplianceDashboard() {
         id="notices"
       >
         <Status error={results.notices?.error} message={results.notices?.message} />
-        {/* Başlık metnine girmeden (karar düğmesi adları) bağlantılara "yeni sekme" açıklaması. */}
-        <span id="notices-new-tab" hidden>
-          {t("noticeQueue.newTab")}
-        </span>
         {notices.error ? (
           <div className="space-y-2">
             <Status error={notices.error} />
@@ -871,7 +954,7 @@ export default function ComplianceDashboard() {
                     href={n.contentUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    aria-describedby="notices-new-tab"
+                    aria-describedby="compliance-new-tab"
                   >
                     {n.contentUrl}
                   </a>
@@ -890,7 +973,7 @@ export default function ComplianceDashboard() {
                         href={`/property/${encodeURIComponent(n.propertyId)}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        aria-describedby="notices-new-tab"
+                        aria-describedby="compliance-new-tab"
                       >
                         {n.property?.title ?? (
                           <span className="break-all font-mono text-xs">{n.propertyId}</span>
@@ -909,6 +992,7 @@ export default function ComplianceDashboard() {
                   {n.explanation}
                 </p>
                 <form
+                  noValidate
                   aria-labelledby={titleId}
                   onSubmit={decide(n)}
                   className="mt-2 grid gap-2 sm:grid-cols-2"
@@ -923,8 +1007,7 @@ export default function ComplianceDashboard() {
                     <select
                       id={`d-${n.id}`}
                       name="decision"
-                      required
-                      className={input}
+                      className={inputClass}
                       value={decision}
                       onChange={(e) =>
                         setDecisions((prev) => ({ ...prev, [n.id]: e.target.value }))
@@ -946,13 +1029,7 @@ export default function ComplianceDashboard() {
                       error={fieldError(key, "ground")}
                       required
                     >
-                      <select
-                        id={`g-${n.id}`}
-                        name="ground"
-                        required
-                        className={input}
-                        defaultValue=""
-                      >
+                      <select id={`g-${n.id}`} name="ground" className={inputClass} defaultValue="">
                         <option value="" disabled>
                           {t("choose")}
                         </option>
@@ -972,13 +1049,12 @@ export default function ComplianceDashboard() {
                       <textarea
                         id={`f-${n.id}`}
                         name="facts"
-                        required
                         minLength={10}
                         maxLength={MAX.facts}
                         rows={4}
                         value={draft.facts}
                         onChange={(e) => editDraft(n.id, { facts: e.target.value })}
-                        className={input}
+                        className={inputClass}
                       />
                     </Field>
                     <CharLimitStatus length={draft.facts.length} max={MAX.facts} />
@@ -986,7 +1062,7 @@ export default function ComplianceDashboard() {
                   <div>
                     <Field
                       id={`l-${n.id}`}
-                      label={t("legalReference")}
+                      label={t("legalReferenceOptional")}
                       hint={withCount(null, draft.legalReference.length, MAX.legalReference)}
                       error={fieldError(key, "legalReference")}
                     >
@@ -996,7 +1072,7 @@ export default function ComplianceDashboard() {
                         maxLength={MAX.legalReference}
                         value={draft.legalReference}
                         onChange={(e) => editDraft(n.id, { legalReference: e.target.value })}
-                        className={input}
+                        className={inputClass}
                       />
                     </Field>
                     <CharLimitStatus
@@ -1021,6 +1097,8 @@ export default function ComplianceDashboard() {
           })}
         </ul>
       </Card>
+
+      {afterNotices}
 
       <Card title={t("transparency")} id="transparency">
         <fieldset>
@@ -1051,7 +1129,7 @@ export default function ComplianceDashboard() {
                   const from = e.target.value;
                   setPeriod((p) => ({ ...p, from }));
                 }}
-                className={input}
+                className={inputClass}
               />
             </Field>
             <Field id="report-to" label={t("report.to")} error={toError}>
@@ -1063,7 +1141,7 @@ export default function ComplianceDashboard() {
                   const to = e.target.value;
                   setPeriod((p) => ({ ...p, to }));
                 }}
-                className={input}
+                className={inputClass}
               />
             </Field>
           </div>

@@ -36,7 +36,12 @@
     "counter": "{count}/{max} characters",
     "nearLimit": "Messages can be at most {max} characters; you are close to the limit.",
     "truncated": "The pasted text did not fit; your message was cut to {max} characters.",
-    "prefillAccessibility": "{hasProperty, select, yes {I have a question about the accessibility of “{property}”: } other {I have a question about a property’s accessibility: }}"
+    "prefillAccessibility": "{hasProperty, select, yes {I have a question about the accessibility of “{property}”: } other {I have a question about a property’s accessibility: }}",
+    "copyRef": "Copy",
+    "copyRefLabel": "Copy ticket number ({id})",
+    "copied": "Copied",
+    "atLimit": "You have reached the {max}-character limit; no more text can be added.",
+    "agentOff": "The assistant is offline right now; use “{button}” to reach our team."
   },
   "admin": {
     "link": "Support queue",
@@ -79,9 +84,44 @@
     "groupTitle": "{count, plural, one {# ticket} other {# tickets}} for the same booking",
     "groupResolveAll": "Mark all resolved",
     "assignedToYou": "Assigned to you",
-    "handler": "Reviewer: {id}"
+    "handler": "Reviewer: {id}",
+    "updatedTo": "Ticket moved to “{status}”; it is listed under the “{filter}” filter.",
+    "bulkUpdatedTo": "{count, plural, one {# ticket} other {# tickets}} moved to “{status}”; listed under the “{filter}” filter.",
+    "language": "Language: {locale}",
+    "intent": {
+      "booking_status": "Booking status question",
+      "cancellation_quote": "Cancellation fee question",
+      "property_policy": "Property rules question",
+      "refund_request": "Refund request",
+      "legal_or_complaint": "Legal issue/complaint",
+      "human_request": "Asked for a human agent",
+      "prompt_injection": "Attempt to change the assistant's instructions",
+      "greeting": "Greeting",
+      "unknown": "Topic not identified"
+    }
   },
   "agent": {
     "localTime": "property local time"
+  },
+  "help": {
+    "title": "Frequently asked questions",
+    "cancellation": {
+      "question": "How do I cancel my booking?",
+      "answer": "You can cancel your booking under <link>My account › My bookings</link>. How much you get back depends on the listing's cancellation policy and when you cancel; the terms are shown on the listing page and again before you pay."
+    },
+    "refund": {
+      "question": "When will I get my refund?",
+      "answer": "Refunds to your card usually appear within 5–10 business days. For a problem with your stay, open a refund claim from the booking page and follow it in the <link>Resolution center</link>."
+    },
+    "payment": {
+      "question": "Is my payment safe?",
+      "answer": "Your card number is not stored on the platform; payments are processed by the payment provider and only a token and the transaction reference are kept. More in the <link>Trust center</link>."
+    },
+    "accessibility": {
+      "question": "How do I find a stay that meets my accessibility needs?",
+      "answer": "Use the accessibility filters on the <link>search</link> page. Listing pages show only features our team has verified against evidence; missing information does not mean a feature is missing. If you have a specific need, ask the assistant on this page before booking or ask to be connected to the human support team (sign-in required)."
+    },
+    "policiesTitle": "Policies and reports",
+    "report": "Report illegal content or fraud"
   }
 }

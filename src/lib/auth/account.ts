@@ -274,8 +274,36 @@ async function consumeToken(raw: string, kind: AuthTokenKind, now: Date): Promis
   return row.userId;
 }
 
-export async function verifyEmail(raw: string, now = new Date()): Promise<{ userId: string }> {
-  const userId = await consumeToken(raw, AuthTokenKind.EMAIL_VERIFY, now);
+/**
+ * Kullanılmış bir doğrulama token'ının sahibi e-postasını zaten doğrulamışsa kullanıcı kimliği;
+ * değilse null. Bağlantıya ikinci kez tıklayan kullanıcı hata yerine "zaten doğrulandı" görür.
+ */
+async function alreadyVerifiedTokenOwner(raw: string): Promise<string | null> {
+  const row = await prisma.authToken.findUnique({
+    where: { tokenHash: sha256Hex(raw) },
+    select: { kind: true, usedAt: true, user: { select: { id: true, emailVerifiedAt: true } } },
+  });
+  if (row?.kind !== AuthTokenKind.EMAIL_VERIFY || !row.usedAt) return null;
+  return row.user.emailVerifiedAt ? row.user.id : null;
+}
+
+/**
+ * E-postayı doğrular. Token daha önce kullanılmış ve e-posta zaten doğrulanmışsa hata yerine
+ * `alreadyVerified: true` döner; bilinmeyen, başka türden ve süresi dolmuş token'lar 400 alır.
+ */
+export async function verifyEmail(
+  raw: string,
+  now = new Date()
+): Promise<{ userId: string; alreadyVerified?: boolean }> {
+  let userId: string;
+  try {
+    userId = await consumeToken(raw, AuthTokenKind.EMAIL_VERIFY, now);
+  } catch (error) {
+    if (!(error instanceof ValidationError)) throw error;
+    const ownerId = await alreadyVerifiedTokenOwner(raw);
+    if (!ownerId) throw error;
+    return { userId: ownerId, alreadyVerified: true };
+  }
   await prisma.user.updateMany({
     where: { id: userId, emailVerifiedAt: null },
     data: { emailVerifiedAt: now },

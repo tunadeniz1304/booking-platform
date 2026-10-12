@@ -101,9 +101,8 @@ function DepositRow({
   const f = useFormat();
   const errorText = useErrorText();
   const fid = `deposit-${propertyId}-${row.roomTypeId ?? "listing"}`;
-  const scope = row.roomTypeId
-    ? t("roomLabel", { room: row.roomName ?? row.roomTypeId })
-    : t("listingWide");
+  const scopeName = row.roomTypeId ? (row.roomName ?? row.roomTypeId) : t("listingWide");
+  const scope = row.roomTypeId ? t("roomLabel", { room: scopeName }) : scopeName;
   const label = row.roomTypeId
     ? t("amountRoom", { room: row.roomName ?? row.roomTypeId, currency })
     : t("amountListing", { currency });
@@ -227,6 +226,7 @@ function DepositRow({
       </div>
       <Button type="submit" className="min-h-[44px]" busy={busy}>
         {t("save")}
+        <span className="sr-only">: {scopeName}</span>
       </Button>
       {row.amountMinor !== null && (
         <Button

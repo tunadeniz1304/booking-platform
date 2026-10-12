@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
-import { apiFetch } from "@/lib/api-client";
+import { ApiError, apiFetch } from "@/lib/api-client";
 import { useFormat } from "@/i18n/use-format";
 import type { AccessibilityCodeValue } from "@/lib/compliance/accessibility-codes";
 import { Button, Card, Status, focusRing, useErrorText, useLoader } from "@/components/ui/ui";
@@ -91,6 +91,15 @@ export default function AccessibilityReviewQueue() {
     property: row.propertyTitle,
   });
 
+  // F776: bilinen hata kodları arayüz dilinde ve ne yapılacağını söyleyen metinle gösterilir.
+  const actionErrorText = (err: unknown) => {
+    if (err instanceof ApiError) {
+      if (err.code === "ACCESSIBILITY_EVIDENCE_REQUIRED") return t("admin.errors.evidenceRequired");
+      if (err.code === "NOT_FOUND") return t("admin.errors.notFound");
+    }
+    return errorText(err);
+  };
+
   const verify = async (row: ReviewRow, verified: boolean, undo = false) => {
     if (pendingRef.current) return;
     if (!undo) {
@@ -143,7 +152,7 @@ export default function AccessibilityReviewQueue() {
       }
       rows.reload();
     } catch (err: unknown) {
-      const text = errorText(err);
+      const text = actionErrorText(err);
       // Geri alınan satır bu listede olmayabilir: hata üstte gösterilir, yeniden denenebilir.
       if (undo) {
         setActionError(text);
@@ -220,8 +229,18 @@ export default function AccessibilityReviewQueue() {
                 {row.widthCm !== null && ` · ${t("width", { width: row.widthCm })}`}
               </h3>
               <p className="text-gray-700">
-                <a href={`/property/${row.propertyId}`} className={`underline ${focusRing}`}>
+                {/* F786: ilan yeni sekmede açılır; kuyruk, filtre ve geri alma durumu korunur. */}
+                <a
+                  href={`/property/${row.propertyId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`underline ${focusRing}`}
+                >
                   {row.propertyTitle}
+                  <span className="sr-only"> {t("host.newTab")}</span>
+                  <span aria-hidden="true" className="ml-1">
+                    {"↗"}
+                  </span>
                 </a>{" "}
                 ·{" "}
                 {row.roomTypeName ? t("roomType", { name: row.roomTypeName }) : t("wholeProperty")}
@@ -239,22 +258,33 @@ export default function AccessibilityReviewQueue() {
                 <a
                   href={row.evidencePhotoUrl}
                   target="_blank"
-                  rel="noreferrer"
+                  rel="noopener noreferrer"
                   className={`inline-flex min-h-[2.5rem] items-center font-semibold text-[#003580] underline ${focusRing}`}
                 >
                   {t("evidence")}
+                  <span className="sr-only">
+                    : {t(`codes.${row.code}`)} – {row.propertyTitle} {t("host.newTab")}
+                  </span>
+                  <span aria-hidden="true" className="ml-1">
+                    {"↗"}
+                  </span>
                 </a>
               )}
               {row.verified ? (
                 <Button
                   variant="secondary"
                   busy={pending === row.id}
+                  aria-label={t("admin.unverifyLabel", names(row))}
                   onClick={() => void verify(row, false)}
                 >
                   {t("admin.unverify")}
                 </Button>
               ) : (
-                <Button busy={pending === row.id} onClick={() => void verify(row, true)}>
+                <Button
+                  busy={pending === row.id}
+                  aria-label={t("admin.verifyLabel", names(row))}
+                  onClick={() => void verify(row, true)}
+                >
                   {t("admin.verify")}
                 </Button>
               )}

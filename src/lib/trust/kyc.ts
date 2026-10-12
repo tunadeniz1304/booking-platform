@@ -368,6 +368,7 @@ export async function getIdentityStatus(userId: string) {
     verifiedAt: verified?.verifiedAt?.toISOString() ?? null,
     lastError: current && current.status !== "VERIFIED" ? current.lastError : null,
     required: { host: cfg.KYC_REQUIRED_FOR_HOSTS, guest: cfg.KYC_REQUIRED_FOR_GUESTS },
+    maxStartsPerDay: cfg.KYC_MAX_STARTS_PER_DAY,
     testDocuments: provider === "mock" ? [...MOCK_TEST_DOCUMENTS] : [],
   };
 }

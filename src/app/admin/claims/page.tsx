@@ -9,7 +9,7 @@ import { PageShell, RoleGate } from "@/components/ui/ui";
 export default function AdminClaimsPage() {
   const t = useTranslations("resolution");
   return (
-    <PageShell title={t("admin.pageTitle")} intro={t("admin.pageIntro")}>
+    <PageShell title={t("admin.pageTitle")} intro={t("admin.pageIntro")} width="wide">
       <RoleGate roles={["ADMIN"]}>
         {() => (
           <>

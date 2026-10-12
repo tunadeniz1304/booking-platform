@@ -10,9 +10,17 @@ import CouponField from "@/components/booking/CouponField";
 import { ResendVerificationButton } from "@/components/auth/AuthCard";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
-import { Button, focusRing, loginHref, useErrorText, useSession } from "@/components/ui/ui";
+import {
+  Button,
+  focusRing,
+  loginHref,
+  useErrorText,
+  usePageHeadingFocus,
+  useSession,
+} from "@/components/ui/ui";
 import { ApiError, apiFetch, isNetworkError } from "@/lib/api-client";
 import { useFormat } from "@/i18n/use-format";
+import { bedTypeKey } from "@/lib/i18n/bed-type";
 
 interface CheckoutRatePlan {
   id: string;
@@ -137,6 +145,7 @@ function CheckoutFrame({ children }: { children: ReactNode }) {
 function CheckoutContent() {
   const t = useTranslations("checkout");
   const tq = useTranslations("quote");
+  const tc = useTranslations("common");
   const router = useRouter();
   const searchParams = useSearchParams();
   const f = useFormat();
@@ -145,12 +154,14 @@ function CheckoutContent() {
   const formRef = useRef<HTMLFormElement>(null);
   const submitRef = useRef<HTMLButtonElement>(null);
   const inFlight = useRef(false);
+  const h1Ref = usePageHeadingFocus();
 
   const propertyId = searchParams.get("propertyId") ?? "";
   const roomId = searchParams.get("roomId") ?? "";
   const checkIn = searchParams.get("checkIn") ?? "";
   const checkOut = searchParams.get("checkOut") ?? "";
-  const guestParam = searchParams.get("guestCount");
+  // İlan sayfası `guests` kullanır; ikisi de kabul edilir (F1005).
+  const guestParam = searchParams.get("guestCount") ?? searchParams.get("guests");
   const guestCount = guestParam === null ? 1 : Number(guestParam);
   const ratePlanId = searchParams.get("ratePlanId") ?? undefined;
 
@@ -234,6 +245,12 @@ function CheckoutContent() {
     plans.find((p) => p.id === ratePlanId) ??
     (ratePlanId ? undefined : (plans.find((p) => p.isDefault) ?? plans[0]));
   const nights = nightsBetween(checkIn, checkOut);
+  // Yatak tipi kodu arayüz dilinde; eski serbest metin olduğu gibi (F1306).
+  const bedKey = room ? bedTypeKey(room.bedType) : null;
+  const bedLabel = bedKey ? tc(bedKey) : (room?.bedType ?? "");
+
+  /** Süresi dolan teklif gönderimden önce yeniden alınır (F1393). */
+  const refreshExpiredQuote = useCallback(() => setRefreshKey((k) => k + 1), [setRefreshKey]);
 
   // İlana dönüşte yalnız geçerli seçimler taşınır; geçmiş/bozuk tarih yeniden seçtirilir.
   const propertyParams = new URLSearchParams();
@@ -369,7 +386,13 @@ function CheckoutContent() {
           <div className="text-center">
             {/* Yükleme hatası sonradan oluşur; başlık ve açıklama duyurulur (F750). */}
             <div role={!missing && !invalid ? "alert" : undefined}>
-              <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
+              <h1
+                ref={h1Ref}
+                tabIndex={-1}
+                className="text-2xl font-bold text-gray-900 focus:outline-none"
+              >
+                {title}
+              </h1>
               <p className="mt-2 text-gray-600">{hint}</p>
             </div>
             <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
@@ -476,7 +499,13 @@ function CheckoutContent() {
             {t("steps.confirmation")}
           </li>
         </ol>
-        <h1 className="mt-2 text-2xl font-bold text-gray-900">{t("title")}</h1>
+        <h1
+          ref={h1Ref}
+          tabIndex={-1}
+          className="mt-2 text-2xl font-bold text-gray-900 focus:outline-none"
+        >
+          {t("title")}
+        </h1>
 
         <form
           ref={formRef}
@@ -514,7 +543,7 @@ function CheckoutContent() {
                 <div className="flex justify-between gap-4">
                   <dt className="text-gray-600">{t("room")}</dt>
                   <dd className="text-right font-medium text-gray-900">
-                    {room ? `${room.name} (${room.bedType})` : loadingValue}
+                    {room ? `${room.name} (${bedLabel})` : loadingValue}
                   </dd>
                 </div>
               )}
@@ -605,11 +634,12 @@ function CheckoutContent() {
                   </div>
                 </div>
               )}
-              {quote && <QuoteBreakdown quote={quote} />}
+              {quote && <QuoteBreakdown quote={quote} onExpire={refreshExpiredQuote} />}
               <CouponField
                 applied={couponCode}
                 status={quote?.coupon?.status ?? null}
                 onApply={setCouponCode}
+                loading={quoteLoading}
               />
             </div>
             <p className="mt-3 text-xs text-gray-500">{t("totalNotice")}</p>
@@ -673,17 +703,19 @@ function CheckoutContent() {
             )}
           </div>
 
-          <button
+          {/* Ortak düğme; `busy`: odak düğmede kalır, ikinci gönderim yok sayılır (F425). */}
+          <Button
             ref={submitRef}
             type="submit"
+            size="lg"
+            fullWidth
+            busy={submitting}
             disabled={submitDisabled}
-            aria-disabled={submitting || undefined}
-            aria-busy={submitting || undefined}
             aria-describedby={`checkout-next-step ${submitReasonIds}`.trim()}
-            className="w-full rounded-lg bg-[#003580] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#002b66] disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-700 aria-disabled:cursor-wait"
+            className="disabled:bg-gray-300 disabled:text-gray-700 disabled:opacity-100"
           >
             {submitting ? t("processing") : t("submit")}
-          </button>
+          </Button>
         </form>
       </main>
     </CheckoutFrame>

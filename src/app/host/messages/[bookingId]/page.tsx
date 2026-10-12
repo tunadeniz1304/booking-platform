@@ -22,8 +22,9 @@ export default function HostMessagesPage() {
       intro={
         <>
           <p>{t("messagesPage.intro")}</p>
+          {/* Panelin başına değil rezervasyon kartına döner; kart yüklenirken de var (F1266). */}
           <Link
-            href="/host"
+            href="/host#host-bookings"
             className={`mt-1 inline-flex items-center gap-1 py-2 font-semibold text-[#003580] hover:underline ${focusRing}`}
           >
             <span aria-hidden="true">←</span>

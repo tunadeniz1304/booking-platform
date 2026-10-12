@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { useTranslations } from "next-intl";
 import { useFormat } from "@/i18n/use-format";
+import { firstDayOfWeek } from "@/lib/i18n/week-start";
 import { apiFetch } from "@/lib/api-client";
 import {
   publishStaySelection,
@@ -117,19 +118,19 @@ function addDaysIso(date: string, days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-/** Pazartesi=0 … Pazar=6. */
-function weekdayIndex(date: string): number {
-  return (new Date(`${date}T00:00:00.000Z`).getUTCDay() + 6) % 7;
+/** Haftadaki sıra: `weekStart` (getDay biçiminde, 0=Pazar) günü 0, son gün 6. */
+function weekdayIndex(date: string, weekStart: number): number {
+  return (new Date(`${date}T00:00:00.000Z`).getUTCDay() - weekStart + 7) % 7;
 }
 
 function isPriced(d: CalendarDay): d is CalendarDay & { priceMinor: number; band: number } {
   return d.available && d.priceMinor !== null && d.band !== null;
 }
 
-/** Pazartesi başlangıçlı haftalara böler (baştaki boşluklar null). */
-function weeksOf(days: CalendarDay[]): Array<Array<CalendarDay | null>> {
+/** Dilin hafta başlangıcına göre haftalara böler (baştaki boşluklar null). */
+function weeksOf(days: CalendarDay[], weekStart: number): Array<Array<CalendarDay | null>> {
   if (days.length === 0) return [];
-  const lead = weekdayIndex(days[0].date);
+  const lead = weekdayIndex(days[0].date, weekStart);
   const cells: Array<CalendarDay | null> = [...Array<null>(lead).fill(null), ...days];
   while (cells.length % 7 !== 0) cells.push(null);
   const weeks: Array<Array<CalendarDay | null>> = [];
@@ -184,6 +185,8 @@ export default function PriceCalendar({
 }) {
   const t = useTranslations("property.calendar");
   const f = useFormat();
+  // DateRangePicker ile aynı hafta başlangıcı (en-US Pazar, tr Pazartesi).
+  const weekStart = useMemo(() => firstDayOfWeek(f.locale), [f.locale]);
   const currentMonth = monthKey(new Date());
   const initialStay =
     initialCheckIn !== undefined &&
@@ -290,12 +293,14 @@ export default function PriceCalendar({
     }
   };
 
-  const weeks = useMemo(() => weeksOf(view?.days ?? []), [view]);
+  const weeks = useMemo(() => weeksOf(view?.days ?? [], weekStart), [view, weekStart]);
   const weekdayNames = useMemo(() => {
     const fmt = new Intl.DateTimeFormat(f.locale, { weekday: "short", timeZone: "UTC" });
-    // 2024-01-01 Pazartesi.
-    return Array.from({ length: 7 }, (_, i) => fmt.format(new Date(Date.UTC(2024, 0, 1 + i))));
-  }, [f.locale]);
+    // 2024-01-07 Pazar.
+    return Array.from({ length: 7 }, (_, i) =>
+      fmt.format(new Date(Date.UTC(2024, 0, 7 + weekStart + i)))
+    );
+  }, [f.locale, weekStart]);
   const monthFormat = useMemo(
     () => new Intl.DateTimeFormat(f.locale, { month: "long", year: "numeric", timeZone: "UTC" }),
     [f.locale]
@@ -359,7 +364,7 @@ export default function PriceCalendar({
   const handleDayKeyDown = (e: KeyboardEvent<HTMLButtonElement>, date: string) => {
     // Ay yüklenirken odak eski ızgarada kalır; gezinme hedef günden devam eder.
     const base = loading && focusedDate ? focusedDate : date;
-    const weekday = weekdayIndex(base);
+    const weekday = weekdayIndex(base, weekStart);
     let target: string;
     switch (e.key) {
       case "ArrowLeft":

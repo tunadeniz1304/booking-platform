@@ -13,7 +13,9 @@ export const GET = observed(
     try {
       const { id } = await params;
       const { userId } = await requireAuth(req);
-      return NextResponse.json(await listMessages(id, userId));
+      // Daha eski sayfa: `?before=<mesaj id>` (F1058).
+      const before = req.nextUrl.searchParams.get("before");
+      return NextResponse.json(await listMessages(id, userId, { before }));
     } catch (error) {
       return toErrorResponse(error, "bookings.messages.list");
     }

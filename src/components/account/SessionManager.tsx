@@ -1,12 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { ApiError, apiFetch, logout } from "@/lib/api-client";
 import { useFormat } from "@/i18n/use-format";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
-import { Button, Status, loginHref } from "@/components/ui/ui";
+import { Button, Status, focusRing, loginHref } from "@/components/ui/ui";
 import { ReauthCancelledError, useAccountErrorText, useReauth } from "./ReauthDialog";
 
 interface SessionView {
@@ -23,6 +24,17 @@ const fetchSessions = () =>
 
 /** "Diğer tüm oturumlar" sorgusu; `revoking` anahtarı olarak da kullanılır. */
 const OTHERS = "scope=others";
+
+/** F793: şifre değişikliği "Şifremi unuttum" akışındaki e-posta bağlantısıyla yapılır. */
+const CHANGE_PASSWORD_HREF = "/forgot-password";
+const changePasswordClass = `text-sm font-semibold text-[#003580] hover:underline ${focusRing}`;
+
+/** `info`: kullanıcının kendi vazgeçmesi gibi nötr bilgi; `changePassword`: şifre bağlantısı da. */
+interface SessionStatus {
+  kind: "ok" | "error" | "info";
+  text: string;
+  changePassword?: boolean;
+}
 
 const RELATIVE_STEPS: ReadonlyArray<[Intl.RelativeTimeFormatUnit, number]> = [
   ["day", 86_400_000],
@@ -56,7 +68,7 @@ export default function SessionManager() {
   const [loading, setLoading] = useState(false);
   // İşlemdeki düğme: oturum kimliği ya da OTHERS (F634: yalnız o düğmenin metni değişir).
   const [revoking, setRevoking] = useState<string | null>(null);
-  const [status, setStatus] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
+  const [status, setStatus] = useState<SessionStatus | null>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
   // F631: kaldırılan satırın sırası (-1: bölüm başlığı); yenilenen listede odak oraya taşınır.
@@ -140,14 +152,19 @@ export default function SessionManager() {
       const res = await reauth.run(() =>
         apiFetch<{ revoked?: number }>(`/api/account/sessions?${query}`, { method: "DELETE" })
       );
-      setStatus({
-        kind: "ok",
-        text: key === OTHERS ? t("revokedCount", { count: res.revoked ?? 0 }) : t("revokedOk"),
-      });
+      const count = res.revoked ?? 0;
+      setStatus(
+        key !== OTHERS
+          ? { kind: "ok", text: t("revokedOk") }
+          : count > 0
+            ? { kind: "ok", text: t("revokedOthersOk"), changePassword: true }
+            : { kind: "ok", text: t("revokedCount", { count }) }
+      );
       pendingFocus.current = index;
     } catch (err) {
       // F1187: kullanıcı yeniden doğrulamadan kendisi vazgeçti; hata değil, liste de değişmedi.
       if (err instanceof ReauthCancelledError) {
+        setStatus({ kind: "info", text: t("revokeCancelled") });
         setRevoking(null);
         return;
       }
@@ -188,6 +205,14 @@ export default function SessionManager() {
           error={status?.kind === "error" ? status.text : null}
           message={status?.kind === "ok" ? status.text : null}
         />
+        <p role="status" className="text-sm text-gray-700">
+          {status?.kind === "info" ? status.text : null}
+        </p>
+        {status?.changePassword && (
+          <Link href={CHANGE_PASSWORD_HREF} className={`mt-1 inline-block ${changePasswordClass}`}>
+            {t("changePassword")}
+          </Link>
+        )}
       </div>
       {loadError && (
         <div className="mt-2">
@@ -259,15 +284,22 @@ export default function SessionManager() {
         </ul>
       )}
       {others > 0 && (
-        <button
-          type="button"
-          onClick={() => void revoke(OTHERS, OTHERS, t("confirmRevokeOthers"))}
-          aria-disabled={busy || undefined}
-          aria-busy={revoking === OTHERS || undefined}
-          className="mt-4 min-h-[44px] rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white aria-disabled:opacity-50 sm:min-h-0"
-        >
-          {revoking === OTHERS ? t("revoking") : t("revokeOthers", { count: others })}
-        </button>
+        <>
+          <button
+            type="button"
+            onClick={() => void revoke(OTHERS, OTHERS, t("confirmRevokeOthers"))}
+            aria-disabled={busy || undefined}
+            aria-busy={revoking === OTHERS || undefined}
+            className="mt-4 min-h-[44px] rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white aria-disabled:opacity-50 sm:min-h-0"
+          >
+            {revoking === OTHERS ? t("revoking") : t("revokeOthers", { count: others })}
+          </button>
+          <p className="mt-4">
+            <Link href={CHANGE_PASSWORD_HREF} className={changePasswordClass}>
+              {t("changePassword")}
+            </Link>
+          </p>
+        </>
       )}
       {reauth.dialog}
       {confirmDialog}

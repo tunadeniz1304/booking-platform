@@ -4,7 +4,8 @@ import { useRef, useState, useTransition, type KeyboardEvent } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { LOCALES, LOCALE_COOKIE } from "@/i18n/config";
-import { useSessionUserCache } from "./useSessionUserCache";
+import { requestOfflinePageRefresh } from "@/lib/pwa/refresh-offline-page";
+import { refreshSessionUser, useSessionUserCache } from "./useSessionUserCache";
 
 /** Kapalı select'te değeri hemen değiştiren tuşlar (Windows: ok, Home/End, PageUp/PageDown). */
 const NAV_KEYS = [
@@ -56,14 +57,19 @@ export default function LocaleSwitcher({
     if (next === current) return;
     setRequested(next);
     document.cookie = `${LOCALE_COOKIE}=${next}; path=/; max-age=31536000; samesite=lax`;
+    requestOfflinePageRefresh();
     // Oturum açıksa kalıcı tercih (e-posta dili) de güncellenir; misafirde istek atılmaz.
-    if (user !== null) {
+    // Oturum henüz bilinmiyorsa önce (paylaşılan) /api/user/me yanıtı beklenir.
+    const persist = (u: typeof user) => {
+      if (!u) return;
       void fetch("/api/user/locale", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ locale: next }),
       }).catch(() => undefined);
-    }
+    };
+    if (user === undefined) void refreshSessionUser().then(persist);
+    else persist(user);
     startTransition(() => router.refresh());
   };
 
@@ -104,7 +110,7 @@ export default function LocaleSwitcher({
           onBlur={() => {
             if (draft !== null) apply(draft);
           }}
-          className={`rounded border border-white/40 bg-transparent px-1 py-0.5 aria-busy:cursor-progress aria-busy:opacity-60 ${showLabel ? "min-h-[44px] min-w-0 flex-1 sm:flex-none" : "min-h-[1.75rem]"} ${className}`}
+          className={`rounded border border-white/40 bg-transparent px-1 py-0.5 text-base aria-busy:cursor-progress aria-busy:opacity-60 lg:text-sm ${showLabel ? "min-h-[44px] min-w-0 flex-1 sm:flex-none" : "min-h-[1.75rem]"} ${className}`}
         >
           {LOCALES.map((l) => (
             <option key={l} value={l} lang={l} className="bg-white text-gray-900">

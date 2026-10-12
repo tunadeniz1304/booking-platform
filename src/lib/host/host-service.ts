@@ -421,12 +421,15 @@ export async function listHostBookings(actor: AccessClaims) {
       propertyId: true,
       roomId: true,
       guestCount: true,
+      user: { select: { firstName: true, lastName: true } },
     },
     orderBy: { checkIn: "asc" },
     take: 200,
   });
-  return rows.map((b) => ({
+  // Ev sahibi misafiri adıyla tanıyabilsin (F834); iç içe `user` yanıta sızmaz.
+  return rows.map(({ user, ...b }) => ({
     ...b,
     totalPriceMinor: minorFromDb(b.totalPriceMinor),
+    guestName: [user?.firstName, user?.lastName].filter(Boolean).join(" ") || null,
   }));
 }

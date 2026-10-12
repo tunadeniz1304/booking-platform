@@ -78,12 +78,7 @@ export async function apiUploadWithProgress<T = unknown>(
   const parsed = parseJson(res.text);
   if (res.status < 200 || res.status >= 300) {
     const err = (parsed ?? {}) as { error?: string; code?: string; details?: unknown };
-    throw new ApiError(
-      res.status,
-      err.error ?? `İstek başarısız (${res.status})`,
-      err.code,
-      err.details
-    );
+    throw new ApiError(res.status, err.error ?? `HTTP ${res.status}`, err.code, err.details);
   }
   return parsed as T;
 }

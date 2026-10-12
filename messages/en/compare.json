@@ -67,5 +67,6 @@
   "noAmenities": "No amenities listed",
   "cleared": "Comparison selection cleared.",
   "undo": "Undo",
-  "chipFallback": "Listing {n}"
+  "chipFallback": "Listing {n}",
+  "addNamed": "Add to compare: {title}"
 }

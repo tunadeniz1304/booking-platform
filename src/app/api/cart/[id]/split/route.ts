@@ -2,17 +2,24 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAuth, requireVerifiedEmail } from "@/lib/auth";
 import { toErrorResponse } from "@/lib/http/errors";
 import { observed } from "@/lib/http/observed";
+import { getConfig } from "@/lib/config/app-config";
 import { createSplitPlan, getSplitPlan } from "@/lib/cart";
 import { splitPlanSchema } from "@/lib/cart/schemas";
 
 type Ctx = { params: Promise<{ id: string }> };
 
-/** Bölünmüş ödeme planı (organizatör: pay durumları + davet linkleri; plan yoksa null). */
+/**
+ * Bölünmüş ödeme planı (organizatör: pay durumları + davet linkleri; plan yoksa null).
+ * `maxShares`: organizatör dahil en fazla pay (SPLIT_PAY_MAX_SHARES); istemci sınırı buradan alır.
+ */
 export const GET = observed("cart.split", async function getHandler(req: NextRequest, ctx: Ctx) {
   try {
     const { id } = await ctx.params;
     const { userId } = await requireAuth(req);
-    return NextResponse.json({ plan: await getSplitPlan(id, userId) });
+    return NextResponse.json({
+      plan: await getSplitPlan(id, userId),
+      maxShares: getConfig().SPLIT_PAY_MAX_SHARES,
+    });
   } catch (error) {
     return toErrorResponse(error, "cart.split.get");
   }

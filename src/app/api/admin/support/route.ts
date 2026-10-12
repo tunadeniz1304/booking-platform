@@ -13,7 +13,11 @@ export const GET = observed("admin.support.list", async function getHandler(req:
       .enum(["OPEN", "IN_PROGRESS", "RESOLVED"])
       .optional()
       .parse(req.nextUrl.searchParams.get("status") ?? undefined);
-    return NextResponse.json({ tickets: await listSupportTickets(status) });
+    const tickets = await listSupportTickets(status);
+    // F667: talebi üstlenen/çözen yönetici (`resolvedById`) arayüze `handlerId` olarak da açılır.
+    return NextResponse.json({
+      tickets: tickets.map((row) => ({ ...row, handlerId: row.resolvedById })),
+    });
   } catch (error) {
     return toErrorResponse(error, "admin.support.list");
   }

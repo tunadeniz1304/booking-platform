@@ -1,8 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { focusRing } from "@/components/ui/ui";
+import { propertyHref } from "@/components/property/PropertyCard";
+import { draftDates, useSearchDraft } from "@/components/search/useSearchDraft";
 import { localizeCountryName, placeCityKey } from "@/lib/i18n/place-display-names";
 import { POPULAR_DESTINATIONS } from "@/lib/popular-destinations";
 import { normalizePlace } from "@/lib/search/normalize-place";
@@ -12,7 +15,8 @@ import { normalizePlace } from "@/lib/search/normalize-place";
  * /api/locations?q= ucu üzerinden çeker (şehir + ülke). Boş sorguda
  * popüler destinasyonlar, tek harflik sorguda bu harfle başlayan popüler
  * destinasyonlar gösterilir (sunucu çağrılmaz). Değer veritabanındaki adla
- * gönderilir; ekranda şehir/ülke adı arayüz diline çevrilir.
+ * gönderilir; ekranda şehir/ülke adı arayüz diline çevrilir. Başlığı sorguyla eşleşen
+ * tesisler ayrı bir "Tesisler" grubunda gösterilir; seçilince doğrudan ilan sayfası açılır.
  *
  * WAI-ARIA "combobox + listbox popup" deseni: odak her zaman input'ta kalır,
  * ok tuşları aria-activedescendant ile öneriler arasında gezinir, Enter
@@ -25,10 +29,23 @@ interface LocationOption {
   country: string;
 }
 
+/** `/api/locations?include=properties` yanıtındaki ilan öğesi (şehir öğelerinde `type` yoktur). */
+interface PropertyOption {
+  type: "property";
+  id: string;
+  title: string;
+  city: string;
+  country: string;
+}
+
+const isPropertyOption = (r: LocationOption | PropertyOption): r is PropertyOption =>
+  "type" in r && r.type === "property";
+
 /** Sunucu yanıtı ve ait olduğu sorgu; `items: null` = istek başarısız. */
 interface RemoteResult {
   query: string;
   items: LocationOption[] | null;
+  properties: PropertyOption[];
 }
 
 /** Sunucu araması bu uzunluktan itibaren yapılır. */
@@ -37,6 +54,7 @@ const MAX_OPTIONS = 8;
 
 const LISTBOX_ID = "destination-listbox";
 const HEADING_ID = "destination-listbox-heading";
+const PROPERTY_HEADING_ID = "destination-listbox-properties";
 const OPTION_ID_PREFIX = "destination-opt-";
 
 interface DestinationAutocompleteProps {
@@ -48,6 +66,8 @@ export default function DestinationAutocomplete({ value, onChange }: Destination
   const t = useTranslations("search");
   const tHome = useTranslations("home");
   const locale = useLocale();
+  const router = useRouter();
+  const draft = useSearchDraft();
   const [remote, setRemote] = useState<RemoteResult | null>(null);
   const [open, setOpen] = useState(false);
   // Klavyeyle vurgulanan öneri (aria-activedescendant); -1 = yok.
@@ -75,19 +95,23 @@ export default function DestinationAutocomplete({ value, onChange }: Destination
     // 250 ms debounce
     const timer = setTimeout(async () => {
       let items: LocationOption[] | null = null;
+      let properties: PropertyOption[] = [];
       try {
-        const res = await fetch(`/api/locations?q=${encodeURIComponent(query)}`, {
-          signal: controller.signal,
-        });
+        const url = `/api/locations?q=${encodeURIComponent(query)}&include=properties`;
+        const res = await fetch(url, { signal: controller.signal });
         if (res.ok) {
           const data: unknown = await res.json();
-          if (Array.isArray(data)) items = data as LocationOption[];
+          if (Array.isArray(data)) {
+            const rows = data as Array<LocationOption | PropertyOption>;
+            items = rows.filter((r) => !isPropertyOption(r));
+            properties = rows.filter(isPropertyOption);
+          }
         }
       } catch (err) {
         if ((err as Error).name === "AbortError") return;
       }
       if (controller.signal.aborted) return;
-      setRemote({ query, items });
+      setRemote({ query, items, properties });
       setActiveIndex(-1);
     }, 250);
 
@@ -141,10 +165,14 @@ export default function DestinationAutocomplete({ value, onChange }: Destination
     }
     items = merged;
   }
+  // Tesis eşleşmeleri şehirlerden sonra, kendi grubunda.
+  const properties: readonly PropertyOption[] =
+    remoteQuery && !pending ? (remote?.properties ?? []) : [];
+  const suggestionCount = items.length + properties.length;
 
   // Öneri yoksa (ya da yüklenemediyse) yazılan metinle arama seçeneği sunulur.
-  const searchOption = query.length > 0 && !pending && items.length === 0;
-  const optionCount = items.length + (searchOption ? 1 : 0);
+  const searchOption = query.length > 0 && !pending && suggestionCount === 0;
+  const optionCount = suggestionCount + (searchOption ? 1 : 0);
   const showList = open && optionCount > 0;
 
   const changeValue = (next: string) => {
@@ -161,6 +189,27 @@ export default function DestinationAutocomplete({ value, onChange }: Destination
     setActiveIndex(-1);
   };
 
+  // Tesis seçilince arama formundaki tarih ve kişi sayısı ilan sayfasına taşınır.
+  const selectProperty = (opt: PropertyOption) => {
+    setOpen(false);
+    setActiveIndex(-1);
+    const dates = draftDates(draft);
+    router.push(
+      propertyHref(
+        opt.id,
+        draft
+          ? {
+              checkIn: dates?.checkIn ?? null,
+              checkOut: dates?.checkOut ?? null,
+              guests: draft.adults + draft.children,
+              adults: draft.adults,
+              children: draft.children,
+            }
+          : undefined
+      )
+    );
+  };
+
   const submitQuery = () => {
     setOpen(false);
     setActiveIndex(-1);
@@ -169,6 +218,7 @@ export default function DestinationAutocomplete({ value, onChange }: Destination
 
   const choose = (idx: number) => {
     if (idx < items.length) selectOption(items[idx]);
+    else if (idx < suggestionCount) selectProperty(properties[idx - items.length]);
     else if (searchOption) submitQuery();
   };
 
@@ -220,7 +270,7 @@ export default function DestinationAutocomplete({ value, onChange }: Destination
 
   const emptyText = failed
     ? t("autocomplete.error")
-    : query.length > 0 && !pending && items.length === 0
+    : query.length > 0 && !pending && suggestionCount === 0
       ? t("autocomplete.noResults")
       : "";
 
@@ -229,7 +279,7 @@ export default function DestinationAutocomplete({ value, onChange }: Destination
     ? ""
     : loading
       ? t("autocomplete.searching")
-      : emptyText || t("autocomplete.count", { count: items.length });
+      : emptyText || t("autocomplete.count", { count: suggestionCount });
 
   const optionClass = (idx: number) =>
     `flex w-full cursor-pointer items-center gap-3 px-4 py-2.5 text-left text-sm text-gray-800 transition hover:bg-blue-50 ${
@@ -288,7 +338,7 @@ export default function DestinationAutocomplete({ value, onChange }: Destination
           onFocus={() => setOpen(true)}
           onKeyDown={handleKeyDown}
           placeholder={t("autocomplete.placeholder")}
-          className="w-full rounded-sm border border-gray-500 bg-white py-2.5 pl-10 pr-10 text-sm text-gray-900 placeholder-gray-500 focus:border-[#003580] focus:outline-none focus:ring-1 focus:ring-[#003580]"
+          className="w-full rounded-sm border border-gray-500 bg-white py-2.5 pl-10 pr-10 text-base text-gray-900 placeholder-gray-500 focus:border-[#003580] focus:outline-none focus:ring-1 focus:ring-[#003580] sm:text-sm"
         />
         {value && (
           <button
@@ -374,15 +424,60 @@ export default function DestinationAutocomplete({ value, onChange }: Destination
                   <span className="text-gray-500">{countryName(opt.country)}</span>
                 </li>
               ))}
+              {properties.length > 0 && (
+                <li role="presentation">
+                  <ul role="group" aria-labelledby={PROPERTY_HEADING_ID}>
+                    <li
+                      role="presentation"
+                      id={PROPERTY_HEADING_ID}
+                      className="px-4 pb-1 pt-3 text-xs font-semibold uppercase tracking-wide text-gray-600"
+                    >
+                      {t("autocomplete.properties")}
+                    </li>
+                    {properties.map((opt, i) => {
+                      const idx = items.length + i;
+                      return (
+                        <li
+                          key={opt.id}
+                          id={`${OPTION_ID_PREFIX}${idx}`}
+                          role="option"
+                          aria-selected={idx === activeIndex}
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => selectProperty(opt)}
+                          onMouseEnter={() => setActiveIndex(idx)}
+                          className={optionClass(idx)}
+                        >
+                          <svg
+                            className="h-4 w-4 shrink-0 text-gray-400"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                            aria-hidden="true"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
+                            />
+                          </svg>
+                          <span className="font-medium">{opt.title}</span>
+                          <span className="text-gray-500">{cityName(opt.city)}</span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </li>
+              )}
               {searchOption && (
                 <li
-                  id={`${OPTION_ID_PREFIX}${items.length}`}
+                  id={`${OPTION_ID_PREFIX}${suggestionCount}`}
                   role="option"
-                  aria-selected={activeIndex === items.length}
+                  aria-selected={activeIndex === suggestionCount}
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={submitQuery}
-                  onMouseEnter={() => setActiveIndex(items.length)}
-                  className={optionClass(items.length)}
+                  onMouseEnter={() => setActiveIndex(suggestionCount)}
+                  className={optionClass(suggestionCount)}
                 >
                   <svg
                     className="h-4 w-4 shrink-0 text-gray-400"

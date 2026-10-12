@@ -33,9 +33,13 @@ function obligationsOf(err: unknown): Obligations | null {
   return d as Obligations;
 }
 
-/** KVKK self-servis (P2-5): veri dışa aktarımı ve hesap silme. */
+/**
+ * KVKK self-servis (P2-5): veri dışa aktarımı, hesap silme ve çerez tercihleri; diğer başvurular
+ * (bilgi, düzeltme, itiraz) destek ekibine yönlendirilir.
+ */
 export default function PrivacyCenter() {
   const t = useTranslations("privacy.center");
+  const tNotice = useTranslations("privacy.notice");
   const router = useRouter();
   const [feedback, setFeedback] = useState<{ error?: string; message?: string }>({});
   const [exporting, setExporting] = useState(false);
@@ -272,6 +276,28 @@ export default function PrivacyCenter() {
             </ul>
           )}
         </div>
+      </Card>
+
+      {/* F418: çerez onayı hesap gizlilik sayfasından da değiştirilebilir. */}
+      <Card title={t("cookiesTitle")} id="cookie-preferences">
+        <p className="text-sm text-gray-800">{t("cookiesBody")}</p>
+        <CookiePreferencesButton />
+      </Card>
+
+      {/* F612: bilgi, düzeltme ve itiraz başvuruları insan destek ekibine gider. */}
+      <Card title={t("requestsTitle")} id="other-requests">
+        <p className="text-sm text-gray-800">
+          {tNotice.rich("rights.requests", {
+            link: (c) => (
+              <Link
+                href="/support"
+                className={`font-semibold text-[#003580] underline ${focusRing}`}
+              >
+                {c}
+              </Link>
+            ),
+          })}
+        </p>
       </Card>
 
       <p className="text-sm text-gray-800">

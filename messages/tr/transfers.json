@@ -47,7 +47,11 @@
     "closeConfirm": "Yine de kapat",
     "tooLateSuffix": "(girişe {hours} saatten az; devredilemez)",
     "askTooHigh": "Satış fiyatı en fazla {max} olabilir.",
-    "keepNote": "Bu adım rezervasyonu hemen devretmez: rezervasyon, alıcı bağlantıyla ödeme yapana kadar sizde kalır. Ödeme onaylanınca satış fiyatı size ödenir."
+    "keepNote": "Bu adım rezervasyonu hemen devretmez: rezervasyon, alıcı bağlantıyla ödeme yapana kadar sizde kalır. Ödeme onaylanınca satış fiyatı size ödenir.",
+    "share": "Paylaş",
+    "shareTitle": "Rezervasyon devri",
+    "shareText": "{property} rezervasyonumu {amount} karşılığında devralmak için bu bağlantıyla ödeme yap.",
+    "shared": "Paylaşıldı."
   },
   "claim": {
     "title": "Rezervasyonu devral",

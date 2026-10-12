@@ -5,7 +5,17 @@ import { useTranslations } from "next-intl";
 import { ApiError, apiFetch } from "@/lib/api-client";
 import { useFormat } from "@/i18n/use-format";
 import { parseAmountToMinor } from "@/lib/ui/amount-input";
-import { Button, Card, Field, Status, focusRing, inputClass, useLoader } from "@/components/ui/ui";
+import {
+  Button,
+  Card,
+  Field,
+  LoadError,
+  Status,
+  focusFirstInvalid,
+  focusRing,
+  inputClass,
+  useLoader,
+} from "@/components/ui/ui";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { ReauthCancelledError, useAccountErrorText, useReauth } from "./ReauthDialog";
 
@@ -110,8 +120,6 @@ export default function AgentMandates() {
   const [copied, setCopied] = useState(false);
   // F617: belge en az bir kez panoya kopyalandı mı (düğme etiketinden bağımsız, kalıcı).
   const [tokenCopied, setTokenCopied] = useState(false);
-  const amountInput = useRef<HTMLInputElement>(null);
-  const currencySelect = useRef<HTMLSelectElement>(null);
   const tokenInput = useRef<HTMLTextAreaElement>(null);
   const submitButton = useRef<HTMLButtonElement>(null);
   const copyTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -229,12 +237,13 @@ export default function AgentMandates() {
     const maxAmountMinor = parseAmountToMinor(String(form.get("amount") ?? ""));
     if (maxAmountMinor === null || maxAmountMinor <= 0) {
       setAmountError(maxAmountMinor === null ? t("amountFormat") : t("amountInvalid"));
-      amountInput.current?.focus();
+      // F427: odak aria-invalid DOM'a yazıldıktan sonra taşınır; etiket ve hata birlikte okunur.
+      focusFirstInvalid(e.currentTarget);
       return;
     }
     setAmountError(null);
     if (currencyError) {
-      currencySelect.current?.focus();
+      focusFirstInvalid(e.currentTarget);
       return;
     }
     // F617: kopyalanmamış belge yeni yetkiyle sessizce ekrandan kalkmasın.
@@ -391,7 +400,6 @@ export default function AgentMandates() {
               error={amountError}
             >
               <input
-                ref={amountInput}
                 id="mandate-amount"
                 name="amount"
                 type="text"
@@ -416,7 +424,6 @@ export default function AgentMandates() {
             error={currencyError}
           >
             <select
-              ref={currencySelect}
               id="mandate-currency"
               name="currency"
               value={currency}
@@ -556,12 +563,18 @@ export default function AgentMandates() {
             </div>
           </div>
         )}
-        <Status error={status.error ?? list.error} message={status.message} />
+        <Status error={status.error} message={status.message} />
         <p role="status" className="text-sm text-gray-700">
           {status.info}
         </p>
 
         <h3 className="mt-4 text-base font-semibold text-gray-900">{t("listTitle")}</h3>
+        {/* F636: liste hatası formun başarı mesajını gizlemez; kendi başlığı altında yenilenir. */}
+        {list.error && (
+          <div className="mt-2">
+            <LoadError error={list.error} onRetry={list.reload} busy={list.loading} />
+          </div>
+        )}
         {list.data === null && !list.error && (
           <p className="text-sm text-gray-700">{tc("loading")}</p>
         )}

@@ -4,16 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { apiFetch } from "@/lib/api-client";
 import { useFormat } from "@/i18n/use-format";
-import {
-  Button,
-  Card,
-  Field,
-  Status,
-  inputClass,
-  useErrorText,
-  useLoader,
-} from "@/components/ui/ui";
+import { Button, Card, Field, Status, inputClass, useLoader } from "@/components/ui/ui";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { isStaleRecord, useAdminErrorText } from "@/components/admin/admin-error-text";
 
 type BlockReason = "PAUSED" | "PROVIDER_DISABLED" | "IDENTITY_UNVERIFIED";
 
@@ -62,9 +55,10 @@ interface RowFeedback {
 export default function PayoutAdmin() {
   const t = useTranslations("payouts");
   const tc = useTranslations("common");
+  const ta = useTranslations("admin");
   const locale = useLocale();
   const f = useFormat();
-  const errorText = useErrorText();
+  const errorText = useAdminErrorText();
   const [retrying, setRetrying] = useState(false);
   const { data, error, reload } = useLoader(
     () =>
@@ -137,13 +131,23 @@ export default function PayoutAdmin() {
       });
       reload();
     } catch (e) {
-      setFeedback({ userId: row.userId, message: null, error: errorText(e) });
+      // Kayıt başka bir yöneticice değiştirilmiş/kaldırılmışsa liste güncel hâliyle yenilenir.
+      const stale = isStaleRecord(e);
+      setFeedback({
+        userId: row.userId,
+        message: null,
+        error: stale ? ta("staleRecord") : errorText(e),
+      });
+      if (stale) reload();
     } finally {
       setBusy(null);
     }
   };
 
   const accounts = data?.accounts ?? [];
+  // Yenilemeden sonra satırı kalmayan hesabın sonucu listenin üstünde gösterilir.
+  const orphanFeedback =
+    feedback && !accounts.some((row) => row.userId === feedback.userId) ? feedback : null;
   const needle = query.trim().toLocaleLowerCase(locale);
   const visible = accounts.filter((row) => {
     // İşlem yapılan satır, sonucu okunana kadar filtreden bağımsız görünür kalır.
@@ -167,8 +171,17 @@ export default function PayoutAdmin() {
           </Button>
         </div>
       )}
+      {orphanFeedback && (
+        <div className="mb-3">
+          <Status error={orphanFeedback.error} message={orphanFeedback.message} />
+        </div>
+      )}
       {!data ? (
-        !error && <p className="text-sm text-gray-600">{t("loading")}</p>
+        !error && (
+          <p role="status" className="text-sm text-gray-600">
+            {t("loading")}
+          </p>
+        )
       ) : accounts.length === 0 ? (
         <p className="text-sm text-gray-700">{t("admin.empty")}</p>
       ) : (
@@ -272,11 +285,22 @@ export default function PayoutAdmin() {
                     <Button
                       variant={row.payoutsPaused ? "primary" : "danger"}
                       busy={busy === row.userId}
+                      aria-describedby={
+                        row.payoutsPaused ? undefined : `payout-pause-hint-${row.userId}`
+                      }
                       onClick={() => toggle(row)}
                     >
                       {row.payoutsPaused ? t("admin.resume") : t("admin.pause")}
                     </Button>
                   </div>
+                  {!row.payoutsPaused && (
+                    <p
+                      id={`payout-pause-hint-${row.userId}`}
+                      className="mt-1 text-xs text-gray-600"
+                    >
+                      {t("admin.pauseHint", { count: row.pendingPayouts })}
+                    </p>
+                  )}
                   {rowFeedback && (
                     <div className="mt-2">
                       <Status error={rowFeedback.error} message={rowFeedback.message} />

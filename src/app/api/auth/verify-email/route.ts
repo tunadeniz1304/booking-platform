@@ -10,8 +10,11 @@ const bodySchema = z.object({ token: z.string().min(20).max(200) });
 export const POST = observed("auth.verify_email", async function postHandler(req: NextRequest) {
   try {
     const { token } = bodySchema.parse(await req.json());
-    await verifyEmail(token);
-    return NextResponse.json({ verified: true });
+    const { alreadyVerified } = await verifyEmail(token);
+    // Önceden doğrulanmış hesapta kullanılmış bağlantı hata değil (F398).
+    return NextResponse.json(
+      alreadyVerified ? { verified: true, alreadyVerified: true } : { verified: true }
+    );
   } catch (error) {
     return toErrorResponse(error, "auth.verify_email");
   }

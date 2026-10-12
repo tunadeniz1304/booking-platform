@@ -231,7 +231,7 @@ export default function ResultsMap({
   }, [selected?.id]);
 
   const fallback = (
-    <p role="alert" className="rounded-lg bg-amber-50 p-4 text-sm text-amber-950">
+    <p role="status" className="rounded-lg bg-amber-50 p-4 text-sm text-amber-950">
       {t("mapView.fallback")}
     </p>
   );

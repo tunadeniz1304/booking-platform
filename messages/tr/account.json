@@ -100,7 +100,9 @@
     "deleteLabel": "Sil: {name}, eklendi {date}",
     "confirmDeleteBody": "Eklendi {date}. Bu passkey ile artık giriş yapamaz ve ödeme doğrulayamazsınız.",
     "confirmDeleteLast": "Bu, hesabınızdaki son passkey. Silerseniz parolasız giriş kapanır ve riskli görünen ödemelerde bankanızın 3D Secure doğrulaması istenir.",
-    "confirmDeleteAction": "Passkey'i sil"
+    "confirmDeleteAction": "Passkey'i sil",
+    "addCancelled": "Passkey eklenmedi: işlem iptal edildi ya da süresi doldu.",
+    "deleteCancelled": "İşlem iptal edildi; passkey silinmedi."
   },
   "reauth": {
     "title": "Bu işlemi onaylayın",
@@ -147,7 +149,8 @@
     "revokeCurrent": "Bu cihazda çıkış yap",
     "revokeLabel": "Oturumu kapat: {device}, son etkinlik {date}",
     "revoking": "Kapatılıyor…",
-    "revokedCount": "{count, plural, =0 {Kapatılacak başka oturum yoktu} one {# oturum kapatıldı} other {# oturum kapatıldı}}"
+    "revokedCount": "{count, plural, =0 {Kapatılacak başka oturum yoktu} one {# oturum kapatıldı} other {# oturum kapatıldı}}",
+    "revokeCancelled": "İşlem iptal edildi; hiçbir oturum kapatılmadı."
   },
   "mandates": {
     "title": "Yapay zekâ ajanı ödeme yetkileri",

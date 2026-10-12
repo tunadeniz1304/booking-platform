@@ -50,6 +50,15 @@ export const SESSION_EXPIRED_EVENT = "session-expired";
 /** Bu sekmede oturum görüldü mü (hiç giriş yapmamış ziyaretçiye "oturum doldu" denmez). */
 let sessionSeen = false;
 
+/**
+ * Sunucunun JS'e açık oturum ipucu (`has_session=1`, sır içermez): yenileme çerezi httpOnly ve
+ * yalnız `/api/auth`'a gittiğinden oturumun varlığı ancak bununla bilinir. İpucu yoksa anonim
+ * ziyaretçi için `/api/user/me` ve `/api/auth/refresh` istekleri (401) hiç gönderilmez (F1145).
+ */
+function hasSessionHint(): boolean {
+  return typeof document === "undefined" || /(?:^|;\s*)has_session=1/.test(document.cookie);
+}
+
 function notifySessionExpired(): void {
   if (!sessionSeen || typeof window === "undefined") return;
   sessionSeen = false;
@@ -153,7 +162,8 @@ export async function apiFetch<T = unknown>(
   try {
     let res = await send();
     if (res.status === 401 && !path.startsWith("/api/auth/")) {
-      if (await refreshSession()) res = await send();
+      // İpucu yoksa yenileme çerezi de yoktur: yenileme denenmez (bu sekmede oturum görülmediyse).
+      if ((hasSessionHint() || sessionSeen) && (await refreshSession())) res = await send();
       else notifySessionExpired();
     }
     if (!res.ok) throw await toApiError(res);
@@ -175,10 +185,13 @@ export interface SessionUser {
 }
 
 /**
- * Oturumdaki kullanıcı; oturum yoksa (401/403/404) `null`. Ağ hatası, zaman aşımı ve 5xx'te
- * fırlatır (F403): çağıran "giriş yapılmamış" ile "oturum bilgisi alınamadı"yı ayırmalı.
+ * Oturumdaki kullanıcı; oturum yoksa (ipucu çerezi yok ya da 401/403/404) `null`. Ağ hatası,
+ * zaman aşımı ve 5xx'te fırlatır (F403): çağıran "giriş yapılmamış" ile "oturum bilgisi
+ * alınamadı"yı ayırmalı.
  */
 export async function fetchCurrentUser(): Promise<SessionUser | null> {
+  // Oturum ipucu yok → anonim ziyaretçi; sunucuya sorulmaz (konsolda 401 gürültüsü olmaz).
+  if (!hasSessionHint()) return null;
   try {
     const user = await apiFetch<SessionUser>("/api/user/me");
     sessionSeen = true;

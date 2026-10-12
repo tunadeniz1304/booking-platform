@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth";
+import { getConfig } from "@/lib/config/app-config";
 import { toErrorResponse } from "@/lib/http/errors";
 import { listHostPartyRisks } from "@/lib/trust/party-risk-service";
 
@@ -7,7 +8,11 @@ import { listHostPartyRisks } from "@/lib/trust/party-risk-service";
 export async function GET(req: NextRequest) {
   try {
     const actor = await requireRole(req, ["HOST", "ADMIN"]);
-    return NextResponse.json({ items: await listHostPartyRisks(actor) });
+    // F852: eşik panelde gösterilir (ek alan; `items` sözleşmesi değişmez).
+    return NextResponse.json({
+      items: await listHostPartyRisks(actor),
+      threshold: getConfig().PARTY_RISK_THRESHOLD,
+    });
   } catch (error) {
     return toErrorResponse(error, "host.trust.party_risk");
   }

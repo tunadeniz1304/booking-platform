@@ -35,6 +35,8 @@ const footerColumns: { key: string; links: { label: string; href: string }[] }[]
 
 export default function Footer() {
   const t = useTranslations("footer");
+  const tCommon = useTranslations("common");
+  const tReport = useTranslations("compliance.report");
   const tCookies = useTranslations("privacy.notice.cookies");
   return (
     <footer className="border-t border-gray-200 bg-gray-50">
@@ -63,7 +65,7 @@ export default function Footer() {
 
         <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-gray-200 pt-8 sm:flex-row">
           <p className="text-xs text-gray-600">
-            © {new Date().getFullYear()} booking-platform · {t("demo")}
+            © {new Date().getFullYear()} {tCommon("brand")} · {t("demo")}
           </p>
           <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 sm:justify-end">
             <Link
@@ -77,6 +79,12 @@ export default function Footer() {
               className={`${linkTarget} text-xs text-gray-600 transition hover:text-[#003580] hover:underline ${focusClass}`}
             >
               {t("trustCenter")}
+            </Link>
+            <Link
+              href="/report"
+              className={`${linkTarget} text-xs text-gray-600 transition hover:text-[#003580] hover:underline ${focusClass}`}
+            >
+              {tReport("title")}
             </Link>
             <Link
               href="/account/privacy"

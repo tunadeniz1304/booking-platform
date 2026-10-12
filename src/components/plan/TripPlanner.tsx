@@ -16,6 +16,7 @@ import {
   inputClass,
   useErrorText,
 } from "@/components/ui/ui";
+import { GuestCountStepper } from "@/components/booking/GuestCountStepper";
 
 interface TripStop {
   city: string;
@@ -87,6 +88,8 @@ type FieldErrors = Partial<Record<FieldName, string>>;
 const STORAGE_KEY = "trip-planner-state";
 const MAX_CITIES = 6;
 const MAX_NIGHTS = 30;
+const MIN_GUESTS = 1;
+const MAX_GUESTS = 10;
 const FIELD_IDS: Record<FieldName, string> = {
   cities: "trip-cities",
   days: "trip-days",
@@ -100,6 +103,8 @@ const ERROR_ICON = "\u26A0\uFE0E";
 const CHIP_CLASS = `inline-flex min-h-[44px] items-center rounded-full border px-3 text-sm disabled:cursor-not-allowed disabled:opacity-60 sm:min-h-[32px] ${focusRing}`;
 const CHIP_ON = "border-[#003580] bg-blue-50 font-semibold text-[#003580]";
 const CHIP_OFF = "border-gray-500 bg-white text-gray-900";
+/** `Field` etiketinin görünümü. */
+const STEPPER_LABEL = "block text-sm font-medium text-gray-800";
 
 function loadState(): SavedState | null {
   if (typeof window === "undefined") return null;
@@ -124,6 +129,12 @@ function addIsoDays(iso: string, n: number): string {
 }
 
 const normCity = (c: string) => c.trim().toLocaleLowerCase("tr-TR");
+
+/** Metin alanındaki değer `min`–`max` aralığında bir tam sayı mı. */
+function inRange(value: string, min: number, max: number): boolean {
+  const n = Number(value);
+  return value.trim() !== "" && Number.isInteger(n) && n >= min && n <= max;
+}
 
 function toRequest(v: Pick<SavedState, "cities" | "days" | "guests" | "startDate">): PlanRequest {
   return {
@@ -264,7 +275,22 @@ export default function TripPlanner() {
       const bad = list.find((c) => c.length < 2 || c.length > 60);
       if (bad) errors.cities = t("errors.cityLength", { city: bad });
     }
+    // F725: sayı alanları metin girişi olduğundan aralık burada denetlenir.
+    if (!inRange(days, minNights, MAX_NIGHTS)) errors.days = t("errors.invalid.days");
+    if (!inRange(guests, MIN_GUESTS, MAX_GUESTS)) errors.guests = t("errors.invalid.guests");
     return errors;
+  }
+
+  /** Hata metni, `Field` ile aynı biçimde (simge + ekran okuyucu için "Hata:" öneki). */
+  function stepperError(message: string | undefined) {
+    if (!message) return undefined;
+    return (
+      <>
+        <span aria-hidden="true">{ERROR_ICON} </span>
+        <span className="sr-only">{tc("errorPrefix")} </span>
+        {message}
+      </>
+    );
   }
 
   function toggleCity(city: string) {
@@ -460,32 +486,39 @@ export default function TripPlanner() {
               </div>
             )}
           </div>
-          <Field label={t("form.days")} id="trip-days" hint={daysHint} error={fieldErrors.days}>
-            <input
+          {/* F725: 44px −/+ düğmeli sayı alanları (dokunmatikte küçük döndürme okları yerine). */}
+          <div>
+            <GuestCountStepper
               id="trip-days"
-              type="number"
-              inputMode="numeric"
+              label={<span className={STEPPER_LABEL}>{t("form.days")}</span>}
+              value={days}
               min={minNights}
               max={MAX_NIGHTS}
-              className={inputClass}
-              value={days}
-              required
-              onChange={(e) => setDays(e.target.value)}
+              decreaseLabel={t("form.decreaseDays")}
+              increaseLabel={t("form.increaseDays")}
+              valueText={(n) => `${t("form.days")}: ${n}`}
+              error={stepperError(fieldErrors.days)}
+              describedBy="trip-days-hint"
+              onChange={setDays}
+              onStep={(n) => setDays(String(n))}
             />
-          </Field>
-          <Field label={t("form.guests")} id="trip-guests" error={fieldErrors.guests}>
-            <input
-              id="trip-guests"
-              type="number"
-              inputMode="numeric"
-              min={1}
-              max={10}
-              className={inputClass}
-              value={guests}
-              required
-              onChange={(e) => setGuests(e.target.value)}
-            />
-          </Field>
+            <p id="trip-days-hint" className="mt-1 text-xs text-gray-600">
+              {daysHint}
+            </p>
+          </div>
+          <GuestCountStepper
+            id="trip-guests"
+            label={<span className={STEPPER_LABEL}>{t("form.guests")}</span>}
+            value={guests}
+            min={MIN_GUESTS}
+            max={MAX_GUESTS}
+            decreaseLabel={t("form.decreaseGuests")}
+            increaseLabel={t("form.increaseGuests")}
+            valueText={(n) => `${t("form.guests")}: ${n}`}
+            error={stepperError(fieldErrors.guests)}
+            onChange={setGuests}
+            onStep={(n) => setGuests(String(n))}
+          />
           <Field
             label={t("form.startDate")}
             id="trip-start"

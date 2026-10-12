@@ -11,14 +11,18 @@ import { COMPARE_MAX, useCompareSelection } from "./useCompareSelection";
  * CompareBar'daki canlı bölgeden duyurulur. Sınır dolunca düğme odaklanabilir kalır
  * (aria-disabled) ve nedeni görünür bir açıklamayla verilir.
  * F1209: bağlantıdan ayırt edilsin diye onay kutusu görünümlü, çerçeveli bir düğmedir.
+ * F698/F972: `title` verilince erişilebilir ad görünen etiketle başlar ve ilan adını içerir.
  */
 export default function CompareToggle({
   propertyId,
   className = "",
+  title,
 }: {
   propertyId: string;
   /** Ek yerleşim sınıfları; ör. kartı kaplayan bağlantının üstünde kalmak için `relative z-[2]`. */
   className?: string;
+  /** İlan adı; listelerde aynı etiketli düğmeleri ayırt etmek için erişilebilir ada eklenir. */
+  title?: string;
 }) {
   const t = useTranslations("compare");
   const hintId = useId();
@@ -31,6 +35,9 @@ export default function CompareToggle({
         type="button"
         aria-disabled={blocked || undefined}
         aria-describedby={blocked ? hintId : undefined}
+        aria-label={
+          title ? (selected ? t("removeNamed", { title }) : t("addNamed", { title })) : undefined
+        }
         onClick={() => {
           if (blocked) return;
           toggle(propertyId);

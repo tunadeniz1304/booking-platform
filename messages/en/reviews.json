@@ -56,7 +56,7 @@
   },
   "highlights": {
     "title": "Highlighted themes",
-    "basedOn": "Clustered from {count} reviews; every claim is a verbatim quote from a review.",
+    "basedOn": "Compiled from {count, plural, one {# review} other {# reviews}}; every claim is a verbatim quote from a review.",
     "mentions": "Mentioned in {count, plural, one {# review} other {# reviews}}",
     "quoteLabel": "Show quote in review",
     "sentiment": {

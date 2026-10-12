@@ -452,7 +452,8 @@ function SuggestionRow({
         </div>
       </details>
       <p className="text-sm text-gray-800">
-        <span lang={serverLang}>{s.explanation}</span> <LlmBadge mode={s.llmMode} />
+        <span lang={serverLang}>{s.explanation}</span>{" "}
+        <LlmBadge mode={s.llmMode} audience="staff" />
       </p>
       <p id={noteId} className="text-xs text-gray-700">
         {t("suggestions.acceptNote")}

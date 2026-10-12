@@ -57,18 +57,27 @@ export interface NoticeEventPayload {
   noticeId: string;
 }
 
+export type NoticeRateLimitScope = "notice" | "appeal";
+
+/** Limit sayacının anahtarı; bildirim rotası Retry-After için aynı anahtarın TTL'ini okur. */
+export function noticeRateLimitKey(client: string, scope: NoticeRateLimitScope = "notice"): string {
+  return `dsa:${scope}:${client}`;
+}
+
 /**
- * İstemci başına sabit pencereli limit (`DSA_NOTICE_MAX_PER_WINDOW`). Redis erişilemezse
+ * İstemci başına sabit pencereli limit (`DSA_NOTICE_MAX_PER_WINDOW`). Bildirim ve itiraz ayrı
+ * sayılır: bildirim gönderen biri kendi itirazından engellenmez. Redis erişilemezse
  * fail-open: yasal bildirim kanalı kapanmamalı (proxy genel limiti yine geçerli).
  */
 export async function assertNoticeRateLimit(
   redis: Pick<RedisClient, "incrWithTtl">,
-  client: string
+  client: string,
+  scope: NoticeRateLimitScope = "notice"
 ): Promise<void> {
   const { DSA_NOTICE_MAX_PER_WINDOW, DSA_NOTICE_WINDOW_SECONDS } = getConfig();
   let count: number;
   try {
-    count = await redis.incrWithTtl(`dsa:notice:${client}`, DSA_NOTICE_WINDOW_SECONDS);
+    count = await redis.incrWithTtl(noticeRateLimitKey(client, scope), DSA_NOTICE_WINDOW_SECONDS);
   } catch (error) {
     logger.warn(errorFields(error), "dsa notice rate limit unavailable; allowing");
     return;
@@ -90,7 +99,12 @@ export async function submitNotice(input: NoticeInput): Promise<Notice> {
         where: { id: input.propertyId },
         select: { id: true },
       });
-      if (!exists) throw new ValidationError("Bildirilen ilan bulunamadı");
+      if (!exists) {
+        throw new ValidationError("Bildirilen ilan bulunamadı", {
+          formErrors: [],
+          fieldErrors: { propertyId: ["NOT_FOUND"] },
+        });
+      }
     }
     const row = await tx.notice.create({
       data: {
@@ -231,11 +245,28 @@ export async function decideNotice(
   return notice;
 }
 
+/**
+ * Yönetim listesi. Bekleyenler en eskiden sıralanır: 200 sınırı en uzun bekleyeni düşürmez.
+ * Notice'in Prisma ilişkisi yok; ilan başlıkları ayrı sorguyla eklenir.
+ */
 export async function listNotices(opts: { status?: "RECEIVED" | "DECIDED" } = {}) {
-  return prisma.notice.findMany({
+  const rows = await prisma.notice.findMany({
     where: opts.status ? { status: opts.status } : undefined,
-    orderBy: { createdAt: "desc" },
+    orderBy: { createdAt: opts.status === "RECEIVED" ? "asc" : "desc" },
     take: 200,
+  });
+  const ids = [...new Set(rows.flatMap((r) => (r.propertyId ? [r.propertyId] : [])))];
+  const properties =
+    ids.length === 0
+      ? []
+      : await prisma.property.findMany({
+          where: { id: { in: ids } },
+          select: { id: true, title: true },
+        });
+  const titles = new Map(properties.map((p) => [p.id, p.title]));
+  return rows.map((r) => {
+    const title = r.propertyId ? titles.get(r.propertyId) : undefined;
+    return { ...r, property: title === undefined ? null : { title } };
   });
 }
 

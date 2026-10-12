@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { ApiError, apiFetch } from "@/lib/api-client";
 import { useFormat } from "@/i18n/use-format";
-import { Button, Card, Field, focusRing, inputClass } from "@/components/ui/ui";
+import { Button, Card, Field, LoadError, focusRing, inputClass } from "@/components/ui/ui";
 import { useAccountErrorText } from "./ReauthDialog";
 
 type KycStatus = "NOT_STARTED" | "PENDING" | "VERIFIED" | "REQUIRES_INPUT" | "FAILED";
@@ -29,14 +29,25 @@ const STATUS_STYLE: Record<KycStatus, string> = {
   FAILED: "bg-red-50 text-red-800",
 };
 
-/** "İnceleniyor" durumunda yoklama: 15 sn aralıkla en fazla 5 dk. */
+/** "İnceleniyor" durumunda yoklama: sekme görünürken 15 sn aralıkla, en fazla 30 dk. */
 const POLL_INTERVAL_MS = 15_000;
-const POLL_MAX_TRIES = 20;
+const POLL_MAX_TRIES = 120;
 
 const fetchStatus = () => apiFetch<IdentityStatus>("/api/account/identity");
 
 /** Sağlayıcı dönüş adresi `/account?kyc=return` (kyc.ts). */
 const isKycReturn = () => new URLSearchParams(window.location.search).get("kyc") === "return";
+
+/** Kartın başlığına odak taşır (`scroll`: başlığı görünümün üstüne getirir). */
+function focusCardHeading(root: HTMLElement | null, scroll: boolean) {
+  window.requestAnimationFrame(() => {
+    const heading = root?.querySelector<HTMLElement>("h2");
+    if (!heading) return;
+    heading.tabIndex = -1;
+    if (scroll) heading.scrollIntoView({ block: "start" });
+    heading.focus({ preventScroll: scroll });
+  });
+}
 
 type ResendState = "idle" | "sending" | "sent" | "verified" | "failed" | "login";
 
@@ -96,22 +107,33 @@ export default function IdentityVerification({ role }: { role?: string }) {
   const [busy, setBusy] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // F636: durum yüklenemedi; "Tekrar dene" ile yeniden istenir.
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [reloading, setReloading] = useState(false);
+  // F744: durumun en son sunucudan alındığı an ("Son güncelleme").
+  const [checkedAt, setCheckedAt] = useState<Date | null>(null);
   const [emailBlocked, setEmailBlocked] = useState(false);
   const [info, setInfo] = useState<string | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+
+  const applyStatus = useCallback((fresh: IdentityStatus) => {
+    setData(fresh);
+    setCheckedAt(new Date());
+    setLoadFailed(false);
+  }, []);
 
   const load = useCallback(
     () =>
       fetchStatus()
         .then((fresh) => {
-          setData(fresh);
+          applyStatus(fresh);
           return fresh;
         })
         .catch(() => {
-          setError(t("loadFailed"));
+          setLoadFailed(true);
           return null;
         }),
-    [t]
+    [applyStatus]
   );
 
   useEffect(() => {
@@ -119,7 +141,7 @@ export default function IdentityVerification({ role }: { role?: string }) {
     fetchStatus()
       .then((d) => {
         if (cancelled) return;
-        setData(d);
+        applyStatus(d);
         // F621: sağlayıcıdan dönüşte kartı öne getir ve sonucu duyur.
         if (!isKycReturn()) return;
         setInfo(
@@ -127,40 +149,57 @@ export default function IdentityVerification({ role }: { role?: string }) {
             ? t("returnPending")
             : t("resultAnnounce", { status: t(`status.${d.status}`) })
         );
-        window.requestAnimationFrame(() => {
-          const heading = rootRef.current?.querySelector<HTMLElement>("h2");
-          if (!heading) return;
-          heading.tabIndex = -1;
-          heading.scrollIntoView({ block: "start" });
-          heading.focus({ preventScroll: true });
-        });
+        focusCardHeading(rootRef.current, true);
       })
       .catch(() => {
-        if (!cancelled) setError(t("loadFailed"));
+        if (!cancelled) setLoadFailed(true);
       });
     return () => {
       cancelled = true;
     };
-  }, [t]);
+  }, [t, applyStatus]);
 
   // "İnceleniyor": sonuç webhook'la gelir; sayfayı elle yenilemeden kart güncellenir.
+  // F744: yalnız sekme görünürken yoklanır; sekmeye dönülünce hemen bakılır.
   const pending = data?.status === "PENDING";
   useEffect(() => {
     if (!pending) return;
+    let active = true;
     let tries = 0;
-    const timer = window.setInterval(() => {
+    let inFlight = false;
+    const poll = () => {
+      if (document.visibilityState !== "visible" || inFlight || tries >= POLL_MAX_TRIES) return;
       tries += 1;
-      if (tries >= POLL_MAX_TRIES) window.clearInterval(timer);
+      inFlight = true;
       fetchStatus()
         .then((fresh) => {
+          if (!active) return;
+          applyStatus(fresh);
           if (fresh.status === "PENDING") return;
-          setData(fresh);
           setInfo(t("resultAnnounce", { status: t(`status.${fresh.status}`) }));
         })
-        .catch(() => {});
-    }, POLL_INTERVAL_MS);
-    return () => window.clearInterval(timer);
-  }, [pending, t]);
+        .catch(() => {})
+        .finally(() => {
+          inFlight = false;
+        });
+    };
+    const timer = window.setInterval(poll, POLL_INTERVAL_MS);
+    document.addEventListener("visibilitychange", poll);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", poll);
+    };
+  }, [pending, t, applyStatus]);
+
+  async function retryLoad() {
+    if (reloading) return;
+    setReloading(true);
+    const fresh = await load();
+    setReloading(false);
+    // Düğme kalkar; odak kaybolmasın diye kart başlığına taşınır.
+    if (fresh) focusCardHeading(rootRef.current, false);
+  }
 
   async function start(e: FormEvent) {
     e.preventDefault();
@@ -216,7 +255,12 @@ export default function IdentityVerification({ role }: { role?: string }) {
     <div ref={rootRef} className="mt-8">
       <Card id="kyc" title={t("title")}>
         <p className="text-sm text-gray-600">{t("intro")}</p>
-        {!data && !error && <p className="mt-3 text-sm text-gray-500">{t("loading")}</p>}
+        {!data && !loadFailed && <p className="mt-3 text-sm text-gray-500">{t("loading")}</p>}
+        {loadFailed && (
+          <div className="mt-3">
+            <LoadError error={t("loadFailed")} onRetry={() => void retryLoad()} busy={reloading} />
+          </div>
+        )}
         {error && (
           <p role="alert" className="mt-3 text-sm text-red-700">
             {error}
@@ -242,7 +286,7 @@ export default function IdentityVerification({ role }: { role?: string }) {
             </p>
             {data.verifiedAt && (
               <p className="text-gray-700">
-                {t("verifiedAt", { date: fmt.date(data.verifiedAt) })}
+                {t("verifiedAt", { date: fmt.date(data.verifiedAt, "medium") })}
               </p>
             )}
             {data.lastError && (
@@ -273,9 +317,16 @@ export default function IdentityVerification({ role }: { role?: string }) {
                 {data.provider === "stripe" && (
                   <p className="text-gray-700">{t("pendingRestart")}</p>
                 )}
-                <Button variant="secondary" busy={refreshing} onClick={refresh}>
-                  {refreshing ? t("refreshing") : t("refresh")}
-                </Button>
+                <div className="flex flex-wrap items-center gap-3">
+                  <Button variant="secondary" busy={refreshing} onClick={refresh}>
+                    {refreshing ? t("refreshing") : t("refresh")}
+                  </Button>
+                  {checkedAt && (
+                    <p className="text-xs text-gray-600">
+                      {t("lastUpdated", { time: fmt.time(checkedAt) })}
+                    </p>
+                  )}
+                </div>
               </div>
             )}
             {canStart && data.provider === "mock" && (

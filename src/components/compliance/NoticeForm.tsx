@@ -15,6 +15,7 @@ import {
   inputClass,
   useSession,
 } from "@/components/ui/ui";
+import { AppealCharLimitStatus } from "@/components/compliance/AppealCharLimit";
 
 const CATEGORIES = [
   "ILLEGAL_LISTING",
@@ -44,6 +45,17 @@ const ERROR_ICON = "⚠︎";
 const LINK_CLASS = `font-semibold text-[#003580] underline ${focusRing}`;
 
 const REQUEST_TIMEOUT_MS = 20_000;
+const EXPLANATION_MAX = 5000;
+
+type RetryAfterBody = { details?: { retryAfterSeconds?: unknown } } | null;
+
+/** 429 yanıtındaki bekleme süresi (sn): önce `details.retryAfterSeconds`, sonra `Retry-After`. */
+async function retryAfterSeconds(res: Response): Promise<number | null> {
+  const body = (await res.json().catch(() => null)) as RetryAfterBody;
+  const fromBody = body?.details?.retryAfterSeconds;
+  const seconds = typeof fromBody === "number" ? fromBody : Number(res.headers.get("Retry-After"));
+  return Number.isFinite(seconds) && seconds > 0 ? seconds : null;
+}
 
 /** Yavaş ağda istek süresiz beklemez; zaman aşımı ağ hatasından ayrı döner (metin korunur). */
 async function postNotice(body: unknown): Promise<Response | "timeout" | null> {
@@ -109,9 +121,12 @@ export default function NoticeForm({
 }) {
   const t = useTranslations("compliance.report");
   const tc = useTranslations("common");
+  const tl = useTranslations("compliance.admin.fieldLimits");
   const locale = useLocale();
   const [state, setState] = useState<"idle" | "sending" | "sent">("idle");
   const [error, setError] = useState<string | null>(null);
+  const [rateLimited, setRateLimited] = useState(false);
+  const [explanationLength, setExplanationLength] = useState(0);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [reference, setReference] = useState<string | null>(null);
   const [sentEmail, setSentEmail] = useState("");
@@ -127,6 +142,7 @@ export default function NoticeForm({
     ? `${sessionUser.firstName} ${sessionUser.lastName}`.trim() || undefined
     : undefined;
   const doneRef = useRef<HTMLHeadingElement>(null);
+  const errorRef = useRef<HTMLDivElement>(null);
   const focusNext = useRef<string | null>(null);
   // Sunucu ve ilk istemci render'ı aynı (boş) origin'i görür: hydration uyumsuzluğu olmaz.
   const origin = useSyncExternalStore(subscribeNever, clientOrigin, serverOrigin);
@@ -138,6 +154,11 @@ export default function NoticeForm({
     doneRef.current?.scrollIntoView({ block: "start" });
     doneRef.current?.focus();
   }, [state]);
+
+  // Gönder düğmesinin altındaki hata (ve destek bağlantısı) ekran dışında kalmasın.
+  useEffect(() => {
+    if (error) errorRef.current?.scrollIntoView?.({ block: "nearest" });
+  }, [error]);
 
   // Odak, hedef alan (ör. yeni açılan URL alanı) DOM'a yazıldıktan sonra taşınır.
   useEffect(() => {
@@ -173,6 +194,8 @@ export default function NoticeForm({
     unlinkProperty();
     setFieldErrors({});
     setError(null);
+    setRateLimited(false);
+    setExplanationLength(0);
     setReference(null);
     setCopyState("idle");
     setState("idle");
@@ -205,6 +228,7 @@ export default function NoticeForm({
     for (const name of FIELDS) {
       if (!VALIDATORS[name](values[name])) clientErrors[name] = t(`errors.${name}`);
     }
+    setRateLimited(false);
     if (Object.keys(clientErrors).length > 0) {
       setError(null);
       showFieldErrors(clientErrors);
@@ -257,9 +281,15 @@ export default function NoticeForm({
         return;
       }
     }
-    setError(
-      res?.status === 429 ? t("rateLimited") : res?.status === 400 ? t("invalid") : t("error")
-    );
+    if (res?.status === 429) {
+      const seconds = await retryAfterSeconds(res);
+      setRateLimited(true);
+      setError(
+        seconds ? t("rateLimitedRetry", { minutes: Math.ceil(seconds / 60) }) : t("rateLimited")
+      );
+      return;
+    }
+    setError(res?.status === 400 ? t("invalid") : t("error"));
   };
 
   const invalidFields = FIELDS.filter((name) => fieldErrors[name]);
@@ -410,6 +440,7 @@ export default function NoticeForm({
           <Field
             id="notice-explanation"
             label={t("explanation")}
+            hint={tl("count", { count: explanationLength, max: EXPLANATION_MAX })}
             error={fieldErrors.explanation}
             required
           >
@@ -417,11 +448,13 @@ export default function NoticeForm({
               id="notice-explanation"
               name="explanation"
               minLength={20}
-              maxLength={5000}
+              maxLength={EXPLANATION_MAX}
               rows={5}
+              onChange={(e) => setExplanationLength(e.currentTarget.value.length)}
               className={inputClass}
             />
           </Field>
+          <AppealCharLimitStatus length={explanationLength} max={EXPLANATION_MAX} />
           <Field
             id="notice-reporterName"
             label={t("reporterName")}
@@ -488,7 +521,20 @@ export default function NoticeForm({
           <Button type="submit" busy={state === "sending"}>
             {state === "sending" ? t("sending") : t("submit")}
           </Button>
-          <Status error={error} />
+          <div ref={errorRef} className="scroll-mb-24">
+            <Status error={error} />
+            {error && rateLimited && (
+              <p className="text-sm text-gray-800">
+                {t.rich("rateLimitedAlt", {
+                  link: (c) => (
+                    <Link href="/support" className={LINK_CLASS}>
+                      {c}
+                    </Link>
+                  ),
+                })}
+              </p>
+            )}
+          </div>
         </form>
       )}
     </Card>

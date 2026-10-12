@@ -143,6 +143,7 @@ export default function AccountPage() {
   const tPrivacy = useTranslations("privacy");
   const tNav = useTranslations("nav");
   const tProperty = useTranslations("property");
+  const tPayment = useTranslations("payment");
   const fmt = useFormat();
   const router = useRouter();
   const errorText = useErrorText();
@@ -427,6 +428,8 @@ export default function AccountPage() {
         prev.map((b) => (b.id === booking.id ? { ...b, status: "CANCELLED" } : b))
       );
       const refund = res?.refund;
+      // Ödeme öncesi durumlarda (PENDING/HELD) tahsilat yoktur: "iade yok" yanıltıcı olur.
+      const notCharged = booking.status === "PENDING" || booking.status === "HELD";
       setNotice({
         key: `booking-${booking.id}`,
         kind: "info",
@@ -436,9 +439,11 @@ export default function AccountPage() {
                 amount: formatPrice(refund.refundMinor, refund.currency),
                 percent: String(refund.refundPercent),
               })
-            : refund
-              ? t("bookings.cancelDone.noRefund")
-              : t("bookings.cancelDone.plain"),
+            : notCharged
+              ? tPayment("cancel.cancelledNoCharge")
+              : refund
+                ? t("bookings.cancelDone.noRefund")
+                : t("bookings.cancelDone.plain"),
       });
     } catch (err) {
       pendingFocusId.current = null;
@@ -582,7 +587,7 @@ export default function AccountPage() {
             </li>
             <li>
               <Link href="/trips" className={sectionNavLinkClass}>
-                {tPwa("accountLink")}
+                {tNav("trips")}
               </Link>
             </li>
             <li>
@@ -693,9 +698,18 @@ export default function AccountPage() {
             {/* Rezervasyonlar */}
             {showBookings && (
               <section id="account-bookings" aria-labelledby="account-bookings-title">
-                <h2 id="account-bookings-title" className="text-2xl font-semibold text-gray-900">
+                <h2 id="account-bookings-title" className="text-xl font-semibold text-gray-900">
                   {t("bookings.title")}
                 </h2>
+                <p className="mt-1 text-sm text-gray-600">
+                  {tPwa.rich("accountQrHint", {
+                    link: (chunks) => (
+                      <Link href="/trips" className={`font-semibold underline ${focusRing}`}>
+                        {chunks}
+                      </Link>
+                    ),
+                  })}
+                </p>
                 <div className="mt-4">
                   {loading ? (
                     renderCardSkeletons()
@@ -846,7 +860,7 @@ export default function AccountPage() {
             {/* Favoriler */}
             {showFavorites && (
               <section id="account-favorites" aria-labelledby="account-favorites-title">
-                <h2 id="account-favorites-title" className="text-2xl font-semibold text-gray-900">
+                <h2 id="account-favorites-title" className="text-xl font-semibold text-gray-900">
                   {t("favorites.title")}
                 </h2>
                 {/* Kaldırma/geri alma sonucu: kalıcı canlı bölge + "Geri al" (süre sınırı yok). */}

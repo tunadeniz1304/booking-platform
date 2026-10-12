@@ -101,6 +101,7 @@ export default function SmartFilter({
   onClear,
   priceCurrency,
   pricesAreTotal,
+  errorId,
 }: {
   filters: SmartFilters | null;
   llmMode: string | null;
@@ -112,6 +113,8 @@ export default function SmartFilter({
   priceCurrency?: string | null;
   /** Fiyat süzgeci konaklama toplamına mı (tarih var) gecelik fiyata mı uygulanıyor. */
   pricesAreTotal?: boolean;
+  /** Sayfanın gösterdiği yorumlama hatasının id'si; verilirse giriş geçersiz işaretlenir (F971). */
+  errorId?: string;
 }) {
   const t = useTranslations("search");
   const tProperty = useTranslations("property");
@@ -127,10 +130,8 @@ export default function SmartFilter({
         date: (iso) => fmt.date(iso, "medium"),
         price: (value) => {
           const amount = priceCurrency ? fmt.decimal(value, priceCurrency) : fmt.number(value);
-          if (pricesAreTotal === undefined) return amount;
-          return pricesAreTotal
-            ? t("mapPrice.total", { price: amount })
-            : t("mapPrice.perNight", { price: amount });
+          // Toplam fiyatta gece sayısı burada bilinmediğinden yalnız tutar gösterilir.
+          return pricesAreTotal === false ? t("mapPrice.perNight", { price: amount }) : amount;
         },
         amenity: (name) => {
           const key = amenityNameKey(name);
@@ -139,6 +140,8 @@ export default function SmartFilter({
       })
     : [];
   const removedAll = chips.length === 0 && filters !== null && filters === userFilters;
+  const describedBy =
+    "smart-filter-hint" + (tooShort ? " smart-filter-short" : "") + (errorId ? ` ${errorId}` : "");
   const inputRef = useRef<HTMLInputElement>(null);
   const chipListRef = useRef<HTMLUListElement>(null);
   // Kaldırılan çipin sırası: filtreler güncellenince odak bir sonraki çipe (yoksa
@@ -211,10 +214,8 @@ export default function SmartFilter({
             required
             minLength={SMART_MIN_LENGTH}
             maxLength={300}
-            aria-invalid={tooShort || undefined}
-            aria-describedby={
-              tooShort ? "smart-filter-hint smart-filter-short" : "smart-filter-hint"
-            }
+            aria-invalid={tooShort || errorId ? true : undefined}
+            aria-describedby={describedBy}
             placeholder={t("smart.placeholder")}
             onChange={(e) => {
               setText(e.target.value);

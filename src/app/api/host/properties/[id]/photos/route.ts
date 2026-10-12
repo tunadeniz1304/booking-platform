@@ -15,7 +15,16 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       listPropertyPhotos(actor, id),
       visualSearchStatus(),
     ]);
-    return NextResponse.json({ photos, visual });
+    const cfg = getConfig();
+    // F445: kısıtlar yüklemeden önce gösterilir (ek alan; mevcut sözleşme değişmez).
+    return NextResponse.json({
+      photos,
+      visual,
+      limits: {
+        maxBytes: cfg.VISION_MAX_UPLOAD_BYTES,
+        maxPhotos: cfg.VISION_MAX_PHOTOS_PER_PROPERTY,
+      },
+    });
   } catch (error) {
     return toErrorResponse(error, "host.photos.list");
   }

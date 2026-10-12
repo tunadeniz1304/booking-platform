@@ -36,7 +36,12 @@
     "counter": "{count}/{max} karakter",
     "nearLimit": "Mesajlar en fazla {max} karakter olabilir; sınıra yaklaştınız.",
     "truncated": "Yapıştırdığınız metin sığmadı; mesajınız {max} karaktere kısaltıldı.",
-    "prefillAccessibility": "{hasProperty, select, yes {“{property}” tesisinin erişilebilirliği hakkında sorum var: } other {Bir tesisin erişilebilirliği hakkında sorum var: }}"
+    "prefillAccessibility": "{hasProperty, select, yes {“{property}” tesisinin erişilebilirliği hakkında sorum var: } other {Bir tesisin erişilebilirliği hakkında sorum var: }}",
+    "copyRef": "Kopyala",
+    "copyRefLabel": "Talep numarasını kopyala ({id})",
+    "copied": "Kopyalandı",
+    "atLimit": "{max} karakter sınırına ulaştınız; daha fazla yazılamaz.",
+    "agentOff": "Asistan şu an kapalı; “{button}” düğmesiyle ekibimize yazabilirsiniz."
   },
   "admin": {
     "link": "Destek kuyruğu",
@@ -79,9 +84,44 @@
     "groupTitle": "Aynı rezervasyon için {count} talep",
     "groupResolveAll": "Hepsini çözüldü olarak işaretle",
     "assignedToYou": "Size atandı",
-    "handler": "İnceleyen: {id}"
+    "handler": "İnceleyen: {id}",
+    "updatedTo": "Talep “{status}” durumuna alındı; “{filter}” filtresinde listelenir.",
+    "bulkUpdatedTo": "{count} talep “{status}” durumuna alındı; “{filter}” filtresinde listelenir.",
+    "language": "Dil: {locale}",
+    "intent": {
+      "booking_status": "Rezervasyon durumu sorusu",
+      "cancellation_quote": "İptal ücreti sorusu",
+      "property_policy": "Tesis kuralları sorusu",
+      "refund_request": "İade talebi",
+      "legal_or_complaint": "Hukuki konu/şikâyet",
+      "human_request": "İnsan temsilci isteği",
+      "prompt_injection": "Asistan talimatlarını değiştirme girişimi",
+      "greeting": "Selamlaşma",
+      "unknown": "Konu belirlenemedi"
+    }
   },
   "agent": {
     "localTime": "tesis saatiyle"
+  },
+  "help": {
+    "title": "Sık sorulan sorular",
+    "cancellation": {
+      "question": "Rezervasyonumu nasıl iptal ederim?",
+      "answer": "Rezervasyonunuzu <link>Hesabım › Rezervasyonlarım</link> bölümünden iptal edebilirsiniz. Ne kadar iade alacağınız ilanın iptal politikasına ve ne zaman iptal ettiğinize bağlıdır; koşullar ilan sayfasında ve ödemeden önce gösterilir."
+    },
+    "refund": {
+      "question": "İadem ne zaman hesabıma geçer?",
+      "answer": "Kartınıza yapılan iadeler genellikle 5–10 iş günü içinde görünür. Konaklamanızla ilgili bir sorun için iade talebini rezervasyon sayfasından açabilir, durumunu <link>Çözüm merkezi</link> sayfasından izleyebilirsiniz."
+    },
+    "payment": {
+      "question": "Ödemem güvende mi?",
+      "answer": "Kart numaranız platformda saklanmaz; ödeme, ödeme sağlayıcısı üzerinden işlenir ve yalnızca belirteç (token) ile işlem referansı tutulur. Ayrıntılar <link>Güven merkezi</link> sayfasında."
+    },
+    "accessibility": {
+      "question": "Erişilebilirlik ihtiyacıma uygun bir konaklamayı nasıl bulurum?",
+      "answer": "<link>Arama</link> sayfasındaki erişilebilirlik filtrelerini kullanın. İlan sayfasında yalnız ekibimizin kanıtla doğruladığı özellikler gösterilir; bilgi olmaması özelliğin olmadığı anlamına gelmez. Özel bir ihtiyacınız varsa rezervasyondan önce bu sayfadaki asistana sorun ya da insan destek ekibine bağlanın (giriş gerekir)."
+    },
+    "policiesTitle": "Politikalar ve bildirimler",
+    "report": "Yasa dışı içerik veya dolandırıcılık bildir"
   }
 }

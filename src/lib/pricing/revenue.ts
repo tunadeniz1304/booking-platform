@@ -473,14 +473,17 @@ function alreadyDecided(): ConflictError {
 export async function acceptSuggestion(actor: AccessClaims, id: string): Promise<SuggestionView> {
   const { suggestion, propertyId } = await loadOwnedSuggestion(actor, id);
   const price = minorToDb(suggestion.suggestedMinor);
+  const date = fromDate(suggestion.date);
   await prisma.$transaction(async (tx) => {
     const res = await tx.priceSuggestion.updateMany({
       where: { id, status: "PENDING" },
       data: { status: "ACCEPTED", decidedBy: actor.userId, decidedAt: new Date() },
     });
     if (res.count !== 1) throw alreadyDecided();
+    const night = { roomTypeId: suggestion.roomTypeId, date: suggestion.date };
+    // Öneriden sonra elle değişen fiyat ezilmez (karşılaştır-ve-yaz; hata işlemi geri alır).
     const day = await tx.inventoryDay.updateMany({
-      where: { roomTypeId: suggestion.roomTypeId, date: suggestion.date },
+      where: { ...night, priceMinor: minorToDb(suggestion.currentMinor) },
       data: {
         priceMinor: price,
         priceOverride: true,
@@ -494,17 +497,19 @@ export async function acceptSuggestion(actor: AccessClaims, id: string): Promise
         } as Prisma.InputJsonValue,
       },
     });
-    if (day.count !== 1) throw new NotFoundError("Gece envanteri bulunamadı");
-    const night = fromDate(suggestion.date);
+    if (day.count !== 1) {
+      if ((await tx.inventoryDay.count({ where: night })) === 0)
+        throw new NotFoundError("Gece envanteri bulunamadı");
+      throw new ConflictError("Fiyat öneri üretildikten sonra değişti", "PRICE_CHANGED");
+    }
     await noteAvailabilityChanged(tx, {
       propertyId,
       roomId: suggestion.roomTypeId,
-      from: night,
-      to: night,
+      from: date,
+      to: date,
       reason: "revenue",
     });
   });
-  const date = fromDate(suggestion.date);
   await invalidatePriceCache(suggestion.roomTypeId, date);
   await invalidatePropertySearchCache(propertyId);
   logger.info(

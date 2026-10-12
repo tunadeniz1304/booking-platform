@@ -1,6 +1,14 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { ApiError, apiFetch } from "@/lib/api-client";
@@ -25,6 +33,8 @@ interface ThreadResponse {
   messages: Msg[];
   /** Sunucu sınırı (MESSAGE_MAX_LENGTH); eski yanıtlarda yoksa varsayılan kullanılır. */
   maxLength?: number;
+  /** Bu sayfadan daha eski mesaj var mı (`?before=<id>` ile yüklenir). */
+  hasMore?: boolean;
   /** Konuşma bağlamı (ev sahibi sayfasında `showContext` ile özet olarak gösterilir). */
   context?: {
     propertyTitle: string;
@@ -39,7 +49,8 @@ interface ThreadResponse {
 
 type ThreadState = ThreadResponse & { bookingId: string };
 type LiveState = "live" | "reconnecting" | "stopped";
-type PendingDraft = { text: string; mode: string | null };
+type PendingDraft = { text: string; mode: string | null; language: string | null };
+type DraftResponse = { draft: string; llmMode?: string; language?: "tr" | "en" };
 type LoadError = { message: string; retryable: boolean };
 
 /** Sunucu varsayılanı (app-config MESSAGE_MAX_LENGTH); yanıt `maxLength` verirse o geçerlidir. */
@@ -127,6 +138,7 @@ export default function BookingMessages({
   const [text, setText] = useState("");
   const [fromDraft, setFromDraft] = useState(false);
   const [draftMode, setDraftMode] = useState<string | null>(null);
+  const [draftLanguage, setDraftLanguage] = useState<string | null>(null);
   const [pendingDraft, setPendingDraft] = useState<PendingDraft | null>(null);
   const [undoText, setUndoText] = useState<string | null>(null);
   const [busy, setBusy] = useState<"send" | "draft" | null>(null);
@@ -138,9 +150,17 @@ export default function BookingMessages({
   const [reloadKey, setReloadKey] = useState(0);
   /** Yalnız karşı taraftan yeni gelen mesajın kısa duyurusu (liste kendisi duyurmaz). */
   const [announcement, setAnnouncement] = useState("");
+  /** Canlı gelen yüksek riskli mesaj ise acil duyuru (geçmiş uyarılar okunmaz). */
+  const [alertText, setAlertText] = useState("");
+  /** Yüklenen en eski sayfanın ardında daha eski mesaj var mı (son sayfa yenilemesi ezmez). */
+  const [older, setOlder] = useState<{ bookingId: string; hasMore: boolean } | null>(null);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const [olderFailed, setOlderFailed] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const draftBoxRef = useRef<HTMLDivElement>(null);
+  /** Eski mesajlar eklenince görünen ilk mesaj yerinde kalsın diye önceki kaydırma ölçüleri. */
+  const keepScroll = useRef<{ height: number; top: number; focusList: boolean } | null>(null);
   /** Gönderim/taslak sürerken yazılanı kaybetmemek için güncel metin. */
   const textRef = useRef("");
   /** Kullanıcı listenin dibindeyse (ya da kendi mesajını gönderdiyse) yeni mesajda dibe kaydırılır. */
@@ -195,8 +215,12 @@ export default function BookingMessages({
       for (const m of fresh) s.ids.add(m.id);
       const incoming = fresh.filter((m) => m.senderRole !== s.role);
       if (incoming.length === 0) return;
+      // Yüksek riskli yeni mesaj acil (alert) duyurulur; diğerleri nazik durum metniyle.
+      const high = incoming.some((m) => m.risk?.level === "HIGH");
+      const announce = high ? setAlertText : setAnnouncement;
       if (incoming.length > 1) {
-        setAnnouncement(t("newMessages", { count: incoming.length }));
+        const count = t("newMessages", { count: incoming.length });
+        announce(high ? `${count} ${tt("message.highTitle")}` : count);
         return;
       }
       const m = incoming[0];
@@ -206,7 +230,7 @@ export default function BookingMessages({
       const risk = m.risk
         ? ` ${m.risk.level === "HIGH" ? tt("message.highTitle") : tt("message.warnTitle")}`
         : "";
-      setAnnouncement(`${t("newMessage", { sender, body })}${risk}`);
+      announce(`${t("newMessage", { sender, body })}${risk}`);
     },
     [bookingId, t, tt]
   );
@@ -307,10 +331,18 @@ export default function BookingMessages({
   }, [hasThread, liveState, refetch]);
 
   // Yalnız liste kabı kaydırılır (sayfa değil); eski mesajları okuyan kullanıcının
-  // görünümü gelen yeni mesajla çekilmez.
-  useEffect(() => {
+  // görünümü gelen yeni mesajla çekilmez. Eski mesajlar üste eklenince görünüm korunur.
+  useLayoutEffect(() => {
     const el = listRef.current;
-    if (el && stickToBottom.current) el.scrollTop = el.scrollHeight;
+    if (!el) return;
+    const keep = keepScroll.current;
+    if (keep) {
+      keepScroll.current = null;
+      el.scrollTop = keep.top + (el.scrollHeight - keep.height);
+      if (keep.focusList) el.focus({ preventScroll: true });
+      return;
+    }
+    if (stickToBottom.current) el.scrollTop = el.scrollHeight;
   }, [thread?.messages.length]);
 
   // Taslak önerisi açılınca odak öneri kutusuna gider (ekran okuyucu başlığı ve metni okur).
@@ -321,6 +353,41 @@ export default function BookingMessages({
   function onListScroll() {
     const el = listRef.current;
     if (el) stickToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+  }
+
+  async function loadOlder() {
+    const first = thread?.messages[0];
+    if (loadingOlder || !thread || !first) return;
+    setLoadingOlder(true);
+    setOlderFailed(false);
+    try {
+      const res = await apiFetch<ThreadResponse>(
+        `${threadUrl}?before=${encodeURIComponent(first.id)}`
+      );
+      const el = listRef.current;
+      const hasMore = res.hasMore === true;
+      // Düğme kalkacaksa (başka eski mesaj yok) odak kaybolmasın diye listeye taşınır.
+      const focusList = !hasMore && !!el?.contains(document.activeElement);
+      const known = new Set(thread.messages.map((m) => m.id));
+      const added = res.messages.some((m) => !known.has(m.id));
+      stickToBottom.current = false;
+      if (el && added) {
+        keepScroll.current = { height: el.scrollHeight, top: el.scrollTop, focusList };
+      } else if (focusList) {
+        el?.focus({ preventScroll: true });
+      }
+      setOlder({ bookingId, hasMore });
+      setThread((prev) =>
+        prev?.bookingId === bookingId
+          ? { ...prev, messages: mergeMessages(prev.messages, res.messages) }
+          : prev
+      );
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) setNeedsLogin(true);
+      else setOlderFailed(true);
+    } finally {
+      setLoadingOlder(false);
+    }
   }
 
   function reconnect() {
@@ -369,6 +436,7 @@ export default function BookingMessages({
       );
       setFromDraft(false);
       setDraftMode(null);
+      setDraftLanguage(null);
       setUndoText(null);
       setPendingDraft(null);
       setLimitTried(false);
@@ -389,18 +457,18 @@ export default function BookingMessages({
     setPendingDraft(null);
     let showSuggestion = false;
     try {
-      const res = await apiFetch<{ draft: string; llmMode?: string }>(`${threadUrl}/draft`, {
-        method: "POST",
-      });
+      const res = await apiFetch<DraftResponse>(`${threadUrl}/draft`, { method: "POST" });
       const mode = res.llmMode ?? null;
+      const language = res.language ?? null;
       if (textRef.current.trim()) {
         // Yazılmış metin korunur; taslak ayrı öneri kutusunda onaya sunulur.
         showSuggestion = true;
-        setPendingDraft({ text: res.draft, mode });
+        setPendingDraft({ text: res.draft, mode, language });
       } else {
         updateText(res.draft);
         setFromDraft(true);
         setDraftMode(mode);
+        setDraftLanguage(language);
         setUndoText(null);
       }
     } catch (err) {
@@ -423,6 +491,7 @@ export default function BookingMessages({
     setUndoText(previous.trim() ? previous : null);
     setFromDraft(true);
     setDraftMode(pendingDraft.mode);
+    setDraftLanguage(pendingDraft.language);
     setPendingDraft(null);
     inputRef.current?.focus();
   }
@@ -438,6 +507,7 @@ export default function BookingMessages({
     setUndoText(null);
     setFromDraft(false);
     setDraftMode(null);
+    setDraftLanguage(null);
     inputRef.current?.focus();
   }
 
@@ -495,6 +565,12 @@ export default function BookingMessages({
   ]
     .filter(Boolean)
     .join(" ");
+  /** Taslağın yazıldığı dil (misafirin dili arayüz dilinden farklı olabilir). */
+  const languageNote = (language: string | null) =>
+    language && t.has(`draftLanguageName.${language}`)
+      ? ` ${t("draftLanguage", { language: t(`draftLanguageName.${language}`) })}`
+      : "";
+  const olderHasMore = older?.bookingId === bookingId ? older.hasMore : thread.hasMore === true;
 
   const myRole = thread.role;
   const timeZone = localTimeZone();
@@ -535,7 +611,8 @@ export default function BookingMessages({
           {" · "}
           <time dateTime={m.createdAt}>{f.time(m.createdAt)}</time>
         </p>
-        {/* Geçmiş uyarılar kendiliğinden okunmaz; yeni gelen uyarı durum alanında duyurulur. */}
+        {/* Geçmiş uyarılar kendiliğinden okunmaz; yeni gelen uyarı duyuru alanında okunur
+            (yüksek risk acil). */}
         {!mine && m.risk && (
           <div
             className={`mb-1 max-w-[80%] rounded-md border px-3 py-2 text-left text-xs ${
@@ -615,6 +692,23 @@ export default function BookingMessages({
         onScroll={onListScroll}
         className={`mt-4 max-h-80 space-y-4 overflow-y-auto rounded-md ${focusRing}`}
       >
+        {olderHasMore && thread.messages.length > 0 && (
+          <div className="flex flex-col items-center gap-1">
+            <Button
+              variant="secondary"
+              busy={loadingOlder}
+              onClick={() => void loadOlder()}
+              className="min-h-[44px] sm:min-h-0"
+            >
+              {loadingOlder ? t("loadingOlder") : t("loadOlder")}
+            </Button>
+            {olderFailed && (
+              <p role="alert" className="text-sm text-red-600">
+                {t("loadOlderFailed")}
+              </p>
+            )}
+          </div>
+        )}
         {thread.messages.length === 0 && <p className="text-sm text-gray-500">{t("empty")}</p>}
         {groupByDay(thread.messages).map((day) => (
           <div key={day.key}>
@@ -627,6 +721,9 @@ export default function BookingMessages({
       </div>
       <p role="status" className="sr-only">
         {announcement}
+      </p>
+      <p role="alert" className="sr-only">
+        {alertText}
       </p>
       <div className={liveState === "live" ? undefined : "mt-2 flex flex-wrap items-center gap-2"}>
         <p role="status" className="text-sm text-gray-700">
@@ -656,6 +753,7 @@ export default function BookingMessages({
               if (!e.target.value.trim()) {
                 setFromDraft(false);
                 setDraftMode(null);
+                setDraftLanguage(null);
               }
             }}
             aria-invalid={shownError || overLimit ? true : undefined}
@@ -697,6 +795,7 @@ export default function BookingMessages({
               </p>
               <p id="msg-draft-notice" className="mt-1 text-xs text-amber-800">
                 {t("aiDraftNotice")}
+                {languageNote(pendingDraft.language)}
               </p>
               <div className="mt-2 flex flex-wrap gap-2">
                 <Button
@@ -729,6 +828,7 @@ export default function BookingMessages({
                 <LlmBadge mode={draftMode} audience="staff" />
                 <p id="msg-ai-notice" className="text-xs text-amber-800">
                   {t("aiDraftNotice")}
+                  {languageNote(draftLanguage)}
                 </p>
               </div>
             )}

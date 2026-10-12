@@ -11,6 +11,7 @@ import {
   Field,
   focusRing,
   LlmBadge,
+  LoadError,
   Status,
   inputClass,
   useLoader,
@@ -378,12 +379,12 @@ export default function AdminDashboard() {
 function LlmStatusCard() {
   const t = useTranslations("admin");
   const loader = useAdminLoader<LlmStatus>("/api/llm/status");
-  const { data, error } = loader;
+  const { data, error, reload } = loader;
   const modeLabel = (m: string) => (t.has(`llm.modes.${m}`) ? t(`llm.modes.${m}`) : m);
   return (
     <Card title={t("llm.title")} id="llm-status">
       <RefreshBar loader={loader} name={t("llm.title")} />
-      <Status error={error} />
+      {error && <LoadError error={error} onRetry={reload} busy={loader.loading} />}
       <LoadingNote loading={!data && !error} />
       {data && (
         <dl className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm text-gray-800 md:grid-cols-4">
@@ -449,8 +450,9 @@ function OutboxCard({ title, loader }: { title: string; loader: Loaded<OutboxSta
 
   return (
     <Card title={title} id="outbox">
+      <p className="mb-3 text-sm text-gray-700">{t("outbox.description")}</p>
       <RefreshBar loader={loader} name={t("outbox.title")} />
-      <Status error={error} />
+      {error && <LoadError error={error} onRetry={reload} busy={loader.loading} />}
       <RowAnnouncer fb={rowFb} />
       <LoadingNote loading={!data && !error} />
       {data && (
@@ -691,8 +693,9 @@ function EventsCard({ title, loader }: { title: string; loader: Loaded<DemandEve
           <LlmBadge mode={lastMode} audience="staff" />
         </div>
       </form>
-      <div className="mt-3">
-        <Status error={error ?? feedback.error} message={feedback.message} />
+      <div className="mt-3 space-y-2">
+        {error && <LoadError error={error} onRetry={reload} busy={loader.loading} />}
+        <Status error={feedback.error} message={feedback.message} />
       </div>
       <RowAnnouncer fb={rowFb} />
       <LoadingNote loading={!data && !error} />
@@ -916,9 +919,10 @@ function FraudCard({
 
   return (
     <Card title={title} id="fraud">
+      <p className="mb-3 text-sm text-gray-700">{t("fraud.description")}</p>
       <RefreshBar loader={loader} name={t("fraud.title")} />
       <p className="mb-3 text-xs text-gray-700">{t("fraud.effectHint")}</p>
-      <Status error={error} />
+      {error && <LoadError error={error} onRetry={reload} busy={loader.loading} />}
       <RowAnnouncer fb={rowFb} />
       <LoadingNote loading={!data && !error} />
       {data?.length === 0 && <p className="text-sm text-gray-700">{t("fraud.empty")}</p>}
@@ -1083,7 +1087,7 @@ function ReviewModerationCard({
   return (
     <Card title={title} id="review-moderation">
       <RefreshBar loader={loader} name={t("moderation.title")} />
-      <Status error={error} />
+      {error && <LoadError error={error} onRetry={reload} busy={loader.loading} />}
       <RowAnnouncer fb={rowFb} />
       <LoadingNote loading={!data && !error} />
       {data?.length === 0 && <p className="text-sm text-gray-700">{t("moderation.empty")}</p>}
@@ -1158,11 +1162,12 @@ function ExperimentsCard() {
   const pct = (v: number) =>
     f.number(v, { style: "percent", minimumFractionDigits: 1, maximumFractionDigits: 1 });
   const loader = useAdminLoader<ExperimentResult[]>("/api/admin/experiments");
-  const { data, error } = loader;
+  const { data, error, reload } = loader;
   return (
     <Card title={t("experiments.title")} id="experiments">
+      <p className="mb-3 text-sm text-gray-700">{t("experiments.description")}</p>
       <RefreshBar loader={loader} name={t("experiments.title")} />
-      <Status error={error} />
+      {error && <LoadError error={error} onRetry={reload} busy={loader.loading} />}
       <LoadingNote loading={!data && !error} />
       {data?.length === 0 && <p className="text-sm text-gray-700">{t("experiments.empty")}</p>}
       {data?.map((exp) => (
@@ -1303,7 +1308,7 @@ function RoleCard({ prefill = null }: { prefill?: { id: string } | null }) {
             onChange={(e) => setUserId(e.target.value)}
           />
         </Field>
-        <Field label={t("roles.newRole")} id="role-value">
+        <Field label={t("roles.newRole")} id="role-value" hint={t("roles.newRoleHint")}>
           <select
             id="role-value"
             className={inputClass}

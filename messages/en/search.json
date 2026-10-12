@@ -88,7 +88,8 @@
     "searching": "Searching…",
     "formLabel": "Search stays",
     "maxGuests": "You can select up to {max, plural, one {# guest} other {# guests}}.",
-    "childrenHintPricing": "Ages 0–12 · age doesn't affect the price"
+    "childrenHintPricing": "Ages 0–12 · age doesn't affect the price",
+    "dateRange": "{checkIn} – {checkOut} · {nights}"
   },
   "picker": {
     "prevMonth": "Previous month",
@@ -117,7 +118,8 @@
     "count": "{count, plural, one {# suggestion} other {# suggestions}}",
     "error": "Suggestions could not be loaded. You can still search for what you typed.",
     "searchFor": "Search for “{query}”",
-    "clear": "Clear destination"
+    "clear": "Clear destination",
+    "properties": "Properties"
   },
   "mapView": {
     "initFailed": "the map could not be initialised",
@@ -177,8 +179,8 @@
     "fromPerNight": "per night from",
     "taxesOnDates": "taxes and fees are added once you pick dates",
     "seeDeal": "See deal",
-    "addFavorite": "Add to favourites",
-    "removeFavorite": "Remove from favourites",
+    "addFavorite": "Add to favorites",
+    "removeFavorite": "Remove from favorites",
     "favoriteAdded": "Added to favorites",
     "favoriteRemoved": "Removed from favorites",
     "favoriteAddFailed": "Couldn't add to favorites. Please try again.",
@@ -187,8 +189,8 @@
     "noRating": "No ratings yet",
     "seeRoom": "See room",
     "seePrices": "See prices",
-    "addFavoriteNamed": "Add to favourites: {title}",
-    "removeFavoriteNamed": "Remove from favourites: {title}",
+    "addFavoriteNamed": "Add to favorites: {title}",
+    "removeFavoriteNamed": "Remove from favorites: {title}",
     "noPhoto": "No photo added",
     "notStayTotal": "excl. taxes and fees, not the total for your dates",
     "nightsGuestsTotal": "total for {nights, plural, one {# night} other {# nights}}, {guests, plural, one {# guest} other {# guests}}"

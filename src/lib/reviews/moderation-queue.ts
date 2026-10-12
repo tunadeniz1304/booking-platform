@@ -1,8 +1,9 @@
+import type { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { NotFoundError } from "@/lib/http/errors";
 import { withSerializableRetry } from "@/lib/db/transactions";
-import { getLlmClient } from "@/lib/llm/client";
+import { getLlmClient, type LlmMode } from "@/lib/llm/client";
 import { demoModerationExplain } from "@/lib/llm/demo";
 import { assertNumbersGrounded, buildFactSet } from "@/lib/llm/guards";
 import { bumpVersion, recomputeRating } from "@/lib/reviews/review-service";
@@ -11,6 +12,9 @@ import type { ModerationReason } from "@/lib/reviews/moderation";
 const QUEUE_LIMIT = 50;
 /** LLM açıklaması istenen en fazla kayıt; kalanlar deterministik açıklamayla döner. */
 const EXPLAIN_LIMIT = 10;
+const QUEUE_WHERE: Prisma.ReviewWhereInput = {
+  moderationStatus: { in: ["PENDING_REVIEW", "HIDDEN"] },
+};
 
 function parseReasons(raw: unknown): ModerationReason[] {
   if (!Array.isArray(raw)) return [];
@@ -26,7 +30,9 @@ function parseReasons(raw: unknown): ModerationReason[] {
  * "Neden işaretlendi" açıklaması: LLM yalnızca gerekçe kodlarını ifade eder, karar vermez;
  * yorum metni modele gönderilmez (PII içerebilir). Demo/hata → deterministik metin.
  */
-async function explain(reasons: ModerationReason[]): Promise<string> {
+async function explain(
+  reasons: ModerationReason[]
+): Promise<{ explanation: string; llmMode: LlmMode }> {
   // v2-P0-7: açıklamadaki her sayı gerekçe kodu/detayından gelmeli; uydurma sayı → demo.
   const facts = buildFactSet(reasons.flatMap((r) => [r.code, r.detail]));
   const res = await getLlmClient().completeJson(
@@ -45,12 +51,17 @@ async function explain(reasons: ModerationReason[]): Promise<string> {
       validate: (data) => assertNumbersGrounded(data.explanation, facts),
     }
   );
-  return res.data.explanation;
+  return { explanation: res.data.explanation, llmMode: res.llmMode };
+}
+
+/** Kuyruktaki toplam kayıt (liste QUEUE_LIMIT ile kesilir; panel "gösterilen/toplam" yazar). */
+export async function countModerationQueue(): Promise<number> {
+  return prisma.review.count({ where: QUEUE_WHERE });
 }
 
 export async function listModerationQueue() {
   const rows = await prisma.review.findMany({
-    where: { moderationStatus: { in: ["PENDING_REVIEW", "HIDDEN"] } },
+    where: QUEUE_WHERE,
     orderBy: { createdAt: "asc" },
     take: QUEUE_LIMIT,
     select: {
@@ -68,6 +79,11 @@ export async function listModerationQueue() {
   return Promise.all(
     rows.map(async (r, i) => {
       const reasons = parseReasons(r.moderationReasons);
+      // EXPLAIN_LIMIT sonrası LLM'e gidilmez: deterministik (demo) açıklama.
+      const { explanation, llmMode } =
+        i < EXPLAIN_LIMIT
+          ? await explain(reasons)
+          : { explanation: demoModerationExplain(reasons).explanation, llmMode: "demo" as const };
       return {
         id: r.id,
         propertyId: r.propertyId,
@@ -77,8 +93,8 @@ export async function listModerationQueue() {
         status: r.moderationStatus,
         reportCount: r.reportCount,
         reasons,
-        explanation:
-          i < EXPLAIN_LIMIT ? await explain(reasons) : demoModerationExplain(reasons).explanation,
+        explanation,
+        llmMode,
         createdAt: r.createdAt.toISOString(),
       };
     })

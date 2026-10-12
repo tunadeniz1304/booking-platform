@@ -16,7 +16,11 @@ import AuthCard, {
 } from "@/components/auth/AuthCard";
 import PasskeyLoginButton from "@/components/auth/PasskeyLoginButton";
 import PasswordRevealInput from "@/components/auth/PasswordRevealInput";
-import { setSessionUserCache, useSessionUserCache } from "@/components/layout/useSessionUserCache";
+import {
+  refreshSessionUser,
+  setSessionUserCache,
+  useSessionUserCache,
+} from "@/components/layout/useSessionUserCache";
 import { invalidateFavoriteIds } from "@/components/property/useFavoriteIds";
 import { Button, ButtonLink, buttonClass } from "@/components/ui/ui";
 import { logout } from "@/lib/api-client";
@@ -75,7 +79,9 @@ export default function LoginPage() {
   const router = useRouter();
   const authErrorText = useAuthErrorText();
   const redirect = safeRedirect(useSearchParam("redirect"));
-  const context = redirectContext(redirect);
+  // Ödeme sayfası `reason=checkout` da gönderir: dönüş adresi tanınmasa da bağlam korunur.
+  const reason = useSearchParam("reason");
+  const context = redirectContext(redirect) ?? (reason === "checkout" ? "booking" : null);
   // Hidrasyondan önce gönder düğmesi devre dışı: Enter yerel GET gönderimiyle sayfayı yenilemez.
   const hydrated = useSyncExternalStore(noopSubscribe, clientSnapshot, serverSnapshot);
   // undefined: oturum bilinmiyor (form gösterilir); oturum açıksa form yerine devam seçenekleri.
@@ -100,6 +106,10 @@ export default function LoginPage() {
   const autofillRef = useRef<AbortController | null>(null);
   const [autofillRound, setAutofillRound] = useState(0);
   const [signingOut, setSigningOut] = useState(false);
+  // Passkey girişi beklenirken parola formu gönderilmez (iki giriş yarışmaz).
+  const [passkeyBusy, setPasskeyBusy] = useState(false);
+  // Giriş sonrası yönlendirme sürerken önbellek dolsa da "oturum açık" görünümüne geçilmez.
+  const [leaving, setLeaving] = useState(false);
   const waiting = retryIn > 0;
   const autofillReady = sessionUser === null;
 
@@ -127,11 +137,14 @@ export default function LoginPage() {
   }, [retryIn, t]);
 
   const goBack = useCallback(
-    (role?: string) => {
+    async (role?: string) => {
+      setLeaving(true);
       invalidateFavoriteIds();
+      // Sonraki sayfanın başlığı kullanıcıyı hemen gösterir ("Giriş yap" yanıp sönmez).
+      const user = await refreshSessionUser();
       // Açık yönlendirme yok: yalnız aynı kökendeki göreli yol (safeRedirect).
       const target = safeRedirect(new URLSearchParams(window.location.search).get("redirect"));
-      router.push(target === "/" ? homeForRole(role) : target);
+      router.push(target === "/" ? homeForRole(role ?? user?.role) : target);
       router.refresh();
     },
     [router]
@@ -145,7 +158,7 @@ export default function LoginPage() {
     autofillRef.current = controller;
     void loginWithPasskeyAutofill(controller.signal).then(
       (result) => {
-        if (result) goBack(result.user.role);
+        if (result) void goBack(result.user.role);
       },
       () => {
         if (!controller.signal.aborted) setError(t("passkey.failed"));
@@ -195,7 +208,7 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (submitting || waiting) return;
+    if (submitting || waiting || passkeyBusy || leaving) return;
     setError(null);
     setStatus(null);
     setCredentialError(false);
@@ -227,7 +240,7 @@ export default function LoginPage() {
         }
       }
       if (res.ok) {
-        goBack(data.user?.role);
+        await goBack(data.user?.role);
         return;
       }
       showFailure(data, res.status);
@@ -259,7 +272,7 @@ export default function LoginPage() {
     router.refresh();
   };
 
-  if (sessionUser) {
+  if (sessionUser && !leaving) {
     const target = redirect === "/" ? homeForRole(sessionUser.role) : redirect;
     return (
       <AuthCard title={t("login.signedInTitle")} focusTitle>
@@ -293,11 +306,18 @@ export default function LoginPage() {
       : context === "booking"
         ? t("login.continueBooking")
         : null;
+  // Giriş nedeni notu varsa genel alt başlık ("Rezervasyonlarınıza...") gösterilmez.
+  const subtitle =
+    context === "addToCart"
+      ? t("login.addToCartSubtitle")
+      : contextNote
+        ? undefined
+        : t("login.subtitle");
 
   return (
     <AuthCard
       title={context === "addToCart" ? t("login.addToCartTitle") : t("login.title")}
-      subtitle={context === "addToCart" ? t("login.addToCartSubtitle") : t("login.subtitle")}
+      subtitle={subtitle}
     >
       {contextNote && (
         <p role="note" className="mt-4 rounded-lg bg-blue-50 px-4 py-3 text-sm text-[#003580]">
@@ -312,6 +332,8 @@ export default function LoginPage() {
             type="email"
             required
             autoComplete="username webauthn"
+            autoCapitalize="none"
+            spellCheck={false}
             value={email}
             onChange={(e) => setTypedEmail(e.target.value)}
             className={authInputClass}
@@ -362,7 +384,7 @@ export default function LoginPage() {
         <div>
           <button
             ref={submitRef}
-            {...submitButtonProps(submitting || waiting)}
+            {...submitButtonProps(submitting || waiting || passkeyBusy)}
             disabled={!hydrated}
             aria-busy={submitting || undefined}
           >
@@ -392,8 +414,15 @@ export default function LoginPage() {
 
       <PasskeyLoginButton
         onSuccess={goBack}
-        onStart={() => autofillRef.current?.abort()}
+        disabled={submitting}
+        onStart={() => {
+          autofillRef.current?.abort();
+          // Önceki parola hatası passkey denemesiyle ilgisiz: kutu ve alan işaretleri temizlenir.
+          setError(null);
+          setCredentialError(false);
+        }}
         onBusyChange={(busy) => {
+          setPasskeyBusy(busy);
           if (!busy) setAutofillRound((n) => n + 1);
         }}
       />

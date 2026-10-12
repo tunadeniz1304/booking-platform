@@ -25,8 +25,8 @@
       "description": "The number of reviews written by guests who actually stayed. More reviews help, but each new review adds a little less than the one before."
     },
     "personal": {
-      "label": "Personalisation",
-      "description": "If you are signed in, how closely the listing's city and property type match your past bookings and favourites."
+      "label": "Personalization",
+      "description": "If you are signed in, how closely the listing's city and property type match your past bookings and favorites."
     },
     "semantic": {
       "label": "Relevance to your search",
@@ -48,7 +48,8 @@
   "factorPoints": "{points} points",
   "weightsSet": {
     "default": "Standard weights were used because there is no search text.",
-    "withQuery": "Because you entered search text or a destination, weights that favour text similarity were used.",
+    "withQuery": "Because you entered search text or a destination, weights that favor text similarity were used.",
     "ltr": "This result was ordered by an experimental ranking model; the contributions below are approximate."
-  }
+  },
+  "whyFor": "(for {title})"
 }

@@ -51,10 +51,14 @@ export default function StepUpDialog({
     closedRef.current = false;
     const returnFocus =
       document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    // Diyalog açıkken arka plan sayfası kaymasın (F629).
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
     if (dialog && !dialog.open) dialog.showModal();
     primary.current?.focus();
     return () => {
       closedRef.current = true;
+      document.body.style.overflow = prevOverflow;
       if (busyRef.current) WebAuthnAbortService.cancelCeremony();
       if (dialog?.open) dialog.close();
       if (returnFocus?.isConnected) returnFocus.focus();
@@ -106,7 +110,7 @@ export default function StepUpDialog({
         if (busyRef.current) WebAuthnAbortService.cancelCeremony();
         onCancelRef.current();
       }}
-      className="w-[calc(100vw-2rem)] max-w-sm rounded-xl bg-white p-6 shadow-lg backdrop:bg-black/40"
+      className="max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-sm overflow-y-auto overscroll-contain rounded-xl bg-white p-6 shadow-lg backdrop:bg-black/40"
     >
       <h2 id="stepup-title" className="text-lg font-semibold text-gray-900">
         {t("title")}

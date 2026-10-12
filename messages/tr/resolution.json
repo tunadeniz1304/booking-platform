@@ -17,7 +17,7 @@
   "admin": {
     "pageTitle": "Hasar ve iade talepleri",
     "pageIntro": "Yanıtlanan ya da yanıt süresi dolan talepleri inceleyin ve karara bağlayın. Ters ibrazlar ödeme sağlayıcısında yürütülür.",
-    "title": "Talepler",
+    "title": "Hasar ve iade talepleri",
     "filter": "Duruma göre filtrele",
     "all": "Tümü",
     "select": "Ayrıntıyı göster",
@@ -30,7 +30,13 @@
     "optionCount": "{label} ({count})",
     "decideAsAdmin": "Yönetici olarak karar ver",
     "selectedBadge": "Seçili",
-    "goToDetail": "Ayrıntıya git"
+    "goToDetail": "Ayrıntıya git",
+    "search": {
+      "label": "Rezervasyon no, talep no veya mülk adıyla ara",
+      "hint": "Kimliğin bir bölümünü (ör. son 8 karakter) yazmanız yeterli.",
+      "resultCount": "{total} talepten {shown} tanesi gösteriliyor.",
+      "noMatch": "Aramayla eşleşen talep yok."
+    }
   },
   "type": {
     "GUEST_REFUND": "Misafir iade talebi",
@@ -85,7 +91,7 @@
   "deposit": {
     "title": "Hasar depozitosu",
     "none": "Bu rezervasyonda hasar depozitosu yok.",
-    "expected": "Beklenen depozito: {amount}. Girişten kısa süre önce kartınızda provizyon olarak bloke edilir.",
+    "expected": "Beklenen depozito: {amount}. Girişten kısa süre önce kartınızdan provizyon (geçici bloke) alınır.",
     "amount": "Tutar",
     "captured": "Tahsil edilen",
     "status": "Durum",
@@ -107,7 +113,7 @@
     "noteVoided": "Provizyon serbest bırakıldı; depozito tutarı karttan çekilmedi.",
     "noteExpired": "Provizyonun süresi doldu ve kendiliğinden serbest bırakıldı; depozito tutarı karttan çekilmedi ve artık tahsil edilemez.",
     "noteFailed": "Karttan provizyon alınamadı; onaylanan bir hasar tutarı depozitodan tahsil edilemeyebilir.",
-    "expectedOther": "Beklenen depozito: {amount}. Girişten kısa süre önce misafirin kartında provizyon olarak bloke edilir."
+    "expectedOther": "Beklenen depozito: {amount}. Girişten kısa süre önce misafirin kartından provizyon (geçici bloke) alınır."
   },
   "panel": {
     "title": "Hasar depozitosu ve çözüm merkezi",
@@ -229,7 +235,9 @@
     "sendFirstReply": "Yanıtımı gönder",
     "refresh": "Yazışmayı yenile",
     "lastChecked": "Son kontrol: {time}",
-    "newCount": "{count} yeni mesaj geldi."
+    "newCount": "{count} yeni mesaj geldi.",
+    "adminLabel": "Taraflara mesaj (yönetici)",
+    "adminHint": "Bu mesaj her iki tarafa da görünür."
   },
   "evidence": {
     "title": "Kanıtlar",

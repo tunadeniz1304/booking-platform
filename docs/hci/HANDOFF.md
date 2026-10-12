@@ -1,6 +1,6 @@
 # HCI düzeltme işi — Handoff
 
-> Son güncelleme: 2026-10-11 · Durum: Critical/High turu birleştirildi (PR #9) · **onaylı 12 renk düzeltmesi + 2 gerileme UYGULANDI** (§1.1, §7) · sırada: crossOwner istekleri (§4.3), çalışma zamanı taraması, Medium/Low turu
+> Son güncelleme: 2026-10-12 · Durum: Critical/High (PR #9) ve renk + gerilemeler (PR #10) birleştirildi · **Medium/Low turu uygulandı** (130 paket, commit `433af79`) · **crossOwner 2. tur sürüyor** (§8) · sonra: kapılar, çalışma zamanı önce/sonra, rapor, PR
 > Bu dosya, haftalık kullanım limiti dolarsa ya da oturum kesilirse işi kaldığı yerden sürdürmek içindir.
 
 ## 1. Hedef ve kullanıcı kararları
@@ -115,3 +115,18 @@ Düzeltme sonrası ortaya çıkan 2 gerileme — **İKİSİ DE DÜZELTİLDİ** (
 2. **Ev sahibi promosyon tablosu, mobil:** sayfa 181 px yatay taşıyor (önce 142 px). Tablo kaydırılabilir bir kapsayıcıya alınmamış: `tabIndex=0` + `role="region"` + `aria-label` + `overflow-x-auto`. Sahip: `src/components/host/PromotionsPanel.tsx` (hostB).
 
 Konsol hataları 251'den 333'e çıktı; artışın 319'u `401 Unauthorized`. Bu, uzun tarama sırasında süresi dolan demo oturumlarından kaynaklanan tarama artefaktı, uygulama gerilemesi değil.
+
+## 8. Medium/Low turu ve paketler arası istekler (2026-10-12, bulut oturumu)
+
+Ortam bulut konteyneri (Linux). Scratchpad: `/tmp/claude-0/-home-user-booking-platform/6c8e30e3-b8b0-5400-b6f9-3d38ab33293b/scratchpad` (aşağıda `$S`). Dal: `hci/regressions-and-color-vs4f2l`.
+
+| Adım                                                                                                                        | Durum                                                                                                                      |
+| --------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| crossOwner sınıflandırma (131 istek)                                                                                        | bitti: 76 uygulanabilir (Medium/Low paketlerine katıldı), 31 zaten yapılmış, 24 ertelendi (gerekçeler `$S/xo/triage.json`) |
+| Medium/Low turu: 130 paket (`$S/ml/pkgs/`, betik `$S/ml/ml-fix.js`)                                                         | bitti: 754 fixed, 247 partially_fixed, 153 already_ok, 8 skipped; sonuçlar `$S/ml/results.json`                            |
+| Mesaj yamaları (`$S/msg-ml/p*.json`)                                                                                        | birleştirildi (125 yama, 2.726 yeni, 583 güncelleme; 24 çakışmada sonraki paket kazandı)                                   |
+| Kapılar (tur 1 sonrası)                                                                                                     | lint, typecheck, i18n, format, unit (1.328) geçti; testUpdates uygulandı                                                   |
+| crossOwner 2. tur: ajanların yeni 546 isteği → 81 paket (`$S/ml/pkgs2/`, betik `$S/ml/ml-fix2.js`, plan `$S/ml/plan2.json`) | sürüyor; ilk koşuda 16 paket oturum limitine takıldı, resume edildi. Run id'leri `$S/ml/runs2.txt`                         |
+| Çalışma zamanı taraması                                                                                                     | önce (792a57a, 178 ziyaret) bitti: `$S/sweep/base-out/`; sonra: 2. tur bitince (`$S/sweep/README.md`)                      |
+
+Devam (aynı oturumda): `Workflow({scriptPath: "$S/ml/ml-fix2.js", resumeFromRunId: <run id>, args: <plan2.json'daki wf>})`. Sonuç toplama: `node $S/ml/collect.mjs <out.json> <run id>...`. Kayıt: `node $S/ml/records-ml.mjs $S/ml/results.json $S/xo/triage.json <round2.json>`. Mesajlar: `node $S/merge-messages.mjs . $S/msg-ml` (r2 yamaları tur 1 yamalarından sonra birleşir).

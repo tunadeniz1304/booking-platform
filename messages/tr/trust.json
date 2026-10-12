@@ -76,11 +76,12 @@
     "requiredHostDone": "İlan oluşturmak için gereken kimlik doğrulaması tamamlandı.",
     "requiredGuestDone": "Rezervasyon için gereken kimlik doğrulaması tamamlandı.",
     "emailSent": "Doğrulama e-postası gönderildi. E-postadaki bağlantıya tıkladıktan sonra burada doğrulamayı yeniden başlatın.",
-    "emailAlreadyVerified": "E-posta adresiniz doğrulanmış; kimlik doğrulamayı yeniden başlatabilirsiniz."
+    "emailAlreadyVerified": "E-posta adresiniz doğrulanmış; kimlik doğrulamayı yeniden başlatabilirsiniz.",
+    "lastUpdated": "Son güncelleme: {time}"
   },
   "partyRisk": {
     "title": "Parti riski uyarıları",
-    "intro": "Genç hesap, tek gece, kalabalık grup, yakın tarih ve hafta sonu sinyallerinden hesaplanan otomatik uyarılar. Rezervasyon iptal edilmez; misafirle ev kurallarını teyit edin.",
+    "intro": "Yeni hesap, tek gece, kalabalık grup, yakın tarih ve hafta sonu sinyallerinden hesaplanan otomatik uyarılar. Rezervasyon iptal edilmez; misafirle ev kurallarını teyit edin.",
     "loading": "Uyarılar yükleniyor…",
     "loadFailed": "Uyarılar yüklenemedi.",
     "empty": "Yaklaşan rezervasyonlarınızda parti riski uyarısı yok.",

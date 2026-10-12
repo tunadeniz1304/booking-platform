@@ -6,10 +6,29 @@ import { propertyPatchSchema, updateProperty } from "@/lib/host/host-service";
 import { prisma } from "@/lib/prisma";
 import { LISTABLE_PROPERTY } from "@/lib/compliance/listing";
 import { logger, errorFields } from "@/lib/observability/logger";
+import { DEFAULT_POLICIES, toSnapshot, type PolicySnapshot } from "@/lib/booking/cancellation";
 
 interface Props {
   params: Promise<{ id: string }>;
 }
+
+type PolicyRow = { kind: string; version: number; rules: unknown } | null;
+
+/**
+ * Rezervasyonda uygulanacak iptal politikası (booking-service ile aynı seçim: iade edilemez
+ * plan → NON_REFUNDABLE, yoksa planın ya da mülkün politikası; atanmamışsa varsayılan).
+ * Kurallar okunamazsa null: ödeme ekranı ücretsiz iptal satırını göstermez.
+ */
+function policySummary(policy: PolicyRow, refundable = true): PolicySnapshot | null {
+  if (!refundable) return DEFAULT_POLICIES.NON_REFUNDABLE;
+  try {
+    return toSnapshot(policy);
+  } catch {
+    return null;
+  }
+}
+
+const POLICY_SELECT = { select: { kind: true, version: true, rules: true } } as const;
 
 export async function GET(_req: Request, { params }: Props) {
   const { id } = await params;
@@ -27,6 +46,9 @@ export async function GET(_req: Request, { params }: Props) {
         ratingAvg: true,
         ratingCount: true,
         images: true,
+        timeZone: true,
+        checkInTime: true,
+        cancellationPolicy: POLICY_SELECT,
         location: { select: { city: true, country: true } },
         amenities: { select: { name: true, icon: true } },
         rooms: {
@@ -49,6 +71,7 @@ export async function GET(_req: Request, { params }: Props) {
                 refundable: true,
                 priceModifierBps: true,
                 isDefault: true,
+                cancellationPolicy: POLICY_SELECT,
               },
               orderBy: { priceModifierBps: "asc" },
             },
@@ -62,14 +85,24 @@ export async function GET(_req: Request, { params }: Props) {
       return NextResponse.json({ error: "Konaklama bulunamadı" }, { status: 404 });
     }
 
+    // `cancellationPolicy` + `timeZone`/`checkInTime`: ödeme ekranı ücretsiz iptal son anını
+    // `freeCancellation` (lib/booking/free-cancellation-deadline.ts) ile hesaplar.
     return NextResponse.json({
       ...property,
       basePriceMinor: minorFromDb(property.basePriceMinor),
+      cancellationPolicy: policySummary(property.cancellationPolicy),
       // `capacity`: bir sürüm boyunca `maxOccupancy`'nin geriye uyumlu adı (ADR 0010).
       rooms: property.rooms.map((r) => ({
         ...r,
         capacity: r.maxOccupancy,
         priceModifierMinor: minorFromDb(r.priceModifierMinor),
+        ratePlans: r.ratePlans.map((plan) => ({
+          ...plan,
+          cancellationPolicy: policySummary(
+            plan.cancellationPolicy ?? property.cancellationPolicy,
+            plan.refundable
+          ),
+        })),
       })),
     });
   } catch (error) {

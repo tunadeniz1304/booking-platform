@@ -24,8 +24,21 @@ export default async function RankingExplainedPage({ searchParams }: RankingPage
   const fromQuery = fromRaw
     ? new URLSearchParams(fromRaw.slice(fromRaw.indexOf("?") + 1)).toString()
     : "";
-  const factors = Object.keys(RANKING_WEIGHTS) as Array<keyof typeof RANKING_WEIGHTS>;
-  const weight = (value: number) => t("weightValue", { value: Math.round(value * 100) });
+  // F1115: varsayılan ağırlığa göre azalan sıra; çubuk yalnızca görsel orantı.
+  const factors = (Object.keys(RANKING_WEIGHTS) as Array<keyof typeof RANKING_WEIGHTS>).sort(
+    (a, b) => RANKING_WEIGHTS[b] - RANKING_WEIGHTS[a]
+  );
+  const weight = (value: number) => (
+    <>
+      {t("weightValue", { value: Math.round(value * 100) })}
+      <span aria-hidden="true" className="ml-auto mt-1 block h-1.5 w-20 rounded-full bg-gray-200">
+        <span
+          className="block h-1.5 rounded-full bg-[#003580]"
+          style={{ width: `${Math.round(value * 100)}%` }}
+        />
+      </span>
+    </>
+  );
 
   return (
     <PageShell title={t("title")} intro={t("intro")}>

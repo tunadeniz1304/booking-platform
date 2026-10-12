@@ -1,15 +1,18 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useId, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useFormat } from "@/i18n/use-format";
+import { bedTypeKey } from "@/lib/i18n/bed-type";
 import DateRangePicker from "@/components/search/DateRangePicker";
 import QuoteBreakdown from "./QuoteBreakdown";
+import { GuestCountStepper } from "./GuestCountStepper";
 import PriceInsight from "./PriceInsight";
 import { useQuote } from "./useQuote";
-import { subscribeStaySelection } from "./stay-selection";
+import { publishStaySelection, subscribeStaySelection } from "./stay-selection";
+import { subscribeStaySelectionClear } from "./stay-selection-clear";
 import AddToCartButton from "@/components/cart/AddToCartButton";
 import { Button, focusRing, useSession } from "@/components/ui/ui";
 
@@ -68,6 +71,13 @@ const MEAL_PLAN_KEYS: Record<string, string> = {
   FULL_BOARD: "widget.mealFullBoard",
 };
 
+type GuestField = "adults" | "children";
+
+interface StayDates {
+  checkIn: string;
+  checkOut: string;
+}
+
 /** Misafir sayısı: tam sayı ve en az `min`; geçersizse `fallback`. */
 function toCount(value: number | undefined, min: number, fallback: number): number {
   return value !== undefined && Number.isFinite(value) && value >= min
@@ -78,6 +88,8 @@ function toCount(value: number | undefined, min: number, fallback: number): numb
 export default function BookingWidget({ propertyId, rooms, initial }: BookingWidgetProps) {
   const router = useRouter();
   const t = useTranslations("booking");
+  const ts = useTranslations("search");
+  const tc = useTranslations("common");
   const f = useFormat();
   const validStay =
     initial?.checkIn !== undefined &&
@@ -96,10 +108,16 @@ export default function BookingWidget({ propertyId, rooms, initial }: BookingWid
   const [adults, setAdults] = useState(() =>
     toCount(initial?.adults, 1, toCount(initial?.guests, 1, 2))
   );
+  // `guests` toplamı yetişkin sayıldığında çocuklar ayrıca eklenmez (çift sayım olmasın).
   const [children, setChildren] = useState(() =>
-    initial?.adults !== undefined ? toCount(initial.children, 0, 0) : 0
+    initial?.adults === undefined && initial?.guests !== undefined
+      ? 0
+      : toCount(initial?.children, 0, 0)
   );
   const guestCount = adults + children;
+  // Elle yazılan misafir sayısı (taslak) ve alandan çıkınca gösterilen aralık hatası.
+  const [guestDrafts, setGuestDrafts] = useState<Partial<Record<GuestField, string>>>({});
+  const [guestErrors, setGuestErrors] = useState<Partial<Record<GuestField, string>>>({});
   const [navigating, startNavigation] = useTransition();
   const [selectedRoomId, setSelectedRoomId] = useState<string>(
     rooms.find((r) => r.id === initial?.roomId)?.id ?? rooms[0]?.id ?? ""
@@ -111,7 +129,16 @@ export default function BookingWidget({ propertyId, rooms, initial }: BookingWid
   const triggerRef = useRef<HTMLButtonElement>(null);
   const datesRef = useRef<HTMLDivElement>(null);
   const submitRef = useRef<HTMLButtonElement>(null);
+  // Olay dinleyicileri güncel tarihleri buradan okur; yarım seçimle kapanışta son eksiksiz
+  // aralık geri yüklenir.
+  const currentDates = useRef<StayDates>({ checkIn, checkOut });
+  const lastFullRange = useRef<StayDates | null>(null);
+  // Fiyat takvimi yayınlamadan önceki tarihler (takvimde "Seçimi temizle" bunları geri yükler).
+  const beforeCalendar = useRef<StayDates | null>(null);
+  // Kendi yayınımız abonelikte yok sayılır.
+  const publishing = useRef(false);
   const uid = useId();
+  const titleId = `${uid}-title`;
   const datesLabelId = `${uid}-dates`;
   const datesValueId = `${uid}-dates-value`;
   const adultsId = `${uid}-adults`;
@@ -133,8 +160,8 @@ export default function BookingWidget({ propertyId, rooms, initial }: BookingWid
     !roomPicked &&
     selectedRoom !== undefined &&
     selectedRoom.id !== initial.roomId;
-  // Misafir seçenekleri en büyük oda kapasitesine kadar; aramadan gelen değer daima listede
-  // (aksi halde kontrollü select ilk seçeneği gösterirken teklif başka sayıyla hesaplanır).
+  // Misafir sayısı en büyük oda kapasitesine kadar; aramadan gelen değer daima aralıkta
+  // (aksi halde alan gösterdiği sayıya hiç dönemez).
   const maxCapacity = availableRooms.reduce((max, room) => Math.max(max, room.capacity), 0);
   const adultMax = Math.max(maxCapacity || 6, adults);
   const childMax = Math.max((maxCapacity || 6) - 1, children);
@@ -160,10 +187,17 @@ export default function BookingWidget({ propertyId, rooms, initial }: BookingWid
     refreshKey,
   });
 
+  useEffect(() => {
+    currentDates.current = { checkIn, checkOut };
+    if (checkIn && checkOut && checkIn < checkOut) lastFullRange.current = { checkIn, checkOut };
+  }, [checkIn, checkOut]);
+
   // P1-3: fiyat takviminden seçilen tarihler formu doldurur.
   useEffect(
     () =>
       subscribeStaySelection((s) => {
+        if (publishing.current) return;
+        if (!beforeCalendar.current) beforeCalendar.current = currentDates.current;
         setCheckIn(s.checkIn);
         setCheckOut(s.checkOut);
         setEdited(true);
@@ -171,17 +205,40 @@ export default function BookingWidget({ propertyId, rooms, initial }: BookingWid
     []
   );
 
-  const closeCalendar = (returnFocus: boolean) => {
+  // Takvimde "Seçimi temizle": takvimin yayınladığı tarihler geri alınır (yeniden yayınlanmaz).
+  // Adres satırı da geri alınan tarihlerle güncellensin diye `edited` açık kalır.
+  useEffect(
+    () =>
+      subscribeStaySelectionClear(() => {
+        const before = beforeCalendar.current;
+        if (!before) return;
+        beforeCalendar.current = null;
+        setCheckIn(before.checkIn);
+        setCheckOut(before.checkOut);
+        setEdited(true);
+      }),
+    []
+  );
+
+  const closeCalendar = useCallback((returnFocus: boolean) => {
     setCalendarOpen(false);
+    // Yalnız girişle kapanınca son eksiksiz aralık geri gelir; yoksa çıkış tarihi istemi fiyat
+    // alanında görünür kalır.
+    const { checkIn: inNow, checkOut: outNow } = currentDates.current;
+    const full = lastFullRange.current;
+    if (inNow && !outNow && full) {
+      setCheckIn(full.checkIn);
+      setCheckOut(full.checkOut);
+    }
     // Gün düğmesi DOM'dan kalktığı için odak tarih düğmesine geri verilir.
     if (returnFocus) requestAnimationFrame(() => triggerRef.current?.focus());
-  };
+  }, []);
 
   // Takvim dışına tıklama ya da odak geçişi takvimi kapatır (arkadaki alanlar örtülmesin).
   useEffect(() => {
     if (!calendarOpen) return;
     const onOutside = (e: Event) => {
-      if (datesRef.current && !datesRef.current.contains(e.target as Node)) setCalendarOpen(false);
+      if (datesRef.current && !datesRef.current.contains(e.target as Node)) closeCalendar(false);
     };
     document.addEventListener("mousedown", onOutside);
     document.addEventListener("focusin", onOutside);
@@ -189,17 +246,27 @@ export default function BookingWidget({ propertyId, rooms, initial }: BookingWid
       document.removeEventListener("mousedown", onOutside);
       document.removeEventListener("focusin", onOutside);
     };
-  }, [calendarOpen]);
+  }, [calendarOpen, closeCalendar]);
 
-  const openCalendar = () => {
-    setCalendarOpen(true);
-    requestAnimationFrame(() => triggerRef.current?.focus());
-  };
+  // Seçici açılınca odağı kendisi gün ızgarasına taşır.
+  const openCalendar = () => setCalendarOpen(true);
 
-  const handleDateChange = (v: { checkIn: string; checkOut: string }) => {
+  const handleDateChange = (v: StayDates) => {
     setCheckIn(v.checkIn);
     setCheckOut(v.checkOut);
     setEdited(true);
+    currentDates.current = v;
+    // Formdaki seçim esas alınır; fiyat takvimi de aynı aralığı gösterir.
+    beforeCalendar.current = null;
+    if (v.checkIn && v.checkOut && v.checkIn < v.checkOut) {
+      lastFullRange.current = v;
+      publishing.current = true;
+      try {
+        publishStaySelection(v);
+      } finally {
+        publishing.current = false;
+      }
+    }
     if (v.checkOut) closeCalendar(true);
   };
 
@@ -298,6 +365,66 @@ export default function BookingWidget({ propertyId, rooms, initial }: BookingWid
     submitRef.current?.focus();
   };
 
+  // Süresi dolan teklif yenilenir; kararlı geri çağrı (her çizimde zamanlayıcı sıfırlanmasın).
+  const refreshExpiredQuote = useCallback(() => setRefreshKey((k) => k + 1), []);
+
+  const guestStepper = (field: GuestField) => {
+    const isAdults = field === "adults";
+    const current = isAdults ? adults : children;
+    const min = isAdults ? 1 : 0;
+    const max = isAdults ? adultMax : childMax;
+    const parse = (raw: string) => {
+      const n = Number(raw.trim());
+      return raw.trim() !== "" && Number.isInteger(n) && n >= min && n <= max ? n : null;
+    };
+    const apply = (n: number) => {
+      setGuestErrors((e) => ({ ...e, [field]: undefined }));
+      if (n === current) return;
+      if (isAdults) setAdults(n);
+      else setChildren(n);
+      setEdited(true);
+      setNotice("");
+    };
+    return (
+      <GuestCountStepper
+        id={isAdults ? adultsId : childrenId}
+        label={<span className="block text-sm text-gray-700">{t(`widget.${field}`)}</span>}
+        value={guestDrafts[field] ?? String(current)}
+        min={min}
+        max={max}
+        onChange={(raw) => {
+          setGuestDrafts((d) => ({ ...d, [field]: raw }));
+          const n = parse(raw);
+          if (n !== null) apply(n);
+        }}
+        onStep={(n) => {
+          setGuestDrafts((d) => ({ ...d, [field]: undefined }));
+          apply(n);
+        }}
+        onCommit={() => {
+          const raw = guestDrafts[field];
+          if (raw === undefined) return;
+          // Geçersiz yazım geri alınır; kullanılan sayı hata metninde söylenir.
+          setGuestDrafts((d) => ({ ...d, [field]: undefined }));
+          if (parse(raw) !== null) return;
+          setGuestErrors((e) => ({
+            ...e,
+            [field]: t(isAdults ? "widget.adultsRange" : "widget.childrenRange", {
+              min,
+              max,
+              current,
+            }),
+          }));
+        }}
+        decreaseLabel={ts(isAdults ? "bar.decreaseAdults" : "bar.decreaseChildren")}
+        increaseLabel={ts(isAdults ? "bar.increaseAdults" : "bar.increaseChildren")}
+        valueText={(n) => ts("bar.countStatus", { label: t(`widget.${field}`), count: n })}
+        error={guestErrors[field]}
+        describedBy={overCapacity ? capacityMsgId : undefined}
+      />
+    );
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     // Yönlendirme sürerken ikinci gönderim yok sayılır.
@@ -360,9 +487,12 @@ export default function BookingWidget({ propertyId, rooms, initial }: BookingWid
   return (
     <form
       onSubmit={handleSubmit}
+      aria-labelledby={titleId}
       className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm"
     >
-      <h2 className="text-xl font-semibold text-gray-900">{t("widget.title")}</h2>
+      <h2 id={titleId} className="text-xl font-semibold text-gray-900">
+        {t("widget.title")}
+      </h2>
 
       <div className="relative mt-4" ref={datesRef}>
         <span id={datesLabelId} className="block text-sm font-medium text-gray-700">
@@ -371,24 +501,18 @@ export default function BookingWidget({ propertyId, rooms, initial }: BookingWid
         <button
           ref={triggerRef}
           type="button"
-          onClick={() => setCalendarOpen(!calendarOpen)}
+          onClick={() => (calendarOpen ? closeCalendar(false) : openCalendar())}
           aria-expanded={calendarOpen}
           aria-haspopup="dialog"
           aria-labelledby={`${datesLabelId} ${datesValueId}`}
-          className={`mt-1 min-h-[44px] w-full rounded-lg border border-gray-500 px-3 py-2 text-left text-sm text-gray-900 hover:border-[#003580] ${focusRing}`}
+          className={`mt-1 min-h-[44px] w-full rounded-lg border border-gray-500 px-3 py-2 text-left text-base text-gray-900 hover:border-[#003580] sm:text-sm ${focusRing}`}
         >
           <span id={datesValueId}>{dateSummary}</span>
         </button>
         {calendarOpen && (
           // Seçici dar kapsayıcıda kendiliğinden tek aya düşer; gün düğmeleri hücreye sığar.
           <div className="absolute left-0 right-0 z-20">
-            {/* Görünür adım yönergesi; ekran okuyucuya seçicinin kendi duyurusu okunur. */}
-            <p
-              aria-hidden="true"
-              className="mb-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-900"
-            >
-              {checkIn && !checkOut ? t("widget.pickCheckOut") : t("widget.pickCheckIn")}
-            </p>
+            {/* Adım ve gece sayısı satırı seçicinin kendisinde. */}
             <DateRangePicker
               value={{ checkIn, checkOut }}
               onChange={handleDateChange}
@@ -410,53 +534,9 @@ export default function BookingWidget({ propertyId, rooms, initial }: BookingWid
 
       <fieldset className="mt-3">
         <legend className="block text-sm font-medium text-gray-700">{t("widget.guests")}</legend>
-        <div className="mt-1 grid grid-cols-2 gap-3">
-          <div>
-            <label htmlFor={adultsId} className="block text-sm text-gray-700">
-              {t("widget.adults")}
-            </label>
-            <select
-              id={adultsId}
-              value={adults}
-              onChange={(e) => {
-                setAdults(Number(e.target.value));
-                setEdited(true);
-                setNotice("");
-              }}
-              aria-invalid={overCapacity || undefined}
-              aria-describedby={overCapacity ? capacityMsgId : undefined}
-              className={`mt-1 min-h-[44px] w-full rounded-lg border border-gray-500 px-3 py-2 text-sm focus:border-[#003580] ${focusRing}`}
-            >
-              {Array.from({ length: adultMax }, (_, i) => i + 1).map((count) => (
-                <option key={count} value={count}>
-                  {count}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label htmlFor={childrenId} className="block text-sm text-gray-700">
-              {t("widget.children")}
-            </label>
-            <select
-              id={childrenId}
-              value={children}
-              onChange={(e) => {
-                setChildren(Number(e.target.value));
-                setEdited(true);
-                setNotice("");
-              }}
-              aria-invalid={overCapacity || undefined}
-              aria-describedby={overCapacity ? capacityMsgId : undefined}
-              className={`mt-1 min-h-[44px] w-full rounded-lg border border-gray-500 px-3 py-2 text-sm focus:border-[#003580] ${focusRing}`}
-            >
-              {Array.from({ length: childMax + 1 }, (_, i) => i).map((count) => (
-                <option key={count} value={count}>
-                  {count}
-                </option>
-              ))}
-            </select>
-          </div>
+        <div className="mt-1 flex flex-wrap gap-x-6 gap-y-3">
+          {guestStepper("adults")}
+          {guestStepper("children")}
         </div>
       </fieldset>
 
@@ -493,21 +573,27 @@ export default function BookingWidget({ propertyId, rooms, initial }: BookingWid
                   .filter(Boolean)
                   .join(" ") || undefined
               }
-              className={`mt-1 min-h-[44px] w-full rounded-lg border border-gray-500 px-3 py-2 text-sm focus:border-[#003580] ${focusRing}`}
+              className={`mt-1 min-h-[44px] w-full rounded-lg border border-gray-500 px-3 py-2 text-base focus:border-[#003580] sm:text-sm ${focusRing}`}
             >
-              {availableRooms.map((room) => (
-                <option key={room.id} value={room.id}>
-                  {t(
-                    room.capacity < guestCount ? "widget.roomOptionTooSmall" : "widget.roomOption",
-                    {
-                      name: room.name,
-                      capacity: room.capacity,
-                      bedType: room.bedType,
-                      guests: guestCount,
-                    }
-                  )}
-                </option>
-              ))}
+              {availableRooms.map((room) => {
+                // Yatak tipi kodu arayüz dilinde; eski serbest metin olduğu gibi gösterilir.
+                const bedKey = bedTypeKey(room.bedType);
+                return (
+                  <option key={room.id} value={room.id}>
+                    {t(
+                      room.capacity < guestCount
+                        ? "widget.roomOptionTooSmall"
+                        : "widget.roomOption",
+                      {
+                        name: room.name,
+                        capacity: room.capacity,
+                        bedType: bedKey ? tc(bedKey) : room.bedType,
+                        guests: guestCount,
+                      }
+                    )}
+                  </option>
+                );
+              })}
             </select>
           </>
         )}
@@ -599,21 +685,11 @@ export default function BookingWidget({ propertyId, rooms, initial }: BookingWid
             {quoteErrorAction === "dates" ? t("widget.pickOtherDates") : t("widget.retry")}
           </Button>
         )}
-        {quote && <QuoteBreakdown quote={quote} />}
+        {quote && <QuoteBreakdown quote={quote} heading="h3" onExpire={refreshExpiredQuote} />}
         <p className="sr-only" role="status">
           {liveText}
         </p>
       </div>
-
-      {/* Teklif hatasında ya da kapasite aşımında gecelik fiyat değerlendirmesi gösterilmez. */}
-      {selectedRoom && datesComplete && !errorText && !overCapacity && (
-        <PriceInsight
-          roomId={selectedRoom.id}
-          checkIn={checkIn}
-          checkOut={checkOut}
-          guests={guestCount}
-        />
-      )}
 
       {/* Pasifken de odaklanabilir (aria-disabled); nedeni aria-describedby ile okunur. */}
       <button
@@ -640,6 +716,18 @@ export default function BookingWidget({ propertyId, rooms, initial }: BookingWid
         childCount={children}
         disabled={!quote}
       />
+
+      {/* Ana düğmelerden sonra: değerlendirme içeriği devam düğmesini aşağı itmez. Teklif
+          hatasında ya da kapasite aşımında gecelik fiyat değerlendirmesi gösterilmez. */}
+      {selectedRoom && datesComplete && !errorText && !overCapacity && (
+        <PriceInsight
+          roomId={selectedRoom.id}
+          checkIn={checkIn}
+          checkOut={checkOut}
+          guests={guestCount}
+          user={session.status === "ready" ? session.user : undefined}
+        />
+      )}
     </form>
   );
 }

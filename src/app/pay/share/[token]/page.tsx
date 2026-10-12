@@ -320,8 +320,15 @@ export default function SharePayPage() {
       {t("share.home")}
     </Link>
   );
+  // Organizatör bölünmüş ödeme durumunu sepet sayfasında izler; oraya dönüş yolu (F717).
+  const statusLink = share?.isOrganizer ? (
+    <Link href="/checkout/cart" className={linkClass}>
+      {t("share.backToStatus")}
+    </Link>
+  ) : null;
   const exitLinks = (
     <div className="mt-4 flex flex-wrap gap-4">
+      {statusLink}
       <Link href="/trips" className={linkClass}>
         {tc("checkout.trips")}
       </Link>
@@ -371,6 +378,9 @@ export default function SharePayPage() {
   const emailUnverified =
     (share as ShareViewDTO & { emailVerified?: boolean }).emailVerified === false;
   const payInfoId = `${cardIds}-info`;
+  const summaryTitleId = `${cardIds}-summary-title`;
+  const payTitleId = `${cardIds}-pay-title`;
+  const challengeTitleId = `${cardIds}-3ds-title`;
 
   /** Pay ödenemiyorsa nedeni: başka hesapça ödendi, plan iptal/tamamlandı ya da süre doldu. */
   const closedText =
@@ -391,8 +401,14 @@ export default function SharePayPage() {
           <p className="text-gray-700">{t("share.from", { name: share.organizerName })}</p>
         )}
 
-        <section className="mt-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-          <ul className="divide-y divide-gray-100 text-sm">
+        <section
+          aria-labelledby={summaryTitleId}
+          className="mt-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm"
+        >
+          <h2 id={summaryTitleId} className="text-lg font-semibold text-gray-900">
+            {t("share.summary")}
+          </h2>
+          <ul className="mt-3 divide-y divide-gray-100 text-sm">
             {share.items.map((i, idx) => (
               <li key={idx} className="py-2 text-gray-700">
                 {i.propertyTitle} · {i.roomTypeName} · {f.date(i.checkIn, "medium")} →{" "}
@@ -466,7 +482,10 @@ export default function SharePayPage() {
               <p className="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">
                 {closedText}
               </p>
-              <div className="mt-4">{homeLink}</div>
+              <div className="mt-4 flex flex-wrap gap-4">
+                {statusLink}
+                {homeLink}
+              </div>
             </div>
           )}
         </div>
@@ -482,9 +501,11 @@ export default function SharePayPage() {
           <form
             onSubmit={pay}
             className="mt-6 space-y-3 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm"
-            aria-label={tp("title")}
+            aria-labelledby={payTitleId}
           >
-            <h2 className="text-lg font-semibold text-gray-900">{tp("title")}</h2>
+            <h2 id={payTitleId} className="text-lg font-semibold text-gray-900">
+              {tp("title")}
+            </h2>
             {/* Provizyon: şimdi yalnız bloke edilir; tüm paylar gelince tahsil, gelmezse iptal. */}
             <p id={payInfoId} className="text-sm text-gray-700">
               {t("share.payInfo", { amount: f.money(share.amountMinor, share.currency) })}
@@ -498,6 +519,7 @@ export default function SharePayPage() {
               errors={cardErrors}
               idPrefix={cardIds}
               showTestCards
+              disabled={busy}
             />
             {/* Meşgulken `disabled` yerine aria-disabled: odak düğmede kalır, çift gönderim yok. */}
             <button
@@ -518,10 +540,11 @@ export default function SharePayPage() {
         {challenge && (
           <form
             onSubmit={confirm3ds}
-            aria-label={tp("threeDsTitle")}
+            aria-labelledby={challengeTitleId}
             className="mt-6 space-y-3 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm"
           >
             <h2
+              id={challengeTitleId}
               ref={challengeHeadingRef}
               tabIndex={-1}
               className="text-lg font-semibold text-gray-900 focus:outline-none"

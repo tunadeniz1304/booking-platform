@@ -13,6 +13,8 @@ const bodySchema = z.object({
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .optional(),
+  /** Anlatımın dili (arayüz dili); verilmezse Türkçe. */
+  locale: z.enum(["tr", "en"]).optional(),
 });
 
 /** Çok şehirli gezi planı (rezervasyon yapmaz; her durak için teklif kimliği döner). */

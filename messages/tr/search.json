@@ -88,7 +88,8 @@
     "searching": "Aranıyor…",
     "formLabel": "Konaklama ara",
     "maxGuests": "En fazla {max} misafir seçebilirsiniz.",
-    "childrenHintPricing": "0–12 yaş · yaş fiyatı etkilemez"
+    "childrenHintPricing": "0–12 yaş · yaş fiyatı etkilemez",
+    "dateRange": "{checkIn} – {checkOut} · {nights}"
   },
   "picker": {
     "prevMonth": "Önceki ay",
@@ -117,7 +118,8 @@
     "count": "{count} öneri",
     "error": "Öneriler yüklenemedi. Yazdığınızla yine de arayabilirsiniz.",
     "searchFor": "“{query}” için ara",
-    "clear": "Varış yerini temizle"
+    "clear": "Varış yerini temizle",
+    "properties": "Tesisler"
   },
   "mapView": {
     "initFailed": "harita başlatılamadı",
@@ -171,12 +173,12 @@
     "allRemoved": "Tüm akıllı filtreleri kaldırdınız; sonuçlar yalnızca arama ölçütlerinize göre gösteriliyor."
   },
   "card": {
-    "reviews": "{count, plural, other {# değerlendirme}}",
+    "reviews": "{count, plural, other {# yorum}}",
     "nightsTotal": "{count} gece toplam",
     "taxesIncluded": "vergi ve ücretler dahil",
     "fromPerNight": "gecelik başlangıç",
     "taxesOnDates": "tarih seçince vergi ve ücretler eklenir",
-    "seeDeal": "Fırsatı Gör",
+    "seeDeal": "Fırsatı gör",
     "addFavorite": "Favorilere ekle",
     "removeFavorite": "Favorilerden çıkar",
     "favoriteAdded": "Favorilere eklendi",

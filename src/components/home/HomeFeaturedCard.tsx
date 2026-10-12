@@ -19,6 +19,8 @@ export default function HomeFeaturedCard(props: Omit<PropertyCardProps, "searchC
               checkIn: dates?.checkIn ?? null,
               checkOut: dates?.checkOut ?? null,
               guests: draft.adults + draft.children,
+              adults: draft.adults,
+              children: draft.children,
             }
           : undefined
       }

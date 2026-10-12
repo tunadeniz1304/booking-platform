@@ -1,7 +1,7 @@
 {
   "manifest": {
-    "name": "Booking — Stay Reservations",
-    "shortName": "Booking",
+    "name": "booking-platform — Stay Reservations",
+    "shortName": "booking-platform",
     "description": "Search stays and view your bookings and QR card even offline (portfolio/demo project)."
   },
   "trips": {
@@ -32,7 +32,8 @@
     "stay": "Length of stay",
     "nights": "{count, plural, one {# night} other {# nights}}",
     "emptyNote": "Bookings awaiting payment or cancelled bookings are not shown here.",
-    "allBookingsLink": "All my bookings"
+    "allBookingsLink": "All my bookings",
+    "introScope": "Bookings awaiting payment, past bookings and cancelled bookings are listed under <link>My account › My bookings</link>."
   },
   "push": {
     "title": "Push notifications",

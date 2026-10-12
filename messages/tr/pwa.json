@@ -1,7 +1,7 @@
 {
   "manifest": {
-    "name": "Booking — Konaklama Rezervasyonu",
-    "shortName": "Booking",
+    "name": "booking-platform — Konaklama Rezervasyonu",
+    "shortName": "booking-platform",
     "description": "Konaklama arayın, rezervasyonlarınızı ve QR kartınızı çevrimdışı da görün (portföy/demo projesi)."
   },
   "trips": {
@@ -32,11 +32,12 @@
     "stay": "Süre",
     "nights": "{count, plural, one {# gece} other {# gece}}",
     "emptyNote": "Ödemesi tamamlanmamış ya da iptal edilmiş rezervasyonlar burada görünmez.",
-    "allBookingsLink": "Tüm rezervasyonlarım"
+    "allBookingsLink": "Tüm rezervasyonlarım",
+    "introScope": "Ödemesi bekleyen, geçmiş ve iptal edilen rezervasyonlarınız <link>Hesabım › Rezervasyonlarım</link> bölümünde listelenir."
   },
   "push": {
     "title": "Anlık bildirimler",
-    "description": "Fiyat alarmınızdaki konaklamanın fiyatı düştüğünde ve check-in'den önce bu cihaza bildirim gönderelim.",
+    "description": "Fiyat alarmınızdaki konaklamanın fiyatı düştüğünde ve giriş gününden önce bu cihaza bildirim gönderelim.",
     "enable": "Bu cihazda bildirimleri aç",
     "disable": "Bu cihazda bildirimleri kapat",
     "working": "İşleniyor…",

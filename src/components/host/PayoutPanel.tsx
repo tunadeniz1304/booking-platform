@@ -3,15 +3,18 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { apiFetch } from "@/lib/api-client";
+import { ApiError, apiFetch } from "@/lib/api-client";
 import { useFormat } from "@/i18n/use-format";
 import {
   Button,
+  ButtonLink,
   Card,
   Field,
+  LoadError,
   Status,
   focusRing,
   inputClass,
+  loginHref,
   useErrorText,
   useLoader,
 } from "@/components/ui/ui";
@@ -106,15 +109,41 @@ type Action = "connect" | "schedule" | "refresh";
 /** Ev sahibi ödemeleri (P1-4): hesap durumu, bakiyeler ve payout geçmişi. */
 export default function PayoutPanel() {
   const t = useTranslations("payouts");
+  const tc = useTranslations("common");
   const f = useFormat();
   const errorText = useErrorText();
-  const { data, error, reload } = useLoader(() => apiFetch<Overview>("/api/host/payouts"), []);
+  // 401'de (oturum düştü) hata görünümü dönüş adresli giriş bağlantısı da gösterir.
+  const [authLost, setAuthLost] = useState(false);
+  const { data, error, loading, reload } = useLoader(
+    () =>
+      apiFetch<Overview>("/api/host/payouts").then(
+        (d) => {
+          setAuthLost(false);
+          return d;
+        },
+        (e: unknown) => {
+          setAuthLost(e instanceof ApiError && e.status === 401);
+          throw e;
+        }
+      ),
+    []
+  );
   const [schedule, setSchedule] = useState<Schedule | "">("");
   const [busy, setBusy] = useState<Action | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  if (error) return <Status error={error} />;
+  if (error)
+    return (
+      <Card title={t("account.title")} id="payout-account">
+        <LoadError error={error} onRetry={reload} busy={loading} />
+        {authLost && (
+          <ButtonLink href={loginHref()} variant="secondary" className="mt-2 min-h-[44px]">
+            {tc("sessionExpired.login")}
+          </ButtonLink>
+        )}
+      </Card>
+    );
   if (!data)
     return (
       <div role="status" aria-live="polite" aria-busy="true">
@@ -276,7 +305,7 @@ export default function PayoutPanel() {
               busy={busy === "schedule"}
               aria-disabled={!scheduleChanged || undefined}
             >
-              {t("account.saveSchedule")}
+              {busy === "schedule" ? t("account.savingSchedule") : t("account.saveSchedule")}
             </Button>
           ) : (
             <Button

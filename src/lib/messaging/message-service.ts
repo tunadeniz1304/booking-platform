@@ -113,7 +113,8 @@ export async function listMessages(
 ) {
   const access = await resolveThreadAccess(bookingId, userId);
   const thread = await prisma.messageThread.findUnique({ where: { bookingId } });
-  const size = getConfig().MESSAGE_PAGE_SIZE;
+  const config = getConfig();
+  const size = config.MESSAGE_PAGE_SIZE;
   const cursor =
     thread && opts.before
       ? await prisma.message.findFirst({
@@ -145,6 +146,8 @@ export async function listMessages(
   return {
     role: access.role,
     canWrite: WRITABLE.has(access.status),
+    /** Mesaj gövdesi üst sınırı; istemci sayaç ve yerel sınır için kullanır. */
+    maxLength: config.MESSAGE_MAX_LENGTH,
     hasMore,
     /** Konuşma bağlamı (ev sahibi sayfası özeti); misafirin yalnız adı verilir. */
     context: {

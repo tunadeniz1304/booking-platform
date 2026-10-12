@@ -19,9 +19,9 @@ export default function AdminCompliancePage() {
   const sections = [
     { id: "takedowns", label: t("takedowns") },
     { id: "notices", label: t("notices") },
-    { id: "transparency", label: t("transparency") },
     { id: "appeals", label: tAppeal("title") },
     { id: "accessibility-review", label: tAccessibility("title") },
+    { id: "transparency", label: t("transparency") },
   ];
   return (
     <PageShell title={t("title")} intro={t("intro")}>
@@ -46,9 +46,14 @@ export default function AdminCompliancePage() {
                 ))}
               </ul>
             </nav>
-            <ComplianceDashboard />
-            <AppealQueue />
-            <AccessibilityReviewQueue />
+            <ComplianceDashboard
+              afterNotices={
+                <>
+                  <AppealQueue />
+                  <AccessibilityReviewQueue />
+                </>
+              }
+            />
           </div>
         )}
       </RoleGate>

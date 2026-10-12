@@ -56,7 +56,7 @@
     "error": "Rezervasyonlar yüklenemedi.",
     "filter": {
       "status": "Duruma göre süz",
-      "property": "Mülke göre süz",
+      "property": "İlana göre süz",
       "all": "Tümü",
       "count": "{total} rezervasyondan {shown} tanesi gösteriliyor.",
       "empty": "Bu süzgeçlerle eşleşen rezervasyon yok."

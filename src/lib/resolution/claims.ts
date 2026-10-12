@@ -516,9 +516,31 @@ export async function listClaims(
   return rows.map((r) => toSummary(r, actor, titles));
 }
 
+export interface ClaimPartyView {
+  displayName: string;
+}
+
+/** Yönetici görünümü: tarafların adı (ad + soyadın baş harfi); kullanıcı yoksa null. */
+async function claimParties(
+  claim: Claim
+): Promise<{ opener: ClaimPartyView | null; respondent: ClaimPartyView | null }> {
+  const ids = [claim.openedById, claim.respondentId].filter((id): id is string => !!id);
+  const users = ids.length
+    ? await prisma.user.findMany({
+        where: { id: { in: ids } },
+        select: { id: true, firstName: true, lastName: true },
+      })
+    : [];
+  const view = (id: string | null): ClaimPartyView | null => {
+    const u = id ? users.find((x) => x.id === id) : undefined;
+    return u ? { displayName: `${u.firstName} ${u.lastName.slice(0, 1)}.`.trim() } : null;
+  };
+  return { opener: view(claim.openedById), respondent: view(claim.respondentId) };
+}
+
 export async function getClaimDetail(actor: AccessClaims, claimId: string) {
   const claim = await loadClaimForActor(actor, claimId);
-  const [messages, evidence, booking, deposit] = await Promise.all([
+  const [messages, evidence, booking, deposit, parties] = await Promise.all([
     prisma.claimMessage.findMany({ where: { claimId }, orderBy: { createdAt: "asc" } }),
     prisma.claimEvidence.findMany({
       where: { claimId },
@@ -535,6 +557,7 @@ export async function getClaimDetail(actor: AccessClaims, claimId: string) {
     }),
     loadBooking(claim.bookingId),
     prisma.damageDeposit.findUnique({ where: { bookingId: claim.bookingId } }),
+    actor.role === "ADMIN" ? claimParties(claim) : Promise.resolve(undefined),
   ]);
   const titles = new Map(booking ? [[booking.id, booking.property.title]] : []);
   const roleOf = (userId: string) =>
@@ -581,6 +604,7 @@ export async function getClaimDetail(actor: AccessClaims, claimId: string) {
       height: e.height,
       createdAt: e.createdAt.toISOString(),
     })),
+    ...(parties ? { parties } : {}),
   };
 }
 

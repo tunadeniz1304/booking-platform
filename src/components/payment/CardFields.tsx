@@ -138,7 +138,15 @@ export function CardFields({
           autoComplete="cc-number"
           maxLength={23}
           value={values.number}
-          onChange={(e) => onChange("number", e.target.value)}
+          onChange={(e) =>
+            onChange(
+              "number",
+              e.target.value
+                .replace(/\D/g, "")
+                .slice(0, 19)
+                .replace(/(\d{4})(?=\d)/g, "$1 ")
+            )
+          }
         />
       </Field>
       <div className="grid grid-cols-2 gap-3">
@@ -153,7 +161,7 @@ export function CardFields({
             onChange={(e) => onChange("exp", formatExpiry(e.target.value))}
           />
         </Field>
-        <Field label={t("cvc")} id={ids.cvc} error={errors?.cvc}>
+        <Field label={t("cvc")} id={ids.cvc} hint={t("cvcHint")} error={errors?.cvc}>
           <input
             {...common}
             id={ids.cvc}

@@ -39,7 +39,7 @@
     "linkedTitle": "Listing being reported",
     "reportAnother": "Report other content",
     "errorSummary": "Please fix {count, plural, one {# problem} other {# problems}} in the form:",
-    "sentEmail": "A confirmation email was sent to {email}.",
+    "sentEmail": "A confirmation email will be sent to {email} within a few minutes; if it doesn't arrive, check your spam folder.",
     "referenceLabel": "Your reference number",
     "referenceHint": "Share this number if you contact support.",
     "copyReference": "Copy number",
@@ -55,7 +55,9 @@
     "home": "Back to home",
     "reporterEmailHint": "Confirmation and decision emails are sent to this address. It is used only to contact you about this notice.",
     "privacyNote": "Your name and email address are not shared with the property owner; only our team reviewing the notice sees them. For details, read the <link>privacy notice</link>.",
-    "timeout": "The connection timed out. What you entered is kept; you can send the notice again."
+    "timeout": "The connection timed out. What you entered is kept; you can send the notice again.",
+    "rateLimitedRetry": "Too many notices sent. Please try again in about {minutes, plural, one {# minute} other {# minutes}}.",
+    "rateLimitedAlt": "If it can't wait, <link>contact our support team</link>."
   },
   "admin": {
     "title": "Compliance",
@@ -208,7 +210,9 @@
     },
     "slaWarning": {
       "dueSoon": "SLA deadline approaching"
-    }
+    },
+    "referenceNoOptional": "Document no. (optional)",
+    "legalReferenceOptional": "Legal reference (optional)"
   },
   "accessibility": {
     "title": "Accessibility",
@@ -257,8 +261,8 @@
       "note": "Note (optional)",
       "add": "Add feature",
       "added": "Feature added.",
-      "evidenceSaved": "Evidence updated; the feature will be reviewed again.",
-      "deleted": "Feature deleted.",
+      "evidenceSaved": "Evidence updated for {name}; the feature will be reviewed again.",
+      "deleted": "Feature deleted: {name}.",
       "saveEvidence": "Save evidence",
       "saveEvidenceLabel": "Save evidence for {name}",
       "evidenceVerifiedWarning": "This feature is verified. If you change and save the evidence, verification is removed and the platform team reviews it again.",
@@ -289,7 +293,8 @@
       "pendingReviewHint": "Appears on the listing and in search once our team reviews and verifies the evidence.",
       "needsEvidenceHint": "Choose and save evidence from your listing photos; it appears on the listing once our team verifies it.",
       "newTab": "(opens in a new tab)",
-      "noteHint": "Up to {max} characters; {remaining, plural, one {# character} other {# characters}} left."
+      "noteHint": "Up to {max} characters; {remaining, plural, one {# character} other {# characters}} left.",
+      "adding": "Adding…"
     },
     "admin": {
       "title": "Accessibility verification queue",
@@ -321,6 +326,12 @@
         "unverifyEffect": "The feature is hidden on the listing and in search and returns to the awaiting-review list.",
         "verify": "Verify",
         "unverify": "Remove verification"
+      },
+      "verifyLabel": "Verify: {name} ({property})",
+      "unverifyLabel": "Remove verification: {name} ({property})",
+      "errors": {
+        "evidenceRequired": "A feature without an evidence photo can't be verified. Wait for the host to add evidence.",
+        "notFound": "This declaration no longer exists; the host may have deleted it."
       }
     },
     "askSupport": "Ask Support",
@@ -331,7 +342,7 @@
   },
   "appeal": {
     "title": "Appeal a decision",
-    "intro": "Under DSA Art. 20 you can appeal a content moderation decision. A qualified member of staff reviews your appeal and emails you the outcome.",
+    "intro": "Under Article 20 of the EU Digital Services Act (DSA), you can appeal a content moderation decision. A qualified member of staff reviews your appeal and emails you the outcome.",
     "invalidLink": "This appeal link is incomplete or incorrect. Use the full link from your decision email; if the problem continues, contact our support team with the decision ID and your email address.",
     "decisionTitle": "Decision under appeal",
     "decision": "Decision",
@@ -345,7 +356,7 @@
     "existing": {
       "PENDING": "Your appeal was received and is under review (reference: {reference}).",
       "UPHELD": "Your appeal was upheld; the decision was reversed (reference: {reference}).",
-      "REJECTED": "Your appeal was rejected (reference: {reference}). You may refer the matter to an out-of-court dispute settlement body (DSA Art. 21)."
+      "REJECTED": "Your appeal was rejected (reference: {reference}). Under DSA Art. 21, you may refer the matter to a certified out-of-court dispute settlement body."
     },
     "windowClosed": "The appeal period for this decision has ended.",
     "formTitle": "Your appeal",
@@ -375,7 +386,7 @@
       "groundHint": "A ground is required because the listing will be removed.",
       "response": "Reasons (sent to the appellant)",
       "submit": "Save appeal decision",
-      "decided": "Appeal decision saved; the outcome will be emailed.",
+      "decided": "Appeal decision saved for “{item}”; the outcome will be emailed.",
       "chooseOutcome": "Choose an outcome.",
       "confirm": {
         "title": "Save the appeal decision?",
@@ -387,7 +398,13 @@
       },
       "rowTitle": "Appellant: {role} · Decision: {decision}",
       "noDecision": "not on record",
-      "appealedAt": "Appeal date: {date}"
+      "appealedAt": "Appeal date: {date}",
+      "responseHint": "At least 10 characters.",
+      "errors": {
+        "response": "Reasons must be 10 to 5,000 characters.",
+        "decided": "The appeal for “{item}” was already decided; the list was refreshed.",
+        "notFound": "The appeal for “{item}” no longer exists; the list was refreshed."
+      }
     },
     "sentTitle": "Your appeal has been received",
     "notDecided": "No appealable decision was found for this link. The notice may not have been decided yet; you will be emailed when a decision is made.",
@@ -398,6 +415,12 @@
     "windowEndsAt": "{date}, {time} (Turkey time, GMT+3)",
     "daysLeft": "{days, plural, =0 {Ends today} one {# day left} other {# days left}}",
     "appealDecidedAt": "Appeal decision date",
-    "disputeHelp": "Ask our support team about out-of-court dispute settlement (DSA Art. 21)"
+    "disputeHelp": "Ask our support team about out-of-court dispute settlement (DSA Art. 21)",
+    "timeout": "The connection timed out. What you entered is kept; you can send the appeal again.",
+    "copyReference": "Copy reference",
+    "copied": "Copied.",
+    "copyFailed": "Could not copy; select the reference and copy it manually.",
+    "nextSteps": "A qualified member of staff reviews your appeal. If it is upheld, the earlier decision is reversed; if it is rejected, you may refer the matter to an out-of-court dispute settlement body (DSA Art. 21).",
+    "home": "Back to home"
   }
 }

@@ -13,7 +13,7 @@ import {
 import { useTranslations } from "next-intl";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
-import { Button, Status } from "@/components/ui/ui";
+import { Button, Status, focusRing } from "@/components/ui/ui";
 import { ApiError, apiFetch } from "@/lib/api-client";
 
 /**
@@ -49,7 +49,7 @@ export default function AuthCard({
         id="main"
         className="mx-auto flex w-full max-w-md flex-1 items-center justify-center px-4 py-16"
       >
-        <div className="w-full rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
+        <div className="w-full rounded-2xl border border-gray-200 bg-white p-6 shadow-sm sm:p-8">
           <h1
             ref={titleRef}
             tabIndex={focusTitle ? -1 : undefined}
@@ -94,13 +94,14 @@ export function Notice({
   );
 }
 
-/** Kimlik formlarındaki alanların ortak (değişmeyen) görünümü. */
-export const authInputClass =
-  "mt-1 w-full rounded-lg border border-gray-500 px-3 py-2 text-sm focus:border-[#003580] focus:outline-none focus:ring-1 focus:ring-[#003580]";
+/**
+ * Kimlik formlarındaki alanların ortak (değişmeyen) görünümü: küçük ekranda 16px (iOS odakta
+ * büyütmez), en az 44px yükseklik ve sitenin ortak odak halkası.
+ */
+export const authInputClass = `mt-1 min-h-[44px] w-full rounded-lg border border-gray-500 px-3 py-2 text-base focus:border-[#003580] sm:text-sm ${focusRing}`;
 
 /** Birincil gönder düğmesi; `aria-disabled` iken odak düğmede kalır (bkz. `submitButtonProps`). */
-export const authSubmitClass =
-  "w-full rounded-lg bg-[#003580] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#002b66] disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-700 aria-disabled:cursor-not-allowed aria-disabled:bg-gray-300 aria-disabled:text-gray-700";
+export const authSubmitClass = `w-full rounded-lg bg-[#003580] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#002b66] disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-700 aria-disabled:cursor-not-allowed aria-disabled:bg-gray-300 aria-disabled:text-gray-700 ${focusRing}`;
 
 /**
  * Gönderim sürerken `disabled` yerine `aria-disabled` + `aria-busy`: `disabled` klavye

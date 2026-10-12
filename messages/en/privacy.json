@@ -62,10 +62,10 @@
     "exportBody": "Download a copy of the personal data associated with your account (profile, bookings, reviews, favorites) as a JSON file. JSON is a machine-readable text file that you can open in any text editor. Your password (including its encrypted form) is not included.",
     "exportButton": "Download my data",
     "deleteTitle": "Delete my account",
-    "deleteBody": "Your personal fields are deleted or replaced with a random value that does not identify you. Booking and payment records are kept in anonymised form because of legal retention obligations. This cannot be undone.",
+    "deleteBody": "Your personal fields are deleted or replaced with a random value that does not identify you. Booking and payment records are kept in anonymized form because of legal retention obligations. This cannot be undone.",
     "deleteButton": "Delete my account",
     "confirmTitle": "Are you sure you want to permanently delete your account?",
-    "acknowledge": "I understand that my upcoming bookings will be cancelled under their cancellation terms, my wallet credit will be deleted and this cannot be undone.",
+    "acknowledge": "I understand that my upcoming bookings will be cancelled under their cancellation terms, my wallet balance will be deleted and this cannot be undone.",
     "deleting": "Deleting…",
     "confirmDelete": "Yes, delete my account",
     "cancel": "Cancel",
@@ -73,7 +73,7 @@
     "deleteEffects": {
       "title": "When you delete your account:",
       "bookings": "Your upcoming bookings are cancelled under the cancellation terms that applied when you booked. You may get no refund or only a partial refund.",
-      "wallet": "Credit and rewards in your wallet are deleted and cannot be used later.",
+      "wallet": "Your wallet balance and rewards are deleted and cannot be used later.",
       "transfers": "Booking transfer listings you have put up for sale are withdrawn.",
       "listings": "If you are a host, your listings are taken offline.",
       "obligations": "If, as a host, you have upcoming confirmed bookings, a pending payout or an open claim, you must resolve them first."
@@ -91,9 +91,12 @@
     },
     "exporting": "Preparing…",
     "exportFallback": "If the download did not start, download the file here",
-    "deletedBody": "You have been signed out. Your personal fields have been deleted or replaced with a pseudonym; booking and payment records are kept in anonymised form.",
+    "deletedBody": "You have been signed out. Your personal fields have been deleted or replaced with a pseudonym; booking and payment records are kept in anonymized form.",
     "deletedBookings": "{count, plural, one {# upcoming booking was cancelled under its cancellation terms.} other {# upcoming bookings were cancelled under their cancellation terms.}}",
     "deletedTransfers": "{count, plural, one {# booking transfer listing was withdrawn.} other {# booking transfer listings were withdrawn.}}",
-    "deletedHome": "Go to the home page"
+    "deletedHome": "Go to the home page",
+    "cookiesTitle": "Cookie preferences",
+    "cookiesBody": "Analytics cookies are used only if you give consent. You can change your choice or withdraw your consent at any time.",
+    "requestsTitle": "Other requests (information, rectification, objection)"
   }
 }

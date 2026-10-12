@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useState, type FormEvent, type MouseEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type MouseEvent,
+  type ReactNode,
+} from "react";
 import { useTranslations } from "next-intl";
 import { apiFetch } from "@/lib/api-client";
 import {
@@ -66,6 +73,82 @@ interface PanelStatus {
 
 /** Not alanı üst sınırı (API ile aynı). */
 const NOTE_MAX = 500;
+
+/** Silme sonrası odak hedefleri (satır kalkınca odak `body`'ye düşmesin). */
+const EMPTY_ID = "a11y-features-empty";
+const featureNameId = (id: string) => `a11y-feature-${id}`;
+
+const EVIDENCE_OPTION_CLASS =
+  "flex min-h-[44px] cursor-pointer items-center gap-2 rounded border border-gray-200 p-1.5 text-xs text-gray-800 has-[:checked]:bg-blue-50 has-[:checked]:font-semibold";
+
+/**
+ * Kanıt seçimi: "Kanıt yok" ve ilanın her fotoğrafı için küçük resimli bir radyo düğmesi.
+ * Seçim yalnız `onChange`'e bildirilir; gönderim çağıranın işidir (WCAG 3.2.2).
+ */
+function EvidencePicker({
+  name,
+  legend,
+  hint,
+  hintId,
+  value,
+  onChange,
+  photos,
+  photoLabel,
+  noneLabel,
+}: {
+  name: string;
+  legend: ReactNode;
+  hint: string;
+  hintId: string;
+  value: string;
+  onChange: (value: string) => void;
+  photos: ReadonlyArray<Photo>;
+  photoLabel: (id: string) => string;
+  noneLabel: string;
+}) {
+  return (
+    <fieldset aria-describedby={hintId} className="min-w-0">
+      <legend className="text-xs font-medium text-gray-800">{legend}</legend>
+      <div className="mt-1 flex flex-wrap gap-2">
+        <label className={EVIDENCE_OPTION_CLASS}>
+          <input
+            type="radio"
+            name={name}
+            value=""
+            checked={value === ""}
+            onChange={() => onChange("")}
+            className="h-4 w-4 shrink-0"
+          />
+          {noneLabel}
+        </label>
+        {photos.map((p) => (
+          <label key={p.id} className={EVIDENCE_OPTION_CLASS}>
+            <input
+              type="radio"
+              name={name}
+              value={p.id}
+              checked={value === p.id}
+              onChange={() => onChange(p.id)}
+              className="h-4 w-4 shrink-0"
+            />
+            {/* Görünür etiket adı verir; küçük resim yalnız görsel ayırt etme içindir. */}
+            {/* eslint-disable-next-line @next/next/no-img-element -- kanıt küçük resmi */}
+            <img
+              src={p.url}
+              alt=""
+              loading="lazy"
+              className="h-16 w-16 shrink-0 rounded object-cover"
+            />
+            <span className="max-w-[9rem]">{photoLabel(p.id)}</span>
+          </label>
+        ))}
+      </div>
+      <p id={hintId} className="mt-1 text-xs text-gray-600">
+        {hint}
+      </p>
+    </fieldset>
+  );
+}
 
 /** Boş genişlik geçerlidir (isteğe bağlı); doluysa aralık içinde tam sayı olmalı. */
 function parseWidth(
@@ -136,6 +219,15 @@ export default function AccessibilityPanel({
   const [editNoteLength, setEditNoteLength] = useState(0);
   const [busy, setBusy] = useState<string | null>(null);
   const { confirm, confirmDialog } = useConfirm();
+  // Silinen satırın komşusu (ya da boş liste metni); yeni liste çizilince odak buraya geçer.
+  const focusAfterReload = useRef<string | null>(null);
+
+  useEffect(() => {
+    const target = focusAfterReload.current;
+    if (!target || !featureList) return;
+    focusAfterReload.current = null;
+    document.getElementById(target)?.focus();
+  }, [featureList]);
 
   const photoOptions = photoList ?? [];
   const photosEmpty = photoList !== null && photoList.length === 0;
@@ -148,8 +240,6 @@ export default function AccessibilityPanel({
       ? t("host.photoOptionDated", { index, date: fmt.dateTime(createdAt) })
       : t("host.photoOption", { index });
   };
-
-  const photoUrl = (id: string) => photoOptions.find((p) => p.id === id)?.url ?? null;
 
   const scopeLabel = (feature: Feature) =>
     feature.roomTypeName ? t("roomType", { name: feature.roomTypeName }) : t("host.wholeListing");
@@ -238,7 +328,7 @@ export default function AccessibilityPanel({
             roomTypeId: scope || null,
             widthCm: isWidth ? widthCm : null,
             note: String(f.get("note") ?? "").trim() || null,
-            evidencePhotoId: String(f.get("evidencePhotoId") ?? "") || null,
+            evidencePhotoId: addEvidence || null,
           }),
         });
         form.reset();
@@ -270,7 +360,7 @@ export default function AccessibilityPanel({
           method: "PATCH",
           body: JSON.stringify({ evidencePhotoId: photoId || null }),
         }),
-      t("host.evidenceSaved"),
+      t("host.evidenceSaved", { name }),
       { id: feature.id, successInRow: true }
     );
     if (ok)
@@ -331,6 +421,9 @@ export default function AccessibilityPanel({
 
   async function remove(feature: Feature) {
     const name = t(`codes.${feature.code}`);
+    const list = featureList ?? [];
+    const index = list.findIndex((f) => f.id === feature.id);
+    const neighbour = list[index + 1] ?? (index > 0 ? list[index - 1] : undefined);
     if (
       !(await confirm({
         title: t("host.deleteConfirmTitle", { name, scope: scopeLabel(feature) }),
@@ -340,15 +433,17 @@ export default function AccessibilityPanel({
       }))
     )
       return;
-    await run(
+    focusAfterReload.current = neighbour ? featureNameId(neighbour.id) : EMPTY_ID;
+    const ok = await run(
       `delete-${feature.id}`,
       () =>
         apiFetch(`/api/host/properties/${propertyId}/accessibility/${feature.id}`, {
           method: "DELETE",
         }),
-      t("host.deleted"),
+      t("host.deleted", { name: scopedName(feature) }),
       { id: feature.id, successInList: true }
     );
+    if (!ok) focusAfterReload.current = null;
   }
 
   /** İlan kartındaki "Fotoğraflar" bölümünü açıp dosya seçiciye odaklanır. */
@@ -372,19 +467,6 @@ export default function AccessibilityPanel({
     };
     requestAnimationFrame(focusInput);
   }
-
-  const evidencePreview = (id: string) => {
-    const url = id ? photoUrl(id) : null;
-    if (!url) return null;
-    return (
-      // eslint-disable-next-line @next/next/no-img-element -- kanıt önizlemesi, optimize edilmez
-      <img
-        src={url}
-        alt={t("host.evidencePreviewAlt", { photo: photoLabel(id) })}
-        className="h-16 w-24 rounded object-cover"
-      />
-    );
-  };
 
   if (properties.length === 0) return null;
 
@@ -412,7 +494,11 @@ export default function AccessibilityPanel({
       <div role="status" aria-live="polite">
         {listLoading && <p className="text-sm text-gray-600">{t("host.loading")}</p>}
       </div>
-      {featureList?.length === 0 && <p className="mt-2 text-sm text-gray-700">{t("host.empty")}</p>}
+      {featureList?.length === 0 && (
+        <p id={EMPTY_ID} tabIndex={-1} className="mt-2 text-sm text-gray-700">
+          {t("host.empty")}
+        </p>
+      )}
       {featureList && featureList.length > 0 && (
         <ul className="mt-3 divide-y divide-gray-200" aria-label={t("host.listLabel")}>
           {featureList.map((feature) => {
@@ -429,7 +515,11 @@ export default function AccessibilityPanel({
               <li key={feature.id} className="py-3 text-sm">
                 <div className="flex flex-wrap items-start gap-3">
                   <div className="min-w-0 flex-1">
-                    <p className="font-medium text-gray-900">
+                    <p
+                      id={featureNameId(feature.id)}
+                      tabIndex={-1}
+                      className="font-medium text-gray-900"
+                    >
                       {name}
                       {feature.widthCm !== null && (
                         <span className="font-normal text-gray-700">
@@ -468,50 +558,6 @@ export default function AccessibilityPanel({
                     </p>
                   </div>
                   <div className="flex flex-wrap items-end gap-2">
-                    <div>
-                      <label
-                        htmlFor={`a11y-evidence-${feature.id}`}
-                        className="block text-xs font-medium text-gray-800"
-                      >
-                        {t("evidence")}
-                        <span className="sr-only">: {fullName}</span>
-                      </label>
-                      <select
-                        id={`a11y-evidence-${feature.id}`}
-                        value={draft}
-                        aria-describedby={hintId}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          setDrafts((d) => ({ ...d, [feature.id]: value }));
-                        }}
-                        className={`${inputClass} min-h-[44px]`}
-                      >
-                        <option value="">{t("host.noEvidence")}</option>
-                        {photoOptions.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {photoLabel(p.id)}
-                          </option>
-                        ))}
-                      </select>
-                      <p id={hintId} className="mt-1 max-w-[16rem] text-xs text-gray-600">
-                        {photosEmpty
-                          ? t("host.noPhotosHint")
-                          : feature.verified
-                            ? t("host.evidenceVerifiedWarning")
-                            : t("host.evidenceHint")}
-                      </p>
-                    </div>
-                    {evidencePreview(draft)}
-                    <Button
-                      variant="secondary"
-                      className="min-h-[44px]"
-                      disabled={!dirty}
-                      busy={busy === `evidence-${feature.id}`}
-                      onClick={() => void saveEvidence(feature, draft)}
-                      aria-label={t("host.saveEvidenceLabel", { name: fullName })}
-                    >
-                      {t("host.saveEvidence")}
-                    </Button>
                     {feature.evidencePhotoUrl && (
                       <a
                         href={feature.evidencePhotoUrl}
@@ -553,6 +599,40 @@ export default function AccessibilityPanel({
                       {t("host.delete")}
                     </Button>
                   </div>
+                </div>
+                <div className="mt-2 flex flex-wrap items-end gap-2">
+                  <EvidencePicker
+                    name={`a11y-evidence-${feature.id}`}
+                    legend={
+                      <>
+                        {t("evidence")}
+                        <span className="sr-only">: {fullName}</span>
+                      </>
+                    }
+                    hint={
+                      photosEmpty
+                        ? t("host.noPhotosHint")
+                        : feature.verified
+                          ? t("host.evidenceVerifiedWarning")
+                          : t("host.evidenceHint")
+                    }
+                    hintId={hintId}
+                    value={draft}
+                    onChange={(value) => setDrafts((d) => ({ ...d, [feature.id]: value }))}
+                    photos={photoOptions}
+                    photoLabel={photoLabel}
+                    noneLabel={t("host.noEvidence")}
+                  />
+                  <Button
+                    variant="secondary"
+                    className="min-h-[44px]"
+                    disabled={!dirty}
+                    busy={busy === `evidence-${feature.id}`}
+                    onClick={() => void saveEvidence(feature, draft)}
+                    aria-label={t("host.saveEvidenceLabel", { name: fullName })}
+                  >
+                    {t("host.saveEvidence")}
+                  </Button>
                 </div>
                 {isEditing && (
                   <form
@@ -708,27 +788,18 @@ export default function AccessibilityPanel({
             />
           </Field>
         )}
-        <div>
-          <Field
-            id="a11y-evidence"
-            label={t("evidence")}
+        <div className="sm:col-span-2">
+          <EvidencePicker
+            name="evidencePhotoId"
+            legend={t("evidence")}
             hint={photosEmpty ? t("host.noPhotosHint") : t("host.evidenceHint")}
-          >
-            <select
-              id="a11y-evidence"
-              name="evidencePhotoId"
-              value={addEvidence}
-              onChange={(e) => setAddEvidence(e.target.value)}
-              className={inputClass}
-            >
-              <option value="">{t("host.noEvidence")}</option>
-              {photoOptions.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {photoLabel(p.id)}
-                </option>
-              ))}
-            </select>
-          </Field>
+            hintId="a11y-evidence-hint"
+            value={addEvidence}
+            onChange={setAddEvidence}
+            photos={photoOptions}
+            photoLabel={photoLabel}
+            noneLabel={t("host.noEvidence")}
+          />
           {photosEmpty && propertyId && (
             <a
               href={`#prop-${propertyId}`}
@@ -739,7 +810,6 @@ export default function AccessibilityPanel({
             </a>
           )}
         </div>
-        {addEvidence && <div className="sm:col-span-2">{evidencePreview(addEvidence)}</div>}
         <div className="sm:col-span-2">
           <Field id="a11y-note" label={t("host.note")} hint={noteLimit(noteLength)}>
             <textarea
@@ -754,7 +824,7 @@ export default function AccessibilityPanel({
         </div>
         <div className="sm:col-span-2">
           <Button type="submit" disabled={!propertyId || listLoading} busy={busy === "add"}>
-            {t("host.add")}
+            {busy === "add" ? t("host.adding") : t("host.add")}
           </Button>
         </div>
       </form>

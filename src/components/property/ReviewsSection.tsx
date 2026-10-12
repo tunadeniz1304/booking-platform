@@ -16,7 +16,7 @@ import {
   useLoader,
   useSession,
 } from "@/components/ui/ui";
-import ReviewHighlights, { type HighlightQuote } from "./ReviewHighlights";
+import ReviewHighlights, { focusHighlightTrigger, type HighlightQuote } from "./ReviewHighlights";
 import ReviewHostReplyForm from "./ReviewHostReplyForm";
 
 interface ReviewItem {
@@ -56,10 +56,13 @@ function ReportButton({
   reviewId,
   signedIn,
   author,
+  propertyId,
 }: {
   reviewId: string;
   signedIn: boolean | null;
   author: string;
+  /** Verilirse yasa dışı içerik bildirim formunda ilan önceden seçilir. */
+  propertyId?: string;
 }) {
   const t = useTranslations("reviews");
   const tc = useTranslations("common");
@@ -240,6 +243,22 @@ function ReportButton({
             >
               {t("report.cancel")}
             </button>
+            <p className="w-full text-gray-700">
+              {t.rich("report.illegalHint", {
+                link: (chunks) => (
+                  <Link
+                    href={
+                      propertyId
+                        ? `/report?propertyId=${encodeURIComponent(propertyId)}`
+                        : "/report"
+                    }
+                    className={`font-semibold underline ${focusRing}`}
+                  >
+                    {chunks}
+                  </Link>
+                ),
+              })}
+            </p>
           </div>
         </div>
       )}
@@ -581,6 +600,10 @@ export default function ReviewsSection({
           )}
         </div>
       )}
+      {/* Özet yüklenirken yer tutucu: özet sonradan gelince yorum listesi aşağı kaymasın. */}
+      {summary.loading && !summary.data && !summary.error && (
+        <div aria-hidden="true" className="mt-3 min-h-[8rem] rounded-lg border border-gray-200" />
+      )}
       {/* Uzun özet canlı bölge değil; yalnız kısa "hazır" ya da hata metni duyurulur. */}
       <div role="status">
         {summaryReady && <p className="sr-only">{t("summary.ready")}</p>}
@@ -709,6 +732,15 @@ export default function ReviewsSection({
                   />
                 </p>
               )}
+              {activeQuote?.reviewId === r.id && activeQuote.triggerId && (
+                <button
+                  type="button"
+                  onClick={() => focusHighlightTrigger(activeQuote.triggerId!)}
+                  className={`mt-2 inline-flex min-h-[44px] items-center text-xs text-gray-700 underline sm:min-h-0 ${focusRing}`}
+                >
+                  {t("highlights.backToHighlights")}
+                </button>
+              )}
               <HostReply reply={replyOf(r)} />
               {isOwnerHost && !r.hostReply && (
                 <ReviewHostReplyForm
@@ -719,7 +751,12 @@ export default function ReviewsSection({
                   }
                 />
               )}
-              <ReportButton reviewId={r.id} signedIn={signedIn} author={r.author} />
+              <ReportButton
+                reviewId={r.id}
+                signedIn={signedIn}
+                author={r.author}
+                propertyId={propertyId}
+              />
             </li>
           ))}
         </ul>

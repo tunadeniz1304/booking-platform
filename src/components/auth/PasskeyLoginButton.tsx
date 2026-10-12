@@ -10,6 +10,7 @@ const noopSubscribe = () => () => {};
 
 /**
  * "Geçiş anahtarı (passkey) ile giriş" (discoverable credential; e-posta/parola gerekmez).
+ * `onSuccess`: giriş tamamlanınca kullanıcının rolüyle çağrılır (rol ana sayfasına yönlendirme için).
  * `disabled`: başka bir giriş (parola) sürerken düğme etkisiz ve önceki passkey iletisi silinir.
  * `onStart`: passkey denemesi başlarken (ör. parola hatasını temizlemek için).
  * `onBusyChange`: passkey beklenirken parola formunu kilitlemek için.
@@ -20,7 +21,7 @@ export default function PasskeyLoginButton({
   onStart,
   onBusyChange,
 }: {
-  onSuccess: () => void;
+  onSuccess: (role?: string) => void;
   disabled?: boolean;
   onStart?: () => void;
   onBusyChange?: (busy: boolean) => void;
@@ -76,8 +77,8 @@ export default function PasskeyLoginButton({
     setNotice(null);
     onStart?.();
     try {
-      await loginWithPasskey();
-      onSuccess();
+      const { user } = await loginWithPasskey();
+      onSuccess(user.role);
     } catch (err) {
       // WebAuthn iptal ile "bu cihazda anahtar yok"u ayırt etmez (ikisi de NotAllowedError).
       if (passkeyErrorCode(err) === "CANCELLED") setNotice(t("passkey.cancelled"));

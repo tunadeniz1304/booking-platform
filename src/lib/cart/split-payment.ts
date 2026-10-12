@@ -639,9 +639,23 @@ async function assertAttemptsLeft(shareId: string): Promise<void> {
   }
 }
 
-async function recordFailedAttempt(shareId: string): Promise<void> {
-  const { PAYMENT_ATTEMPTS_WINDOW_SECONDS } = getConfig();
-  await redis.incrWithTtl(attemptsKey(shareId), PAYMENT_ATTEMPTS_WINDOW_SECONDS).catch(() => 0);
+/** Başarısız denemeyi sayar; kalan hakkı döner (Redis yanıt vermezse null). */
+async function recordFailedAttempt(shareId: string): Promise<number | null> {
+  const { PAYMENT_ATTEMPTS_WINDOW_SECONDS, PAYMENT_MAX_ATTEMPTS } = getConfig();
+  const count = await redis
+    .incrWithTtl(attemptsKey(shareId), PAYMENT_ATTEMPTS_WINDOW_SECONDS)
+    .catch(() => null);
+  return count === null ? null : Math.max(0, PAYMENT_MAX_ATTEMPTS - count);
+}
+
+/** Kart reddi; kalan deneme hakkı sayfada gösterilir (son denemede uyarı, 0'da kilit). */
+function shareDeclined(declineCode: string, attemptsLeft: number | null): HttpError {
+  const declined = new PaymentDeclinedError(declineCode);
+  if (attemptsLeft === null) return declined;
+  return new HttpError(declined.status, declined.code, declined.message, {
+    declineCode,
+    attemptsLeft,
+  });
 }
 
 function assertShareOpen(share: TokenShare, now = Date.now()): void {
@@ -761,8 +775,7 @@ export async function payShare(input: {
         },
       });
       splitShareTotal.inc({ outcome: "declined" });
-      await recordFailedAttempt(share.id);
-      throw new PaymentDeclinedError(result.declineCode);
+      throw shareDeclined(result.declineCode, await recordFailedAttempt(share.id));
     }
     if (result.status === "requires_action") {
       const recorded = await prisma.paymentShare.updateMany({
@@ -818,12 +831,15 @@ export async function confirmShareChallenge(input: {
         data: { status: PaymentShareStatus.FAILED, failureCode: result.declineCode },
       });
       splitShareTotal.inc({ outcome: "declined" });
-      await recordFailedAttempt(share.id);
-      throw new PaymentDeclinedError(result.declineCode);
+      throw shareDeclined(result.declineCode, await recordFailedAttempt(share.id));
     }
     if (result.status === "requires_action") {
-      await recordFailedAttempt(share.id);
-      throw new ConflictError("Doğrulama kodu hatalı", "CHALLENGE_FAILED");
+      const attemptsLeft = await recordFailedAttempt(share.id);
+      throw new ConflictError(
+        "Doğrulama kodu hatalı",
+        "CHALLENGE_FAILED",
+        attemptsLeft === null ? undefined : { attemptsLeft }
+      );
     }
     await claimAuthorizedShare(share.id, result.providerRef, input.userId, provider.name, [
       PaymentShareStatus.REQUIRES_ACTION,

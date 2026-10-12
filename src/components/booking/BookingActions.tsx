@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { ApiError, apiFetch, isNetworkError } from "@/lib/api-client";
+import { ApiError, apiFetch, isNetworkError, isTimeoutError } from "@/lib/api-client";
 import { MOCK_3DS_CODE } from "@/lib/payment/card-token";
 import { useFormat } from "@/i18n/use-format";
 import { Field, focusRing } from "@/components/ui/ui";
@@ -52,6 +52,8 @@ interface Message {
   kind: "error" | "info" | "note";
   text: string;
   at?: "cancel";
+  /** Yalnız rezervasyon HELD iken geçerli (ör. zaman aşımından sonraki durum kontrolü notu). */
+  whileHeld?: boolean;
 }
 
 /** 3DS adımında bu kodlar geldiğinde bekleyen doğrulama kapanmıştır: kart formuna dönülür. */
@@ -112,8 +114,13 @@ export default function BookingActions({
   const [stepUpToken, setStepUpToken] = useState<string | null>(null);
   /** P1-7: cüzdan kredisinden kullanılacak tutar (minor-unit; 0 = yalnız kart). */
   const [creditMinor, setCreditMinor] = useState(0);
+  /** Kredi tutarı geçerli mi (geçersizken ödeme gönderilmez; odak tutar alanına taşınır). */
+  const [creditValid, setCreditValid] = useState(true);
   /** P1-3: "şimdi rezerve et, sonra öde" seçili mi (kredi ile birlikte kullanılamaz). */
   const [rnpl, setRnpl] = useState(false);
+  /** Kredi ve "sonra öde" seçenekleri okundu mu: ödeme formu ancak sonra çizilir (kayma olmasın). */
+  const [creditReady, setCreditReady] = useState(false);
+  const [rnplReady, setRnplReady] = useState(false);
   /** Deneme sınırı aşıldı (PAYMENT_ATTEMPTS_EXCEEDED): ödeme formları kapanır. */
   const [payLocked, setPayLocked] = useState(false);
   /** Her yeni ödeme denemesi (kesin ret sonrası) yeni bir anahtar alır; ağ hatasında aynısı kalır. */
@@ -127,6 +134,7 @@ export default function BookingActions({
   const expRef = useRef<HTMLInputElement>(null);
   const cvcRef = useRef<HTMLInputElement>(null);
   const codeRef = useRef<HTMLInputElement>(null);
+  const creditInputRef = useRef<HTMLInputElement>(null);
   const payButtonRef = useRef<HTMLButtonElement>(null);
   const errorRef = useRef<HTMLParagraphElement>(null);
   const lockedRef = useRef<HTMLHeadingElement>(null);
@@ -242,8 +250,8 @@ export default function BookingActions({
       focusNext.current = "locked";
     }
     // Kesin ret: sonraki deneme yeni bir işlemdir (aynı anahtar eski sonucu döndürmesin).
-    if (err instanceof ApiError && err.status < 500 && !isNetworkError(err))
-      setIdemKey(newIdemKey());
+    // Zaman aşımı (status 0) kesin ret değildir: ödeme gerçekleşmiş olabilir, anahtar korunur.
+    if (err instanceof ApiError && err.status >= 400 && err.status < 500) setIdemKey(newIdemKey());
     const text = errorText(err, fallback);
     const left = attemptsLeftOf(err);
     setMessage({
@@ -251,6 +259,24 @@ export default function BookingActions({
       text: left === null ? text : `${text} ${t("attempts.left", { count: left })}`,
       at,
     });
+  }
+
+  /**
+   * Zaman aşımı: ödeme gerçekleşmiş olabilir. Aynı Idempotency-Key korunur (yeniden deneme iki kez
+   * tahsil etmez) ve rezervasyon yeniden okunur; onaylandıysa not kendiliğinden kalkar.
+   */
+  function handleTimeout(err: unknown): boolean {
+    if (!isTimeoutError(err)) return false;
+    setMessage({ kind: "info", text: t("timeoutCheck"), whileHeld: true });
+    onChanged();
+    return true;
+  }
+
+  /** Kredi tutarı geçersizse ödeme gönderilmez; odak tutar alanına gider (hata orada yazılı). */
+  function creditBlocked(): boolean {
+    if (rnpl || creditValid) return false;
+    creditInputRef.current?.focus();
+    return true;
   }
 
   function startBusy() {
@@ -321,7 +347,7 @@ export default function BookingActions({
       if (out.status === "requires_action") openChallenge(out.challenge?.hint);
       else paid();
     } catch (err) {
-      showError(err, t("failed"));
+      if (!handleTimeout(err)) showError(err, t("failed"));
     } finally {
       endBusy();
     }
@@ -338,6 +364,7 @@ export default function BookingActions({
   }
 
   async function stripeSubmit(cardToken: string): Promise<PayResponse> {
+    if (creditBlocked()) return { status: "failed" };
     setMessage(null);
     setBusy(true);
     try {
@@ -347,7 +374,7 @@ export default function BookingActions({
     } catch (err) {
       // Stripe akışında token tekrar kullanılamaz: doğrulamadan sonra form yeniden gönderilir.
       if (isStepUp(err)) setStepUp({ cardToken: "" });
-      else showError(err, t("failed"));
+      else if (!handleTimeout(err)) showError(err, t("failed"));
       return { status: "failed" };
     } finally {
       setBusy(false);
@@ -362,7 +389,7 @@ export default function BookingActions({
       });
       paid();
     } catch (err) {
-      showError(err, t("verificationFailed"));
+      if (!handleTimeout(err)) showError(err, t("verificationFailed"));
     }
   }
 
@@ -378,7 +405,7 @@ export default function BookingActions({
 
   async function pay(e: React.FormEvent) {
     e.preventDefault();
-    if (busyRef.current) return;
+    if (busyRef.current || creditBlocked()) return;
     setMessage(null);
     setFieldErrors({});
     // Biçim (AA/YY) ve süre ayrı doğrulanır; hata ilgili alanın altında gösterilir.
@@ -399,7 +426,7 @@ export default function BookingActions({
         setStepUp({ cardToken });
         return;
       }
-      showError(err, t("failed"));
+      if (!handleTimeout(err)) showError(err, t("failed"));
     } finally {
       endBusy();
     }
@@ -417,6 +444,7 @@ export default function BookingActions({
       setChallenge(null);
       paid();
     } catch (err) {
+      if (handleTimeout(err)) return;
       showError(err, t("verificationFailed"));
       // Doğrulama kapandıysa (ret / bekleyen yok / deneme sınırı) kod ekranında bırakma;
       // açık kaldıysa odak kod alanına döner (girilen kod seçili, doğrudan yeniden yazılır).
@@ -476,7 +504,7 @@ export default function BookingActions({
     }
   }
 
-  const input = `mt-1 w-full rounded-lg border border-gray-500 px-3 py-2 text-sm ${focusRing}`;
+  const input = `mt-1 w-full rounded-lg border border-gray-500 px-3 py-2 text-base sm:text-sm ${focusRing}`;
   const submitClass = `w-full rounded-lg bg-[#003580] px-4 py-3 text-sm font-semibold text-white disabled:bg-gray-300 disabled:text-gray-700 aria-disabled:bg-gray-300 aria-disabled:text-gray-700 ${focusRing}`;
   const secondaryClass = `min-h-[44px] w-full rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 ${focusRing}`;
   const held = status === "HELD" && !expired;
@@ -484,9 +512,12 @@ export default function BookingActions({
     remainingMs !== null && remainingMs > 0
       ? `${Math.floor(remainingMs / 60_000)}:${String(Math.floor((remainingMs % 60_000) / 1000)).padStart(2, "0")}`
       : null;
-  const showCardForm = held && !!payConfig && !useStripeForm && !challenge && !payLocked;
+  /** Seçenek kutuları belirmeden form çizilmez: yazarken alanlar aşağı kaymasın (F1021/F759). */
+  const optionsReady = creditReady && (useStripeForm || rnplReady);
+  const showCardForm =
+    held && !!payConfig && optionsReady && !useStripeForm && !challenge && !payLocked;
   const showCodeForm = held && !!challenge && !payLocked;
-  const showStripe = held && useStripeForm && !payLocked;
+  const showStripe = held && useStripeForm && optionsReady && !payLocked;
   /** Tahsil edilecek tutar düğmede de görünür (kredi düşülmüş). */
   const payLabel =
     amountMinor !== undefined && currency
@@ -524,6 +555,8 @@ export default function BookingActions({
       </div>
     ) : null;
   const cancelLabel = cancelling ? t("cancel.processing") : t("cancel.button");
+  /** Zaman aşımı notu rezervasyon onaylanınca (sayfa yeni durumu duyurur) gösterilmez. */
+  const statusMessage = message?.whileHeld && status !== "HELD" ? null : message;
   const cancelBusyClass = "aria-disabled:cursor-not-allowed aria-disabled:opacity-60";
 
   return (
@@ -565,7 +598,7 @@ export default function BookingActions({
           <h2 className="text-lg font-semibold text-gray-900">{t("title")}</h2>
           {holdInfo}
 
-          {!payConfig && (
+          {(!payConfig || !optionsReady) && (
             <div className="min-h-[18rem] space-y-3" aria-busy={!configFailed}>
               {configFailed ? (
                 <>
@@ -583,16 +616,27 @@ export default function BookingActions({
           )}
 
           {!!payConfig && !challenge && !useStripeForm && (
-            <RnplOption bookingId={bookingId} disabled={busy} selected={rnpl} onChange={setRnpl} />
+            <RnplOption
+              bookingId={bookingId}
+              disabled={busy}
+              selected={rnpl}
+              onChange={setRnpl}
+              onLoaded={() => setRnplReady(true)}
+            />
           )}
-          {/* Gizlenir, kaldırılmaz: geri dönüldüğünde kutu ile gönderilen kredi aynı kalır. */}
-          <div hidden={!payConfig || !!challenge || rnpl}>
+          {/* Gizlenir, kaldırılmaz: geri dönüldüğünde kutu ile gönderilen kredi aynı kalır.
+              "Sonra öde" seçiliyken kutu kaybolmaz; devre dışı görünür ve nedeni yazılır. */}
+          <div hidden={!payConfig || !!challenge}>
             <WalletCreditOption
               bookingId={bookingId}
               totalMinor={amountMinor}
               currency={currency}
               disabled={busy}
               onChange={setCreditMinor}
+              onValidityChange={setCreditValid}
+              inputRef={creditInputRef}
+              rnplSelected={rnpl}
+              onLoaded={() => setCreditReady(true)}
             />
           </div>
 
@@ -722,10 +766,10 @@ export default function BookingActions({
       <p
         role="status"
         aria-live="polite"
-        className={message?.kind === "info" ? "text-sm text-green-700" : "sr-only"}
+        className={statusMessage?.kind === "info" ? "text-sm text-green-700" : "sr-only"}
       >
-        {message && message.kind !== "error"
-          ? message.text
+        {statusMessage && statusMessage.kind !== "error"
+          ? statusMessage.text
           : expired
             ? t("hold.expired")
             : announcement}

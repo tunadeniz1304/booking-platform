@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { useTranslations } from "next-intl";
 import { ApiError, apiFetch, logout } from "@/lib/api-client";
 import { useFormat } from "@/i18n/use-format";
@@ -19,8 +19,12 @@ import ClaimMessages from "./ClaimMessages";
 import {
   ACTIVE_STATUSES,
   ClaimStatusBadge,
+  ClaimStatusHelp,
+  ClaimSteps,
   DepositSummary,
   useClaimErrorText,
+  useDisputeText,
+  usePartyLabel,
   type ClaimDetailResponse,
   type ClaimType,
 } from "./shared";
@@ -31,6 +35,24 @@ export type ClaimDetailResult =
 
 /** Sunucu, geri çekilen talebi bu karar notuyla CLOSED olarak kapatır. */
 const WITHDRAWN_NOTE = "withdrawn";
+
+/** Hızlı yüklemeler sessiz kalsın; daha uzun sürerse "Yükleniyor…" duyurulur. */
+const LOADING_ANNOUNCE_DELAY_MS = 400;
+
+const skeletonBlock = "rounded-md bg-gray-100 motion-safe:animate-pulse";
+
+const HOUR_MS = 3_600_000;
+
+/** Kalan süre metni için dakikada bir güncellenen saat (sunucuda ve ilk çizimde yok). */
+function subscribeMinute(onChange: () => void) {
+  const id = setInterval(onChange, 60_000);
+  return () => clearInterval(id);
+}
+const currentMinute = () => Math.floor(Date.now() / 60_000) * 60_000;
+const noMinute = () => null;
+
+/** Kart başlığı düzeyi: yönetici görünümünde ayrıntı "Seçili talep" h2'sinin altına girer. */
+type HeadingLevel = 2 | 3;
 
 type PartySide = "guest" | "host" | "cardholder";
 
@@ -45,12 +67,21 @@ function isNotFound(error: unknown): boolean {
   return error instanceof ApiError && error.status === 404;
 }
 
+/** Aynı hatanın tekrar alınıp alınmadığını anlamak için kaba imza. */
+function errorSignature(error: unknown): string {
+  if (error instanceof ApiError) return `${error.status}|${error.code ?? ""}|${error.message}`;
+  return error instanceof Error ? `${error.name}|${error.message}` : String(error);
+}
+
 type LoadState = {
   claimId: string;
   data: ClaimDetailResponse | null;
   failed: boolean;
   error: unknown;
-  /** Her sonuçta artar; aynı hata yeniden alındığında uyarı yeniden duyurulur. */
+  /**
+   * Her sonuçta artar; aynı hata yeniden alındığında uyarı yeniden duyurulur. Arka plan
+   * yenilemesi (yazışma yoklaması) aynı hatayı yeniden alırsa artmaz; uyarı tekrar okunmaz.
+   */
   seq: number;
 };
 
@@ -60,7 +91,7 @@ type LoadState = {
  */
 function useClaimDetail(claimId: string, onResult?: (result: ClaimDetailResult) => void) {
   const [state, setState] = useState<LoadState | null>(null);
-  const [version, setVersion] = useState(0);
+  const [request, setRequest] = useState({ version: 0, quiet: false });
   const [reloading, setReloading] = useState(false);
   const onResultRef = useRef(onResult);
   useEffect(() => {
@@ -82,13 +113,14 @@ function useClaimDetail(claimId: string, onResult?: (result: ClaimDetailResult) 
       })
       .catch((error: unknown) => {
         if (!active) return;
-        setState((prev) => ({
-          claimId,
-          data: prev?.claimId === claimId ? prev.data : null,
-          failed: true,
-          error,
-          seq: (prev?.seq ?? 0) + 1,
-        }));
+        setState((prev) => {
+          const same = prev?.claimId === claimId ? prev : null;
+          const seq =
+            request.quiet && same?.failed && errorSignature(same.error) === errorSignature(error)
+              ? same.seq
+              : (prev?.seq ?? 0) + 1;
+          return { claimId, data: same?.data ?? null, failed: true, error, seq };
+        });
         if (isNotFound(error)) onResultRef.current?.({ status: "notFound" });
       })
       .finally(() => {
@@ -97,7 +129,7 @@ function useClaimDetail(claimId: string, onResult?: (result: ClaimDetailResult) 
     return () => {
       active = false;
     };
-  }, [claimId, version]);
+  }, [claimId, request]);
   const current = state?.claimId === claimId ? state : null;
   return {
     data: current?.data ?? null,
@@ -107,7 +139,12 @@ function useClaimDetail(claimId: string, onResult?: (result: ClaimDetailResult) 
     reloading,
     reload: () => {
       setReloading(true);
-      setVersion((v) => v + 1);
+      setRequest((r) => ({ version: r.version + 1, quiet: false }));
+    },
+    /** Arka plan yenilemesi: aynı hata tekrar alınırsa uyarı yeniden duyurulmaz. */
+    refreshQuietly: () => {
+      setReloading(true);
+      setRequest((r) => ({ version: r.version + 1, quiet: true }));
     },
   };
 }
@@ -117,7 +154,8 @@ function useClaimDetail(claimId: string, onResult?: (result: ClaimDetailResult) 
  * `readOnly` (yönetici görünümü) taraf eylemlerini (yanıt / yükleme / geri çekme) gizler;
  * yönetici, aktif ve ters ibraz olmayan taleplerde taraflara mesaj yazabilir
  * (`canAdminMessage={false}` ile kapatılır). `renderAdmin` ile karar formu gibi ek içerik
- * detay verisiyle birlikte eklenir; `onResult` yükleme sonucunu (bulundu / bulunamadı) bildirir.
+ * detay verisiyle birlikte (yazışma ve kanıtların ardından) eklenir; `onResult` yükleme sonucunu
+ * (bulundu / bulunamadı) bildirir. `headingLevel={3}` kart başlıklarını h3 yapar.
  */
 export default function ClaimDetail({
   claimId,
@@ -125,17 +163,27 @@ export default function ClaimDetail({
   canAdminMessage = true,
   renderAdmin,
   onResult,
+  headingLevel = 2,
 }: {
   claimId: string;
   readOnly?: boolean;
   canAdminMessage?: boolean;
   renderAdmin?: (detail: ClaimDetailResponse, reload: () => void) => ReactNode;
   onResult?: (result: ClaimDetailResult) => void;
+  headingLevel?: HeadingLevel;
 }) {
   const t = useTranslations("resolution");
   const tc = useTranslations("common");
   const claimError = useClaimErrorText();
-  const { data, failed, error, seq, reloading, reload } = useClaimDetail(claimId, onResult);
+  const { data, failed, error, seq, reloading, reload, refreshQuietly } = useClaimDetail(
+    claimId,
+    onResult
+  );
+  const [announceLoading, setAnnounceLoading] = useState(false);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setAnnounceLoading(true), LOADING_ANNOUNCE_DELAY_MS);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   if (failed && !data) {
     if (!readOnly && isNotFound(error)) return <ClaimNotFound />;
@@ -149,10 +197,27 @@ export default function ClaimDetail({
     );
   }
   if (!data) {
+    // Durum bölgesi metinsiz bağlanır, metin gecikmeyle yazılır; böylece duyurulur.
     return (
-      <p aria-live="polite" className="text-sm text-gray-600">
-        {t("loading")}
-      </p>
+      <div>
+        <p role="status" className="sr-only">
+          {announceLoading ? t("loading") : null}
+        </p>
+        <div aria-hidden="true" className="space-y-6">
+          <div className="space-y-3 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+            <div className={`h-6 w-48 ${skeletonBlock}`} />
+            <div className={`h-5 w-32 ${skeletonBlock}`} />
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <div className={`h-14 ${skeletonBlock}`} />
+              <div className={`h-14 ${skeletonBlock}`} />
+            </div>
+          </div>
+          <div className="space-y-3 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+            <div className={`h-6 w-40 ${skeletonBlock}`} />
+            <div className={`h-20 ${skeletonBlock}`} />
+          </div>
+        </div>
+      </div>
     );
   }
   const { claim } = data;
@@ -164,6 +229,9 @@ export default function ClaimDetail({
   const adminCanReply = canAdminMessage && claim.role === "ADMIN" && writable;
   const replyNote =
     isParty && !partyCanReply ? t(active ? "detail.replyChargeback" : "detail.replyClosed") : null;
+  const sides = partySides(claim.type);
+  const side = claim.role === "OPENER" ? sides.opener : sides.respondent;
+  const depositViewer = claim.role === "ADMIN" ? "ADMIN" : side === "host" ? "HOST" : "GUEST";
 
   return (
     <div className="space-y-6">
@@ -180,21 +248,31 @@ export default function ClaimDetail({
         canWithdraw={isParty && active && claim.role === "OPENER"}
         canReply={partyCanReply}
         onChanged={reload}
+        headingLevel={headingLevel}
       />
-      {!active && <ClaimOutcome detail={data} />}
-      {renderAdmin?.(data, reload)}
+      {!active && <ClaimOutcome detail={data} headingLevel={headingLevel} />}
       {data.deposit && (
-        <Card title={t("deposit.title")}>
-          <DepositSummary deposit={data.deposit} currency={data.deposit.currency} />
+        <Card title={t("deposit.title")} headingLevel={headingLevel}>
+          <DepositSummary
+            deposit={data.deposit}
+            currency={data.deposit.currency}
+            viewerRole={depositViewer}
+          />
         </Card>
       )}
       <Card id="claim-messages">
+        {/* Talep aktifken yazışma 30 sn'de bir yenilenir; yeni mesajlar duyurulur. */}
         <ClaimMessages
           claimId={claim.id}
           messages={data.messages}
           canReply={partyCanReply || adminCanReply}
           viewerRole={claim.role}
+          claimType={claim.type}
           onSent={reload}
+          onRefresh={refreshQuietly}
+          live={active}
+          refreshing={reloading}
+          headingLevel={headingLevel}
         />
         {replyNote && <p className="mt-2 text-sm text-gray-700">{replyNote}</p>}
       </Card>
@@ -204,11 +282,14 @@ export default function ClaimDetail({
           evidence={data.evidence}
           canUpload={isParty && active}
           onUploaded={reload}
+          claimType={claim.type}
+          headingLevel={headingLevel}
         />
         {isParty && !active && (
           <p className="mt-2 text-sm text-gray-700">{t("detail.uploadClosed")}</p>
         )}
       </Card>
+      {renderAdmin?.(data, reload)}
     </div>
   );
 }
@@ -266,17 +347,22 @@ function ClaimOverview({
   canWithdraw,
   canReply,
   onChanged,
+  headingLevel,
 }: {
   detail: ClaimDetailResponse;
   canWithdraw: boolean;
   canReply: boolean;
   onChanged: () => void;
+  headingLevel: HeadingLevel;
 }) {
   const t = useTranslations("resolution");
   const f = useFormat();
   const claimError = useClaimErrorText();
+  const partyLabel = usePartyLabel();
+  const dispute = useDisputeText();
   const { confirm, confirmDialog } = useConfirm();
   const { claim, booking } = detail;
+  const now = useSyncExternalStore<number | null>(subscribeMinute, currentMinute, noMinute);
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<{ error?: string; message?: string }>({});
   const statusRef = useRef<HTMLDivElement>(null);
@@ -320,7 +406,8 @@ function ClaimOverview({
       [t("role.RESPONDENT"), t(`detail.party.${sides.respondent}`)]
     );
   } else {
-    rows.push([t("detail.yourRole"), t(`role.${claim.role}`)]);
+    // "Talebi açan" yerine tarafın adı (misafir / ev sahibi / kart sahibi) gösterilir.
+    rows.push([t("detail.yourRole"), partyLabel(claim.type, claim.role)]);
   }
   if (claim.status === "AWAITING_RESPONSE" && claim.slaDueAt) {
     rows.push([t("detail.sla"), f.dateTime(claim.slaDueAt)]);
@@ -335,21 +422,33 @@ function ClaimOverview({
     ]);
   }
 
+  const SubHeading = headingLevel === 3 ? "h4" : "h3";
+  // Kalan süre listedeki gibi öne yazılır; saat ilk çizimde yoksa yalnız tarih gösterilir.
+  const timeLeft = (due: string) => {
+    const ms = now === null ? NaN : new Date(due).getTime() - now;
+    if (!Number.isFinite(ms)) return null;
+    if (ms <= 0) return t("list.deadlinePassed");
+    if (ms < HOUR_MS) return t("list.timeLeftUnderHour");
+    if (ms < 48 * HOUR_MS) return t("list.timeLeftHours", { count: Math.floor(ms / HOUR_MS) });
+    return t("list.timeLeftDays", { count: Math.floor(ms / (24 * HOUR_MS)) });
+  };
+  const left = claim.slaDueAt ? timeLeft(claim.slaDueAt) : null;
+
   return (
-    <Card title={t(`type.${claim.type}`)}>
-      <div
-        ref={statusRef}
-        tabIndex={-1}
-        className="mb-3 flex flex-wrap items-center gap-2 text-sm text-gray-700 focus:outline-none"
-      >
-        <ClaimStatusBadge status={claim.status} />
-        {claim.propertyTitle && <span>{claim.propertyTitle}</span>}
+    <Card title={t(`type.${claim.type}`)} headingLevel={headingLevel}>
+      <div ref={statusRef} tabIndex={-1} className="mb-3 space-y-2 focus:outline-none">
+        <div className="flex flex-wrap items-center gap-2 text-sm text-gray-700">
+          <ClaimStatusBadge status={claim.status} />
+          {claim.propertyTitle && <span>{claim.propertyTitle}</span>}
+        </div>
+        <ClaimStatusHelp status={claim.status} role={claim.role} type={claim.type} />
       </div>
       {claim.status === "AWAITING_RESPONSE" &&
         claim.slaDueAt &&
         (claim.role === "RESPONDENT" || claim.role === "OPENER") && (
           <div className="mb-3 text-sm">
             <p className="font-medium text-amber-800">
+              {left && <span className="font-semibold">{left} · </span>}
               {claim.role === "RESPONDENT"
                 ? t("list.respondCta", { date: f.dateTime(claim.slaDueAt) })
                 : t("list.awaitingOther", { date: f.dateTime(claim.slaDueAt) })}
@@ -364,6 +463,11 @@ function ClaimOverview({
             )}
           </div>
         )}
+      {claim.type !== "CHARGEBACK" && (
+        <div className="mb-3">
+          <ClaimSteps status={claim.status} />
+        </div>
+      )}
       <dl className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
         {rows.map(([label, value]) => (
           <div key={label} className="rounded-md bg-gray-50 p-2">
@@ -384,13 +488,19 @@ function ClaimOverview({
         {claim.escalatedAt && (
           <li>{t("detail.escalated", { date: f.dateTime(claim.escalatedAt) })}</li>
         )}
-        {claim.externalStatus && <li>{t("detail.external", { status: claim.externalStatus })}</li>}
+        {claim.externalStatus && (
+          <li>{t("detail.external", { status: dispute.status(claim.externalStatus) })}</li>
+        )}
         {claim.externalReason && (
-          <li>{t("detail.externalReason", { reason: claim.externalReason })}</li>
+          <li>{t("detail.externalReason", { reason: dispute.reason(claim.externalReason) })}</li>
         )}
       </ul>
-      <h3 className="mt-4 text-sm font-semibold text-gray-900">{t("detail.description")}</h3>
-      <p className="mt-1 whitespace-pre-wrap text-sm text-gray-800">{claim.description}</p>
+      <SubHeading className="mt-4 text-sm font-semibold text-gray-900">
+        {t("detail.description")}
+      </SubHeading>
+      <p className="mt-1 whitespace-pre-wrap break-words text-sm text-gray-800 [overflow-wrap:anywhere]">
+        {claim.description}
+      </p>
       {canWithdraw && (
         <div className="mt-4">
           <Button variant="danger" busy={busy} onClick={() => void withdraw()}>
@@ -411,15 +521,22 @@ type OutcomeRow = { label: string; value: number | null; hint?: string; always?:
  * yazılır (misafir / ev sahibi); platformun karşıladığı tutar yalnız yöneticiye gösterilir.
  * Geri çekilen talepte karar kartı yerine geri çekme bilgisi gösterilir.
  */
-function ClaimOutcome({ detail }: { detail: ClaimDetailResponse }) {
+function ClaimOutcome({
+  detail,
+  headingLevel,
+}: {
+  detail: ClaimDetailResponse;
+  headingLevel: HeadingLevel;
+}) {
   const t = useTranslations("resolution.outcome");
   const f = useFormat();
   const { claim } = detail;
+  const SubHeading = headingLevel === 3 ? "h4" : "h3";
 
   if (claim.status === "CLOSED" && claim.decisionNote === WITHDRAWN_NOTE && claim.decidedAt) {
     const date = f.dateTime(claim.decidedAt);
     return (
-      <Card title={t("withdrawnTitle")}>
+      <Card title={t("withdrawnTitle")} headingLevel={headingLevel}>
         <p className="text-sm text-gray-800">
           {claim.role === "OPENER"
             ? t("withdrawnByYou", { date })
@@ -456,7 +573,7 @@ function ClaimOutcome({ detail }: { detail: ClaimDetailResponse }) {
   const shown = amounts.filter((a) => a.value !== null && (a.always || a.value > 0));
   if (!claim.decidedAt && shown.length === 0 && !claim.decisionNote) return null;
   return (
-    <Card title={t("title")}>
+    <Card title={t("title")} headingLevel={headingLevel}>
       {claim.decidedAt && (
         <p className="mb-2 text-sm text-gray-700">
           {t("decidedAt", { date: f.dateTime(claim.decidedAt) })}
@@ -479,8 +596,10 @@ function ClaimOutcome({ detail }: { detail: ClaimDetailResponse }) {
       )}
       {claim.decisionNote && (
         <>
-          <h3 className="mt-3 text-sm font-semibold text-gray-900">{t("note")}</h3>
-          <p className="mt-1 whitespace-pre-wrap text-sm text-gray-800">{claim.decisionNote}</p>
+          <SubHeading className="mt-3 text-sm font-semibold text-gray-900">{t("note")}</SubHeading>
+          <p className="mt-1 whitespace-pre-wrap break-words text-sm text-gray-800 [overflow-wrap:anywhere]">
+            {claim.decisionNote}
+          </p>
         </>
       )}
     </Card>

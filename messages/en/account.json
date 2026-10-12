@@ -100,7 +100,9 @@
     "deleteLabel": "Delete: {name}, added {date}",
     "confirmDeleteBody": "Added {date}. You will no longer be able to sign in or verify payments with this passkey.",
     "confirmDeleteLast": "This is the last passkey on your account. If you delete it, passwordless sign-in is turned off and payments that look risky will ask for your bank's 3D Secure verification instead.",
-    "confirmDeleteAction": "Delete passkey"
+    "confirmDeleteAction": "Delete passkey",
+    "addCancelled": "No passkey was added: the request was cancelled or timed out.",
+    "deleteCancelled": "Cancelled; the passkey was not deleted."
   },
   "reauth": {
     "title": "Confirm it's you",
@@ -147,7 +149,8 @@
     "revokeCurrent": "Sign out on this device",
     "revokeLabel": "Sign out session: {device}, last active {date}",
     "revoking": "Signing out…",
-    "revokedCount": "{count, plural, =0 {There were no other sessions to sign out} one {# session signed out} other {# sessions signed out}}"
+    "revokedCount": "{count, plural, =0 {There were no other sessions to sign out} one {# session signed out} other {# sessions signed out}}",
+    "revokeCancelled": "Cancelled; no sessions were signed out."
   },
   "mandates": {
     "title": "AI agent payment permissions",

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type ComponentProps, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -20,10 +20,15 @@ import {
   useLoader,
 } from "@/components/ui/ui";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import BookingStatusBadge, {
+  BOOKING_STATUSES,
+  bookingStatusKey,
+} from "@/components/booking/BookingStatusBadge";
 import DepositSettings from "./DepositSettings";
 import PromotionsPanel from "./PromotionsPanel";
 import AccessibilityPanel from "./AccessibilityPanel";
 import { hasHostUnsavedChanges, useHostUnsavedChanges } from "./useHostUnsavedChanges";
+import { notifyHostPhotosChanged } from "./host-photos-changed";
 import { CURRENCIES, toMajorNumber } from "@/lib/money/money";
 import { BED_TYPES, DEFAULT_BED_TYPE } from "@/lib/i18n/bed-type";
 
@@ -62,15 +67,6 @@ interface HostBooking {
   /** API eklediğinde gösterilir (F834). */
   guestName?: string | null;
 }
-
-const BOOKING_STATUSES = [
-  "PENDING",
-  "HELD",
-  "CONFIRMED",
-  "CANCELLED",
-  "EXPIRED",
-  "COMPLETED",
-] as const;
 
 const PROPERTY_TYPES = ["HOTEL", "APARTMENT", "VILLA", "HOSTEL", "BED_AND_BREAKFAST"] as const;
 
@@ -166,12 +162,13 @@ function qualityLevel(score: number): "good" | "medium" | "low" {
 }
 
 /** Açıklama karakter sayacı; ekran okuyucuya yalnız sınıra yaklaşınca duyurulur (F126/F173). */
-function DescriptionCount({ length }: { length: number }) {
+function DescriptionCount({ length, id }: { length: number; id?: string }) {
   const t = useTranslations("host");
   const text = t("property.fields.descriptionCount", { count: length, max: DESCRIPTION_MAX });
   return (
     <>
-      <p aria-hidden="true" className="mt-1 text-xs text-gray-600">
+      {/* Gizli olsa da alanın aria-describedby'ı bu metni açıklama olarak okur (F997). */}
+      <p id={id} aria-hidden="true" className="mt-1 text-xs text-gray-600">
         {text}
       </p>
       <p role="status" className="sr-only">
@@ -181,6 +178,70 @@ function DescriptionCount({ length }: { length: number }) {
   );
 }
 
+/** Açıklama alanı: Field'ın verdiği ipucu/hata bağına sayaç kimliğini de ekler (F997). */
+function DescriptionTextarea({
+  countId,
+  "aria-describedby": describedBy,
+  ...props
+}: ComponentProps<"textarea"> & { countId: string }) {
+  return (
+    <textarea {...props} aria-describedby={describedBy ? `${describedBy} ${countId}` : countId} />
+  );
+}
+
+/**
+ * Uzun metin taslakları sekme oturumunda (sessionStorage) tutulur: oturum dolup girişe gidip
+ * dönünce kaybolmaz (F402). Depolama kapalıysa sessizce atlanır.
+ */
+const DRAFT_PREFIX = "host-draft:";
+
+function readDraft(key: string): string | null {
+  try {
+    return window.sessionStorage.getItem(DRAFT_PREFIX + key);
+  } catch {
+    return null;
+  }
+}
+
+function writeDraft(key: string, value: string | null): void {
+  try {
+    if (value === null) window.sessionStorage.removeItem(DRAFT_PREFIX + key);
+    else window.sessionStorage.setItem(DRAFT_PREFIX + key, value);
+  } catch {
+    /* depolama kapalı: taslak tutulmaz */
+  }
+}
+
+/** "Kaydetmeden ayrıl" onayından sonra taslaklar geri getirilmez. */
+function clearDrafts(): void {
+  try {
+    const store = window.sessionStorage;
+    const keys = Array.from({ length: store.length }, (_, i) => store.key(i));
+    for (const key of keys) {
+      if (key?.startsWith(DRAFT_PREFIX)) store.removeItem(key);
+    }
+  } catch {
+    /* yok say */
+  }
+}
+
+const CREATE_DRAFT_KEY = "create";
+
+/** Yeni ilan taslağı: yalnız serbest metin alanları (başlık, açıklama). */
+function readCreateDraft(): { title: string; description: string } | null {
+  const raw = readDraft(CREATE_DRAFT_KEY);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as { title?: unknown; description?: unknown };
+    return {
+      title: typeof parsed.title === "string" ? parsed.title : "",
+      description: typeof parsed.description === "string" ? parsed.description : "",
+    };
+  } catch {
+    return null;
+  }
+}
+
 export default function HostDashboard() {
   const t = useTranslations("host");
   const tp = useTranslations("payouts");
@@ -188,11 +249,10 @@ export default function HostDashboard() {
   const tt = useTranslations("trust");
   const tNav = useTranslations("nav");
   const tRevenue = useTranslations("revenue");
+  const tc = useTranslations("common");
   const f = useFormat();
-  const statusLabel = (s: string) =>
-    (BOOKING_STATUSES as readonly string[]).includes(s)
-      ? t(`bookingStatus.${s as (typeof BOOKING_STATUSES)[number]}`)
-      : s;
+  // Misafir ve rezervasyon ayrıntısıyla aynı durum adları; bilinmeyen durum ham kod göstermez.
+  const statusLabel = (s: string) => tc(bookingStatusKey(s));
   // Uçlar ayrı yüklenir: biri düşerse diğeri çalışmaya devam eder (F279).
   const propertiesLoader = useLoader(() => apiFetch<HostProperty[]>("/api/host/properties"));
   const bookingsLoader = useLoader(() => apiFetch<HostBooking[]>("/api/host/bookings"));
@@ -241,7 +301,9 @@ export default function HostDashboard() {
       cancelLabel: t("unsaved.leaveConfirm.cancel"),
       tone: "danger",
     }).then((ok) => {
-      if (ok) router.push(href);
+      if (!ok) return;
+      clearDrafts();
+      router.push(href);
     });
   };
 
@@ -422,8 +484,9 @@ export default function HostDashboard() {
                       {f.date(b.checkIn, "short")} – {f.date(b.checkOut, "short")} ·{" "}
                       {t("bookings.columns.guests")}: {b.guestCount}
                     </p>
-                    <p className="text-gray-800">
-                      {f.money(b.totalPriceMinor, b.currency)} · {statusLabel(b.status)}
+                    <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-gray-800">
+                      {f.money(b.totalPriceMinor, b.currency)}{" "}
+                      <BookingStatusBadge status={b.status} />
                     </p>
                     {(b.status === "CONFIRMED" || b.status === "COMPLETED") && (
                       <Link
@@ -494,7 +557,9 @@ export default function HostDashboard() {
                         <td className="py-2 pr-4">{f.date(b.checkOut, "short")}</td>
                         <td className="py-2 pr-4">{b.guestCount}</td>
                         <td className="py-2 pr-4">{f.money(b.totalPriceMinor, b.currency)}</td>
-                        <td className="py-2 pr-4">{statusLabel(b.status)}</td>
+                        <td className="py-2 pr-4">
+                          <BookingStatusBadge status={b.status} />
+                        </td>
                         <td className="py-2">
                           {(b.status === "CONFIRMED" || b.status === "COMPLETED") && (
                             <Link
@@ -610,6 +675,7 @@ function CreatePropertyForm({
   const [form, setForm] = useState(() => ({
     title: "",
     description: "",
+    ...readCreateDraft(),
     propertyType: "APARTMENT" as (typeof PROPERTY_TYPES)[number],
     city: "",
     country: t("create.defaultCountry"),
@@ -626,6 +692,14 @@ function CreatePropertyForm({
   const [busy, setBusy] = useState(false);
   // Yarım kalan yeni ilan formunda sayfadan ayrılırken uyarı (F838).
   useHostUnsavedChanges(form.title.trim() !== "" || form.description.trim() !== "");
+  useEffect(() => {
+    writeDraft(
+      CREATE_DRAFT_KEY,
+      form.title.trim() || form.description.trim()
+        ? JSON.stringify({ title: form.title, description: form.description })
+        : null
+    );
+  }, [form.title, form.description]);
 
   const order: ReadonlyArray<[string, string]> = [
     ["title", `${id}-name`],
@@ -673,6 +747,7 @@ function CreatePropertyForm({
       if (form.licenseNumber.trim()) body.licenseNumber = form.licenseNumber.trim();
       await apiFetch("/api/properties", { method: "POST", body: JSON.stringify(body) });
       setStatus({ message: t("create.created") });
+      writeDraft(CREATE_DRAFT_KEY, null);
       onCreated();
     } catch (err) {
       if (err instanceof ApiError && err.code === "IDENTITY_VERIFICATION_REQUIRED") {
@@ -741,8 +816,9 @@ function CreatePropertyForm({
             hint={t("create.descriptionHint")}
             error={errors.description}
           >
-            <textarea
+            <DescriptionTextarea
               id={`${id}-desc`}
+              countId={`${id}-desc-count`}
               rows={4}
               className={inputClass}
               value={form.description}
@@ -752,7 +828,7 @@ function CreatePropertyForm({
               onChange={(e) => setForm({ ...form, description: e.target.value })}
             />
           </Field>
-          <DescriptionCount length={form.description.length} />
+          <DescriptionCount length={form.description.length} id={`${id}-desc-count`} />
         </div>
         <Field label={t("create.city")} id={`${id}-city`} error={errors.city}>
           <input
@@ -880,7 +956,9 @@ function CreatePropertyForm({
             variant="secondary"
             aria-disabled={busy}
             onClick={() => {
-              if (!busy) onCancel();
+              if (busy) return;
+              writeDraft(CREATE_DRAFT_KEY, null);
+              onCancel();
             }}
           >
             {t("create.cancel")}
@@ -926,10 +1004,18 @@ function PropertyPanel({
   const { confirm, confirmDialog } = useConfirm();
   const p = property;
   const pid = `prop-${p.id}`;
-  const [open, setOpen] = useState(defaultOpen);
+  const descDraftKey = `desc:${p.id}`;
+  // Girişe gidip dönünce kaydedilmemiş açıklama geri gelir; kart açık başlar (F402).
+  const [restoredDescription] = useState(() => {
+    const draft = readDraft(descDraftKey);
+    return draft !== null && draft !== p.description ? draft : null;
+  });
+  const [open, setOpen] = useState(defaultOpen || restoredDescription !== null);
   const latest = propertyFormValues(p);
   const [base, setBase] = useState(latest);
-  const [form, setForm] = useState(latest);
+  const [form, setForm] = useState(() =>
+    restoredDescription === null ? latest : { ...latest, description: restoredDescription }
+  );
   const [errors, setErrors] = useState<FieldErrors>({});
   const [status, setStatus] = useState<{ error?: string; message?: string }>({});
   const [busy, setBusy] = useState(false);
@@ -975,6 +1061,10 @@ function PropertyPanel({
       priceChanged ||
       licenseChanged);
   useHostUnsavedChanges(dirty);
+  // Sunucudaki metinle aynıysa (kayıt sonrası dahil) taslak silinir.
+  useEffect(() => {
+    writeDraft(descDraftKey, form.description !== p.description ? form.description : null);
+  }, [descDraftKey, form.description, p.description]);
 
   /** Düzenleme önceki "Kaydedildi." mesajını kaldırır; yerine kaydedilmemiş uyarısı görünür. */
   function edit(patch: Partial<PropertyFormValues>) {
@@ -1180,8 +1270,9 @@ function PropertyPanel({
                   hint={t("create.descriptionHint")}
                   error={errors.description}
                 >
-                  <textarea
+                  <DescriptionTextarea
                     id={`${pid}-desc`}
+                    countId={`${pid}-desc-count`}
                     rows={4}
                     className={inputClass}
                     value={form.description}
@@ -1191,7 +1282,7 @@ function PropertyPanel({
                     onChange={(e) => edit({ description: e.target.value })}
                   />
                 </Field>
-                <DescriptionCount length={form.description.length} />
+                <DescriptionCount length={form.description.length} id={`${pid}-desc-count`} />
               </div>
               <div>
                 <Field
@@ -1852,7 +1943,7 @@ function ListingCopy({
         {draft && (
           <div className="space-y-2 rounded-md bg-gray-50 p-3 text-sm text-gray-900">
             <p className="flex items-center gap-2 font-medium">
-              {t("listingCopy.draft")} <LlmBadge mode={mode} />
+              {t("listingCopy.draft")} <LlmBadge mode={mode} audience="staff" />
             </p>
             {(["tr", "en"] as const).map((lang) => (
               <div key={lang} className="space-y-2">
@@ -1984,6 +2075,7 @@ function PhotoUpload({ propertyId, onChanged }: { propertyId: string; onChanged:
         );
         photosLoader.reload();
         onChanged();
+        notifyHostPhotosChanged(propertyId);
       }
     } finally {
       setProgress(null);
@@ -2012,6 +2104,7 @@ function PhotoUpload({ propertyId, onChanged }: { propertyId: string; onChanged:
       setMessage(t("photos.removed"));
       photosLoader.reload();
       onChanged();
+      notifyHostPhotosChanged(propertyId);
     } catch (err) {
       setErrors([errorText(err)]);
     } finally {
@@ -2123,7 +2216,7 @@ function PhotoUpload({ propertyId, onChanged }: { propertyId: string; onChanged:
                 {t("photos.qualityRated", { score, level: qualityLevel(score) })}
               </p>
               {result.duplicate && (
-                <p role="alert" className="text-amber-800">
+                <p className="text-amber-800">
                   {t(`photos.duplicate.${result.duplicate.scope}`)}{" "}
                   <button
                     type="button"

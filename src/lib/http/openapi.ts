@@ -263,10 +263,18 @@ function extendedPaths(
       get: {
         operationId: "listLocations",
         tags: ["search"],
-        summary: "Şehir otomatik tamamlama (en çok 20)",
+        summary: "Şehir otomatik tamamlama (en çok 20; `include=properties` ile en çok 5 ilan)",
         security: [],
-        parameters: [{ name: "q", in: "query", schema: { type: "string", maxLength: 100 } }],
-        responses: { ...ok("Şehir listesi", arrayOfRef("Location")) },
+        parameters: [
+          { name: "q", in: "query", schema: { type: "string", maxLength: 100 } },
+          {
+            name: "include",
+            in: "query",
+            description: "`properties`: başlığı eşleşen ilanlar şehirlerin ardına eklenir (q ≥ 2)",
+            schema: { type: "string", enum: ["properties"] },
+          },
+        ],
+        responses: { ...ok("Şehir (ve istenirse ilan) listesi", arrayOfRef("Location")) },
       },
     },
     "/api/properties": {
@@ -915,15 +923,25 @@ export function buildOpenApiDocument() {
               {
                 type: "object",
                 required: ["text"],
-                properties: { text: { type: "string", minLength: 3, maxLength: 300 } },
+                properties: {
+                  text: { type: "string", minLength: 3, maxLength: 300 },
+                  filtersOnly: {
+                    type: "boolean",
+                    description: "true: yalnız filtre döner, arama yapılmaz (`SmartSearchFilters`)",
+                  },
+                },
               },
               { text: "İstanbul'da deniz manzaralı 2 kişilik otel" }
             ),
           },
           responses: {
             "200": {
-              description: "Çözümlenen filtre ve sonuçlar (`ai_generated: true`)",
-              content: jsonContent(ref("schemas", "SmartSearchResult")),
+              description:
+                "Filtre ve sonuçlar (`ai_generated: true`); `filtersOnly: true` ise yalnız filtre",
+              // Açık uçlu şemalar: tam yanıt ikisine de uyar, bu yüzden `oneOf` değil `anyOf`.
+              content: jsonContent({
+                anyOf: [ref("schemas", "SmartSearchResult"), ref("schemas", "SmartSearchFilters")],
+              }),
             },
             ...common,
           },
@@ -1000,7 +1018,7 @@ export function buildOpenApiDocument() {
           operationId: "supportChat",
           tags: ["support"],
           summary:
-            "P1-4: AI destek ajanı (tek tur; salt-okur araçlar, iade/iptal yapamaz; para/hukuki talep → insan kuyruğu; AI kovası)",
+            "P1-4: AI destek ajanı (isteğe bağlı `history` ile son 6 tur bağlamı; salt-okur araçlar, iade/iptal yapamaz; para/hukuki talep → insan kuyruğu; AI kovası)",
           security: secured,
           requestBody: {
             required: true,
@@ -1017,6 +1035,21 @@ export function buildOpenApiDocument() {
             },
             ...authed,
             "503": ref("responses", "ServiceUnavailable"),
+          },
+        },
+      },
+      "/api/support/tickets": {
+        get: {
+          operationId: "listMySupportTickets",
+          tags: ["support"],
+          summary: "Misafirin kendi destek talepleri (insana devredilen konuların durumu)",
+          security: secured,
+          responses: {
+            "200": {
+              description: "Talepler (en yeniden eskiye, en fazla 5)",
+              content: jsonContent(ref("schemas", "MySupportTicketList")),
+            },
+            "401": ref("responses", "Unauthorized"),
           },
         },
       },

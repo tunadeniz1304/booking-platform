@@ -10,7 +10,7 @@
   },
   "tierBadge": "{tier} tier",
   "tierAria": "Loyalty tier: {tier}",
-  "cashbackRate": "You earn {rate}% cashback on completed stays; it is added to your wallet balance.",
+  "cashbackRate": "You earn {rate}% cashback (credit) on completed stays; it is added to your wallet balance.",
   "completedStays": "{count, plural, =0 {No completed stays yet} one {# completed stay} other {# completed stays}}",
   "nextTier": "{count, plural, one {# more stay} other {# more stays}} to reach {tier} ({rate}% cashback).",
   "topTier": "You are at the top tier.",

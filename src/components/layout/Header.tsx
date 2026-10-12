@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { ResendVerificationButton } from "@/components/auth/AuthCard";
+import { invalidateFavoriteIds } from "@/components/property/useFavoriteIds";
 import { focusRing } from "@/components/ui/ui";
 import { logout, type SessionUser } from "@/lib/api-client";
 import LocaleSwitcher from "./LocaleSwitcher";
@@ -200,6 +201,8 @@ export default function Header() {
     }
     focusLoginAfterLogout.current = stay;
     setSessionUserCache(null);
+    // Önceki kullanıcının favori kalpleri kartlarda kalmasın.
+    invalidateFavoriteIds();
     if (!stay) router.push("/");
     router.refresh();
   };

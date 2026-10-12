@@ -67,15 +67,15 @@ async function assertAttemptsLeft(bookingId: string): Promise<void> {
  * Başarısız yetkilendirme / 3DS denemesini sayar (v4#13). Sınıra ulaşılınca ödeme kalıcı
  * olarak FAILED(`ATTEMPTS_EXCEEDED`) işaretlenir; sonraki pay/confirm istekleri 429 alır.
  * Sayaç rezervasyon başınadır: yeni Idempotency-Key ile tekrar `pay` + `confirm` döngüsü
- * 3DS kodunu kaba kuvvetle denemeye izin vermez.
+ * 3DS kodunu kaba kuvvetle denemeye izin vermez. Sınırın altındaysa kalan hakkı (> 0) döner.
  */
-async function recordFailedAttempt(booking: PayableBooking): Promise<void> {
+async function recordFailedAttempt(booking: PayableBooking): Promise<number> {
   const { PAYMENT_MAX_ATTEMPTS, PAYMENT_ATTEMPTS_WINDOW_SECONDS } = getConfig();
   const attempts = await redis.incrWithTtl(
     attemptsKey(booking.id),
     PAYMENT_ATTEMPTS_WINDOW_SECONDS
   );
-  if (attempts < PAYMENT_MAX_ATTEMPTS) return;
+  if (attempts < PAYMENT_MAX_ATTEMPTS) return PAYMENT_MAX_ATTEMPTS - attempts;
   await prisma.payment.updateMany({
     where: { bookingId: booking.id, status: { in: OPEN_STATUSES } },
     data: { status: PaymentStatus.FAILED, failureCode: "ATTEMPTS_EXCEEDED" },
@@ -85,6 +85,13 @@ async function recordFailedAttempt(booking: PayableBooking): Promise<void> {
     attempts,
   });
   throw new PaymentAttemptsExceededError(PAYMENT_MAX_ATTEMPTS);
+}
+
+/** Ret hatası + kalan deneme hakkı (`details.attemptsLeft`); ödeme ekranı mesajda gösterir. */
+function declinedError(code: string, attemptsLeft: number): PaymentDeclinedError {
+  const error = new PaymentDeclinedError(code);
+  Object.assign(error.details as { declineCode: string }, { attemptsLeft });
+  return error;
 }
 
 /** Kart BIN'i PSP token metadata'sından (v4#13); desteklenmiyorsa / hata → null. */
@@ -235,8 +242,7 @@ async function payLocked(input: Parameters<typeof payForBooking>[0]): Promise<Pa
       failureCode: result.declineCode,
     });
     paymentsTotal.inc({ outcome: "declined" });
-    await recordFailedAttempt(booking);
-    throw new PaymentDeclinedError(result.declineCode);
+    throw declinedError(result.declineCode, await recordFailedAttempt(booking));
   }
   if (result.status === "requires_action") {
     const recorded = await transitionPayment(booking, OPEN_STATUSES, {
@@ -346,8 +352,7 @@ export async function confirmPaymentChallenge(input: {
       );
       await releaseBookingCredit(booking.id, "challenge_failed");
       paymentsTotal.inc({ outcome: "declined" });
-      await recordFailedAttempt(booking);
-      throw new PaymentDeclinedError(code);
+      throw declinedError(code, await recordFailedAttempt(booking));
     }
     return captureAndConfirm(booking, result.providerRef, [PaymentStatus.REQUIRES_ACTION]);
   }).finally(() => redis.del(`booking:${input.bookingId}`).catch(() => 0));

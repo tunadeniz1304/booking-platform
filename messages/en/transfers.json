@@ -1,6 +1,6 @@
 {
   "page": {
-    "title": "Booking transfer",
+    "title": "Booking transfers",
     "intro": "Transfer a confirmed booking you can't use, or browse other people's listings."
   },
   "discover": {
@@ -47,7 +47,11 @@
     "closeConfirm": "Close anyway",
     "tooLateSuffix": "(less than {hours} hours to check-in; can't be transferred)",
     "askTooHigh": "Your price can be at most {max}.",
-    "keepNote": "This doesn't transfer the booking yet: it stays yours until the buyer pays through the link. Once the payment is approved, your price is paid out to you."
+    "keepNote": "This doesn't transfer the booking yet: it stays yours until the buyer pays through the link. Once the payment is approved, your price is paid out to you.",
+    "share": "Share",
+    "shareTitle": "Booking transfer",
+    "shareText": "To take over my booking at {property} for {amount}, pay through this link.",
+    "shared": "Shared."
   },
   "claim": {
     "title": "Take over booking",

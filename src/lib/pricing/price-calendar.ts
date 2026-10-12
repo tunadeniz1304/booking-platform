@@ -362,6 +362,8 @@ export interface CalendarMonth {
   maxPriceMinor: number | null;
   /** Satırların en son güncellenme zamanı (ISO); hiç satır yoksa null. */
   updatedAt: string | null;
+  /** Fiyat ufkunun son günü (YYYY-MM-DD). */
+  horizonEnd: string;
 }
 
 const MONTH_RE = /^(\d{4})-(0[1-9]|1[0-2])$/;
@@ -494,5 +496,6 @@ export async function getCalendarMonth(
     minPriceMinor: grid.min,
     maxPriceMinor: grid.max,
     updatedAt: updatedAt?.toISOString() ?? null,
+    horizonEnd,
   };
 }

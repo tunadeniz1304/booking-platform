@@ -49,6 +49,9 @@ export interface QuoteView {
 /** Ağ/yanıt hatasında yer tutucu; dönüşte etkin dildeki mesaja çevrilir. */
 const FETCH_FAILED = "\u0000quote-fetch-failed";
 
+/** Yanıtsız sunucuda "yükleniyor" sonsuza dek sürmez: istek iptal edilir, hata gösterilir. */
+const QUOTE_TIMEOUT_MS = 10_000;
+
 export interface QuoteState {
   quote: QuoteView | null;
   loading: boolean;
@@ -111,8 +114,11 @@ export function useQuote(params: {
     if (!key) return;
     let active = true;
     const controller = new AbortController();
+    let deadline: ReturnType<typeof setTimeout> | undefined;
     const timer = setTimeout(() => {
       setState({ key, quote: null, loading: true, error: null, code: null, details: null });
+      // Zaman aşımında `active` hâlâ true: catch FETCH_FAILED yazar, arayüz "tekrar dene" sunar.
+      deadline = setTimeout(() => controller.abort(), QUOTE_TIMEOUT_MS);
       fetch(`/api/quote?${key}`, { signal: controller.signal, cache: "no-store" })
         .then(async (res) => {
           const body = await res.json();
@@ -147,11 +153,13 @@ export function useQuote(params: {
               code: null,
               details: null,
             });
-        });
+        })
+        .finally(() => clearTimeout(deadline));
     }, 150);
     return () => {
       active = false;
       clearTimeout(timer);
+      clearTimeout(deadline);
       controller.abort();
     };
   }, [key]);

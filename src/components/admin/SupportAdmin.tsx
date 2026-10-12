@@ -4,16 +4,10 @@ import { useId, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { apiFetch } from "@/lib/api-client";
 import { useFormat } from "@/i18n/use-format";
-import {
-  Button,
-  Card,
-  Status,
-  focusRing,
-  inputClass,
-  useErrorText,
-  useLoader,
-} from "@/components/ui/ui";
+import { Button, Card, Field, Status, focusRing, inputClass, useLoader } from "@/components/ui/ui";
 import { useRowFocusRecovery } from "@/components/admin/AdminDashboard";
+import { AdminCopyableId } from "@/components/admin/AdminCopyableId";
+import { isStaleRecord, useAdminErrorText } from "@/components/admin/admin-error-text";
 
 type TicketStatus = "OPEN" | "IN_PROGRESS" | "RESOLVED";
 /** "ACTIVE": açık + inceleniyor (varsayılan; incelemeye alınan talep listede kalır). */
@@ -80,13 +74,16 @@ function groupTickets(rows: TicketRow[]): TicketGroup[] {
 export default function SupportAdmin({ currentUserId }: { currentUserId?: string } = {}) {
   const t = useTranslations("support.admin");
   const tc = useTranslations("common");
+  const ta = useTranslations("admin");
   const f = useFormat();
-  const errorText = useErrorText();
+  const errorText = useAdminErrorText();
   const filterId = useId();
   const searchId = useId();
   const [status, setStatus] = useState<TicketFilter>("ACTIVE");
   const [query, setQuery] = useState("");
-  const { data, error, reload } = useLoader(() => fetchTickets(status), [status]);
+  const { data, error, loading, reload } = useLoader(() => fetchTickets(status), [status], {
+    resetOnDepsChange: true,
+  });
   const [busy, setBusy] = useState<{ key: string; ids: ReadonlySet<string> } | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -137,6 +134,8 @@ export default function SupportAdmin({ currentUserId }: { currentUserId?: string
     const done: TicketRow[] = [];
     let failure: unknown = null;
     let failed = 0;
+    // Başka yönetici işlemiş/kaldırmış: hata metni bunu söyler ve liste yenilenir.
+    let stale = false;
     try {
       for (const row of targets) {
         try {
@@ -148,6 +147,7 @@ export default function SupportAdmin({ currentUserId }: { currentUserId?: string
         } catch (e) {
           failure = e;
           failed += 1;
+          if (isStaleRecord(e)) stale = true;
         }
       }
       if (done.length > 0) {
@@ -161,15 +161,24 @@ export default function SupportAdmin({ currentUserId }: { currentUserId?: string
           for (const row of done) copy.delete(row.id);
           return copy;
         });
-        setMessage(targets.length === 1 ? t("updated") : t("bulkUpdated", { count: done.length }));
+        // Yeni durum ve talebin bundan sonra listelendiği filtre adıyla.
+        const statusLabel = t(`status.${next}`);
+        const filter = next === "RESOLVED" ? statusLabel : t("active");
+        setMessage(
+          targets.length === 1
+            ? t("updatedTo", { status: statusLabel, filter })
+            : t("bulkUpdatedTo", { count: done.length, status: statusLabel, filter })
+        );
+        markFocus(index);
+        reload();
+      } else if (stale) {
         markFocus(index);
         reload();
       }
       if (failed > 0) {
+        const reason = stale ? ta("staleRecord") : errorText(failure);
         setActionError(
-          targets.length === 1
-            ? errorText(failure)
-            : t("bulkFailed", { count: failed, error: errorText(failure) })
+          targets.length === 1 ? reason : t("bulkFailed", { count: failed, error: reason })
         );
       }
     } finally {
@@ -214,15 +223,29 @@ export default function SupportAdmin({ currentUserId }: { currentUserId?: string
               )}
             </p>
             <p className="break-words text-gray-700">
-              {t("ticketId", { id: row.id })}
-              {row.userId ? ` · ${t("user", { id: row.userId })}` : ""}
+              <AdminCopyableId id={row.id} label={(id) => t("ticketId", { id })} />
+              {row.userId && (
+                <>
+                  {" · "}
+                  <AdminCopyableId id={row.userId} label={(id) => t("user", { id })} />
+                </>
+              )}
+              {row.locale && ` · ${t("language", { locale: row.locale.toUpperCase() })}`}
             </p>
             <p className="text-gray-700">
-              {row.intent} · {t("confidence", { value: row.confidence.toFixed(2) })}
-              {row.bookingId ? ` · ${t("booking", { id: row.bookingId })}` : ""}
+              {t.has(`intent.${row.intent}`) ? t(`intent.${row.intent}`) : row.intent} ·{" "}
+              {t("confidence", { value: f.number(row.confidence, { style: "percent" }) })}
+              {row.bookingId && (
+                <>
+                  {" · "}
+                  <AdminCopyableId id={row.bookingId} label={(id) => t("booking", { id })} />
+                </>
+              )}
             </p>
             {row.status === "IN_PROGRESS" && row.handlerId && !mine && (
-              <p className="break-words text-gray-700">{t("handler", { id: row.handlerId })}</p>
+              <p className="break-words text-gray-700">
+                <AdminCopyableId id={row.handlerId} label={(id) => t("handler", { id })} />
+              </p>
             )}
             <p className="mt-1 whitespace-pre-line text-gray-900">{row.summary}</p>
             <div className="mt-2 flex flex-wrap gap-2">
@@ -261,42 +284,43 @@ export default function SupportAdmin({ currentUserId }: { currentUserId?: string
     <Card title={t("title")} id="support-admin">
       <div className="mb-4 flex flex-wrap gap-4">
         <div className="w-full max-w-xs">
-          <label htmlFor={filterId} className="block text-sm font-medium text-gray-900">
-            {t("filter")}
-          </label>
-          <select
-            id={filterId}
-            className={inputClass}
-            value={status}
-            onChange={(e) => changeFilter(e.target.value as TicketFilter)}
-          >
-            <option value="ACTIVE">{t("active")}</option>
-            {STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {t(`status.${s}`)}
-              </option>
-            ))}
-            <option value="">{t("all")}</option>
-          </select>
+          <Field id={filterId} label={t("filter")}>
+            <select
+              id={filterId}
+              className={inputClass}
+              value={status}
+              onChange={(e) => changeFilter(e.target.value as TicketFilter)}
+            >
+              <option value="ACTIVE">{t("active")}</option>
+              {STATUSES.map((s) => (
+                <option key={s} value={s}>
+                  {t(`status.${s}`)}
+                </option>
+              ))}
+              <option value="">{t("all")}</option>
+            </select>
+          </Field>
         </div>
         <div className="w-full max-w-xs">
-          <label htmlFor={searchId} className="block text-sm font-medium text-gray-900">
-            {t("search")}
-          </label>
-          <input
-            id={searchId}
-            type="search"
-            className={inputClass}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            autoComplete="off"
-          />
+          <Field id={searchId} label={t("search")}>
+            <input
+              id={searchId}
+              type="search"
+              className={inputClass}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              autoComplete="off"
+            />
+          </Field>
         </div>
+      </div>
+      <div className="mb-3">
+        <Status error={actionError} message={message} />
       </div>
       {error ? (
         <div className="space-y-2">
           <Status error={error} />
-          <Button variant="secondary" onClick={reload}>
+          <Button variant="secondary" busy={loading} onClick={reload}>
             {tc("errorPage.retry")}
           </Button>
         </div>
@@ -379,7 +403,6 @@ export default function SupportAdmin({ currentUserId }: { currentUserId?: string
           )}
         </>
       )}
-      <Status error={actionError} message={message} />
     </Card>
   );
 }

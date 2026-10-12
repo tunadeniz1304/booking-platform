@@ -10,8 +10,10 @@ import {
   isEmailNotVerifiedError,
   useClaimErrorText,
   useDisputeText,
+  usePartyLabel,
   type ClaimDetailResponse,
   type ClaimRole,
+  type ClaimType,
 } from "./shared";
 
 type Message = ClaimDetailResponse["messages"][number];
@@ -49,6 +51,8 @@ export default function ClaimMessages({
   live,
   onRefresh,
   refreshing = false,
+  headingLevel = 2,
+  claimType,
 }: {
   claimId: string;
   messages: Message[];
@@ -60,11 +64,16 @@ export default function ClaimMessages({
   onRefresh?: () => void;
   /** Üst bileşen yeniden yüklerken "Yenile" düğmesi meşgul gösterilir. */
   refreshing?: boolean;
+  /** Başlık düzeyi; içinde bulunduğu kartın diğer kart başlıklarıyla aynı düzeyde olmalı. */
+  headingLevel?: 2 | 3;
+  /** Verilirse gönderen "Misafir" / "Ev sahibi" olarak gösterilir; yoksa genel rol adı. */
+  claimType?: ClaimType;
 }) {
   const t = useTranslations("resolution");
   const f = useFormat();
   const claimError = useClaimErrorText();
   const text = useMessageText();
+  const partyLabel = usePartyLabel();
   const [body, setBody] = useState("");
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<{ error?: string; message?: string }>({});
@@ -148,6 +157,8 @@ export default function ClaimMessages({
       setFeedback({ message: t("messages.sent") });
       markChecked();
       onSent();
+      // Odak yeni mesaj için yanıt kutusuna döner.
+      inputRef.current?.focus();
     } catch (err) {
       setFeedback({ error: claimError(err) });
       setNeedsVerify(isEmailNotVerifiedError(err));
@@ -156,6 +167,9 @@ export default function ClaimMessages({
     }
   }
 
+  const Heading = headingLevel === 3 ? "h3" : "h2";
+  const isAdmin = viewerRole === "ADMIN";
+  const countText = t("messages.count", { count: body.length, max: MESSAGE_MAX });
   const firstReply =
     viewerRole === "RESPONDENT" && !messages.some((m) => m.mine && m.role !== "SYSTEM");
   const limitNote =
@@ -168,7 +182,7 @@ export default function ClaimMessages({
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-        <h3 className="text-base font-semibold text-gray-900">{t("messages.title")}</h3>
+        <Heading className="text-lg font-semibold text-gray-900">{t("messages.title")}</Heading>
         {polling && (
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <p className="text-xs text-gray-600">
@@ -199,7 +213,8 @@ export default function ClaimMessages({
               }`}
             >
               <p className="text-xs text-gray-600">
-                {m.mine ? t("messages.you") : t(`role.${m.role}`)} · {f.dateTime(m.createdAt)}
+                {m.mine ? t("messages.you") : partyLabel(claimType, m.role)} ·{" "}
+                {f.dateTime(m.createdAt)}
               </p>
               <p className="mt-1 whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
                 {text(m)}
@@ -211,9 +226,9 @@ export default function ClaimMessages({
       {canReply && (
         <form onSubmit={send} noValidate className="space-y-2">
           <Field
-            label={t("messages.label")}
+            label={isAdmin ? t("messages.adminLabel") : t("messages.label")}
             id={inputId}
-            hint={t("messages.count", { count: body.length, max: MESSAGE_MAX })}
+            hint={isAdmin ? `${t("messages.adminHint")} ${countText}` : countText}
             error={fieldError}
           >
             <textarea

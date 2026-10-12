@@ -36,6 +36,7 @@ export default function CouponField({
   loading?: boolean;
 }) {
   const t = useTranslations("quote");
+  const tc = useTranslations("common");
   const id = useId();
   const statusId = `${id}-status`;
   const hintId = `${id}-hint`;
@@ -117,7 +118,7 @@ export default function CouponField({
               apply();
             }
           }}
-          className="block min-w-0 flex-1 rounded-md border border-gray-400 px-3 py-2 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003580]"
+          className="block min-w-0 flex-1 rounded-md border border-gray-400 px-3 py-2 text-base focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003580] sm:text-sm"
           aria-invalid={invalid || undefined}
           aria-describedby={describedBy || undefined}
         />
@@ -141,6 +142,11 @@ export default function CouponField({
               data-testid="coupon-status"
               className={`text-xs ${status === "APPLIED" ? "text-green-800" : "text-red-700"}`}
             >
+              {/* Sonuç yalnız renkle ayrılmasın (F376). */}
+              <span aria-hidden="true">{status === "APPLIED" ? "\u2713" : "\u26A0\uFE0E"} </span>
+              <span className="sr-only">
+                {tc(status === "APPLIED" ? "successPrefix" : "errorPrefix")}{" "}
+              </span>
               {statusText}
             </p>
           )}

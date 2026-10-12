@@ -48,7 +48,8 @@
     "endingIn": "son 4 hane {last4}",
     "destinationDemo": "Demo hesap; gerçek bir banka hesabına ödeme yapılmaz",
     "destinationProvider": "Banka hesabınız Stripe'ta yönetilir",
-    "manageAtProvider": "Banka hesabını Stripe'ta görüntüle veya değiştir"
+    "manageAtProvider": "Banka hesabını Stripe'ta görüntüle veya değiştir",
+    "savingSchedule": "Kaydediliyor…"
   },
   "policy": "Tutar, girişten {hours} saat sonra emanetten serbest bırakılır; %{commission} platform komisyonu düşülür ve payınızın %{reserve} oranındaki kısmı {days} gün rezervde tutulur.",
   "identityRequired": "Ödeme için kimlik doğrulaması gereklidir.",
@@ -141,7 +142,8 @@
       "pending": "Bekleyen ödemesi olanlar"
     },
     "resultCount": "{total} hesaptan {shown} tanesi gösteriliyor.",
-    "noMatch": "Arama ya da filtreyle eşleşen hesap yok."
+    "noMatch": "Arama ya da filtreyle eşleşen hesap yok.",
+    "pauseHint": "{count, plural, =0 {Bekleyen ödeme yok. Durdurursanız yeni ödemeler siz devam ettirene kadar gönderilmez.} other {Durdurursanız bekleyen # ödeme siz devam ettirene kadar gönderilmez.}}"
   },
   "policyNoReserve": "Tutar, girişten {hours} saat sonra emanetten serbest bırakılır; %{commission} platform komisyonu düşülür ve payınızın bir kısmı {days} gün rezervde tutulur. Rezerv oranı hesabınızı bağladığınızda gösterilir.",
   "resolve": {

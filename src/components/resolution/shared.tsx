@@ -187,6 +187,61 @@ export function isEmailNotVerifiedError(err: unknown): boolean {
   return err instanceof ApiError && err.code === "EMAIL_NOT_VERIFIED";
 }
 
+/** Hata iletisinin yanında sunulacak çıkış yolu (`labelKey`, "resolution" ad alanında). */
+export type ClaimErrorAction =
+  | { href: string; labelKey: "errorAction.contactSupport" | "errorAction.viewClaims" }
+  | "resendVerification"
+  | null;
+
+/**
+ * Hata koduna göre kullanıcının atabileceği sonraki adım: doğrulama e-postasını yeniden
+ * gönderme, desteğe yazma ya da zaten açık talebi çözüm merkezinde bulma. Yoksa null.
+ */
+export function claimErrorAction(err: unknown): ClaimErrorAction {
+  if (!(err instanceof ApiError)) return null;
+  switch (err.code) {
+    case "EMAIL_NOT_VERIFIED":
+      return "resendVerification";
+    case "CLAIM_REFUND_IN_PROGRESS":
+      return { href: "/support", labelKey: "errorAction.contactSupport" };
+    case "CLAIM_ALREADY_OPEN":
+      return { href: "/resolution", labelKey: "errorAction.viewClaims" };
+    default:
+      return null;
+  }
+}
+
+/** Talebin tarafları: türüne göre açan/yanıtlayan rolünün kime karşılık geldiği. */
+export type ClaimParty = "GUEST" | "HOST" | "CARDHOLDER";
+
+const PARTY_SIDES: Record<ClaimType, { OPENER: ClaimParty; RESPONDENT: ClaimParty }> = {
+  GUEST_REFUND: { OPENER: "GUEST", RESPONDENT: "HOST" },
+  HOST_DAMAGE: { OPENER: "HOST", RESPONDENT: "GUEST" },
+  CHARGEBACK: { OPENER: "CARDHOLDER", RESPONDENT: "HOST" },
+};
+
+/** Rolün talep türündeki tarafı (misafir / ev sahibi / kart sahibi); yönetici için null. */
+export function partyKey(type: ClaimType, role: string): ClaimParty | null {
+  if (role !== "OPENER" && role !== "RESPONDENT") return null;
+  return PARTY_SIDES[type]?.[role] ?? null;
+}
+
+/**
+ * Rol etiketi: taraf belliyse "Misafir" / "Ev sahibi" / "Kart sahibi" (`mine` ise "(siz)"
+ * eklenir); değilse genel rol adı ("Yönetici", "Sistem").
+ */
+export function usePartyLabel() {
+  const t = useTranslations("resolution");
+  return useCallback(
+    (type: ClaimType | null | undefined, role: string, mine = false): string => {
+      const k = type ? partyKey(type, role) : null;
+      const label = k ? t(`party.${k}`) : t(`role.${role}`);
+      return mine && k ? t("party.you", { party: label }) : label;
+    },
+    [t]
+  );
+}
+
 /** Ödeme sağlayıcısı (Stripe) itiraz durumları, gerekçeleri ve olayları; bilinmeyenler "Diğer". */
 const DISPUTE_STATUSES = new Set([
   "warning_needs_response",
@@ -283,6 +338,70 @@ export function ClaimStatusBadge({ status }: { status: ClaimStatus }) {
     >
       {CLAIM_STATUSES.includes(status) ? t(status) : status}
     </span>
+  );
+}
+
+const HELP_ROLES: readonly string[] = ["OPENER", "RESPONDENT", "ADMIN"];
+
+/** Durumun role göre açıklaması: şimdi ne oluyor, sizden ne bekleniyor, sonra ne olacak. */
+export function ClaimStatusHelp({
+  status,
+  role,
+  type,
+}: {
+  status: ClaimStatus;
+  role: string;
+  type?: ClaimType | null;
+}) {
+  const t = useTranslations("resolution");
+  let text: string | null = null;
+  if (type === "CHARGEBACK" && ACTIVE_STATUSES.includes(status)) {
+    text = t("statusHelp.chargebackActive");
+  } else if (CLAIM_STATUSES.includes(status) && HELP_ROLES.includes(role)) {
+    text = t(`statusHelp.${status}.${role}`);
+  }
+  return text ? <p className="text-sm text-gray-700">{text}</p> : null;
+}
+
+const CLAIM_STEPS = ["opened", "response", "review", "decision"] as const;
+
+/** Sürecin hangi adımında olunduğu: yanıt bekleniyor → 1, incelemede → 2, sonuçlandı → 3. */
+function claimStepIndex(status: ClaimStatus): number {
+  if (status === "AWAITING_RESPONSE") return 1;
+  if (status === "OPEN" || status === "ESCALATED") return 2;
+  return 3;
+}
+
+/**
+ * Talep süreci adım göstergesi. Geçerli adım `aria-current` ve kalın yazıyla, tamamlanan
+ * adımlar onay işaretiyle belirtilir (yalnız renge dayanmaz).
+ */
+export function ClaimSteps({ status }: { status: ClaimStatus }) {
+  const t = useTranslations("resolution");
+  const current = claimStepIndex(status);
+  const last = CLAIM_STEPS.length - 1;
+  return (
+    <ol
+      aria-label={t("steps.label")}
+      className="flex flex-wrap items-center gap-x-2 text-sm text-gray-600"
+    >
+      {CLAIM_STEPS.map((key, idx) => {
+        const done = idx < current || (idx === last && current === last);
+        return (
+          <li
+            key={key}
+            aria-current={idx === current ? "step" : undefined}
+            className={
+              idx === current ? "font-semibold text-gray-900" : done ? "text-gray-900" : undefined
+            }
+          >
+            {idx > 0 && <span aria-hidden="true">· </span>}
+            {done && <span aria-hidden="true">✓ </span>}
+            {t(`steps.${key}`)}
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 

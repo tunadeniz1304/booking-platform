@@ -7,6 +7,8 @@ import { useFormat } from "@/i18n/use-format";
 import type { Formatter } from "@/lib/i18n/format";
 import { Button, ButtonLink, focusRing, loginHref } from "@/components/ui/ui";
 import { refreshSessionUser } from "@/components/layout/useSessionUserCache";
+import BookingNumberText from "@/components/booking/BookingNumberText";
+import { APP_RECONNECT_EVENT } from "@/components/pwa/NetworkStatusBanner";
 
 interface ItineraryItem {
   id: string;
@@ -39,6 +41,8 @@ type State =
 /** Yanıt bu süreyi aşarsa istek kesilir ve "Tekrar dene" gösterilir. */
 const LOAD_TIMEOUT_MS = 20_000;
 const DAY_MS = 86_400_000;
+/** /trips yalnız yaklaşan onaylı rezervasyonları gösterir; tam liste hesap sayfasındadır. */
+const ALL_BOOKINGS_HREF = "/account#account-bookings";
 
 async function loadItinerary(signal: AbortSignal): Promise<Response> {
   const init: RequestInit = { credentials: "same-origin", signal };
@@ -74,17 +78,23 @@ export default function TripsView() {
   const [copy, setCopy] = useState<{ id: string; ok: boolean } | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const focusAfterRetry = useRef(false);
+  /** Bağlantı dönünce yapılan arka plan yenilemesi (başarısızsa eldeki kopya korunur). */
+  const backgroundRefresh = useRef(false);
 
   useEffect(() => {
     let active = true;
     let timer = 0;
+    const background = backgroundRefresh.current;
+    backgroundRefresh.current = false;
     const controller = new AbortController();
     const finish = (next: State) => {
       if (!active) return;
       active = false;
       window.clearTimeout(timer);
       setRetrying(false);
-      setState(next);
+      setState((prev) =>
+        background && prev.kind === "ready" && next.kind !== "ready" ? prev : next
+      );
     };
     timer = window.setTimeout(() => {
       controller.abort();
@@ -116,6 +126,18 @@ export default function TripsView() {
     focusAfterRetry.current = false;
     if (state.kind === "ready") listRef.current?.focus();
   }, [state]);
+
+  // Çevrimdışı kopya ya da boş çevrimdışı durumda bağlantı dönünce liste kendiliğinden yenilenir.
+  const stale = (state.kind === "ready" && state.fromCache) || state.kind === "offline-empty";
+  useEffect(() => {
+    if (!stale) return;
+    const onReconnect = () => {
+      backgroundRefresh.current = true;
+      setAttempt((n) => n + 1);
+    };
+    window.addEventListener(APP_RECONNECT_EVENT, onReconnect);
+    return () => window.removeEventListener(APP_RECONNECT_EVENT, onReconnect);
+  }, [stale]);
 
   const retry = () => {
     focusAfterRetry.current = true;
@@ -187,7 +209,7 @@ export default function TripsView() {
           <p className="mt-1 text-xs text-gray-600">{t("emptyNote")}</p>
           <div className="mt-4 flex flex-wrap justify-center gap-3">
             <ButtonLink href="/">{tc("notFound.search")}</ButtonLink>
-            <ButtonLink href="/account" variant="secondary">
+            <ButtonLink href={ALL_BOOKINGS_HREF} variant="secondary">
               {t("allBookingsLink")}
             </ButtonLink>
           </div>
@@ -269,7 +291,7 @@ export default function TripsView() {
                           className="break-all font-mono text-sm text-gray-900"
                           data-testid="booking-code"
                         >
-                          {item.id}
+                          <BookingNumberText id={item.id} className="font-mono" />
                         </code>
                       </figcaption>
                     </figure>
@@ -288,6 +310,9 @@ export default function TripsView() {
               );
             })}
           </ul>
+          <ButtonLink href={ALL_BOOKINGS_HREF} variant="secondary">
+            {t("allBookingsLink")}
+          </ButtonLink>
         </>
       )}
     </div>

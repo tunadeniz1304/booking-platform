@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { PageShell, RoleGate, focusRing } from "@/components/ui/ui";
+import { ButtonLink, PageShell, RoleGate, focusRing } from "@/components/ui/ui";
 import ClaimDetail, { type ClaimDetailResult } from "@/components/resolution/ClaimDetail";
 import type { ClaimSummary } from "@/components/resolution/shared";
 
@@ -68,7 +68,26 @@ export default function ClaimDetailPage() {
         </div>
       }
     >
-      <RoleGate>{() => (id ? <ClaimDetail claimId={id} onResult={onResult} /> : null)}</RoleGate>
+      <RoleGate>
+        {(user) =>
+          id ? (
+            <>
+              {/* Yönetici kararı yönetim panelinde verilir; talep orada seçili açılır (F657). */}
+              {user.role === "ADMIN" && result?.status !== "notFound" && (
+                <p className="mb-4">
+                  <ButtonLink
+                    href={`/admin/claims?claim=${encodeURIComponent(id)}`}
+                    variant="secondary"
+                  >
+                    {t("admin.decideAsAdmin")}
+                  </ButtonLink>
+                </p>
+              )}
+              <ClaimDetail claimId={id} onResult={onResult} />
+            </>
+          ) : null
+        }
+      </RoleGate>
     </PageShell>
   );
 }

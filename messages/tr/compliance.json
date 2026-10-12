@@ -39,7 +39,7 @@
     "linkedTitle": "Bildirilen ilan",
     "reportAnother": "Başka bir içerik bildir",
     "errorSummary": "Formda {count} hata var; lütfen düzeltin:",
-    "sentEmail": "Onay e-postası {email} adresine gönderildi.",
+    "sentEmail": "Onay e-postası birkaç dakika içinde {email} adresine gönderilecek; gelmezse istenmeyen posta klasörünüzü kontrol edin.",
     "referenceLabel": "Başvuru numaranız",
     "referenceHint": "Destekle iletişime geçerseniz bu numarayı paylaşın.",
     "copyReference": "Numarayı kopyala",
@@ -55,7 +55,9 @@
     "home": "Ana sayfaya dön",
     "reporterEmailHint": "Onay ve karar e-postaları bu adrese gönderilir. Adresiniz yalnız bu bildirimle ilgili iletişim için kullanılır.",
     "privacyNote": "Adınız ve e-posta adresiniz ilan sahibiyle paylaşılmaz; yalnız bildirimi inceleyen ekibimiz görür. Ayrıntılar için <link>aydınlatma metnini</link> okuyun.",
-    "timeout": "Bağlantı zaman aşımına uğradı. Yazdıklarınız korunuyor; bildirimi yeniden gönderebilirsiniz."
+    "timeout": "Bağlantı zaman aşımına uğradı. Yazdıklarınız korunuyor; bildirimi yeniden gönderebilirsiniz.",
+    "rateLimitedRetry": "Çok fazla bildirim gönderildi. Yaklaşık {minutes} dakika sonra tekrar deneyin.",
+    "rateLimitedAlt": "Bekleyemeyecek bir durumsa <link>destek ekibimize ulaşın</link>."
   },
   "admin": {
     "title": "Uyum",
@@ -208,7 +210,9 @@
     },
     "slaWarning": {
       "dueSoon": "SLA bitişi yaklaşıyor"
-    }
+    },
+    "referenceNoOptional": "Evrak no (isteğe bağlı)",
+    "legalReferenceOptional": "Hukuki referans (isteğe bağlı)"
   },
   "accessibility": {
     "title": "Erişilebilirlik",
@@ -257,8 +261,8 @@
       "note": "Not (isteğe bağlı)",
       "add": "Özelliği ekle",
       "added": "Özellik eklendi.",
-      "evidenceSaved": "Kanıt güncellendi; özellik yeniden incelenecek.",
-      "deleted": "Özellik silindi.",
+      "evidenceSaved": "{name}: kanıt güncellendi; özellik yeniden incelenecek.",
+      "deleted": "{name} özelliği silindi.",
       "saveEvidence": "Kanıtı kaydet",
       "saveEvidenceLabel": "{name} için kanıtı kaydet",
       "evidenceVerifiedWarning": "Bu özellik doğrulandı. Kanıtı değiştirip kaydederseniz doğrulama kaldırılır ve platform ekibi yeniden inceler.",
@@ -289,7 +293,8 @@
       "pendingReviewHint": "Platform ekibi kanıtı inceleyip doğruladığında ilanda ve aramada görünür.",
       "needsEvidenceHint": "İlan fotoğraflarınızdan bir kanıt seçip kaydedin; platform ekibi doğruladıktan sonra ilanda görünür.",
       "newTab": "(yeni sekmede açılır)",
-      "noteHint": "En fazla {max} karakter; {remaining} karakter kaldı."
+      "noteHint": "En fazla {max} karakter; {remaining} karakter kaldı.",
+      "adding": "Ekleniyor…"
     },
     "admin": {
       "title": "Erişilebilirlik doğrulama kuyruğu",
@@ -321,6 +326,12 @@
         "unverifyEffect": "Özellik ilanda ve aramada gizlenir ve inceleme bekleyenler listesine döner.",
         "verify": "Doğrula",
         "unverify": "Doğrulamayı kaldır"
+      },
+      "verifyLabel": "Doğrula: {name} ({property})",
+      "unverifyLabel": "Doğrulamayı kaldır: {name} ({property})",
+      "errors": {
+        "evidenceRequired": "Kanıt fotoğrafı olmayan bir özellik doğrulanamaz. Ev sahibinin kanıt eklemesini bekleyin.",
+        "notFound": "Bu beyan artık bulunamıyor; ev sahibi silmiş olabilir."
       }
     },
     "askSupport": "Destek'e soru sor",
@@ -331,7 +342,7 @@
   },
   "appeal": {
     "title": "Karara itiraz",
-    "intro": "DSA md. 20 kapsamında içerik moderasyonu kararına itiraz edebilirsiniz. İtirazınızı yetkili bir çalışan inceler; sonuç e-postayla bildirilir.",
+    "intro": "AB Dijital Hizmetler Yasası (DSA) md. 20 kapsamında içerik moderasyonu kararına itiraz edebilirsiniz. İtirazınızı yetkili bir çalışan inceler; sonuç e-postayla bildirilir.",
     "invalidLink": "İtiraz bağlantısı eksik ya da hatalı. Karar e-postanızdaki bağlantının tamamını kullanın; sorun sürerse karar numarası ve e-posta adresinizle destek ekibimize ulaşın.",
     "decisionTitle": "İtiraz edilen karar",
     "decision": "Karar",
@@ -345,7 +356,7 @@
     "existing": {
       "PENDING": "İtirazınız alındı ve inceleniyor (itiraz no: {reference}).",
       "UPHELD": "İtirazınız kabul edildi; karar geri alındı (itiraz no: {reference}).",
-      "REJECTED": "İtirazınız reddedildi (itiraz no: {reference}). DSA md. 21 kapsamında mahkeme dışı uyuşmazlık çözümüne başvurabilirsiniz."
+      "REJECTED": "İtirazınız reddedildi (itiraz no: {reference}). DSA md. 21 kapsamında sertifikalı bir mahkeme dışı uyuşmazlık çözüm kuruluşuna başvurabilirsiniz."
     },
     "windowClosed": "Bu karar için itiraz süresi doldu.",
     "formTitle": "İtirazınız",
@@ -375,7 +386,7 @@
       "groundHint": "İlan kaldırılacağı için dayanak zorunludur.",
       "response": "Gerekçe (itiraz edene gönderilir)",
       "submit": "İtiraz kararını kaydet",
-      "decided": "İtiraz kararı kaydedildi; sonuç e-postalanacak.",
+      "decided": "“{item}” için yapılan itirazın kararı kaydedildi; sonuç e-postalanacak.",
       "chooseOutcome": "Bir sonuç seçin.",
       "confirm": {
         "title": "İtiraz kararı kaydedilsin mi?",
@@ -387,7 +398,13 @@
       },
       "rowTitle": "İtiraz eden: {role} · Karar: {decision}",
       "noDecision": "kayıtlı değil",
-      "appealedAt": "İtiraz tarihi: {date}"
+      "appealedAt": "İtiraz tarihi: {date}",
+      "responseHint": "En az 10 karakter.",
+      "errors": {
+        "response": "Gerekçe 10 ile 5000 karakter arasında olmalı.",
+        "decided": "“{item}” için yapılan itiraza zaten karar verilmiş; liste yenilendi.",
+        "notFound": "“{item}” için yapılan itiraz artık bulunamıyor; liste yenilendi."
+      }
     },
     "sentTitle": "İtirazınız alındı",
     "notDecided": "Bu bağlantı için itiraz edilebilir bir karar bulunamadı. Bildirim henüz sonuçlanmamış olabilir; karar verildiğinde size e-postayla bildirilir.",
@@ -398,6 +415,12 @@
     "windowEndsAt": "{date}, {time} (TSİ)",
     "daysLeft": "{days, plural, =0 {Bugün sona eriyor} other {# gün kaldı}}",
     "appealDecidedAt": "İtiraz karar tarihi",
-    "disputeHelp": "Mahkeme dışı uyuşmazlık çözümü (DSA md. 21) için destek ekibimize danışın"
+    "disputeHelp": "Mahkeme dışı uyuşmazlık çözümü (DSA md. 21) için destek ekibimize danışın",
+    "timeout": "Bağlantı zaman aşımına uğradı. Yazdıklarınız korunuyor; itirazı yeniden gönderebilirsiniz.",
+    "copyReference": "İtiraz numarasını kopyala",
+    "copied": "Kopyalandı.",
+    "copyFailed": "Kopyalanamadı; numarayı elle seçip kopyalayın.",
+    "nextSteps": "Yetkili bir çalışan itirazınızı inceler. İtiraz kabul edilirse önceki karar geri alınır; reddedilirse DSA md. 21 kapsamında mahkeme dışı uyuşmazlık çözümüne başvurabilirsiniz.",
+    "home": "Ana sayfaya dön"
   }
 }

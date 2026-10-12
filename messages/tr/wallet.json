@@ -10,7 +10,7 @@
   },
   "tierBadge": "{tier} seviyesi",
   "tierAria": "Sadakat seviyesi: {tier}",
-  "cashbackRate": "Tamamlanan konaklamalarınızda %{rate} nakit iade (cashback) kazanırsınız; tutar cüzdan bakiyenize eklenir.",
+  "cashbackRate": "Tamamlanan konaklamalarınızda %{rate} nakit iade (kredi) kazanırsınız; tutar cüzdan bakiyenize eklenir.",
   "completedStays": "{count, plural, =0 {Henüz tamamlanan konaklama yok} one {# tamamlanan konaklama} other {# tamamlanan konaklama}}",
   "nextTier": "{count, plural, one {# konaklama} other {# konaklama}} daha tamamlayınca {tier} seviyesine geçersiniz (%{rate} nakit iade).",
   "topTier": "En üst seviyedesiniz.",
@@ -20,7 +20,7 @@
   "lots": {
     "title": "Cüzdan hareketleri",
     "source": {
-      "CASHBACK": "Nakit iade (cashback)",
+      "CASHBACK": "Nakit iade",
       "REFUND": "İade edilen bakiye"
     },
     "remaining": "Kalan {remaining} / {amount}",

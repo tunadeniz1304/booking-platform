@@ -40,7 +40,7 @@
     "waiting": "Passkey onayı bekleniyor…",
     "verify": "Passkey ile doğrula",
     "cancel": "Vazgeç",
-    "whatIsPasskey": "Passkey, telefonunuzun ya da bilgisayarınızın kilidini açtığınız yöntemle (parmak izi, yüz tanıma veya PIN) yaptığınız, parola gerektirmeyen bir doğrulamadır.",
+    "whatIsPasskey": "Passkey, telefonunuzun ya da bilgisayarınızın kilidini açtığınız yöntemle (parmak izi, yüz tanıma veya PIN) yaptığınız, şifre gerektirmeyen bir doğrulamadır.",
     "noPasskey": "Passkey'iniz yoksa hesap sayfasında birkaç saniyede oluşturabilir, sonra bu pencereye dönüp yeniden deneyebilirsiniz.",
     "holdUntil": "Odanız sizin için tutuluyor; tutma süresi saat {time} itibarıyla doluyor.",
     "waitingHint": "Cihazınızın açtığı passkey penceresinde parmak izi, yüz tanıma veya PIN ile onay verin. Telefonunuzla doğruluyorsanız telefonunuza gelen isteği onaylayın.",
@@ -124,5 +124,7 @@
   "threeDsNoCode": "Kod gelmedi mi? Birkaç dakika bekleyin; yine gelmezse aşağıdan başka bir kartla ödeyebilirsiniz. Kartınızdan ödeme alınmadı.",
   "otherOptions": "Diğer seçenekler",
   "stepUpCancelled": "Ödeme tamamlanmadı; devam etmek için ek doğrulama gerekiyor.",
-  "stepUpRetry": "Dilediğinizde yeniden deneyebilirsiniz."
+  "stepUpRetry": "Dilediğinizde yeniden deneyebilirsiniz.",
+  "timeoutCheck": "İstek zaman aşımına uğradı; ödemeniz alınmış olabilir, rezervasyonun durumunu yeniden kontrol ediyoruz. Rezervasyon hâlâ ödeme bekliyorsa yeniden deneyebilirsiniz; aynı ödeme iki kez alınmaz.",
+  "cvcHint": "Kartın arkasındaki 3 haneli kod (American Express'te önde 4 hane)"
 }

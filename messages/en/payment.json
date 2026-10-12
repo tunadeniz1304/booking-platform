@@ -124,5 +124,7 @@
   "threeDsNoCode": "Didn't get a code? Wait a few minutes; if it still doesn't arrive, you can pay with another card below. Your card has not been charged.",
   "otherOptions": "Other options",
   "stepUpCancelled": "Payment not completed; additional verification is needed to continue.",
-  "stepUpRetry": "You can try again whenever you're ready."
+  "stepUpRetry": "You can try again whenever you're ready.",
+  "timeoutCheck": "The request timed out; your payment may have gone through, so we're re-checking your booking status. If the booking is still awaiting payment, you can try again; the same payment won't be taken twice.",
+  "cvcHint": "The 3-digit code on the back of your card (4 digits on the front for American Express)"
 }

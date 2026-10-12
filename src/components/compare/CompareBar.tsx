@@ -17,10 +17,13 @@ export default function CompareBar({
   checkIn,
   checkOut,
   guests,
+  from,
 }: {
   checkIn?: string;
   checkOut?: string;
   guests?: number;
+  /** Arama sorgusu (filtreler dahil); karşılaştırmadaki "Aramaya dön" bu aramaya döner. */
+  from?: string;
 }) {
   const t = useTranslations("compare");
   const { ids, toggle, clear, full } = useCompareSelection();
@@ -132,6 +135,7 @@ export default function CompareBar({
     params.set("checkOut", checkOut);
   }
   if (guests) params.set("guests", String(guests));
+  if (from) params.set("from", from);
 
   const announcement = undoIds
     ? t("cleared")

@@ -64,6 +64,23 @@ export async function receiveTakedown(
       select: { id: true, isActive: true },
     });
     if (!property) throw new NotFoundError("İlan bulunamadı");
+    if (input.referenceNo) {
+      // Aynı evrakın iki kez girilmesi ikinci bir SLA sayacı açmasın.
+      const duplicate = await tx.takedownRequest.findFirst({
+        where: {
+          propertyId: property.id,
+          referenceNo: input.referenceNo,
+          status: { not: "CLOSED" },
+        },
+        select: { id: true },
+      });
+      if (duplicate) {
+        throw new ConflictError(
+          "Bu ilan ve evrak no için açık talep zaten var",
+          "TAKEDOWN_DUPLICATE"
+        );
+      }
+    }
     await tx.property.update({ where: { id: property.id }, data: { isActive: false } });
     const row = await tx.takedownRequest.create({
       data: {
@@ -267,10 +284,22 @@ export async function closeTakedown(
   });
 }
 
+/**
+ * Yönetim listesi. TakedownRequest'in Prisma ilişkisi yok; ilan başlıkları ayrı sorguyla eklenir.
+ */
 export async function listTakedowns(opts: { status?: "RECEIVED" | "ACTIONED" | "CLOSED" } = {}) {
-  return prisma.takedownRequest.findMany({
+  const rows = await prisma.takedownRequest.findMany({
     where: opts.status ? { status: opts.status } : undefined,
     orderBy: { receivedAt: "desc" },
     take: 200,
+  });
+  const properties = await prisma.property.findMany({
+    where: { id: { in: [...new Set(rows.map((r) => r.propertyId))] } },
+    select: { id: true, title: true },
+  });
+  const titles = new Map(properties.map((p) => [p.id, p.title]));
+  return rows.map((r) => {
+    const title = titles.get(r.propertyId);
+    return { ...r, property: title === undefined ? null : { title } };
   });
 }

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { focusRing } from "@/components/ui/ui";
+import { Button, focusRing } from "@/components/ui/ui";
 import { CONSENT_COOKIE, readConsent, type ConsentValue } from "@/lib/privacy/consent";
 
 const MAX_AGE_SECONDS = 180 * 24 * 60 * 60;
@@ -95,6 +95,8 @@ export default function CookieConsent() {
     const root = document.documentElement;
     const apply = () => {
       const height = Math.ceil(band.getBoundingClientRect().height);
+      // Alttaki diğer yapışkan çubuklar (karşılaştırma) bandın üstünde durabilsin.
+      root.style.setProperty("--cookie-banner-h", `${height}px`);
       root.style.scrollPaddingBottom = `${height + 16}px`;
       document.body.style.paddingBottom = `${height}px`;
     };
@@ -103,6 +105,7 @@ export default function CookieConsent() {
     observer?.observe(band);
     return () => {
       observer?.disconnect();
+      root.style.removeProperty("--cookie-banner-h");
       root.style.scrollPaddingBottom = "";
       document.body.style.paddingBottom = "";
     };
@@ -147,9 +150,8 @@ export default function CookieConsent() {
   );
 
   // Mobilde düğmeler tek satırda eşit genişlikte (bant ekranın daha azını kaplar).
-  const buttonBase = `flex-1 rounded-md px-3 py-2 text-sm font-semibold sm:flex-none sm:px-4 ${focusRing}`;
   // Kabul ve ret eşit görsel ağırlıkta (EDPB/KVKK: karanlık desen yok).
-  const outlineButton = `${buttonBase} border border-[#003580] text-[#003580] hover:bg-blue-50`;
+  const buttonLayout = "flex-1 sm:flex-none";
 
   return (
     <section
@@ -163,7 +165,7 @@ export default function CookieConsent() {
           else decide("necessary");
         }
       }}
-      className="fixed inset-x-0 bottom-0 z-50 max-h-[60vh] overflow-y-auto border-t border-gray-300 bg-white p-4 shadow-lg"
+      className="fixed inset-x-0 bottom-0 z-50 max-h-[60vh] overflow-y-auto border-t border-gray-300 bg-white p-4 shadow-lg print:hidden"
     >
       <div className="mx-auto flex max-w-5xl flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div className="text-sm text-gray-900">
@@ -209,30 +211,33 @@ export default function CookieConsent() {
         </div>
         <div className="flex flex-wrap gap-2">
           {customizing ? (
-            <button
-              type="button"
-              className={`${buttonBase} bg-[#003580] text-white hover:bg-[#002b66]`}
+            <Button
+              className={buttonLayout}
               onClick={() => decide(analytics ? "necessary,analytics" : "necessary")}
             >
               {t("save")}
-            </button>
+            </Button>
           ) : (
-            <button type="button" className={outlineButton} onClick={() => setCustomizing(true)}>
+            <Button
+              variant="secondary"
+              className={buttonLayout}
+              onClick={() => setCustomizing(true)}
+            >
               {t("customize")}
-            </button>
+            </Button>
           )}
-          <button type="button" className={outlineButton} onClick={() => decide("necessary")}>
+          <Button variant="secondary" className={buttonLayout} onClick={() => decide("necessary")}>
             {t("necessaryOnly")}
-          </button>
+          </Button>
           {/* Özelleştirmede tek kaydetme yolu kutu durumunu izleyen "Tercihleri kaydet"tir. */}
           {!customizing && (
-            <button
-              type="button"
-              className={outlineButton}
+            <Button
+              variant="secondary"
+              className={buttonLayout}
               onClick={() => decide("necessary,analytics")}
             >
               {t("acceptAll")}
-            </button>
+            </Button>
           )}
         </div>
       </div>

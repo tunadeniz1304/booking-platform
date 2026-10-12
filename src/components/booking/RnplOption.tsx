@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { apiFetch } from "@/lib/api-client";
 import { useFormat } from "@/i18n/use-format";
@@ -26,24 +26,52 @@ interface Props {
   onChange: (rnpl: boolean) => void;
   /** Seçiliyken cüzdan kredisinin bu seçenekle kullanılamayacağını açıklayan notu gösterir. */
   creditNote?: boolean;
+  /** Teklif yanıtı gelince bir kez çağrılır: seçenek gösteriliyor mu (F1021). */
+  onLoaded?: (shown: boolean) => void;
 }
 
 /**
  * P1-3 "Şimdi rezerve et, sonra öde" seçimi. Teklif sunucudan gelir; uygun değilse (ya da
  * RNPL_ENABLED=false) hiçbir şey gösterilmez. Seçildiğinde iptal zaman çizelgesi görünür.
  */
-export default function RnplOption({ bookingId, disabled, selected, onChange, creditNote }: Props) {
+export default function RnplOption({
+  bookingId,
+  disabled,
+  selected,
+  onChange,
+  creditNote,
+  onLoaded,
+}: Props) {
   const [offer, setOffer] = useState<RnplOffer | null>(null);
+  const [loaded, setLoaded] = useState(false);
+  const onLoadedRef = useRef(onLoaded);
+
+  useEffect(() => {
+    onLoadedRef.current = onLoaded;
+  }, [onLoaded]);
 
   useEffect(() => {
     let alive = true;
     apiFetch<RnplOffer>(`/api/bookings/${bookingId}/rnpl`)
-      .then((o) => alive && setOffer(o))
-      .catch(() => undefined); // Teklif okunamazsa seçenek görünmez; ödeme "şimdi öde" kalır.
+      .then((o) => {
+        if (!alive) return;
+        setOffer(o);
+        setLoaded(true);
+        onLoadedRef.current?.(!!(o.available && o.dueAt && o.freeCancellationUntil));
+      })
+      .catch(() => {
+        // Teklif okunamazsa seçenek görünmez; ödeme "şimdi öde" kalır.
+        if (!alive) return;
+        setLoaded(true);
+        onLoadedRef.current?.(false);
+      });
     return () => {
       alive = false;
     };
   }, [bookingId]);
+
+  // Yanıt gelene kadar yer ayrılır: seçenek belirince altındaki kart alanları kaymasın (F1152).
+  if (!loaded) return <div aria-hidden="true" className="min-h-[44px]" />;
 
   return (
     <RnplChoice

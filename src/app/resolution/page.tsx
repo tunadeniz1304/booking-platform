@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { apiFetch } from "@/lib/api-client";
-import { Card, PageShell, RoleGate, Status, focusRing, useLoader } from "@/components/ui/ui";
+import { Card, LoadError, PageShell, RoleGate, focusRing, useLoader } from "@/components/ui/ui";
 import ClaimList from "@/components/resolution/ClaimList";
 import {
   ACTIVE_STATUSES,
@@ -18,6 +18,8 @@ type ClaimGroup = "action" | "active" | "resolved";
 type ClaimFilter = "all" | ClaimGroup;
 const FILTERS: readonly ClaimFilter[] = ["all", "action", "active", "resolved"];
 const GROUP_ORDER: Record<ClaimGroup, number> = { action: 0, active: 1, resolved: 2 };
+const LOADING_ANNOUNCE_DELAY_MS = 400;
+const skeletonBlock = "rounded-md bg-gray-100 motion-safe:animate-pulse";
 
 /** Yanıt sırası kullanıcıdaysa "işlem bekleyen", sonuçlanmamışsa "devam eden". */
 function claimGroup(claim: ClaimSummary): ClaimGroup {
@@ -57,8 +59,16 @@ export default function ResolutionPage() {
 
 function MyClaims() {
   const t = useTranslations("resolution");
-  const { data, error } = useLoader(() => apiFetch<{ claims: ClaimSummary[] }>("/api/claims"));
+  const { data, error, loading, reload } = useLoader(() =>
+    apiFetch<{ claims: ClaimSummary[] }>("/api/claims")
+  );
   const [filter, setFilter] = useState<ClaimFilter>("all");
+  const [announceLoading, setAnnounceLoading] = useState(false);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setAnnounceLoading(true), LOADING_ANNOUNCE_DELAY_MS);
+    return () => window.clearTimeout(timer);
+  }, []);
+  const initialLoading = !data && !error;
   const claims = data ? sortClaims(data.claims) : [];
   const showFilter = claims.length > 1;
   const active = showFilter ? filter : "all";
@@ -70,11 +80,21 @@ function MyClaims() {
       title={data ? t("list.titleCount", { count: data.claims.length }) : t("list.title")}
       id="my-claims"
     >
-      <Status error={error} />
-      {!data && !error && (
-        <p aria-live="polite" className="text-sm text-gray-600">
-          {t("loading")}
-        </p>
+      {/* Bölge metinsiz bağlanır, metin gecikmeyle yazılır; böylece duyurulur (F1347). */}
+      <p role="status" className="sr-only">
+        {initialLoading && announceLoading ? t("loading") : null}
+      </p>
+      {error && <LoadError error={error} onRetry={reload} busy={loading} />}
+      {initialLoading && (
+        <ul aria-hidden="true" className="space-y-3">
+          {[0, 1, 2].map((i) => (
+            <li key={i} className="h-24 space-y-2 rounded-md border border-gray-200 p-3">
+              <div className={`h-5 w-40 ${skeletonBlock}`} />
+              <div className={`h-4 w-full ${skeletonBlock}`} />
+              <div className={`h-4 w-1/2 ${skeletonBlock}`} />
+            </li>
+          ))}
+        </ul>
       )}
       {data && (
         <div className="space-y-4">

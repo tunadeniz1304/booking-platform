@@ -4,9 +4,9 @@
     "intro": "Track occupancy, average daily rate (ADR) and revenue per available room (RevPAR); review price suggestions with their contribution table, then accept or reject them."
   },
   "loading": "Loading…",
-  "loadingProperties": "Loading properties…",
-  "noProperties": "You don't have any properties yet.",
-  "propertyLabel": "Property",
+  "loadingProperties": "Loading listings…",
+  "noProperties": "You don't have any listings yet.",
+  "propertyLabel": "Listing",
   "percent": "{value}%",
   "factor": {
     "occupancy": "Occupancy",

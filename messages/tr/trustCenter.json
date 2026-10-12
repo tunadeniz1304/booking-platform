@@ -24,7 +24,7 @@
     "transparency": "DSA şeffaflık raporu",
     "transparencyNote": "Bildirim, kaldırma ve itiraz sayılarını gösterir (kişisel veri içermez). Rapor şimdilik yalnız yöneticilerin açabildiği uyum panelinden JSON/CSV olarak dışa aktarılır.",
     "ranking": "Sıralama nasıl çalışır?",
-    "report": "Yasa dışı bir ilanı ya da içeriği bildir",
+    "report": "İçerik bildir",
     "privacy": "Gizlilik ve KVKK bildirimi"
   },
   "footnote": "Portföy/demo projesidir; bağlantılar kaynak depodaki gerçek iş akışlarını ve uçları gösterir.",

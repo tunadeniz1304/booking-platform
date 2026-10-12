@@ -110,7 +110,9 @@ function InnerForm({
         disabled={busy || working || !stripe}
         className="w-full rounded-lg bg-[#003580] px-4 py-3 text-sm font-semibold text-white disabled:bg-gray-300 disabled:text-gray-700"
       >
-        {busy || working ? t("processing") : t("payAndConfirm")}
+        {busy || working
+          ? t("processing")
+          : `${t("payAndConfirm")} · ${f.money(amountMinor, currency)}`}
       </button>
     </form>
   );

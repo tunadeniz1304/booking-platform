@@ -14,6 +14,7 @@ import AuthCard, {
   withRedirect,
 } from "@/components/auth/AuthCard";
 import { Button, Status } from "@/components/ui/ui";
+import { readRememberedAuthEmail } from "@/lib/auth/auth-email-handoff";
 import { postJsonWithPow } from "@/lib/auth/pow-fetch";
 
 /** Giriş formuyla aynı kural: sunucunun reddettiği "a@b" gibi adresler gönderilmeden yakalanır. */
@@ -23,6 +24,8 @@ const linkClass =
   "inline-flex min-h-[44px] items-center font-semibold text-[#003580] hover:underline sm:min-h-[24px]";
 
 const noopSubscribe = () => () => {};
+const clientSnapshot = () => true;
+const serverSnapshot = () => false;
 /** Posta kutusu bağlantısı yalnız demo modunda (sunucu `<html data-demo>` yazar). */
 const isDemoDocument = () => document.documentElement.dataset.demo === "true";
 
@@ -38,19 +41,36 @@ export default function ForgotPasswordPage() {
   const tNav = useTranslations("nav");
   const authErrorText = useAuthErrorText();
   const redirect = safeRedirect(useSearchParam("redirect"));
-  // Girişte yazılan adres `?email=` ile gelir; kullanıcı alanı değiştirene kadar o kullanılır.
+  // Girişte yazılan adres sekme deposundan (F1039; eski bağlantılarda `?email=`) gelir;
+  // kullanıcı alanı değiştirene kadar o kullanılır.
   const emailParam = useSearchParam("email");
+  const rememberedEmail = useSyncExternalStore(noopSubscribe, readRememberedAuthEmail, () => null);
   const [typedEmail, setTypedEmail] = useState<string | null>(null);
-  const email = typedEmail ?? emailParam ?? "";
+  const email = typedEmail ?? emailParam ?? rememberedEmail ?? "";
   const [state, setState] = useState<"idle" | "sending" | "sent" | "invalid" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
   const [resending, setResending] = useState(false);
   const [resendMessage, setResendMessage] = useState<string | null>(null);
   const [resendError, setResendError] = useState<string | null>(null);
   const [cooldown, setCooldown] = useState(0);
+  /** Tarayıcı doğrulaması (PoW) sürüyor: neden metni ve "İptal" gösterilir (F389). */
+  const [verifying, setVerifying] = useState(false);
+  const [verifyStatus, setVerifyStatus] = useState<string | null>(null);
   const demo = useSyncExternalStore(noopSubscribe, isDemoDocument, () => false);
+  // Hidrasyondan önce gönder düğmesi devre dışı: Enter yerel GET gönderimiyle sayfayı yenilemez.
+  const hydrated = useSyncExternalStore(noopSubscribe, clientSnapshot, serverSnapshot);
   const inputRef = useRef<HTMLInputElement>(null);
   const focusInputOnForm = useRef(false);
+  const abortRef = useRef<AbortController | null>(null);
+  const submitRef = useRef<HTMLButtonElement>(null);
+  const resendRef = useRef<HTMLButtonElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+
+  // Sayfadan çıkılınca süren doğrulama arka planda çalışmaya devam etmez.
+  useEffect(() => {
+    const pending = abortRef;
+    return () => pending.current?.abort();
+  }, []);
 
   useEffect(() => {
     if (cooldown <= 0) return;
@@ -65,8 +85,34 @@ export default function ForgotPasswordPage() {
     inputRef.current?.focus();
   }, [state]);
 
-  const requestLink = async (): Promise<RequestResult> => {
-    const res = await postJsonWithPow("/api/auth/password/forgot", { email }).catch(() => null);
+  /** İptal edilirse null (durum metni "Doğrulama iptal edildi" olur). */
+  const requestLink = async (): Promise<RequestResult | null> => {
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setVerifyStatus(null);
+    const res = await postJsonWithPow(
+      "/api/auth/password/forgot",
+      { email },
+      {
+        signal: controller.signal,
+        onChallenge: () => {
+          setVerifying(true);
+          setVerifyStatus(t("login.verifyingInfo"));
+        },
+      }
+    ).catch(() => null);
+    if (abortRef.current === controller) abortRef.current = null;
+    // İptal düğmesi kalkarken odak kaybolmasın.
+    if (document.activeElement === cancelRef.current) {
+      (submitRef.current ?? resendRef.current)?.focus();
+    }
+    setVerifying(false);
+    // `.catch` iptali de yutar: sinyalden anlaşılır.
+    if (controller.signal.aborted) {
+      setVerifyStatus(t("forgot.verifyCancelled"));
+      return null;
+    }
+    setVerifyStatus(null);
     if (res && res.status === 202) return { ok: true };
     if (res && res.status === 400) {
       return { ok: false, invalid: true, message: t("forgot.invalidEmail") };
@@ -89,6 +135,10 @@ export default function ForgotPasswordPage() {
     }
     setState("sending");
     const result = await requestLink();
+    if (!result) {
+      setState("idle");
+      return;
+    }
     if (result.ok) {
       setResendMessage(null);
       setResendError(null);
@@ -112,6 +162,7 @@ export default function ForgotPasswordPage() {
     setResendError(null);
     const result = await requestLink();
     setResending(false);
+    if (!result) return;
     if (result.ok) {
       setResendMessage(t("forgot.resent"));
       setCooldown(RESEND_COOLDOWN_SECONDS);
@@ -124,8 +175,29 @@ export default function ForgotPasswordPage() {
     focusInputOnForm.current = true;
     setResendMessage(null);
     setResendError(null);
+    setVerifyStatus(null);
     setState("idle");
   };
+
+  // Kalıcı `role="status"` bölgesi: doğrulama nedeni / iptal ve "İptal" düğmesi.
+  const verifyRegion = (
+    <>
+      <div role="status" className={verifyStatus ? "mt-2 text-sm text-gray-700" : undefined}>
+        {verifyStatus}
+      </div>
+      {verifying && (
+        <Button
+          ref={cancelRef}
+          variant="secondary"
+          fullWidth
+          onClick={() => abortRef.current?.abort()}
+          className="mt-2 min-h-[44px]"
+        >
+          {t("login.cancelVerify")}
+        </Button>
+      )}
+    </>
+  );
 
   const backToLogin = (
     <p className="mt-6 text-center text-sm text-gray-600">
@@ -137,8 +209,14 @@ export default function ForgotPasswordPage() {
 
   if (state === "sent") {
     const waiting = cooldown > 0;
+    // Görünür kutu yerinde kalır; duyuru formdan beri DOM'daki AuthCard bölgesinden (F381).
+    const announceSent = !resending && !resendMessage && !resendError && !verifyStatus;
     return (
-      <AuthCard title={t("forgot.sentTitle")} focusTitle>
+      <AuthCard
+        title={t("forgot.sentTitle")}
+        focusTitle
+        status={announceSent ? <span className="sr-only">{t("forgot.sent")}</span> : null}
+      >
         <p className="mt-4 break-words text-sm text-gray-700">
           {t("forgot.sentTo", { email: email.trim() })}
         </p>
@@ -158,6 +236,7 @@ export default function ForgotPasswordPage() {
         )}
         <div className="mt-6 space-y-3">
           <Button
+            ref={resendRef}
             variant="secondary"
             busy={resending}
             aria-disabled={waiting || undefined}
@@ -172,6 +251,7 @@ export default function ForgotPasswordPage() {
               {t("verify.resendWait", { seconds: cooldown })}
             </p>
           )}
+          {verifyRegion}
           <Status error={resendError} message={resendMessage} />
           <Button variant="secondary" onClick={tryOtherEmail} className="min-h-[44px] w-full">
             {t("forgot.otherEmail")}
@@ -183,8 +263,21 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <AuthCard title={t("forgot.title")} subtitle={t("forgot.subtitle")}>
-      <form onSubmit={submit} noValidate className="mt-6 space-y-4">
+    <AuthCard
+      title={t("forgot.title")}
+      subtitle={t("forgot.subtitle")}
+      status={
+        state === "sending" && !verifying ? (
+          <span className="sr-only">{t("forgot.sending")}</span>
+        ) : null
+      }
+    >
+      <form
+        onSubmit={submit}
+        noValidate
+        aria-busy={state === "sending" || undefined}
+        className="mt-6 space-y-4"
+      >
         <AuthField
           id="email"
           label={t("email")}
@@ -204,9 +297,16 @@ export default function ForgotPasswordPage() {
             className={authInputClass}
           />
         </AuthField>
-        <button {...submitButtonProps(state === "sending")}>
-          {state === "sending" ? t("forgot.sending") : t("forgot.submit")}
-        </button>
+        <div>
+          <button ref={submitRef} {...submitButtonProps(state === "sending")} disabled={!hydrated}>
+            {verifying
+              ? t("login.verifying")
+              : state === "sending"
+                ? t("forgot.sending")
+                : t("forgot.submit")}
+          </button>
+          {verifyRegion}
+        </div>
       </form>
       {state === "error" && <Notice kind="error">{error ?? t("forgot.error")}</Notice>}
       {backToLogin}

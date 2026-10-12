@@ -1,5 +1,5 @@
 {
-  "title": "Gezi planlayıcı",
+  "title": "Gezi planla",
   "intro": "Şehirleri ve gün sayısını girin; en kısa rotayı ve her durak için uygun konaklamayı önerelim.",
   "form": {
     "title": "Gezi bilgileri",
@@ -13,7 +13,11 @@
     "daysHint": "Her şehir için en az 1 gece: {min}–30 gece.",
     "daysHintCheckout": "Her şehir için en az 1 gece: {min}–30 gece. Son çıkış: {date}.",
     "startDateHint": "Boş bırakırsanız {date} kullanılır.",
-    "cityOptions": "Desteklenen şehirler (eklemek ya da çıkarmak için seçin):"
+    "cityOptions": "Desteklenen şehirler (eklemek ya da çıkarmak için seçin):",
+    "decreaseDays": "Gece sayısını azalt",
+    "increaseDays": "Gece sayısını artır",
+    "decreaseGuests": "Misafir sayısını azalt",
+    "increaseGuests": "Misafir sayısını artır"
   },
   "result": {
     "title": "Önerilen plan",

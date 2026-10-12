@@ -1,10 +1,19 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { apiFetch } from "@/lib/api-client";
 import { useFormat } from "@/i18n/use-format";
-import { Button, Card, Field, Status, inputClass, useLoader } from "@/components/ui/ui";
+import {
+  Button,
+  Card,
+  Field,
+  LoadError,
+  RefreshStatus,
+  Status,
+  inputClass,
+  useLoader,
+} from "@/components/ui/ui";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { parseAmountToMinor } from "@/lib/ui/amount-input";
 import ClaimDetail from "@/components/resolution/ClaimDetail";
@@ -45,8 +54,10 @@ interface ClaimQueueResponse {
 /** Yönetici talep kuyruğu: durum filtresi, liste ve seçili talebin ayrıntısı + karar formu. */
 export default function ClaimAdmin() {
   const t = useTranslations("resolution");
+  const locale = useLocale();
   const [initialQuery] = useState(readClaimQuery);
   const [status, setStatus] = useState<ClaimStatus | "">(initialQuery.status);
+  const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(initialQuery.claim);
   // Her seçimde (ve ?claim= ile açılışta) artar: odak ve kaydırma ayrıntı başlığına taşınır.
   const [detailFocusTick, setDetailFocusTick] = useState(initialQuery.claim ? 1 : 0);
@@ -60,8 +71,11 @@ export default function ClaimAdmin() {
     if (id) setDetailFocusTick((n) => n + 1);
   };
   const closeDetail = () => {
-    // Önce seçili satırın düğmesi (liste yeniden yüklenmiş olabilir), yoksa tetikleyici.
-    const rowButton = document.querySelector<HTMLElement>('#claim-admin [aria-pressed="true"]');
+    // Önce seçili satırın "Ayrıntıya git" düğmesi (liste yeniden yüklenmiş olabilir; satırdaki
+    // kopyalama düğmesi değil, son kutudaki), yoksa tetikleyici.
+    const rowButton = document.querySelector<HTMLElement>(
+      '#claim-admin li[aria-current="true"] > div:last-child > button'
+    );
     const opener = rowButton ?? openerRef.current;
     setSelectedId(null);
     openerRef.current = null;
@@ -99,7 +113,7 @@ export default function ClaimAdmin() {
     if (next !== `${pathname}${search}${hash}`) window.history.replaceState(null, "", next);
   }, [status, selectedId]);
 
-  const { data, error, reload } = useLoader(async () => {
+  const { data, error, loading, reload } = useLoader(async () => {
     const res = await apiFetch<ClaimQueueResponse>(
       `/api/admin/claims${status ? `?status=${encodeURIComponent(status)}` : ""}`
     );
@@ -107,6 +121,17 @@ export default function ClaimAdmin() {
   }, [status]);
   // Filtre değişince önceki sonuç yeni filtrenin (boş) sonucu gibi gösterilmez.
   const list = data && data.filter === status ? data.claims : null;
+  // Rezervasyon no, talep no ya da mülk adına göre istemci tarafı arama.
+  const needle = query.trim().toLocaleLowerCase(locale);
+  const shown =
+    list && needle
+      ? list.filter((c) =>
+          [c.bookingId, c.id, c.propertyTitle ?? ""].some((v) =>
+            v.toLocaleLowerCase(locale).includes(needle)
+          )
+        )
+      : list;
+  const refreshing = loading && list !== null;
   const counts = data?.counts;
   const withCount = (label: string, count: number) =>
     counts ? t("admin.optionCount", { label, count }) : label;
@@ -115,30 +140,54 @@ export default function ClaimAdmin() {
   return (
     <div className="space-y-6 lg:grid lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:items-start lg:gap-6 lg:space-y-0">
       <Card title={t("admin.title")} id="claim-admin">
-        <div className="mb-4 max-w-xs">
-          <Field label={t("admin.filter")} id="claim-status-filter">
-            <select
-              id="claim-status-filter"
-              className={inputClass}
-              value={status}
-              onChange={(e) => setStatus(e.target.value as ClaimStatus | "")}
-            >
-              <option value="">{withCount(t("admin.all"), total)}</option>
-              {CLAIM_STATUSES.map((s) => (
-                <option key={s} value={s}>
-                  {withCount(t(`status.${s}`), counts?.[s] ?? 0)}
-                </option>
-              ))}
-            </select>
-          </Field>
+        <div className="mb-4 flex flex-wrap gap-4">
+          <div className="w-full max-w-xs">
+            <Field label={t("admin.filter")} id="claim-status-filter">
+              <select
+                id="claim-status-filter"
+                className={inputClass}
+                value={status}
+                onChange={(e) => setStatus(e.target.value as ClaimStatus | "")}
+              >
+                <option value="">{withCount(t("admin.all"), total)}</option>
+                {CLAIM_STATUSES.map((s) => (
+                  <option key={s} value={s}>
+                    {withCount(t(`status.${s}`), counts?.[s] ?? 0)}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </div>
+          <div className="w-full max-w-xs">
+            <Field label={t("admin.search.label")} id="claim-search" hint={t("admin.search.hint")}>
+              <input
+                id="claim-search"
+                type="search"
+                className={inputClass}
+                autoComplete="off"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+            </Field>
+          </div>
         </div>
-        <Status error={error} />
+        {/* Bildirimler filtrenin altında, listenin üstünde (diğer kuyruklarla aynı sıra). */}
+        {error && <LoadError error={error} onRetry={reload} busy={loading} />}
         {!list && !error && (
-          <p aria-live="polite" className="text-sm text-gray-600">
+          <p role="status" className="text-sm text-gray-600">
             {t("loading")}
           </p>
         )}
+        {list && <RefreshStatus loading={refreshing} className="mb-2" />}
+        {list && shown && needle !== "" && list.length > 0 && (
+          <p role="status" className="mb-3 text-xs text-gray-600">
+            {shown.length === 0
+              ? t("admin.search.noMatch")
+              : t("admin.search.resultCount", { shown: shown.length, total: list.length })}
+          </p>
+        )}
         {list &&
+          shown &&
           (list.length === 0 ? (
             <div className="space-y-2">
               <p className="text-sm text-gray-700">
@@ -153,7 +202,16 @@ export default function ClaimAdmin() {
               )}
             </div>
           ) : (
-            <ClaimList claims={list} selectedId={selectedId} onSelect={select} showRole={false} />
+            shown.length > 0 && (
+              <div aria-busy={refreshing || undefined} className={refreshing ? "opacity-60" : ""}>
+                <ClaimList
+                  claims={shown}
+                  selectedId={selectedId}
+                  onSelect={select}
+                  showRole={false}
+                />
+              </div>
+            )
           ))}
       </Card>
 
@@ -176,6 +234,7 @@ export default function ClaimAdmin() {
             key={selectedId}
             claimId={selectedId}
             readOnly
+            headingLevel={3}
             renderAdmin={(detail, reloadDetail) => (
               <DecisionForm
                 detail={detail}

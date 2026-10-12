@@ -53,7 +53,9 @@
     "searchOther": "Search other stays",
     "adults": "Adults",
     "children": "Children (ages 0-12)",
-    "continuing": "Going to the next step…"
+    "continuing": "Going to the next step…",
+    "adultsRange": "Adults must be a whole number from {min} to {max}. The previous value ({current}) was kept.",
+    "childrenRange": "Children must be a whole number from {min} to {max}. The previous value ({current}) was kept."
   },
   "priceInsight": {
     "title": "Price check for these dates",

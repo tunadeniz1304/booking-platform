@@ -1,14 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { ApiError, apiFetch, fetchCurrentUser } from "@/lib/api-client";
+import { ApiError, apiFetch, fetchCurrentUser, isTimeoutError } from "@/lib/api-client";
 import { useFormat } from "@/i18n/use-format";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import { useCart, type CartDTO, type CartItemDTO } from "@/components/cart/useCart";
-import { SplitPayPanel } from "@/components/cart/SplitPayPanel";
+import { SplitPayPanel, type SplitLoadState } from "@/components/cart/SplitPayPanel";
 import {
   CardFields,
   tokenizeCardFields,
@@ -16,7 +16,7 @@ import {
   type CardFieldErrors,
 } from "@/components/payment/CardFields";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
-import { Field, focusFirstInvalid, inputClass, useErrorText } from "@/components/ui/ui";
+import { Button, Field, focusFirstInvalid, inputClass, useErrorText } from "@/components/ui/ui";
 import type { SplitPlanDTO } from "@/lib/cart/split-payment";
 
 type PayOutcome =
@@ -41,6 +41,27 @@ type PriceChange = { itemId: string; previousTotal: number; currentTotal: number
 const SPLIT_ANCHOR = "cart-split-pay";
 /** E-posta doğrulama uyarısı ("Odaları tut" düğmesinin açıklaması). */
 const VERIFY_ID = "cart-verify-email";
+
+/** Birincil düğmenin pasif / meşgul görünümü (mevcut gri renkler korunur). */
+const PRIMARY_DISABLED =
+  "aria-disabled:bg-gray-300 aria-disabled:text-gray-700 aria-disabled:opacity-100";
+
+/** Görsel ayraç: ekran okuyucu "orta nokta" yerine kısa bir duraklama (virgül) duyar. */
+function Sep() {
+  return (
+    <>
+      <span aria-hidden="true"> · </span>
+      <span className="sr-only">, </span>
+    </>
+  );
+}
+
+/** Ret yanıtındaki kalan deneme hakkı (sunucu `details.attemptsLeft` gönderirse). */
+function attemptsLeftOf(err: unknown): number | null {
+  if (!(err instanceof ApiError) || !err.details || typeof err.details !== "object") return null;
+  const left = (err.details as { attemptsLeft?: unknown }).attemptsLeft;
+  return typeof left === "number" && left > 0 ? left : null;
+}
 
 /** Üst ve alt bilgi çerçevesi (tek oda checkout'uyla aynı gezinme). */
 function CartCheckoutFrame({ children }: { children: ReactNode }) {
@@ -97,11 +118,16 @@ export default function CartCheckoutPage() {
   const t = useTranslations("cart");
   const tp = useTranslations("payment");
   const tc = useTranslations("checkout");
+  const tcommon = useTranslations("common");
   const f = useFormat();
   const errText = useErrorText();
   const { confirm, confirmDialog } = useConfirm();
-  const { cart, setCart, loading, reload } = useCart();
+  const formIds = useId();
+  const { cart, setCart, loading, error, reload } = useCart();
   const [busy, setBusy] = useState(false);
+  // Sepet yüklenemediğinde yeniden deneme; başarısız denemede uyarı yeniden duyurulur.
+  const [retrying, setRetrying] = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [message, setMessage] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [holdKey, setHoldKey] = useState(newKey);
@@ -114,6 +140,10 @@ export default function CartCheckoutPage() {
   const [challenge, setChallenge] = useState<string | null>(null);
   const [code, setCode] = useState("");
   const [splitPlan, setSplitPlan] = useState<SplitPlanDTO | null>(null);
+  // Bölüşme planı okunana dek tek ödeme formu gösterilmez (var olan plan üstüne çift ödeme yok).
+  const [splitLoad, setSplitLoad] = useState<SplitLoadState>("loading");
+  // Çok fazla başarısız kart denemesi: tek ödeme formu kapanır (bölüşme ve bırakma açık kalır).
+  const [payLocked, setPayLocked] = useState(false);
   const [pendingCartId, setPendingCartId] = useState<string | null>(null);
   const [pendingTimedOut, setPendingTimedOut] = useState(false);
   const [expired, setExpired] = useState(false);
@@ -180,6 +210,11 @@ export default function CartCheckoutPage() {
                   : splitActive
                     ? "split"
                     : "pay";
+
+  // Panel bağlı değilken (başka adım) okuma durumu sıfırlanır; yeniden bağlanınca eski "ready" ile
+  // form bir an görünüp kalkmasın (odak kaybolmasın).
+  const splitMounted = held && (step === "pay" || step === "split");
+  if (!splitMounted && splitLoad !== "loading") setSplitLoad("loading");
 
   // Adım değişince odak yeni adımın başlığına taşınır (gönder düğmesi DOM'dan kalkınca
   // odak body'ye düşmesin; ekran okuyucu yeni adımı duysun).
@@ -459,20 +494,48 @@ export default function CartCheckoutPage() {
   }
 
   async function payFailed(err: unknown) {
-    if (err instanceof ApiError && err.code === "PAYMENT_DECLINED") {
-      setMessage(t("checkout.declined"));
-    } else if (err instanceof ApiError && err.code === "HOLD_EXPIRED") {
-      setMessage(t("checkout.expired"));
+    const errCode = err instanceof ApiError ? err.code : undefined;
+    let text: string;
+    if (errCode === "PAYMENT_DECLINED") {
+      text = t("checkout.declined");
+    } else if (errCode === "HOLD_EXPIRED") {
+      text = t("checkout.expired");
       setExpired(true);
+    } else if (errCode === "PAYMENT_ATTEMPTS_EXCEEDED") {
+      text = tp("errors.PAYMENT_ATTEMPTS_EXCEEDED");
+      setPayLocked(true);
     } else {
-      setMessage(apiText(err, tp("failed")));
+      text = apiText(err, tp("failed"));
     }
+    const left = attemptsLeftOf(err);
+    setMessage(left === null ? text : `${text} ${tp("attempts.left", { count: left })}`);
     focusAfterBusy.current = "alert";
     setNotice(null);
     setChallenge(null);
     setCode("");
     setPayKey(newKey());
     await reload();
+  }
+
+  /**
+   * Zaman aşımı (F401): ödeme sunucuda tamamlanmış olabilir. Idempotency-Key korunur (yeniden
+   * deneme iki kez tahsil etmez), bilgi notu gösterilir ve sepetin son hâli okunur.
+   */
+  async function payTimedOut(cartId: string) {
+    setMessage(null);
+    setNotice(t("checkout.timeoutCheck"));
+    try {
+      const res = await apiFetch<{ cart: CartDTO }>(`/api/cart/${cartId}`, { cache: "no-store" });
+      if (res.cart.status === "CHECKED_OUT") {
+        setNotice(null);
+        setChallenge(null);
+        setDone(doneFrom(res.cart, "card"));
+      } else {
+        setCart(res.cart);
+      }
+    } catch {
+      // okunamadı: not kalır; aynı anahtarla yeniden denemek güvenli
+    }
   }
 
   /** 3DS adımından çıkış: kod gelmediyse ya da kart yanlışsa başka kartla yeniden denenir. */
@@ -540,7 +603,8 @@ export default function CartCheckoutPage() {
         })
       );
     } catch (err) {
-      await payFailed(err);
+      if (isTimeoutError(err)) await payTimedOut(cart.id);
+      else await payFailed(err);
     } finally {
       setBusy(false);
     }
@@ -559,10 +623,24 @@ export default function CartCheckoutPage() {
       );
       setChallenge(null);
     } catch (err) {
-      await payFailed(err);
+      if (isTimeoutError(err)) await payTimedOut(cart.id);
+      else await payFailed(err);
     } finally {
       setBusy(false);
     }
+  }
+
+  async function retryLoad() {
+    if (retrying) return;
+    setRetrying(true);
+    await reload();
+    setRetrying(false);
+    setLoadAttempt((n) => n + 1);
+    // Yeniden deneme düğmesi kalktıysa (sepet yüklendi) odak body'ye düşmesin.
+    requestAnimationFrame(() => {
+      const active = document.activeElement;
+      if (!active || active === document.body) (noCartRef.current ?? titleRef.current)?.focus();
+    });
   }
 
   async function postRelease(cartId: string): Promise<CartDTO> {
@@ -699,7 +777,10 @@ export default function CartCheckoutPage() {
     return (
       <CartCheckoutFrame>
         <main id="main" className="mx-auto w-full max-w-3xl flex-1 px-4 py-8">
-          <p className="text-gray-500">{t("loading")}</p>
+          <h1 className="text-2xl font-bold text-gray-900">{t("checkout.title")}</h1>
+          <p role="status" className="mt-4 text-gray-500">
+            {t("loading")}
+          </p>
         </main>
       </CartCheckoutFrame>
     );
@@ -739,7 +820,11 @@ export default function CartCheckoutPage() {
                 className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-gray-200 bg-white p-4"
               >
                 <span id={`done-${item.id}`} className="text-sm text-gray-800">
-                  {itemName(item)} · {itemDates(item)}
+                  {item.propertyTitle}
+                  <Sep />
+                  {item.roomTypeName}
+                  <Sep />
+                  {itemDates(item)}
                 </span>
                 {item.bookingId && (
                   <Link
@@ -775,12 +860,37 @@ export default function CartCheckoutPage() {
   }
 
   if (!cart || cart.items.length === 0) {
+    // Yükleme hatası "ödenecek sepet yok" gibi gösterilmez (sepet silinmiş sanılmasın).
+    const loadFailed = !!error && !cart;
     return (
       <CartCheckoutFrame>
         <main id="main" className="mx-auto w-full max-w-3xl flex-1 px-4 py-8 text-center">
-          <p ref={noCartRef} tabIndex={-1} className="text-gray-700 focus:outline-none">
-            {expired ? t("checkout.expiredNoCart") : t("checkout.noCart")}
-          </p>
+          <h1
+            ref={titleRef}
+            tabIndex={-1}
+            className="text-2xl font-bold text-gray-900 focus:outline-none"
+          >
+            {t("checkout.title")}
+          </h1>
+          {loadFailed ? (
+            <>
+              <div key={loadAttempt} role="alert" className="mt-4">
+                <h2 className="text-lg font-semibold text-gray-900">{t("loadFailed")}</h2>
+                <p className="mt-2 text-sm text-gray-600">{t("loadFailedHint")}</p>
+              </div>
+              <Button
+                className="mt-4 min-h-[44px]"
+                busy={retrying}
+                onClick={() => void retryLoad()}
+              >
+                {tcommon("errorPage.retry")}
+              </Button>
+            </>
+          ) : (
+            <p ref={noCartRef} tabIndex={-1} className="mt-4 text-gray-700 focus:outline-none">
+              {expired ? t("checkout.expiredNoCart") : t("checkout.noCart")}
+            </p>
+          )}
           {statusRegion}
           {expired && (
             <button
@@ -794,15 +904,22 @@ export default function CartCheckoutPage() {
             </button>
           )}
           <div>
-            <Link href="/cart" className="mt-4 inline-block text-primary-600 hover:underline">
+            <Link
+              href="/cart"
+              className="mt-4 inline-flex min-h-[44px] items-center text-primary-600 hover:underline"
+            >
               {t("checkout.backToCart")}
             </Link>
           </div>
           {/* Ödenmiş sepet artık aktif değil: rezervasyonlara giden yol gösterilir. */}
-          <p className="mt-6 text-sm text-gray-600">{t("checkout.noCartPaidHint")}</p>
-          <Link href="/trips" className="mt-2 inline-block text-primary-600 hover:underline">
-            {t("checkout.trips")}
-          </Link>
+          {!loadFailed && (
+            <>
+              <p className="mt-6 text-sm text-gray-600">{t("checkout.noCartPaidHint")}</p>
+              <Link href="/trips" className="mt-2 inline-block text-primary-600 hover:underline">
+                {t("checkout.trips")}
+              </Link>
+            </>
+          )}
           {confirmDialog}
         </main>
       </CartCheckoutFrame>
@@ -846,7 +963,9 @@ export default function CartCheckoutPage() {
                     <div className={row}>
                       <dt className={dt}>{tc("room")}</dt>
                       <dd className={dd}>
-                        {item.roomTypeName} · {t("checkout.roomCount", { count: item.quantity })}
+                        {item.roomTypeName}
+                        <Sep />
+                        {t("checkout.roomCount", { count: item.quantity })}
                       </dd>
                     </div>
                     <div className={row}>
@@ -957,21 +1076,22 @@ export default function CartCheckoutPage() {
                 </div>
               </div>
             )}
-            <button
+            <Button
               ref={holdButtonRef}
-              type="button"
               onClick={hold}
-              aria-disabled={busy || emailUnverified || undefined}
-              aria-busy={busy || undefined}
+              busy={busy}
+              aria-disabled={emailUnverified || undefined}
               aria-describedby={emailUnverified ? VERIFY_ID : undefined}
               data-testid="cart-hold"
-              className="mt-3 w-full rounded-lg bg-[#003580] px-4 py-3 text-sm font-semibold text-white hover:bg-[#002b66] aria-disabled:bg-gray-300 aria-disabled:text-gray-700"
+              size="lg"
+              fullWidth
+              className={`mt-3 ${PRIMARY_DISABLED}`}
             >
               {busy ? t("checkout.holding") : t("checkout.hold")}
-            </button>
+            </Button>
             <Link
               href="/cart"
-              className="mt-3 inline-block text-sm text-primary-600 hover:underline"
+              className="mt-3 inline-flex min-h-[44px] items-center text-sm text-primary-600 hover:underline"
             >
               {t("checkout.backToCart")}
             </Link>
@@ -1007,15 +1127,15 @@ export default function CartCheckoutPage() {
           >
             <h2 className="text-lg font-semibold text-gray-900">{t("checkout.expiredTitle")}</h2>
             <p className="mt-2 text-sm text-gray-700">{t("checkout.expiredHint")}</p>
-            <button
-              type="button"
+            <Button
               onClick={recoverExpired}
-              aria-disabled={busy || undefined}
-              aria-busy={busy || undefined}
-              className="mt-3 w-full rounded-lg bg-[#003580] px-4 py-3 text-sm font-semibold text-white hover:bg-[#002b66] aria-disabled:bg-gray-300 aria-disabled:text-gray-700"
+              busy={busy}
+              size="lg"
+              fullWidth
+              className={`mt-3 ${PRIMARY_DISABLED}`}
             >
               {t("checkout.reholdButton")}
-            </button>
+            </Button>
           </div>
         )}
 
@@ -1035,7 +1155,7 @@ export default function CartCheckoutPage() {
         )}
 
         {/* İki ödeme yolu birbirini dışlar: önce yol seçilir, yalnız seçilen form gösterilir. */}
-        {step === "pay" && (
+        {step === "pay" && splitLoad === "ready" && (
           <fieldset className="mt-4">
             <legend className="text-sm font-semibold text-gray-900">
               {t("checkout.payMethodLegend")}
@@ -1061,15 +1181,16 @@ export default function CartCheckoutPage() {
           </fieldset>
         )}
 
-        {step === "pay" && payMethod === "card" && (
+        {step === "pay" && payMethod === "card" && splitLoad === "ready" && !payLocked && (
           <form
             ref={payFormRef}
             onSubmit={pay}
             className="mt-3 space-y-3 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm"
-            aria-label={tp("title")}
+            aria-labelledby={`${formIds}-pay-title`}
             aria-busy={busy}
           >
             <h2
+              id={`${formIds}-pay-title`}
               ref={payHeadingRef}
               tabIndex={-1}
               className="text-lg font-semibold text-gray-900 focus:outline-none"
@@ -1087,25 +1208,35 @@ export default function CartCheckoutPage() {
               disabled={busy}
               showTestCards
             />
-            <button
+            <Button
               type="submit"
-              aria-disabled={busy || undefined}
+              busy={busy}
               data-testid="cart-pay"
-              className="w-full rounded-lg bg-[#003580] px-4 py-3 text-sm font-semibold text-white hover:bg-[#002b66] aria-disabled:bg-gray-300 aria-disabled:text-gray-700"
+              size="lg"
+              fullWidth
+              className={PRIMARY_DISABLED}
             >
-              {busy
-                ? tp("processing")
-                : `${tp("payAndConfirm")} · ${f.money(cart.totalMinor, cart.currency)}`}
-            </button>
+              {busy ? (
+                tp("processing")
+              ) : (
+                // Tek satır içi öğe: flex düğmede ayracın boşlukları kırpılmasın.
+                <span>
+                  {tp("payAndConfirm")}
+                  <Sep />
+                  {f.money(cart.totalMinor, cart.currency)}
+                </span>
+              )}
+            </Button>
           </form>
         )}
 
-        {/* Kart seçiliyken de bağlı (gizli) kalır: var olan bölüşme planı yüklenebilsin. */}
+        {/* Kart seçiliyken de bağlı (gizli) kalır: var olan bölüşme planı yüklenebilsin. Plan
+            okunana dek (yükleniyor / hata) panel görünür, tek ödeme formu gösterilmez. */}
         {held && (step === "pay" || step === "split") && (
           <div
             id={SPLIT_ANCHOR}
             tabIndex={-1}
-            hidden={step === "pay" && payMethod !== "split"}
+            hidden={step === "pay" && payMethod !== "split" && splitLoad === "ready"}
             className="scroll-mt-4 focus:outline-none"
           >
             <SplitPayPanel
@@ -1113,6 +1244,7 @@ export default function CartCheckoutPage() {
               totalMinor={cart.totalMinor}
               currency={cart.currency}
               allowCreate
+              onLoadState={setSplitLoad}
               onPlan={(plan) => {
                 setSplitPlan(plan);
                 // Plan iptal edilirse panel (iptal özeti) görünür kalsın.
@@ -1125,11 +1257,12 @@ export default function CartCheckoutPage() {
         {step === "challenge" && (
           <form
             onSubmit={confirm3ds}
-            aria-label={tp("threeDsTitle")}
+            aria-labelledby={`${formIds}-3ds-title`}
             aria-busy={busy}
             className="mt-6 space-y-3 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm"
           >
             <h2
+              id={`${formIds}-3ds-title`}
               ref={challengeHeadingRef}
               tabIndex={-1}
               className="text-lg font-semibold text-gray-900 focus:outline-none"
@@ -1149,13 +1282,9 @@ export default function CartCheckoutPage() {
                 required
               />
             </Field>
-            <button
-              type="submit"
-              aria-disabled={busy || undefined}
-              className="w-full rounded-lg bg-[#003580] px-4 py-3 text-sm font-semibold text-white aria-disabled:bg-gray-300 aria-disabled:text-gray-700"
-            >
+            <Button type="submit" busy={busy} size="lg" fullWidth className={PRIMARY_DISABLED}>
               {busy ? tp("processing") : tp("verify")}
-            </button>
+            </Button>
             <p className="text-sm text-gray-600">{t("checkout.threeDsNoCode")}</p>
             <button
               type="button"
@@ -1174,13 +1303,16 @@ export default function CartCheckoutPage() {
             type="button"
             onClick={release}
             aria-disabled={busy || undefined}
-            className="mt-6 min-h-[44px] w-full rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-800"
+            className="mt-6 min-h-[44px] w-full rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-800 aria-disabled:cursor-not-allowed aria-disabled:opacity-60"
           >
             {t("release")}
           </button>
         )}
         {held && step !== "pending" && (
-          <Link href="/cart" className="mt-3 inline-block text-sm text-primary-600 hover:underline">
+          <Link
+            href="/cart"
+            className="mt-3 inline-flex min-h-[44px] items-center text-sm text-primary-600 hover:underline"
+          >
             {t("checkout.backToCart")}
           </Link>
         )}

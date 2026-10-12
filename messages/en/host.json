@@ -56,7 +56,7 @@
     "error": "Bookings could not be loaded.",
     "filter": {
       "status": "Filter by status",
-      "property": "Filter by property",
+      "property": "Filter by listing",
       "all": "All",
       "count": "Showing {shown} of {total} bookings.",
       "empty": "No bookings match these filters."
@@ -81,16 +81,16 @@
     "rating": "Rating {rating}/5",
     "published": "Live",
     "unpublished": "Not live",
-    "license": "Licence:",
+    "license": "License:",
     "fields": {
       "title": "Title",
       "basePrice": "Base nightly price ({currency})",
       "description": "Description",
-      "licenseNumber": "Licence number",
-      "licenseHint": "Province plate code + sequence number, e.g. 34-12345. Listings without a licence cannot go live.",
+      "licenseNumber": "License number",
+      "licenseHint": "Province plate code + sequence number, e.g. 34-12345. Listings without a license cannot go live.",
       "isActive": "Publish when I save",
       "basePriceHint": "Example: 1,500 or 1,500.50",
-      "licenseNumberOptional": "Licence number (optional)",
+      "licenseNumberOptional": "License number (optional)",
       "titleHint": "2 to 120 characters.",
       "descriptionCount": "{count}/{max} characters"
     },
@@ -100,8 +100,8 @@
     "manage": "Manage listing: details, rooms, calendar, photos",
     "visibility": {
       "live": "Visible in search.",
-      "pending": "Marked as live, but not visible in search until the licence is verified.",
-      "rejected": "Licence not found in the registry; the listing is not visible in search. Correct the licence number and press Save.",
+      "pending": "Marked as live, but not visible in search until the license is verified.",
+      "rejected": "License not found in the registry; the listing is not visible in search. Correct the license number and press Save.",
       "off": "Not visible in search; guests cannot find this listing."
     },
     "pricePreview": "New nightly price: {price} (currently: {previous})",
@@ -113,7 +113,7 @@
     },
     "noRating": "No rating yet",
     "noChanges": "Nothing has changed, so there is nothing to save.",
-    "licenseChangeNote": "A new licence number is re-verified when you save; the listing will not appear in search until it is verified.",
+    "licenseChangeNote": "A new license number is re-verified when you save; the listing will not appear in search until it is verified.",
     "publish": "Publish",
     "unpublish": "Unpublish",
     "publishedNow": "The listing is now live.",
@@ -258,9 +258,9 @@
       "COUPON": "Coupon"
     },
     "condition": {
-      "EARLY_BIRD": "At least {count} days before arrival",
-      "LAST_MINUTE": "At most {count} days before arrival",
-      "LONG_STAY": "At least {count} nights"
+      "EARLY_BIRD": "At least {count, plural, one {# day} other {# days}} before arrival",
+      "LAST_MINUTE": "At most {count, plural, one {# day} other {# days}} before arrival",
+      "LONG_STAY": "At least {count, plural, one {# night} other {# nights}}"
     },
     "percentOff": "{percent}%",
     "allListings": "All my listings",
@@ -360,7 +360,7 @@
   },
   "create": {
     "title": "New listing",
-    "intro": "Enter the basics and your first room. You can add photos, more rooms and the calendar after the listing is created. The listing appears in search once its licence is verified.",
+    "intro": "Enter the basics and your first room. You can add photos, more rooms and the calendar after the listing is created. The listing appears in search once its license is verified.",
     "type": "Property type",
     "types": {
       "HOTEL": "Hotel",

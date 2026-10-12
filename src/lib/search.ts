@@ -238,6 +238,8 @@ function structuralWhere(params: SearchParams, ids?: string[]): Prisma.PropertyW
   if (params.propertyType) {
     and.push({ propertyType: params.propertyType as Prisma.PropertyWhereInput["propertyType"] });
   }
+  // F1140: asgari misafir puanı (0–5).
+  if (params.minRating !== undefined) and.push({ ratingAvg: { gte: params.minRating } });
   // Seçilen TÜM olanaklar bulunmalı (v2'de "herhangi biri" yeterliydi).
   for (const name of params.amenities ?? []) and.push({ amenities: { some: { name } } });
   // P1-13(e): yalnız doğrulanmış erişilebilirlik özellikleri (AND, aynı oda tipinde).
@@ -263,6 +265,7 @@ async function loadCatalog(params: SearchParams, ids?: string[]): Promise<Catalo
     amenities: [...(params.amenities ?? [])].sort(),
     ...(params.accessibility?.length ? { a11y: [...params.accessibility].sort() } : {}),
     guests: params.guests ?? 0,
+    ...(params.minRating !== undefined ? { minRating: params.minRating } : {}),
     ids: ids ? [...ids].sort() : null,
   };
   const key = `search:cat2:v${await getVersion(CATALOG_VERSION_KEY)}:${hashKey(structural)}`;
@@ -599,6 +602,8 @@ export async function searchProperties(
       : displayAmount(baseMinor, e.currency, currency, fx);
     if (params.minPrice !== undefined && amount < params.minPrice) continue;
     if (params.maxPrice !== undefined && amount > params.maxPrice) continue;
+    // Katalog önbelleği puan güncellemesinden eski olabilir; filtre burada da uygulanır.
+    if (params.minRating !== undefined && e.ratingAvg < params.minRating) continue;
     results.push({
       id: e.id,
       title: e.title,

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { ApiError, apiFetch } from "@/lib/api-client";
 import { loginHref, useErrorText, useSession } from "@/components/ui/ui";
+import { setHeaderCartCount } from "@/components/layout/useHeaderCartCount";
 
 /** Girişten dönüşte tamamlanacak bekleyen eylem (sorgu parametresi). */
 const INTENT = "add-to-cart";
@@ -22,6 +23,8 @@ interface Props {
   /** Çocuk sayısı (varsayılan 0); misafir toplamı = adults + childCount. */
   childCount?: number;
   disabled?: boolean;
+  /** Düğmenin neden etkin olmadığını anlatan öğenin id'si; aria-describedby'a eklenir. */
+  describedBy?: string;
 }
 
 /**
@@ -40,6 +43,7 @@ export default function AddToCartButton({
   adults,
   childCount,
   disabled,
+  describedBy,
 }: Props) {
   const t = useTranslations("cart");
   const router = useRouter();
@@ -81,11 +85,11 @@ export default function AddToCartButton({
   }
 
   async function add() {
-    if (!roomTypeId || busy) return;
+    if (disabled || !roomTypeId || busy) return;
     setBusy(true);
     setStatus(null);
     try {
-      await apiFetch("/api/cart/items", {
+      const res = await apiFetch<{ cart: { items: unknown[] } | null }>("/api/cart/items", {
         method: "POST",
         body: JSON.stringify({
           propertyId,
@@ -98,6 +102,8 @@ export default function AddToCartButton({
           quantity: 1,
         }),
       });
+      // Başlıktaki sepet rozeti aynı sayfada güncel kalır.
+      if (res.cart) setHeaderCartCount(res.cart.items.length);
       // Odak düğmedeyse, düğmenin yerini alan "Sepete git" bağlantısına taşınır (F582).
       focusCartLink.current = document.activeElement === buttonRef.current;
       setStatus({ kind: "ok", text: t("add.added"), key });
@@ -148,17 +154,16 @@ export default function AddToCartButton({
           {t("add.goToCart")}
         </Link>
       ) : (
-        // Meşgulken `disabled` yerine aria-disabled: odak düğmede kalır (F582).
+        // `disabled` yerine aria-disabled: düğme odaklanabilir kalır, nedeni okunur (F582, F1010).
         <button
           ref={buttonRef}
           type="button"
           onClick={() => void add()}
-          disabled={disabled || !roomTypeId}
-          aria-disabled={busy || undefined}
+          aria-disabled={disabled || busy || !roomTypeId || undefined}
           aria-busy={busy || undefined}
-          aria-describedby={hintId}
+          aria-describedby={describedBy ? `${describedBy} ${hintId}` : hintId}
           data-testid="add-to-cart"
-          className="w-full rounded-lg border border-[#003580] px-4 py-3 text-sm font-semibold text-[#003580] transition hover:bg-blue-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003580] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:border-gray-300 disabled:text-gray-500 aria-busy:cursor-wait"
+          className="w-full rounded-lg border border-[#003580] px-4 py-3 text-sm font-semibold text-[#003580] transition hover:bg-blue-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003580] focus-visible:ring-offset-2 aria-disabled:cursor-not-allowed aria-disabled:border-gray-300 aria-disabled:text-gray-500"
         >
           {busy ? t("add.adding") : t("add.button")}
         </button>

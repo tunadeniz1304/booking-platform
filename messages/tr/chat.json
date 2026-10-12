@@ -43,5 +43,13 @@
   "yesterday": "Dün",
   "newMessage": "{sender} yeni mesaj gönderdi: {body}",
   "newMessages": "{count} yeni mesaj geldi.",
-  "riskSentNotice": "Bu mesaj alıcıya güvenlik uyarısıyla gösterildi. Gerekçeler: {reasons}."
+  "riskSentNotice": "Bu mesaj alıcıya güvenlik uyarısıyla gösterildi. Gerekçeler: {reasons}.",
+  "draftLanguage": "Taslak dili: {language}.",
+  "draftLanguageName": {
+    "tr": "Türkçe",
+    "en": "İngilizce"
+  },
+  "loadOlder": "Daha eski mesajları yükle",
+  "loadingOlder": "Eski mesajlar yükleniyor…",
+  "loadOlderFailed": "Eski mesajlar yüklenemedi. Tekrar deneyin."
 }

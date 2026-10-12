@@ -55,6 +55,8 @@ export default function WalletCreditOption({
   const t = useTranslations("wallet.checkout");
   const fmt = useFormat();
   const [opts, setOpts] = useState<CreditOptions | null>(null);
+  /** Seçenek okunana dek yer ayrılır; kutu sonradan belirince ödeme formu aşağı itilmez. */
+  const [loaded, setLoaded] = useState(false);
   const [use, setUse] = useState(false);
   const [amount, setAmount] = useState(0);
   /** Kullanıcının yazdığı metin ("1.250,50" gibi); tutar ondan ayrıştırılır. */
@@ -95,11 +97,14 @@ export default function WalletCreditOption({
         if (!active) return;
         setOpts(o);
         setAmount(o.reservedMinor > 0 ? o.reservedMinor : o.maxUsableMinor);
+        setLoaded(true);
         onLoadedRef.current?.(o.maxUsableMinor > 0);
       })
       .catch(() => {
         // Kredi seçeneği okunamazsa yalnız kart.
-        if (active) onLoadedRef.current?.(false);
+        if (!active) return;
+        setLoaded(true);
+        onLoadedRef.current?.(false);
       });
     return () => {
       active = false;
@@ -113,6 +118,7 @@ export default function WalletCreditOption({
     onValidityRef.current?.(!usable || valid);
   }, [usable, valid]);
 
+  if (!loaded) return <div aria-hidden="true" className="min-h-[44px]" />;
   if (!opts || max <= 0) return null;
   const cur = currency ?? opts.currency;
   const maxText = fmt.money(max, cur);

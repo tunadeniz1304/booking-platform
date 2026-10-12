@@ -11,6 +11,7 @@ import { loginHref } from "@/components/ui/ui";
 import { propertyTypeKey } from "@/lib/i18n/property-type";
 import { setFavoriteId, useFavoriteIds } from "@/components/property/useFavoriteIds";
 import RatingBadge from "@/components/property/RatingBadge";
+import CompareToggle from "@/components/compare/CompareToggle";
 import { unsplashLoader } from "@/lib/ui/image-loader";
 
 /**
@@ -30,6 +31,8 @@ export interface SearchContext {
   children?: number | null;
   roomId?: string | null;
   ratePlanId?: string | null;
+  /** Aramanın sorgu dizgesi (F918); ilan sayfasındaki "Arama sonuçlarına dön" bağlantısı için. */
+  from?: string | null;
 }
 
 /**
@@ -47,6 +50,7 @@ export function propertyHref(id: string, ctx?: SearchContext): string {
   if (ctx?.children && ctx.children > 0) params.set("children", String(ctx.children));
   if (ctx?.roomId) params.set("roomId", ctx.roomId);
   if (ctx?.ratePlanId) params.set("ratePlanId", ctx.ratePlanId);
+  if (ctx?.from) params.set("from", ctx.from);
   const q = params.toString();
   return q ? `/property/${id}?${q}` : `/property/${id}`;
 }
@@ -89,6 +93,8 @@ export interface PropertyCardProps {
    * `searchContext` içindeki tarihlerden çıkarılır.
    */
   datesSelected?: boolean;
+  /** Kartta "Karşılaştırmaya ekle" düğmesini gösterir. */
+  showCompare?: boolean;
 }
 
 export default function PropertyCard({
@@ -105,8 +111,10 @@ export default function PropertyCard({
   stay,
   searchContext,
   datesSelected,
+  showCompare = false,
 }: PropertyCardProps) {
-  const href = propertyHref(id, stay ?? searchContext);
+  // Teklif varsa onun tarih/oda bağlamı; aramaya dönüş (`from`) her durumda korunur (F918).
+  const href = propertyHref(id, stay ? { ...stay, from: searchContext?.from } : searchContext);
   const hasDates = datesSelected ?? Boolean(searchContext?.checkIn && searchContext?.checkOut);
   const router = useRouter();
   const t = useTranslations("search");
@@ -220,9 +228,9 @@ export default function PropertyCard({
           )}
         </div>
 
-        <div className="mt-4 flex items-end justify-between border-t border-gray-100 pt-4">
+        <div className="mt-4 flex items-end justify-between gap-3 border-t border-gray-100 pt-4">
           {stay ? (
-            <div data-testid="card-price">
+            <div data-testid="card-price" className="min-w-0">
               {/* F1214: toplamın kaç gece ve kaç misafir için olduğu. */}
               <p className="text-xs text-gray-500">
                 {t("card.nightsGuestsTotal", { nights: stay.nights, guests: stay.guests })}
@@ -233,7 +241,7 @@ export default function PropertyCard({
               <p className="text-xs text-gray-500">{t("card.taxesIncluded")}</p>
             </div>
           ) : (
-            <div data-testid="card-price">
+            <div data-testid="card-price" className="min-w-0">
               <p className="text-xs text-gray-500">{t("card.fromPerNight")}</p>
               <p className="text-lg font-bold text-gray-900">{f.money(priceMinor, currency)}</p>
               <p className="text-xs text-gray-500">
@@ -245,11 +253,17 @@ export default function PropertyCard({
               ve yinelenen bağlantı adı olmasın diye erişilebilirlik ağacından gizli. */}
           <span
             aria-hidden="true"
-            className="whitespace-nowrap rounded-sm bg-[#003580] px-4 py-2 text-sm font-semibold text-white transition group-hover:bg-[#002b66]"
+            className="shrink-0 whitespace-nowrap rounded-sm bg-[#003580] px-4 py-2 text-sm font-semibold text-white transition group-hover:bg-[#002b66]"
           >
             {stay ? t("card.seeRoom") : t("card.seePrices")}
           </span>
         </div>
+        {/* Kartı kaplayan başlık bağlantısının (after:z-[1]) üstünde, ayrı sekme durağı (F688). */}
+        {showCompare && (
+          <div className="mt-3">
+            <CompareToggle propertyId={id} title={title} className="relative z-[2]" />
+          </div>
+        )}
       </div>
 
       <div className="relative order-first h-48 overflow-hidden">

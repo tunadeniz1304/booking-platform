@@ -43,8 +43,26 @@ export async function registerServiceWorker(): Promise<ServiceWorkerRegistration
   }
 }
 
-/** Oturum kapanınca kişisel çevrimdışı önbellekler (seyahat planı) silinir. */
+/** Ortak cihazda önceki kullanıcının destek sohbeti (SupportChat) kalmasın. */
+const SUPPORT_CHAT_STORAGE_PREFIX = "support-chat:";
+
+function clearSupportChatStorage(): void {
+  try {
+    const storage = window.sessionStorage;
+    const keys: string[] = [];
+    for (let i = 0; i < storage.length; i++) {
+      const key = storage.key(i);
+      if (key?.startsWith(SUPPORT_CHAT_STORAGE_PREFIX)) keys.push(key);
+    }
+    keys.forEach((key) => storage.removeItem(key));
+  } catch {
+    // depolama erişimi engelliyse silinecek bir şey de yok
+  }
+}
+
+/** Oturum kapanınca kişisel çevrimdışı önbellekler (seyahat planı, destek sohbeti) silinir. */
 export async function clearOfflineUserData(): Promise<void> {
+  clearSupportChatStorage();
   try {
     navigator.serviceWorker?.controller?.postMessage({ type: "CLEAR_USER_DATA" });
     if (typeof caches !== "undefined") {

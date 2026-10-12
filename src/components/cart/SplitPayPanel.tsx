@@ -93,6 +93,7 @@ export function SplitPayPanel({
   onLoadState?: (state: SplitLoadState) => void;
 }) {
   const t = useTranslations("cart.split");
+  const tCart = useTranslations("cart");
   const f = useFormat();
   const errText = useErrorText();
   const baseId = useId();
@@ -899,7 +900,16 @@ export function SplitPayPanel({
         >
           {t("title")}
         </h2>
-        <span className="text-sm font-medium text-gray-700">{t(`planStatus.${plan.status}`)}</span>
+        <span className="flex flex-wrap items-baseline gap-x-3">
+          <span className="text-sm font-medium text-gray-700">
+            {t(`planStatus.${plan.status}`)}
+          </span>
+          {plan.status === "SETTLED" && (
+            <Link href="/trips" className="text-sm font-semibold text-primary-600 hover:underline">
+              {tCart("checkout.trips")}
+            </Link>
+          )}
+        </span>
       </div>
       {open && (
         <>

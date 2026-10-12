@@ -50,5 +50,6 @@
     "default": "Arama metni olmadığı için standart ağırlıklar kullanıldı.",
     "withQuery": "Arama metni ya da varış yeri girildiği için metin benzerliğinin daha ağır bastığı ağırlıklar kullanıldı.",
     "ltr": "Bu sonuç deneysel bir sıralama modeliyle sıralandı; aşağıdaki katkılar yaklaşıktır."
-  }
+  },
+  "whyFor": "({title} için)"
 }

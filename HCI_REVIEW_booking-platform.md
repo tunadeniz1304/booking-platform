@@ -1874,7 +1874,30 @@ Her isteğin durumu ve notu `docs/hci/fix-status.json` içinde ilgili paketin `c
 
 ### 8.5 Çalışma zamanı: önce / sonra
 
-RUNTIME_PLACEHOLDER
+Aynı tarama betiği iki ayrı `next dev` (webpack) sunucusuna, aynı demo veritabanıyla koşuldu: önce = `792a57a` (Medium/Low turundan önce), sonra = `4412f41` (bu turun kodu). 4 persona (anonim, misafir, ev sahibi, yönetici) × tüm sayfa rotaları × masaüstü (1280 px) / mobil (375 px) = 178 ziyaret; her ziyarette axe-core, `<h1>` sayısı, yatay taşma, 24 px altı etkileşim hedefi, konsol hataları ve sayfa başlığı ölçüldü.
+
+| Ölçüm                               | Önce        | Sonra (`4412f41`)          | Tarama sonrası düzeltmeyle |
+| ----------------------------------- | ----------- | -------------------------- | -------------------------- |
+| Ziyaret / hata / 2xx dışı           | 178 / 0 / 0 | 178 / 0 / 0                | —                          |
+| Genel (sayfaya özgü olmayan) başlık | 0           | 0                          | —                          |
+| `<h1>` olmayan sayfa                | 2           | 0                          | 0                          |
+| Birden çok `<h1>` olan sayfa        | 0           | 0                          | 0                          |
+| axe serious + critical düğüm        | 0           | 0                          | 0                          |
+| Yatay taşma (sayfa)                 | 0           | 1 (1 px, mobil `/account`) | 0 (düzeltildi)             |
+| Konsol hatası                       | 1           | 4                          | 0                          |
+| 24 px altı hedef                    | 276         | 372                        | ≈124 (aşağıya bakın)       |
+
+Taramanın yakaladığı gerilemeler ve düzeltmeleri:
+
+- **`/trust` sayfa hatası (4 ziyaret):** "Cannot access 'focusRing' before initialization". Bu turda `Header` → `AuthCard` içe aktarması eklenince `ui.tsx` → `Header` → `AuthCard` → `ui.tsx` döngüsü oluştu; `AuthCard` modül düzeyinde `focusRing` okuduğu için `ui.tsx` önce yüklendiğinde TDZ hatası verdi. `focusRing` bağımlılığı olmayan `src/components/ui/focusRing.ts` modülüne taşındı (`ui.tsx` yeniden dışa aktarıyor); `AuthCard` ve `Header` doğrudan oradan alıyor. Yeniden taramada konsol hatası 0.
+- **Demo şeridindeki "Posta kutusu (demo)" bağlantısı (178 ziyaret, 15 px):** bu turda eklendi; satır içi dolgu (`py-[5px]`) ile hedef 25 px oldu, şerit yüksekliği değişmedi.
+- **Yeni yardımcı bağlantılar (≈40 ziyaret, 17–20 px):** `/trust` liste bağlantıları, `/support` politika listesi, `/transfers` atlama menüsü (`inline-block py-0.5`), `/ranking` gezinmesi ve ilan breadcrumb'ı (`sm:min-h-[24px]`, önce `sm:min-h-0`).
+- **Masaüstü başlıkta menü çakışması (ekran görüntüsünde görüldü, taşma ölçümü yakalamaz):** bu turda "Seyahatlerim" eklenince oturum açık kullanıcıda çubuk 6 öğeye çıktı ve 1280–1536 px'de sağdaki tema/dil/hesap alanının altına 25–89 px girdi. Çubuk en fazla 5 öğe; kalabalıkta "Rezervasyon devri" (`overflow`) ve rol panelleri menü düğmesinde. Yeniden ölçümde 4 persona × 4 genişlikte çakışma yok (en az 63 px boşluk).
+- **Mobil `/account` 1 px taşma:** yükleme iskeletinde `flex-1` öğesinin `min-w-0` eksikti; eklendi.
+
+Düzeltmeler sonrası etkilenen 7 rota (`/trust`, `/ranking`, `/support`, `/transfers`, `/property/[id]`, `/login`, `/account`; 38 ziyaret) yeniden tarandı. Bu rotalarda 24 px altı hedef önce 113, sonra 150, düzeltmeyle 42 oldu; taşma ve konsol hatası 0. Kalan 42'si etiketin içinde duran radyo/onay kutuları (tıklama alanı etiketin tamamı), cümle içi bağlantılar ("Destek'e soru sor", "İptal koşullarını gör") ve boşken 20 px olan destek konuşması günlüğü; hepsi WCAG 2.5.8 istisnası. Tüm 178 ziyaret için ≈124 tahmini, yeniden taranan 7 rotanın ölçümü ile diğer sayfalarda yalnızca demo şeridi bağlantısının düzelmesi toplanarak bulundu.
+
+Önceki 1 konsol hatası, misafir mobil `/booking/[id]` mesaj akışında (SSE) ölçüm sırasında alınan 429 (hız sınırı) yanıtıydı; kod değişikliğiyle ilgisi yok. Tarama araçları ve çıktıları oturum scratchpad'inde (`sweep/`); kalıcı kayıt bu bölüm.
 
 ### 8.6 Atlanan ve ertelenen maddeler
 

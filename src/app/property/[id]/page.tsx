@@ -208,7 +208,7 @@ export default async function PropertyPage({ params, searchParams }: PropertyPag
   if (initial.guests) cityParams.set("guests", String(initial.guests));
   const from = one(sp.from);
   const fromQuery = from ? new URLSearchParams(from.slice(from.indexOf("?") + 1)).toString() : "";
-  const crumbLink = `inline-flex min-h-[44px] items-center underline hover:text-[#003580] sm:min-h-0 ${focusRing}`;
+  const crumbLink = `inline-flex min-h-[44px] items-center underline hover:text-[#003580] sm:min-h-[24px] ${focusRing}`;
 
   const amenityName = (amenity: { name: string; icon: string | null }) =>
     amenity.icon && t.has(`amenityNames.${amenity.icon}`)

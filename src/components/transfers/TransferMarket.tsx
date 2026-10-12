@@ -71,6 +71,8 @@ const KNOWN_STATUSES = ["LISTED", "CLAIMED", "CAPTURE_PENDING", "COMPLETED", "CA
 const MIN_HOURS_BEFORE_CHECKIN = 48;
 
 const linkClass = `font-semibold text-[#003580] underline ${focusRing}`;
+/** Atlama menüsü bağlantıları: satır kutusu + dolgu ≥ 24 px (WCAG 2.5.8). */
+const jumpLinkClass = `inline-block py-0.5 ${linkClass}`;
 
 /** Sunucu varsayılanı TRANSFER_MAX_ASK_RATIO=1: satış fiyatı ödenen tutarı aşamaz. */
 function maxAskOf(b: MyBooking): number {
@@ -100,18 +102,18 @@ export default function TransferMarket() {
         <nav aria-label={t("jump.label")}>
           <ul className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
             <li>
-              <a href="#sell" className={linkClass}>
+              <a href="#sell" className={jumpLinkClass}>
                 {t("sell.title")}
               </a>
             </li>
             <li>
-              <a href="#discover" className={linkClass}>
+              <a href="#discover" className={jumpLinkClass}>
                 {t("jump.discover")}
               </a>
             </li>
             {session.user && (
               <li>
-                <a href="#my-transfers" className={linkClass}>
+                <a href="#my-transfers" className={jumpLinkClass}>
                   {t("mine.title")}
                 </a>
               </li>

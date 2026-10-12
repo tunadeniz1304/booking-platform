@@ -18,10 +18,9 @@ import Footer from "@/components/layout/Footer";
 import { refreshSessionUser, useSessionUserCache } from "@/components/layout/useSessionUserCache";
 import { APP_RECONNECT_EVENT } from "@/components/pwa/NetworkStatusBanner";
 import { ApiError, isNetworkError, logout, type SessionUser } from "@/lib/api-client";
+import { focusRing } from "./focusRing";
 
-/** Ortak odak halkası (klavye kullanıcıları için görünür). */
-export const focusRing =
-  "focus:outline-none focus-visible:ring-2 focus-visible:ring-[#003580] focus-visible:ring-offset-2";
+export { focusRing };
 
 /** iOS Safari 16px altı alanda odakta sayfayı büyütür; küçük ekranda `text-base`. */
 export const inputClass = `mt-1 block w-full rounded-md border border-gray-500 bg-white px-3 py-2 text-base text-gray-900 sm:text-sm ${focusRing}`;

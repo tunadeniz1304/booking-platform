@@ -13,7 +13,7 @@ type RankingPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
-const link = `inline-flex min-h-[44px] items-center font-semibold text-[#003580] underline sm:min-h-0 ${focusRing}`;
+const link = `inline-flex min-h-[44px] items-center font-semibold text-[#003580] underline sm:min-h-[24px] ${focusRing}`;
 
 /** DSA ve Omnibus şeffaflık yükümlülükleri: sıralamanın ana parametreleri ve ağırlıkları. */
 // F1138/F1358: ortak PageShell ve çıkış yolları; `from`, dönülecek arama sorgusudur.

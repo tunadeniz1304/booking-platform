@@ -11,7 +11,7 @@ const REPO_URL = "https://github.com/tunadeniz1304/booking-platform";
 const SECURITY_WORKFLOW_URL = `${REPO_URL}/actions/workflows/security.yml`;
 const SECURITY_POLICY_URL = `${REPO_URL}/blob/main/SECURITY.md`;
 
-const linkClass = `font-semibold text-brand underline underline-offset-2 hover:no-underline ${focusRing}`;
+const linkClass = `inline-block py-0.5 font-semibold text-brand underline underline-offset-2 hover:no-underline ${focusRing}`;
 // WCAG 1.4.8: uzun açıklamalarda satır uzunluğu ~65 karakterle sınırlı.
 const noteClass = "mt-1 max-w-prose text-sm text-gray-700";
 const statusClass =

@@ -67,7 +67,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
             {/* Doğrulama/sıfırlama e-postaları demo posta kutusunda; herkes için tek giriş noktası. */}
             <Link
               href="/dev/mailbox"
-              className="ml-2 whitespace-nowrap underline focus:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-1"
+              className="ml-2 whitespace-nowrap py-[5px] underline focus:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-1"
             >
               {tNav("mailbox")}
             </Link>

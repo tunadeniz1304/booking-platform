@@ -13,7 +13,8 @@ import {
 import { useTranslations } from "next-intl";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
-import { Button, Status, focusRing } from "@/components/ui/ui";
+import { Button, Status } from "@/components/ui/ui";
+import { focusRing } from "@/components/ui/focusRing";
 import { ApiError, apiFetch } from "@/lib/api-client";
 
 /**

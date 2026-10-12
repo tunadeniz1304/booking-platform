@@ -120,15 +120,15 @@ Konsol hataları 251'den 333'e çıktı; artışın 319'u `401 Unauthorized`. Bu
 
 Ortam bulut konteyneri (Linux). Scratchpad: `/tmp/claude-0/-home-user-booking-platform/6c8e30e3-b8b0-5400-b6f9-3d38ab33293b/scratchpad` (aşağıda `$S`; oturum bitince silinir, kalıcı kayıt `docs/hci/` altında). Dal: `hci/regressions-and-color-vs4f2l`.
 
-| Adım                                                            | Sonuç                                                                                                                                  |
-| --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| crossOwner sınıflandırma (131 istek)                            | 76 uygulanabilir (Medium/Low paketlerine katıldı), 31 zaten yapılmış, 24 ertelendi                                                     |
-| Medium/Low turu: 130 paket                                      | 637 fixed, 244 partially_fixed, 126 already_ok, 8 skipped (Medium/Low, renk hariç 1.015 bulgu)                                         |
-| crossOwner 2. tur: Medium/Low ajanlarının 543 isteği → 81 paket | 377 uygulandı, 19 kısmen, 124 zaten yapılmış, 23 ertelendi; kalan 11 küçük istek merkezde                                              |
-| Mesaj yamaları                                                  | 155 yama, 2.910 yeni anahtar, 666 güncelleme                                                                                           |
-| Kapılar                                                         | lint, typecheck, format, i18n, unit (1.328), mcp:smoke, llm:eval, build geçti; integration + e2e CI'da                                 |
-| Kayıtlar                                                        | `hci-findings.json` (`fixOutcome`), `fix-status.json` (`ml-pNNN` + `crossOwner[].status`), rapor §4.2 / §6 / §8, `docs/hci/areas/*.md` |
-| Çalışma zamanı önce/sonra                                       | rapor §8.5                                                                                                                             |
+| Adım                                                            | Sonuç                                                                                                                                              |
+| --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| crossOwner sınıflandırma (131 istek)                            | 76 uygulanabilir (Medium/Low paketlerine katıldı), 31 zaten yapılmış, 24 ertelendi                                                                 |
+| Medium/Low turu: 130 paket                                      | 637 fixed, 244 partially_fixed, 126 already_ok, 8 skipped (Medium/Low, renk hariç 1.015 bulgu)                                                     |
+| crossOwner 2. tur: Medium/Low ajanlarının 543 isteği → 81 paket | 377 uygulandı, 19 kısmen, 124 zaten yapılmış, 23 ertelendi; kalan 11 küçük istek merkezde                                                          |
+| Mesaj yamaları                                                  | 155 yama, 2.910 yeni anahtar, 666 güncelleme                                                                                                       |
+| Kapılar                                                         | lint, typecheck, format, i18n, unit (1.328), mcp:smoke, llm:eval, build geçti; integration + e2e CI'da                                             |
+| Kayıtlar                                                        | `hci-findings.json` (`fixOutcome`), `fix-status.json` (`ml-pNNN` + `crossOwner[].status`), rapor §4.2 / §6 / §8, `docs/hci/areas/*.md`             |
+| Çalışma zamanı önce/sonra                                       | 178 ziyaret: axe S+C 0→0, `<h1>`suz sayfa 2→0; taramanın bulduğu `/trust` TDZ hatası, 1 px taşma ve yeni küçük bağlantılar düzeltildi (rapor §8.5) |
 
 Açık kalanlar (rapor §6): ertelenen 47 istek ve 15 atlanan bulgu yeni arka uç ucu, şema/migration ya da ürün kararı istiyor; kısmen düzeltilen 393 bulgunun kalan kısmı her bulgunun "Yapılan düzeltme" notunda; 8 renk/tema bulgusu palet kararı bekliyor.
 

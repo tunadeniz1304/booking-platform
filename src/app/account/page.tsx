@@ -637,7 +637,7 @@ export default function AccountPage() {
             className="mt-6 flex items-center gap-4 rounded-2xl bg-white p-6 shadow-sm"
           >
             <div className="h-16 w-16 shrink-0 rounded-full bg-gray-100 motion-safe:animate-pulse" />
-            <div className="flex-1 space-y-2">
+            <div className="min-w-0 flex-1 space-y-2">
               <div className={`h-5 w-48 max-w-full ${skeletonBlock}`} />
               <div className={`h-4 w-64 max-w-full ${skeletonBlock}`} />
             </div>

@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { ResendVerificationButton } from "@/components/auth/AuthCard";
 import { invalidateFavoriteIds } from "@/components/property/useFavoriteIds";
-import { focusRing } from "@/components/ui/ui";
+import { focusRing } from "@/components/ui/focusRing";
 import { logout, type SessionUser } from "@/lib/api-client";
 import LocaleSwitcher from "./LocaleSwitcher";
 import ThemeToggle from "./ThemeToggle";
@@ -28,6 +28,8 @@ interface NavItem {
   requiresLogin?: true;
   /** Rol paneli ya da demo bağlantısı: menü kalabalıksa masaüstünde de menü düğmesinde. */
   extra?: true;
+  /** Daha az kullanılan herkese açık öğe: menü kalabalıksa o da masaüstünde menü düğmesine geçer. */
+  overflow?: true;
   /** Öğeyi geçerli sayan yollar (varsayılan: yalnız `href` ve alt yolları). */
   match?: readonly string[];
 }
@@ -37,7 +39,7 @@ const NAV_ITEMS: readonly NavItem[] = [
   // Arama → ilan → karşılaştırma akışı da "Konaklama" bölümündedir.
   { key: "stays", href: "/", match: ["/", "/search", "/property", "/compare"] },
   { key: "plan", href: "/plan", requiresLogin: true },
-  { key: "transfers", href: "/transfers" },
+  { key: "transfers", href: "/transfers", overflow: true },
   // v5 P2-1: AI destek asistanı oturum ister.
   { key: "support", href: "/support", requiresLogin: true },
   { key: "trips", href: "/trips", roles: ["USER", "HOST", "ADMIN"] },
@@ -49,8 +51,11 @@ const NAV_ITEMS: readonly NavItem[] = [
   { key: "mailbox", href: "/dev/mailbox", roles: ["ADMIN"], extra: true },
 ];
 
-/** max-w-7xl başlıkta tek satıra sığan öğe sayısı; fazlasında ek bağlantılar menü düğmesinde. */
-const MAX_BAR_ITEMS = 6;
+/**
+ * max-w-7xl başlıkta, oturum açıkken sağdaki kullanıcı alanıyla birlikte tek satıra sığan öğe
+ * sayısı; fazlasında `overflow` ve `extra` öğeleri masaüstünde de menü düğmesinde.
+ */
+const MAX_BAR_ITEMS = 5;
 
 const navCurrentClass =
   "aria-[current=page]:font-bold aria-[current=page]:underline aria-[current=page]:decoration-2 aria-[current=page]:underline-offset-4";
@@ -215,9 +220,9 @@ export default function Header() {
     (item) =>
       (item.key !== "mailbox" || demo) && (!item.roles || (user && item.roles.includes(user.role)))
   );
-  // Tek satıra sığmayan menüde ek bağlantılar (rol panelleri, demo) masaüstünde de menü düğmesinde.
-  const crowded = items.length > MAX_BAR_ITEMS && items.some((item) => item.extra);
-  const barItems = crowded ? items.filter((item) => !item.extra) : items;
+  // Tek satıra sığmayan menüde ek bağlantılar (rol panelleri, demo, devir) masaüstünde de menü düğmesinde.
+  const crowded = items.length > MAX_BAR_ITEMS;
+  const barItems = crowded ? items.filter((item) => !item.extra && !item.overflow) : items;
   const menuHidden = crowded ? "" : "xl:hidden";
   const isCurrent = (href: string) =>
     href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
@@ -404,7 +409,7 @@ export default function Header() {
                   key={item.key}
                   href={itemHref(item)}
                   aria-current={isItemCurrent(item) ? "page" : undefined}
-                  className={`flex min-h-[44px] items-center gap-1 rounded-sm px-3 py-2 text-sm font-medium text-white transition hover:bg-white/10 aria-[current=page]:bg-white/15 ${navCurrentClass} ${crowded && !item.extra ? "xl:hidden" : ""} ${headerFocusRing}`}
+                  className={`flex min-h-[44px] items-center gap-1 rounded-sm px-3 py-2 text-sm font-medium text-white transition hover:bg-white/10 aria-[current=page]:bg-white/15 ${navCurrentClass} ${crowded && barItems.includes(item) ? "xl:hidden" : ""} ${headerFocusRing}`}
                 >
                   {t(item.key)}
                   {cartBadge(item)}

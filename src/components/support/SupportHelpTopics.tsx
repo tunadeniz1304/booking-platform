@@ -6,6 +6,8 @@ import { useTranslations } from "next-intl";
 import { Card, focusRing } from "@/components/ui/ui";
 
 const linkClass = `font-semibold text-[#003580] underline underline-offset-2 ${focusRing}`;
+/** Liste içindeki tek başına bağlantılar: satır kutusu + dolgu ≥ 24 px (WCAG 2.5.8). */
+const listLinkClass = `inline-block py-0.5 ${linkClass}`;
 
 /** Oturum gerektirmeyen sık sorular; her yanıt ilgili sayfaya bağlanır. */
 const TOPICS = [
@@ -45,17 +47,17 @@ export default function SupportHelpTopics() {
       <Card id="support-policies" title={t("policiesTitle")}>
         <ul className="space-y-2 text-sm">
           <li>
-            <Link href="/report" className={linkClass}>
+            <Link href="/report" className={listLinkClass}>
               {t("report")}
             </Link>
           </li>
           <li>
-            <Link href="/trust" className={linkClass}>
+            <Link href="/trust" className={listLinkClass}>
               {tTrust("pageTitle")}
             </Link>
           </li>
           <li>
-            <Link href="/privacy" className={linkClass}>
+            <Link href="/privacy" className={listLinkClass}>
               {tTrust("policies.privacy")}
             </Link>
           </li>
